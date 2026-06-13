@@ -248,7 +248,7 @@ export function CatalogBrowser({
                     className="flex min-w-0 flex-col gap-3 border-t border-border/50 pt-3 text-sm text-muted-foreground"
                   >
                     <div className="flex flex-wrap gap-2">
-                      <EntryAssetBadges entry={entry} />
+                      <EntryAssetBadges entry={entry} locale={locale} />
                     </div>
                     <p className="line-clamp-2">
                       {entry.version || entry.genre || "AstroDX remote directory entry"}

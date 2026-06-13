@@ -96,7 +96,7 @@ describe("default zh routes", () => {
     expect(html).toContain("AstroDX 谱面资料站与下载入口。");
     expect(html).toContain("搜索曲库");
     expect(html).toContain("浏览版本");
-    expect(html).toContain("Latest Covers");
+    expect(html).toContain("最新封面");
     expect(html).toContain("aspect-square");
     expect(html).toContain(`/catalog-assets/${toRouteSlug("song-9")}/bg.jpg`);
     expect(html).toContain("曲目 9");

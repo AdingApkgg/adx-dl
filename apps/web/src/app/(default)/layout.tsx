@@ -18,5 +18,9 @@ export default async function DefaultRootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <RootLayoutShell lang="zh-CN">{children}</RootLayoutShell>;
+  return (
+    <RootLayoutShell lang="zh-CN" locale="zh">
+      {children}
+    </RootLayoutShell>
+  );
 }

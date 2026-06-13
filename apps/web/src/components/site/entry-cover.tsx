@@ -5,27 +5,41 @@ import {
   formatEntryTitle,
   type CatalogEntry,
 } from "@/lib/catalog-shared";
+import { getDictionary } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type EntryCoverProps = {
   entry: CatalogEntry;
   locale: "zh" | "en" | "ja";
   className?: string;
+  /** Eagerly load above-the-fold covers (LCP). Next 16: use loading/fetchPriority, not the deprecated `priority` prop. */
+  priority?: boolean;
+  sizes?: string;
 };
 
-export function EntryCover({ entry, locale, className }: EntryCoverProps) {
+export function EntryCover({
+  entry,
+  locale,
+  className,
+  priority = false,
+  sizes = "(max-width: 768px) 100vw, 512px",
+}: EntryCoverProps) {
   const title = formatEntryTitle(entry, locale);
+  const cover = getDictionary(locale).cover;
 
   if (entry.media.cover_url) {
     return (
       <div className={cn("relative overflow-hidden rounded-xl", className)}>
         <Image
           src={entry.media.cover_url}
-          alt={`${title} cover`}
+          alt={cover.alt(title)}
           fill
           unoptimized
-          sizes="(max-width: 768px) 100vw, 512px"
+          sizes={sizes}
           className="object-cover"
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
+          decoding="async"
         />
       </div>
     );
@@ -33,7 +47,8 @@ export function EntryCover({ entry, locale, className }: EntryCoverProps) {
 
   return (
     <div
-      aria-label="AstroDX cover placeholder"
+      role="img"
+      aria-label={cover.placeholder}
       className={cn(
         "flex h-full w-full items-end rounded-xl bg-linear-to-br from-slate-950 via-slate-800 to-blue-700 p-4 text-white",
         className

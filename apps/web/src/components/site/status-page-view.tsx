@@ -53,7 +53,10 @@ export function StatusPageView({
   const labels = getDictionary(locale).statusPage;
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10">
+    <main
+      id="main-content"
+      className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
+    >
       <section className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card/80 p-6">
         <Badge variant="secondary" className="w-fit">
           <ServerIcon data-icon="inline-start" />

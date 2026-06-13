@@ -1,0 +1,252 @@
+import {
+  buildChartDescription,
+  difficultyLevelRange,
+  difficultySlotLabel,
+  formatEntryArtist,
+  formatEntrySubcategory,
+  formatEntryTitle,
+  type CatalogEntry,
+} from "@/lib/catalog-shared";
+import {
+  buildLocalePath,
+  getDictionary,
+  getStaticPageMetadata,
+  type Locale,
+  type StaticPageMetadataKey,
+} from "@/lib/i18n";
+import { toRouteSlug } from "@/lib/route-slug";
+import { resolveSiteUrl } from "@/lib/site-url";
+
+const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
+const siteName = "AstroDX Archive";
+const organizationId = `${siteUrl}/#organization`;
+const websiteId = `${siteUrl}/#website`;
+const sourceRepository = "https://github.com/AdingApkgg/adx-dl";
+
+type JsonLdValue = Record<string, unknown>;
+
+function getStructuredDataLanguage(locale: Locale) {
+  if (locale === "zh") {
+    return "zh-CN";
+  }
+
+  return locale;
+}
+
+function toAbsoluteUrl(pathname: string) {
+  if (!pathname) {
+    return siteUrl;
+  }
+
+  if (/^https?:\/\//.test(pathname)) {
+    return pathname;
+  }
+
+  return `${siteUrl}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
+}
+
+function buildOrganization(): JsonLdValue {
+  return {
+    "@type": "Organization",
+    "@id": organizationId,
+    name: siteName,
+    url: siteUrl,
+    logo: `${siteUrl}/opengraph-image.png`,
+    sameAs: [sourceRepository],
+  };
+}
+
+export function buildHomeStructuredData(locale: Locale): JsonLdValue {
+  const pageMetadata = getStaticPageMetadata(locale).home;
+  const homePath = buildLocalePath("/", locale);
+  const searchPath = buildLocalePath("/search", locale);
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      buildOrganization(),
+      {
+        "@type": "WebSite",
+        "@id": websiteId,
+        name: siteName,
+        description: pageMetadata.description,
+        url: toAbsoluteUrl(homePath),
+        inLanguage: getStructuredDataLanguage(locale),
+        publisher: { "@id": organizationId },
+        potentialAction: {
+          "@type": "SearchAction",
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: `${toAbsoluteUrl(searchPath)}?q={search_term_string}`,
+          },
+          "query-input": "required name=search_term_string",
+        },
+      },
+    ],
+  };
+}
+
+export function buildHomeFaqStructuredData(
+  locale: Locale,
+  totalEntries: number,
+  versionCount: number
+): JsonLdValue {
+  const items = getDictionary(locale).home.faq(totalEntries, versionCount);
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    inLanguage: getStructuredDataLanguage(locale),
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.a,
+      },
+    })),
+  };
+}
+
+export function buildListingStructuredData(
+  locale: Locale,
+  entries: CatalogEntry[],
+  pageKey: Extract<StaticPageMetadataKey, "charts" | "search">
+): JsonLdValue {
+  const dictionary = getDictionary(locale);
+  const meta = getStaticPageMetadata(locale)[pageKey];
+  const listPath = buildLocalePath(meta.pathname, locale);
+  const listUrl = toAbsoluteUrl(listPath);
+
+  const itemListElement = entries.slice(0, 100).map((entry, index) => ({
+    "@type": "ListItem",
+    position: index + 1,
+    url: toAbsoluteUrl(buildLocalePath(`/charts/${toRouteSlug(entry.id)}`, locale)),
+    name: formatEntryTitle(entry, locale),
+  }));
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "CollectionPage",
+        "@id": listUrl,
+        url: listUrl,
+        name: meta.title,
+        description: meta.description,
+        inLanguage: getStructuredDataLanguage(locale),
+        isPartOf: { "@id": websiteId },
+        mainEntity: {
+          "@type": "ItemList",
+          numberOfItems: entries.length,
+          itemListElement,
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: dictionary.nav.home,
+            item: toAbsoluteUrl(buildLocalePath("/", locale)),
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: meta.title,
+            item: listUrl,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+export function buildChartDetailStructuredData(
+  locale: Locale,
+  entry: CatalogEntry
+): JsonLdValue[] {
+  const dictionary = getDictionary(locale);
+  const title = formatEntryTitle(entry, locale);
+  const artist = formatEntryArtist(entry, locale);
+  const branch = formatEntrySubcategory(entry);
+  const detailPath = buildLocalePath(`/charts/${toRouteSlug(entry.id)}`, locale);
+  const detailUrl = toAbsoluteUrl(detailPath);
+  const keywords = [
+    ...new Set([entry.category, branch, entry.version, entry.cabinet].filter(Boolean)),
+  ];
+  const range = difficultyLevelRange(entry);
+  const difficultyNames = entry.difficulties
+    .map((difficulty) => difficultySlotLabel(difficulty.slot))
+    .join(", ");
+
+  const additionalProperty: JsonLdValue[] = [
+    { "@type": "PropertyValue", name: "category", value: entry.category },
+    { "@type": "PropertyValue", name: "branch", value: branch },
+    ...(entry.version
+      ? [{ "@type": "PropertyValue", name: "version", value: entry.version }]
+      : []),
+    ...(entry.bpm != null
+      ? [{ "@type": "PropertyValue", name: "beatsPerMinute", value: entry.bpm }]
+      : []),
+    { "@type": "PropertyValue", name: "difficultyCount", value: entry.difficulties.length },
+    ...(range
+      ? [{ "@type": "PropertyValue", name: "levelRange", value: `${range.low}–${range.high}` }]
+      : []),
+    ...(difficultyNames
+      ? [{ "@type": "PropertyValue", name: "difficulties", value: difficultyNames }]
+      : []),
+  ];
+
+  const musicRecording: JsonLdValue = {
+    "@context": "https://schema.org",
+    "@type": "MusicRecording",
+    "@id": `${detailUrl}#recording`,
+    name: title,
+    url: detailUrl,
+    inLanguage: getStructuredDataLanguage(locale),
+    description: buildChartDescription(entry, locale),
+    byArtist: {
+      "@type": "MusicGroup",
+      name: artist,
+    },
+    ...(entry.genre ? { genre: entry.genre } : {}),
+    ...(entry.media.cover_url ? { image: toAbsoluteUrl(entry.media.cover_url) } : {}),
+    isFamilyFriendly: true,
+    keywords,
+    identifier: entry.id,
+    isPartOf: { "@id": websiteId },
+    additionalProperty,
+  };
+
+  return [
+    musicRecording,
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: dictionary.nav.home,
+          item: toAbsoluteUrl(buildLocalePath("/", locale)),
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: dictionary.nav.browse,
+          item: toAbsoluteUrl(buildLocalePath("/charts", locale)),
+        },
+        {
+          "@type": "ListItem",
+          position: 3,
+          name: title,
+          item: detailUrl,
+        },
+      ],
+    },
+  ];
+}
+
+export type { JsonLdValue };

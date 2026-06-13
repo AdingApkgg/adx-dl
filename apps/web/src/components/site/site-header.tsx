@@ -6,7 +6,14 @@ import { DownloadIcon, LibraryBigIcon, SearchIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { ThemeToggle } from "@/components/site/theme-toggle";
-import { defaultLocale, getDictionary, locales, switchLocale, type Locale } from "@/lib/i18n";
+import {
+  defaultLocale,
+  getDictionary,
+  getHtmlLang,
+  locales,
+  switchLocale,
+  type Locale,
+} from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -30,7 +37,8 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
               <Image
                 src="/brand-icon.png"
-                alt="AstroDX"
+                alt=""
+                aria-hidden="true"
                 className="size-7 rounded-md"
                 width={28}
                 height={28}
@@ -41,13 +49,13 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
                 ASTRODX
               </span>
               <span className="text-sm text-muted-foreground">
-                Archive & Download Portal
+                {dictionary.home.tagline}
               </span>
             </div>
           </Link>
-          <Badge variant="secondary">{totalEntries} entries</Badge>
+          <Badge variant="secondary">{dictionary.home.entriesBadge(totalEntries)}</Badge>
         </div>
-        <nav className="hidden items-center gap-2 md:flex">
+        <nav aria-label={dictionary.nav.primaryLabel} className="hidden items-center gap-2 md:flex">
           <Button variant="ghost" size="sm" asChild>
             <Link href={homeHref}>
               <LibraryBigIcon data-icon="inline-start" />
@@ -68,7 +76,10 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
           </Button>
         </nav>
         <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-1 md:flex">
+          <nav
+            aria-label={dictionary.nav.languageLabel}
+            className="hidden items-center gap-1 md:flex"
+          >
             {locales.map((targetLocale) => (
               <Button
                 key={targetLocale}
@@ -76,12 +87,16 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
                 size="sm"
                 asChild
               >
-                <Link href={switchLocale(pathname, targetLocale)}>
+                <Link
+                  href={switchLocale(pathname, targetLocale)}
+                  aria-current={targetLocale === locale ? "true" : undefined}
+                  lang={getHtmlLang(targetLocale)}
+                >
                   {dictionary.language[targetLocale]}
                 </Link>
               </Button>
             ))}
-          </div>
+          </nav>
           <ThemeToggle />
         </div>
       </div>

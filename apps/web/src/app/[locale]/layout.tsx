@@ -26,5 +26,9 @@ export default async function LocalizedRootLayout({
   const { locale } = await params;
   const routeLocale = getPrefixedRouteLocale(locale);
 
-  return <RootLayoutShell lang={getHtmlLang(routeLocale)}>{children}</RootLayoutShell>;
+  return (
+    <RootLayoutShell lang={getHtmlLang(routeLocale)} locale={routeLocale}>
+      {children}
+    </RootLayoutShell>
+  );
 }

@@ -90,6 +90,39 @@ describe("i18n helpers", () => {
     expect(jaStatus.networkChartsDescription).toBe("アップロードとダウンロード速度の推移");
   });
 
+  test("exposes static page metadata entries for zh en ja", async () => {
+    const i18n = (await loadI18nModule()) as Partial<I18nModule> & {
+      getStaticPageMetadata?: (
+        locale?: string | null
+      ) => Record<string, { pathname: string; title: string; description: string }>;
+    };
+
+    expect(typeof i18n.getStaticPageMetadata).toBe("function");
+
+    const zhPages = i18n.getStaticPageMetadata?.("zh") ?? {};
+    const enPages = i18n.getStaticPageMetadata?.("en") ?? {};
+    const jaPages = i18n.getStaticPageMetadata?.("ja") ?? {};
+
+    expect(zhPages.home).toEqual({
+      pathname: "/",
+      title: "AstroDX 谱面资料站与下载入口。",
+      description: "构建时扫描远端 AstroDX 目录，提取单曲元数据、谱面信息与统一索引。",
+      keywords: ["AstroDX", "AstroDX Archive", "谱面资料站", "下载入口", "目录索引"],
+    });
+    expect(enPages.search).toEqual({
+      pathname: "/search",
+      title: "Search",
+      description: "Filter the catalog by keyword, branch, and display language.",
+      keywords: ["AstroDX", "AstroDX Archive", "search", "chart search", "branch filter"],
+    });
+    expect(jaPages.status).toEqual({
+      pathname: "/status",
+      title: "サーバー状態",
+      description: "公開監視ページの主要なサーバー状態とネットワーク指標を確認します。",
+      keywords: ["AstroDX", "AstroDX Archive", "サーバー状態", "監視ページ", "ネットワーク指標"],
+    });
+  });
+
   test("builds localized page metadata with canonical and alternate paths", async () => {
     const pageMetadata = await loadPageMetadataModule();
 
@@ -109,9 +142,76 @@ describe("i18n helpers", () => {
     );
     expect(metadata?.alternates?.canonical).toBe("/en/search");
     expect(metadata?.alternates?.languages).toEqual({
+      "x-default": "/search",
       "zh-CN": "/search",
       en: "/en/search",
       ja: "/ja/search",
+    });
+  });
+
+  test("builds localized metadata from named static pages", async () => {
+    const pageMetadata = (await loadPageMetadataModule()) as Partial<PageMetadataModule> & {
+      buildLocalizedPageMetadata?: (
+        locale: "zh" | "en" | "ja",
+        page: "home" | "charts" | "search" | "status"
+      ) => {
+        title?: string;
+        description?: string;
+        keywords?: string[] | null;
+        robots?: {
+          index?: boolean;
+          follow?: boolean;
+        };
+        alternates?: {
+          canonical?: string | URL;
+          languages?: Record<string, string | URL | undefined>;
+        };
+        openGraph?: {
+          title?: string;
+          description?: string;
+          url?: string | URL;
+          siteName?: string;
+        };
+        twitter?: {
+          title?: string;
+          description?: string;
+        };
+      };
+    };
+
+    expect(typeof pageMetadata.buildLocalizedPageMetadata).toBe("function");
+
+    const metadata = pageMetadata.buildLocalizedPageMetadata?.("ja", "status");
+
+    expect(metadata?.title).toBe("サーバー状態 | AstroDX Archive");
+    expect(metadata?.description).toBe("公開監視ページの主要なサーバー状態とネットワーク指標を確認します。");
+    expect(metadata?.keywords).toEqual([
+      "AstroDX",
+      "AstroDX Archive",
+      "サーバー状態",
+      "監視ページ",
+      "ネットワーク指標",
+    ]);
+    expect(metadata?.robots).toEqual({
+      index: true,
+      follow: true,
+    });
+    expect(metadata?.alternates?.canonical).toBe("/ja/status");
+    expect(metadata?.alternates?.languages).toEqual({
+      "x-default": "/status",
+      "zh-CN": "/status",
+      en: "/en/status",
+      ja: "/ja/status",
+    });
+    expect(metadata?.openGraph).toMatchObject({
+      title: "サーバー状態 | AstroDX Archive",
+      description: "公開監視ページの主要なサーバー状態とネットワーク指標を確認します。",
+      url: "https://adxdls.saop.cc/ja/status",
+      siteName: "AstroDX Archive",
+    });
+    expect(metadata?.twitter).toMatchObject({
+      title: "サーバー状態 | AstroDX Archive",
+      description: "公開監視ページの主要なサーバー状態とネットワーク指標を確認します。",
     });
   });
 });

@@ -184,7 +184,9 @@ describe("page views locale-driven content", () => {
 
     const html = renderToStaticMarkup(<ChartDetailPageView entry={entry} locale="zh" />);
 
-    expect(html).toContain("AstroDX cover placeholder");
+    // The branded placeholder is now an accessible image with a localized label.
+    expect(html).toContain('role="img"');
+    expect(html).toContain("AstroDX 封面占位图");
   });
 
   test("search view keeps localized browser copy and localized detail links", () => {

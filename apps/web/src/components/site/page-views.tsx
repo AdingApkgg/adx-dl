@@ -11,6 +11,7 @@ import { AdxDownloadButton } from "@/components/site/adx-download-button";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
 import { EntryAssetBadges } from "@/components/site/entry-asset-badges";
 import { EntryCover } from "@/components/site/entry-cover";
+import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,15 +24,23 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { type Catalog, type CatalogEntry } from "@/lib/catalog";
 import {
+  buildChartDescription,
+  difficultySlotLabel,
   formatEntryArtist,
   formatEntrySubcategory,
   formatEntryTitle,
 } from "@/lib/catalog-shared";
-import { buildLocalePath, getDictionary } from "@/lib/i18n";
+import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { toRouteSlug } from "@/lib/route-slug";
+import {
+  buildChartDetailStructuredData,
+  buildHomeFaqStructuredData,
+  buildHomeStructuredData,
+  buildListingStructuredData,
+} from "@/lib/structured-data";
 
 type SharedViewProps = {
-  locale?: "zh" | "en" | "ja";
+  locale?: Locale;
 };
 
 type HomePageViewProps = SharedViewProps & {
@@ -42,6 +51,8 @@ type CatalogPageViewProps = SharedViewProps & {
   entries: CatalogEntry[];
   title: string;
   description: string;
+  intro: string;
+  pageKey: "charts" | "search";
 };
 
 type ChartDetailPageViewProps = SharedViewProps & {
@@ -50,67 +61,74 @@ type ChartDetailPageViewProps = SharedViewProps & {
 
 export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
   const dictionary = getDictionary(locale);
+  const home = dictionary.home;
   const latestEntries = [...catalog.entries]
     .sort((a, b) => (b.imported_at ?? "").localeCompare(a.imported_at ?? ""))
     .slice(0, 8);
   const categoryBranches = Object.entries(catalog.categories).flatMap(([category, subcategories]) =>
     subcategories.map((subcategory) => `${category} · ${subcategory}`)
   );
+  const versionCount = new Set(Object.values(catalog.categories).flat()).size;
+  const updatedDate = catalog.generated_at.slice(0, 10);
+  const faqItems = home.faq(catalog.total_entries, versionCount);
   const searchHref = buildLocalePath("/search", locale);
   const chartsHref = buildLocalePath("/charts", locale);
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-8 md:px-6 md:py-10">
+    <main
+      id="main-content"
+      className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-8 md:px-6 md:py-10"
+    >
+      <SeoJsonLd
+        data={[
+          buildHomeStructuredData(locale),
+          buildHomeFaqStructuredData(locale, catalog.total_entries, versionCount),
+        ]}
+      />
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
         <Card className="border border-border/70 bg-card/85">
           <CardHeader className="gap-3">
             <Badge variant="secondary" className="w-fit">
-              {dictionary.home.badge}
+              {home.badge}
             </Badge>
-            <CardTitle className="text-4xl md:text-5xl">
-              {dictionary.home.title}
+            <CardTitle asChild className="text-4xl md:text-5xl">
+              <h1>{home.title}</h1>
             </CardTitle>
             <CardDescription className="max-w-3xl text-base">
-              {dictionary.home.description}
+              {home.description}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
             <div className="grid gap-3 sm:grid-cols-2">
               <Button size="lg" asChild>
                 <Link href={searchHref}>
-                  <SearchIcon data-icon="inline-start" />
-                  {dictionary.home.searchCta}
+                  <SearchIcon data-icon="inline-start" aria-hidden="true" />
+                  {home.searchCta}
                 </Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
                 <Link href={chartsHref}>
-                  <DownloadIcon data-icon="inline-start" />
-                  {dictionary.home.browseCta}
+                  <DownloadIcon data-icon="inline-start" aria-hidden="true" />
+                  {home.browseCta}
                 </Link>
               </Button>
             </div>
             <Separator />
             <div className="grid gap-3 sm:grid-cols-3">
-              <MetricCard label="Total entries" value={`${catalog.total_entries}`} />
+              <MetricCard label={home.metricsTotal} value={`${catalog.total_entries}`} />
               <MetricCard
-                label="Catalog categories"
+                label={home.metricsCategories}
                 value={`${Object.keys(catalog.categories).length}`}
               />
-              <MetricCard
-                label="Catalog updated"
-                value={new Date(catalog.generated_at).toLocaleString()}
-                compact
-              />
+              <MetricCard label={home.metricsUpdated} value={updatedDate} compact />
             </div>
           </CardContent>
         </Card>
 
         <Card size="sm" className="border border-border/70 bg-card/85">
           <CardHeader>
-            <CardTitle>Catalog branches</CardTitle>
-            <CardDescription>
-              Quickly scan the category and branch groups exposed by the catalog.
-            </CardDescription>
+            <CardTitle>{home.branchesTitle}</CardTitle>
+            <CardDescription>{home.branchesDescription}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             {categoryBranches.map((label) => (
@@ -126,21 +144,25 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
         <div className="md:col-span-2 xl:col-span-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex flex-col gap-1">
-              <h2 className="text-2xl font-semibold">Latest Covers</h2>
-              <p className="text-sm text-muted-foreground">
-                Recently indexed remote charts with ready-to-browse cover art.
-              </p>
+              <h2 className="text-2xl font-semibold">{home.latestTitle}</h2>
+              <p className="text-sm text-muted-foreground">{home.latestDescription}</p>
             </div>
           </div>
         </div>
-        {latestEntries.map((entry) => (
+        {latestEntries.map((entry, index) => (
           <Card
             key={entry.id}
             size="sm"
             className="overflow-hidden border border-border/70 bg-card/85"
           >
             <div className="aspect-square overflow-hidden">
-              <EntryCover entry={entry} locale={locale} className="h-full w-full" />
+              <EntryCover
+                entry={entry}
+                locale={locale}
+                priority={index < 4}
+                sizes="(max-width: 768px) 50vw, 25vw"
+                className="h-full w-full"
+              />
             </div>
             <CardHeader>
               <CardTitle>{formatEntryTitle(entry, locale)}</CardTitle>
@@ -157,13 +179,11 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
               </div>
               <Button variant="outline" size="sm" asChild>
                 <Link
-                  href={buildLocalePath(
-                    `/charts/${toRouteSlug(entry.id)}`,
-                    locale
-                  )}
+                  href={buildLocalePath(`/charts/${toRouteSlug(entry.id)}`, locale)}
+                  aria-label={`${home.openDetail} — ${formatEntryTitle(entry, locale)}`}
                 >
-                  <ArrowRightIcon data-icon="inline-start" />
-                  Open Detail
+                  <ArrowRightIcon data-icon="inline-start" aria-hidden="true" />
+                  {home.openDetail}
                 </Link>
               </Button>
             </CardContent>
@@ -174,42 +194,52 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
       <section className="grid gap-4 md:grid-cols-3">
         <Card size="sm">
           <CardHeader>
-            <CardTitle>Data pipeline</CardTitle>
-            <CardDescription>
-              Remote directory scanning, `maidata` parsing, and static catalog
-              generation.
-            </CardDescription>
+            <CardTitle>{home.pipelineTitle}</CardTitle>
+            <CardDescription>{home.pipelineDescription}</CardDescription>
           </CardHeader>
           <CardContent>
             <Badge variant="secondary">
-              <BoxesIcon data-icon="inline-start" />
-              Remote index builder
+              <BoxesIcon data-icon="inline-start" aria-hidden="true" />
+              {home.pipelineBadge}
             </Badge>
           </CardContent>
         </Card>
         <Card size="sm">
           <CardHeader>
-            <CardTitle>Static output</CardTitle>
-            <CardDescription>
-              Next.js 16 static export for Cloudflare Pages friendly deployment.
-            </CardDescription>
+            <CardTitle>{home.staticTitle}</CardTitle>
+            <CardDescription>{home.staticDescription}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Badge variant="secondary">Bun + Turbopack</Badge>
+            <Badge variant="secondary">{home.staticBadge}</Badge>
           </CardContent>
         </Card>
         <Card size="sm">
           <CardHeader>
-            <CardTitle>Downloads</CardTitle>
-            <CardDescription>
-              Builds download actions from the remote directory contents detected
-              at catalog build time.
-            </CardDescription>
+            <CardTitle>{home.downloadsTitle}</CardTitle>
+            <CardDescription>{home.downloadsDescription}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Badge variant="secondary">Remote directory-driven</Badge>
+            <Badge variant="secondary">{home.downloadsBadge}</Badge>
           </CardContent>
         </Card>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-2xl font-semibold">{home.faqHeading}</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          {faqItems.map((item) => (
+            <Card key={item.q} size="sm" className="border border-border/70 bg-card/85">
+              <CardHeader>
+                <CardTitle asChild>
+                  <h3 className="text-base font-medium">{item.q}</h3>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">{item.a}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </section>
     </main>
   );
@@ -220,6 +250,7 @@ export function ChartsPageView({
   locale = "zh",
 }: SharedViewProps & { entries: CatalogEntry[] }) {
   const dictionary = getDictionary(locale);
+  const versionCount = new Set(entries.map((entry) => formatEntrySubcategory(entry))).size;
 
   return (
     <CatalogPageView
@@ -227,6 +258,8 @@ export function ChartsPageView({
       locale={locale}
       title={dictionary.charts.title}
       description={dictionary.charts.description}
+      intro={dictionary.charts.intro(entries.length, versionCount)}
+      pageKey="charts"
     />
   );
 }
@@ -243,6 +276,8 @@ export function SearchPageView({
       locale={locale}
       title={dictionary.searchPage.title}
       description={dictionary.searchPage.description}
+      intro={dictionary.searchPage.intro(entries.length)}
+      pageKey="search"
     />
   );
 }
@@ -252,15 +287,27 @@ export function ChartDetailPageView({
   locale = "zh",
 }: ChartDetailPageViewProps) {
   const dictionary = getDictionary(locale);
+  const detail = dictionary.detail;
   const branchLabel = formatEntrySubcategory(entry);
   const showVersionBadge = entry.category !== "Remote" && entry.version;
+  const description = buildChartDescription(entry, locale);
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10">
+    <main
+      id="main-content"
+      className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
+    >
+      <SeoJsonLd data={buildChartDetailStructuredData(locale, entry)} />
       <section className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/80">
           <div className="aspect-square">
-            <EntryCover entry={entry} locale={locale} className="h-full w-full" />
+            <EntryCover
+              entry={entry}
+              locale={locale}
+              priority
+              sizes="(max-width: 1024px) 100vw, 320px"
+              className="h-full w-full"
+            />
           </div>
         </div>
 
@@ -274,24 +321,25 @@ export function ChartDetailPageView({
             <h1 className="text-4xl font-semibold">{formatEntryTitle(entry, locale)}</h1>
             <p className="text-lg text-muted-foreground">{formatEntryArtist(entry, locale)}</p>
           </div>
+          <p className="text-base leading-relaxed text-muted-foreground">{description}</p>
           <div className="flex flex-wrap gap-2">
-            <EntryAssetBadges entry={entry} />
+            <EntryAssetBadges entry={entry} locale={locale} />
           </div>
           <div className="flex flex-wrap gap-2">
             {entry.download_mode === "onsite" || entry.download_mode === "mixed" ? (
               <AdxDownloadButton directoryName={entry.remote_dir_name} locale={locale} />
             ) : (
               <Button disabled>
-                <DownloadIcon data-icon="inline-start" />
-                {dictionary.detail.onsitePending}
+                <DownloadIcon data-icon="inline-start" aria-hidden="true" />
+                {detail.onsitePending}
               </Button>
             )}
             {(entry.download_mode === "external" || entry.download_mode === "mixed") &&
             entry.source_url ? (
               <Button variant="outline" asChild>
                 <a href={entry.source_url} target="_blank" rel="noreferrer">
-                  <ExternalLinkIcon data-icon="inline-start" />
-                  {dictionary.detail.sourceLink}
+                  <ExternalLinkIcon data-icon="inline-start" aria-hidden="true" />
+                  {detail.sourceLink}
                 </a>
               </Button>
             ) : null}
@@ -302,37 +350,58 @@ export function ChartDetailPageView({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_320px]">
         <Card>
           <CardHeader>
-            <CardTitle>{dictionary.detail.metadata}</CardTitle>
-            <CardDescription>
-              Parsed directly from the remote AstroDX directory resources.
-            </CardDescription>
+            <CardTitle>{detail.metadata}</CardTitle>
+            <CardDescription>{detail.metadataDescription}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
             <div className="grid gap-4 md:grid-cols-2">
-              <MetadataItem label="Version" value={entry.version || "Unknown"} />
-              <MetadataItem label="Genre" value={entry.genre || "Unknown"} />
-              <MetadataItem label="BPM" value={entry.bpm ? `${entry.bpm}` : "Unknown"} />
+              <MetadataItem label={detail.versionLabel} value={entry.version || detail.unknownValue} />
+              <MetadataItem label={detail.genreLabel} value={entry.genre || detail.unknownValue} />
               <MetadataItem
-                label="Short ID"
-                value={entry.short_id || "Not available"}
+                label={detail.bpmLabel}
+                value={entry.bpm ? `${entry.bpm}` : detail.unknownValue}
+              />
+              <MetadataItem
+                label={detail.shortIdLabel}
+                value={entry.short_id || detail.notAvailableValue}
               />
             </div>
             <Separator />
             <div className="flex flex-col gap-3">
-              <h2 className="text-lg font-medium">{dictionary.detail.difficulties}</h2>
-              <div className="grid gap-3 md:grid-cols-2">
-                {entry.difficulties.map((difficulty) => (
-                  <Card key={`${entry.id}-${difficulty.slot}`} size="sm">
-                    <CardHeader>
-                      <CardTitle className="text-base">
-                        Level {difficulty.level || difficulty.slot}
-                      </CardTitle>
-                      <CardDescription>
-                        Charter: {difficulty.designer || "Unknown"}
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-                ))}
+              <h2 className="text-lg font-medium">{detail.difficulties}</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
+                  <caption className="sr-only">
+                    {formatEntryTitle(entry, locale)} — {detail.difficulties}
+                  </caption>
+                  <thead>
+                    <tr className="border-b border-border/60 text-left text-muted-foreground">
+                      <th scope="col" className="py-2 pr-4 font-medium">
+                        {detail.tableDifficulty}
+                      </th>
+                      <th scope="col" className="py-2 pr-4 font-medium">
+                        {detail.tableLevel}
+                      </th>
+                      <th scope="col" className="py-2 font-medium">
+                        {detail.tableCharter}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entry.difficulties.map((difficulty) => (
+                      <tr
+                        key={`${entry.id}-${difficulty.slot}`}
+                        className="border-b border-border/40 last:border-0"
+                      >
+                        <th scope="row" className="py-2 pr-4 text-left font-medium">
+                          {difficultySlotLabel(difficulty.slot)}
+                        </th>
+                        <td className="py-2 pr-4">{difficulty.level || "-"}</td>
+                        <td className="py-2">{difficulty.designer || detail.unknownValue}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </CardContent>
@@ -341,22 +410,18 @@ export function ChartDetailPageView({
         <div className="flex flex-col gap-6">
           <Card size="sm">
             <CardHeader>
-              <CardTitle>{dictionary.detail.assets}</CardTitle>
-              <CardDescription>
-                Resource availability detected from the remote directory.
-              </CardDescription>
+              <CardTitle>{detail.assets}</CardTitle>
+              <CardDescription>{detail.assetsDescription}</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
-              <EntryAssetBadges entry={entry} />
+              <EntryAssetBadges entry={entry} locale={locale} />
             </CardContent>
           </Card>
 
           <Card size="sm">
             <CardHeader>
-              <CardTitle>{dictionary.detail.source}</CardTitle>
-              <CardDescription>
-                Built from the remote AstroDX directory index.
-              </CardDescription>
+              <CardTitle>{detail.source}</CardTitle>
+              <CardDescription>{detail.sourceDescription}</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-2 text-sm text-muted-foreground">
               <p>{entry.source_url}</p>
@@ -375,12 +440,19 @@ function CatalogPageView({
   locale = "zh",
   title,
   description,
+  intro,
+  pageKey,
 }: CatalogPageViewProps) {
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10">
+    <main
+      id="main-content"
+      className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
+    >
+      <SeoJsonLd data={buildListingStructuredData(locale, entries, pageKey)} />
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">{title}</h1>
         <p className="text-muted-foreground">{description}</p>
+        <p className="text-sm text-muted-foreground">{intro}</p>
       </div>
       <CatalogBrowser
         entries={entries}
