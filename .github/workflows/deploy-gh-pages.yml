@@ -52,18 +52,9 @@ jobs:
           SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || vars.INDEXNOW_SITE_URL }}
         run: |
           if [ -n "$SITE_URL" ]; then
-            CNAME_DOMAIN="$(python3 - <<'PY'
-import os
-from urllib.parse import urlparse
-
-raw_site_url = os.environ.get("SITE_URL", "").strip()
-if raw_site_url and "://" not in raw_site_url:
-    raw_site_url = f"https://{raw_site_url}"
-
-parsed = urlparse(raw_site_url)
-print(parsed.netloc or parsed.path)
-PY
-)"
+            CNAME_DOMAIN="${SITE_URL#http://}"
+            CNAME_DOMAIN="${CNAME_DOMAIN#https://}"
+            CNAME_DOMAIN="${CNAME_DOMAIN%%/*}"
             if [ -n "$CNAME_DOMAIN" ]; then
               printf '%s' "$CNAME_DOMAIN" > "public/CNAME"
               echo "Prepared public/CNAME for $CNAME_DOMAIN"
