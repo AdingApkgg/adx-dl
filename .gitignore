@@ -1,0 +1,42 @@
+.DS_Store
+
+# Local agent/planning artifacts
+.superpowers/
+docs/superpowers/
+
+# Python caches
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Local environments
+.venv/
+venv/
+
+# Generated or temporary workspace files
+site/.tmp-server-ws.json
+
+# Frontend dependencies and build outputs
+site/node_modules/
+site/.next/
+site/out/
+site/public/catalog-assets/
+
+# Large local media archives: keep directory skeleton only
+Community/**
+!Community/
+!Community/.gitkeep
+!Community/**/
+!Community/**/.gitkeep
+
+Event Packs/**
+!Event Packs/
+!Event Packs/.gitkeep
+!Event Packs/**/
+!Event Packs/**/.gitkeep
+
+Official/**
+!Official/
+!Official/.gitkeep
+!Official/**/
+!Official/**/.gitkeep

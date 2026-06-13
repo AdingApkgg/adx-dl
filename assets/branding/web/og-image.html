@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AstroDX OG Image</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 20% 20%, rgba(76, 165, 255, 0.18), transparent 32%),
+          radial-gradient(circle at 78% 18%, rgba(32, 105, 255, 0.22), transparent 28%),
+          radial-gradient(circle at 50% 100%, rgba(10, 52, 168, 0.38), transparent 40%),
+          linear-gradient(180deg, #020617 0%, #06153c 54%, #081a4d 100%);
+        color: #f8fbff;
+      }
+
+      .frame {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        padding: 56px 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .frame::before,
+      .frame::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+        filter: blur(10px);
+        opacity: 0.8;
+      }
+
+      .frame::before {
+        top: 56px;
+        right: 92px;
+        width: 180px;
+        height: 180px;
+        background: radial-gradient(circle, rgba(98, 191, 255, 0.28), transparent 70%);
+      }
+
+      .frame::after {
+        bottom: 24px;
+        left: 28px;
+        width: 260px;
+        height: 260px;
+        background: radial-gradient(circle, rgba(39, 98, 255, 0.24), transparent 72%);
+      }
+
+      .copy {
+        position: relative;
+        z-index: 1;
+        max-width: 640px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        border: 1px solid rgba(150, 201, 255, 0.26);
+        border-radius: 999px;
+        background: rgba(8, 19, 53, 0.54);
+        color: #b5d9ff;
+        font-size: 18px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .title {
+        margin: 22px 0 14px;
+        font-size: 88px;
+        line-height: 0.96;
+        letter-spacing: -0.05em;
+      }
+
+      .subtitle {
+        margin: 0;
+        color: #d6e8ff;
+        font-size: 28px;
+        line-height: 1.45;
+      }
+
+      .meta {
+        display: flex;
+        gap: 14px;
+        margin-top: 28px;
+        flex-wrap: wrap;
+      }
+
+      .chip {
+        padding: 10px 16px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #ebf5ff;
+        font-size: 20px;
+      }
+
+      .mark {
+        position: relative;
+        z-index: 1;
+        width: 320px;
+        height: 320px;
+        border-radius: 40px;
+        display: grid;
+        place-items: center;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+          rgba(5, 12, 34, 0.72);
+        border: 1px solid rgba(143, 186, 255, 0.2);
+        box-shadow:
+          0 30px 80px rgba(0, 0, 0, 0.48),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(12px);
+      }
+
+      .mark img {
+        width: 220px;
+        height: 220px;
+        image-rendering: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="frame">
+      <section class="copy">
+        <div class="eyebrow">AstroDX Archive</div>
+        <h1 class="title">AstroDX</h1>
+        <p class="subtitle">
+          Community-driven chart archive, indexing, and download portal built for
+          AstroDX level collections.
+        </p>
+        <div class="meta">
+          <span class="chip">Official Packages</span>
+          <span class="chip">Chart Index</span>
+          <span class="chip">Downloads</span>
+        </div>
+      </section>
+      <section class="mark">
+        <img src="../original/app-icon-xhdpi.png" alt="AstroDX app icon" />
+      </section>
+    </main>
+  </body>
+</html>
