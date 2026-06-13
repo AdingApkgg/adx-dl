@@ -28,14 +28,14 @@ jobs:
           python-version: "3.11"
 
       - name: Build catalog
-        run: python3 -c "from pathlib import Path; from tools.build_catalog import build_catalog; print(build_catalog(Path('.').resolve(), max_workers=16))"
+        working-directory: pipeline
+        run: python3 -c "from pathlib import Path; from tools.build_catalog import build_catalog; print(build_catalog(Path('..').resolve(), max_workers=16))"
 
       - name: Install dependencies
-        working-directory: site
         run: bun install --frozen-lockfile
 
       - name: Prepare IndexNow key file
-        working-directory: site
+        working-directory: apps/web
         env:
           INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY || vars.INDEXNOW_KEY }}
         run: |
@@ -47,7 +47,7 @@ jobs:
           fi
 
       - name: Prepare CNAME file
-        working-directory: site
+        working-directory: apps/web
         env:
           SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || vars.INDEXNOW_SITE_URL }}
         run: |
@@ -66,7 +66,7 @@ jobs:
           fi
 
       - name: Build site
-        working-directory: site
+        working-directory: apps/web
         env:
           NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
         run: bun run build
@@ -75,13 +75,13 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site/out
+          publish_dir: ./apps/web/out
           publish_branch: gh-pages
           force_orphan: true
 
       - name: Submit IndexNow
         continue-on-error: true
-        working-directory: site
+        working-directory: apps/web
         env:
           INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY || vars.INDEXNOW_KEY }}
           INDEXNOW_SITE_URL: ${{ vars.INDEXNOW_SITE_URL || vars.NEXT_PUBLIC_SITE_URL }}

@@ -148,7 +148,8 @@ def build_catalog(
         "categories": {"Remote": sorted({entry["subcategory"] for entry in entries})},
         "entries": entries,
     }
-    catalog_path = root / "catalog" / "index.json"
+    # Monorepo layout: generated catalog lives under data/catalog at the repo root.
+    catalog_path = root / "data" / "catalog" / "index.json"
     catalog_path.parent.mkdir(parents=True, exist_ok=True)
     catalog_path.write_text(
         json.dumps(catalog, ensure_ascii=False, indent=2) + "\n",

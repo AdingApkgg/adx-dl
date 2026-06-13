@@ -6,7 +6,9 @@ import { toLegacyRouteSlug, toRouteSlug } from "@/lib/route-slug";
 
 export type { Catalog, CatalogDifficulty, CatalogEntry } from "@/lib/catalog-shared";
 
-const catalogPath = path.resolve(process.cwd(), "..", "catalog", "index.json");
+// Monorepo layout: the web app lives at apps/web; the generated catalog lives at
+// data/catalog at the repo root (two levels up from the app's cwd during build).
+const catalogPath = path.resolve(process.cwd(), "..", "..", "data", "catalog", "index.json");
 
 export const readCatalog = cache(async (): Promise<Catalog> => {
   const raw = await fs.readFile(catalogPath, "utf-8");

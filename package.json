@@ -1,0 +1,19 @@
+{
+  "name": "astrodx",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "bun@1.3.14",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter web dev",
+    "build": "bun run --filter web build",
+    "start": "bun run --filter web start",
+    "lint": "bun run --filter web lint",
+    "test": "bun run --filter web test",
+    "submit:indexnow": "bun run --filter web submit:indexnow",
+    "build:catalog": "cd pipeline && python3 -c \"from pathlib import Path; from tools.build_catalog import build_catalog; print(build_catalog(Path('..').resolve(), max_workers=16))\"",
+    "test:catalog": "cd pipeline && python3 -m unittest tests.test_build_catalog tests.test_parse_maidata"
+  }
+}

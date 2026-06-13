@@ -1,30 +1,48 @@
 # AstroDX
 
-本项目现在以远端目录索引为主：构建阶段直接扫描 `https://adx-dl.larx.cc/`，进入每个曲目目录读取 `maidata.txt` 或 `maidata_dx.txt`，再生成供站点使用的 `catalog/index.json`。
+AstroDX 谱面资料站 monorepo:Python 构建器抓取远端目录索引,Next.js 站点读取生成的目录数据并静态导出到 GitHub Pages。
 
-## 当前主流程
+## 仓库结构
 
-1. 构建远端索引
-
-```bash
-python3 -c "from pathlib import Path; from tools.build_catalog import build_catalog; print(build_catalog(Path('.').resolve(), max_workers=16))"
+```
+.
+├─ apps/
+│  └─ web/            # Next.js 16 静态站点(bun);读取 data/catalog/index.json
+├─ pipeline/          # Python 构建器与测试
+│  ├─ tools/          #   远端抓取、maidata 解析、目录构建
+│  └─ tests/          #   构建器单元测试
+├─ data/
+│  └─ catalog/        # 构建生成的目录索引数据(index.json)
+├─ assets/            # 品牌资源(图标 / Open Graph 等)
+└─ package.json       # bun workspaces 根(workspaces: apps/*)
 ```
 
-2. 构建站点
+## 常用命令(均在仓库根目录执行)
+
+1. 构建远端索引(写入 `data/catalog/index.json`)
 
 ```bash
-cd site
-bun run build
+bun run build:catalog
 ```
 
-## 关键目录
+2. 安装依赖并构建站点(静态导出到 `apps/web/out`)
 
-- `catalog/`：构建生成的索引数据
-- `tools/`：远端抓取、目录解析与辅助脚本
-- `site/`：读取 `catalog/index.json` 的静态站点
+```bash
+bun install
+bun run build          # 等价于 bun run --filter web build
+```
+
+3. 测试
+
+```bash
+bun run test           # 站点测试(bun test,运行于 apps/web)
+bun run test:catalog   # 构建器测试(python unittest,运行于 pipeline)
+```
+
+> 也可进入子包直接操作,例如 `cd apps/web && bun run dev`。
 
 ## 索引来源
 
 - 根目录来自 `https://adx-dl.larx.cc/`
 - 逐目录提取 `title`、`artist`、`version`、`genre`、`cabinet`、`short_id`、难度信息
-- 封面、音频、PV 直接保留远端 URL，不再复制到本地 `site/public/catalog-assets`
+- 封面、音频、PV 直接保留远端 URL,不复制到本地

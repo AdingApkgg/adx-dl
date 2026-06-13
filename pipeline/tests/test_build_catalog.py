@@ -271,7 +271,7 @@ class BuildCatalogTests(unittest.TestCase):
                 entry["media"]["cover_url"],
                 "https://adx-dl.larx.cc/39%20%5BDX%5D/bg.png",
             )
-            self.assertFalse((root / "site" / "public" / "catalog-assets").exists())
+            self.assertFalse((root / "apps" / "web" / "public" / "catalog-assets").exists())
 
     def test_build_catalog_parallel_fetch_keeps_entries_in_stable_order(self) -> None:
         with TemporaryDirectory() as temp_dir:

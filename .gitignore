@@ -14,13 +14,13 @@ __pycache__/
 venv/
 
 # Generated or temporary workspace files
-site/.tmp-server-ws.json
+apps/web/.tmp-server-ws.json
 
-# Frontend dependencies and build outputs
-site/node_modules/
-site/.next/
-site/out/
-site/public/catalog-assets/
+# Frontend dependencies and build outputs (bun workspaces hoist to the root)
+node_modules/
+apps/web/.next/
+apps/web/out/
+apps/web/public/catalog-assets/
 
 # Large local media archives: keep directory skeleton only
 Community/**
