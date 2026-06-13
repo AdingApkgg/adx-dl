@@ -99,14 +99,14 @@ def _build_entry_for_directory(
     generated_at: str,
     fetch_text: Callable[[str], str],
 ) -> dict[str, Any] | None:
-    directory_html = fetch_text(directory["url"])
-    files = parse_remote_directory_files(directory_html, directory["url"])
-    file_index = {file["name"]: file for file in files}
-    maidata_url = _pick_file(file_index, "maidata.txt", "maidata_dx.txt")
-    if not maidata_url:
-        return None
-
     try:
+        directory_html = fetch_text(directory["url"])
+        files = parse_remote_directory_files(directory_html, directory["url"])
+        file_index = {file["name"]: file for file in files}
+        maidata_url = _pick_file(file_index, "maidata.txt", "maidata_dx.txt")
+        if not maidata_url:
+            return None
+
         maidata_text = fetch_text(maidata_url)
         return _build_remote_entry(directory, files, maidata_text, generated_at)
     except Exception:

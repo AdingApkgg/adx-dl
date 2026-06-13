@@ -323,6 +323,43 @@ class BuildCatalogTests(unittest.TestCase):
 
             self.assertEqual([entry["id"] for entry in catalog["entries"]], ["1-a", "2-b"])
 
+    def test_build_catalog_skips_directory_when_directory_fetch_times_out(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            payloads = {
+                "https://adx-dl.larx.cc/": """
+                <table>
+                  <tr><td><a href="ok/">ok/</a></td><td></td><td>2026-06-13 05:25:42 +08:00</td></tr>
+                  <tr><td><a href="timeout/">timeout/</a></td><td></td><td>2026-06-13 05:25:42 +08:00</td></tr>
+                </table>
+                """,
+                "https://adx-dl.larx.cc/ok/": """
+                <table>
+                  <tr><td><a href="maidata.txt">maidata.txt</a></td><td>6.9 KiB</td><td>2026-06-13 05:25:42 +08:00</td></tr>
+                </table>
+                """,
+                "https://adx-dl.larx.cc/ok/maidata.txt": """
+                &title=OK Song
+                &artist=Artist OK
+                &version=maimai DX
+                &shortid=42
+                &lv_5=12+
+                &des_5=Jack
+                &inote_5=(175){4},1,2,3,4
+                """,
+            }
+
+            def fake_fetch(url: str) -> str:
+                if url == "https://adx-dl.larx.cc/timeout/":
+                    raise TimeoutError("The read operation timed out")
+                return payloads[url]
+
+            catalog_path = build_catalog(root, fetch_text=fake_fetch, max_workers=2)
+            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(catalog["total_entries"], 1)
+            self.assertEqual([entry["id"] for entry in catalog["entries"]], ["42-ok"])
+
     def test_fetch_text_retries_without_ssl_verification_on_certificate_error(self) -> None:
         calls: list[object] = []
 
