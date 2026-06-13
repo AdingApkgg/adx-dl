@@ -8,8 +8,9 @@ import {
 } from "@/lib/catalog-shared";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { toRouteSlug } from "@/lib/route-slug";
+import { resolveSiteUrl } from "@/lib/site-url";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://adxdls.saop.cc";
+const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 const openGraphImageUrl = `${siteUrl}/opengraph-image.png`;
 
 type PageMetadataOptions = {

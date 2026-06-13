@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 
 import "../globals.css";
 import { RootLayoutShell } from "@/app/root-layout-shell";
+import { resolveSiteUrl } from "@/lib/site-url";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://adxdls.saop.cc";
+const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
