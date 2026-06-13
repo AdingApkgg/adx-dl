@@ -48,7 +48,7 @@ export function StatusHistoryCharts({
       <Card>
         <CardHeader>
           <CardTitle>{labels.resourceChartsTitle}</CardTitle>
-          <CardDescription>{labels.cpuTrendLabel}</CardDescription>
+          <CardDescription>{labels.resourceChartsDescription}</CardDescription>
         </CardHeader>
         <CardContent className="h-72">
           {isMounted ? (
@@ -90,7 +90,7 @@ export function StatusHistoryCharts({
       <Card>
         <CardHeader>
           <CardTitle>{labels.networkChartsTitle}</CardTitle>
-          <CardDescription>{labels.uploadSpeedTrendLabel}</CardDescription>
+          <CardDescription>{labels.networkChartsDescription}</CardDescription>
         </CardHeader>
         <CardContent className="h-72">
           {isMounted ? (

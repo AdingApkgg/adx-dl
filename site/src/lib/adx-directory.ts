@@ -28,6 +28,14 @@ export function parseAdxDirectoryFiles(html: string, directoryUrl: string): AdxR
       }
 
       const url = new URL(href, directory);
+      if (
+        (url.protocol !== "http:" && url.protocol !== "https:") ||
+        url.origin !== directory.origin ||
+        !url.pathname.startsWith(directory.pathname)
+      ) {
+        return null;
+      }
+
       const relativePath = url.pathname.slice(directory.pathname.length);
 
       if (!relativePath || relativePath.includes("/") || href.endsWith("/")) {

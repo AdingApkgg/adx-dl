@@ -6,7 +6,7 @@ import { getHtmlLang } from "@/lib/i18n";
 
 import { getPrefixedRouteLocale } from "./route-locale";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://astrodx.pages.dev";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://adxdls.saop.cc";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

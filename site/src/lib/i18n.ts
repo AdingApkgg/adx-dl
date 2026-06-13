@@ -68,7 +68,9 @@ export type SiteDictionary = {
     tcpLabel: string;
     udpLabel: string;
     resourceChartsTitle: string;
+    resourceChartsDescription: string;
     networkChartsTitle: string;
+    networkChartsDescription: string;
     waitingForHistory: string;
     cpuTrendLabel: string;
     loadTrendLabel: string;
@@ -156,7 +158,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       tcpLabel: "TCP",
       udpLabel: "UDP",
       resourceChartsTitle: "资源趋势",
+      resourceChartsDescription: "CPU、内存与磁盘占用趋势",
       networkChartsTitle: "网络趋势",
+      networkChartsDescription: "上传与下载速率趋势",
       waitingForHistory: "等待更多数据",
       cpuTrendLabel: "CPU 趋势",
       loadTrendLabel: "负载趋势",
@@ -244,7 +248,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       tcpLabel: "TCP",
       udpLabel: "UDP",
       resourceChartsTitle: "Resource Trends",
+      resourceChartsDescription: "CPU, memory, and disk usage over time",
       networkChartsTitle: "Network Trends",
+      networkChartsDescription: "Upload and download throughput over time",
       waitingForHistory: "Waiting for more data",
       cpuTrendLabel: "CPU Trend",
       loadTrendLabel: "Load Trend",
@@ -332,7 +338,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       tcpLabel: "TCP",
       udpLabel: "UDP",
       resourceChartsTitle: "リソース推移",
+      resourceChartsDescription: "CPU・メモリ・ディスク使用率の推移",
       networkChartsTitle: "ネットワーク推移",
+      networkChartsDescription: "アップロードとダウンロード速度の推移",
       waitingForHistory: "より多くのデータを待っています",
       cpuTrendLabel: "CPU 推移",
       loadTrendLabel: "負荷推移",

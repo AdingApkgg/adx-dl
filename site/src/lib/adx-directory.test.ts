@@ -19,6 +19,39 @@ const listingHtml = `
   </html>
 `;
 
+const realListingHtml = `
+  <html>
+    <body>
+      <nav>
+        <a href="javascript:updateColorScheme(&quot;default&quot;)">Default theme</a>
+      </nav>
+      <h1>
+        <a href="/">adx-dl.larx.cc</a>
+        <span>39</span>
+      </h1>
+      <table>
+        <tbody>
+          <tr>
+            <td><a href="../">Parent directory</a></td>
+          </tr>
+          <tr>
+            <td><a href="/39/bg.jpg">bg.jpg</a></td>
+          </tr>
+          <tr>
+            <td><a href="/39/maidata.txt">maidata.txt</a></td>
+          </tr>
+          <tr>
+            <td><a href="/39/pv.mp4">pv.mp4</a></td>
+          </tr>
+          <tr>
+            <td><a href="/39/track.mp3">track.mp3</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </body>
+  </html>
+`;
+
 describe("adx directory probing", () => {
   test("builds a trailing-slash directory url", () => {
     expect(buildAdxDirectoryUrl("39")).toBe("https://adx-dl.larx.cc/39/");
@@ -31,6 +64,15 @@ describe("adx directory probing", () => {
     expect(parseAdxDirectoryFiles(listingHtml, "https://adx-dl.larx.cc/39/")).toEqual([
       { name: "bg.jpg", url: "https://adx-dl.larx.cc/39/bg.jpg" },
       { name: "maidata.txt", url: "https://adx-dl.larx.cc/39/maidata.txt" },
+      { name: "track.mp3", url: "https://adx-dl.larx.cc/39/track.mp3" },
+    ]);
+  });
+
+  test("ignores theme and site links outside the probed directory", () => {
+    expect(parseAdxDirectoryFiles(realListingHtml, "https://adx-dl.larx.cc/39/")).toEqual([
+      { name: "bg.jpg", url: "https://adx-dl.larx.cc/39/bg.jpg" },
+      { name: "maidata.txt", url: "https://adx-dl.larx.cc/39/maidata.txt" },
+      { name: "pv.mp4", url: "https://adx-dl.larx.cc/39/pv.mp4" },
       { name: "track.mp3", url: "https://adx-dl.larx.cc/39/track.mp3" },
     ]);
   });

@@ -115,6 +115,29 @@ describe("CatalogBrowser", () => {
     expect(html).not.toContain("Alpha 24");
   });
 
+  test("renders entries in a card-grid layout instead of the legacy dense row list", () => {
+    const html = renderToStaticMarkup(
+      <CatalogBrowser
+        entries={[
+          buildEntry({}),
+          buildEntry({
+            id: "community-beta",
+            title: "Midnight Echo",
+            artist: "Alpha Crew",
+            artist_en: "Alpha Crew",
+            category: "Community",
+            subcategory: "Touhou",
+          }),
+        ]}
+        locale="en"
+        detailPathPrefix="/charts"
+      />
+    );
+
+    expect(html).toContain('data-layout="card-grid"');
+    expect(html).not.toContain("data-entry-row=");
+  });
+
   test("renders localized empty state when no entries are available", () => {
     const html = renderToStaticMarkup(
       <CatalogBrowser entries={[]} locale="ja" detailPathPrefix="/ja/charts" />

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import "../globals.css";
 import { RootLayoutShell } from "@/app/root-layout-shell";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://astrodx.pages.dev";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://adxdls.saop.cc";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

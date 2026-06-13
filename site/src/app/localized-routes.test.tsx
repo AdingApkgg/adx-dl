@@ -203,8 +203,12 @@ describe("localized routes", () => {
 
     expect(enHtml).toContain("Server Status");
     expect(enHtml).toContain("Refresh Now");
+    expect(enHtml).toContain("Resource Trends");
+    expect(enHtml).toContain("Waiting for more data");
     expect(jaHtml).toContain("サーバー状態");
     expect(jaHtml).toContain("今すぐ更新");
+    expect(jaHtml).toContain("リソース推移");
+    expect(jaHtml).toContain("より多くのデータを待っています");
   });
 
   test("zh and invalid locale routes throw notFound", async () => {

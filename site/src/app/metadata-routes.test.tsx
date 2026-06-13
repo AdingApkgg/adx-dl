@@ -118,15 +118,15 @@ function expectLocalizedAlternates(
 ) {
   const basePath = canonical.replace(/^\/(en|ja)(?=\/|$)/, "") || "/";
 
-  expect(metadata.metadataBase?.toString()).toBe("https://astrodx.pages.dev/");
+  expect(metadata.metadataBase?.toString()).toBe("https://adxdls.saop.cc/");
   expect(metadata.alternates?.canonical).toBe(canonical);
   expect(metadata.alternates?.languages).toEqual({
     "zh-CN": basePath,
     en: canonical.startsWith("/en") ? canonical : `/en${basePath === "/" ? "" : basePath}`,
     ja: canonical.startsWith("/ja") ? canonical : `/ja${basePath === "/" ? "" : basePath}`,
   });
-  expect(metadata.openGraph?.images).toEqual(["https://astrodx.pages.dev/opengraph-image.png"]);
-  expect(metadata.twitter?.images).toEqual(["https://astrodx.pages.dev/opengraph-image.png"]);
+  expect(metadata.openGraph?.images).toEqual(["https://adxdls.saop.cc/opengraph-image.png"]);
+  expect(metadata.twitter?.images).toEqual(["https://adxdls.saop.cc/opengraph-image.png"]);
 }
 
 describe("route metadata", () => {

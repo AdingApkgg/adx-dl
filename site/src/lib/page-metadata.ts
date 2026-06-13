@@ -9,7 +9,7 @@ import {
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { toRouteSlug } from "@/lib/route-slug";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://astrodx.pages.dev";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://adxdls.saop.cc";
 const openGraphImageUrl = `${siteUrl}/opengraph-image.png`;
 
 type PageMetadataOptions = {

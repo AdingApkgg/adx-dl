@@ -32,20 +32,22 @@ const history: ServerStatusHistoryPoint[] = [
 ];
 
 describe("status history charts", () => {
-  test("renders resource and network chart sections when there are at least two points", () => {
+  test("renders localized chart titles and series descriptions when there are at least two points", () => {
     const html = renderToStaticMarkup(<StatusHistoryCharts locale="zh" history={history} />);
 
     expect(html).toContain("资源趋势");
     expect(html).toContain("网络趋势");
-    expect(html).toContain("CPU 趋势");
-    expect(html).toContain("上传速率");
+    expect(html).toContain("CPU、内存与磁盘占用趋势");
+    expect(html).toContain("上传与下载速率趋势");
   });
 
-  test("renders waiting state when there is not enough history", () => {
+  test("renders waiting state under the resource chart title when there is not enough history", () => {
     const html = renderToStaticMarkup(
       <StatusHistoryCharts locale="zh" history={history.slice(0, 1)} />
     );
 
+    expect(html).toContain("资源趋势");
     expect(html).toContain("等待更多数据");
+    expect(html).not.toContain("网络趋势");
   });
 });

@@ -1,14 +1,17 @@
 import { ExternalLinkIcon, RefreshCcwIcon, ServerIcon } from "lucide-react";
 
+import { StatusHistoryCharts } from "@/components/site/status-history-charts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import type { ServerStatusHistoryPoint } from "@/lib/server-status-history";
 import { STATUS_SOURCE_URL, type ServerStatusSnapshot } from "@/lib/server-status";
 
 type StatusPageViewProps = {
   locale?: Locale;
   snapshot: ServerStatusSnapshot | null;
+  history: ServerStatusHistoryPoint[];
   isRefreshing: boolean;
   errorMessage: string | null;
   onRefresh?: () => void;
@@ -42,6 +45,7 @@ function MetricCard({
 export function StatusPageView({
   locale = "zh",
   snapshot,
+  history,
   isRefreshing,
   errorMessage,
   onRefresh,
@@ -74,6 +78,8 @@ export function StatusPageView({
         </p>
         {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
       </section>
+
+      <StatusHistoryCharts locale={locale} history={history} />
 
       {snapshot ? (
         <>

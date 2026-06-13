@@ -73,6 +73,23 @@ describe("i18n helpers", () => {
     expect(i18n.getDictionary?.("ja").nav.home).toBe("ホーム");
   });
 
+  test("provides localized Nezha chart descriptions for zh en ja", async () => {
+    const i18n = await loadI18nModule();
+
+    expect(typeof i18n.getDictionary).toBe("function");
+
+    const zhStatus = i18n.getDictionary?.("zh").statusPage as Record<string, unknown>;
+    const enStatus = i18n.getDictionary?.("en").statusPage as Record<string, unknown>;
+    const jaStatus = i18n.getDictionary?.("ja").statusPage as Record<string, unknown>;
+
+    expect(zhStatus.resourceChartsDescription).toBe("CPU、内存与磁盘占用趋势");
+    expect(zhStatus.networkChartsDescription).toBe("上传与下载速率趋势");
+    expect(enStatus.resourceChartsDescription).toBe("CPU, memory, and disk usage over time");
+    expect(enStatus.networkChartsDescription).toBe("Upload and download throughput over time");
+    expect(jaStatus.resourceChartsDescription).toBe("CPU・メモリ・ディスク使用率の推移");
+    expect(jaStatus.networkChartsDescription).toBe("アップロードとダウンロード速度の推移");
+  });
+
   test("builds localized page metadata with canonical and alternate paths", async () => {
     const pageMetadata = await loadPageMetadataModule();
 

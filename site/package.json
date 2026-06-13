@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "submit:indexnow": "bun run scripts/submit-indexnow.ts"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans": "^5.2.10",

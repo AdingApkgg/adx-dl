@@ -169,5 +169,7 @@ describe("default zh routes", () => {
     expect(html).toContain("服务器状态");
     expect(html).toContain("查看原监控页");
     expect(html).toContain("立即刷新");
+    expect(html).toContain("资源趋势");
+    expect(html).toContain("等待更多数据");
   });
 });

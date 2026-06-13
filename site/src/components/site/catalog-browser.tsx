@@ -170,23 +170,25 @@ export function CatalogBrowser({
           </CardContent>
         </Card>
       ) : (
-        <div data-layout="dense-row-list" className="grid gap-3">
+        <div
+          data-layout="card-grid"
+          className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+        >
           {paginatedEntries.map((entry) => (
             <Card
               key={entry.id}
               size="sm"
-              data-entry-row={entry.id}
-              className="overflow-hidden border border-border/70 bg-card/80"
+              className="flex h-full overflow-hidden border border-border/70 bg-card/80"
             >
-              <div className="flex min-w-0 flex-col sm:flex-row">
+              <div className="flex min-w-0 flex-1 flex-col">
                 <div
                   data-entry-cover="compact"
-                  className="aspect-square w-full shrink-0 overflow-hidden border-b border-border/60 sm:w-28 sm:border-r sm:border-b-0 lg:w-32"
+                  className="aspect-[4/3] w-full shrink-0 overflow-hidden border-b border-border/60"
                 >
                   <EntryCover entry={entry} locale={locale} className="h-full w-full" />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">
-                  <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex min-w-0 flex-col gap-4">
                     <div data-entry-meta="primary" className="flex min-w-0 flex-1 flex-col gap-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="secondary">{formatEntrySubcategory(entry)}</Badge>
@@ -214,7 +216,7 @@ export function CatalogBrowser({
                     </div>
                     <div
                       data-entry-actions="compact"
-                      className="flex flex-wrap items-center gap-2 lg:max-w-[320px] lg:justify-end"
+                      className="mt-auto flex flex-wrap items-center gap-2"
                     >
                       <Button variant="outline" size="sm" asChild>
                         <Link href={`${detailPathPrefix}/${toRouteSlug(entry.id)}`}>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { StatusPageView } from "@/components/site/status-page-view";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { appendHistoryPoint, type ServerStatusHistoryPoint } from "@/lib/server-status-history";
 import {
   fetchServerStatus,
   ServerStatusParseError,
@@ -11,10 +12,12 @@ import {
 } from "@/lib/server-status";
 
 const REFRESH_INTERVAL_MS = 60_000;
+const MAX_HISTORY_POINTS = 24;
 
 export function ServerStatusClient({ locale = "zh" }: { locale?: Locale }) {
   const labels = getDictionary(locale).statusPage;
   const [snapshot, setSnapshot] = useState<ServerStatusSnapshot | null>(null);
+  const [history, setHistory] = useState<ServerStatusHistoryPoint[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const snapshotRef = useRef<ServerStatusSnapshot | null>(null);
@@ -26,6 +29,9 @@ export function ServerStatusClient({ locale = "zh" }: { locale?: Locale }) {
       const nextSnapshot = await fetchServerStatus();
       snapshotRef.current = nextSnapshot;
       setSnapshot(nextSnapshot);
+      setHistory((currentHistory) =>
+        appendHistoryPoint(currentHistory, nextSnapshot, MAX_HISTORY_POINTS)
+      );
       setErrorMessage(null);
     } catch (error) {
       if (snapshotRef.current) {
@@ -59,6 +65,7 @@ export function ServerStatusClient({ locale = "zh" }: { locale?: Locale }) {
     <StatusPageView
       locale={locale}
       snapshot={snapshot}
+      history={history}
       isRefreshing={isRefreshing}
       errorMessage={errorMessage}
       onRefresh={() => void load()}
