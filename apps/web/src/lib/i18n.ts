@@ -141,6 +141,11 @@ export type SiteDictionary = {
     tableDifficulty: string;
     tableLevel: string;
     tableCharter: string;
+    preview: string;
+    previewDescription: string;
+    pvLabel: string;
+    audioLabel: string;
+    mediaUnsupported: string;
   };
   assets: {
     audio: string;
@@ -315,6 +320,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       tableDifficulty: "难度",
       tableLevel: "等级",
       tableCharter: "谱师",
+      preview: "预览",
+      previewDescription: "在线观看 PV 或试听音频(资源来自远端目录)。",
+      pvLabel: "PV 影像",
+      audioLabel: "音频试听",
+      mediaUnsupported: "你的浏览器不支持播放该媒体。",
     },
     assets: { audio: "音频", jacket: "封面图", pv: "PV", dxChart: "DX 谱面" },
     cover: {
@@ -478,6 +488,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       tableDifficulty: "Difficulty",
       tableLevel: "Level",
       tableCharter: "Charter",
+      preview: "Preview",
+      previewDescription: "Watch the PV or listen to the audio (served from the remote directory).",
+      pvLabel: "Promotion Video (PV)",
+      audioLabel: "Audio preview",
+      mediaUnsupported: "Your browser does not support playing this media.",
     },
     assets: { audio: "Audio", jacket: "Jacket", pv: "PV", dxChart: "DX Chart" },
     cover: {
@@ -640,6 +655,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       tableDifficulty: "難易度",
       tableLevel: "レベル",
       tableCharter: "譜師",
+      preview: "プレビュー",
+      previewDescription: "PV の視聴や音源の試聴ができます(遠端ディレクトリ提供)。",
+      pvLabel: "PV 映像",
+      audioLabel: "音源試聴",
+      mediaUnsupported: "お使いのブラウザはこのメディアの再生に対応していません。",
     },
     assets: { audio: "音源", jacket: "ジャケット", pv: "PV", dxChart: "DX 譜面" },
     cover: {

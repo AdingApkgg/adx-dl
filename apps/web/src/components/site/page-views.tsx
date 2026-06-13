@@ -9,6 +9,7 @@ import {
 
 import { AdxDownloadButton } from "@/components/site/adx-download-button";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
+import { ChartMediaPlayer } from "@/components/site/chart-media-player";
 import { EntryAssetBadges } from "@/components/site/entry-asset-badges";
 import { EntryCover } from "@/components/site/entry-cover";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
@@ -346,6 +347,8 @@ export function ChartDetailPageView({
           </div>
         </div>
       </section>
+
+      <ChartMediaPlayer entry={entry} locale={locale} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_320px]">
         <Card>

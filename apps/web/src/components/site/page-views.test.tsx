@@ -203,4 +203,29 @@ describe("page views locale-driven content", () => {
     expect(zhHtml).toContain("搜索曲名、曲师、版本...");
     expect(zhHtml).toContain(`href="/charts/${toRouteSlug("song-1")}"`);
   });
+
+  test("detail view renders PV and audio players when media is available", () => {
+    const slug = toRouteSlug("song-1");
+    const html = renderToStaticMarkup(<ChartDetailPageView entry={buildEntry()} locale="zh" />);
+
+    expect(html).toContain("预览");
+    expect(html).toContain("<video");
+    expect(html).toContain(`src="/catalog-assets/${slug}/pv.mp4"`);
+    expect(html).toContain("<audio");
+    expect(html).toContain(`src="/catalog-assets/${slug}/track.mp3"`);
+  });
+
+  test("detail view omits the preview section when no audio or PV", () => {
+    const base = buildEntry();
+    const entry = {
+      ...base,
+      assets: { ...base.assets, has_pv: false, has_audio: false },
+    };
+
+    const html = renderToStaticMarkup(<ChartDetailPageView entry={entry} locale="zh" />);
+
+    expect(html).not.toContain("<video");
+    expect(html).not.toContain("<audio");
+    expect(html).not.toContain("预览");
+  });
 });
