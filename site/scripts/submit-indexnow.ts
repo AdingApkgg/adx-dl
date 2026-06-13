@@ -1,6 +1,6 @@
 import { readRouteSlugs } from "@/lib/catalog";
 import {
-  assertValidIndexNowConfig,
+  getOptionalIndexNowConfig,
   buildIndexNowPayload,
   buildIndexNowUrlList,
 } from "@/lib/indexnow";
@@ -10,10 +10,17 @@ const rawSiteUrl = process.env.INDEXNOW_SITE_URL ?? process.env.NEXT_PUBLIC_SITE
 const rawKey = process.env.INDEXNOW_KEY ?? "";
 
 async function main() {
-  const { siteUrl, key } = assertValidIndexNowConfig({
+  const config = getOptionalIndexNowConfig({
     siteUrl: rawSiteUrl,
     key: rawKey,
   });
+
+  if (!config) {
+    console.log("Skipping IndexNow submission because INDEXNOW_SITE_URL or INDEXNOW_KEY is not set");
+    return;
+  }
+
+  const { siteUrl, key } = config;
 
   const slugs = await readRouteSlugs();
   const urlList = buildIndexNowUrlList(siteUrl, slugs);

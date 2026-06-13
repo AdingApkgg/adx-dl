@@ -46,6 +46,34 @@ jobs:
             echo "INDEXNOW_KEY is not set; skipping key file generation"
           fi
 
+      - name: Prepare CNAME file
+        working-directory: site
+        env:
+          SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || vars.INDEXNOW_SITE_URL }}
+        run: |
+          if [ -n "$SITE_URL" ]; then
+            CNAME_DOMAIN="$(python3 - <<'PY'
+import os
+from urllib.parse import urlparse
+
+raw_site_url = os.environ.get("SITE_URL", "").strip()
+if raw_site_url and "://" not in raw_site_url:
+    raw_site_url = f"https://{raw_site_url}"
+
+parsed = urlparse(raw_site_url)
+print(parsed.netloc or parsed.path)
+PY
+)"
+            if [ -n "$CNAME_DOMAIN" ]; then
+              printf '%s' "$CNAME_DOMAIN" > "public/CNAME"
+              echo "Prepared public/CNAME for $CNAME_DOMAIN"
+            else
+              echo "SITE_URL is set but could not be parsed; skipping CNAME generation"
+            fi
+          else
+            echo "SITE_URL is not set; skipping CNAME generation"
+          fi
+
       - name: Build site
         working-directory: site
         env:

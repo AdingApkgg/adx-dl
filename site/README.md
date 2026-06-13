@@ -41,7 +41,7 @@ python3 -c "from pathlib import Path; from tools.build_catalog import build_cata
 - `INDEXNOW_SITE_URL`：可选；未设置时回退到 `NEXT_PUBLIC_SITE_URL`
 - `INDEXNOW_KEY`：IndexNow key
 
-工作流会在构建前生成 `public/indexnow-<key>.txt`，构建完成并发布后执行：
+工作流会在构建前生成 `public/indexnow-<key>.txt` 和 `public/CNAME`，构建完成并发布后执行：
 
 ```bash
 bun run submit:indexnow

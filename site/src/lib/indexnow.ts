@@ -68,6 +68,17 @@ export function assertValidIndexNowConfig(input: { siteUrl: string; key: string 
   };
 }
 
+export function getOptionalIndexNowConfig(input: { siteUrl: string; key: string }) {
+  const siteUrl = input.siteUrl.trim();
+  const key = input.key.trim();
+
+  if (!siteUrl || !key) {
+    return null;
+  }
+
+  return assertValidIndexNowConfig({ siteUrl, key });
+}
+
 export function buildIndexNowPayload(input: {
   siteUrl: string;
   key: string;

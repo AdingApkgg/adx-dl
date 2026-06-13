@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  getOptionalIndexNowConfig,
   assertValidIndexNowConfig,
   buildIndexNowKeyLocation,
   buildIndexNowPayload,
@@ -97,5 +98,22 @@ describe("indexnow helpers", () => {
     expect(() =>
       assertValidIndexNowConfig({ siteUrl: "https://adxdls.saop.cc", key: "" })
     ).toThrow("INDEXNOW_KEY is required");
+  });
+
+  test("getOptionalIndexNowConfig returns null when site URL or key is missing", () => {
+    expect(getOptionalIndexNowConfig({ siteUrl: "", key: "abc123" })).toBeNull();
+    expect(getOptionalIndexNowConfig({ siteUrl: "https://adxdls.saop.cc", key: "" })).toBeNull();
+  });
+
+  test("getOptionalIndexNowConfig returns normalized config when both values are present", () => {
+    expect(
+      getOptionalIndexNowConfig({
+        siteUrl: " https://adxdls.saop.cc/ ",
+        key: " abc123 ",
+      })
+    ).toEqual({
+      siteUrl: "https://adxdls.saop.cc",
+      key: "abc123",
+    });
   });
 });
