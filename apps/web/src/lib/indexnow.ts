@@ -27,14 +27,14 @@ export function buildIndexNowUrlList(siteUrl: string, slugs: string[]): string[]
 
   const defaultUrls = [
     ...staticPaths.map((pathname) => joinUrl(siteUrl, pathname)),
-    ...uniqueSlugs.map((slug) => joinUrl(siteUrl, `/charts/${slug}`)),
+    ...uniqueSlugs.map((slug) => joinUrl(siteUrl, `/charts/${encodeURIComponent(slug)}`)),
   ];
 
   const localizedUrls = prefixedLocales.flatMap((locale) => [
     ...staticPaths.map((pathname) =>
       joinUrl(siteUrl, pathname === "/" ? `/${locale}` : `/${locale}${pathname}`)
     ),
-    ...uniqueSlugs.map((slug) => joinUrl(siteUrl, `/${locale}/charts/${slug}`)),
+    ...uniqueSlugs.map((slug) => joinUrl(siteUrl, `/${locale}/charts/${encodeURIComponent(slug)}`)),
   ]);
 
   return [...defaultUrls, ...localizedUrls];

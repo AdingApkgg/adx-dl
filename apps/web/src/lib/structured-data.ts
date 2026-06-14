@@ -121,7 +121,7 @@ export function buildListingStructuredData(
   const itemListElement = entries.slice(0, 100).map((entry, index) => ({
     "@type": "ListItem",
     position: index + 1,
-    url: toAbsoluteUrl(buildLocalePath(`/charts/${entrySlug(entry)}`, locale)),
+    url: toAbsoluteUrl(buildLocalePath(`/charts/${encodeURIComponent(entrySlug(entry))}`, locale)),
     name: formatEntryTitle(entry, locale),
   }));
 
@@ -171,7 +171,7 @@ export function buildChartDetailStructuredData(
   const title = formatEntryTitle(entry, locale);
   const artist = formatEntryArtist(entry, locale);
   const branch = formatEntrySubcategory(entry);
-  const detailPath = buildLocalePath(`/charts/${entrySlug(entry)}`, locale);
+  const detailPath = buildLocalePath(`/charts/${encodeURIComponent(entrySlug(entry))}`, locale);
   const detailUrl = toAbsoluteUrl(detailPath);
   const keywords = [
     ...new Set([entry.category, branch, entry.version, entry.cabinet].filter(Boolean)),

@@ -74,7 +74,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   );
 
   const detailRoutes = catalog.entries.flatMap((entry) => {
-    const pathname = `/charts/${entrySlug(entry)}`;
+    const pathname = `/charts/${encodeURIComponent(entrySlug(entry))}`;
     const lastModified = toIsoDate(entry.imported_at) ?? siteLastModified;
     const images = entry.media.cover_url ? [toAbsoluteAsset(entry.media.cover_url)] : undefined;
 
