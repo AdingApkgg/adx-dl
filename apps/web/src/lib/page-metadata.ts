@@ -14,7 +14,7 @@ import {
   type Locale,
   type StaticPageMetadataKey,
 } from "@/lib/i18n";
-import { toRouteSlug } from "@/lib/route-slug";
+import { entrySlug } from "@/lib/route-slug";
 import { resolveSiteUrl } from "@/lib/site-url";
 
 const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
@@ -146,7 +146,7 @@ export function buildStatusPageMetadata(locale: Locale): Metadata {
 export function buildChartDetailMetadata(locale: Locale, entry: CatalogEntry): Metadata {
   return buildPageMetadata({
     locale,
-    pathname: `/charts/${toRouteSlug(entry.id)}`,
+    pathname: `/charts/${entrySlug(entry)}`,
     title: formatEntryTitle(entry, locale),
     description: buildChartDescription(entry, locale),
     keywords: buildDetailKeywords(locale, entry),

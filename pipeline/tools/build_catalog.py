@@ -19,6 +19,27 @@ def _slugify(value: str) -> str:
     return slug or "remote-entry"
 
 
+def _path_slug(name: str) -> str:
+    # Readable, URL-safe route slug derived from the remote directory name.
+    # \W keeps Unicode word chars (incl. CJK) and turns whitespace/punctuation
+    # into dashes, so non-ASCII titles stay human-readable in the URL.
+    slug = re.sub(r"\W+", "-", name.strip(), flags=re.UNICODE).strip("-").lower()
+    return slug or "chart"
+
+
+def _assign_route_slugs(entries: list[dict[str, Any]]) -> None:
+    seen: set[str] = set()
+    for entry in entries:
+        base = _path_slug(entry["remote_dir_name"])
+        slug = base
+        index = 2
+        while slug in seen:
+            slug = f"{base}-{index}"
+            index += 1
+        seen.add(slug)
+        entry["slug"] = slug
+
+
 def _pick_file(file_index: dict[str, dict[str, str]], *names: str) -> str:
     for name in names:
         if name in file_index:
@@ -141,6 +162,7 @@ def build_catalog(
                     entries.append(entry)
 
     entries.sort(key=lambda entry: entry["id"])
+    _assign_route_slugs(entries)
 
     catalog = {
         "generated_at": generated_at,

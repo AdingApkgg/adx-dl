@@ -32,7 +32,7 @@ import {
   formatEntryTitle,
 } from "@/lib/catalog-shared";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
-import { toRouteSlug } from "@/lib/route-slug";
+import { entrySlug } from "@/lib/route-slug";
 import {
   buildChartDetailStructuredData,
   buildHomeFaqStructuredData,
@@ -180,7 +180,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
               </div>
               <Button variant="outline" size="sm" asChild>
                 <Link
-                  href={buildLocalePath(`/charts/${toRouteSlug(entry.id)}`, locale)}
+                  href={buildLocalePath(`/charts/${entrySlug(entry)}`, locale)}
                   aria-label={`${home.openDetail} — ${formatEntryTitle(entry, locale)}`}
                 >
                   <ArrowRightIcon data-icon="inline-start" aria-hidden="true" />

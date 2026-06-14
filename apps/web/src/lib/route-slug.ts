@@ -1,3 +1,13 @@
+/**
+ * Canonical route slug for a chart. Prefers the readable, directory-derived
+ * `slug` from the catalog; falls back to the legacy FNV hash when absent
+ * (e.g. older catalogs or test fixtures), so old links keep resolving.
+ */
+export function entrySlug(entry: { slug?: string | null; id: string }): string {
+  const slug = entry.slug?.trim();
+  return slug ? slug : toRouteSlug(entry.id);
+}
+
 export function toRouteSlug(id: string): string {
   let hash = 2166136261;
 

@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { cache } from "react";
 import type { Catalog, CatalogEntry } from "@/lib/catalog-shared";
-import { toLegacyRouteSlug, toRouteSlug } from "@/lib/route-slug";
+import { entrySlug, toLegacyRouteSlug, toRouteSlug } from "@/lib/route-slug";
 
 export type { Catalog, CatalogDifficulty, CatalogEntry } from "@/lib/catalog-shared";
 
@@ -29,11 +29,21 @@ const readEntryByRouteSlugMap = cache(async () => {
   const entries = await readCatalogEntries();
   const map = new Map<string, CatalogEntry>();
 
+  // Pass 1: canonical (readable, directory-derived) slugs win.
   for (const entry of entries) {
-    map.set(toRouteSlug(entry.id), entry);
+    map.set(entrySlug(entry), entry);
+  }
+
+  // Pass 2: legacy aliases (FNV hash + URL-encoded id) keep old links resolving,
+  // but never shadow a canonical slug.
+  for (const entry of entries) {
+    const hashed = toRouteSlug(entry.id);
+    if (!map.has(hashed)) {
+      map.set(hashed, entry);
+    }
 
     const legacy = toLegacyRouteSlug(entry.id);
-    if (legacy) {
+    if (legacy && !map.has(legacy)) {
       map.set(legacy, entry);
     }
   }
@@ -51,4 +61,11 @@ export async function readEntryByRouteSlug(
 export async function readRouteSlugs(): Promise<string[]> {
   const map = await readEntryByRouteSlugMap();
   return Array.from(map.keys());
+}
+
+// Canonical slugs only (one per chart) — for sitemaps / IndexNow, so we don't
+// submit the legacy alias URLs that just canonicalize back to these.
+export async function readCanonicalSlugs(): Promise<string[]> {
+  const entries = await readCatalogEntries();
+  return entries.map((entry) => entrySlug(entry));
 }

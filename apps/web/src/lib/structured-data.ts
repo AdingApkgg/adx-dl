@@ -14,7 +14,7 @@ import {
   type Locale,
   type StaticPageMetadataKey,
 } from "@/lib/i18n";
-import { toRouteSlug } from "@/lib/route-slug";
+import { entrySlug } from "@/lib/route-slug";
 import { resolveSiteUrl } from "@/lib/site-url";
 
 const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
@@ -121,7 +121,7 @@ export function buildListingStructuredData(
   const itemListElement = entries.slice(0, 100).map((entry, index) => ({
     "@type": "ListItem",
     position: index + 1,
-    url: toAbsoluteUrl(buildLocalePath(`/charts/${toRouteSlug(entry.id)}`, locale)),
+    url: toAbsoluteUrl(buildLocalePath(`/charts/${entrySlug(entry)}`, locale)),
     name: formatEntryTitle(entry, locale),
   }));
 
@@ -171,7 +171,7 @@ export function buildChartDetailStructuredData(
   const title = formatEntryTitle(entry, locale);
   const artist = formatEntryArtist(entry, locale);
   const branch = formatEntrySubcategory(entry);
-  const detailPath = buildLocalePath(`/charts/${toRouteSlug(entry.id)}`, locale);
+  const detailPath = buildLocalePath(`/charts/${entrySlug(entry)}`, locale);
   const detailUrl = toAbsoluteUrl(detailPath);
   const keywords = [
     ...new Set([entry.category, branch, entry.version, entry.cabinet].filter(Boolean)),

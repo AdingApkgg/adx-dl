@@ -25,7 +25,7 @@ import {
   formatEntryTitle,
 } from "@/lib/catalog-shared";
 import { getDictionary } from "@/lib/i18n";
-import { toRouteSlug } from "@/lib/route-slug";
+import { entrySlug } from "@/lib/route-slug";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -219,14 +219,14 @@ export function CatalogBrowser({
                       className="mt-auto flex flex-wrap items-center gap-2"
                     >
                       <Button variant="outline" size="sm" asChild>
-                        <Link href={`${detailPathPrefix}/${toRouteSlug(entry.id)}`}>
+                        <Link href={`${detailPathPrefix}/${entrySlug(entry)}`}>
                           <SearchIcon data-icon="inline-start" />
                           {dictionary.details}
                         </Link>
                       </Button>
                       {(entry.download_mode === "onsite" || entry.download_mode === "mixed") && (
                         <Button size="sm" asChild>
-                          <Link href={`${detailPathPrefix}/${toRouteSlug(entry.id)}`}>
+                          <Link href={`${detailPathPrefix}/${entrySlug(entry)}`}>
                             <DownloadIcon data-icon="inline-start" />
                             {dictionary.download}
                           </Link>

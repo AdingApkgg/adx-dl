@@ -1,4 +1,4 @@
-import { readRouteSlugs } from "@/lib/catalog";
+import { readCanonicalSlugs } from "@/lib/catalog";
 import {
   getOptionalIndexNowConfig,
   buildIndexNowPayload,
@@ -22,7 +22,7 @@ async function main() {
 
   const { siteUrl, key } = config;
 
-  const slugs = await readRouteSlugs();
+  const slugs = await readCanonicalSlugs();
   const urlList = buildIndexNowUrlList(siteUrl, slugs);
   const payload = buildIndexNowPayload({ siteUrl, key, urlList });
 

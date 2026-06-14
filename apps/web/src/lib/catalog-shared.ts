@@ -13,6 +13,8 @@ export type CatalogEntryMedia = {
 
 export type CatalogEntry = {
   id: string;
+  /** Readable, URL-safe route slug derived from remote_dir_name by the builder. */
+  slug?: string;
   remote_dir_name: string;
   title: string;
   title_en?: string;

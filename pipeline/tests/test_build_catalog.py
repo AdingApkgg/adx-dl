@@ -129,6 +129,7 @@ class BuildCatalogTests(unittest.TestCase):
 
             self.assertEqual(catalog["total_entries"], 1)
             self.assertEqual(catalog["categories"]["Remote"], ["maimai DX"])
+            self.assertEqual(entry["slug"], "39-dx")
             self.assertEqual(entry["title"], "39 [DX]")
             self.assertEqual(entry["artist"], "sasakure.UK x DECO*27")
             self.assertEqual(entry["remote_dir_name"], "39 [DX]")

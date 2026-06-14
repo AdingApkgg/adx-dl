@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 import { readCatalog } from "@/lib/catalog";
 import { buildLocalePath, locales, type Locale } from "@/lib/i18n";
-import { toRouteSlug } from "@/lib/route-slug";
+import { entrySlug } from "@/lib/route-slug";
 import { resolveSiteUrl } from "@/lib/site-url";
 
 export const dynamic = "force-static";
@@ -74,7 +74,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   );
 
   const detailRoutes = catalog.entries.flatMap((entry) => {
-    const pathname = `/charts/${toRouteSlug(entry.id)}`;
+    const pathname = `/charts/${entrySlug(entry)}`;
     const lastModified = toIsoDate(entry.imported_at) ?? siteLastModified;
     const images = entry.media.cover_url ? [toAbsoluteAsset(entry.media.cover_url)] : undefined;
 
