@@ -55,7 +55,25 @@ export async function readEntryByRouteSlug(
   slug: string
 ): Promise<CatalogEntry | undefined> {
   const map = await readEntryByRouteSlugMap();
-  return map.get(slug);
+
+  const direct = map.get(slug);
+  if (direct) {
+    return direct;
+  }
+
+  // Static export can hand the dynamic [slug] param to the page percent-encoded
+  // (notably for non-ASCII slugs), while the map is keyed by the raw slug.
+  // Fall back to the decoded form so CJK chart pages resolve instead of 404ing.
+  try {
+    const decoded = decodeURIComponent(slug);
+    if (decoded !== slug) {
+      return map.get(decoded);
+    }
+  } catch {
+    // malformed escape sequence — ignore and fall through
+  }
+
+  return undefined;
 }
 
 export async function readRouteSlugs(): Promise<string[]> {
