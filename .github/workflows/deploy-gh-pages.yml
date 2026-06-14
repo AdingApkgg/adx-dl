@@ -34,41 +34,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Prepare IndexNow key file
-        working-directory: apps/web
-        env:
-          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY || vars.INDEXNOW_KEY }}
-        run: |
-          if [ -n "$INDEXNOW_KEY" ]; then
-            printf '%s' "$INDEXNOW_KEY" > "public/indexnow-$INDEXNOW_KEY.txt"
-            echo "Prepared public/indexnow-$INDEXNOW_KEY.txt"
-          else
-            echo "INDEXNOW_KEY is not set; skipping key file generation"
-          fi
-
-      - name: Prepare CNAME file
-        working-directory: apps/web
-        env:
-          SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || vars.INDEXNOW_SITE_URL }}
-        run: |
-          if [ -n "$SITE_URL" ]; then
-            CNAME_DOMAIN="${SITE_URL#http://}"
-            CNAME_DOMAIN="${CNAME_DOMAIN#https://}"
-            CNAME_DOMAIN="${CNAME_DOMAIN%%/*}"
-            if [ -n "$CNAME_DOMAIN" ]; then
-              printf '%s' "$CNAME_DOMAIN" > "public/CNAME"
-              echo "Prepared public/CNAME for $CNAME_DOMAIN"
-            else
-              echo "SITE_URL is set but could not be parsed; skipping CNAME generation"
-            fi
-          else
-            echo "SITE_URL is not set; skipping CNAME generation"
-          fi
-
       - name: Build site
         working-directory: apps/web
-        env:
-          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
         run: bun run build
 
       - name: Publish to gh-pages
@@ -82,8 +49,5 @@ jobs:
       - name: Submit IndexNow
         continue-on-error: true
         working-directory: apps/web
-        env:
-          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY || vars.INDEXNOW_KEY }}
-          INDEXNOW_SITE_URL: ${{ vars.INDEXNOW_SITE_URL || vars.NEXT_PUBLIC_SITE_URL }}
-          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+        # Key file, site URL, and CNAME all ship in the repo — no Actions secrets or variables needed.
         run: bun run submit:indexnow

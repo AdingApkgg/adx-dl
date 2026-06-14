@@ -3,16 +3,18 @@ import {
   getOptionalIndexNowConfig,
   buildIndexNowPayload,
   buildIndexNowUrlList,
+  resolveIndexNowKey,
 } from "@/lib/indexnow";
+import { resolveSiteUrl } from "@/lib/site-url";
 
 const endpoint = process.env.INDEXNOW_ENDPOINT ?? "https://api.indexnow.org/indexnow";
-const rawSiteUrl = process.env.INDEXNOW_SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "";
-const rawKey = process.env.INDEXNOW_KEY ?? "";
+const siteUrl = resolveSiteUrl(process.env.INDEXNOW_SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL);
+const key = resolveIndexNowKey(process.env.INDEXNOW_KEY);
 
 async function main() {
   const config = getOptionalIndexNowConfig({
-    siteUrl: rawSiteUrl,
-    key: rawKey,
+    siteUrl,
+    key,
   });
 
   if (!config) {
@@ -20,11 +22,9 @@ async function main() {
     return;
   }
 
-  const { siteUrl, key } = config;
-
   const slugs = await readCanonicalSlugs();
-  const urlList = buildIndexNowUrlList(siteUrl, slugs);
-  const payload = buildIndexNowPayload({ siteUrl, key, urlList });
+  const urlList = buildIndexNowUrlList(config.siteUrl, slugs);
+  const payload = buildIndexNowPayload({ siteUrl: config.siteUrl, key: config.key, urlList });
 
   console.log(`Submitting ${payload.urlList.length} URLs to ${endpoint}`);
   console.log(`IndexNow host: ${payload.host}`);

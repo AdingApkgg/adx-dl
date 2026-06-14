@@ -7,9 +7,22 @@ import {
   buildIndexNowPayload,
   buildIndexNowUrlList,
   normalizeSiteUrl,
+  resolveIndexNowKey,
 } from "@/lib/indexnow";
 
 describe("indexnow helpers", () => {
+  test("resolveIndexNowKey falls back to the committed default when unset or blank", () => {
+    const fallback = resolveIndexNowKey(undefined);
+    expect(fallback).toMatch(/^[a-zA-Z0-9-]{8,}$/);
+    expect(resolveIndexNowKey("")).toBe(fallback);
+    expect(resolveIndexNowKey("   ")).toBe(fallback);
+    expect(resolveIndexNowKey(null)).toBe(fallback);
+  });
+
+  test("resolveIndexNowKey trims and prefers an explicit override", () => {
+    expect(resolveIndexNowKey(" custom-key ")).toBe("custom-key");
+  });
+
   test("normalizeSiteUrl trims trailing slash and preserves origin", () => {
     expect(normalizeSiteUrl("https://adxdls.saop.cc/")).toBe("https://adxdls.saop.cc");
     expect(normalizeSiteUrl("https://adxdls.saop.cc")).toBe("https://adxdls.saop.cc");

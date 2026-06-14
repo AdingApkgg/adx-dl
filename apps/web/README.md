@@ -33,25 +33,28 @@ python3 -c "from pathlib import Path; from tools.build_catalog import build_cata
 
 ## IndexNow
 
-部署工作流支持在发布完成后自动提交 IndexNow。
+部署工作流会在发布完成后自动提交 IndexNow。
 
-需要配置以下 GitHub Actions Variables / Secrets：
+IndexNow key 按协议本就是公开的（站点根目录可访问 `/indexnow-<key>.txt`），因此直接随仓库提交：
 
-- `NEXT_PUBLIC_SITE_URL`：站点公开基址，例如 `https://adxdls.saop.cc`
-- `INDEXNOW_SITE_URL`：可选；未设置时回退到 `NEXT_PUBLIC_SITE_URL`
-- `INDEXNOW_KEY`：IndexNow key
+- key 文件：`public/indexnow-<key>.txt`
+- 默认 key：`src/lib/indexnow.ts` 中的 `defaultIndexNowKey`（可被 `INDEXNOW_KEY` 环境变量覆盖）
 
-工作流会在构建前生成 `public/indexnow-<key>.txt` 和 `public/CNAME`，构建完成并发布后执行：
+站点基址沿用 `NEXT_PUBLIC_SITE_URL`（GitHub Actions Variable，未设置时回退到 `src/lib/site-url.ts` 的默认值）。`INDEXNOW_SITE_URL` 为可选覆盖。无需任何 Secret。
+
+工作流会在构建前生成 `public/CNAME`，构建并发布后执行：
 
 ```bash
 bun run submit:indexnow
 ```
 
-本地验证时可以直接传入环境变量：
+本地验证时可直接运行（无参数即使用仓库内默认值）；如需临时覆盖：
 
 ```bash
 NEXT_PUBLIC_SITE_URL=https://adxdls.saop.cc INDEXNOW_KEY=your-key bun run submit:indexnow
 ```
+
+> 轮换 key：替换 `public/` 下的 key 文件并更新 `defaultIndexNowKey` 即可，两者必须一致。
 
 ## 相关目录
 

@@ -9,6 +9,21 @@ export type IndexNowPayload = {
 
 const staticPaths = ["/", "/charts", "/versions", "/search", "/status"] as const;
 
+// The IndexNow key is public by protocol design — it is served at
+// `/indexnow-<key>.txt` on the site — so it lives in the repo as a default and
+// migrates with `git clone`. Override via the INDEXNOW_KEY env var if needed.
+const defaultIndexNowKey = "b736ff0ebfd4421d37c455504f5d1178";
+
+export function resolveIndexNowKey(rawKey?: string | null): string {
+  const trimmedKey = rawKey?.trim();
+
+  if (!trimmedKey) {
+    return defaultIndexNowKey;
+  }
+
+  return trimmedKey;
+}
+
 export function normalizeSiteUrl(siteUrl: string): string {
   return new URL(siteUrl).toString().replace(/\/$/, "");
 }
