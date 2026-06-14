@@ -10,25 +10,27 @@ import {
   getAdxDownloadFileName,
   saveBlobAsFile,
 } from "@/lib/adx-archive";
-import { fetchAdxDirectoryFiles } from "@/lib/adx-directory";
+import type { AdxRemoteFile } from "@/lib/adx-directory";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 type AdxDownloadButtonProps = {
-  directoryName?: string;
+  /** Files to pack into the .adx (maidata + assets), with their in-archive names. */
+  files: AdxRemoteFile[];
+  /** Base name for the downloaded .adx file (the chart's directory name). */
+  fileName?: string;
   locale: Locale;
 };
 
-type DownloadStatus = "idle" | "probing" | "packing" | "success" | "error";
+type DownloadStatus = "idle" | "packing" | "success" | "error";
 
-export function AdxDownloadButton({ directoryName, locale }: AdxDownloadButtonProps) {
+export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButtonProps) {
   const detailDictionary = getDictionary(locale).detail;
   const [status, setStatus] = React.useState<DownloadStatus>("idle");
   const [progress, setProgress] = React.useState({ completed: 0, total: 0 });
   const [errorMessage, setErrorMessage] = React.useState("");
-  const normalizedDirectoryName =
-    typeof directoryName === "string" ? directoryName.trim() : "";
-  const canDownload = normalizedDirectoryName.length > 0;
-  const isBusy = status === "probing" || status === "packing";
+  const normalizedFileName = typeof fileName === "string" ? fileName.trim() : "";
+  const canDownload = files.length > 0 && normalizedFileName.length > 0;
+  const isBusy = status === "packing";
 
   async function handleClick() {
     if (!canDownload || isBusy) {
@@ -37,10 +39,6 @@ export function AdxDownloadButton({ directoryName, locale }: AdxDownloadButtonPr
 
     try {
       setErrorMessage("");
-      setStatus("probing");
-
-      const files = await fetchAdxDirectoryFiles(normalizedDirectoryName);
-
       setProgress({ completed: 0, total: files.length });
       setStatus("packing");
 
@@ -48,9 +46,9 @@ export function AdxDownloadButton({ directoryName, locale }: AdxDownloadButtonPr
         concurrency: 4,
         onProgress: (completed, total) => setProgress({ completed, total }),
       });
-      const archiveBlob = await buildAdxArchiveBlob(normalizedDirectoryName, archiveInputs);
+      const archiveBlob = await buildAdxArchiveBlob(normalizedFileName, archiveInputs);
 
-      saveBlobAsFile(archiveBlob, getAdxDownloadFileName(normalizedDirectoryName));
+      saveBlobAsFile(archiveBlob, getAdxDownloadFileName(normalizedFileName));
       setStatus("success");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unknown error");
@@ -59,13 +57,11 @@ export function AdxDownloadButton({ directoryName, locale }: AdxDownloadButtonPr
   }
 
   const label =
-    status === "probing"
-      ? detailDictionary.downloadPreparing
-      : status === "packing"
-        ? detailDictionary.downloadPacking(progress.completed, progress.total)
-        : canDownload
-          ? detailDictionary.onsiteDownload
-          : detailDictionary.onsitePending;
+    status === "packing"
+      ? detailDictionary.downloadPacking(progress.completed, progress.total)
+      : canDownload
+        ? detailDictionary.onsiteDownload
+        : detailDictionary.onsitePending;
 
   return (
     <div className="flex flex-col gap-2">

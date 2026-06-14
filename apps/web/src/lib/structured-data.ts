@@ -287,7 +287,7 @@ export function buildChartDetailStructuredData(
   ];
   const range = difficultyLevelRange(entry);
   const difficultyNames = entry.difficulties
-    .map((difficulty) => difficultySlotLabel(difficulty.slot))
+    .map((difficulty) => difficultySlotLabel(difficulty))
     .join(", ");
 
   const additionalProperty: JsonLdValue[] = [

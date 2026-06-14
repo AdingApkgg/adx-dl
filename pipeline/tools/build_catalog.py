@@ -1,17 +1,46 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from tools.parse_maidata import parse_maidata_text
 from tools.remote_catalog import fetch_text as default_fetch_text
-from tools.remote_catalog import parse_remote_directory_files, parse_remote_root_directories
 
-REMOTE_ROOT = "https://adx-dl.larx.cc/"
+# Authoritative, version-complete chart index (replaces the old flat-directory scrape).
+INDEX_URL = "https://adx-dl.larx.cc/tmp/astrodx-charts/index.json"
+MEDIA_BASE = "https://adx-dl.larx.cc/tmp/astrodx-charts/"
+
+# Canonical maimai version names by versionid (matches the site's MAIMAI_VERSIONS).
+CANONICAL_VERSIONS: dict[int, str] = {
+    0: "maimai",
+    1: "maimai PLUS",
+    2: "maimai GreeN",
+    3: "maimai GreeN PLUS",
+    4: "maimai ORANGE",
+    5: "maimai ORANGE PLUS",
+    6: "maimai PiNK",
+    7: "maimai PiNK PLUS",
+    8: "maimai MURASAKi",
+    9: "maimai MURASAKi PLUS",
+    10: "maimai MiLK",
+    11: "maimai MiLK PLUS",
+    12: "maimai FiNALE",
+    13: "maimai DX",
+    14: "maimai DX PLUS",
+    15: "maimai DX Splash",
+    16: "maimai DX Splash PLUS",
+    17: "maimai DX UNiVERSE",
+    18: "maimai DX UNiVERSE PLUS",
+    19: "maimai DX FESTiVAL",
+    20: "maimai DX FESTiVAL PLUS",
+    21: "maimai DX BUDDiES",
+    22: "maimai DX BUDDiES PLUS",
+    23: "maimai DX PRiSM",
+    24: "maimai DX PRiSM PLUS",
+    25: "maimai DX CiRCLE",
+}
 
 
 def _slugify(value: str) -> str:
@@ -20,7 +49,7 @@ def _slugify(value: str) -> str:
 
 
 def _path_slug(name: str) -> str:
-    # Readable, URL-safe route slug derived from the remote directory name.
+    # Readable, URL-safe route slug derived from the chart directory name.
     # \W keeps Unicode word chars (incl. CJK) and turns whitespace/punctuation
     # into dashes, so non-ASCII titles stay human-readable in the URL.
     slug = re.sub(r"\W+", "-", name.strip(), flags=re.UNICODE).strip("-").lower()
@@ -40,127 +69,108 @@ def _assign_route_slugs(entries: list[dict[str, Any]]) -> None:
         entry["slug"] = slug
 
 
-def _pick_file(file_index: dict[str, dict[str, str]], *names: str) -> str:
-    for name in names:
-        if name in file_index:
-            return file_index[name]["url"]
-    return ""
+def _media_url(relative_path: str) -> str:
+    from urllib.parse import quote
+
+    return MEDIA_BASE + quote(relative_path, safe="/")
 
 
-def _build_remote_entry(
-    directory: dict[str, str],
-    files: list[dict[str, str]],
-    maidata_text: str,
-    generated_at: str,
-) -> dict[str, Any]:
-    parsed = parse_maidata_text(maidata_text)
-    file_index = {file["name"]: file for file in files}
-    remote_dir_name = directory["name"]
-    short_id = str(parsed.get("short_id", "")).strip()
-    stable_key = f"{short_id}-{remote_dir_name}" if short_id else remote_dir_name
-    version = str(parsed.get("version", "") or "").strip()
-    cabinet = str(parsed.get("cabinet", "") or "").strip()
-    subcategory = version or cabinet or "Unknown"
-    imported_at = (
-        file_index.get("maidata.txt", {}).get("modified_at")
-        or file_index.get("maidata_dx.txt", {}).get("modified_at")
-        or next((file.get("modified_at", "") for file in files if file.get("modified_at")), "")
-        or generated_at
-    )
+def _strip_cabinet_prefix(segment: str) -> tuple[str, str]:
+    # "[DX] 1000年生きてる" -> ("1000年生きてる", "DX"); "[奏]アイドル" -> ("アイドル", "奏")
+    match = re.match(r"^\[([^\]]*)\]\s*(.*)$", segment)
+    if match:
+        name = match.group(2).strip()
+        return (name or segment, match.group(1).strip())
+    return (segment, "")
 
-    files_payload = {
-        "maidata": _pick_file(file_index, "maidata.txt"),
-        "maidata_dx": _pick_file(file_index, "maidata_dx.txt"),
-        "audio": _pick_file(file_index, "track.mp3", "track.ogg"),
-        "background": _pick_file(file_index, "bg.png", "bg.jpg", "bg.jpeg"),
-        "pv": _pick_file(file_index, "pv.mp4"),
-    }
+
+def _build_entry(item: dict[str, Any], generated_at: str) -> dict[str, Any]:
+    path = str(item.get("path", "")).strip()
+    segment = path.split("/")[-1] if path else str(item.get("title", ""))
+    name, cabinet = _strip_cabinet_prefix(segment)
+
+    files = item.get("files") or {}
+
+    def media(key: str) -> str:
+        rel = files.get(key)
+        return _media_url(rel) if rel else ""
+
+    maidata_url = media("maidata")
+    audio_url = media("audio")
+    cover_url = media("bg")
+    pv_url = media("pv")
+
+    version_id = item.get("versionid")
+    version = CANONICAL_VERSIONS.get(version_id, str(item.get("version", "") or "").strip())
+    short_id = str(item.get("shortid", "") or "").strip()
+    stable_key = f"{short_id}-{name}" if short_id else name
+
+    difficulties = [
+        {
+            "slot": difficulty.get("slot"),
+            "name": str(difficulty.get("name", "") or ""),
+            "level": str(difficulty.get("level", "") or ""),
+            "designer": str(difficulty.get("designer", "") or ""),
+        }
+        for difficulty in item.get("difficulties", [])
+        if difficulty.get("has_notes", True)
+    ]
 
     return {
         "id": _slugify(stable_key),
-        "remote_dir_name": remote_dir_name,
-        "title": str(parsed.get("title", "") or remote_dir_name).strip() or remote_dir_name,
-        "title_en": str(parsed.get("title_en", "") or "").strip(),
-        "artist": str(parsed.get("artist", "") or "").strip(),
-        "artist_en": str(parsed.get("artist_en", "") or "").strip(),
+        "remote_dir_name": name,
+        "title": str(item.get("title", "") or name),
+        "title_en": "",
+        "artist": str(item.get("artist", "") or ""),
+        "artist_en": "",
         "category": "Remote",
-        "subcategory": subcategory,
+        "subcategory": version or cabinet or "Unknown",
         "source_archive": "",
-        "source_folder": remote_dir_name,
+        "source_folder": path,
         "version": version,
-        "genre": str(parsed.get("genre", "") or "").strip(),
+        "versionid": version_id,
+        "genre": str(item.get("genre", "") or ""),
         "cabinet": cabinet,
         "short_id": short_id,
-        "offset": parsed.get("offset"),
-        "bpm": parsed.get("bpm"),
-        "difficulties": parsed.get("difficulties", []),
+        "offset": item.get("first"),
+        "bpm": item.get("bpm"),
+        "difficulties": difficulties,
         "download_mode": "onsite",
         "download_url": "",
-        "source_url": directory["url"],
-        "license_note": "Built from remote directory listing",
-        "files": files_payload,
+        "source_url": _media_url(path) + "/" if path else "",
+        "license_note": "Built from astrodx-charts index",
+        "files": {
+            "maidata": maidata_url,
+            "maidata_dx": "",
+            "audio": audio_url,
+            "background": cover_url,
+            "pv": pv_url,
+        },
         "assets": {
-            "has_audio": bool(files_payload["audio"]),
-            "has_background": bool(files_payload["background"]),
-            "has_pv": bool(files_payload["pv"]),
-            "has_dx_chart": bool(files_payload["maidata_dx"]),
+            "has_audio": bool(audio_url),
+            "has_background": bool(cover_url),
+            "has_pv": bool(pv_url),
+            "has_dx_chart": cabinet == "DX",
         },
         "media": {
-            "entry_base_url": directory["url"],
-            "cover_url": files_payload["background"],
-            "audio_url": files_payload["audio"],
-            "pv_url": files_payload["pv"],
+            "entry_base_url": _media_url(path) + "/" if path else "",
+            "cover_url": cover_url,
+            "audio_url": audio_url,
+            "pv_url": pv_url,
         },
-        "imported_at": imported_at,
+        "imported_at": generated_at,
     }
-
-
-def _build_entry_for_directory(
-    directory: dict[str, str],
-    generated_at: str,
-    fetch_text: Callable[[str], str],
-) -> dict[str, Any] | None:
-    try:
-        directory_html = fetch_text(directory["url"])
-        files = parse_remote_directory_files(directory_html, directory["url"])
-        file_index = {file["name"]: file for file in files}
-        maidata_url = _pick_file(file_index, "maidata.txt", "maidata_dx.txt")
-        if not maidata_url:
-            return None
-
-        maidata_text = fetch_text(maidata_url)
-        return _build_remote_entry(directory, files, maidata_text, generated_at)
-    except Exception:
-        return None
 
 
 def build_catalog(
     root: Path,
     fetch_text: Callable[[str], str] = default_fetch_text,
-    max_workers: int = 8,
+    max_workers: int = 8,  # kept for signature compatibility; no longer used
 ) -> Path:
     generated_at = datetime.now(timezone.utc).isoformat()
-    root_html = fetch_text(REMOTE_ROOT)
-    directories = parse_remote_root_directories(root_html, REMOTE_ROOT)
-    entries: list[dict[str, Any]] = []
+    items = json.loads(fetch_text(INDEX_URL))
 
-    if directories:
-        worker_count = max(1, min(max_workers, len(directories)))
-        with ThreadPoolExecutor(max_workers=worker_count) as executor:
-            futures = [
-                executor.submit(
-                    _build_entry_for_directory,
-                    directory,
-                    generated_at,
-                    fetch_text,
-                )
-                for directory in directories
-            ]
-            for future in as_completed(futures):
-                entry = future.result()
-                if entry is not None:
-                    entries.append(entry)
-
+    entries = [_build_entry(item, generated_at) for item in items]
     entries.sort(key=lambda entry: entry["id"])
     _assign_route_slugs(entries)
 
@@ -170,7 +180,7 @@ def build_catalog(
         "categories": {"Remote": sorted({entry["subcategory"] for entry in entries})},
         "entries": entries,
     }
-    # Monorepo layout: generated catalog lives under data/catalog at the repo root.
+
     catalog_path = root / "data" / "catalog" / "index.json"
     catalog_path.parent.mkdir(parents=True, exist_ok=True)
     catalog_path.write_text(

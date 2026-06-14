@@ -1,365 +1,131 @@
 import json
 import ssl
-import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from urllib.error import URLError
+from urllib.parse import quote
 
-from tools.build_catalog import build_catalog
-from tools.remote_catalog import (
-    fetch_text,
-    parse_remote_directory_files,
-    parse_remote_root_directories,
+from tools.build_catalog import MEDIA_BASE, build_catalog
+from tools.remote_catalog import fetch_text
+
+
+def _media_url(relative_path: str) -> str:
+    return MEDIA_BASE + quote(relative_path, safe="/")
+
+
+SAMPLE_INDEX = json.dumps(
+    [
+        {
+            "title": "コネクト",
+            "artist": "ClariS",
+            "shortid": "10146",
+            "version": "でらっくす PLUS",
+            "versionid": 14,
+            "genre": "POPSアニメ",
+            "bpm": 175,
+            "first": 0,
+            "path": "でらっくす PLUS/[DX] コネクト",
+            "files": {
+                "maidata": "でらっくす PLUS/[DX] コネクト/maidata.txt",
+                "audio": "でらっくす PLUS/[DX] コネクト/track.mp3",
+                "bg": "でらっくす PLUS/[DX] コネクト/bg.png",
+                "pv": "でらっくす PLUS/[DX] コネクト/pv.mp4",
+            },
+            "difficulties": [
+                {"slot": 2, "name": "Basic", "level": "4.0", "designer": None, "has_notes": True},
+                {"slot": 5, "name": "Master", "level": "13.4", "designer": "Charter", "has_notes": True},
+                {"slot": 6, "name": "Re:Master", "level": "0", "designer": None, "has_notes": False},
+            ],
+        },
+        {
+            "title": "Bare Song",
+            "artist": "Nobody",
+            "shortid": "",
+            "version": "FiNALE",
+            "versionid": 12,
+            "genre": "",
+            "bpm": None,
+            "first": 0,
+            "path": "FiNALE/[ST] Bare Song",
+            "files": {
+                "maidata": "FiNALE/[ST] Bare Song/maidata.txt",
+                "audio": "FiNALE/[ST] Bare Song/track.mp3",
+                "bg": "FiNALE/[ST] Bare Song/bg.png",
+                "pv": "",
+            },
+            "difficulties": [
+                {"slot": 3, "name": "Advanced", "level": "7.0", "designer": None, "has_notes": True},
+            ],
+        },
+    ],
+    ensure_ascii=False,
 )
 
 
 class BuildCatalogTests(unittest.TestCase):
-    def test_parse_remote_root_directories_extracts_direct_children(self) -> None:
-        html = """
-        <html>
-          <body>
-            <a href="../">Parent directory</a>
-            <a href="39%20%5BDX%5D/">39 [DX]/</a>
-            <a href="?sort=name&order=asc">Name</a>
-            <a href="nested/path/">nested/path/</a>
-            <a href="39%20%5BDX%5D/">39 [DX]/</a>
-          </body>
-        </html>
-        """
+    def _build(self) -> dict:
+        with TemporaryDirectory() as temp_dir:
+            catalog_path = build_catalog(Path(temp_dir), fetch_text=lambda _url: SAMPLE_INDEX)
+            return json.loads(catalog_path.read_text(encoding="utf-8"))
 
-        directories = parse_remote_root_directories(html, "https://adx-dl.larx.cc/")
+    def test_transforms_index_into_catalog_entries(self) -> None:
+        catalog = self._build()
+        self.assertEqual(catalog["total_entries"], 2)
+        # Entries are sorted by id: "10146" (CJK stripped) < "bare-song".
+        konekto = catalog["entries"][0]
 
+        self.assertEqual(konekto["title"], "コネクト")
+        self.assertEqual(konekto["artist"], "ClariS")
+        # Version is canonicalized from versionid (14 -> maimai DX PLUS).
+        self.assertEqual(konekto["version"], "maimai DX PLUS")
+        self.assertEqual(konekto["versionid"], 14)
+        self.assertEqual(konekto["subcategory"], "maimai DX PLUS")
+        # Cabinet prefix is stripped for the readable name/slug.
+        self.assertEqual(konekto["remote_dir_name"], "コネクト")
+        self.assertEqual(konekto["slug"], "コネクト")
+        self.assertEqual(konekto["cabinet"], "DX")
+        self.assertEqual(konekto["short_id"], "10146")
+        self.assertEqual(konekto["bpm"], 175)
         self.assertEqual(
-            directories,
+            konekto["files"]["maidata"],
+            _media_url("でらっくす PLUS/[DX] コネクト/maidata.txt"),
+        )
+        self.assertEqual(
+            konekto["media"]["cover_url"],
+            _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
+        )
+        self.assertTrue(konekto["assets"]["has_pv"])
+        self.assertTrue(konekto["assets"]["has_dx_chart"])
+
+    def test_only_playable_difficulties_with_source_names(self) -> None:
+        konekto = self._build()["entries"][0]
+        # The has_notes=False Re:Master row is dropped; names come from the source.
+        self.assertEqual(
+            konekto["difficulties"],
             [
-                {
-                    "name": "39 [DX]",
-                    "url": "https://adx-dl.larx.cc/39%20%5BDX%5D/",
-                }
+                {"slot": 2, "name": "Basic", "level": "4.0", "designer": ""},
+                {"slot": 5, "name": "Master", "level": "13.4", "designer": "Charter"},
             ],
         )
 
-    def test_parse_remote_directory_files_extracts_file_rows(self) -> None:
-        html = """
-        <table>
-          <tr>
-            <td><a href="../">Parent directory</a></td>
-            <td></td>
-            <td></td>
-          </tr>
-          <tr>
-            <td><a href="bg.png">bg.png</a></td>
-            <td>246.7 KiB</td>
-            <td>2026-06-13 05:25:42 +08:00</td>
-          </tr>
-          <tr>
-            <td><a href="maidata.txt">maidata.txt</a></td>
-            <td>6.9 KiB</td>
-            <td>2026-06-13 05:25:42 +08:00</td>
-          </tr>
-          <tr>
-            <td><a href="nested/">nested/</a></td>
-            <td></td>
-            <td></td>
-          </tr>
-        </table>
-        """
+    def test_missing_pv_and_standard_cabinet(self) -> None:
+        bare = self._build()["entries"][1]
+        self.assertEqual(bare["version"], "maimai FiNALE")
+        self.assertEqual(bare["cabinet"], "ST")
+        self.assertEqual(bare["short_id"], "")
+        self.assertEqual(bare["files"]["pv"], "")
+        self.assertEqual(bare["media"]["pv_url"], "")
+        self.assertFalse(bare["assets"]["has_pv"])
+        self.assertFalse(bare["assets"]["has_dx_chart"])
+        self.assertEqual(bare["download_mode"], "onsite")
 
-        files = parse_remote_directory_files(
-            html,
-            "https://adx-dl.larx.cc/39%20%5BDX%5D/",
+    def test_catalog_categories_list_distinct_versions(self) -> None:
+        catalog = self._build()
+        self.assertEqual(
+            catalog["categories"]["Remote"], ["maimai DX PLUS", "maimai FiNALE"]
         )
-
-        self.assertEqual([file["name"] for file in files], ["bg.png", "maidata.txt"])
-        self.assertEqual(files[0]["url"], "https://adx-dl.larx.cc/39%20%5BDX%5D/bg.png")
-        self.assertEqual(files[0]["size_label"], "246.7 KiB")
-        self.assertEqual(files[0]["modified_at"], "2026-06-13 05:25:42 +08:00")
-
-    def test_build_catalog_scans_remote_directories_and_builds_entries(self) -> None:
-        with TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            payloads = {
-                "https://adx-dl.larx.cc/": """
-                <table>
-                  <tr>
-                    <td><a href="39%20%5BDX%5D/">39 [DX]/</a></td>
-                    <td></td>
-                    <td>2026-06-13 05:25:42 +08:00</td>
-                  </tr>
-                </table>
-                """,
-                "https://adx-dl.larx.cc/39%20%5BDX%5D/": """
-                <table>
-                  <tr>
-                    <td><a href="bg.png">bg.png</a></td>
-                    <td>246.7 KiB</td>
-                    <td>2026-06-13 05:25:42 +08:00</td>
-                  </tr>
-                  <tr>
-                    <td><a href="maidata.txt">maidata.txt</a></td>
-                    <td>6.9 KiB</td>
-                    <td>2026-06-13 05:25:42 +08:00</td>
-                  </tr>
-                  <tr>
-                    <td><a href="track.mp3">track.mp3</a></td>
-                    <td>2.7 MiB</td>
-                    <td>2026-06-13 05:25:42 +08:00</td>
-                  </tr>
-                </table>
-                """,
-                "https://adx-dl.larx.cc/39%20%5BDX%5D/maidata.txt": """
-                &title=39 [DX]
-                &artist=sasakure.UK x DECO*27
-                &wholebpm=175
-                &shortid=10146
-                &genre=niconicoボーカロイド
-                &cabinet=DX
-                &version=maimai DX
-                &lv_5=12+
-                &des_5=Jack
-                &inote_5=(175){4},1,2,3,4
-                """,
-            }
-
-            catalog_path = build_catalog(root, fetch_text=payloads.__getitem__)
-            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-            entry = catalog["entries"][0]
-
-            self.assertEqual(catalog["total_entries"], 1)
-            self.assertEqual(catalog["categories"]["Remote"], ["maimai DX"])
-            self.assertEqual(entry["slug"], "39-dx")
-            self.assertEqual(entry["title"], "39 [DX]")
-            self.assertEqual(entry["artist"], "sasakure.UK x DECO*27")
-            self.assertEqual(entry["remote_dir_name"], "39 [DX]")
-            self.assertEqual(
-                entry["files"]["maidata"],
-                "https://adx-dl.larx.cc/39%20%5BDX%5D/maidata.txt",
-            )
-            self.assertEqual(
-                entry["media"]["cover_url"],
-                "https://adx-dl.larx.cc/39%20%5BDX%5D/bg.png",
-            )
-            self.assertEqual(
-                entry["media"]["audio_url"],
-                "https://adx-dl.larx.cc/39%20%5BDX%5D/track.mp3",
-            )
-            self.assertEqual(entry["download_mode"], "onsite")
-            self.assertEqual(entry["license_note"], "Built from remote directory listing")
-
-    def test_build_catalog_skips_directories_without_maidata(self) -> None:
-        with TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            payloads = {
-                "https://adx-dl.larx.cc/": """
-                <table>
-                  <tr>
-                    <td><a href="empty/">empty/</a></td>
-                    <td></td>
-                    <td>2026-06-13 05:25:42 +08:00</td>
-                  </tr>
-                </table>
-                """,
-                "https://adx-dl.larx.cc/empty/": """
-                <table>
-                  <tr>
-                    <td><a href="bg.png">bg.png</a></td>
-                    <td>246.7 KiB</td>
-                    <td>2026-06-13 05:25:42 +08:00</td>
-                  </tr>
-                </table>
-                """,
-            }
-
-            catalog_path = build_catalog(root, fetch_text=payloads.__getitem__)
-            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-
-            self.assertEqual(catalog["total_entries"], 0)
-            self.assertEqual(catalog["entries"], [])
-
-    def test_build_catalog_uses_maidata_dx_when_plain_maidata_missing(self) -> None:
-        with TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            payloads = {
-                "https://adx-dl.larx.cc/": """
-                <table>
-                  <tr>
-                    <td><a href="dx-only/">dx-only/</a></td>
-                    <td></td>
-                    <td>2026-06-13 05:25:42 +08:00</td>
-                  </tr>
-                </table>
-                """,
-                "https://adx-dl.larx.cc/dx-only/": """
-                <table>
-                  <tr>
-                    <td><a href="maidata_dx.txt">maidata_dx.txt</a></td>
-                    <td>6.9 KiB</td>
-                    <td>2026-06-13 05:25:42 +08:00</td>
-                  </tr>
-                  <tr>
-                    <td><a href="track.mp3">track.mp3</a></td>
-                    <td>2.7 MiB</td>
-                    <td>2026-06-13 05:25:42 +08:00</td>
-                  </tr>
-                </table>
-                """,
-                "https://adx-dl.larx.cc/dx-only/maidata_dx.txt": """
-                &title=DX Only
-                &artist=Remote Artist
-                &version=maimai DX PRiSM
-                &shortid=620
-                &lv_5=13+
-                &des_5=Charter
-                &inote_5=(225){4},1,2,3,4
-                """,
-            }
-
-            catalog_path = build_catalog(root, fetch_text=payloads.__getitem__)
-            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-            entry = catalog["entries"][0]
-
-            self.assertEqual(
-                entry["files"]["maidata_dx"],
-                "https://adx-dl.larx.cc/dx-only/maidata_dx.txt",
-            )
-            self.assertEqual(entry["files"]["maidata"], "")
-            self.assertTrue(entry["assets"]["has_dx_chart"])
-            self.assertEqual(entry["subcategory"], "maimai DX PRiSM")
-
-    def test_build_catalog_sets_remote_media_urls_without_copying_assets(self) -> None:
-        with TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            payloads = {
-                "https://adx-dl.larx.cc/": """
-                <table>
-                  <tr>
-                    <td><a href="39%20%5BDX%5D/">39 [DX]/</a></td>
-                    <td></td>
-                    <td>2026-06-13 05:25:42 +08:00</td>
-                  </tr>
-                </table>
-                """,
-                "https://adx-dl.larx.cc/39%20%5BDX%5D/": """
-                <table>
-                  <tr>
-                    <td><a href="bg.png">bg.png</a></td>
-                    <td>246.7 KiB</td>
-                    <td>2026-06-13 05:25:42 +08:00</td>
-                  </tr>
-                  <tr>
-                    <td><a href="maidata.txt">maidata.txt</a></td>
-                    <td>6.9 KiB</td>
-                    <td>2026-06-13 05:25:42 +08:00</td>
-                  </tr>
-                </table>
-                """,
-                "https://adx-dl.larx.cc/39%20%5BDX%5D/maidata.txt": """
-                &title=39 [DX]
-                &artist=Artist
-                &version=maimai DX
-                &lv_5=12+
-                &des_5=Jack
-                &inote_5=(175){4},1,2,3,4
-                """,
-            }
-
-            catalog_path = build_catalog(root, fetch_text=payloads.__getitem__)
-            entry = json.loads(catalog_path.read_text(encoding="utf-8"))["entries"][0]
-
-            self.assertEqual(
-                entry["media"]["cover_url"],
-                "https://adx-dl.larx.cc/39%20%5BDX%5D/bg.png",
-            )
-            self.assertFalse((root / "apps" / "web" / "public" / "catalog-assets").exists())
-
-    def test_build_catalog_parallel_fetch_keeps_entries_in_stable_order(self) -> None:
-        with TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            payloads = {
-                "https://adx-dl.larx.cc/": """
-                <table>
-                  <tr><td><a href="b/">b/</a></td><td></td><td>2026-06-13 05:25:42 +08:00</td></tr>
-                  <tr><td><a href="a/">a/</a></td><td></td><td>2026-06-13 05:25:42 +08:00</td></tr>
-                </table>
-                """,
-                "https://adx-dl.larx.cc/a/": """
-                <table>
-                  <tr><td><a href="maidata.txt">maidata.txt</a></td><td>6.9 KiB</td><td>2026-06-13 05:25:42 +08:00</td></tr>
-                </table>
-                """,
-                "https://adx-dl.larx.cc/b/": """
-                <table>
-                  <tr><td><a href="maidata.txt">maidata.txt</a></td><td>6.9 KiB</td><td>2026-06-13 05:25:42 +08:00</td></tr>
-                </table>
-                """,
-                "https://adx-dl.larx.cc/a/maidata.txt": """
-                &title=A Song
-                &artist=Artist A
-                &version=maimai DX
-                &shortid=1
-                &lv_5=12+
-                &des_5=Jack
-                &inote_5=(175){4},1,2,3,4
-                """,
-                "https://adx-dl.larx.cc/b/maidata.txt": """
-                &title=B Song
-                &artist=Artist B
-                &version=maimai DX
-                &shortid=2
-                &lv_5=12+
-                &des_5=Jack
-                &inote_5=(175){4},1,2,3,4
-                """,
-            }
-
-            def fake_fetch(url: str) -> str:
-                if url.endswith("/a/maidata.txt"):
-                    time.sleep(0.02)
-                return payloads[url]
-
-            catalog_path = build_catalog(root, fetch_text=fake_fetch, max_workers=2)
-            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-
-            self.assertEqual([entry["id"] for entry in catalog["entries"]], ["1-a", "2-b"])
-
-    def test_build_catalog_skips_directory_when_directory_fetch_times_out(self) -> None:
-        with TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            payloads = {
-                "https://adx-dl.larx.cc/": """
-                <table>
-                  <tr><td><a href="ok/">ok/</a></td><td></td><td>2026-06-13 05:25:42 +08:00</td></tr>
-                  <tr><td><a href="timeout/">timeout/</a></td><td></td><td>2026-06-13 05:25:42 +08:00</td></tr>
-                </table>
-                """,
-                "https://adx-dl.larx.cc/ok/": """
-                <table>
-                  <tr><td><a href="maidata.txt">maidata.txt</a></td><td>6.9 KiB</td><td>2026-06-13 05:25:42 +08:00</td></tr>
-                </table>
-                """,
-                "https://adx-dl.larx.cc/ok/maidata.txt": """
-                &title=OK Song
-                &artist=Artist OK
-                &version=maimai DX
-                &shortid=42
-                &lv_5=12+
-                &des_5=Jack
-                &inote_5=(175){4},1,2,3,4
-                """,
-            }
-
-            def fake_fetch(url: str) -> str:
-                if url == "https://adx-dl.larx.cc/timeout/":
-                    raise TimeoutError("The read operation timed out")
-                return payloads[url]
-
-            catalog_path = build_catalog(root, fetch_text=fake_fetch, max_workers=2)
-            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-
-            self.assertEqual(catalog["total_entries"], 1)
-            self.assertEqual([entry["id"] for entry in catalog["entries"]], ["42-ok"])
 
     def test_fetch_text_retries_without_ssl_verification_on_certificate_error(self) -> None:
         calls: list[object] = []

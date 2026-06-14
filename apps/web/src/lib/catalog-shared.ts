@@ -1,5 +1,7 @@
 export type CatalogDifficulty = {
   slot: number;
+  /** Official difficulty name from the source (Basic/Advanced/Expert/Master/Re:Master/Utage). */
+  name?: string;
   level: string;
   designer: string;
 };
@@ -119,25 +121,29 @@ export function versionSlug(subcategory: string): string {
 
 type EntryLocale = "zh" | "en" | "ja";
 
-// Standard maimai DX difficulty ordering. Verified against the catalog level
-// distribution (slot medians 2 / 4 / 7.5 / 10.5 / 13, slots 6-7 = 宴 charts).
-// The labels are official romanized proper nouns, identical across locales.
+// Fallback difficulty labels by slot, used only when the catalog entry lacks the
+// source-provided name. Source slots: 2 Basic / 3 Advanced / 4 Expert / 5 Master /
+// 6 Re:Master / 7 Utage. The labels are official romanized proper nouns.
 const MAIMAI_SLOT_LABELS: Record<number, string> = {
-  1: "Basic",
-  2: "Advanced",
-  3: "Expert",
-  4: "Master",
-  5: "Re:Master",
-  6: "U·TAGE",
+  2: "Basic",
+  3: "Advanced",
+  4: "Expert",
+  5: "Master",
+  6: "Re:Master",
   7: "U·TAGE",
 };
 
-export function difficultySlotLabel(slot: number): string {
-  return MAIMAI_SLOT_LABELS[slot] ?? `Lv.${slot}`;
+export function difficultySlotLabel(difficulty: { slot: number; name?: string }): string {
+  const name = difficulty.name?.trim();
+  if (name) {
+    return name;
+  }
+  return MAIMAI_SLOT_LABELS[difficulty.slot] ?? `Lv.${difficulty.slot}`;
 }
 
+// Levels can be plain ("13"), suffixed ("12+"), or decimal ("13.4").
 function levelSortValue(level: string): number {
-  const match = level.match(/^(\d+)(\+)?/);
+  const match = level.match(/^(\d+(?:\.\d+)?)(\+)?/);
   if (!match) {
     return -1;
   }

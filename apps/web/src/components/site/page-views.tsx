@@ -294,6 +294,14 @@ export function ChartDetailPageView({
   const showVersionBadge = entry.category !== "Remote" && entry.version;
   const description = buildChartDescription(entry, locale);
 
+  // Files packed into the downloaded .adx, named as the AstroDX app expects.
+  const downloadFiles = [
+    { name: "maidata.txt", url: entry.files.maidata },
+    { name: "track.mp3", url: entry.media.audio_url },
+    { name: "bg.png", url: entry.media.cover_url },
+    { name: "pv.mp4", url: entry.media.pv_url },
+  ].filter((file) => file.url);
+
   return (
     <main
       id="main-content"
@@ -329,7 +337,11 @@ export function ChartDetailPageView({
           </div>
           <div className="flex flex-wrap gap-2">
             {entry.download_mode === "onsite" || entry.download_mode === "mixed" ? (
-              <AdxDownloadButton directoryName={entry.remote_dir_name} locale={locale} />
+              <AdxDownloadButton
+                files={downloadFiles}
+                fileName={entry.remote_dir_name}
+                locale={locale}
+              />
             ) : (
               <Button disabled>
                 <DownloadIcon data-icon="inline-start" aria-hidden="true" />
@@ -398,7 +410,7 @@ export function ChartDetailPageView({
                         className="border-b border-border/40 last:border-0"
                       >
                         <th scope="row" className="py-2 pr-4 text-left font-medium">
-                          {difficultySlotLabel(difficulty.slot)}
+                          {difficultySlotLabel(difficulty)}
                         </th>
                         <td className="py-2 pr-4">{difficulty.level || "-"}</td>
                         <td className="py-2">{difficulty.designer || detail.unknownValue}</td>
