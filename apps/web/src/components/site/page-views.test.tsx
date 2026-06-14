@@ -51,10 +51,10 @@ function buildEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
       has_dx_chart: true,
     },
     media: {
-      entry_base_url: `/catalog-assets/${slug}`,
-      cover_url: `/catalog-assets/${slug}/bg.jpg`,
-      audio_url: `/catalog-assets/${slug}/track.mp3`,
-      pv_url: `/catalog-assets/${slug}/pv.mp4`,
+      entry_base_url: `/covers/${slug}`,
+      cover_url: `/covers/${slug}/bg.jpg`,
+      audio_url: `/covers/${slug}/track.mp3`,
+      pv_url: `/covers/${slug}/pv.mp4`,
     },
     difficulties: [{ slot: 0, level: "12+", designer: "Designer 1" }],
     imported_at: "2026-06-12T12:00:00.000Z",
@@ -96,14 +96,13 @@ describe("page views locale-driven content", () => {
     expect(enHtml).toContain("Song 1");
     expect(enHtml).toContain("Artist 1");
     expect(enHtml).toContain(`href="/en/charts/song-1"`);
-    expect(enHtml).toContain('data-layout="dense-row-list"');
-    expect(enHtml).toContain('data-entry-row="song-1"');
+    expect(enHtml).toContain('data-layout="card-grid"');
     expect(enHtml).toContain('data-entry-cover="compact"');
     expect(enHtml).toContain('data-entry-meta="primary"');
     expect(enHtml).toContain('data-entry-actions="compact"');
     expect(enHtml).toContain('data-entry-summary="secondary"');
     expect(enHtml).toContain('alt="Song 1 cover"');
-    expect(enHtml).toContain("aspect-square");
+    expect(enHtml).toContain("aspect-[4/3]");
     expect(enHtml).toContain("Jacket");
     expect(enHtml).toContain("Download");
     expect(enHtml.match(/role="combobox"/g)?.length).toBe(1);
@@ -125,7 +124,7 @@ describe("page views locale-driven content", () => {
     expect(enHtml).toContain("Chart Metadata");
     expect(enHtml).toContain("Onsite Download");
     expect(enHtml).toContain('alt="Song 1 cover"');
-    expect(enHtml).toContain("/catalog-assets/song-1/bg.jpg");
+    expect(enHtml).toContain("/covers/song-1/bg.jpg");
 
     expect(jaHtml).toContain("曲目 1");
     expect(jaHtml).toContain("歌手 1");
@@ -152,11 +151,11 @@ describe("page views locale-driven content", () => {
       <ChartDetailPageView entry={remoteEntry} locale="en" />
     );
 
-    expect(homeHtml).toContain("Catalog branches");
-    expect(homeHtml).toContain("Remote · maimai DX PRiSM / DX");
-    expect(homeHtml).not.toContain("Official branches");
+    // The home now surfaces the branch label (version + cabinet) on the version
+    // tiles and latest-cover cards, not a dedicated "branches" section.
+    expect(homeHtml).toContain("maimai DX PRiSM / DX");
+    expect(homeHtml).not.toContain("legacy-remote-subcategory");
 
-    expect(detailHtml).toContain("Remote");
     expect(detailHtml).toContain("maimai DX PRiSM / DX");
     expect(detailHtml).not.toContain("legacy-remote-subcategory");
   });
@@ -195,11 +194,11 @@ describe("page views locale-driven content", () => {
     const enHtml = renderToStaticMarkup(<SearchPageView entries={[entry]} locale="en" />);
     const zhHtml = renderToStaticMarkup(<SearchPageView entries={[entry]} locale="zh" />);
 
-    expect(enHtml).toContain("All Categories");
+    // The category tab bar only renders with >2 categories; with a single
+    // category the localized browser copy lives in the search placeholder.
     expect(enHtml).toContain("Search title, artist, version...");
     expect(enHtml).toContain(`href="/en/charts/song-1"`);
 
-    expect(zhHtml).toContain("全部分类");
     expect(zhHtml).toContain("搜索曲名、曲师、版本...");
     expect(zhHtml).toContain(`href="/charts/song-1"`);
   });
@@ -210,9 +209,9 @@ describe("page views locale-driven content", () => {
 
     expect(html).toContain("预览");
     expect(html).toContain("<video");
-    expect(html).toContain(`src="/catalog-assets/${slug}/pv.mp4"`);
+    expect(html).toContain(`src="/covers/${slug}/pv.mp4"`);
     expect(html).toContain("<audio");
-    expect(html).toContain(`src="/catalog-assets/${slug}/track.mp3"`);
+    expect(html).toContain(`src="/covers/${slug}/track.mp3"`);
   });
 
   test("detail view omits the preview section when no audio or PV", () => {

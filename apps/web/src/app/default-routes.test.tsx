@@ -43,10 +43,10 @@ function buildEntry(index: number): CatalogEntry {
       has_dx_chart: true,
     },
     media: {
-      entry_base_url: `/catalog-assets/${slug}`,
-      cover_url: `/catalog-assets/${slug}/bg.jpg`,
-      audio_url: `/catalog-assets/${slug}/track.mp3`,
-      pv_url: index % 3 === 0 ? `/catalog-assets/${slug}/pv.mp4` : "",
+      entry_base_url: `/covers/${slug}`,
+      cover_url: `/covers/${slug}/bg.jpg`,
+      audio_url: `/covers/${slug}/track.mp3`,
+      pv_url: index % 3 === 0 ? `/covers/${slug}/pv.mp4` : "",
     },
     difficulties: [
       { slot: 0, level: "12+", designer: `Designer ${index}` },
@@ -93,7 +93,7 @@ describe("default zh routes", () => {
     expect(html).toContain("浏览版本");
     expect(html).toContain("最新封面");
     expect(html).toContain("aspect-square");
-    expect(html).toContain(`/catalog-assets/${slugOf("song-9")}/bg.jpg`);
+    expect(html).toContain(`/covers/${slugOf("song-9")}/bg.jpg`);
     expect(html).toContain("曲目 9");
     expect(html).toContain("曲目 2");
     expect(html).not.toContain("曲目 1");
@@ -106,8 +106,8 @@ describe("default zh routes", () => {
 
     expect(html).toContain("浏览曲目");
     expect(html).toContain("按分类、分支与显示语言浏览 AstroDX 目录条目。");
-    expect(html).toContain('data-layout="dense-row-list"');
-    expect(html).toContain('data-entry-row="song-1"');
+    expect(html).toContain('data-layout="card-grid"');
+    expect(html).toContain('href="/charts/song-1"');
     expect(html).toContain('data-entry-actions="compact"');
     expect(html).toContain("曲目 1");
     expect(html).toContain("详情");
@@ -121,7 +121,7 @@ describe("default zh routes", () => {
 
     expect(html).toContain("搜索");
     expect(html).toContain("按关键字、版本分支与谱面信息筛选目录。");
-    expect(html).toContain('data-layout="dense-row-list"');
+    expect(html).toContain('data-layout="card-grid"');
     expect(html).toContain('data-entry-summary="secondary"');
     expect(html).toContain("曲目 1");
     expect(html).toContain("下载");
@@ -147,7 +147,7 @@ describe("default zh routes", () => {
     expect(html).toContain("难度列表");
     expect(html).toContain("资源状态");
     expect(html).toContain("来源信息");
-    expect(html).toContain(`/catalog-assets/${slugOf("song-3◆phase")}/bg.jpg`);
+    expect(html).toContain(`/covers/${slugOf("song-3◆phase")}/bg.jpg`);
     expect(html).toContain("站内下载");
     expect(html).toContain("来源链接");
   });
