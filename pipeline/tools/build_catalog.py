@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import sys
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,11 +19,14 @@ from tools.remote_catalog import fetch_text as default_fetch_text
 INDEX_URL = "https://adx-dl.larx.cc/tmp/astrodx-charts/index.json"
 MEDIA_BASE = "https://adx-dl.larx.cc/tmp/astrodx-charts/"
 
-# Cover images are mirrored into the web app's public/ during the build so the
-# static site serves them itself instead of hot-linking the remote host. Audio
-# and PV stay remote (too large to bundle into the static export).
+# Cover images are converted to lossless AVIF and mirrored into the web app's
+# public/ during the build so the static site serves a small local copy instead
+# of hot-linking the remote host. The remote original is kept on the entry (for
+# the .adx download and OG/social images); audio and PV always stay remote.
 LOCAL_MEDIA_ROUTE = "/covers"
 COVER_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+# Formats avifenc can decode as input. Other source formats are left remote.
+AVIF_SOURCE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 
 # Canonical maimai version names by versionid (matches the site's MAIMAI_VERSIONS).
 CANONICAL_VERSIONS: dict[int, str] = {
@@ -169,6 +174,8 @@ def _build_entry(item: dict[str, Any], generated_at: str) -> dict[str, Any]:
         "media": {
             "entry_base_url": _media_url(path) + "/" if path else "",
             "cover_url": cover_url,
+            # Local lossless-AVIF copy for on-page display; set during the build.
+            "cover_avif": "",
             "audio_url": audio_url,
             "pv_url": pv_url,
         },
@@ -181,23 +188,48 @@ def _cover_extension(remote_url: str) -> str:
     return ext if ext in COVER_EXTENSIONS else ".png"
 
 
+def _to_avif_lossless(data: bytes, src_ext: str) -> bytes | None:
+    """Convert image bytes to lossless AVIF via avifenc. Returns None when the
+    source format can't be decoded, avifenc is missing, or the encode fails — the
+    caller then keeps the remote cover as a graceful fallback."""
+    if src_ext not in AVIF_SOURCE_EXTENSIONS:
+        return None
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / f"in{src_ext}"
+        dst = Path(tmp) / "out.avif"
+        src.write_bytes(data)
+        try:
+            subprocess.run(
+                ["avifenc", "--lossless", str(src), str(dst)],
+                check=True,
+                capture_output=True,
+                timeout=180,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            print(f"[catalog] avifenc failed ({src_ext}): {error}", file=sys.stderr)
+            return None
+        return dst.read_bytes()
+
+
 def _download_cover(
     entry: dict[str, Any],
     media_root: Path,
     fetch_bytes: Callable[[str], bytes],
+    to_avif: Callable[[bytes, str], bytes | None],
 ) -> bool:
-    """Mirror one entry's cover into media_root/<slug>.<ext> (one flat file per
-    chart, no per-chart subdirectory) and rewrite its URL to the local path.
-    Returns True when the local copy is in place; on any failure the remote URL
-    is left untouched as a graceful fallback."""
+    """Mirror one entry's cover as a lossless AVIF at media_root/<slug>.avif and
+    point media.cover_avif at it (for on-page display). cover_url and
+    files.background keep the remote original, so the .adx download and OG/social
+    images still pull the unconverted file. Returns True when the local AVIF is in
+    place; any failure leaves cover_avif empty and the remote cover untouched."""
     remote_url = entry["media"]["cover_url"]
     if not remote_url or remote_url.startswith("/"):
         return False  # no cover, or already local
 
     slug = entry["slug"]
-    ext = _cover_extension(remote_url)
-    target_file = media_root / f"{slug}{ext}"
-    local_url = f"{LOCAL_MEDIA_ROUTE}/{slug}{ext}"
+    src_ext = _cover_extension(remote_url)
+    target_file = media_root / f"{slug}.avif"
+    local_url = f"{LOCAL_MEDIA_ROUTE}/{slug}.avif"
 
     if not target_file.exists():
         try:
@@ -207,11 +239,13 @@ def _download_cover(
             return False
         if not data:
             return False
+        avif = to_avif(data, src_ext)
+        if not avif:
+            return False  # unconvertible source or encode failure; keep remote cover
         target_file.parent.mkdir(parents=True, exist_ok=True)
-        target_file.write_bytes(data)
+        target_file.write_bytes(avif)
 
-    entry["media"]["cover_url"] = local_url
-    entry["files"]["background"] = local_url
+    entry["media"]["cover_avif"] = local_url
     return True
 
 
@@ -219,12 +253,13 @@ def _download_covers(
     entries: list[dict[str, Any]],
     media_root: Path,
     fetch_bytes: Callable[[str], bytes],
+    to_avif: Callable[[bytes, str], bytes | None],
     max_workers: int,
 ) -> int:
     media_root.mkdir(parents=True, exist_ok=True)
     with ThreadPoolExecutor(max_workers=max(1, max_workers)) as pool:
         results = pool.map(
-            lambda entry: _download_cover(entry, media_root, fetch_bytes), entries
+            lambda entry: _download_cover(entry, media_root, fetch_bytes, to_avif), entries
         )
         return sum(1 for ok in results if ok)
 
@@ -233,6 +268,7 @@ def build_catalog(
     root: Path,
     fetch_text: Callable[[str], str] = default_fetch_text,
     fetch_bytes: Callable[[str], bytes] | None = default_fetch_bytes,
+    to_avif: Callable[[bytes, str], bytes | None] = _to_avif_lossless,
     download_media: bool = True,
     media_root: Path | None = None,
     max_workers: int = 8,
@@ -244,12 +280,13 @@ def build_catalog(
     entries.sort(key=lambda entry: entry["id"])
     _assign_route_slugs(entries)
 
-    # Pull cover images into the web app's public/ so they ship with the static
-    # export; cover URLs are rewritten to the local /covers path in place.
+    # Convert covers to lossless AVIF into the web app's public/ so they ship with
+    # the static export; media.cover_avif points at the local copy while cover_url
+    # stays remote for the .adx download and OG/social images.
     if download_media and fetch_bytes is not None:
         target = media_root or (root / "apps" / "web" / "public" / "covers")
-        saved = _download_covers(entries, target, fetch_bytes, max_workers)
-        print(f"[catalog] mirrored {saved}/{len(entries)} cover images to {target}")
+        saved = _download_covers(entries, target, fetch_bytes, to_avif, max_workers)
+        print(f"[catalog] mirrored {saved}/{len(entries)} cover images (AVIF) to {target}")
 
     catalog = {
         "generated_at": generated_at,

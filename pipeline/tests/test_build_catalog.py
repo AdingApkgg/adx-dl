@@ -131,7 +131,13 @@ class BuildCatalogTests(unittest.TestCase):
             catalog["categories"]["Remote"], ["maimai DX PLUS", "maimai FiNALE"]
         )
 
-    def test_downloads_cover_images_to_local_paths(self) -> None:
+    def test_downloads_cover_images_as_local_avif(self) -> None:
+        seen_exts: list[str] = []
+
+        def fake_avif(data: bytes, src_ext: str) -> bytes:
+            seen_exts.append(src_ext)
+            return b"AVIFDATA"
+
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             media_root = root / "media"
@@ -139,25 +145,37 @@ class BuildCatalogTests(unittest.TestCase):
                 root,
                 fetch_text=lambda _url: SAMPLE_INDEX,
                 fetch_bytes=lambda _url: b"PNGDATA",
+                to_avif=fake_avif,
                 download_media=True,
                 media_root=media_root,
             )
             catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
 
             konekto = catalog["entries"][0]  # slug "10146"
-            # Flat path: one file per chart, no per-chart subdirectory.
-            self.assertEqual(konekto["media"]["cover_url"], "/covers/10146.png")
-            self.assertEqual(konekto["files"]["background"], "/covers/10146.png")
-            # Only images are mirrored — audio/PV stay remote.
+            # Display points at the local lossless-AVIF copy (one flat file/chart)...
+            self.assertEqual(konekto["media"]["cover_avif"], "/covers/10146.avif")
+            # ...while cover_url and files.background keep the remote original
+            # (used by the .adx download and OG/social images).
+            self.assertEqual(
+                konekto["media"]["cover_url"],
+                _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
+            )
+            self.assertEqual(
+                konekto["files"]["background"],
+                _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
+            )
+            # Audio/PV always stay remote.
             self.assertEqual(
                 konekto["media"]["audio_url"],
                 _media_url("でらっくす PLUS/[DX] コネクト/track.mp3"),
             )
-            saved = media_root / "10146.png"
+            saved = media_root / "10146.avif"
             self.assertTrue(saved.exists())
-            self.assertEqual(saved.read_bytes(), b"PNGDATA")
+            self.assertEqual(saved.read_bytes(), b"AVIFDATA")
 
-    def test_keeps_remote_cover_url_when_download_fails(self) -> None:
+        self.assertIn(".png", seen_exts)  # the source ext is passed to the converter
+
+    def test_keeps_remote_cover_when_download_fails(self) -> None:
         def boom(_url: str) -> bytes:
             raise RuntimeError("network down")
 
@@ -167,12 +185,34 @@ class BuildCatalogTests(unittest.TestCase):
                 root,
                 fetch_text=lambda _url: SAMPLE_INDEX,
                 fetch_bytes=boom,
+                to_avif=lambda _data, _ext: b"AVIFDATA",
                 download_media=True,
                 media_root=root / "media",
             )
             konekto = json.loads(catalog_path.read_text(encoding="utf-8"))["entries"][0]
 
-        # A failed download leaves the remote URL in place as a fallback.
+        # A failed download leaves cover_avif empty and the remote URL intact.
+        self.assertEqual(konekto["media"]["cover_avif"], "")
+        self.assertEqual(
+            konekto["media"]["cover_url"],
+            _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
+        )
+
+    def test_keeps_remote_cover_when_avif_conversion_unavailable(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            catalog_path = build_catalog(
+                root,
+                fetch_text=lambda _url: SAMPLE_INDEX,
+                fetch_bytes=lambda _url: b"PNGDATA",
+                to_avif=lambda _data, _ext: None,  # avifenc missing / encode failed
+                download_media=True,
+                media_root=root / "media",
+            )
+            konekto = json.loads(catalog_path.read_text(encoding="utf-8"))["entries"][0]
+
+        # No AVIF written; display falls back to the remote cover.
+        self.assertEqual(konekto["media"]["cover_avif"], "")
         self.assertEqual(
             konekto["media"]["cover_url"],
             _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),

@@ -27,6 +27,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install libavif (avifenc for lossless cover conversion)
+        run: sudo apt-get update && sudo apt-get install -y libavif-bin
+
       - name: Build catalog
         working-directory: pipeline
         run: python3 -c "from pathlib import Path; from tools.build_catalog import build_catalog; print(build_catalog(Path('..').resolve(), max_workers=16))"
