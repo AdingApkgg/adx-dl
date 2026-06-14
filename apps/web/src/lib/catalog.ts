@@ -123,7 +123,8 @@ const readVersionData = cache(async () => {
 // plus an "Unknown" bucket appended when non-empty.
 export async function readVersionGroups(): Promise<VersionGroup[]> {
   const { byIndex, unknown } = await readVersionData();
-  const groups: VersionGroup[] = MAIMAI_VERSIONS.map((version) => ({
+  // Newest version first (descending: CiRCLE -> maimai); Unknown appended last.
+  const groups: VersionGroup[] = [...MAIMAI_VERSIONS].reverse().map((version) => ({
     slug: version.slug,
     name: version.name,
     imageIndex: version.index,
