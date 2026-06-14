@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
 import type { CatalogEntry } from "@/lib/catalog-shared";
-import { toRouteSlug } from "@/lib/route-slug";
 
 function buildEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
   return {
@@ -127,7 +126,7 @@ describe("structured data builders", () => {
     const { buildChartDetailStructuredData } = await import("./structured-data");
     const { buildChartDescription } = await import("./catalog-shared");
     const entry = buildEntry();
-    const slug = toRouteSlug(entry.id);
+    const slug = entry.id;
     const detailUrl = `https://adxdls.saop.cc/charts/${slug}`;
 
     const [recording, breadcrumb] = buildChartDetailStructuredData("zh", entry) as [

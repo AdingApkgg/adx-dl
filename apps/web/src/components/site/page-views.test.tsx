@@ -10,14 +10,14 @@ import {
 import type { Catalog } from "@/lib/catalog-shared";
 import type { CatalogEntry } from "@/lib/catalog-shared";
 import { getDictionary } from "@/lib/i18n";
-import { toRouteSlug } from "@/lib/route-slug";
 
 function buildEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
   const entryId = overrides.id ?? "song-1";
-  const entrySlug = toRouteSlug(entryId);
+  const slug = entryId;
 
   return {
     id: entryId,
+    slug,
     remote_dir_name: entryId,
     title: "曲目 1",
     title_en: "Song 1",
@@ -51,10 +51,10 @@ function buildEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
       has_dx_chart: true,
     },
     media: {
-      entry_base_url: `/catalog-assets/${entrySlug}`,
-      cover_url: `/catalog-assets/${entrySlug}/bg.jpg`,
-      audio_url: `/catalog-assets/${entrySlug}/track.mp3`,
-      pv_url: `/catalog-assets/${entrySlug}/pv.mp4`,
+      entry_base_url: `/catalog-assets/${slug}`,
+      cover_url: `/catalog-assets/${slug}/bg.jpg`,
+      audio_url: `/catalog-assets/${slug}/track.mp3`,
+      pv_url: `/catalog-assets/${slug}/pv.mp4`,
     },
     difficulties: [{ slot: 0, level: "12+", designer: "Designer 1" }],
     imported_at: "2026-06-12T12:00:00.000Z",
@@ -95,7 +95,7 @@ describe("page views locale-driven content", () => {
 
     expect(enHtml).toContain("Song 1");
     expect(enHtml).toContain("Artist 1");
-    expect(enHtml).toContain(`href="/en/charts/${toRouteSlug("song-1")}"`);
+    expect(enHtml).toContain(`href="/en/charts/song-1"`);
     expect(enHtml).toContain('data-layout="dense-row-list"');
     expect(enHtml).toContain('data-entry-row="song-1"');
     expect(enHtml).toContain('data-entry-cover="compact"');
@@ -110,7 +110,7 @@ describe("page views locale-driven content", () => {
 
     expect(jaHtml).toContain("曲目 1");
     expect(jaHtml).toContain("歌手 1");
-    expect(jaHtml).toContain(`href="/ja/charts/${toRouteSlug("song-1")}"`);
+    expect(jaHtml).toContain(`href="/ja/charts/song-1"`);
     expect(jaHtml.match(/role="combobox"/g)?.length).toBe(1);
   });
 
@@ -125,7 +125,7 @@ describe("page views locale-driven content", () => {
     expect(enHtml).toContain("Chart Metadata");
     expect(enHtml).toContain("Onsite Download");
     expect(enHtml).toContain('alt="Song 1 cover"');
-    expect(enHtml).toContain("/catalog-assets/e-6-1rjq8u6/bg.jpg");
+    expect(enHtml).toContain("/catalog-assets/song-1/bg.jpg");
 
     expect(jaHtml).toContain("曲目 1");
     expect(jaHtml).toContain("歌手 1");
@@ -197,15 +197,15 @@ describe("page views locale-driven content", () => {
 
     expect(enHtml).toContain("All Categories");
     expect(enHtml).toContain("Search title, artist, version...");
-    expect(enHtml).toContain(`href="/en/charts/${toRouteSlug("song-1")}"`);
+    expect(enHtml).toContain(`href="/en/charts/song-1"`);
 
     expect(zhHtml).toContain("全部分类");
     expect(zhHtml).toContain("搜索曲名、曲师、版本...");
-    expect(zhHtml).toContain(`href="/charts/${toRouteSlug("song-1")}"`);
+    expect(zhHtml).toContain(`href="/charts/song-1"`);
   });
 
   test("detail view renders PV and audio players when media is available", () => {
-    const slug = toRouteSlug("song-1");
+    const slug = "song-1";
     const html = renderToStaticMarkup(<ChartDetailPageView entry={buildEntry()} locale="zh" />);
 
     expect(html).toContain("预览");

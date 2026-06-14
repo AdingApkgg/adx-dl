@@ -1,14 +1,14 @@
 import { describe, expect, mock, test } from "bun:test";
 
 import { buildChartDescription, type CatalogEntry } from "@/lib/catalog-shared";
-import { toLegacyRouteSlug, toRouteSlug } from "@/lib/route-slug";
 
 function buildEntry(index: number, overrides: Partial<CatalogEntry> = {}): CatalogEntry {
   const entryId = overrides.id ?? `song-${index}`;
-  const entrySlug = toRouteSlug(entryId);
+  const slug = entryId;
 
   return {
     id: entryId,
+    slug,
     remote_dir_name: entryId,
     title: `曲目 ${index}`,
     title_en: `Song ${index}`,
@@ -42,10 +42,10 @@ function buildEntry(index: number, overrides: Partial<CatalogEntry> = {}): Catal
       has_dx_chart: true,
     },
     media: {
-      entry_base_url: `/catalog-assets/${entrySlug}`,
-      cover_url: `/catalog-assets/${entrySlug}/bg.jpg`,
-      audio_url: `/catalog-assets/${entrySlug}/track.mp3`,
-      pv_url: index % 3 === 0 ? `/catalog-assets/${entrySlug}/pv.mp4` : "",
+      entry_base_url: `/catalog-assets/${slug}`,
+      cover_url: `/catalog-assets/${slug}/bg.jpg`,
+      audio_url: `/catalog-assets/${slug}/track.mp3`,
+      pv_url: index % 3 === 0 ? `/catalog-assets/${slug}/pv.mp4` : "",
     },
     difficulties: [
       { slot: 0, level: "12+", designer: `Designer ${index}` },
@@ -84,21 +84,10 @@ mock.module("@/lib/catalog", () => ({
   }),
   readCatalogEntries: async () => entries,
   readEntryById: async (id: string) => entries.find((entry) => entry.id === id),
-  readEntryByRouteSlug: async (slug: string) => {
-    const hashed = entries.find((entry) => toRouteSlug(entry.id) === slug);
-    if (hashed) {
-      return hashed;
-    }
-
-    return entries.find((entry) => toLegacyRouteSlug(entry.id) === slug);
-  },
-  readRouteSlugs: async () =>
-    entries.flatMap((entry) => {
-      const hashed = toRouteSlug(entry.id);
-      const legacy = toLegacyRouteSlug(entry.id);
-      return legacy ? [hashed, legacy] : [hashed];
-    }),
-  readCanonicalSlugs: async () => entries.map((entry) => toRouteSlug(entry.id)),
+  readEntryByRouteSlug: async (slug: string) =>
+    entries.find((entry) => entry.slug === slug),
+  readRouteSlugs: async () => entries.map((entry) => entry.slug!),
+  readCanonicalSlugs: async () => entries.map((entry) => entry.slug!),
   readVersionGroups: async () => [
     { slug: "maimai-dx-prism", name: "maimai DX PRiSM", imageIndex: 23, count: 1 },
   ],
@@ -299,7 +288,7 @@ describe("route metadata", () => {
     });
 
     const entry3 = buildEntry(3);
-    const song3Slug = toRouteSlug("song-3");
+    const song3Slug = "song-3";
     const song3Cover = `/catalog-assets/${song3Slug}/bg.jpg`;
     const zhDescription = buildChartDescription(entry3, "zh");
     const enDescription = buildChartDescription(entry3, "en");
@@ -366,7 +355,7 @@ describe("route metadata", () => {
     expect(zhMetadata?.openGraph).toMatchObject({
       title: "远端曲目 5 | AstroDX Archive",
       description: zhDescription,
-      url: `https://adxdls.saop.cc/charts/${toRouteSlug("remote-song-5")}`,
+      url: `https://adxdls.saop.cc/charts/remote-song-5`,
       siteName: "AstroDX Archive",
     });
     expect(enMetadata?.twitter).toMatchObject({
@@ -409,13 +398,13 @@ describe("metadata files", () => {
           },
         }),
         expect.objectContaining({
-          url: `https://adxdls.saop.cc/charts/${toRouteSlug("song-3")}`,
+          url: `https://adxdls.saop.cc/charts/song-3`,
           alternates: {
             languages: {
-              "x-default": `https://adxdls.saop.cc/charts/${toRouteSlug("song-3")}`,
-              "zh-CN": `https://adxdls.saop.cc/charts/${toRouteSlug("song-3")}`,
-              en: `https://adxdls.saop.cc/en/charts/${toRouteSlug("song-3")}`,
-              ja: `https://adxdls.saop.cc/ja/charts/${toRouteSlug("song-3")}`,
+              "x-default": `https://adxdls.saop.cc/charts/song-3`,
+              "zh-CN": `https://adxdls.saop.cc/charts/song-3`,
+              en: `https://adxdls.saop.cc/en/charts/song-3`,
+              ja: `https://adxdls.saop.cc/ja/charts/song-3`,
             },
           },
         }),

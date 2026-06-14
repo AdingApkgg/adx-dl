@@ -2,14 +2,14 @@ import { describe, expect, mock, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import type { Catalog, CatalogEntry } from "@/lib/catalog-shared";
-import { toLegacyRouteSlug, toRouteSlug } from "@/lib/route-slug";
 
 function buildEntry(index: number): CatalogEntry {
   const entryId = index === 3 ? "song-3◆phase" : `song-${index}`;
-  const entrySlug = toRouteSlug(entryId);
+  const slug = `song-${index}`;
 
   return {
     id: entryId,
+    slug,
     remote_dir_name: entryId,
     title: `曲目 ${index}`,
     title_en: `Song ${index}`,
@@ -43,10 +43,10 @@ function buildEntry(index: number): CatalogEntry {
       has_dx_chart: true,
     },
     media: {
-      entry_base_url: `/catalog-assets/${entrySlug}`,
-      cover_url: `/catalog-assets/${entrySlug}/bg.jpg`,
-      audio_url: `/catalog-assets/${entrySlug}/track.mp3`,
-      pv_url: index % 3 === 0 ? `/catalog-assets/${entrySlug}/pv.mp4` : "",
+      entry_base_url: `/catalog-assets/${slug}`,
+      cover_url: `/catalog-assets/${slug}/bg.jpg`,
+      audio_url: `/catalog-assets/${slug}/track.mp3`,
+      pv_url: index % 3 === 0 ? `/catalog-assets/${slug}/pv.mp4` : "",
     },
     difficulties: [
       { slot: 0, level: "12+", designer: `Designer ${index}` },
@@ -57,6 +57,8 @@ function buildEntry(index: number): CatalogEntry {
 }
 
 const entries = Array.from({ length: 4 }, (_, index) => buildEntry(index + 1));
+
+const slugOf = (id: string) => entries.find((entry) => entry.id === id)!.slug!;
 
 const catalog: Catalog = {
   generated_at: "2026-06-12T00:00:00.000Z",
@@ -71,21 +73,10 @@ mock.module("@/lib/catalog", () => ({
   readCatalog: async () => catalog,
   readCatalogEntries: async () => entries,
   readEntryById: async (id: string) => entries.find((entry) => entry.id === id),
-  readEntryByRouteSlug: async (slug: string) => {
-    const hashed = entries.find((entry) => toRouteSlug(entry.id) === slug);
-    if (hashed) {
-      return hashed;
-    }
-
-    return entries.find((entry) => toLegacyRouteSlug(entry.id) === slug);
-  },
-  readRouteSlugs: async () =>
-    entries.flatMap((entry) => {
-      const hashed = toRouteSlug(entry.id);
-      const legacy = toLegacyRouteSlug(entry.id);
-      return legacy ? [hashed, legacy] : [hashed];
-    }),
-  readCanonicalSlugs: async () => entries.map((entry) => toRouteSlug(entry.id)),
+  readEntryByRouteSlug: async (slug: string) =>
+    entries.find((entry) => entry.slug === slug),
+  readRouteSlugs: async () => entries.map((entry) => entry.slug!),
+  readCanonicalSlugs: async () => entries.map((entry) => entry.slug!),
   readVersionGroups: async () => [],
   readVersionGroup: async () => undefined,
   readVersionSlugs: async () => [],
@@ -155,11 +146,7 @@ describe("localized routes", () => {
     const { default: LocalizedChartDetailPage, dynamicParams, generateStaticParams } = await import(
       "./[locale]/charts/[slug]/page"
     );
-    const expectedSlugs = entries.flatMap((entry) => {
-      const hashed = toRouteSlug(entry.id);
-      const legacy = toLegacyRouteSlug(entry.id);
-      return legacy ? [hashed, legacy] : [hashed];
-    });
+    const expectedSlugs = entries.map((entry) => entry.slug!);
 
     expect(dynamicParams).toBe(false);
     expect(await generateStaticParams()).toEqual(
@@ -172,7 +159,7 @@ describe("localized routes", () => {
       await LocalizedChartDetailPage({
         params: Promise.resolve({
           locale: "en",
-          slug: toRouteSlug("song-3◆phase"),
+          slug: slugOf("song-3◆phase"),
         }),
       })
     );
@@ -180,7 +167,7 @@ describe("localized routes", () => {
       await LocalizedChartDetailPage({
         params: Promise.resolve({
           locale: "ja",
-          slug: toRouteSlug("song-3◆phase"),
+          slug: slugOf("song-3◆phase"),
         }),
       })
     );

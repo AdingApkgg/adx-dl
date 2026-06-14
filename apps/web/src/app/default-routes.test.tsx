@@ -2,14 +2,14 @@ import { describe, expect, mock, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import type { Catalog, CatalogEntry } from "@/lib/catalog-shared";
-import { toLegacyRouteSlug, toRouteSlug } from "@/lib/route-slug";
 
 function buildEntry(index: number): CatalogEntry {
   const entryId = index === 3 ? "song-3◆phase" : `song-${index}`;
-  const entrySlug = toRouteSlug(entryId);
+  const slug = `song-${index}`;
 
   return {
     id: entryId,
+    slug,
     remote_dir_name: entryId,
     title: `曲目 ${index}`,
     title_en: `Song ${index}`,
@@ -43,10 +43,10 @@ function buildEntry(index: number): CatalogEntry {
       has_dx_chart: true,
     },
     media: {
-      entry_base_url: `/catalog-assets/${entrySlug}`,
-      cover_url: `/catalog-assets/${entrySlug}/bg.jpg`,
-      audio_url: `/catalog-assets/${entrySlug}/track.mp3`,
-      pv_url: index % 3 === 0 ? `/catalog-assets/${entrySlug}/pv.mp4` : "",
+      entry_base_url: `/catalog-assets/${slug}`,
+      cover_url: `/catalog-assets/${slug}/bg.jpg`,
+      audio_url: `/catalog-assets/${slug}/track.mp3`,
+      pv_url: index % 3 === 0 ? `/catalog-assets/${slug}/pv.mp4` : "",
     },
     difficulties: [
       { slot: 0, level: "12+", designer: `Designer ${index}` },
@@ -57,6 +57,8 @@ function buildEntry(index: number): CatalogEntry {
 }
 
 const entries = Array.from({ length: 9 }, (_, index) => buildEntry(index + 1));
+
+const slugOf = (id: string) => entries.find((entry) => entry.id === id)!.slug!;
 
 const catalog: Catalog = {
   generated_at: "2026-06-12T00:00:00.000Z",
@@ -71,21 +73,10 @@ mock.module("@/lib/catalog", () => ({
   readCatalog: async () => catalog,
   readCatalogEntries: async () => entries,
   readEntryById: async (id: string) => entries.find((entry) => entry.id === id),
-  readEntryByRouteSlug: async (slug: string) => {
-    const hashed = entries.find((entry) => toRouteSlug(entry.id) === slug);
-    if (hashed) {
-      return hashed;
-    }
-
-    return entries.find((entry) => toLegacyRouteSlug(entry.id) === slug);
-  },
-  readRouteSlugs: async () =>
-    entries.flatMap((entry) => {
-      const hashed = toRouteSlug(entry.id);
-      const legacy = toLegacyRouteSlug(entry.id);
-      return legacy ? [hashed, legacy] : [hashed];
-    }),
-  readCanonicalSlugs: async () => entries.map((entry) => toRouteSlug(entry.id)),
+  readEntryByRouteSlug: async (slug: string) =>
+    entries.find((entry) => entry.slug === slug),
+  readRouteSlugs: async () => entries.map((entry) => entry.slug!),
+  readCanonicalSlugs: async () => entries.map((entry) => entry.slug!),
   readVersionGroups: async () => [],
   readVersionGroup: async () => undefined,
   readVersionSlugs: async () => [],
@@ -102,7 +93,7 @@ describe("default zh routes", () => {
     expect(html).toContain("浏览版本");
     expect(html).toContain("最新封面");
     expect(html).toContain("aspect-square");
-    expect(html).toContain(`/catalog-assets/${toRouteSlug("song-9")}/bg.jpg`);
+    expect(html).toContain(`/catalog-assets/${slugOf("song-9")}/bg.jpg`);
     expect(html).toContain("曲目 9");
     expect(html).toContain("曲目 2");
     expect(html).not.toContain("曲目 1");
@@ -141,15 +132,11 @@ describe("default zh routes", () => {
     const { default: ChartDetailPage, dynamicParams, generateStaticParams } = await import(
       "./(default)/charts/[slug]/page"
     );
-    const expectedSlugs = entries.flatMap((entry) => {
-      const hashed = toRouteSlug(entry.id);
-      const legacy = toLegacyRouteSlug(entry.id);
-      return legacy ? [hashed, legacy] : [hashed];
-    });
+    const expectedSlugs = entries.map((entry) => entry.slug!);
 
     const html = renderToStaticMarkup(
       await ChartDetailPage({
-        params: Promise.resolve({ slug: toRouteSlug("song-3◆phase") }),
+        params: Promise.resolve({ slug: slugOf("song-3◆phase") }),
       })
     );
 
@@ -160,7 +147,7 @@ describe("default zh routes", () => {
     expect(html).toContain("难度列表");
     expect(html).toContain("资源状态");
     expect(html).toContain("来源信息");
-    expect(html).toContain(`/catalog-assets/${toRouteSlug("song-3◆phase")}/bg.jpg`);
+    expect(html).toContain(`/catalog-assets/${slugOf("song-3◆phase")}/bg.jpg`);
     expect(html).toContain("站内下载");
     expect(html).toContain("来源链接");
   });
