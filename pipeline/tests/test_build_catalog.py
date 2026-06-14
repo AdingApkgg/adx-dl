@@ -67,7 +67,11 @@ SAMPLE_INDEX = json.dumps(
 class BuildCatalogTests(unittest.TestCase):
     def _build(self) -> dict:
         with TemporaryDirectory() as temp_dir:
-            catalog_path = build_catalog(Path(temp_dir), fetch_text=lambda _url: SAMPLE_INDEX)
+            catalog_path = build_catalog(
+                Path(temp_dir),
+                fetch_text=lambda _url: SAMPLE_INDEX,
+                download_media=False,
+            )
             return json.loads(catalog_path.read_text(encoding="utf-8"))
 
     def test_transforms_index_into_catalog_entries(self) -> None:
@@ -125,6 +129,53 @@ class BuildCatalogTests(unittest.TestCase):
         catalog = self._build()
         self.assertEqual(
             catalog["categories"]["Remote"], ["maimai DX PLUS", "maimai FiNALE"]
+        )
+
+    def test_downloads_cover_images_to_local_paths(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media_root = root / "media"
+            catalog_path = build_catalog(
+                root,
+                fetch_text=lambda _url: SAMPLE_INDEX,
+                fetch_bytes=lambda _url: b"PNGDATA",
+                download_media=True,
+                media_root=media_root,
+            )
+            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+
+            konekto = catalog["entries"][0]  # slug "10146"
+            # Flat path: one file per chart, no per-chart subdirectory.
+            self.assertEqual(konekto["media"]["cover_url"], "/covers/10146.png")
+            self.assertEqual(konekto["files"]["background"], "/covers/10146.png")
+            # Only images are mirrored — audio/PV stay remote.
+            self.assertEqual(
+                konekto["media"]["audio_url"],
+                _media_url("でらっくす PLUS/[DX] コネクト/track.mp3"),
+            )
+            saved = media_root / "10146.png"
+            self.assertTrue(saved.exists())
+            self.assertEqual(saved.read_bytes(), b"PNGDATA")
+
+    def test_keeps_remote_cover_url_when_download_fails(self) -> None:
+        def boom(_url: str) -> bytes:
+            raise RuntimeError("network down")
+
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            catalog_path = build_catalog(
+                root,
+                fetch_text=lambda _url: SAMPLE_INDEX,
+                fetch_bytes=boom,
+                download_media=True,
+                media_root=root / "media",
+            )
+            konekto = json.loads(catalog_path.read_text(encoding="utf-8"))["entries"][0]
+
+        # A failed download leaves the remote URL in place as a fallback.
+        self.assertEqual(
+            konekto["media"]["cover_url"],
+            _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
         )
 
     def test_fetch_text_retries_without_ssl_verification_on_certificate_error(self) -> None:

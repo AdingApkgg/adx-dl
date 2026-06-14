@@ -47,6 +47,24 @@ def fetch_text(url: str) -> str:
         raise
 
 
+def fetch_bytes(url: str, timeout: int = 60) -> bytes:
+    """Download a remote file as raw bytes, with the same SSL fallback as fetch_text."""
+    request = Request(url, headers={"User-Agent": "AstroDX catalog builder"})
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            return response.read()
+    except ssl.SSLCertVerificationError:
+        insecure_context = ssl._create_unverified_context()
+        with urlopen(request, context=insecure_context, timeout=timeout) as response:
+            return response.read()
+    except URLError as error:
+        if isinstance(error.reason, ssl.SSLCertVerificationError):
+            insecure_context = ssl._create_unverified_context()
+            with urlopen(request, context=insecure_context, timeout=timeout) as response:
+                return response.read()
+        raise
+
+
 def _clean_text(value: str) -> str:
     return " ".join(unescape(_TAG_RE.sub(" ", value)).split())
 

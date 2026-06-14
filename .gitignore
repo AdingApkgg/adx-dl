@@ -20,7 +20,7 @@ apps/web/.tmp-server-ws.json
 node_modules/
 apps/web/.next/
 apps/web/out/
-apps/web/public/catalog-assets/
+apps/web/public/covers/
 
 # Large local media archives: keep directory skeleton only
 Community/**

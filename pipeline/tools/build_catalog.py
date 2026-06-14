@@ -1,16 +1,27 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import sys
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import unquote, urlparse
 
+from tools.remote_catalog import fetch_bytes as default_fetch_bytes
 from tools.remote_catalog import fetch_text as default_fetch_text
 
 # Authoritative, version-complete chart index (replaces the old flat-directory scrape).
 INDEX_URL = "https://adx-dl.larx.cc/tmp/astrodx-charts/index.json"
 MEDIA_BASE = "https://adx-dl.larx.cc/tmp/astrodx-charts/"
+
+# Cover images are mirrored into the web app's public/ during the build so the
+# static site serves them itself instead of hot-linking the remote host. Audio
+# and PV stay remote (too large to bundle into the static export).
+LOCAL_MEDIA_ROUTE = "/covers"
+COVER_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 
 # Canonical maimai version names by versionid (matches the site's MAIMAI_VERSIONS).
 CANONICAL_VERSIONS: dict[int, str] = {
@@ -165,10 +176,66 @@ def _build_entry(item: dict[str, Any], generated_at: str) -> dict[str, Any]:
     }
 
 
+def _cover_extension(remote_url: str) -> str:
+    ext = os.path.splitext(unquote(urlparse(remote_url).path))[1].lower()
+    return ext if ext in COVER_EXTENSIONS else ".png"
+
+
+def _download_cover(
+    entry: dict[str, Any],
+    media_root: Path,
+    fetch_bytes: Callable[[str], bytes],
+) -> bool:
+    """Mirror one entry's cover into media_root/<slug>.<ext> (one flat file per
+    chart, no per-chart subdirectory) and rewrite its URL to the local path.
+    Returns True when the local copy is in place; on any failure the remote URL
+    is left untouched as a graceful fallback."""
+    remote_url = entry["media"]["cover_url"]
+    if not remote_url or remote_url.startswith("/"):
+        return False  # no cover, or already local
+
+    slug = entry["slug"]
+    ext = _cover_extension(remote_url)
+    target_file = media_root / f"{slug}{ext}"
+    local_url = f"{LOCAL_MEDIA_ROUTE}/{slug}{ext}"
+
+    if not target_file.exists():
+        try:
+            data = fetch_bytes(remote_url)
+        except Exception as error:  # noqa: BLE001 - one bad cover shouldn't fail the build
+            print(f"[catalog] cover download failed for {slug}: {error}", file=sys.stderr)
+            return False
+        if not data:
+            return False
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+        target_file.write_bytes(data)
+
+    entry["media"]["cover_url"] = local_url
+    entry["files"]["background"] = local_url
+    return True
+
+
+def _download_covers(
+    entries: list[dict[str, Any]],
+    media_root: Path,
+    fetch_bytes: Callable[[str], bytes],
+    max_workers: int,
+) -> int:
+    media_root.mkdir(parents=True, exist_ok=True)
+    with ThreadPoolExecutor(max_workers=max(1, max_workers)) as pool:
+        results = pool.map(
+            lambda entry: _download_cover(entry, media_root, fetch_bytes), entries
+        )
+        return sum(1 for ok in results if ok)
+
+
 def build_catalog(
     root: Path,
     fetch_text: Callable[[str], str] = default_fetch_text,
-    max_workers: int = 8,  # kept for signature compatibility; no longer used
+    fetch_bytes: Callable[[str], bytes] | None = default_fetch_bytes,
+    download_media: bool = True,
+    media_root: Path | None = None,
+    max_workers: int = 8,
 ) -> Path:
     generated_at = datetime.now(timezone.utc).isoformat()
     items = json.loads(fetch_text(INDEX_URL))
@@ -176,6 +243,13 @@ def build_catalog(
     entries = [_build_entry(item, generated_at) for item in items]
     entries.sort(key=lambda entry: entry["id"])
     _assign_route_slugs(entries)
+
+    # Pull cover images into the web app's public/ so they ship with the static
+    # export; cover URLs are rewritten to the local /covers path in place.
+    if download_media and fetch_bytes is not None:
+        target = media_root or (root / "apps" / "web" / "public" / "covers")
+        saved = _download_covers(entries, target, fetch_bytes, max_workers)
+        print(f"[catalog] mirrored {saved}/{len(entries)} cover images to {target}")
 
     catalog = {
         "generated_at": generated_at,
