@@ -169,12 +169,12 @@ export function buildVersionsPageMetadata(locale: Locale): Metadata {
 
 export function buildVersionDetailMetadata(
   locale: Locale,
-  subcategory: string,
+  name: string,
   slug: string,
   count: number
 ): Metadata {
   const versions = getDictionary(locale).versions;
-  const label = subcategory === "Unknown" ? versions.unknownLabel : subcategory;
+  const label = name === "Unknown" ? versions.unknownLabel : name;
   return buildPageMetadata({
     locale,
     pathname: `/versions/${slug}`,

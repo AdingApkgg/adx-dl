@@ -97,10 +97,12 @@ export function collectSubcategories(entries: CatalogEntry[], category: string):
 }
 
 export type VersionGroup = {
-  /** Raw subcategory / version string from the catalog (e.g. "maimai DX PRiSM"). */
-  subcategory: string;
-  /** ASCII URL slug for the version route (e.g. "maimai-dx-prism"). */
+  /** ASCII URL slug for the version route (e.g. "maimai-dx-prism"); "unknown" for untagged. */
   slug: string;
+  /** Canonical version name (e.g. "maimai DX PRiSM"), or "Unknown". */
+  name: string;
+  /** genrepics icon index, or null when there is no icon (Unknown). */
+  imageIndex: number | null;
   count: number;
 };
 

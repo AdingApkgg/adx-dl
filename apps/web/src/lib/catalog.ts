@@ -2,9 +2,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { cache } from "react";
 import type { Catalog, CatalogEntry, VersionGroup } from "@/lib/catalog-shared";
-import { versionSlug } from "@/lib/catalog-shared";
 import { entrySlug, toLegacyRouteSlug, toRouteSlug } from "@/lib/route-slug";
-import { versionImageIndex } from "@/lib/version-image";
+import { MAIMAI_VERSIONS, versionImageIndex } from "@/lib/version-image";
 
 export type { Catalog, CatalogDifficulty, CatalogEntry } from "@/lib/catalog-shared";
 
@@ -90,50 +89,88 @@ export async function readCanonicalSlugs(): Promise<string[]> {
   return entries.map((entry) => entrySlug(entry));
 }
 
-// --- Version (subcategory) grouping for the /versions browse pages ---
+// --- Version grouping for the /versions browse pages ---
+// Charts are bucketed by canonical maimai version (via the version icon index),
+// which merges catalog variants like "FESTiVAL" and "maimai DX FESTiVAL".
 
-const readVersionMap = cache(async () => {
+const UNKNOWN_VERSION_SLUG = "unknown";
+
+type VersionDetail = { name: string; slug: string; imageIndex: number | null; entries: CatalogEntry[] };
+
+const readVersionData = cache(async () => {
   const entries = await readCatalogEntries();
-  const bySlug = new Map<string, { subcategory: string; entries: CatalogEntry[] }>();
+  const byIndex = new Map<number, CatalogEntry[]>();
+  const unknown: CatalogEntry[] = [];
 
   for (const entry of entries) {
-    const subcategory = entry.subcategory || "Unknown";
-    const slug = versionSlug(subcategory);
-    const group = bySlug.get(slug);
-    if (group) {
-      group.entries.push(entry);
+    const index = versionImageIndex(entry.version);
+    if (index === null) {
+      unknown.push(entry);
+      continue;
+    }
+    const bucket = byIndex.get(index);
+    if (bucket) {
+      bucket.push(entry);
     } else {
-      bySlug.set(slug, { subcategory, entries: [entry] });
+      byIndex.set(index, [entry]);
     }
   }
 
-  return bySlug;
+  return { byIndex, unknown };
 });
 
+// Full grid: all 26 canonical versions in chronological order (count may be 0),
+// plus an "Unknown" bucket appended when non-empty.
 export async function readVersionGroups(): Promise<VersionGroup[]> {
-  const map = await readVersionMap();
-  const groups = Array.from(map.entries()).map(([slug, group]) => ({
-    subcategory: group.subcategory,
-    slug,
-    count: group.entries.length,
+  const { byIndex, unknown } = await readVersionData();
+  const groups: VersionGroup[] = MAIMAI_VERSIONS.map((version) => ({
+    slug: version.slug,
+    name: version.name,
+    imageIndex: version.index,
+    count: byIndex.get(version.index)?.length ?? 0,
   }));
 
-  // Chronological by maimai version icon order; versions without an icon (Unknown) last.
-  return groups.sort((a, b) => {
-    const ai = versionImageIndex(a.subcategory) ?? Number.MAX_SAFE_INTEGER;
-    const bi = versionImageIndex(b.subcategory) ?? Number.MAX_SAFE_INTEGER;
-    return ai - bi || a.subcategory.localeCompare(b.subcategory);
-  });
+  if (unknown.length > 0) {
+    groups.push({
+      slug: UNKNOWN_VERSION_SLUG,
+      name: "Unknown",
+      imageIndex: null,
+      count: unknown.length,
+    });
+  }
+
+  return groups;
 }
 
-export async function readVersionGroup(
-  slug: string
-): Promise<{ subcategory: string; entries: CatalogEntry[] } | undefined> {
-  const map = await readVersionMap();
-  return map.get(slug);
+export async function readVersionGroup(slug: string): Promise<VersionDetail | undefined> {
+  const { byIndex, unknown } = await readVersionData();
+
+  if (slug === UNKNOWN_VERSION_SLUG) {
+    return unknown.length > 0
+      ? { name: "Unknown", slug, imageIndex: null, entries: unknown }
+      : undefined;
+  }
+
+  const version = MAIMAI_VERSIONS.find((candidate) => candidate.slug === slug);
+  const entries = version ? byIndex.get(version.index) : undefined;
+  if (!version || !entries || entries.length === 0) {
+    return undefined;
+  }
+
+  return { name: version.name, slug, imageIndex: version.index, entries };
 }
 
+// Slugs for versions that actually have charts (+ unknown) — for static params,
+// sitemap and IndexNow. Excludes the empty (0-chart) versions shown in the grid.
 export async function readVersionSlugs(): Promise<string[]> {
-  const map = await readVersionMap();
-  return Array.from(map.keys());
+  const { byIndex, unknown } = await readVersionData();
+  const slugs = MAIMAI_VERSIONS.filter(
+    (version) => (byIndex.get(version.index)?.length ?? 0) > 0
+  ).map((version) => version.slug);
+
+  if (unknown.length > 0) {
+    slugs.push(UNKNOWN_VERSION_SLUG);
+  }
+
+  return slugs;
 }

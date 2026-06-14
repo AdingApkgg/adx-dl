@@ -184,16 +184,19 @@ export function buildVersionsIndexStructuredData(
         description: versions.description,
         inLanguage: getStructuredDataLanguage(locale),
         isPartOf: { "@id": websiteId },
-        mainEntity: {
-          "@type": "ItemList",
-          numberOfItems: groups.length,
-          itemListElement: groups.map((group, index) => ({
-            "@type": "ListItem",
-            position: index + 1,
-            url: toAbsoluteUrl(buildLocalePath(`/versions/${group.slug}`, locale)),
-            name: group.subcategory === "Unknown" ? versions.unknownLabel : group.subcategory,
-          })),
-        },
+        mainEntity: (() => {
+          const linkable = groups.filter((group) => group.count > 0);
+          return {
+            "@type": "ItemList",
+            numberOfItems: linkable.length,
+            itemListElement: linkable.map((group, index) => ({
+              "@type": "ListItem",
+              position: index + 1,
+              url: toAbsoluteUrl(buildLocalePath(`/versions/${group.slug}`, locale)),
+              name: group.name === "Unknown" ? versions.unknownLabel : group.name,
+            })),
+          };
+        })(),
       },
       {
         "@type": "BreadcrumbList",
@@ -213,13 +216,13 @@ export function buildVersionsIndexStructuredData(
 
 export function buildVersionDetailStructuredData(
   locale: Locale,
-  subcategory: string,
+  name: string,
   slug: string,
   entries: CatalogEntry[]
 ): JsonLdValue {
   const dictionary = getDictionary(locale);
   const versions = dictionary.versions;
-  const label = subcategory === "Unknown" ? versions.unknownLabel : subcategory;
+  const label = name === "Unknown" ? versions.unknownLabel : name;
   const path = buildLocalePath(`/versions/${slug}`, locale);
   const url = toAbsoluteUrl(path);
 

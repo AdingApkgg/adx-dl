@@ -24,7 +24,7 @@ export async function generateMetadata({
     notFound();
   }
 
-  return buildVersionDetailMetadata("zh", group.subcategory, version, group.entries.length);
+  return buildVersionDetailMetadata("zh", group.name, version, group.entries.length);
 }
 
 export default async function VersionDetailPage({
@@ -41,8 +41,9 @@ export default async function VersionDetailPage({
 
   return (
     <VersionDetailView
-      subcategory={group.subcategory}
+      name={group.name}
       slug={version}
+      imageIndex={group.imageIndex}
       entries={group.entries}
       locale="zh"
     />

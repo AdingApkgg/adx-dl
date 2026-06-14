@@ -29,7 +29,7 @@ export async function generateMetadata({
 
   return buildVersionDetailMetadata(
     getPrefixedRouteLocale(locale),
-    group.subcategory,
+    group.name,
     version,
     group.entries.length
   );
@@ -49,8 +49,9 @@ export default async function LocalizedVersionDetailPage({
 
   return (
     <VersionDetailView
-      subcategory={group.subcategory}
+      name={group.name}
       slug={version}
+      imageIndex={group.imageIndex}
       entries={group.entries}
       locale={getPrefixedRouteLocale(locale)}
     />

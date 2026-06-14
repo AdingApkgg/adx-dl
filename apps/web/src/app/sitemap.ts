@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-import { readCatalog, readVersionGroups } from "@/lib/catalog";
+import { readCatalog, readVersionSlugs } from "@/lib/catalog";
 import { buildLocalePath, locales, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 import { resolveSiteUrl } from "@/lib/site-url";
@@ -73,10 +73,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     )
   );
 
-  const versionGroups = await readVersionGroups();
-  const versionRoutes = versionGroups.flatMap((group) =>
+  const versionSlugs = await readVersionSlugs();
+  const versionRoutes = versionSlugs.flatMap((slug) =>
     locales.map((locale) =>
-      buildSitemapEntry(`/versions/${group.slug}`, locale, { lastModified: siteLastModified })
+      buildSitemapEntry(`/versions/${slug}`, locale, { lastModified: siteLastModified })
     )
   );
 
