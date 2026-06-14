@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { cache } from "react";
 import type { Catalog, CatalogEntry, VersionGroup } from "@/lib/catalog-shared";
-import { entrySlug, toLegacyRouteSlug, toRouteSlug } from "@/lib/route-slug";
+import { entrySlug } from "@/lib/route-slug";
 import { MAIMAI_VERSIONS, versionImageIndex } from "@/lib/version-image";
 
 export type { Catalog, CatalogDifficulty, CatalogEntry } from "@/lib/catalog-shared";
@@ -30,23 +30,9 @@ const readEntryByRouteSlugMap = cache(async () => {
   const entries = await readCatalogEntries();
   const map = new Map<string, CatalogEntry>();
 
-  // Pass 1: canonical (readable, directory-derived) slugs win.
+  // The canonical slug (the numeric maimai shortid) is the only chart route.
   for (const entry of entries) {
     map.set(entrySlug(entry), entry);
-  }
-
-  // Pass 2: legacy aliases (FNV hash + URL-encoded id) keep old links resolving,
-  // but never shadow a canonical slug.
-  for (const entry of entries) {
-    const hashed = toRouteSlug(entry.id);
-    if (!map.has(hashed)) {
-      map.set(hashed, entry);
-    }
-
-    const legacy = toLegacyRouteSlug(entry.id);
-    if (legacy && !map.has(legacy)) {
-      map.set(legacy, entry);
-    }
   }
 
   return map;
@@ -56,25 +42,7 @@ export async function readEntryByRouteSlug(
   slug: string
 ): Promise<CatalogEntry | undefined> {
   const map = await readEntryByRouteSlugMap();
-
-  const direct = map.get(slug);
-  if (direct) {
-    return direct;
-  }
-
-  // Static export can hand the dynamic [slug] param to the page percent-encoded
-  // (notably for non-ASCII slugs), while the map is keyed by the raw slug.
-  // Fall back to the decoded form so CJK chart pages resolve instead of 404ing.
-  try {
-    const decoded = decodeURIComponent(slug);
-    if (decoded !== slug) {
-      return map.get(decoded);
-    }
-  } catch {
-    // malformed escape sequence — ignore and fall through
-  }
-
-  return undefined;
+  return map.get(slug);
 }
 
 export async function readRouteSlugs(): Promise<string[]> {

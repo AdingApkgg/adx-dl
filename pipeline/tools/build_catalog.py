@@ -57,9 +57,12 @@ def _path_slug(name: str) -> str:
 
 
 def _assign_route_slugs(entries: list[dict[str, Any]]) -> None:
+    # Canonical slug is the unique maimai song id (shortid): stable, ASCII, and
+    # collision-free. A numeric suffix disambiguates the (defensive) case of a
+    # missing or duplicate id.
     seen: set[str] = set()
     for entry in entries:
-        base = _path_slug(entry["remote_dir_name"])
+        base = entry["short_id"] or _path_slug(entry["remote_dir_name"])
         slug = base
         index = 2
         while slug in seen:

@@ -15,7 +15,7 @@ export type CatalogEntryMedia = {
 
 export type CatalogEntry = {
   id: string;
-  /** Readable, URL-safe route slug derived from remote_dir_name by the builder. */
+  /** Canonical route slug: the unique maimai song id (shortid). */
   slug?: string;
   remote_dir_name: string;
   title: string;

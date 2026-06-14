@@ -82,9 +82,9 @@ class BuildCatalogTests(unittest.TestCase):
         self.assertEqual(konekto["version"], "maimai DX PLUS")
         self.assertEqual(konekto["versionid"], 14)
         self.assertEqual(konekto["subcategory"], "maimai DX PLUS")
-        # Cabinet prefix is stripped for the readable name/slug.
+        # Canonical slug is the numeric shortid (no readable-name alias).
         self.assertEqual(konekto["remote_dir_name"], "コネクト")
-        self.assertEqual(konekto["slug"], "コネクト")
+        self.assertEqual(konekto["slug"], "10146")
         self.assertEqual(konekto["cabinet"], "DX")
         self.assertEqual(konekto["short_id"], "10146")
         self.assertEqual(konekto["bpm"], 175)
