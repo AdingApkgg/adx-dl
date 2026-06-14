@@ -11,7 +11,7 @@ const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "AstroDX Archive",
+  title: "ADX 谱面资源",
   description: "Chart archive, indexing, and download portal for AstroDX collections.",
   manifest: "/site.webmanifest",
 };

@@ -62,7 +62,7 @@ describe("structured data builders", () => {
         {
           "@type": "Organization",
           "@id": "https://adxdls.saop.cc/#organization",
-          name: "AstroDX Archive",
+          name: "ADX 谱面资源",
           url: "https://adxdls.saop.cc",
           logo: "https://adxdls.saop.cc/opengraph-image.png",
           sameAs: ["https://github.com/AdingApkgg/adx-dl"],
@@ -70,7 +70,7 @@ describe("structured data builders", () => {
         {
           "@type": "WebSite",
           "@id": "https://adxdls.saop.cc/#website",
-          name: "AstroDX Archive",
+          name: "ADX 谱面资源",
           description:
             "Built from remote AstroDX directory scans, with per-song metadata, chart parsing, and a unified catalog for static deployment.",
           url: "https://adxdls.saop.cc/en",

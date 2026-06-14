@@ -10,7 +10,7 @@ describe("SeoJsonLd", () => {
           {
             "@context": "https://schema.org",
             "@type": "WebSite",
-            name: "AstroDX Archive",
+            name: "ADX 谱面资源",
           },
           {
             "@context": "https://schema.org",

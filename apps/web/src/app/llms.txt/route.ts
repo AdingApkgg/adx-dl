@@ -11,9 +11,9 @@ export async function GET() {
   const catalog = await readCatalog();
   const versions = [...new Set(Object.values(catalog.categories).flat())].sort();
 
-  const body = `# AstroDX Archive
+  const body = `# ADX 谱面资源
 
-> AstroDX Archive is an unofficial, community-maintained index of AstroDX charts (maimai DX-style rhythm-game charts). It provides per-chart metadata, cover art, difficulty information, and download links, built from a remote AstroDX directory.
+> ADX 谱面资源 is an unofficial, community-maintained index of AstroDX charts (maimai DX-style rhythm-game charts). It provides per-chart metadata, cover art, difficulty information, and download links, built from a remote AstroDX directory.
 
 The archive currently lists ${catalog.total_entries} charts across ${versions.length} maimai DX version branches. Content is available in Chinese (default), English, and Japanese.
 

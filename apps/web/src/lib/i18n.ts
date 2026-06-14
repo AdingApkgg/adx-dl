@@ -224,7 +224,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       faq: (total, versions) => [
         {
           q: "AstroDX 是什么？",
-          a: "AstroDX 是一款社区开发的 maimai 风格音乐游戏模拟器。本站「AstroDX Archive」收录 AstroDX 谱面，提供元数据、封面与下载链接，是非官方的资料站。",
+          a: "AstroDX 是一款社区开发的 maimai 风格音乐游戏模拟器。本站「ADX 谱面资源」收录 AstroDX 谱面，提供元数据、封面与下载链接，是非官方的资料站。",
         },
         {
           q: "maimai DX 是什么？",
@@ -342,7 +342,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       placeholder: "AstroDX 封面占位图",
     },
     footer: {
-      description: "AstroDX 谱面资料站，基于远端目录构建的非官方索引。",
+      description: "ADX 谱面资源，基于远端目录构建的非官方索引。",
       lastUpdated: (date) => `目录更新于 ${date}`,
       disclaimer: "非官方爱好者资料站。AstroDX 与 maimai 的相关权利归各自所有者所有。",
       sourceLabel: "源代码",
@@ -401,7 +401,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       faq: (total, versions) => [
         {
           q: "What is AstroDX?",
-          a: "AstroDX is a community-built simulator for maimai-style rhythm-game charts. This site, the AstroDX Archive, is an unofficial index of AstroDX charts with metadata, cover art, and download links.",
+          a: "AstroDX is a community-built simulator for maimai-style rhythm-game charts. This site, ADX 谱面资源, is an unofficial index of AstroDX charts with metadata, cover art, and download links.",
         },
         {
           q: "What is maimai DX?",
@@ -521,7 +521,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       placeholder: "AstroDX cover placeholder",
     },
     footer: {
-      description: "AstroDX Archive — an unofficial chart index built from the remote directory.",
+      description: "ADX 谱面资源 — an unofficial chart index built from the remote directory.",
       lastUpdated: (date) => `Catalog updated ${date}`,
       disclaimer:
         "Unofficial fan-made archive. AstroDX and maimai are the property of their respective owners.",
@@ -580,7 +580,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       faq: (total, versions) => [
         {
           q: "AstroDX とは？",
-          a: "AstroDX はコミュニティ製の maimai 風リズムゲームシミュレーターです。本サイト「AstroDX Archive」は AstroDX 譜面を収録し、メタデータ・ジャケット・ダウンロードリンクを提供する非公式アーカイブです。",
+          a: "AstroDX はコミュニティ製の maimai 風リズムゲームシミュレーターです。本サイト「ADX 谱面资源」は AstroDX 譜面を収録し、メタデータ・ジャケット・ダウンロードリンクを提供する非公式アーカイブです。",
         },
         {
           q: "maimai DX とは？",
@@ -699,7 +699,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       placeholder: "AstroDX ジャケットプレースホルダー",
     },
     footer: {
-      description: "AstroDX 譜面アーカイブ — 遠端ディレクトリから構築した非公式インデックス。",
+      description: "ADX 谱面资源 — 遠端ディレクトリから構築した非公式インデックス。",
       lastUpdated: (date) => `カタログ更新: ${date}`,
       disclaimer: "非公式のファンメイドアーカイブです。AstroDX および maimai の権利は各所有者に帰属します。",
       sourceLabel: "ソース",
@@ -757,10 +757,10 @@ export function getStaticPageMetadata(
       description: dictionary.home.description,
       keywords:
         normalizedLocale === "en"
-          ? ["AstroDX", "AstroDX Archive", "chart archive", "downloads", "catalog index"]
+          ? ["AstroDX", "ADX 谱面资源", "chart archive", "downloads", "catalog index"]
           : normalizedLocale === "ja"
-            ? ["AstroDX", "AstroDX Archive", "譜面アーカイブ", "ダウンロード", "統合カタログ"]
-            : ["AstroDX", "AstroDX Archive", "谱面资料站", "下载入口", "目录索引"],
+            ? ["AstroDX", "ADX 谱面资源", "譜面アーカイブ", "ダウンロード", "統合カタログ"]
+            : ["AstroDX", "ADX 谱面资源", "谱面资料站", "下载入口", "目录索引"],
     },
     charts: {
       pathname: "/charts",
@@ -768,10 +768,10 @@ export function getStaticPageMetadata(
       description: dictionary.charts.description,
       keywords:
         normalizedLocale === "en"
-          ? ["AstroDX", "AstroDX Archive", "browse charts", "category filter", "display language"]
+          ? ["AstroDX", "ADX 谱面资源", "browse charts", "category filter", "display language"]
           : normalizedLocale === "ja"
-            ? ["AstroDX", "AstroDX Archive", "譜面一覧", "分類フィルタ", "表示言語"]
-            : ["AstroDX", "AstroDX Archive", "浏览曲目", "分类筛选", "显示语言"],
+            ? ["AstroDX", "ADX 谱面资源", "譜面一覧", "分類フィルタ", "表示言語"]
+            : ["AstroDX", "ADX 谱面资源", "浏览曲目", "分类筛选", "显示语言"],
     },
     search: {
       pathname: "/search",
@@ -779,10 +779,10 @@ export function getStaticPageMetadata(
       description: dictionary.searchPage.description,
       keywords:
         normalizedLocale === "en"
-          ? ["AstroDX", "AstroDX Archive", "search", "chart search", "branch filter"]
+          ? ["AstroDX", "ADX 谱面资源", "search", "chart search", "branch filter"]
           : normalizedLocale === "ja"
-            ? ["AstroDX", "AstroDX Archive", "検索", "キーワード", "譜面情報"]
-            : ["AstroDX", "AstroDX Archive", "搜索", "关键字筛选", "版本分支"],
+            ? ["AstroDX", "ADX 谱面资源", "検索", "キーワード", "譜面情報"]
+            : ["AstroDX", "ADX 谱面资源", "搜索", "关键字筛选", "版本分支"],
     },
     status: {
       pathname: "/status",
@@ -790,10 +790,10 @@ export function getStaticPageMetadata(
       description: dictionary.statusPage.description,
       keywords:
         normalizedLocale === "en"
-          ? ["AstroDX", "AstroDX Archive", "server status", "monitor page", "network metrics"]
+          ? ["AstroDX", "ADX 谱面资源", "server status", "monitor page", "network metrics"]
           : normalizedLocale === "ja"
-            ? ["AstroDX", "AstroDX Archive", "サーバー状態", "監視ページ", "ネットワーク指標"]
-            : ["AstroDX", "AstroDX Archive", "服务器状态", "监控页", "网络指标"],
+            ? ["AstroDX", "ADX 谱面资源", "サーバー状態", "監視ページ", "ネットワーク指標"]
+            : ["AstroDX", "ADX 谱面资源", "服务器状态", "监控页", "网络指标"],
     },
   };
 }

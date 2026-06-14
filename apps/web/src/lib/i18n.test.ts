@@ -107,19 +107,19 @@ describe("i18n helpers", () => {
       pathname: "/",
       title: "AstroDX 谱面资料站与下载入口。",
       description: "构建时扫描远端 AstroDX 目录，提取单曲元数据、谱面信息与统一索引。",
-      keywords: ["AstroDX", "AstroDX Archive", "谱面资料站", "下载入口", "目录索引"],
+      keywords: ["AstroDX", "ADX 谱面资源", "谱面资料站", "下载入口", "目录索引"],
     });
     expect(enPages.search).toEqual({
       pathname: "/search",
       title: "Search",
       description: "Filter the catalog by keyword, branch, and display language.",
-      keywords: ["AstroDX", "AstroDX Archive", "search", "chart search", "branch filter"],
+      keywords: ["AstroDX", "ADX 谱面资源", "search", "chart search", "branch filter"],
     });
     expect(jaPages.status).toEqual({
       pathname: "/status",
       title: "サーバー状態",
       description: "公開監視ページの主要なサーバー状態とネットワーク指標を確認します。",
-      keywords: ["AstroDX", "AstroDX Archive", "サーバー状態", "監視ページ", "ネットワーク指標"],
+      keywords: ["AstroDX", "ADX 谱面资源", "サーバー状態", "監視ページ", "ネットワーク指標"],
     });
   });
 
@@ -136,7 +136,7 @@ describe("i18n helpers", () => {
         "Built from remote AstroDX directory scans, with per-song metadata, chart parsing, and a unified catalog for static deployment.",
     });
 
-    expect(metadata?.title).toBe("Search | AstroDX Archive");
+    expect(metadata?.title).toBe("Search | ADX 谱面资源");
     expect(metadata?.description).toBe(
       "Built from remote AstroDX directory scans, with per-song metadata, chart parsing, and a unified catalog for static deployment."
     );
@@ -183,11 +183,11 @@ describe("i18n helpers", () => {
 
     const metadata = pageMetadata.buildLocalizedPageMetadata?.("ja", "status");
 
-    expect(metadata?.title).toBe("サーバー状態 | AstroDX Archive");
+    expect(metadata?.title).toBe("サーバー状態 | ADX 谱面资源");
     expect(metadata?.description).toBe("公開監視ページの主要なサーバー状態とネットワーク指標を確認します。");
     expect(metadata?.keywords).toEqual([
       "AstroDX",
-      "AstroDX Archive",
+      "ADX 谱面资源",
       "サーバー状態",
       "監視ページ",
       "ネットワーク指標",
@@ -204,13 +204,13 @@ describe("i18n helpers", () => {
       ja: "/ja/status",
     });
     expect(metadata?.openGraph).toMatchObject({
-      title: "サーバー状態 | AstroDX Archive",
+      title: "サーバー状態 | ADX 谱面资源",
       description: "公開監視ページの主要なサーバー状態とネットワーク指標を確認します。",
       url: "https://adxdls.saop.cc/ja/status",
-      siteName: "AstroDX Archive",
+      siteName: "ADX 谱面资源",
     });
     expect(metadata?.twitter).toMatchObject({
-      title: "サーバー状態 | AstroDX Archive",
+      title: "サーバー状態 | ADX 谱面资源",
       description: "公開監視ページの主要なサーバー状態とネットワーク指標を確認します。",
     });
   });

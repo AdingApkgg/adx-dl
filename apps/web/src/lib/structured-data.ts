@@ -19,7 +19,7 @@ import { entrySlug } from "@/lib/route-slug";
 import { resolveSiteUrl } from "@/lib/site-url";
 
 const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
-const siteName = "AstroDX Archive";
+const siteName = "ADX 谱面资源";
 const organizationId = `${siteUrl}/#organization`;
 const websiteId = `${siteUrl}/#website`;
 const sourceRepository = "https://github.com/AdingApkgg/adx-dl";

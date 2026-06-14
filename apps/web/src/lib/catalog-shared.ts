@@ -219,6 +219,6 @@ export function buildChartDescription(entry: CatalogEntry, locale: EntryLocale):
     return head + body;
   }
   const head = `"${title}" is an AstroDX chart by ${artist}, archived under the "${branch}" branch${genre ? `, genre ${genre}` : ""}${bpm ? `, BPM ${bpm}` : ""}.`;
-  const body = ` The AstroDX Archive lists ${count} difficult${count === 1 ? "y" : "ies"}${range ? ` (levels ${range.low}–${range.high})` : ""}${assetClause}, available to browse and download.`;
+  const body = ` ADX 谱面资源 lists ${count} difficult${count === 1 ? "y" : "ies"}${range ? ` (levels ${range.low}–${range.high})` : ""}${assetClause}, available to browse and download.`;
   return head + body;
 }

@@ -46,8 +46,8 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-medium tracking-[0.28em] text-primary">
-                ASTRODX
+              <span className="text-sm font-semibold tracking-wide text-primary">
+                ADX 谱面资源
               </span>
               <span className="text-sm text-muted-foreground">
                 {dictionary.home.tagline}

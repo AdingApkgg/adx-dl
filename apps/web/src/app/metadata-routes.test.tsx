@@ -134,7 +134,7 @@ function expectLocalizedAlternates(
 ) {
   const basePath = canonical.replace(/^\/(en|ja)(?=\/|$)/, "") || "/";
   const absoluteCanonical = `https://adxdls.saop.cc${canonical === "/" ? "" : canonical}`;
-  const fullTitle = `${expected.title} | AstroDX Archive`;
+  const fullTitle = `${expected.title} | ADX 谱面资源`;
   const expectedImage = image ?? {
     url: "https://adxdls.saop.cc/opengraph-image.png",
     alt: fullTitle,
@@ -157,7 +157,7 @@ function expectLocalizedAlternates(
     title: fullTitle,
     description: expected.description,
     url: absoluteCanonical,
-    siteName: "AstroDX Archive",
+    siteName: "ADX 谱面资源",
   });
   expect(metadata.openGraph?.images).toEqual([expectedImage]);
   expect(metadata.twitter).toMatchObject({
@@ -174,42 +174,42 @@ describe("route metadata", () => {
     const searchModule = await import("./(default)/search/page");
     const statusModule = await import("./(default)/status/page");
 
-    expect(homeModule.metadata?.title).toBe("AstroDX 谱面资料站与下载入口。 | AstroDX Archive");
+    expect(homeModule.metadata?.title).toBe("AstroDX 谱面资料站与下载入口。 | ADX 谱面资源");
     expect(homeModule.metadata?.description).toBe(
       "构建时扫描远端 AstroDX 目录，提取单曲元数据、谱面信息与统一索引。"
     );
     expectLocalizedAlternates(homeModule.metadata ?? {}, "/", {
       title: "AstroDX 谱面资料站与下载入口。",
       description: "构建时扫描远端 AstroDX 目录，提取单曲元数据、谱面信息与统一索引。",
-      keywords: ["AstroDX", "AstroDX Archive", "谱面资料站", "下载入口", "目录索引"],
+      keywords: ["AstroDX", "ADX 谱面资源", "谱面资料站", "下载入口", "目录索引"],
     });
 
-    expect(chartsModule.metadata?.title).toBe("浏览曲目 | AstroDX Archive");
+    expect(chartsModule.metadata?.title).toBe("浏览曲目 | ADX 谱面资源");
     expect(chartsModule.metadata?.description).toBe(
       "按分类、分支与显示语言浏览 AstroDX 目录条目。"
     );
     expectLocalizedAlternates(chartsModule.metadata ?? {}, "/charts", {
       title: "浏览曲目",
       description: "按分类、分支与显示语言浏览 AstroDX 目录条目。",
-      keywords: ["AstroDX", "AstroDX Archive", "浏览曲目", "分类筛选", "显示语言"],
+      keywords: ["AstroDX", "ADX 谱面资源", "浏览曲目", "分类筛选", "显示语言"],
     });
 
-    expect(searchModule.metadata?.title).toBe("搜索 | AstroDX Archive");
+    expect(searchModule.metadata?.title).toBe("搜索 | ADX 谱面资源");
     expect(searchModule.metadata?.description).toBe("按关键字、版本分支与谱面信息筛选目录。");
     expectLocalizedAlternates(searchModule.metadata ?? {}, "/search", {
       title: "搜索",
       description: "按关键字、版本分支与谱面信息筛选目录。",
-      keywords: ["AstroDX", "AstroDX Archive", "搜索", "关键字筛选", "版本分支"],
+      keywords: ["AstroDX", "ADX 谱面资源", "搜索", "关键字筛选", "版本分支"],
     });
 
-    expect(statusModule.metadata?.title).toBe("服务器状态 | AstroDX Archive");
+    expect(statusModule.metadata?.title).toBe("服务器状态 | ADX 谱面资源");
     expect(statusModule.metadata?.description).toBe(
       "查看公开监控页中的服务器关键状态与网络指标。"
     );
     expectLocalizedAlternates(statusModule.metadata ?? {}, "/status", {
       title: "服务器状态",
       description: "查看公开监控页中的服务器关键状态与网络指标。",
-      keywords: ["AstroDX", "AstroDX Archive", "服务器状态", "监控页", "网络指标"],
+      keywords: ["AstroDX", "ADX 谱面资源", "服务器状态", "监控页", "网络指标"],
     });
   });
 
@@ -230,7 +230,7 @@ describe("route metadata", () => {
     });
 
     expect(enHomeMetadata?.title).toBe(
-      "AstroDX chart archive for browsing, indexing, and downloads. | AstroDX Archive"
+      "AstroDX chart archive for browsing, indexing, and downloads. | ADX 谱面资源"
     );
     expect(enHomeMetadata?.description).toBe(
       "Built from remote AstroDX directory scans, with per-song metadata, chart parsing, and a unified catalog for static deployment."
@@ -239,40 +239,40 @@ describe("route metadata", () => {
       title: "AstroDX chart archive for browsing, indexing, and downloads.",
       description:
         "Built from remote AstroDX directory scans, with per-song metadata, chart parsing, and a unified catalog for static deployment.",
-      keywords: ["AstroDX", "AstroDX Archive", "chart archive", "downloads", "catalog index"],
+      keywords: ["AstroDX", "ADX 谱面资源", "chart archive", "downloads", "catalog index"],
     });
 
-    expect(enChartsMetadata?.title).toBe("Browse Charts | AstroDX Archive");
+    expect(enChartsMetadata?.title).toBe("Browse Charts | ADX 谱面资源");
     expect(enChartsMetadata?.description).toBe(
       "Explore AstroDX directory entries by category, branch, and display language."
     );
     expectLocalizedAlternates(enChartsMetadata ?? {}, "/en/charts", {
       title: "Browse Charts",
       description: "Explore AstroDX directory entries by category, branch, and display language.",
-      keywords: ["AstroDX", "AstroDX Archive", "browse charts", "category filter", "display language"],
+      keywords: ["AstroDX", "ADX 谱面资源", "browse charts", "category filter", "display language"],
     });
 
-    expect(jaSearchMetadata?.title).toBe("検索 | AstroDX Archive");
+    expect(jaSearchMetadata?.title).toBe("検索 | ADX 谱面资源");
     expect(jaSearchMetadata?.description).toBe(
       "キーワード、バージョン、譜面情報でカタログを絞り込みます。"
     );
     expectLocalizedAlternates(jaSearchMetadata ?? {}, "/ja/search", {
       title: "検索",
       description: "キーワード、バージョン、譜面情報でカタログを絞り込みます。",
-      keywords: ["AstroDX", "AstroDX Archive", "検索", "キーワード", "譜面情報"],
+      keywords: ["AstroDX", "ADX 谱面资源", "検索", "キーワード", "譜面情報"],
     });
 
     const enStatusMetadata = await localizedStatusModule.generateMetadata?.({
       params: Promise.resolve({ locale: "en" }),
     });
-    expect(enStatusMetadata?.title).toBe("Server Status | AstroDX Archive");
+    expect(enStatusMetadata?.title).toBe("Server Status | ADX 谱面资源");
     expect(enStatusMetadata?.description).toBe(
       "View key server health and network metrics from the public monitor page."
     );
     expectLocalizedAlternates(enStatusMetadata ?? {}, "/en/status", {
       title: "Server Status",
       description: "View key server health and network metrics from the public monitor page.",
-      keywords: ["AstroDX", "AstroDX Archive", "server status", "monitor page", "network metrics"],
+      keywords: ["AstroDX", "ADX 谱面资源", "server status", "monitor page", "network metrics"],
     });
   });
 
@@ -293,7 +293,7 @@ describe("route metadata", () => {
     const zhDescription = buildChartDescription(entry3, "zh");
     const enDescription = buildChartDescription(entry3, "en");
 
-    expect(zhMetadata?.title).toBe("曲目 3 | AstroDX Archive");
+    expect(zhMetadata?.title).toBe("曲目 3 | ADX 谱面资源");
     expect(zhMetadata?.description).toBe(zhDescription);
     expectLocalizedAlternates(
       zhMetadata ?? {},
@@ -301,12 +301,12 @@ describe("route metadata", () => {
       {
         title: "曲目 3",
         description: zhDescription,
-        keywords: ["AstroDX", "AstroDX Archive", "曲目 3", "歌手 3", "舞萌DX 2025"],
+        keywords: ["AstroDX", "ADX 谱面资源", "曲目 3", "歌手 3", "舞萌DX 2025"],
       },
       { url: song3Cover, alt: "曲目 3" }
     );
 
-    expect(enMetadata?.title).toBe("Song 3 | AstroDX Archive");
+    expect(enMetadata?.title).toBe("Song 3 | ADX 谱面资源");
     expect(enMetadata?.description).toBe(enDescription);
     expectLocalizedAlternates(
       enMetadata ?? {},
@@ -314,7 +314,7 @@ describe("route metadata", () => {
       {
         title: "Song 3",
         description: enDescription,
-        keywords: ["AstroDX", "AstroDX Archive", "Song 3", "Artist 3", "舞萌DX 2025"],
+        keywords: ["AstroDX", "ADX 谱面资源", "Song 3", "Artist 3", "舞萌DX 2025"],
       },
       { url: song3Cover, alt: "Song 3" }
     );
@@ -347,19 +347,19 @@ describe("route metadata", () => {
     const enDescription = buildChartDescription(entry5, "en");
 
     // Remote branch label (version / cabinet) must appear in the synthesized prose.
-    expect(zhMetadata?.title).toBe("远端曲目 5 | AstroDX Archive");
+    expect(zhMetadata?.title).toBe("远端曲目 5 | ADX 谱面资源");
     expect(zhMetadata?.description).toBe(zhDescription);
     expect(zhDescription).toContain("maimai DX PRiSM / DX");
-    expect(enMetadata?.title).toBe("Remote Song 5 | AstroDX Archive");
+    expect(enMetadata?.title).toBe("Remote Song 5 | ADX 谱面资源");
     expect(enMetadata?.description).toBe(enDescription);
     expect(zhMetadata?.openGraph).toMatchObject({
-      title: "远端曲目 5 | AstroDX Archive",
+      title: "远端曲目 5 | ADX 谱面资源",
       description: zhDescription,
       url: `https://adxdls.saop.cc/charts/remote-song-5`,
-      siteName: "AstroDX Archive",
+      siteName: "ADX 谱面资源",
     });
     expect(enMetadata?.twitter).toMatchObject({
-      title: "Remote Song 5 | AstroDX Archive",
+      title: "Remote Song 5 | ADX 谱面资源",
       description: enDescription,
     });
   });

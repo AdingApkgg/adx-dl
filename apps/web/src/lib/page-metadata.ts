@@ -20,7 +20,7 @@ import { resolveSiteUrl } from "@/lib/site-url";
 
 const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 const openGraphImageUrl = `${siteUrl}/opengraph-image.png`;
-const siteName = "AstroDX Archive";
+const siteName = "ADX 谱面资源";
 const robots = {
   index: true,
   follow: true,
