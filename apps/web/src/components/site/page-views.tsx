@@ -13,6 +13,7 @@ import { ChartMediaPlayer } from "@/components/site/chart-media-player";
 import { EntryAssetBadges } from "@/components/site/entry-asset-badges";
 import { EntryCover } from "@/components/site/entry-cover";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
+import { VersionBadge } from "@/components/site/version-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -170,8 +171,8 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
               <CardDescription>{formatEntryArtist(entry, locale)}</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">{formatEntrySubcategory(entry)}</Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <VersionBadge version={entry.version} label={formatEntrySubcategory(entry)} />
                 {entry.difficulties.slice(0, 3).map((difficulty) => (
                   <Badge key={`${entry.id}-${difficulty.slot}`} variant="outline">
                     {difficulty.level || `Lv.${difficulty.slot}`}
@@ -315,7 +316,7 @@ export function ChartDetailPageView({
         <div className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card/80 p-6">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{entry.category}</Badge>
-            <Badge variant="outline">{branchLabel}</Badge>
+            <VersionBadge version={entry.version} label={branchLabel} />
             {showVersionBadge ? <Badge variant="outline">{entry.version}</Badge> : null}
           </div>
           <div className="flex flex-col gap-2">

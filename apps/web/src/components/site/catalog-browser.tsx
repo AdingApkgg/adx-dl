@@ -10,6 +10,7 @@ import {
 
 import { EntryAssetBadges } from "@/components/site/entry-asset-badges";
 import { EntryCover } from "@/components/site/entry-cover";
+import { VersionBadge } from "@/components/site/version-badge";
 import {
   ALL_CATEGORIES,
   ALL_SUBCATEGORIES,
@@ -191,7 +192,10 @@ export function CatalogBrowser({
                   <div className="flex min-w-0 flex-col gap-4">
                     <div data-entry-meta="primary" className="flex min-w-0 flex-1 flex-col gap-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="secondary">{formatEntrySubcategory(entry)}</Badge>
+                        <VersionBadge
+                          version={entry.version}
+                          label={formatEntrySubcategory(entry)}
+                        />
                         {entry.category !== "Remote" && entry.version ? (
                           <Badge variant="outline" className="text-muted-foreground">
                             {entry.version}
