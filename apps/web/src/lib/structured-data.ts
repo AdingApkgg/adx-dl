@@ -6,6 +6,7 @@ import {
   formatEntrySubcategory,
   formatEntryTitle,
   type CatalogEntry,
+  type VersionGroup,
 } from "@/lib/catalog-shared";
 import {
   buildLocalePath,
@@ -157,6 +158,111 @@ export function buildListingStructuredData(
             name: meta.title,
             item: listUrl,
           },
+        ],
+      },
+    ],
+  };
+}
+
+export function buildVersionsIndexStructuredData(
+  locale: Locale,
+  groups: VersionGroup[]
+): JsonLdValue {
+  const dictionary = getDictionary(locale);
+  const versions = dictionary.versions;
+  const listPath = buildLocalePath("/versions", locale);
+  const listUrl = toAbsoluteUrl(listPath);
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "CollectionPage",
+        "@id": listUrl,
+        url: listUrl,
+        name: versions.title,
+        description: versions.description,
+        inLanguage: getStructuredDataLanguage(locale),
+        isPartOf: { "@id": websiteId },
+        mainEntity: {
+          "@type": "ItemList",
+          numberOfItems: groups.length,
+          itemListElement: groups.map((group, index) => ({
+            "@type": "ListItem",
+            position: index + 1,
+            url: toAbsoluteUrl(buildLocalePath(`/versions/${group.slug}`, locale)),
+            name: group.subcategory === "Unknown" ? versions.unknownLabel : group.subcategory,
+          })),
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: dictionary.nav.home,
+            item: toAbsoluteUrl(buildLocalePath("/", locale)),
+          },
+          { "@type": "ListItem", position: 2, name: versions.title, item: listUrl },
+        ],
+      },
+    ],
+  };
+}
+
+export function buildVersionDetailStructuredData(
+  locale: Locale,
+  subcategory: string,
+  slug: string,
+  entries: CatalogEntry[]
+): JsonLdValue {
+  const dictionary = getDictionary(locale);
+  const versions = dictionary.versions;
+  const label = subcategory === "Unknown" ? versions.unknownLabel : subcategory;
+  const path = buildLocalePath(`/versions/${slug}`, locale);
+  const url = toAbsoluteUrl(path);
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "CollectionPage",
+        "@id": url,
+        url,
+        name: versions.detailTitle(label),
+        description: versions.detailIntro(label, entries.length),
+        inLanguage: getStructuredDataLanguage(locale),
+        isPartOf: { "@id": websiteId },
+        mainEntity: {
+          "@type": "ItemList",
+          numberOfItems: entries.length,
+          itemListElement: entries.slice(0, 100).map((entry, index) => ({
+            "@type": "ListItem",
+            position: index + 1,
+            url: toAbsoluteUrl(
+              buildLocalePath(`/charts/${encodeURIComponent(entrySlug(entry))}`, locale)
+            ),
+            name: formatEntryTitle(entry, locale),
+          })),
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: dictionary.nav.home,
+            item: toAbsoluteUrl(buildLocalePath("/", locale)),
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: versions.title,
+            item: toAbsoluteUrl(buildLocalePath("/versions", locale)),
+          },
+          { "@type": "ListItem", position: 3, name: label, item: url },
         ],
       },
     ],

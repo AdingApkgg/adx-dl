@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-import { readCatalog } from "@/lib/catalog";
+import { readCatalog, readVersionGroups } from "@/lib/catalog";
 import { buildLocalePath, locales, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 import { resolveSiteUrl } from "@/lib/site-url";
@@ -8,7 +8,7 @@ import { resolveSiteUrl } from "@/lib/site-url";
 export const dynamic = "force-static";
 
 const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL).replace(/\/+$/, "");
-const staticPaths = ["/", "/charts", "/search", "/status"] as const;
+const staticPaths = ["/", "/charts", "/search", "/status", "/versions"] as const;
 
 function toAbsoluteUrl(pathname: string): string {
   if (pathname === "/") {
@@ -73,6 +73,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     )
   );
 
+  const versionGroups = await readVersionGroups();
+  const versionRoutes = versionGroups.flatMap((group) =>
+    locales.map((locale) =>
+      buildSitemapEntry(`/versions/${group.slug}`, locale, { lastModified: siteLastModified })
+    )
+  );
+
   const detailRoutes = catalog.entries.flatMap((entry) => {
     const pathname = `/charts/${encodeURIComponent(entrySlug(entry))}`;
     const lastModified = toIsoDate(entry.imported_at) ?? siteLastModified;
@@ -83,5 +90,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     );
   });
 
-  return [...staticRoutes, ...detailRoutes];
+  return [...staticRoutes, ...versionRoutes, ...detailRoutes];
 }

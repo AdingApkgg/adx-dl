@@ -85,6 +85,10 @@ mock.module("@/lib/catalog", () => ({
       const legacy = toLegacyRouteSlug(entry.id);
       return legacy ? [hashed, legacy] : [hashed];
     }),
+  readCanonicalSlugs: async () => entries.map((entry) => toRouteSlug(entry.id)),
+  readVersionGroups: async () => [],
+  readVersionGroup: async () => undefined,
+  readVersionSlugs: async () => [],
 }));
 
 describe("default zh routes", () => {

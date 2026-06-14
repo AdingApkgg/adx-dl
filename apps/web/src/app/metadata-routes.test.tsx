@@ -98,6 +98,15 @@ mock.module("@/lib/catalog", () => ({
       const legacy = toLegacyRouteSlug(entry.id);
       return legacy ? [hashed, legacy] : [hashed];
     }),
+  readCanonicalSlugs: async () => entries.map((entry) => toRouteSlug(entry.id)),
+  readVersionGroups: async () => [
+    { subcategory: "maimai DX PRiSM / DX", slug: "maimai-dx-prism-dx", count: 1 },
+  ],
+  readVersionGroup: async (slug: string) =>
+    slug === "maimai-dx-prism-dx"
+      ? { subcategory: "maimai DX PRiSM / DX", entries }
+      : undefined,
+  readVersionSlugs: async () => ["maimai-dx-prism-dx"],
 }));
 
 function expectLocalizedAlternates(

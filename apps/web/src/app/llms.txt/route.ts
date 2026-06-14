@@ -20,6 +20,7 @@ The archive currently lists ${catalog.total_entries} charts across ${versions.le
 ## Key pages
 - Home: ${siteUrl}/
 - Browse charts: ${siteUrl}/charts
+- Browse by version: ${siteUrl}/versions
 - Search: ${siteUrl}/search
 - Server status: ${siteUrl}/status
 - Sitemap: ${siteUrl}/sitemap.xml

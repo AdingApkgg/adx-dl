@@ -1,8 +1,10 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { cache } from "react";
-import type { Catalog, CatalogEntry } from "@/lib/catalog-shared";
+import type { Catalog, CatalogEntry, VersionGroup } from "@/lib/catalog-shared";
+import { versionSlug } from "@/lib/catalog-shared";
 import { entrySlug, toLegacyRouteSlug, toRouteSlug } from "@/lib/route-slug";
+import { versionImageIndex } from "@/lib/version-image";
 
 export type { Catalog, CatalogDifficulty, CatalogEntry } from "@/lib/catalog-shared";
 
@@ -86,4 +88,52 @@ export async function readRouteSlugs(): Promise<string[]> {
 export async function readCanonicalSlugs(): Promise<string[]> {
   const entries = await readCatalogEntries();
   return entries.map((entry) => entrySlug(entry));
+}
+
+// --- Version (subcategory) grouping for the /versions browse pages ---
+
+const readVersionMap = cache(async () => {
+  const entries = await readCatalogEntries();
+  const bySlug = new Map<string, { subcategory: string; entries: CatalogEntry[] }>();
+
+  for (const entry of entries) {
+    const subcategory = entry.subcategory || "Unknown";
+    const slug = versionSlug(subcategory);
+    const group = bySlug.get(slug);
+    if (group) {
+      group.entries.push(entry);
+    } else {
+      bySlug.set(slug, { subcategory, entries: [entry] });
+    }
+  }
+
+  return bySlug;
+});
+
+export async function readVersionGroups(): Promise<VersionGroup[]> {
+  const map = await readVersionMap();
+  const groups = Array.from(map.entries()).map(([slug, group]) => ({
+    subcategory: group.subcategory,
+    slug,
+    count: group.entries.length,
+  }));
+
+  // Chronological by maimai version icon order; versions without an icon (Unknown) last.
+  return groups.sort((a, b) => {
+    const ai = versionImageIndex(a.subcategory) ?? Number.MAX_SAFE_INTEGER;
+    const bi = versionImageIndex(b.subcategory) ?? Number.MAX_SAFE_INTEGER;
+    return ai - bi || a.subcategory.localeCompare(b.subcategory);
+  });
+}
+
+export async function readVersionGroup(
+  slug: string
+): Promise<{ subcategory: string; entries: CatalogEntry[] } | undefined> {
+  const map = await readVersionMap();
+  return map.get(slug);
+}
+
+export async function readVersionSlugs(): Promise<string[]> {
+  const map = await readVersionMap();
+  return Array.from(map.keys());
 }

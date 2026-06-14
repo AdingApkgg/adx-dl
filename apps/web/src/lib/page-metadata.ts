@@ -9,6 +9,7 @@ import {
 } from "@/lib/catalog-shared";
 import {
   buildLocalePath,
+  getDictionary,
   getStaticPageMetadata,
   locales,
   type Locale,
@@ -152,5 +153,33 @@ export function buildChartDetailMetadata(locale: Locale, entry: CatalogEntry): M
     keywords: buildDetailKeywords(locale, entry),
     image: entry.media.cover_url || openGraphImageUrl,
     imageAlt: formatEntryTitle(entry, locale),
+  });
+}
+
+export function buildVersionsPageMetadata(locale: Locale): Metadata {
+  const versions = getDictionary(locale).versions;
+  return buildPageMetadata({
+    locale,
+    pathname: "/versions",
+    title: versions.title,
+    description: versions.description,
+    keywords: ["AstroDX", siteName, versions.title, "maimai DX"],
+  });
+}
+
+export function buildVersionDetailMetadata(
+  locale: Locale,
+  subcategory: string,
+  slug: string,
+  count: number
+): Metadata {
+  const versions = getDictionary(locale).versions;
+  const label = subcategory === "Unknown" ? versions.unknownLabel : subcategory;
+  return buildPageMetadata({
+    locale,
+    pathname: `/versions/${slug}`,
+    title: versions.detailTitle(label),
+    description: versions.detailIntro(label, count),
+    keywords: ["AstroDX", siteName, label, "maimai DX"],
   });
 }

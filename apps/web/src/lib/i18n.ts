@@ -163,6 +163,16 @@ export type SiteDictionary = {
     disclaimer: string;
     sourceLabel: string;
   };
+  versions: {
+    title: string;
+    description: string;
+    navLabel: string;
+    intro: (count: number) => string;
+    chartCount: (count: number) => string;
+    unknownLabel: string;
+    detailTitle: (label: string) => string;
+    detailIntro: (label: string, count: number) => string;
+  };
 };
 
 export type StaticPageMetadataKey = "home" | "charts" | "search" | "status";
@@ -337,6 +347,17 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       disclaimer: "非官方爱好者资料站。AstroDX 与 maimai 的相关权利归各自所有者所有。",
       sourceLabel: "源代码",
     },
+    versions: {
+      title: "按版本浏览",
+      description: "按 maimai DX 版本浏览 AstroDX 谱面。",
+      navLabel: "版本",
+      intro: (count) => `共 ${count} 个版本分类。`,
+      chartCount: (count) => `${count} 首`,
+      unknownLabel: "未分类",
+      detailTitle: (label) => `${label} 谱面`,
+      detailIntro: (label, count) =>
+        `「${label}」版本下的 ${count} 首 AstroDX 谱面,可在线浏览与下载。`,
+    },
   },
   en: {
     localeLabel: "English",
@@ -506,6 +527,17 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "Unofficial fan-made archive. AstroDX and maimai are the property of their respective owners.",
       sourceLabel: "Source",
     },
+    versions: {
+      title: "Browse by Version",
+      description: "Browse AstroDX charts by maimai DX version.",
+      navLabel: "Versions",
+      intro: (count) => `${count} version categories.`,
+      chartCount: (count) => `${count} charts`,
+      unknownLabel: "Uncategorized",
+      detailTitle: (label) => `${label} charts`,
+      detailIntro: (label, count) =>
+        `${count} AstroDX charts in the "${label}" version, available to browse and download.`,
+    },
   },
   ja: {
     localeLabel: "日本語",
@@ -671,6 +703,17 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       lastUpdated: (date) => `カタログ更新: ${date}`,
       disclaimer: "非公式のファンメイドアーカイブです。AstroDX および maimai の権利は各所有者に帰属します。",
       sourceLabel: "ソース",
+    },
+    versions: {
+      title: "バージョンで閲覧",
+      description: "maimai DX バージョン別に AstroDX 譜面を閲覧します。",
+      navLabel: "バージョン",
+      intro: (count) => `${count} 個のバージョン分類。`,
+      chartCount: (count) => `${count} 曲`,
+      unknownLabel: "未分類",
+      detailTitle: (label) => `${label} の譜面`,
+      detailIntro: (label, count) =>
+        `「${label}」バージョンの ${count} 曲の AstroDX 譜面。オンラインで閲覧・ダウンロードできます。`,
     },
   },
 };

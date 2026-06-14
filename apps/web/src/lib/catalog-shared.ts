@@ -96,6 +96,25 @@ export function collectSubcategories(entries: CatalogEntry[], category: string):
   ].sort();
 }
 
+export type VersionGroup = {
+  /** Raw subcategory / version string from the catalog (e.g. "maimai DX PRiSM"). */
+  subcategory: string;
+  /** ASCII URL slug for the version route (e.g. "maimai-dx-prism"). */
+  slug: string;
+  count: number;
+};
+
+// Version/subcategory strings are Latin (maimai version names), so an ASCII slug
+// is safe and avoids the non-ASCII static-export routing pitfalls of chart slugs.
+export function versionSlug(subcategory: string): string {
+  return (
+    subcategory
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "unknown"
+  );
+}
+
 type EntryLocale = "zh" | "en" | "ja";
 
 // Standard maimai DX difficulty ordering. Verified against the catalog level

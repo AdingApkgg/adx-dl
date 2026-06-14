@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { DownloadIcon, LibraryBigIcon, SearchIcon } from "lucide-react";
+import { DownloadIcon, LayersIcon, LibraryBigIcon, SearchIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { ThemeToggle } from "@/components/site/theme-toggle";
@@ -27,6 +27,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
   const dictionary = getDictionary(locale);
   const homeHref = switchLocale("/", locale);
   const browseHref = switchLocale("/charts", locale);
+  const versionsHref = switchLocale("/versions", locale);
   const searchHref = switchLocale("/search", locale);
 
   return (
@@ -66,6 +67,12 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             <Link href={browseHref}>
               <DownloadIcon data-icon="inline-start" />
               {dictionary.nav.browse}
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={versionsHref}>
+              <LayersIcon data-icon="inline-start" />
+              {dictionary.versions.navLabel}
             </Link>
           </Button>
           <Button variant="ghost" size="sm" asChild>

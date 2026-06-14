@@ -7,7 +7,7 @@ export type IndexNowPayload = {
   urlList: string[];
 };
 
-const staticPaths = ["/", "/charts", "/search", "/status"] as const;
+const staticPaths = ["/", "/charts", "/versions", "/search", "/status"] as const;
 
 export function normalizeSiteUrl(siteUrl: string): string {
   return new URL(siteUrl).toString().replace(/\/$/, "");
