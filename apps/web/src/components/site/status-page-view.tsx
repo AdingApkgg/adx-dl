@@ -1,5 +1,6 @@
 import { ExternalLinkIcon, RefreshCcwIcon, ServerIcon } from "lucide-react";
 
+import { motion, RevealGroup, RevealItem } from "@/components/motion";
 import { StatusHistoryCharts } from "@/components/site/status-history-charts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,14 +32,16 @@ function MetricCard({
   fallback: string;
 }) {
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle className="text-base">{label}</CardTitle>
-      </CardHeader>
-      <CardContent className="text-sm font-medium">
-        <DisplayValue value={value} fallback={fallback} />
-      </CardContent>
-    </Card>
+    <RevealItem className="h-full">
+      <Card size="sm" className="h-full">
+        <CardHeader>
+          <CardTitle className="text-base">{label}</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm font-medium">
+          <DisplayValue value={value} fallback={fallback} />
+        </CardContent>
+      </Card>
+    </RevealItem>
   );
 }
 
@@ -66,7 +69,18 @@ export function StatusPageView({
         <p className="text-muted-foreground">{labels.description}</p>
         <div className="flex flex-wrap gap-3">
           <Button type="button" variant="outline" onClick={onRefresh}>
-            <RefreshCcwIcon data-icon="inline-start" />
+            <motion.span
+              className="inline-flex"
+              data-icon="inline-start"
+              animate={isRefreshing ? { rotate: 360 } : { rotate: 0 }}
+              transition={
+                isRefreshing
+                  ? { duration: 0.9, repeat: Infinity, ease: "linear" }
+                  : { duration: 0.2 }
+              }
+            >
+              <RefreshCcwIcon />
+            </motion.span>
             {labels.refreshNow}
           </Button>
           <Button asChild>
@@ -86,7 +100,7 @@ export function StatusPageView({
 
       {snapshot ? (
         <>
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <RevealGroup className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <MetricCard label={labels.overviewTitle} value={snapshot.name} fallback={labels.unavailable} />
             <MetricCard label={labels.stateLabel} value={snapshot.state} fallback={labels.unavailable} />
             <MetricCard label={labels.regionLabel} value={snapshot.region} fallback={labels.unavailable} />
@@ -94,16 +108,16 @@ export function StatusPageView({
             <MetricCard label={labels.archLabel} value={snapshot.arch} fallback={labels.unavailable} />
             <MetricCard label={labels.lastReportLabel} value={snapshot.lastReportTime} fallback={labels.unavailable} />
             <MetricCard label={labels.loadLabel} value={snapshot.load} fallback={labels.unavailable} />
-          </section>
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          </RevealGroup>
+          <RevealGroup className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <MetricCard label={labels.resourcesTitle} value={snapshot.cpuModel} fallback={labels.unavailable} />
             <MetricCard label={labels.cpuLabel} value={snapshot.cpuPercent} fallback={labels.unavailable} />
             <MetricCard label={labels.memoryLabel} value={snapshot.memoryUsageText} fallback={labels.unavailable} />
             <MetricCard label={labels.swapLabel} value={snapshot.swapUsageText} fallback={labels.unavailable} />
             <MetricCard label={labels.diskLabel} value={snapshot.diskUsageText} fallback={labels.unavailable} />
             <MetricCard label={labels.processLabel} value={snapshot.processCount} fallback={labels.unavailable} />
-          </section>
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          </RevealGroup>
+          <RevealGroup className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <MetricCard label={labels.networkTitle} value={snapshot.uptime} fallback={labels.unavailable} />
             <MetricCard label={labels.uploadTotalLabel} value={snapshot.uploadTotal} fallback={labels.unavailable} />
             <MetricCard label={labels.downloadTotalLabel} value={snapshot.downloadTotal} fallback={labels.unavailable} />
@@ -111,7 +125,7 @@ export function StatusPageView({
             <MetricCard label={labels.downloadSpeedLabel} value={snapshot.downloadSpeed} fallback={labels.unavailable} />
             <MetricCard label={labels.tcpLabel} value={snapshot.tcpCount} fallback={labels.unavailable} />
             <MetricCard label={labels.udpLabel} value={snapshot.udpCount} fallback={labels.unavailable} />
-          </section>
+          </RevealGroup>
         </>
       ) : (
         <Card>

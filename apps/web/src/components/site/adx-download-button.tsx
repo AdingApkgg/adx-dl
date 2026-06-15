@@ -3,6 +3,7 @@
 import * as React from "react";
 import { DownloadIcon } from "lucide-react";
 
+import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import {
   buildAdxArchiveBlob,
@@ -66,18 +67,45 @@ export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButton
   return (
     <div className="flex flex-col gap-2">
       <Button type="button" onClick={handleClick} disabled={!canDownload || isBusy}>
-        <DownloadIcon data-icon="inline-start" />
+        <motion.span
+          className="inline-flex"
+          animate={isBusy ? { y: [0, 2, 0] } : { y: 0 }}
+          transition={
+            isBusy
+              ? { duration: 0.9, repeat: Infinity, ease: "easeInOut" }
+              : { duration: 0.2 }
+          }
+        >
+          <DownloadIcon data-icon="inline-start" />
+        </motion.span>
         {label}
       </Button>
-      {status === "success" ? (
-        <p className="text-sm text-muted-foreground">{detailDictionary.downloadSuccess}</p>
-      ) : null}
-      {status === "error" ? (
-        <p className="text-sm text-destructive">
-          {detailDictionary.downloadErrorPrefix}
-          {errorMessage}
-        </p>
-      ) : null}
+      <AnimatePresence mode="wait">
+        {status === "success" ? (
+          <motion.p
+            key="success"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2, ease: EASE_OUT }}
+            className="text-sm text-muted-foreground"
+          >
+            {detailDictionary.downloadSuccess}
+          </motion.p>
+        ) : status === "error" ? (
+          <motion.p
+            key="error"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2, ease: EASE_OUT }}
+            className="text-sm text-destructive"
+          >
+            {detailDictionary.downloadErrorPrefix}
+            {errorMessage}
+          </motion.p>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

@@ -4,7 +4,8 @@
   "private": true,
   "packageManager": "bun@1.3.14",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev": "bun run --filter web dev",

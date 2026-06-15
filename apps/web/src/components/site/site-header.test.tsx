@@ -20,9 +20,11 @@ describe("SiteHeader", () => {
     expect(html).toContain('href="/ja"');
     expect(html).toContain('href="/ja/charts"');
     expect(html).toContain('href="/ja/search"');
-    expect(html).toContain('href="/charts/song-3"');
-    expect(html).toContain('href="/en/charts/song-3"');
-    expect(html).toContain('href="/ja/charts/song-3"');
+    // The locale + theme switchers are dropdown triggers; their menus mount on
+    // open, so only the trigger buttons appear in the server-rendered markup.
+    // Cross-locale discovery is handled by hreflang alternates, not these links.
+    expect(html).toContain('aria-label="言語切り替え"');
+    expect(html).toContain('aria-label="テーマ切り替え"');
   });
 
   test("renders zh navigation and locale roots on the default locale home route", async () => {
@@ -39,7 +41,7 @@ describe("SiteHeader", () => {
     expect(html).toContain('href="/"');
     expect(html).toContain('href="/charts"');
     expect(html).toContain('href="/search"');
-    expect(html).toContain('href="/en"');
-    expect(html).toContain('href="/ja"');
+    expect(html).toContain('aria-label="语言切换"');
+    expect(html).toContain('aria-label="切换主题"');
   });
 });

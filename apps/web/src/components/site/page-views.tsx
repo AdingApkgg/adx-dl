@@ -9,6 +9,7 @@ import {
   SearchIcon,
 } from "lucide-react";
 
+import { Reveal, RevealGroup, RevealItem } from "@/components/motion";
 import { AdxDownloadButton } from "@/components/site/adx-download-button";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
@@ -174,7 +175,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
       </section>
 
       <section className="flex flex-col gap-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+        <Reveal className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-col gap-1">
             <h2 className="text-2xl font-semibold">{home.branchesTitle}</h2>
             <p className="text-sm text-muted-foreground">{home.branchesDescription}</p>
@@ -185,102 +186,114 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
               <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
             </Link>
           </Button>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        </Reveal>
+        <RevealGroup className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {versionTiles.map((version) => (
-            <Link
-              key={version.index}
-              href={buildLocalePath(`/versions/${version.slug}`, locale)}
-              className="group flex flex-col items-center gap-3 rounded-2xl border border-border/60 bg-card/70 p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10"
-            >
-              <Image
-                src={versionImageSrcByIndex(version.index)}
-                alt={version.name}
-                width={VERSION_IMAGE_DIMENSIONS.width}
-                height={VERSION_IMAGE_DIMENSIONS.height}
-                unoptimized
-                className="h-14 w-auto drop-shadow transition-transform duration-300 group-hover:scale-105"
-              />
-              <div className="flex flex-col items-center gap-0.5 text-center">
-                <span className="line-clamp-1 text-sm font-medium">{version.name}</span>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {version.count} {countUnit}
-                </span>
-              </div>
-            </Link>
+            <RevealItem key={version.index} className="h-full">
+              <Link
+                href={buildLocalePath(`/versions/${version.slug}`, locale)}
+                className="group flex h-full flex-col items-center gap-3 rounded-2xl border border-border/60 bg-card/70 p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10"
+              >
+                <Image
+                  src={versionImageSrcByIndex(version.index)}
+                  alt={version.name}
+                  width={VERSION_IMAGE_DIMENSIONS.width}
+                  height={VERSION_IMAGE_DIMENSIONS.height}
+                  unoptimized
+                  className="h-14 w-auto drop-shadow transition-transform duration-300 group-hover:scale-105"
+                />
+                <div className="flex flex-col items-center gap-0.5 text-center">
+                  <span className="line-clamp-1 text-sm font-medium">{version.name}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {version.count} {countUnit}
+                  </span>
+                </div>
+              </Link>
+            </RevealItem>
           ))}
-        </div>
+        </RevealGroup>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-        <div className="col-span-2 lg:col-span-3 xl:col-span-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-2xl font-semibold">{home.latestTitle}</h2>
-              <p className="text-sm text-muted-foreground">{home.latestDescription}</p>
-            </div>
+      <section className="flex flex-col gap-5">
+        <Reveal className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-2xl font-semibold">{home.latestTitle}</h2>
+            <p className="text-sm text-muted-foreground">{home.latestDescription}</p>
           </div>
-        </div>
-        {latestEntries.map((entry, index) => (
-          <ChartCard
-            key={entry.id}
-            entry={entry}
-            locale={locale}
-            priority={index < 4}
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          />
-        ))}
+        </Reveal>
+        <RevealGroup className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+          {latestEntries.map((entry, index) => (
+            <RevealItem key={entry.id} className="h-full">
+              <ChartCard
+                entry={entry}
+                locale={locale}
+                priority={index < 4}
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              />
+            </RevealItem>
+          ))}
+        </RevealGroup>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>{home.pipelineTitle}</CardTitle>
-            <CardDescription>{home.pipelineDescription}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Badge variant="secondary">
-              <BoxesIcon data-icon="inline-start" aria-hidden="true" />
-              {home.pipelineBadge}
-            </Badge>
-          </CardContent>
-        </Card>
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>{home.staticTitle}</CardTitle>
-            <CardDescription>{home.staticDescription}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Badge variant="secondary">{home.staticBadge}</Badge>
-          </CardContent>
-        </Card>
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>{home.downloadsTitle}</CardTitle>
-            <CardDescription>{home.downloadsDescription}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Badge variant="secondary">{home.downloadsBadge}</Badge>
-          </CardContent>
-        </Card>
-      </section>
+      <RevealGroup className="grid gap-4 md:grid-cols-3">
+        <RevealItem className="h-full">
+          <Card size="sm" className="h-full">
+            <CardHeader>
+              <CardTitle>{home.pipelineTitle}</CardTitle>
+              <CardDescription>{home.pipelineDescription}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Badge variant="secondary">
+                <BoxesIcon data-icon="inline-start" aria-hidden="true" />
+                {home.pipelineBadge}
+              </Badge>
+            </CardContent>
+          </Card>
+        </RevealItem>
+        <RevealItem className="h-full">
+          <Card size="sm" className="h-full">
+            <CardHeader>
+              <CardTitle>{home.staticTitle}</CardTitle>
+              <CardDescription>{home.staticDescription}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Badge variant="secondary">{home.staticBadge}</Badge>
+            </CardContent>
+          </Card>
+        </RevealItem>
+        <RevealItem className="h-full">
+          <Card size="sm" className="h-full">
+            <CardHeader>
+              <CardTitle>{home.downloadsTitle}</CardTitle>
+              <CardDescription>{home.downloadsDescription}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Badge variant="secondary">{home.downloadsBadge}</Badge>
+            </CardContent>
+          </Card>
+        </RevealItem>
+      </RevealGroup>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{home.faqHeading}</h2>
-        <div className="grid gap-4 md:grid-cols-2">
+        <Reveal>
+          <h2 className="text-2xl font-semibold">{home.faqHeading}</h2>
+        </Reveal>
+        <RevealGroup className="grid gap-4 md:grid-cols-2">
           {faqItems.map((item) => (
-            <Card key={item.q} size="sm" className="border border-border/70 bg-card/85">
-              <CardHeader>
-                <CardTitle asChild>
-                  <h3 className="text-base font-medium">{item.q}</h3>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{item.a}</p>
-              </CardContent>
-            </Card>
+            <RevealItem key={item.q} className="h-full">
+              <Card size="sm" className="h-full border border-border/70 bg-card/85">
+                <CardHeader>
+                  <CardTitle asChild>
+                    <h3 className="text-base font-medium">{item.q}</h3>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">{item.a}</p>
+                </CardContent>
+              </Card>
+            </RevealItem>
           ))}
-        </div>
+        </RevealGroup>
       </section>
     </main>
   );
@@ -429,9 +442,11 @@ export function ChartDetailPageView({
         </div>
       </section>
 
-      <ChartMediaPlayer entry={entry} locale={locale} />
+      <Reveal>
+        <ChartMediaPlayer entry={entry} locale={locale} />
+      </Reveal>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_320px]">
+      <Reveal className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_320px]">
         <Card>
           <CardHeader>
             <CardTitle>{detail.metadata}</CardTitle>
@@ -532,7 +547,7 @@ export function ChartDetailPageView({
             </CardContent>
           </Card>
         </div>
-      </div>
+      </Reveal>
 
       <section className="flex flex-col gap-4">
         <h2 className="text-2xl font-semibold">{detail.comments}</h2>
@@ -560,11 +575,11 @@ function CatalogPageView({
       className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
     >
       <SeoJsonLd data={buildListingStructuredData(locale, entries, pageKey)} />
-      <div className="flex flex-col gap-2">
+      <Reveal className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">{title}</h1>
         <p className="text-muted-foreground">{description}</p>
         <p className="text-sm text-muted-foreground">{intro}</p>
-      </div>
+      </Reveal>
       <CatalogBrowser
         entries={entries}
         locale={locale}

@@ -2,20 +2,23 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { DownloadIcon, LayersIcon, LibraryBigIcon, SearchIcon } from "lucide-react";
+import { DownloadIcon, LayersIcon, LibraryBigIcon, SearchIcon, SendIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 
+import { motion, springSoft } from "@/components/motion";
+import { LanguageSwitcher } from "@/components/site/language-switcher";
 import { ThemeToggle } from "@/components/site/theme-toggle";
 import {
   defaultLocale,
   getDictionary,
-  getHtmlLang,
   locales,
   switchLocale,
   type Locale,
 } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+
+const TELEGRAM_COMMUNITY = "https://t.me/FullDiveSAO";
 
 type SiteHeaderProps = {
   totalEntries: number;
@@ -34,8 +37,13 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
     <header className="sticky top-0 z-20 border-b border-border/60 bg-background/90 backdrop-blur">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3 md:px-6">
         <div className="flex items-center gap-3">
-          <Link href={homeHref} className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+          <Link href={homeHref} className="group flex items-center gap-3">
+            <motion.div
+              whileHover={{ scale: 1.06, rotate: -3 }}
+              whileTap={{ scale: 0.95 }}
+              transition={springSoft}
+              className="flex size-10 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20"
+            >
               <Image
                 src="/brand-icon.png"
                 alt=""
@@ -44,7 +52,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
                 width={28}
                 height={28}
               />
-            </div>
+            </motion.div>
             <div className="flex flex-col">
               <span className="text-sm font-semibold tracking-wide text-primary">
                 ADX 谱面资源
@@ -83,28 +91,19 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
           </Button>
         </nav>
         <div className="flex items-center gap-2">
-          <nav
-            aria-label={dictionary.nav.languageLabel}
-            className="hidden items-center gap-1 md:flex"
-          >
-            {locales.map((targetLocale) => (
-              <Button
-                key={targetLocale}
-                variant={targetLocale === locale ? "secondary" : "outline"}
-                size="sm"
-                asChild
-              >
-                <Link
-                  href={switchLocale(pathname, targetLocale)}
-                  aria-current={targetLocale === locale ? "true" : undefined}
-                  lang={getHtmlLang(targetLocale)}
-                >
-                  {dictionary.language[targetLocale]}
-                </Link>
-              </Button>
-            ))}
-          </nav>
-          <ThemeToggle />
+          <LanguageSwitcher locale={locale} pathname={pathname} />
+          <Button variant="outline" size="icon-sm" asChild>
+            <a
+              href={TELEGRAM_COMMUNITY}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={dictionary.nav.community}
+              title={dictionary.nav.community}
+            >
+              <SendIcon />
+            </a>
+          </Button>
+          <ThemeToggle labels={dictionary.theme} />
         </div>
       </div>
     </header>

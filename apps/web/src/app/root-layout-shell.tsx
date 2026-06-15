@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { MotionProvider } from "@/components/motion";
 import { PageViewsProvider, SitePageViews } from "@/components/site/page-view-counter";
 import { SiteHeader } from "@/components/site/site-header";
 import { ThemeProvider } from "@/components/site/theme-provider";
@@ -15,14 +16,29 @@ type RootLayoutShellProps = Readonly<{
 
 const COVER_HOST = "https://adx-dl.larx.cc";
 const SOURCE_REPOSITORY = "https://github.com/AdingApkgg/adx-dl";
+const TELEGRAM_COMMUNITY = "https://t.me/FullDiveSAO";
 // Third-party services warmed early: the pageview counter (fetched on every
 // page) and the comment backend (fetched on chart detail pages).
 const COUNTER_HOST = "https://bsz.saop.cc";
 const COMMENT_HOST = "https://artalk.saop.cc";
 
 // Runs synchronously during HTML parse (before first paint) so the persisted
-// theme is applied with no flash. Mirrors ThemeProvider's logic (default: dark).
-const noFlashThemeScript = `(function(){try{var t=localStorage.getItem('theme');var d=t==='light'?false:(t==='system'?window.matchMedia('(prefers-color-scheme: dark)').matches:true);document.documentElement.classList.toggle('dark',d);}catch(e){document.documentElement.classList.add('dark');}})();`;
+// theme is applied with no flash. Mirrors ThemeProvider's logic: an explicit
+// 'light'/'dark' wins, otherwise (unset or 'system') follow the OS preference.
+const noFlashThemeScript = `(function(){try{var t=localStorage.getItem('theme');var m=window.matchMedia('(prefers-color-scheme: dark)').matches;var d=t==='light'?false:(t==='dark'?true:m);document.documentElement.classList.toggle('dark',d);}catch(e){document.documentElement.classList.add('dark');}})();`;
+
+// Speculation Rules: we ship a pure static export (client RSC nav payloads are
+// pruned for the CF Pages 20k-file cap), so links are full-page loads. This
+// tells Chromium to prefetch same-origin pages on hover/pointerdown, so the
+// cross-document navigation feels near-instant and the @view-transition in
+// globals.css animates it. `prefetch` (not `prerender`) on purpose: it caches
+// the HTML without running page scripts, so the pageview counter / comments
+// backend are NOT triggered for merely-hovered pages. `href_matches: "/*"` only
+// matches same-origin path-absolute URLs, so external links are excluded.
+// Unsupported browsers (Firefox/Safari) ignore it — progressive enhancement.
+const speculationRules = JSON.stringify({
+  prefetch: [{ where: { href_matches: "/*" }, eagerness: "moderate" }],
+});
 
 export async function RootLayoutShell({ children, lang, locale }: RootLayoutShellProps) {
   const catalog = await readCatalog();
@@ -38,6 +54,7 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
         <link rel="dns-prefetch" href={COUNTER_HOST} />
         <link rel="dns-prefetch" href={COMMENT_HOST} />
         <script dangerouslySetInnerHTML={{ __html: noFlashThemeScript }} />
+        <script type="speculationrules" dangerouslySetInnerHTML={{ __html: speculationRules }} />
         <a
           href="#main-content"
           className="sr-only rounded-md bg-primary px-4 py-2 text-primary-foreground focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50"
@@ -45,6 +62,7 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
           {dictionary.nav.skipToContent}
         </a>
         <ThemeProvider>
+          <MotionProvider>
           <TooltipProvider>
             <PageViewsProvider>
               <div className="flex min-h-screen flex-col bg-[radial-gradient(circle_at_top,rgba(64,123,255,0.18),transparent_30%),linear-gradient(180deg,rgba(6,23,66,0.08),transparent_30%)]">
@@ -76,6 +94,14 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
                       </Link>
                       <a
                         className="text-muted-foreground hover:text-foreground"
+                        href={TELEGRAM_COMMUNITY}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {dictionary.footer.communityLabel}
+                      </a>
+                      <a
+                        className="text-muted-foreground hover:text-foreground"
                         href={SOURCE_REPOSITORY}
                         target="_blank"
                         rel="noreferrer"
@@ -94,6 +120,7 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
               </div>
             </PageViewsProvider>
           </TooltipProvider>
+          </MotionProvider>
         </ThemeProvider>
       </body>
     </html>

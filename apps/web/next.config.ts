@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  // The vendored chart engine ships raw TypeScript (no build step), so Next must
+  // transpile it like first-party source.
+  transpilePackages: ["@lxns-network/maimai-chart-engine"],
   turbopack: {
     root: rootDir,
   },

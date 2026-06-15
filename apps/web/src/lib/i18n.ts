@@ -15,6 +15,7 @@ export type SiteDictionary = {
     home: string;
     browse: string;
     search: string;
+    community: string;
     skipToContent: string;
     primaryLabel: string;
     languageLabel: string;
@@ -23,6 +24,12 @@ export type SiteDictionary = {
     zh: string;
     en: string;
     ja: string;
+  };
+  theme: {
+    toggleLabel: string;
+    light: string;
+    dark: string;
+    system: string;
   };
   home: {
     badge: string;
@@ -147,6 +154,8 @@ export type SiteDictionary = {
     tableCharter: string;
     preview: string;
     previewDescription: string;
+    chartPreview: string;
+    chartPreviewDescription: string;
     pvLabel: string;
     audioLabel: string;
     mediaUnsupported: string;
@@ -169,6 +178,7 @@ export type SiteDictionary = {
     lastUpdated: (date: string) => string;
     disclaimer: string;
     sourceLabel: string;
+    communityLabel: string;
   };
   pageViews: {
     siteViews: string;
@@ -208,11 +218,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       home: "首页",
       browse: "曲库",
       search: "搜索",
+      community: "Telegram 社群",
       skipToContent: "跳到主要内容",
       primaryLabel: "主导航",
       languageLabel: "语言切换",
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
+    theme: { toggleLabel: "切换主题", light: "浅色", dark: "深色", system: "跟随系统" },
     home: {
       badge: "资料检索优先",
       title: "AstroDX 谱面资料站与下载入口。",
@@ -354,6 +366,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       tableCharter: "谱师",
       preview: "预览",
       previewDescription: "在线观看 PV 或试听音频(资源来自远端目录)。",
+      chartPreview: "谱面预览",
+      chartPreviewDescription: "在浏览器中播放谱面,与音频同步。",
       pvLabel: "PV 影像",
       audioLabel: "音频试听",
       mediaUnsupported: "你的浏览器不支持播放该媒体。",
@@ -371,6 +385,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       lastUpdated: (date) => `目录更新于 ${date}`,
       disclaimer: "非官方爱好者资料站。AstroDX 与 maimai 的相关权利归各自所有者所有。",
       sourceLabel: "源代码",
+      communityLabel: "Telegram 社群",
     },
     pageViews: {
       siteViews: "本站总访问量",
@@ -401,11 +416,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       home: "Home",
       browse: "Browse",
       search: "Search",
+      community: "Telegram Community",
       skipToContent: "Skip to main content",
       primaryLabel: "Primary",
       languageLabel: "Language",
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
+    theme: { toggleLabel: "Toggle theme", light: "Light", dark: "Dark", system: "System" },
     home: {
       badge: "Search-first archive",
       title: "AstroDX chart archive for browsing, indexing, and downloads.",
@@ -551,6 +568,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       tableCharter: "Charter",
       preview: "Preview",
       previewDescription: "Watch the PV or listen to the audio (served from the remote directory).",
+      chartPreview: "Chart preview",
+      chartPreviewDescription: "Play the chart in your browser, synced to the audio.",
       pvLabel: "Promotion Video (PV)",
       audioLabel: "Audio preview",
       mediaUnsupported: "Your browser does not support playing this media.",
@@ -569,6 +588,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       disclaimer:
         "Unofficial fan-made archive. AstroDX and maimai are the property of their respective owners.",
       sourceLabel: "Source",
+      communityLabel: "Telegram Community",
     },
     pageViews: {
       siteViews: "Site views",
@@ -600,11 +620,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       home: "ホーム",
       browse: "曲一覧",
       search: "検索",
+      community: "Telegram コミュニティ",
       skipToContent: "メインコンテンツへ移動",
       primaryLabel: "メインナビ",
       languageLabel: "言語切り替え",
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
+    theme: { toggleLabel: "テーマ切り替え", light: "ライト", dark: "ダーク", system: "システム" },
     home: {
       badge: "検索優先アーカイブ",
       title: "AstroDX 譜面アーカイブとダウンロード入口。",
@@ -748,6 +770,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       tableCharter: "譜師",
       preview: "プレビュー",
       previewDescription: "PV の視聴や音源の試聴ができます(遠端ディレクトリ提供)。",
+      chartPreview: "譜面プレビュー",
+      chartPreviewDescription: "ブラウザで譜面を音源と同期して再生します。",
       pvLabel: "PV 映像",
       audioLabel: "音源試聴",
       mediaUnsupported: "お使いのブラウザはこのメディアの再生に対応していません。",
@@ -765,6 +789,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       lastUpdated: (date) => `カタログ更新: ${date}`,
       disclaimer: "非公式のファンメイドアーカイブです。AstroDX および maimai の権利は各所有者に帰属します。",
       sourceLabel: "ソース",
+      communityLabel: "Telegram コミュニティ",
     },
     pageViews: {
       siteViews: "総アクセス数",

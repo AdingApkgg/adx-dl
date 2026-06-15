@@ -4,6 +4,22 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Smooth cross-document (MPA) navigations via the native View Transitions API.
+   We ship a pure static export (RSC nav payloads are pruned for the CF Pages
+   20k-file cap), so links are full-page loads — this animates them with zero JS.
+   Progressive enhancement: unsupported browsers just navigate normally. */
+@view-transition {
+  navigation: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

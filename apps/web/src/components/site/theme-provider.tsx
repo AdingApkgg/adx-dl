@@ -24,7 +24,7 @@ function applyResolvedTheme(theme: ResolvedTheme) {
 }
 
 const fallbackValue: ThemeContextValue = {
-  theme: "dark",
+  theme: "system",
   resolvedTheme: "dark",
   setTheme: () => {},
 };
@@ -50,17 +50,17 @@ function subscribeThemePreference(callback: () => void) {
 
 function getThemePreferenceSnapshot(): ThemePreference {
   if (typeof window === "undefined") {
-    return "dark";
+    return "system";
   }
   const stored = window.localStorage.getItem(storageKey);
   if (stored === "light" || stored === "dark" || stored === "system") {
     return stored;
   }
-  return "dark";
+  return "system";
 }
 
 function getThemePreferenceServerSnapshot(): ThemePreference {
-  return "dark";
+  return "system";
 }
 
 function subscribeSystemTheme(callback: () => void) {

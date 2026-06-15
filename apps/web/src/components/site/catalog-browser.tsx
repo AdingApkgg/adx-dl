@@ -4,6 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import { SearchIcon } from "lucide-react";
 
+import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
 import { ChartCard } from "@/components/site/chart-card";
 import {
   ALL_CATEGORIES,
@@ -204,58 +205,79 @@ export function CatalogBrowser({
 
       {genreOptions.length > 0 ? (
         <div className="flex flex-wrap gap-2">
-          <button
+          <motion.button
             type="button"
+            whileTap={{ scale: 0.93 }}
             onClick={() => {
               setGenre("all");
               setCurrentPage(1);
             }}
             className={cn(
-              "rounded-full border px-3 py-1 text-xs font-medium transition",
+              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
               genre === "all"
                 ? "border-primary bg-primary/15 text-primary"
                 : "border-border text-muted-foreground hover:bg-muted/60"
             )}
           >
             {dictionary.allGenres}
-          </button>
+          </motion.button>
           {genreOptions.map((id) => {
             const active = genre === String(id);
             return (
-              <button
+              <motion.button
                 key={id}
                 type="button"
+                whileTap={{ scale: 0.93 }}
                 onClick={() => {
                   setGenre(active ? "all" : String(id));
                   setCurrentPage(1);
                 }}
                 className={cn(
-                  "rounded-full border px-3 py-1 text-xs font-medium transition",
+                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
                   GENRES[id].badge,
                   active ? "ring-2 ring-current" : "opacity-70 hover:opacity-100"
                 )}
               >
                 {GENRES[id][locale]}
-              </button>
+              </motion.button>
             );
           })}
         </div>
       ) : null}
 
       {visibleEntries.length === 0 ? (
-        <Card size="sm">
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            {dictionary.emptyState}
-          </CardContent>
-        </Card>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: EASE_OUT }}
+        >
+          <Card size="sm">
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">
+              {dictionary.emptyState}
+            </CardContent>
+          </Card>
+        </motion.div>
       ) : (
-        <div
+        <motion.div
+          layout
           data-layout="card-grid"
           className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
         >
-          {paginatedEntries.map((entry) => (
-            <ChartCard key={entry.id} entry={entry} locale={locale} />
-          ))}
+          <AnimatePresence mode="popLayout" initial={false}>
+            {paginatedEntries.map((entry) => (
+              <motion.div
+                key={entry.id}
+                layout
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ duration: 0.25, ease: EASE_OUT }}
+                className="h-full"
+              >
+                <ChartCard entry={entry} locale={locale} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
           {totalPages > 1 ? (
             <Card size="sm" className="col-span-full border border-border/70 bg-card/70">
               <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -288,7 +310,7 @@ export function CatalogBrowser({
               </CardContent>
             </Card>
           ) : null}
-        </div>
+        </motion.div>
       )}
     </div>
   );

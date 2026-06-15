@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { Reveal, RevealGroup, RevealItem } from "@/components/motion";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { Badge } from "@/components/ui/badge";
@@ -37,12 +38,12 @@ export function VersionsIndexView({ groups, locale = "zh" }: VersionsIndexViewPr
       className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
     >
       <SeoJsonLd data={buildVersionsIndexStructuredData(locale, groups)} />
-      <div className="flex flex-col gap-2">
+      <Reveal className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">{versions.title}</h1>
         <p className="text-muted-foreground">{versions.description}</p>
         <p className="text-sm text-muted-foreground">{versions.intro(withCharts)}</p>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      </Reveal>
+      <RevealGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {groups.map((group) => {
           const label = group.name === "Unknown" ? versions.unknownLabel : group.name;
           const src = group.imageIndex !== null ? versionImageSrcByIndex(group.imageIndex) : null;
@@ -88,23 +89,24 @@ export function VersionsIndexView({ groups, locale = "zh" }: VersionsIndexViewPr
 
           if (!hasCharts) {
             return (
-              <div key={group.slug} aria-disabled="true">
+              <RevealItem key={group.slug} className="h-full" aria-disabled="true">
                 {card}
-              </div>
+              </RevealItem>
             );
           }
 
           return (
-            <Link
-              key={group.slug}
-              href={buildLocalePath(`/versions/${group.slug}`, locale)}
-              className="group/version block rounded-xl transition-transform hover:-translate-y-0.5"
-            >
-              {card}
-            </Link>
+            <RevealItem key={group.slug} className="h-full">
+              <Link
+                href={buildLocalePath(`/versions/${group.slug}`, locale)}
+                className="group/version block h-full rounded-xl transition-transform hover:-translate-y-0.5"
+              >
+                {card}
+              </Link>
+            </RevealItem>
           );
         })}
-      </div>
+      </RevealGroup>
     </main>
   );
 }
@@ -126,7 +128,7 @@ export function VersionDetailView({
       className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
     >
       <SeoJsonLd data={buildVersionDetailStructuredData(locale, name, slug, entries)} />
-      <div className="flex flex-col gap-3">
+      <Reveal className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-3">
           {src ? (
             <Image
@@ -143,7 +145,7 @@ export function VersionDetailView({
         <p className="text-sm text-muted-foreground">
           {versions.detailIntro(label, entries.length)}
         </p>
-      </div>
+      </Reveal>
       <CatalogBrowser
         entries={entries}
         locale={locale}
