@@ -86,6 +86,7 @@ export function ChartPreview({
   const [gifExporting, setGifExporting] = useState(false);
   const [gifProgress, setGifProgress] = useState(0);
   const [toast, setToast] = useState<Toast>(null);
+  const [showControls, setShowControls] = useState(true);
 
   const isFullscreen = useGameStore((s) => s.isFullscreen);
   const setIsFullscreen = useGameStore((s) => s.setIsFullscreen);
@@ -167,6 +168,26 @@ export function ChartPreview({
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, [setIsFullscreen]);
+
+  // Auto-hide the fullscreen control overlay: show on pointer move, fade after 3s.
+  // (showControls is only read while fullscreen, so no reset is needed otherwise.)
+  useEffect(() => {
+    if (!isFullscreen) return;
+    let timer: number | undefined;
+    const reveal = () => {
+      setShowControls(true);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setShowControls(false), 3000);
+    };
+    reveal();
+    window.addEventListener("pointermove", reveal);
+    window.addEventListener("pointerdown", reveal);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pointermove", reveal);
+      window.removeEventListener("pointerdown", reveal);
+    };
+  }, [isFullscreen]);
 
   const toggleFullscreen = useCallback(() => {
     const el = containerRef.current;
@@ -287,94 +308,114 @@ export function ChartPreview({
 
   const densityNotes = chartData?.notes ?? [];
 
+  const controls = (
+    <ChartControls
+      settingsOpen={settingsOpen}
+      onToggleSettings={() => setSettingsOpen((v) => !v)}
+      isFullscreen={isFullscreen}
+      onToggleFullscreen={toggleFullscreen}
+      onToggleGifRange={toggleGifRange}
+      gifRangeMode={gifRangeMode}
+      gifExporting={gifExporting}
+      gifProgress={gifProgress}
+      levels={levels}
+    />
+  );
+
   return (
     <div
       ref={containerRef}
       tabIndex={0}
       onKeyDown={onKeyDown}
       className={cn(
-        "flex flex-col gap-4 outline-none",
-        isFullscreen && "h-full w-full items-center justify-center bg-black p-4",
+        "outline-none",
+        isFullscreen
+          ? cn(
+              "relative flex h-full w-full items-center justify-center bg-black",
+              !showControls && "cursor-none",
+            )
+          : "flex flex-col gap-4",
       )}
     >
       <ChartCanvas videoUrl={videoUrl} chartName={chartName} />
 
-      {!isFullscreen && totalMs > 0 ? (
-        <DensityWithPlayhead
-          notes={densityNotes}
-          durationMs={totalMs}
-          onSeek={seekToMs}
-          interactive={!gifRangeMode}
-        >
-          {exportRange.range ? (
-            <ChartExportRangeOverlay
-              range={exportRange.range}
-              totalDurationMs={totalMs}
-              onChange={exportRange.update}
-              onPreview={seekToMs}
-            />
-          ) : null}
-        </DensityWithPlayhead>
-      ) : null}
-
-      {gifRangeMode && exportRange.range ? (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-muted-foreground">
-            GIF 区间 {formatDuration(exportRange.range.endMs - exportRange.range.startMs)}
-            ,拖动时间轴上的手柄调整
-          </span>
-          <span className="flex-1" />
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => exportRange.range && runGifExport(exportRange.range)}
-            disabled={gifExporting}
-          >
-            {gifExporting ? `导出中 ${Math.round(gifProgress * 100)}%` : "导出 GIF"}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => exportRange.clear()}
-            disabled={gifExporting}
-          >
-            取消
-          </Button>
-        </div>
-      ) : null}
-
-      <div className={cn("w-full", isFullscreen && "max-w-2xl")}>
-        <ChartControls
-          settingsOpen={settingsOpen}
-          onToggleSettings={() => setSettingsOpen((v) => !v)}
-          isFullscreen={isFullscreen}
-          onToggleFullscreen={toggleFullscreen}
-          onToggleGifRange={toggleGifRange}
-          gifRangeMode={gifRangeMode}
-          gifExporting={gifExporting}
-          gifProgress={gifProgress}
-          levels={levels}
-        />
-      </div>
-
-      {settingsOpen ? (
-        <div
-          className={cn(
-            "w-full rounded-lg border border-border/60 bg-card/40 p-4",
-            isFullscreen && "max-w-2xl",
-          )}
-        >
-          <ChartSettings locale={locale} />
-        </div>
-      ) : null}
-
       {!isFullscreen ? (
         <>
+          {totalMs > 0 ? (
+            <DensityWithPlayhead
+              notes={densityNotes}
+              durationMs={totalMs}
+              onSeek={seekToMs}
+              interactive={!gifRangeMode}
+            >
+              {exportRange.range ? (
+                <ChartExportRangeOverlay
+                  range={exportRange.range}
+                  totalDurationMs={totalMs}
+                  onChange={exportRange.update}
+                  onPreview={seekToMs}
+                />
+              ) : null}
+            </DensityWithPlayhead>
+          ) : null}
+
+          {gifRangeMode && exportRange.range ? (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-muted-foreground">
+                GIF 区间 {formatDuration(exportRange.range.endMs - exportRange.range.startMs)}
+                ,拖动时间轴上的手柄调整
+              </span>
+              <span className="flex-1" />
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => exportRange.range && runGifExport(exportRange.range)}
+                disabled={gifExporting}
+              >
+                {gifExporting ? `导出中 ${Math.round(gifProgress * 100)}%` : "导出 GIF"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => exportRange.clear()}
+                disabled={gifExporting}
+              >
+                取消
+              </Button>
+            </div>
+          ) : null}
+
+          <div className="w-full">{controls}</div>
+
+          {settingsOpen ? (
+            <div className="w-full rounded-lg border border-border/60 bg-card/40 p-4">
+              <ChartSettings locale={locale} />
+            </div>
+          ) : null}
+
           <ChartSimaiStatements simaiText={rawSimaiText} difficulty={selectedDifficulty} />
           <ChartShortcuts locale={locale} />
         </>
-      ) : null}
+      ) : (
+        // Fullscreen: canvas stays flex-centered; controls float as an
+        // auto-hiding bottom overlay so they never squeeze the 100vmin canvas.
+        <div
+          className={cn(
+            "fixed inset-x-0 bottom-0 z-10 flex flex-col items-center gap-3 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-4 pb-5 pt-16 transition-all duration-300",
+            showControls
+              ? "translate-y-0 opacity-100"
+              : "pointer-events-none translate-y-full opacity-0",
+          )}
+        >
+          {settingsOpen ? (
+            <div className="max-h-[55vh] w-full max-w-2xl overflow-auto rounded-lg border border-border/60 bg-card/90 p-4 backdrop-blur [color-scheme:dark]">
+              <ChartSettings locale={locale} />
+            </div>
+          ) : null}
+          <div className="w-full max-w-2xl">{controls}</div>
+        </div>
+      )}
 
       {toast ? (
         <div
