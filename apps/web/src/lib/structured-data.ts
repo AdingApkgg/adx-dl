@@ -283,8 +283,11 @@ export function buildChartDetailStructuredData(
   const branch = formatEntrySubcategory(entry);
   const detailPath = buildLocalePath(`/charts/${encodeURIComponent(entrySlug(entry))}`, locale);
   const detailUrl = toAbsoluteUrl(detailPath);
+  const aliases = entry.aliases ?? [];
   const keywords = [
-    ...new Set([entry.category, branch, entry.version, entry.cabinet].filter(Boolean)),
+    ...new Set(
+      [entry.category, branch, entry.version, entry.cabinet, ...aliases].filter(Boolean)
+    ),
   ];
   const range = difficultyLevelRange(entry);
   const difficultyNames = entry.difficulties
@@ -317,6 +320,7 @@ export function buildChartDetailStructuredData(
     "@type": "MusicRecording",
     "@id": `${detailUrl}#recording`,
     name: title,
+    ...(aliases.length > 0 ? { alternateName: aliases } : {}),
     url: detailUrl,
     inLanguage: getStructuredDataLanguage(locale),
     description: buildChartDescription(entry, locale),

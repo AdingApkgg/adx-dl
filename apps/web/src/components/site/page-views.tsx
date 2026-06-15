@@ -468,6 +468,26 @@ export function ChartDetailPageView({
                 value={entry.short_id || detail.notAvailableValue}
               />
             </div>
+            {entry.aliases && entry.aliases.length > 0 ? (
+              <>
+                <Separator />
+                <div className="flex flex-col gap-2">
+                  <h2 className="text-sm font-medium text-muted-foreground">
+                    {detail.aliasesLabel}
+                  </h2>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {entry.aliases.map((alias) => (
+                      <li
+                        key={alias}
+                        className="rounded-full border border-border/60 bg-muted/60 px-2.5 py-1 text-xs text-foreground/80"
+                      >
+                        {alias}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            ) : null}
             <Separator />
             <div className="flex flex-col gap-3">
               <h2 className="text-lg font-medium">{detail.difficulties}</h2>

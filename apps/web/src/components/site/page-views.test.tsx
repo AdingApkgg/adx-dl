@@ -190,10 +190,10 @@ describe("page views locale-driven content", () => {
 
     // The category tab bar only renders with >2 categories; with a single
     // category the localized browser copy lives in the search placeholder.
-    expect(enHtml).toContain("Search title, artist, version...");
+    expect(enHtml).toContain("Search title, alias, artist, version...");
     expect(enHtml).toContain(`href="/en/charts/song-1"`);
 
-    expect(zhHtml).toContain("搜索曲名、曲师、版本...");
+    expect(zhHtml).toContain("搜索曲名、别名、曲师、版本...");
     expect(zhHtml).toContain(`href="/charts/song-1"`);
   });
 

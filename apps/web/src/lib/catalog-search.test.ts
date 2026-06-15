@@ -6,6 +6,7 @@ import {
   ALL_SUBCATEGORIES,
   applyCatalogFilters,
   buildCatalogSearch,
+  buildCatalogSearchWithMatches,
   getCategoryOptions,
   getSubcategoryOptions,
 } from "./catalog-search";
@@ -95,6 +96,34 @@ describe("catalog-search", () => {
 
     expect(search("moonlight").map((entry) => entry.id)).toEqual(["official-gamma"]);
     expect(search("nighttone").map((entry) => entry.id)).toEqual(["official-gamma"]);
+  });
+
+  test("支持通过别名搜索（即使标题完全不含查询词）", () => {
+    const search = buildCatalogSearch([
+      buildEntry({ id: "official-gamma", title: "月光列车", title_en: "Moonlight Train", aliases: ["月车", "夜行列车"] }),
+    ]);
+
+    expect(search("月车").map((entry) => entry.id)).toEqual(["official-gamma"]);
+    expect(search("夜行列车").map((entry) => entry.id)).toEqual(["official-gamma"]);
+  });
+
+  test("命中别名时回传匹配到的别名，标题已命中则不回传（避免冗余）", () => {
+    const search = buildCatalogSearchWithMatches([
+      buildEntry({ id: "official-gamma", title: "月光列车", title_en: "Moonlight Train", aliases: ["月车", "夜行列车"] }),
+    ]);
+
+    // 仅别名命中 → 给出 aliasHit
+    const byAlias = search("月车");
+    expect(byAlias.map((result) => result.entry.id)).toEqual(["official-gamma"]);
+    expect(byAlias[0].aliasHit).toBe("月车");
+
+    // 标题本身就命中 → 不重复展示别名
+    const byTitle = search("月光");
+    expect(byTitle[0]?.entry.id).toBe("official-gamma");
+    expect(byTitle[0]?.aliasHit).toBeNull();
+
+    // 空查询 → 全量、无 aliasHit
+    expect(search("   ").every((result) => result.aliasHit === null)).toBe(true);
   });
 
   test("空查询返回原始顺序，分类和子分类作为二次筛选", () => {

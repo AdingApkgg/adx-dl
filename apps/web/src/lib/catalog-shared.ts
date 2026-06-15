@@ -37,6 +37,8 @@ export type CatalogEntry = {
   genreid?: number;
   cabinet: string;
   short_id: string;
+  /** Community nicknames (别名) for the song; used to find a chart by an alternate name. */
+  aliases?: string[];
   bpm: number | null;
   offset: number | null;
   download_mode: "onsite" | "external" | "mixed";

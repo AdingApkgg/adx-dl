@@ -19,6 +19,14 @@ from tools.remote_catalog import fetch_text as default_fetch_text
 INDEX_URL = "https://adx-dl.larx.cc/tmp/astrodx-charts/index.json"
 MEDIA_BASE = "https://adx-dl.larx.cc/tmp/astrodx-charts/"
 
+# Song aliases (别名) — community nicknames used to find a chart by an alternate
+# name, the same idea as nonebot-plugin-maimaidx's alias lookup. Both sources are
+# free no-auth JSON keyed by the canonical maimai song id and are unioned per id:
+#   Lxns (落雪咖啡屋): {"aliases": [{"song_id": int, "aliases": [str, ...]}, ...]}
+#   柚子 (yuzuchan):   {"content": [{"SongID": int, "Alias": [str, ...]}, ...]}
+LXNS_ALIAS_URL = "https://maimai.lxns.net/api/v0/maimai/alias/list"
+YUZUCHAN_ALIAS_URL = "https://www.yuzuchan.moe/api/maimaidx/maimaidxalias"
+
 # Cover images are converted to lossless AVIF and mirrored into the web app's
 # public/ during the build so the static site serves a small local copy instead
 # of hot-linking the remote host. The remote original is kept on the entry (for
@@ -157,6 +165,9 @@ def _build_entry(item: dict[str, Any], generated_at: str) -> dict[str, Any]:
         "genreid": item.get("genreid"),
         "cabinet": cabinet,
         "short_id": short_id,
+        # Filled in by _attach_aliases() once the alias map is fetched; kept here
+        # so the field always exists even when the alias source is unavailable.
+        "aliases": [],
         "offset": item.get("first"),
         "bpm": item.get("bpm"),
         "difficulties": difficulties,
@@ -278,6 +289,128 @@ def _mirror_covers_enabled(explicit: bool | None) -> bool:
     return os.environ.get(COVERS_MODE_ENV, "local").strip().lower() != "remote"
 
 
+def _parse_lxns_aliases(payload: object) -> dict[int, list[str]]:
+    out: dict[int, list[str]] = {}
+    if not isinstance(payload, dict):
+        return out
+    for item in payload.get("aliases", []):
+        song_id = item.get("song_id")
+        aliases = [a for a in item.get("aliases", []) if isinstance(a, str) and a.strip()]
+        if isinstance(song_id, int) and aliases:
+            out[song_id] = aliases
+    return out
+
+
+def _parse_yuzuchan_aliases(payload: object) -> dict[int, list[str]]:
+    out: dict[int, list[str]] = {}
+    if not isinstance(payload, dict):
+        return out
+    for item in payload.get("content", []):
+        song_id = item.get("SongID")
+        aliases = [a for a in item.get("Alias", []) if isinstance(a, str) and a.strip()]
+        if isinstance(song_id, int) and aliases:
+            out[song_id] = aliases
+    return out
+
+
+def fetch_alias_map(
+    fetch_text: Callable[[str], str] = default_fetch_text,
+) -> dict[int, list[str]]:
+    """Fetch and union the Lxns + yuzuchan alias lists as {song_id: [alias, ...]}.
+
+    Each source is independently best-effort: one failing (network/JSON/shape) is
+    logged and skipped rather than aborting the build (mirrors the non-fatal
+    IndexNow CI handling). Aliases are unioned per song id, de-duplicated
+    case-insensitively while preserving first-seen order.
+    """
+    sources = (
+        ("lxns", LXNS_ALIAS_URL, _parse_lxns_aliases),
+        ("yuzuchan", YUZUCHAN_ALIAS_URL, _parse_yuzuchan_aliases),
+    )
+
+    merged: dict[int, list[str]] = {}
+    for name, url, parse in sources:
+        try:
+            partial = parse(json.loads(fetch_text(url)))
+        except Exception as error:  # noqa: BLE001 — network/JSON/shape are all non-fatal
+            print(f"[catalog] alias source {name} failed ({error}); skipping")
+            continue
+        for song_id, aliases in partial.items():
+            bucket = merged.setdefault(song_id, [])
+            seen = {a.casefold() for a in bucket}
+            for alias in aliases:
+                if alias.casefold() not in seen:
+                    bucket.append(alias)
+                    seen.add(alias.casefold())
+    return merged
+
+
+def _aliases_for(short_id: str, alias_map: dict[int, list[str]]) -> list[str]:
+    """Resolve a chart's aliases from the Lxns map by its maimai song id.
+
+    AstroDX short_ids follow the maimai id convention where DX charts carry a
+    +10000 offset and UTAGE charts +100000, while Lxns keys aliases on the base
+    song id. So an exact-id miss falls back to the de-offset base id.
+    """
+    if not alias_map or not short_id.isdigit():
+        return []
+    n = int(short_id)
+    candidates = [n]
+    if 10000 <= n < 100000:
+        candidates.append(n - 10000)
+    elif n >= 100000:
+        candidates.append(n - 100000)
+    for key in candidates:
+        if key in alias_map:
+            return alias_map[key]
+    return []
+
+
+def _attach_aliases(
+    entries: list[dict[str, Any]], alias_map: dict[int, list[str]]
+) -> int:
+    """Set each entry's "aliases"; returns how many entries matched an alias.
+
+    Positions the key right after "short_id" so enriching an already-built index
+    yields the same field order as a fresh build (keeps the generated diff clean).
+    """
+    matched = 0
+    for index, entry in enumerate(entries):
+        aliases = _aliases_for(str(entry.get("short_id", "") or ""), alias_map)
+        if aliases:
+            matched += 1
+        if "aliases" in entry:
+            entry["aliases"] = aliases
+            continue
+        rebuilt: dict[str, Any] = {}
+        for key, value in entry.items():
+            rebuilt[key] = value
+            if key == "short_id":
+                rebuilt["aliases"] = aliases
+        rebuilt.setdefault("aliases", aliases)  # no short_id key — append at end
+        entries[index] = rebuilt
+    return matched
+
+
+def enrich_aliases(
+    root: Path, fetch_text: Callable[[str], str] = default_fetch_text
+) -> Path:
+    """Merge aliases into an already-built catalog index.json in place.
+
+    Lets aliases be refreshed on their own cadence without re-running the full,
+    download-heavy build. Safe to run repeatedly.
+    """
+    catalog_path = root / "data" / "catalog" / "index.json"
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    matched = _attach_aliases(catalog["entries"], fetch_alias_map(fetch_text))
+    catalog_path.write_text(
+        json.dumps(catalog, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    print(f"[catalog] aliases: matched {matched}/{len(catalog['entries'])} entries")
+    return catalog_path
+
+
 def build_catalog(
     root: Path,
     fetch_text: Callable[[str], str] = default_fetch_text,
@@ -293,6 +426,10 @@ def build_catalog(
     entries = [_build_entry(item, generated_at) for item in items]
     entries.sort(key=lambda entry: entry["id"])
     _assign_route_slugs(entries)
+
+    # Community aliases (别名) so a chart is findable by its nicknames; best-effort.
+    matched = _attach_aliases(entries, fetch_alias_map(fetch_text))
+    print(f"[catalog] aliases: matched {matched}/{len(entries)} entries")
 
     # Cover handling is switchable before a push via ASTRODX_COVERS (or the
     # download_media arg): "remote" leaves cover_url pointing at the remote host;

@@ -11,7 +11,7 @@ import {
   formatEntryTitle,
   type CatalogEntry,
 } from "@/lib/catalog-shared";
-import { buildLocalePath, type Locale } from "@/lib/i18n";
+import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 
 type ChartCardProps = {
@@ -20,13 +20,22 @@ type ChartCardProps = {
   /** Eagerly load above-the-fold covers (LCP). */
   priority?: boolean;
   sizes?: string;
+  /** The alias that matched the current search, shown as a hint to explain the hit. */
+  aliasHit?: string | null;
 };
 
 // The single chart card used on the home page and in the catalog browser. The
 // whole card is a link to the detail page (no separate buttons) so a tap/click
 // anywhere opens it.
-export function ChartCard({ entry, locale, priority = false, sizes }: ChartCardProps) {
+export function ChartCard({
+  entry,
+  locale,
+  priority = false,
+  sizes,
+  aliasHit = null,
+}: ChartCardProps) {
   const href = buildLocalePath(`/charts/${entrySlug(entry)}`, locale);
+  const aliasMatchLabel = getDictionary(locale).catalogBrowser.aliasMatchLabel;
 
   return (
     <Link
@@ -50,6 +59,17 @@ export function ChartCard({ entry, locale, priority = false, sizes }: ChartCardP
           <p className="line-clamp-1 text-sm text-muted-foreground">
             {formatEntryArtist(entry, locale)}
           </p>
+          {aliasHit ? (
+            <p
+              className="mt-1 line-clamp-1 text-xs text-muted-foreground"
+              title={`${aliasMatchLabel}: ${aliasHit}`}
+            >
+              <span className="mr-1 rounded bg-primary/10 px-1 py-0.5 font-medium text-primary">
+                {aliasMatchLabel}
+              </span>
+              {aliasHit}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <VersionBadge version={entry.version} label={formatEntrySubcategory(entry)} />

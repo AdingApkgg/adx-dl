@@ -2,6 +2,8 @@
 
 `site/` 是 AstroDX 的 Next.js 前端，读取仓库根目录下的 `catalog/index.json` 并渲染曲目列表、详情页和相关状态信息。
 
+曲目支持按社区别名（`aliases` 字段）搜索：别名是 Fuse 检索键，搜索卡片会在「仅别名命中」时给出提示，详情页展示别名 chip。别名数据的来源与刷新方式见仓库根目录 `README.md` 的「别名(Aliases)」一节。
+
 ## 开发
 
 在 `site/` 目录运行：

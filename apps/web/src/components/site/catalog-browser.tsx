@@ -10,7 +10,7 @@ import {
   ALL_CATEGORIES,
   ALL_SUBCATEGORIES,
   applyCatalogFilters,
-  buildCatalogSearch,
+  buildCatalogSearchWithMatches,
   getCategoryOptions,
   getSubcategoryOptions,
 } from "@/lib/catalog-search";
@@ -58,13 +58,22 @@ export function CatalogBrowser({
   const [hasUserSelectedCategory, setHasUserSelectedCategory] = React.useState(false);
   const [currentPage, setCurrentPage] = React.useState(1);
 
-  const search = React.useMemo(() => buildCatalogSearch(entries), [entries]);
+  const search = React.useMemo(() => buildCatalogSearchWithMatches(entries), [entries]);
   const hasQuery = query.trim().length > 0;
   const categories = React.useMemo(() => getCategoryOptions(entries), [entries]);
   const resolvedCategory = categories.includes(category) ? category : ALL_CATEGORIES;
   const effectiveCategory =
     hasQuery && !hasUserSelectedCategory ? ALL_CATEGORIES : resolvedCategory;
-  const baseEntries = React.useMemo(() => search(query), [search, query]);
+  const searchResults = React.useMemo(() => search(query), [search, query]);
+  const baseEntries = React.useMemo(
+    () => searchResults.map((result) => result.entry),
+    [searchResults]
+  );
+  // Which alias matched each result, so a card can explain an alias-driven hit.
+  const aliasHitById = React.useMemo(
+    () => new Map(searchResults.map((result) => [result.entry.id, result.aliasHit])),
+    [searchResults]
+  );
   const subcategories = React.useMemo(() => {
     const options = getSubcategoryOptions(baseEntries, effectiveCategory);
     // Order versions newest-first (matches the release-order sort everywhere else).
@@ -274,7 +283,11 @@ export function CatalogBrowser({
                 transition={{ duration: 0.25, ease: EASE_OUT }}
                 className="h-full"
               >
-                <ChartCard entry={entry} locale={locale} />
+                <ChartCard
+                  entry={entry}
+                  locale={locale}
+                  aliasHit={hasQuery ? aliasHitById.get(entry.id) ?? null : null}
+                />
               </motion.div>
             ))}
           </AnimatePresence>
