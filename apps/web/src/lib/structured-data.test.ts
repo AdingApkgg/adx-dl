@@ -38,10 +38,10 @@ function buildEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
       has_dx_chart: true,
     },
     media: {
-      entry_base_url: "/catalog-assets/song-3",
-      cover_url: "/catalog-assets/song-3/bg.jpg",
-      audio_url: "/catalog-assets/song-3/track.mp3",
-      pv_url: "/catalog-assets/song-3/pv.mp4",
+      entry_base_url: "/covers/song-3",
+      cover_url: "/covers/song-3/bg.jpg",
+      audio_url: "/covers/song-3/track.mp3",
+      pv_url: "/covers/song-3/pv.mp4",
     },
     difficulties: [
       { slot: 0, level: "12+", designer: "Designer 3" },
@@ -129,10 +129,18 @@ describe("structured data builders", () => {
     const slug = entry.id;
     const detailUrl = `https://adxdls.saop.cc/charts/${slug}`;
 
-    const [recording, breadcrumb] = buildChartDetailStructuredData("zh", entry) as [
-      Record<string, unknown> & { additionalProperty: Array<{ name: string; value: unknown }> },
-      Record<string, unknown>,
-    ];
+    const nodes = buildChartDetailStructuredData("zh", entry) as Array<
+      Record<string, unknown> & { additionalProperty?: Array<{ name: string; value: unknown }> }
+    >;
+    const recording = nodes.find((node) => node["@type"] === "MusicRecording") as Record<
+      string,
+      unknown
+    > & { additionalProperty: Array<{ name: string; value: unknown }> };
+    const video = nodes.find((node) => node["@type"] === "VideoObject") as Record<string, unknown>;
+    const breadcrumb = nodes.find((node) => node["@type"] === "BreadcrumbList") as Record<
+      string,
+      unknown
+    >;
 
     expect(recording).toMatchObject({
       "@type": "MusicRecording",
@@ -142,8 +150,9 @@ describe("structured data builders", () => {
       inLanguage: "zh-CN",
       byArtist: { "@type": "MusicGroup", name: "歌手 3" },
       genre: "Anime",
-      image: "https://adxdls.saop.cc/catalog-assets/song-3/bg.jpg",
+      image: "https://adxdls.saop.cc/covers/song-3/bg.jpg",
       identifier: "song-3",
+      isAccessibleForFree: true,
       isPartOf: { "@id": "https://adxdls.saop.cc/#website" },
     });
     // The fabricated duration:"PT0S" must be gone.
@@ -155,9 +164,18 @@ describe("structured data builders", () => {
         { "@type": "PropertyValue", name: "beatsPerMinute", value: 123 },
         { "@type": "PropertyValue", name: "difficultyCount", value: 2 },
         { "@type": "PropertyValue", name: "levelRange", value: "12+–13" },
+        { "@type": "PropertyValue", name: "maimaiSongId", value: "S3" },
       ])
     );
     expect(recording.additionalProperty.some((property) => property.name === "bpm")).toBe(false);
+
+    // PV is exposed as a VideoObject for video rich results.
+    expect(video).toMatchObject({
+      "@type": "VideoObject",
+      "@id": `${detailUrl}#pv`,
+      contentUrl: "https://adxdls.saop.cc/covers/song-3/pv.mp4",
+      thumbnailUrl: "https://adxdls.saop.cc/covers/song-3/bg.jpg",
+    });
 
     expect(breadcrumb).toMatchObject({
       "@type": "BreadcrumbList",

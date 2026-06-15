@@ -149,6 +149,7 @@ def _build_entry(item: dict[str, Any], generated_at: str) -> dict[str, Any]:
         "version": version,
         "versionid": version_id,
         "genre": str(item.get("genre", "") or ""),
+        "genreid": item.get("genreid"),
         "cabinet": cabinet,
         "short_id": short_id,
         "offset": item.get("first"),

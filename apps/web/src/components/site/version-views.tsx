@@ -52,7 +52,9 @@ export function VersionsIndexView({ groups, locale = "zh" }: VersionsIndexViewPr
             <Card
               size="sm"
               className={cn(
-                "h-full overflow-hidden border border-border/70 bg-card/85",
+                "h-full overflow-hidden border border-border/70 bg-card/85 transition-all",
+                hasCharts &&
+                  "group-hover/version:border-primary/40 group-hover/version:shadow-lg group-hover/version:shadow-primary/10",
                 !hasCharts && "opacity-45"
               )}
             >
@@ -96,7 +98,7 @@ export function VersionsIndexView({ groups, locale = "zh" }: VersionsIndexViewPr
             <Link
               key={group.slug}
               href={buildLocalePath(`/versions/${group.slug}`, locale)}
-              className="group/version block rounded-xl transition-colors hover:bg-muted/40"
+              className="group/version block rounded-xl transition-transform hover:-translate-y-0.5"
             >
               {card}
             </Link>

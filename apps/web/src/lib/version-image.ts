@@ -3,6 +3,7 @@
 // matched before their base version. Returns null when no version icon applies
 // (e.g. empty/unknown version) so callers fall back to a text label.
 const VERSION_IMAGE_RULES: ReadonlyArray<readonly [RegExp, number]> = [
+  [/circle/i, 25],
   [/buddies\s*plus/i, 22],
   [/buddies/i, 21],
   [/prism\s*plus/i, 24],

@@ -26,17 +26,20 @@ export function EntryCover({
 }: EntryCoverProps) {
   const title = formatEntryTitle(entry, locale);
   const cover = getDictionary(locale).cover;
+  // Prefer the small local AVIF; fall back to the remote original when a chart
+  // has no converted copy.
+  const coverSrc = entry.media.cover_avif || entry.media.cover_url;
 
-  if (entry.media.cover_url) {
+  if (coverSrc) {
     return (
       <div className={cn("relative overflow-hidden rounded-xl", className)}>
         <Image
-          src={entry.media.cover_url}
+          src={coverSrc}
           alt={cover.alt(title)}
           fill
           unoptimized
           sizes={sizes}
-          className="object-cover"
+          className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : "auto"}
           decoding="async"

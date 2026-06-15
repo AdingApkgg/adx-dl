@@ -5,6 +5,7 @@ import {
   formatEntryArtist,
   formatEntrySubcategory,
   formatEntryTitle,
+  genreLabel,
   type CatalogEntry,
 } from "@/lib/catalog-shared";
 import {
@@ -67,7 +68,9 @@ function buildDetailKeywords(locale: Locale, entry: CatalogEntry) {
     formatEntryTitle(entry, locale),
     formatEntryArtist(entry, locale),
     formatEntrySubcategory(entry),
-  ];
+    ...(entry.genre ? [genreLabel(entry, locale)] : []),
+    "maimai",
+  ].filter(Boolean);
 }
 
 export function buildPageMetadata({
@@ -142,6 +145,17 @@ export function buildSearchPageMetadata(locale: Locale): Metadata {
 
 export function buildStatusPageMetadata(locale: Locale): Metadata {
   return buildLocalizedPageMetadata(locale, "status");
+}
+
+export function buildGuestbookPageMetadata(locale: Locale): Metadata {
+  const guestbook = getDictionary(locale).guestbook;
+  return buildPageMetadata({
+    locale,
+    pathname: "/comments",
+    title: guestbook.title,
+    description: guestbook.description,
+    keywords: ["AstroDX", siteName, guestbook.title, "guestbook", "留言板", "comments"],
+  });
 }
 
 export function buildChartDetailMetadata(locale: Locale, entry: CatalogEntry): Metadata {

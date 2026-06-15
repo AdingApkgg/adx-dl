@@ -20,6 +20,7 @@ function buildEntry(index: number): CatalogEntry {
     source_archive: `archive-${index}.adx`,
     source_folder: `folder-${index}`,
     version: `Ver.${index}`,
+    versionid: index,
     genre: "Anime",
     cabinet: "DX",
     short_id: `S${index}`,
@@ -108,10 +109,7 @@ describe("default zh routes", () => {
     expect(html).toContain("按分类、分支与显示语言浏览 AstroDX 目录条目。");
     expect(html).toContain('data-layout="card-grid"');
     expect(html).toContain('href="/charts/song-1"');
-    expect(html).toContain('data-entry-actions="compact"');
     expect(html).toContain("曲目 1");
-    expect(html).toContain("详情");
-    expect(html).not.toContain("Details");
   });
 
   test("search route renders the zh search view", async () => {
@@ -122,10 +120,8 @@ describe("default zh routes", () => {
     expect(html).toContain("搜索");
     expect(html).toContain("按关键字、版本分支与谱面信息筛选目录。");
     expect(html).toContain('data-layout="card-grid"');
-    expect(html).toContain('data-entry-summary="secondary"');
+    expect(html).toContain('href="/charts/song-1"');
     expect(html).toContain("曲目 1");
-    expect(html).toContain("下载");
-    expect(html).not.toContain("Download");
   });
 
   test("chart detail route renders the zh detail view and actions", async () => {

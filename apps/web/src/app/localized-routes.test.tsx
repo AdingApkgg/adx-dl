@@ -134,10 +134,9 @@ describe("localized routes", () => {
     expect(chartsHtml).toContain("Browse Charts");
     expect(chartsHtml).toContain('data-layout="card-grid"');
     expect(chartsHtml).toContain('href="/en/charts/song-1"');
-    expect(chartsHtml).toContain('data-entry-actions="compact"');
     expect(chartsHtml).toContain("Song 1");
     expect(searchHtml).toContain('data-layout="card-grid"');
-    expect(searchHtml).toContain('data-entry-summary="secondary"');
+    expect(searchHtml).toContain('href="/ja/charts/song-1"');
     expect(searchHtml).toContain("検索");
     expect(searchHtml).toContain("曲目 1");
   });

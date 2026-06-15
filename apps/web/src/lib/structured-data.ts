@@ -5,6 +5,7 @@ import {
   formatEntryArtist,
   formatEntrySubcategory,
   formatEntryTitle,
+  genreLabel,
   type CatalogEntry,
   type VersionGroup,
 } from "@/lib/catalog-shared";
@@ -306,6 +307,9 @@ export function buildChartDetailStructuredData(
     ...(difficultyNames
       ? [{ "@type": "PropertyValue", name: "difficulties", value: difficultyNames }]
       : []),
+    ...(entry.short_id
+      ? [{ "@type": "PropertyValue", name: "maimaiSongId", value: entry.short_id }]
+      : []),
   ];
 
   const musicRecording: JsonLdValue = {
@@ -320,17 +324,37 @@ export function buildChartDetailStructuredData(
       "@type": "MusicGroup",
       name: artist,
     },
-    ...(entry.genre ? { genre: entry.genre } : {}),
+    ...(entry.genre ? { genre: genreLabel(entry, locale) } : {}),
     ...(entry.media.cover_url ? { image: toAbsoluteUrl(entry.media.cover_url) } : {}),
     isFamilyFriendly: true,
+    isAccessibleForFree: true,
     keywords,
     identifier: entry.id,
     isPartOf: { "@id": websiteId },
     additionalProperty,
   };
 
+  // The chart's promotional video, when present — eligible for video rich results.
+  const videoObject: JsonLdValue | null = entry.media.pv_url
+    ? {
+        "@context": "https://schema.org",
+        "@type": "VideoObject",
+        "@id": `${detailUrl}#pv`,
+        name: `${title} — PV`,
+        description: buildChartDescription(entry, locale),
+        contentUrl: toAbsoluteUrl(entry.media.pv_url),
+        ...(entry.media.cover_url
+          ? { thumbnailUrl: toAbsoluteUrl(entry.media.cover_url) }
+          : {}),
+        ...(entry.imported_at ? { uploadDate: entry.imported_at } : {}),
+        inLanguage: getStructuredDataLanguage(locale),
+        isFamilyFriendly: true,
+      }
+    : null;
+
   return [
     musicRecording,
+    ...(videoObject ? [videoObject] : []),
     {
       "@context": "https://schema.org",
       "@type": "BreadcrumbList",

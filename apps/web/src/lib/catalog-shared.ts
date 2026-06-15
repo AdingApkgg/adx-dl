@@ -8,7 +8,10 @@ export type CatalogDifficulty = {
 
 export type CatalogEntryMedia = {
   entry_base_url: string;
+  /** Remote original cover (used by the .adx download and OG/social images). */
   cover_url: string;
+  /** Local lossless-AVIF copy for on-page display; empty when unconverted. */
+  cover_avif?: string;
   audio_url: string;
   pv_url: string;
 };
@@ -27,7 +30,11 @@ export type CatalogEntry = {
   source_archive: string;
   source_folder: string;
   version: string;
+  /** maimai version index (0 = maimai … 25 = CiRCLE); used for release ordering. */
+  versionid?: number;
   genre: string;
+  /** maimai genre id (101–107); stable key for genre color + localized label. */
+  genreid?: number;
   cabinet: string;
   short_id: string;
   bpm: number | null;
@@ -88,6 +95,137 @@ export function formatEntrySubcategory(entry: CatalogEntry): string {
   return entry.subcategory;
 }
 
+function isUtageEntry(entry: CatalogEntry): boolean {
+  const cabinet = entry.cabinet?.trim();
+  return Boolean(cabinet) && cabinet !== "DX" && cabinet !== "ST";
+}
+
+// Newest-first comparator. There is no per-song release date, so order by the
+// maimai version era (versionid, newest first). Within a version, show standard
+// (DX/ST) charts before UTAGE specials — UTAGE song ids carry a large offset
+// that would otherwise push these niche charts to the very top — then by song id.
+export function compareByReleaseDesc(a: CatalogEntry, b: CatalogEntry): number {
+  const versionA = a.versionid ?? -1;
+  const versionB = b.versionid ?? -1;
+  if (versionA !== versionB) {
+    return versionB - versionA;
+  }
+  const utageA = isUtageEntry(a) ? 1 : 0;
+  const utageB = isUtageEntry(b) ? 1 : 0;
+  if (utageA !== utageB) {
+    return utageA - utageB;
+  }
+  const idA = Number(a.short_id) || 0;
+  const idB = Number(b.short_id) || 0;
+  return idB - idA;
+}
+
+export function sortByReleaseDesc(entries: CatalogEntry[]): CatalogEntry[] {
+  return [...entries].sort(compareByReleaseDesc);
+}
+
+// maimai genres, keyed by genreid (101–107). Localized names + a colored chip
+// (literal class strings so Tailwind's scanner emits them). 107 (宴会場) is the
+// UTAGE genre — already conveyed by the cabinet icon, so its chip is suppressed.
+export type GenreInfo = {
+  id: number;
+  slug: string;
+  zh: string;
+  en: string;
+  ja: string;
+  badge: string;
+  dot: string;
+};
+
+export const GENRES: Record<number, GenreInfo> = {
+  101: {
+    id: 101,
+    slug: "pops-anime",
+    ja: "POPS＆アニメ",
+    zh: "流行＆动画",
+    en: "POPS & Anime",
+    badge: "border-sky-500/40 bg-sky-500/12 text-sky-700 dark:text-sky-300",
+    dot: "bg-sky-500",
+  },
+  102: {
+    id: 102,
+    slug: "niconico-vocaloid",
+    ja: "niconico＆ボーカロイド",
+    zh: "niconico＆VOCALOID",
+    en: "niconico & VOCALOID",
+    badge: "border-cyan-500/40 bg-cyan-500/12 text-cyan-700 dark:text-cyan-300",
+    dot: "bg-cyan-500",
+  },
+  103: {
+    id: 103,
+    slug: "touhou",
+    ja: "東方Project",
+    zh: "东方Project",
+    en: "Touhou Project",
+    badge: "border-red-500/40 bg-red-500/12 text-red-600 dark:text-red-300",
+    dot: "bg-red-500",
+  },
+  104: {
+    id: 104,
+    slug: "game-variety",
+    ja: "ゲーム＆バラエティ",
+    zh: "游戏＆综合",
+    en: "Game & Variety",
+    badge: "border-emerald-500/40 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
+    dot: "bg-emerald-500",
+  },
+  105: {
+    id: 105,
+    slug: "maimai",
+    ja: "maimai",
+    zh: "maimai",
+    en: "maimai",
+    badge: "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    dot: "bg-amber-500",
+  },
+  106: {
+    id: 106,
+    slug: "ongeki-chunithm",
+    ja: "オンゲキ＆CHUNITHM",
+    zh: "音击＆中二节奏",
+    en: "ONGEKI & CHUNITHM",
+    badge: "border-violet-500/45 bg-violet-500/15 text-violet-700 dark:text-violet-300",
+    dot: "bg-violet-500",
+  },
+  107: {
+    id: 107,
+    slug: "utage",
+    ja: "宴会場",
+    zh: "宴会场",
+    en: "UTAGE",
+    badge: "border-pink-500/45 bg-pink-500/15 text-pink-700 dark:text-pink-300",
+    dot: "bg-pink-500",
+  },
+};
+
+// Fallback id lookup by the (stable) JP genre string, for entries predating genreid.
+const GENRE_NAME_TO_ID: Record<string, number> = Object.fromEntries(
+  Object.values(GENRES).map((info) => [info.ja, info.id])
+);
+
+export function resolveGenreId(entry: { genreid?: number; genre?: string }): number | null {
+  if (typeof entry.genreid === "number" && GENRES[entry.genreid]) {
+    return entry.genreid;
+  }
+  const byName = entry.genre ? GENRE_NAME_TO_ID[entry.genre.trim()] : undefined;
+  return byName ?? null;
+}
+
+export function genreInfo(entry: { genreid?: number; genre?: string }): GenreInfo | null {
+  const id = resolveGenreId(entry);
+  return id === null ? null : GENRES[id];
+}
+
+export function genreLabel(entry: { genreid?: number; genre?: string }, locale: EntryLocale): string {
+  const info = genreInfo(entry);
+  return info ? info[locale] : (entry.genre ?? "");
+}
+
 export function collectSubcategories(entries: CatalogEntry[], category: string): string[] {
   return [
     ...new Set(
@@ -140,6 +278,67 @@ export function difficultySlotLabel(difficulty: { slot: number; name?: string })
   }
   return MAIMAI_SLOT_LABELS[difficulty.slot] ?? `Lv.${difficulty.slot}`;
 }
+
+// The iconic maimai difficulty colors, used to tint level pills and the detail
+// table so players recognize Basic→Utage at a glance.
+export type DifficultyTone =
+  | "basic"
+  | "advanced"
+  | "expert"
+  | "master"
+  | "remaster"
+  | "utage"
+  | "default";
+
+export function difficultyTone(difficulty: { slot: number; name?: string }): DifficultyTone {
+  const name = (difficulty.name ?? "").toLowerCase();
+  // Check the most specific names first (re:master contains "master").
+  if (name.includes("re:master") || name.includes("remaster")) return "remaster";
+  if (name.includes("master")) return "master";
+  if (name.includes("expert")) return "expert";
+  if (name.includes("advanced")) return "advanced";
+  if (name.includes("basic")) return "basic";
+  if (name.includes("utage") || name.includes("宴")) return "utage";
+  switch (difficulty.slot) {
+    case 2:
+      return "basic";
+    case 3:
+      return "advanced";
+    case 4:
+      return "expert";
+    case 5:
+      return "master";
+    case 6:
+      return "remaster";
+    case 7:
+      return "utage";
+    default:
+      return "default";
+  }
+}
+
+// Literal class strings (kept whole so Tailwind's scanner emits them). Tuned to
+// read clearly on both the light and dark surfaces.
+export const DIFFICULTY_TONE_CLASS: Record<DifficultyTone, string> = {
+  basic: "border-emerald-500/40 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
+  advanced: "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  expert: "border-rose-500/40 bg-rose-500/12 text-rose-600 dark:text-rose-300",
+  master: "border-violet-500/45 bg-violet-500/15 text-violet-700 dark:text-violet-300",
+  remaster: "border-fuchsia-400/45 bg-fuchsia-400/12 text-fuchsia-700 dark:text-fuchsia-200",
+  utage: "border-pink-500/45 bg-pink-500/15 text-pink-700 dark:text-pink-300",
+  default: "border-border bg-muted text-muted-foreground",
+};
+
+// Solid dot colors for the difficulty table.
+export const DIFFICULTY_DOT_CLASS: Record<DifficultyTone, string> = {
+  basic: "bg-emerald-500",
+  advanced: "bg-amber-500",
+  expert: "bg-rose-500",
+  master: "bg-violet-500",
+  remaster: "bg-fuchsia-400",
+  utage: "bg-pink-500",
+  default: "bg-muted-foreground",
+};
 
 // Levels can be plain ("13"), suffixed ("12+"), or decimal ("13.4").
 function levelSortValue(level: string): number {
@@ -205,7 +404,7 @@ export function buildChartDescription(entry: CatalogEntry, locale: EntryLocale):
   const range = difficultyLevelRange(entry);
   const count = entry.difficulties.length;
   const bpm = entry.bpm;
-  const genre = entry.genre;
+  const genre = genreLabel(entry, locale);
   const assetClause = buildAssetClause(entry, locale);
 
   if (locale === "zh") {

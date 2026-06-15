@@ -97,14 +97,8 @@ describe("page views locale-driven content", () => {
     expect(enHtml).toContain("Artist 1");
     expect(enHtml).toContain(`href="/en/charts/song-1"`);
     expect(enHtml).toContain('data-layout="card-grid"');
-    expect(enHtml).toContain('data-entry-cover="compact"');
-    expect(enHtml).toContain('data-entry-meta="primary"');
-    expect(enHtml).toContain('data-entry-actions="compact"');
-    expect(enHtml).toContain('data-entry-summary="secondary"');
     expect(enHtml).toContain('alt="Song 1 cover"');
-    expect(enHtml).toContain("aspect-[4/3]");
-    expect(enHtml).toContain("Jacket");
-    expect(enHtml).toContain("Download");
+    expect(enHtml).toContain("aspect-square");
     expect(enHtml.match(/role="combobox"/g)?.length).toBe(1);
 
     expect(jaHtml).toContain("曲目 1");

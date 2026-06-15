@@ -42,10 +42,10 @@ function buildEntry(index: number, overrides: Partial<CatalogEntry> = {}): Catal
       has_dx_chart: true,
     },
     media: {
-      entry_base_url: `/catalog-assets/${slug}`,
-      cover_url: `/catalog-assets/${slug}/bg.jpg`,
-      audio_url: `/catalog-assets/${slug}/track.mp3`,
-      pv_url: index % 3 === 0 ? `/catalog-assets/${slug}/pv.mp4` : "",
+      entry_base_url: `/covers/${slug}`,
+      cover_url: `/covers/${slug}/bg.jpg`,
+      audio_url: `/covers/${slug}/track.mp3`,
+      pv_url: index % 3 === 0 ? `/covers/${slug}/pv.mp4` : "",
     },
     difficulties: [
       { slot: 0, level: "12+", designer: `Designer ${index}` },
@@ -289,7 +289,7 @@ describe("route metadata", () => {
 
     const entry3 = buildEntry(3);
     const song3Slug = "song-3";
-    const song3Cover = `/catalog-assets/${song3Slug}/bg.jpg`;
+    const song3Cover = `/covers/${song3Slug}/bg.jpg`;
     const zhDescription = buildChartDescription(entry3, "zh");
     const enDescription = buildChartDescription(entry3, "en");
 
@@ -301,7 +301,7 @@ describe("route metadata", () => {
       {
         title: "曲目 3",
         description: zhDescription,
-        keywords: ["AstroDX", "ADX 谱面资源", "曲目 3", "歌手 3", "舞萌DX 2025"],
+        keywords: ["AstroDX", "ADX 谱面资源", "曲目 3", "歌手 3", "舞萌DX 2025", "Anime", "maimai"],
       },
       { url: song3Cover, alt: "曲目 3" }
     );
@@ -314,7 +314,7 @@ describe("route metadata", () => {
       {
         title: "Song 3",
         description: enDescription,
-        keywords: ["AstroDX", "ADX 谱面资源", "Song 3", "Artist 3", "舞萌DX 2025"],
+        keywords: ["AstroDX", "ADX 谱面资源", "Song 3", "Artist 3", "舞萌DX 2025", "Anime", "maimai"],
       },
       { url: song3Cover, alt: "Song 3" }
     );

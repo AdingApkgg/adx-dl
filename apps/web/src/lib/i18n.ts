@@ -34,9 +34,12 @@ export type SiteDictionary = {
     entriesBadge: (count: number) => string;
     metricsTotal: string;
     metricsCategories: string;
+    metricsVersions: string;
+    metricsArtists: string;
     metricsUpdated: string;
     branchesTitle: string;
     branchesDescription: string;
+    versionsCta: string;
     latestTitle: string;
     latestDescription: string;
     openDetail: string;
@@ -108,6 +111,7 @@ export type SiteDictionary = {
     searchPlaceholder: string;
     allCategories: string;
     allSubcategories: string;
+    allGenres: string;
     details: string;
     download: string;
     source: string;
@@ -166,6 +170,11 @@ export type SiteDictionary = {
     disclaimer: string;
     sourceLabel: string;
   };
+  pageViews: {
+    siteViews: string;
+    siteVisitors: string;
+    pageViews: string;
+  };
   versions: {
     title: string;
     description: string;
@@ -175,6 +184,12 @@ export type SiteDictionary = {
     unknownLabel: string;
     detailTitle: (label: string) => string;
     detailIntro: (label: string, count: number) => string;
+  };
+  guestbook: {
+    navLabel: string;
+    title: string;
+    description: string;
+    intro: string;
   };
 };
 
@@ -206,11 +221,14 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       browseCta: "浏览版本",
       tagline: "资料与下载入口",
       entriesBadge: (count) => `${count} 条目`,
-      metricsTotal: "条目总数",
+      metricsTotal: "收录谱面",
       metricsCategories: "分类数",
-      metricsUpdated: "目录更新时间",
-      branchesTitle: "目录分支",
-      branchesDescription: "快速浏览目录中的分类与分支组。",
+      metricsVersions: "版本数",
+      metricsArtists: "曲师数",
+      metricsUpdated: "目录更新",
+      branchesTitle: "按版本浏览",
+      branchesDescription: "从 maimai 初代到最新版本,挑一个版本开始浏览。",
+      versionsCta: "查看全部版本",
       latestTitle: "最新谱面",
       latestDescription: "最近索引的远端谱面及其封面。",
       openDetail: "查看详情",
@@ -299,7 +317,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     catalogBrowser: {
       searchPlaceholder: "搜索曲名、曲师、版本...",
       allCategories: "全部分类",
-      allSubcategories: "全部子分类",
+      allSubcategories: "全部版本",
+      allGenres: "全部曲风",
       details: "详情",
       download: "下载",
       source: "来源",
@@ -353,6 +372,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       disclaimer: "非官方爱好者资料站。AstroDX 与 maimai 的相关权利归各自所有者所有。",
       sourceLabel: "源代码",
     },
+    pageViews: {
+      siteViews: "本站总访问量",
+      siteVisitors: "访客数",
+      pageViews: "本页浏览量",
+    },
     versions: {
       title: "按版本浏览",
       description: "按 maimai DX 版本浏览 AstroDX 谱面。",
@@ -363,6 +387,12 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       detailTitle: (label) => `${label} 谱面`,
       detailIntro: (label, count) =>
         `「${label}」版本下的 ${count} 首 AstroDX 谱面,可在线浏览与下载。`,
+    },
+    guestbook: {
+      navLabel: "留言板",
+      title: "留言板",
+      description: "在这里留言、反馈或闲聊。",
+      intro: "欢迎留下你的想法、建议或问题。评论由 Artalk 提供支持，可匿名或登录后发表。",
     },
   },
   en: {
@@ -385,11 +415,14 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       browseCta: "Browse Releases",
       tagline: "Archive & Download Portal",
       entriesBadge: (count) => `${count} entries`,
-      metricsTotal: "Total entries",
+      metricsTotal: "Charts",
       metricsCategories: "Catalog categories",
-      metricsUpdated: "Catalog updated",
-      branchesTitle: "Catalog branches",
-      branchesDescription: "Quickly scan the category and branch groups exposed by the catalog.",
+      metricsVersions: "Versions",
+      metricsArtists: "Artists",
+      metricsUpdated: "Updated",
+      branchesTitle: "Browse by version",
+      branchesDescription: "From the original maimai to the latest release — pick a version to start.",
+      versionsCta: "View all versions",
       latestTitle: "Latest Charts",
       latestDescription: "Recently indexed remote charts with ready-to-browse cover art.",
       openDetail: "Open Detail",
@@ -480,7 +513,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     catalogBrowser: {
       searchPlaceholder: "Search title, artist, version...",
       allCategories: "All Categories",
-      allSubcategories: "All Subcategories",
+      allSubcategories: "All Versions",
+      allGenres: "All Genres",
       details: "Details",
       download: "Download",
       source: "Source",
@@ -536,6 +570,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "Unofficial fan-made archive. AstroDX and maimai are the property of their respective owners.",
       sourceLabel: "Source",
     },
+    pageViews: {
+      siteViews: "Site views",
+      siteVisitors: "Visitors",
+      pageViews: "Page views",
+    },
     versions: {
       title: "Browse by Version",
       description: "Browse AstroDX charts by maimai DX version.",
@@ -546,6 +585,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       detailTitle: (label) => `${label} charts`,
       detailIntro: (label, count) =>
         `${count} AstroDX charts in the "${label}" version, available to browse and download.`,
+    },
+    guestbook: {
+      navLabel: "Guestbook",
+      title: "Guestbook",
+      description: "Leave a message, feedback, or just say hi.",
+      intro:
+        "Share your thoughts, suggestions, or questions. Comments are powered by Artalk — post anonymously or sign in.",
     },
   },
   ja: {
@@ -568,11 +614,14 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       browseCta: "バージョン一覧",
       tagline: "アーカイブとダウンロード入口",
       entriesBadge: (count) => `${count} 件`,
-      metricsTotal: "総エントリ数",
+      metricsTotal: "譜面数",
       metricsCategories: "分類数",
-      metricsUpdated: "カタログ更新",
-      branchesTitle: "カタログ分類",
-      branchesDescription: "カタログの分類・分岐グループをすばやく確認できます。",
+      metricsVersions: "バージョン数",
+      metricsArtists: "アーティスト数",
+      metricsUpdated: "更新",
+      branchesTitle: "バージョン別に見る",
+      branchesDescription: "初代 maimai から最新作まで、バージョンを選んで閲覧できます。",
+      versionsCta: "すべてのバージョン",
       latestTitle: "最新譜面",
       latestDescription: "最近インデックスされた遠端譜面とそのジャケット。",
       openDetail: "詳細を見る",
@@ -661,7 +710,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     catalogBrowser: {
       searchPlaceholder: "曲名、アーティスト、バージョンで検索...",
       allCategories: "すべての分類",
-      allSubcategories: "すべてのサブ分類",
+      allSubcategories: "すべてのバージョン",
+      allGenres: "すべてのジャンル",
       details: "詳細",
       download: "ダウンロード",
       source: "配布元",
@@ -716,6 +766,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       disclaimer: "非公式のファンメイドアーカイブです。AstroDX および maimai の権利は各所有者に帰属します。",
       sourceLabel: "ソース",
     },
+    pageViews: {
+      siteViews: "総アクセス数",
+      siteVisitors: "訪問者数",
+      pageViews: "ページ閲覧数",
+    },
     versions: {
       title: "バージョンで閲覧",
       description: "maimai DX バージョン別に AstroDX 譜面を閲覧します。",
@@ -726,6 +781,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       detailTitle: (label) => `${label} の譜面`,
       detailIntro: (label, count) =>
         `「${label}」バージョンの ${count} 曲の AstroDX 譜面。オンラインで閲覧・ダウンロードできます。`,
+    },
+    guestbook: {
+      navLabel: "ゲストブック",
+      title: "ゲストブック",
+      description: "メッセージやフィードバック、雑談などお気軽にどうぞ。",
+      intro:
+        "ご意見・ご提案・ご質問をお寄せください。コメントは Artalk によって提供され、匿名でもサインインしても投稿できます。",
     },
   },
 };
