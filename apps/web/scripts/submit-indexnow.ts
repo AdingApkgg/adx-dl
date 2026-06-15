@@ -43,11 +43,18 @@ async function main() {
   console.log(responseText);
 
   if (!response.ok) {
-    throw new Error(`IndexNow submission failed with status ${response.status}`);
+    // IndexNow is a best-effort SEO ping; the site is already published, so a
+    // rejected submission must not fail the build. New sites commonly return
+    // 403 "SiteVerificationNotCompleted" until IndexNow verifies the key file —
+    // later deploys succeed once verification completes.
+    console.warn(
+      `⚠️ IndexNow did not accept the submission (status ${response.status}). ` +
+        `Non-fatal — search engines will be re-pinged on the next deploy.`
+    );
   }
 }
 
 main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
+  // Never fail the deploy over a best-effort IndexNow ping.
+  console.warn("⚠️ IndexNow submission errored (non-fatal):", error);
 });
