@@ -10,6 +10,13 @@ Vendored from **Lxns-Network/maimai-prober-frontend** (`packages/maimai-chart-en
 MIT licensed — see `LICENSE`. Copy taken verbatim; keep changes minimal so it can
 be re-synced from upstream. If you patch it, note the change here.
 
+### Local patches
+
+- `core/audio/AudioManager.ts` `init()`: guard against `dispose()` racing the
+  `answer.wav` fetch (React Strict Mode double-mount / fast unmount) — bail if
+  `this.audioContext` was nulled during the awaits instead of calling
+  `decodeAudioData` on a dead context.
+
 ## Runtime assets
 
 The renderer fetches two files (paths overridable via constructor config):

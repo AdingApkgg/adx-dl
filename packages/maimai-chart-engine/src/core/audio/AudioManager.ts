@@ -48,11 +48,20 @@ export class AudioManager {
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
 
-      this.audioContext = new AudioContextClass();
+      const audioContext = new AudioContextClass();
+      this.audioContext = audioContext;
 
       const response = await fetch(this.answerSoundPath);
       const arrayBuffer = await response.arrayBuffer();
-      this.answerBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
+      // dispose() may run during the awaits above (React Strict Mode's
+      // double-mount, or a fast unmount mid-fetch): it closes and nulls
+      // this.audioContext. Bail instead of decoding on a dead context.
+      if (this.audioContext !== audioContext) {
+        return;
+      }
+
+      this.answerBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
       this.initialized = true;
     } catch (error) {
