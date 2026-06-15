@@ -8,7 +8,7 @@ from unittest.mock import patch
 from urllib.error import URLError
 from urllib.parse import quote
 
-from tools.build_catalog import MEDIA_BASE, build_catalog
+from tools.build_catalog import MEDIA_BASE, _aliases_for, build_catalog, fetch_alias_map
 from tools.remote_catalog import fetch_text
 
 
@@ -273,6 +273,48 @@ class BuildCatalogTests(unittest.TestCase):
 
         self.assertIsNone(calls[0])
         self.assertIsNotNone(calls[1])
+
+    def test_aliases_resolve_with_dx_and_utage_offset_fallback(self) -> None:
+        # Lxns keys aliases on the base maimai song id; AstroDX short_ids carry
+        # the +10000 (DX) / +100000 (UTAGE) offset, so the lookup de-offsets.
+        alias_map = {8: ["真爱歌", "真爱"], 100: ["告诉你的世界"]}
+        self.assertEqual(_aliases_for("100", alias_map), ["告诉你的世界"])  # exact
+        self.assertEqual(_aliases_for("10008", alias_map), ["真爱歌", "真爱"])  # DX → base 8
+        self.assertEqual(_aliases_for("100008", alias_map), ["真爱歌", "真爱"])  # UTAGE → base 8
+        self.assertEqual(_aliases_for("999", alias_map), [])  # no alias
+        self.assertEqual(_aliases_for("", alias_map), [])  # non-numeric short_id
+
+    def test_fetch_alias_map_is_non_fatal_on_unexpected_payload(self) -> None:
+        # A non-dict payload (e.g. an HTML error page parsed as JSON list) must
+        # not break the build — it yields an empty map.
+        self.assertEqual(fetch_alias_map(lambda _url: "[]"), {})
+        self.assertEqual(
+            fetch_alias_map(lambda _url: json.dumps({"aliases": [{"song_id": 8, "aliases": ["真爱"]}]})),
+            {8: ["真爱"]},
+        )
+
+    def test_fetch_alias_map_unions_lxns_and_yuzuchan(self) -> None:
+        lxns = json.dumps({"aliases": [{"song_id": 100, "aliases": ["告诉你的世界"]}]})
+        yuzu = json.dumps(
+            {"content": [{"SongID": 100, "Alias": ["告诉你的世界", "Tell Your World", "tyw"]}]}
+        )
+
+        def fetch(url: str) -> str:
+            return yuzu if "yuzuchan" in url else lxns
+
+        merged = fetch_alias_map(fetch)
+        # Unioned, lxns first, yuzuchan extras appended, case-insensitive dedup of
+        # the shared "告诉你的世界".
+        self.assertEqual(merged, {100: ["告诉你的世界", "Tell Your World", "tyw"]})
+
+    def test_fetch_alias_map_survives_one_failing_source(self) -> None:
+        def fetch(url: str) -> str:
+            if "yuzuchan" in url:
+                raise URLError("yuzuchan down")
+            return json.dumps({"aliases": [{"song_id": 8, "aliases": ["真爱"]}]})
+
+        # lxns still contributes even though yuzuchan errored.
+        self.assertEqual(fetch_alias_map(fetch), {8: ["真爱"]})
 
 
 if __name__ == "__main__":

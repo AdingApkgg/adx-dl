@@ -112,6 +112,8 @@ export type SiteDictionary = {
     allCategories: string;
     allSubcategories: string;
     allGenres: string;
+    /** Prefix shown on a result card when the query matched a song alias (别名), not its title. */
+    aliasMatchLabel: string;
     details: string;
     download: string;
     source: string;
@@ -140,6 +142,7 @@ export type SiteDictionary = {
     genreLabel: string;
     bpmLabel: string;
     shortIdLabel: string;
+    aliasesLabel: string;
     unknownValue: string;
     notAvailableValue: string;
     tableDifficulty: string;
@@ -315,10 +318,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       unavailable: "暂无数据",
     },
     catalogBrowser: {
-      searchPlaceholder: "搜索曲名、曲师、版本...",
+      searchPlaceholder: "搜索曲名、别名、曲师、版本...",
       allCategories: "全部分类",
       allSubcategories: "全部版本",
       allGenres: "全部曲风",
+      aliasMatchLabel: "别名命中",
       details: "详情",
       download: "下载",
       source: "来源",
@@ -347,6 +351,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       genreLabel: "曲风",
       bpmLabel: "BPM",
       shortIdLabel: "短 ID",
+      aliasesLabel: "别名",
       unknownValue: "未知",
       notAvailableValue: "暂无",
       tableDifficulty: "难度",
@@ -511,10 +516,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       unavailable: "Unavailable",
     },
     catalogBrowser: {
-      searchPlaceholder: "Search title, artist, version...",
+      searchPlaceholder: "Search title, alias, artist, version...",
       allCategories: "All Categories",
       allSubcategories: "All Versions",
       allGenres: "All Genres",
+      aliasMatchLabel: "Alias match",
       details: "Details",
       download: "Download",
       source: "Source",
@@ -544,6 +550,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       genreLabel: "Genre",
       bpmLabel: "BPM",
       shortIdLabel: "Short ID",
+      aliasesLabel: "Aliases",
       unknownValue: "Unknown",
       notAvailableValue: "Not available",
       tableDifficulty: "Difficulty",
@@ -708,10 +715,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       unavailable: "利用不可",
     },
     catalogBrowser: {
-      searchPlaceholder: "曲名、アーティスト、バージョンで検索...",
+      searchPlaceholder: "曲名、別名、アーティスト、バージョンで検索...",
       allCategories: "すべての分類",
       allSubcategories: "すべてのバージョン",
       allGenres: "すべてのジャンル",
+      aliasMatchLabel: "別名一致",
       details: "詳細",
       download: "ダウンロード",
       source: "配布元",
@@ -741,6 +749,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       genreLabel: "ジャンル",
       bpmLabel: "BPM",
       shortIdLabel: "短縮 ID",
+      aliasesLabel: "別名",
       unknownValue: "不明",
       notAvailableValue: "なし",
       tableDifficulty: "難易度",

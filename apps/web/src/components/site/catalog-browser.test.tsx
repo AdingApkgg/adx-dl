@@ -73,7 +73,7 @@ describe("CatalogBrowser", () => {
 
     expect(html).toContain("All Categories");
     expect(html).toContain("All Versions");
-    expect(html).toContain("Search title, artist, version...");
+    expect(html).toContain("Search title, alias, artist, version...");
   });
 
   test("renders localized pagination labels when result set spans multiple pages", () => {
