@@ -6,6 +6,22 @@
   position: relative;
   width: 100%;
   height: var(--density-timeline-height, 52px);
+  touch-action: none;
+}
+
+.seekable {
+  cursor: pointer;
+}
+
+.playhead {
+  position: absolute;
+  top: var(--density-marker-top);
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background-color: var(--primary);
+  pointer-events: none;
+  z-index: 30;
 }
 
 .timeMarkerLines {

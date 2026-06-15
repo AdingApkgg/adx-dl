@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -25,44 +25,28 @@ import {
 } from "@lxns-network/maimai-chart-engine";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useGameStore, playbackTimeRef } from "./store/game-store";
+import { useGameStore } from "./store/game-store";
 import { useGameSettingsStore } from "./store/settings-store";
 import { beatsToMs } from "./lib/time-conversion";
 import { formatClock } from "./lib/format";
 import { applyDifficulty } from "./apply-difficulty";
+import { useLiveBeats } from "./hooks/use-live-beats";
 import { EXPORT_FRAME_EVENT, COPY_FRAME_EVENT } from "./chart-canvas";
 
 const SPEED_STEPS = [1, 0.75, 0.5, 0.25];
-
-/** While playing, the authoritative time lives in playbackTimeRef (updated each
- *  frame by ChartCanvas), not in the store — so poll it via rAF for a live bar. */
-function useLiveBeats(): number {
-  const isPlaying = useGameStore((s) => s.isPlaying);
-  const preciseTime = useGameStore((s) => s.timeline.preciseTime);
-  const [playingBeats, setPlayingBeats] = useState(0);
-
-  useEffect(() => {
-    if (!isPlaying) return;
-    let raf = 0;
-    const tick = () => {
-      setPlayingBeats(playbackTimeRef.current);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [isPlaying]);
-
-  return isPlaying ? playingBeats : preciseTime;
-}
 
 export type ChartControlsProps = {
   settingsOpen: boolean;
   onToggleSettings: () => void;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
-  onExportGif: () => void;
+  /** Toggle the GIF range-selection overlay. */
+  onToggleGifRange: () => void;
+  gifRangeMode: boolean;
   gifExporting: boolean;
   gifProgress: number;
+  /** Difficulty slot (2–6) → level string, from the catalog. */
+  levels?: Record<number, string>;
 };
 
 export function ChartControls({
@@ -70,9 +54,11 @@ export function ChartControls({
   onToggleSettings,
   isFullscreen,
   onToggleFullscreen,
-  onExportGif,
+  onToggleGifRange,
+  gifRangeMode,
   gifExporting,
   gifProgress,
+  levels,
 }: ChartControlsProps) {
   const isPlaying = useGameStore((s) => s.isPlaying);
   const togglePlayback = useGameStore((s) => s.togglePlayback);
@@ -120,13 +106,14 @@ export function ChartControls({
         <div className="flex flex-wrap gap-1.5">
           {diffKeys.map((diff) => {
             const active = diff === selectedDifficulty;
+            const level = levels?.[diff];
             return (
               <button
                 key={diff}
                 type="button"
                 onClick={() => applyDifficulty(diff)}
                 className={cn(
-                  "rounded-md border px-2.5 py-1 text-xs font-semibold transition",
+                  "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold transition",
                   active
                     ? "border-transparent text-black"
                     : "border-border/60 text-muted-foreground hover:bg-muted",
@@ -134,6 +121,11 @@ export function ChartControls({
                 style={active ? { backgroundColor: DIFFICULTY_COLORS[diff] } : undefined}
               >
                 {DIFFICULTY_NAMES[diff]}
+                {level ? (
+                  <span className={cn("tabular-nums", active ? "opacity-80" : "opacity-60")}>
+                    {level}
+                  </span>
+                ) : null}
               </button>
             );
           })}
@@ -240,9 +232,10 @@ export function ChartControls({
         <Button
           type="button"
           size="sm"
-          variant="outline"
-          onClick={onExportGif}
+          variant={gifRangeMode ? "default" : "outline"}
+          onClick={onToggleGifRange}
           disabled={disabled || gifExporting}
+          aria-pressed={gifRangeMode}
         >
           <FilmIcon data-icon="inline-start" aria-hidden="true" />
           {gifExporting ? `GIF ${Math.round(gifProgress * 100)}%` : "GIF"}

@@ -461,6 +461,7 @@ export function ChartDetailPageView({
                 videoUrl={entry.media.pv_url || entry.files.pv || undefined}
                 chartName={`${entry.short_id || entry.id}-${formatEntryTitle(entry, locale)}`}
                 locale={locale}
+                levels={Object.fromEntries(entry.difficulties.map((d) => [d.slot, d.level]))}
                 defaultDifficulty={
                   entry.difficulties.length > 0
                     ? Math.max(...entry.difficulties.map((d) => d.slot))

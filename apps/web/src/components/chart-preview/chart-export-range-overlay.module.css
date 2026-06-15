@@ -1,0 +1,80 @@
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  cursor: default;
+  touch-action: none;
+}
+
+.shade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background-color: rgb(0 0 0 / 0.5);
+  pointer-events: none;
+}
+
+.selection {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  border: 1px solid var(--primary);
+  border-radius: 2px;
+  background-color: color-mix(in srgb, var(--primary) 18%, transparent);
+  cursor: grab;
+}
+
+.selection:active {
+  cursor: grabbing;
+}
+
+.durationLabel {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 44px;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  cursor: ew-resize;
+}
+
+.startHandle {
+  bottom: 50%;
+  align-items: flex-start;
+  padding-top: 6px;
+}
+
+.endHandle {
+  top: 50%;
+  align-items: flex-end;
+  padding-bottom: 6px;
+}
+
+.handleGrip {
+  position: relative;
+  width: 6px;
+  height: 26px;
+  border-radius: 3px;
+  background-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent);
+}

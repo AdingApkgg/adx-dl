@@ -1,0 +1,84 @@
+.viewport {
+  height: 240px;
+  overflow-y: auto;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.row {
+  padding: 3px 6px 3px 8px;
+  border-radius: 4px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.row:hover {
+  background-color: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+
+.rowActive {
+  background-color: color-mix(in srgb, #ffd700 16%, transparent);
+  border-left-color: #facc15;
+}
+
+.rowMarker .chunks {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.beat {
+  opacity: 0.5;
+  min-width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+  user-select: none;
+  font-weight: 700;
+}
+
+.chunks {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 0;
+  column-gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.chunk {
+  position: relative;
+  padding: 0 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.chunk:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: -4px;
+  top: 25%;
+  bottom: 25%;
+  width: 1px;
+  background-color: var(--border);
+  pointer-events: none;
+}
+
+.chunk:hover {
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.chunkActive {
+  background-color: color-mix(in srgb, #ffd700 55%, transparent);
+  color: #000;
+}

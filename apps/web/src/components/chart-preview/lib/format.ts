@@ -9,6 +9,11 @@ export function formatChartTimeForFilename(ms: number): string {
   ).padStart(3, "0")}ms`;
 }
 
+/** ms → "3.5s" duration label. */
+export function formatDuration(durationMs: number, suffix = "s"): string {
+  return `${(durationMs / 1000).toFixed(1)}${suffix}`;
+}
+
 /** ms → mm:ss for the transport readout. */
 export function formatClock(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) ms = 0;

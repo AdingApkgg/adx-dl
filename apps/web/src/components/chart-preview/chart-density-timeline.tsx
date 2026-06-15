@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import type { Note } from "@lxns-network/maimai-chart-engine";
 import { cn } from "@/lib/utils";
 import classes from "./chart-density-timeline.module.css";
@@ -19,6 +19,14 @@ type ChartDensityTimelineProps = {
   barMaxHeight?: number;
   showTimeLabels?: boolean;
   showTimeMarkers?: boolean;
+  /** Current playback position; draws a playhead line. */
+  playheadMs?: number;
+  /** Click/drag-to-seek. When provided the timeline is interactive. */
+  onSeek?: (ms: number) => void;
+  /** Disable seeking (e.g. while the GIF range overlay owns the pointer). */
+  interactive?: boolean;
+  /** Overlay rendered on top (e.g. the export-range selector). */
+  children?: ReactNode;
   className?: string;
   style?: CSSProperties;
 };
@@ -64,7 +72,6 @@ function classifyNote(type: Note["type"]): NoteCountKey | null {
     case "touch-hold-start":
       return "touch";
     default:
-      // hold-end / hold-end-simultaneous / touch-hold-end — not counted
       return null;
   }
 }
@@ -120,6 +127,10 @@ export function ChartDensityTimeline({
   barMaxHeight = DEFAULT_BAR_MAX_HEIGHT,
   showTimeLabels = true,
   showTimeMarkers = true,
+  playheadMs,
+  onSeek,
+  interactive = true,
+  children,
   className,
   style,
 }: ChartDensityTimelineProps) {
@@ -130,10 +141,59 @@ export function ChartDensityTimeline({
   const maxCount = useMemo(() => getMaxCount(buckets), [buckets]);
   const timeMarkers = useMemo(() => getTimeMarkers(durationMs), [durationMs]);
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+
+  const seekFromClientX = useCallback(
+    (clientX: number) => {
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || durationMs <= 0 || !onSeek) return;
+      const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+      onSeek((x / rect.width) * durationMs);
+    },
+    [durationMs, onSeek],
+  );
+
+  useEffect(() => {
+    if (!onSeek || !interactive) return;
+    const onMove = (e: PointerEvent) => {
+      if (!draggingRef.current) return;
+      e.preventDefault();
+      seekFromClientX(e.clientX);
+    };
+    const onUp = () => {
+      draggingRef.current = false;
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onUp);
+    return () => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onUp);
+    };
+  }, [onSeek, interactive, seekFromClientX]);
+
   if (durationMs <= 0 || buckets.length === 0) return null;
 
+  const seekable = Boolean(onSeek) && interactive;
+  const playheadPercent =
+    playheadMs !== undefined ? Math.max(0, Math.min((playheadMs / durationMs) * 100, 100)) : null;
+
   return (
-    <div className={cn(classes.timeline, className)} style={style}>
+    <div
+      ref={rootRef}
+      className={cn(classes.timeline, seekable && classes.seekable, className)}
+      style={style}
+      onPointerDown={
+        seekable
+          ? (e) => {
+              draggingRef.current = true;
+              seekFromClientX(e.clientX);
+            }
+          : undefined
+      }
+    >
       {showTimeMarkers && (
         <div className={classes.timeMarkerLines}>
           {timeMarkers.map(({ timeMs, percent }) =>
@@ -187,6 +247,12 @@ export function ChartDensityTimeline({
           );
         })}
       </div>
+
+      {playheadPercent !== null ? (
+        <div className={classes.playhead} style={{ left: `${playheadPercent}%` }} />
+      ) : null}
+
+      {children}
     </div>
   );
 }

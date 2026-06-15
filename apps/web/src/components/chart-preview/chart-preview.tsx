@@ -4,37 +4,73 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getAvailableDifficulties,
   type ChartDifficulty,
+  type Note,
 } from "@lxns-network/maimai-chart-engine";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
 import { ChartCanvas } from "./chart-canvas";
 import { ChartControls } from "./chart-controls";
 import { ChartSettings } from "./chart-settings";
 import { ChartDensityTimeline } from "./chart-density-timeline";
+import { ChartExportRangeOverlay } from "./chart-export-range-overlay";
+import { ChartSimaiStatements } from "./chart-simai-statements";
+import { ChartShortcuts } from "./chart-shortcuts";
 import { useGameStore, playbackTimeRef } from "./store/game-store";
 import { useGameSettingsStore } from "./store/settings-store";
+import { useLiveBeats } from "./hooks/use-live-beats";
 import { applyDifficulty } from "./apply-difficulty";
-import { beatsToMs } from "./lib/time-conversion";
-import { exportChartGif } from "./lib/export-chart-gif";
+import { beatsToMs, msToBeats } from "./lib/time-conversion";
+import { exportChartGif, type ChartExportRange } from "./lib/export-chart-gif";
+import { useExportRange } from "./lib/use-export-range";
+import { formatDuration } from "./lib/format";
 import { downloadBlob, sanitizeFilenameId } from "./lib/file-download";
 
 export type ChartPreviewProps = {
-  /** URL to the simai `maidata.txt`. */
   maidataUrl: string;
-  /** URL to the song audio (`track.mp3`); slaved as the master clock. */
   audioUrl?: string;
-  /** URL to the PV video (`pv.mp4`); shown as canvas background when enabled. */
   videoUrl?: string;
-  /** Human-readable name used for exported filenames. */
   chartName?: string;
-  /** Preferred difficulty (catalog slot 2–6 == engine ChartDifficulty). */
   defaultDifficulty?: number;
+  /** Difficulty slot (2–6) → level string, from the catalog. */
+  levels?: Record<number, string>;
   locale?: Locale;
 };
 
-const GIF_WINDOW_MS = 6000;
-
 type Toast = { title: string; message: string; color: string } | null;
+
+/** Density timeline that tracks the live playhead in an isolated subtree so the
+ *  per-frame update doesn't re-render the whole player. */
+function DensityWithPlayhead({
+  notes,
+  durationMs,
+  onSeek,
+  interactive,
+  children,
+}: {
+  notes: Note[];
+  durationMs: number;
+  onSeek: (ms: number) => void;
+  interactive: boolean;
+  children?: React.ReactNode;
+}) {
+  const liveBeats = useLiveBeats();
+  const chartData = useGameStore((s) => s.chartData);
+  const playheadMs = chartData
+    ? beatsToMs(liveBeats, chartData.bpmEvents, chartData.bpm)
+    : 0;
+  return (
+    <ChartDensityTimeline
+      notes={notes}
+      durationMs={durationMs}
+      playheadMs={playheadMs}
+      onSeek={onSeek}
+      interactive={interactive}
+    >
+      {children}
+    </ChartDensityTimeline>
+  );
+}
 
 export function ChartPreview({
   maidataUrl,
@@ -42,6 +78,7 @@ export function ChartPreview({
   videoUrl,
   chartName = "chart",
   defaultDifficulty,
+  levels,
   locale = "zh",
 }: ChartPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -52,9 +89,17 @@ export function ChartPreview({
 
   const isFullscreen = useGameStore((s) => s.isFullscreen);
   const setIsFullscreen = useGameStore((s) => s.setIsFullscreen);
+  const setPreciseTime = useGameStore((s) => s.setPreciseTime);
   const chartData = useGameStore((s) => s.chartData);
+  const rawSimaiText = useGameStore((s) => s.rawSimaiText);
+  const selectedDifficulty = useGameStore((s) => s.selectedDifficulty);
   const totalMeasures = useGameStore((s) => s.timeline.totalMeasures);
   const beatsPerMeasure = useGameStore((s) => s.timeline.beatsPerMeasure);
+
+  const totalBeats = totalMeasures * beatsPerMeasure;
+  const totalMs = chartData ? beatsToMs(totalBeats, chartData.bpmEvents, chartData.bpm) : 0;
+  const exportRange = useExportRange(totalMs);
+  const gifRangeMode = exportRange.range !== null;
 
   // Load + parse the chart on mount / when the source changes.
   useEffect(() => {
@@ -112,8 +157,11 @@ export function ChartPreview({
     };
   }, []);
 
-  // Keep the store's fullscreen flag in sync with the actual Fullscreen API state
-  // (covers the user pressing Esc).
+  const showToast = useCallback((t: NonNullable<Toast>) => {
+    setToast(t);
+    window.setTimeout(() => setToast(null), 2500);
+  }, []);
+
   useEffect(() => {
     const onChange = () => setIsFullscreen(document.fullscreenElement === containerRef.current);
     document.addEventListener("fullscreenchange", onChange);
@@ -130,44 +178,66 @@ export function ChartPreview({
     }
   }, []);
 
-  const handleExportGif = useCallback(async () => {
-    const state = useGameStore.getState();
-    const chart = state.chartData;
-    if (!chart || gifExporting) return;
+  const seekToMs = useCallback(
+    (ms: number) => {
+      const chart = useGameStore.getState().chartData;
+      if (!chart) return;
+      const beats = msToBeats(ms, chart.bpmEvents, chart.bpm);
+      playbackTimeRef.current = beats;
+      setPreciseTime(beats, true);
+    },
+    [setPreciseTime],
+  );
 
-    const settings = useGameSettingsStore.getState();
-    const startMs = beatsToMs(playbackTimeRef.current, chart.bpmEvents, chart.bpm);
-    const totalBeats = state.timeline.totalMeasures * state.timeline.beatsPerMeasure;
-    const totalMs = beatsToMs(totalBeats, chart.bpmEvents, chart.bpm);
-    const endMs = Math.min(startMs + GIF_WINDOW_MS, totalMs);
-    if (endMs <= startMs) return;
-
-    setGifExporting(true);
-    setGifProgress(0);
-    try {
-      const blob = await exportChartGif({
-        chart,
-        range: { startMs, endMs },
-        beatsPerMeasure: state.timeline.beatsPerMeasure,
-        settings,
-        onProgress: setGifProgress,
-        video:
-          settings.showVideo && videoUrl
-            ? { url: videoUrl, leadInMs: (60000 * 4) / chart.bpm, musicOffset: settings.musicOffset }
-            : undefined,
-      });
-      downloadBlob(blob, `maimai-chart-${sanitizeFilenameId(chartName)}.gif`);
-      setToast({ title: "已导出", message: "GIF 已下载", color: "green" });
-      window.setTimeout(() => setToast(null), 2500);
-    } catch (error) {
-      console.error("GIF export failed:", error);
-      setToast({ title: "导出失败", message: "GIF 生成出错", color: "red" });
-      window.setTimeout(() => setToast(null), 2500);
-    } finally {
-      setGifExporting(false);
-      setGifProgress(0);
+  const toggleGifRange = useCallback(() => {
+    if (gifExporting) return;
+    if (exportRange.range) {
+      exportRange.clear();
+    } else {
+      const chart = useGameStore.getState().chartData;
+      const currentMs = chart ? beatsToMs(playbackTimeRef.current, chart.bpmEvents, chart.bpm) : 0;
+      exportRange.start(currentMs);
     }
-  }, [gifExporting, videoUrl, chartName]);
+  }, [gifExporting, exportRange]);
+
+  const runGifExport = useCallback(
+    async (range: ChartExportRange) => {
+      const state = useGameStore.getState();
+      const chart = state.chartData;
+      if (!chart || gifExporting) return;
+      const settings = useGameSettingsStore.getState();
+
+      setGifExporting(true);
+      setGifProgress(0);
+      try {
+        const blob = await exportChartGif({
+          chart,
+          range,
+          beatsPerMeasure: state.timeline.beatsPerMeasure,
+          settings,
+          onProgress: setGifProgress,
+          video:
+            settings.showVideo && videoUrl
+              ? {
+                  url: videoUrl,
+                  leadInMs: (60000 * 4) / chart.bpm,
+                  musicOffset: settings.musicOffset,
+                }
+              : undefined,
+        });
+        downloadBlob(blob, `maimai-chart-${sanitizeFilenameId(chartName)}.gif`);
+        showToast({ title: "已导出", message: "GIF 已下载", color: "green" });
+        exportRange.clear();
+      } catch (error) {
+        console.error("GIF export failed:", error);
+        showToast({ title: "导出失败", message: "GIF 生成出错", color: "red" });
+      } finally {
+        setGifExporting(false);
+        setGifProgress(0);
+      }
+    },
+    [gifExporting, videoUrl, chartName, showToast, exportRange],
+  );
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -216,9 +286,6 @@ export function ChartPreview({
   );
 
   const densityNotes = chartData?.notes ?? [];
-  const densityDurationMs = chartData
-    ? beatsToMs(totalMeasures * beatsPerMeasure, chartData.bpmEvents, chartData.bpm)
-    : 0;
 
   return (
     <div
@@ -232,8 +299,49 @@ export function ChartPreview({
     >
       <ChartCanvas videoUrl={videoUrl} chartName={chartName} />
 
-      {!isFullscreen && densityDurationMs > 0 ? (
-        <ChartDensityTimeline notes={densityNotes} durationMs={densityDurationMs} />
+      {!isFullscreen && totalMs > 0 ? (
+        <DensityWithPlayhead
+          notes={densityNotes}
+          durationMs={totalMs}
+          onSeek={seekToMs}
+          interactive={!gifRangeMode}
+        >
+          {exportRange.range ? (
+            <ChartExportRangeOverlay
+              range={exportRange.range}
+              totalDurationMs={totalMs}
+              onChange={exportRange.update}
+              onPreview={seekToMs}
+            />
+          ) : null}
+        </DensityWithPlayhead>
+      ) : null}
+
+      {gifRangeMode && exportRange.range ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">
+            GIF 区间 {formatDuration(exportRange.range.endMs - exportRange.range.startMs)}
+            ,拖动时间轴上的手柄调整
+          </span>
+          <span className="flex-1" />
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => exportRange.range && runGifExport(exportRange.range)}
+            disabled={gifExporting}
+          >
+            {gifExporting ? `导出中 ${Math.round(gifProgress * 100)}%` : "导出 GIF"}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => exportRange.clear()}
+            disabled={gifExporting}
+          >
+            取消
+          </Button>
+        </div>
       ) : null}
 
       <div className={cn("w-full", isFullscreen && "max-w-2xl")}>
@@ -242,16 +350,30 @@ export function ChartPreview({
           onToggleSettings={() => setSettingsOpen((v) => !v)}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
-          onExportGif={handleExportGif}
+          onToggleGifRange={toggleGifRange}
+          gifRangeMode={gifRangeMode}
           gifExporting={gifExporting}
           gifProgress={gifProgress}
+          levels={levels}
         />
       </div>
 
       {settingsOpen ? (
-        <div className={cn("w-full rounded-lg border border-border/60 bg-card/40 p-4", isFullscreen && "max-w-2xl")}>
+        <div
+          className={cn(
+            "w-full rounded-lg border border-border/60 bg-card/40 p-4",
+            isFullscreen && "max-w-2xl",
+          )}
+        >
           <ChartSettings locale={locale} />
         </div>
+      ) : null}
+
+      {!isFullscreen ? (
+        <>
+          <ChartSimaiStatements simaiText={rawSimaiText} difficulty={selectedDifficulty} />
+          <ChartShortcuts locale={locale} />
+        </>
       ) : null}
 
       {toast ? (
