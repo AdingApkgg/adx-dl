@@ -2,21 +2,33 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useGameStore, playbackTimeRef, audioMasterTimeMsRef } from "./store/game-store";
-import { useGameSettingsStore } from "./store/settings-store";
+import { useGameSettingsStore, FULLSCREEN_QUALITY_MP } from "./store/settings-store";
 import { MainRenderer, ANSWER_SOUND_BASE_OFFSET_MS } from "@lxns-network/maimai-chart-engine";
 import { useAudio } from "./hooks/use-audio";
 import { useMusicPlayer } from "./hooks/use-music-player";
 import { beatsToMs, msToBeats } from "./lib/time-conversion";
+import { formatChartTimeForFilename } from "./lib/format";
+import { sanitizeFilenameId, downloadBlob } from "./lib/file-download";
 import classes from "./chart-canvas.module.css";
+import { cn } from "@/lib/utils";
 
-// Spike scope vs. the upstream lxns ChartCanvas: this port drops the DEV debug
-// overlay, the PNG/GIF frame-export listeners, and the background-PV-video path.
-// The renderer, the RAF render loop, audio-clock sync, answer SFX scheduling and
-// screen wake-lock are kept verbatim.
-export function ChartCanvas() {
+// Window events the controls dispatch to ask the canvas to export the current
+// frame (kept as events so the controls don't need a ref to the canvas).
+export const EXPORT_FRAME_EVENT = "astrodx-chart-export-frame";
+export const COPY_FRAME_EVENT = "astrodx-chart-copy-frame";
+
+export type ChartCanvasProps = {
+  /** PV video URL (entry.files.pv); drawn behind the chart when `showVideo` is on. */
+  videoUrl?: string;
+  /** Used to name exported PNG files. */
+  chartName?: string;
+};
+
+export function ChartCanvas({ videoUrl, chartName = "chart" }: ChartCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<MainRenderer | null>(null);
+  const bgVideoRef = useRef<HTMLVideoElement>(null);
 
   const animationFrameRef = useRef<number | null>(null);
   const playbackStartTimeRef = useRef<number>(0);
@@ -52,6 +64,7 @@ export function ChartCanvas() {
 
   useMusicPlayer();
 
+  const isFullscreen = useGameStore((s) => s.isFullscreen);
   const isPlaying = useGameStore((s) => s.isPlaying);
   const chartData = useGameStore((s) => s.chartData);
   const totalMeasures = useGameStore((s) => s.timeline.totalMeasures);
@@ -70,9 +83,11 @@ export function ChartCanvas() {
   const normalColorBreakSlide = useGameSettingsStore((s) => s.normalColorBreakSlide);
   const showFireworks = useGameSettingsStore((s) => s.showFireworks);
   const showHitEffect = useGameSettingsStore((s) => s.showHitEffect);
+  const showVideo = useGameSettingsStore((s) => s.showVideo);
   const soundEnabled = useGameSettingsStore((s) => s.soundEnabled);
   const soundVolume = useGameSettingsStore((s) => s.soundVolume);
   const soundOffset = useGameSettingsStore((s) => s.soundOffset);
+  const fullscreenQuality = useGameSettingsStore((s) => s.fullscreenQuality);
 
   const playbackSpeedRef = useRef(playbackSpeed);
 
@@ -84,11 +99,7 @@ export function ChartCanvas() {
   const releaseWakeLock = useCallback(async () => {
     const wakeLock = wakeLockRef.current;
     wakeLockRef.current = null;
-
-    if (!wakeLock) {
-      return;
-    }
-
+    if (!wakeLock) return;
     try {
       await wakeLock.release();
     } catch {
@@ -104,19 +115,13 @@ export function ChartCanvas() {
     ) {
       return;
     }
-
     const wakeLockApi = navigator.wakeLock;
-    if (!wakeLockApi) {
-      return;
-    }
-
+    if (!wakeLockApi) return;
     try {
       const wakeLock = await wakeLockApi.request("screen");
       wakeLockRef.current = wakeLock;
       wakeLock.addEventListener?.("release", () => {
-        if (wakeLockRef.current === wakeLock) {
-          wakeLockRef.current = null;
-        }
+        if (wakeLockRef.current === wakeLock) wakeLockRef.current = null;
       });
     } catch {
       // 浏览器/系统可能拒绝 wake lock，预览继续工作即可
@@ -125,10 +130,7 @@ export function ChartCanvas() {
 
   const resyncAnswerSound = useCallback(
     (currentMs: number, speed: number = playbackSpeedRef.current) => {
-      if (!chartData || !soundEnabled) {
-        return;
-      }
-
+      if (!chartData || !soundEnabled) return;
       answerSoundRefs.current.reset(currentMs);
       answerSoundRefs.current.schedule(chartData.notes, currentMs, speed);
     },
@@ -151,6 +153,41 @@ export function ChartCanvas() {
     }
     const currentBeats = beatsOverride ?? timeline.preciseTime;
     const currentMs = beatsToMs(currentBeats, chart.bpmEvents, chart.bpm);
+
+    // 背景视频：必须在 renderFrame 之前注入帧源（renderFrame 内部 clear 时绘制背景）
+    const bgVideo = bgVideoRef.current;
+    const enabled = !!bgVideo && useGameSettingsStore.getState().showVideo;
+    if (enabled && bgVideo) {
+      const leadInMs = (60000 * 4) / chart.bpm;
+      const musicOffset = useGameSettingsStore.getState().musicOffset;
+      const target = (currentMs - leadInMs - musicOffset) / 1000;
+      const duration = bgVideo.duration;
+      const totalBeats = timeline.totalMeasures * timeline.beatsPerMeasure;
+      const stoppedAtEnd = !playing && currentBeats >= totalBeats;
+      const inWindow =
+        target > 0 && !stoppedAtEnd && (!Number.isFinite(duration) || target < duration);
+      renderer.setBackgroundVideo(inWindow ? bgVideo : null);
+      if (!inWindow) {
+        if (!bgVideo.paused) bgVideo.pause();
+        if (target <= 0 && bgVideo.currentTime > 0) bgVideo.currentTime = 0;
+      } else if (playing) {
+        const speed = useGameStore.getState().playbackSpeed;
+        const drift = bgVideo.currentTime - target;
+        if (Math.abs(drift) > 0.3) {
+          bgVideo.currentTime = target;
+          bgVideo.playbackRate = speed;
+        } else {
+          bgVideo.playbackRate =
+            drift < -0.02 ? speed + 0.1 : drift > 0.02 ? Math.max(0.1, speed - 0.1) : speed;
+        }
+        if (bgVideo.paused) void bgVideo.play().catch(() => {});
+      } else {
+        if (!bgVideo.paused) bgVideo.pause();
+        if (Math.abs(bgVideo.currentTime - target) > 0.04) bgVideo.currentTime = target;
+      }
+    } else {
+      renderer.setBackgroundVideo(null);
+    }
 
     renderer.renderFrame(chart, currentBeats, timeline.beatsPerMeasure);
 
@@ -178,10 +215,11 @@ export function ChartCanvas() {
     renderer.setNormalColorBreakSlide(settingsState.normalColorBreakSlide);
     renderer.setShowFireworks(settingsState.showFireworks);
     renderer.setShowHitEffect(settingsState.showHitEffect);
+    renderer.setFullscreenMaxPixels(FULLSCREEN_QUALITY_MP[settingsState.fullscreenQuality]);
     renderer.setPlaybackSpeed(useGameStore.getState().playbackSpeed);
 
     const handleResize = () => {
-      renderer.resize(false);
+      renderer.resize(useGameStore.getState().isFullscreen);
       renderFrame(playbackTimeRef.current);
     };
 
@@ -204,10 +242,110 @@ export function ChartCanvas() {
     };
   }, [renderFrame, chartData?.bpm]);
 
+  // 全屏 / 画质：重设最大像素并 resize。
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    renderer.setFullscreenMaxPixels(FULLSCREEN_QUALITY_MP[fullscreenQuality]);
+    renderer.resize(isFullscreen);
+    renderFrame(playbackTimeRef.current);
+  }, [isFullscreen, fullscreenQuality, renderFrame]);
+
+  // 背景视频：加载/卸载 PV。
+  useEffect(() => {
+    const video = bgVideoRef.current;
+    if (!video) return;
+    const refresh = () => {
+      if (!useGameStore.getState().isPlaying) renderFrame(playbackTimeRef.current);
+    };
+    if (showVideo && videoUrl) {
+      video.src = videoUrl;
+      video.load();
+      video.addEventListener("loadeddata", refresh);
+      video.addEventListener("seeked", refresh);
+    } else {
+      video.removeAttribute("src");
+      video.load();
+    }
+    renderFrame(playbackTimeRef.current);
+    return () => {
+      video.removeEventListener("loadeddata", refresh);
+      video.removeEventListener("seeked", refresh);
+    };
+  }, [showVideo, videoUrl, chartData, renderFrame]);
+
+  // 导出 / 复制当前帧（由控制条派发 window 事件触发）。
+  useEffect(() => {
+    const notify = (title: string, message: string, color: string) => {
+      window.dispatchEvent(
+        new CustomEvent("astrodx-chart-notify", { detail: { title, message, color } }),
+      );
+    };
+
+    const canvasToBlob = (canvas: HTMLCanvasElement) =>
+      new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob returned null"))),
+          "image/png",
+        ),
+      );
+
+    const exportFrame = async () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const chart = useGameStore.getState().chartData;
+      const currentMs = chart ? beatsToMs(playbackTimeRef.current, chart.bpmEvents, chart.bpm) : 0;
+      const filename = `maimai-chart-${sanitizeFilenameId(chartName)}-${formatChartTimeForFilename(
+        currentMs,
+      )}.png`;
+
+      let blob: Blob;
+      try {
+        blob = await canvasToBlob(canvas);
+      } catch {
+        notify("导出失败", "无法获取当前帧", "red");
+        return;
+      }
+
+      const file = new File([blob], filename, { type: "image/png" });
+      try {
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file] });
+          return;
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+      }
+      downloadBlob(blob, filename);
+      notify("已保存", "当前帧已下载为 PNG", "green");
+    };
+
+    const copyFrame = async () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": canvasToBlob(canvas) }),
+        ]);
+        notify("已复制", "当前帧已复制到剪贴板", "green");
+      } catch {
+        notify("复制失败", "剪贴板不可用", "red");
+      }
+    };
+
+    window.addEventListener(EXPORT_FRAME_EVENT, exportFrame);
+    window.addEventListener(COPY_FRAME_EVENT, copyFrame);
+    return () => {
+      window.removeEventListener(EXPORT_FRAME_EVENT, exportFrame);
+      window.removeEventListener(COPY_FRAME_EVENT, copyFrame);
+    };
+  }, [chartName]);
+
   useEffect(() => {
     if (rendererRef.current) {
       rendererRef.current.setIsPlaying(isPlaying);
     }
+    if (!isPlaying) bgVideoRef.current?.pause();
   }, [isPlaying]);
 
   useEffect(() => {
@@ -215,7 +353,6 @@ export function ChartCanvas() {
       void requestWakeLock();
       return;
     }
-
     void releaseWakeLock();
   }, [isPlaying, requestWakeLock, releaseWakeLock]);
 
@@ -225,10 +362,8 @@ export function ChartCanvas() {
         void requestWakeLock();
         return;
       }
-
       void releaseWakeLock();
     };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -243,13 +378,11 @@ export function ChartCanvas() {
 
   useEffect(() => {
     if (isPlaying) return;
-
     const currentChart = useGameStore.getState().chartData;
     if (!currentChart) {
       answerSoundRefs.current.reset(undefined, true);
       return;
     }
-
     const currentMs = beatsToMs(playbackTimeRef.current, currentChart.bpmEvents, currentChart.bpm);
     answerSoundRefs.current.reset(currentMs, true);
   }, [isPlaying]);
@@ -339,11 +472,7 @@ export function ChartCanvas() {
 
   useEffect(() => {
     answerSoundRefs.current.setEnabled(soundEnabled);
-
-    if (!chartData || !isPlaying) {
-      return;
-    }
-
+    if (!chartData || !isPlaying) return;
     const currentMs = beatsToMs(playbackTimeRef.current, chartData.bpmEvents, chartData.bpm);
     resyncAnswerSound(currentMs);
   }, [soundEnabled, chartData, isPlaying, resyncAnswerSound]);
@@ -354,11 +483,7 @@ export function ChartCanvas() {
 
   useEffect(() => {
     answerSoundRefs.current.setTimingOffset(ANSWER_SOUND_BASE_OFFSET_MS + soundOffset);
-
-    if (!chartData || !isPlaying || !soundEnabled) {
-      return;
-    }
-
+    if (!chartData || !isPlaying || !soundEnabled) return;
     const currentMs = beatsToMs(playbackTimeRef.current, chartData.bpmEvents, chartData.bpm);
     resyncAnswerSound(currentMs);
   }, [soundOffset, chartData, isPlaying, soundEnabled, resyncAnswerSound]);
@@ -369,7 +494,6 @@ export function ChartCanvas() {
       const currentBeats = playbackTimeRef.current;
       playbackStartTimeRef.current = performance.now();
       playbackStartMsRef.current = beatsToMs(currentBeats, chartData.bpmEvents, chartData.bpm);
-
       if (soundEnabled) {
         resyncAnswerSound(playbackStartMsRef.current, playbackSpeed);
       }
@@ -379,16 +503,13 @@ export function ChartCanvas() {
 
   useEffect(() => {
     if (!isPlaying || !chartData || !soundEnabled) return;
-
     const intervalId = window.setInterval(() => {
       if (!useGameStore.getState().isPlaying || !useGameSettingsStore.getState().soundEnabled) {
         return;
       }
-
       const currentMs = getPlaybackMs(performance.now());
       answerSoundRefs.current.schedule(chartData.notes, currentMs, playbackSpeedRef.current);
     }, 250);
-
     return () => {
       window.clearInterval(intervalId);
     };
@@ -421,11 +542,9 @@ export function ChartCanvas() {
           chartData.bpmEvents,
           chartData.bpm,
         );
-        // 传入当前时间，避免播放之前已经过去的 note 音效
         answerSoundRefs.current.reset(playbackStartMsRef.current, true);
       }
 
-      // 帧数限制：跳过帧的时间累积到 accumulatedTimeRef，攒够目标间隔才渲染
       const limit = useGameSettingsStore.getState().fpsLimit;
       if (limit > 0 && lastRenderTimeRef.current > 0) {
         accumulatedTimeRef.current += timestamp - lastRenderTimeRef.current;
@@ -438,7 +557,6 @@ export function ChartCanvas() {
       }
       lastRenderTimeRef.current = timestamp;
 
-      // FPS 统计
       if (lastFrameTimeRef.current > 0) {
         const delta = timestamp - lastFrameTimeRef.current;
         frameTimesRef.current.push(delta);
@@ -467,7 +585,6 @@ export function ChartCanvas() {
         answerSoundRefs.current.reset(playbackStartMsRef.current, true);
       }
 
-      // 音频实际在跑时以 AudioContext 时钟为主，否则回落 rAF 外推。
       const audioMs = audioMasterTimeMsRef.current;
       let currentMs: number;
       if (audioMs !== null) {
@@ -538,8 +655,27 @@ export function ChartCanvas() {
   }, [isPlaying, renderFrame]);
 
   return (
-    <div ref={containerRef} className={classes.container}>
-      <canvas ref={canvasRef} className={classes.canvas} />
+    <div ref={containerRef} className={cn(classes.container, isFullscreen && classes.fullscreen)}>
+      <video
+        ref={bgVideoRef}
+        muted
+        playsInline
+        preload="auto"
+        crossOrigin="anonymous"
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          opacity: 0,
+          pointerEvents: "none",
+          top: 0,
+          left: 0,
+        }}
+      />
+      <canvas
+        ref={canvasRef}
+        className={cn(classes.canvas, isFullscreen && classes.fullscreen)}
+      />
     </div>
   );
 }

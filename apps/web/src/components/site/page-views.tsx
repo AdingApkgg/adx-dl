@@ -16,6 +16,7 @@ import { CatalogBrowser } from "@/components/site/catalog-browser";
 import { ChartCard } from "@/components/site/chart-card";
 import { ChartComments } from "@/components/site/chart-comments";
 import { ChartMediaPlayer } from "@/components/site/chart-media-player";
+import { ChartPreviewIsland } from "@/components/chart-preview/chart-preview-island";
 import { ChartPageViews } from "@/components/site/page-view-counter";
 import { DifficultyPill } from "@/components/site/difficulty-pill";
 import { EntryAssetBadges } from "@/components/site/entry-asset-badges";
@@ -445,6 +446,31 @@ export function ChartDetailPageView({
       <Reveal>
         <ChartMediaPlayer entry={entry} locale={locale} />
       </Reveal>
+
+      {entry.files.maidata ? (
+        <Reveal>
+          <Card>
+            <CardHeader>
+              <CardTitle>{detail.chartPreview}</CardTitle>
+              <CardDescription>{detail.chartPreviewDescription}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartPreviewIsland
+                maidataUrl={entry.files.maidata}
+                audioUrl={entry.media.audio_url || undefined}
+                videoUrl={entry.media.pv_url || entry.files.pv || undefined}
+                chartName={`${entry.short_id || entry.id}-${formatEntryTitle(entry, locale)}`}
+                locale={locale}
+                defaultDifficulty={
+                  entry.difficulties.length > 0
+                    ? Math.max(...entry.difficulties.map((d) => d.slot))
+                    : undefined
+                }
+              />
+            </CardContent>
+          </Card>
+        </Reveal>
+      ) : null}
 
       <Reveal className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_320px]">
         <Card>
