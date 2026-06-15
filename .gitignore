@@ -3,6 +3,7 @@
 # Local agent/planning artifacts
 .superpowers/
 docs/superpowers/
+.claude/
 
 # Python caches
 __pycache__/
