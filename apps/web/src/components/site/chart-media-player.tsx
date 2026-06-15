@@ -47,6 +47,8 @@ export function ChartMediaPlayer({ entry, locale }: ChartMediaPlayerProps) {
               poster={entry.media.cover_url || undefined}
               ariaLabel={`${title} ${detail.pvLabel}`}
               unsupportedLabel={detail.mediaUnsupported}
+              volumeLabel={detail.volumeLabel}
+              muteLabel={detail.muteLabel}
               className="aspect-video w-full rounded-xl border border-border/60 bg-black [color-scheme:dark]"
             />
           </div>

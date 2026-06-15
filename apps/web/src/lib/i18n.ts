@@ -146,6 +146,9 @@ export type SiteDictionary = {
     pvLabel: string;
     audioLabel: string;
     mediaUnsupported: string;
+    volumeLabel: string;
+    muteLabel: string;
+    comments: string;
   };
   assets: {
     audio: string;
@@ -335,6 +338,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       pvLabel: "PV 影像",
       audioLabel: "音频试听",
       mediaUnsupported: "你的浏览器不支持播放该媒体。",
+      volumeLabel: "音量",
+      muteLabel: "静音",
+      comments: "评论",
     },
     assets: { audio: "音频", jacket: "封面图", pv: "PV", dxChart: "DX 谱面" },
     cover: {
@@ -514,6 +520,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       pvLabel: "Promotion Video (PV)",
       audioLabel: "Audio preview",
       mediaUnsupported: "Your browser does not support playing this media.",
+      volumeLabel: "Volume",
+      muteLabel: "Mute",
+      comments: "Comments",
     },
     assets: { audio: "Audio", jacket: "Jacket", pv: "PV", dxChart: "DX Chart" },
     cover: {
@@ -692,6 +701,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       pvLabel: "PV 映像",
       audioLabel: "音源試聴",
       mediaUnsupported: "お使いのブラウザはこのメディアの再生に対応していません。",
+      volumeLabel: "音量",
+      muteLabel: "ミュート",
+      comments: "コメント",
     },
     assets: { audio: "音源", jacket: "ジャケット", pv: "PV", dxChart: "DX 譜面" },
     cover: {
