@@ -1,4 +1,5 @@
 import json
+import os
 import ssl
 import unittest
 from pathlib import Path
@@ -217,6 +218,31 @@ class BuildCatalogTests(unittest.TestCase):
             konekto["media"]["cover_url"],
             _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
         )
+
+    def test_remote_mode_env_skips_local_mirror(self) -> None:
+        def fetch_should_not_run(_url: str) -> bytes:
+            raise AssertionError("remote mode must not download covers")
+
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media_root = root / "media"
+            with patch.dict(os.environ, {"ASTRODX_COVERS": "remote"}):
+                catalog_path = build_catalog(
+                    root,
+                    fetch_text=lambda _url: SAMPLE_INDEX,
+                    fetch_bytes=fetch_should_not_run,
+                    to_avif=lambda _data, _ext: b"AVIFDATA",
+                    media_root=media_root,
+                    # download_media omitted -> ASTRODX_COVERS decides
+                )
+            konekto = json.loads(catalog_path.read_text(encoding="utf-8"))["entries"][0]
+            # Remote mode: nothing downloaded; cover stays the remote link.
+            self.assertEqual(konekto["media"]["cover_avif"], "")
+            self.assertEqual(
+                konekto["media"]["cover_url"],
+                _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
+            )
+            self.assertFalse(media_root.exists())
 
     def test_fetch_text_retries_without_ssl_verification_on_certificate_error(self) -> None:
         calls: list[object] = []

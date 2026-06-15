@@ -27,6 +27,11 @@ LOCAL_MEDIA_ROUTE = "/covers"
 COVER_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 # Formats avifenc can decode as input. Other source formats are left remote.
 AVIF_SOURCE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
+# Build-time switch (set before a push): ASTRODX_COVERS=remote uses the remote
+# image links directly (no download/convert); any other value (default "local")
+# mirrors covers to public/covers as lossless AVIF. The web layer falls back to
+# the remote cover_url automatically when no local AVIF exists, so both modes work.
+COVERS_MODE_ENV = "ASTRODX_COVERS"
 
 # Canonical maimai version names by versionid (matches the site's MAIMAI_VERSIONS).
 CANONICAL_VERSIONS: dict[int, str] = {
@@ -265,12 +270,20 @@ def _download_covers(
         return sum(1 for ok in results if ok)
 
 
+def _mirror_covers_enabled(explicit: bool | None) -> bool:
+    """Whether to mirror covers locally. An explicit download_media argument wins;
+    otherwise the ASTRODX_COVERS env var decides ("remote" -> off, else on)."""
+    if explicit is not None:
+        return explicit
+    return os.environ.get(COVERS_MODE_ENV, "local").strip().lower() != "remote"
+
+
 def build_catalog(
     root: Path,
     fetch_text: Callable[[str], str] = default_fetch_text,
     fetch_bytes: Callable[[str], bytes] | None = default_fetch_bytes,
     to_avif: Callable[[bytes, str], bytes | None] = _to_avif_lossless,
-    download_media: bool = True,
+    download_media: bool | None = None,
     media_root: Path | None = None,
     max_workers: int = 8,
 ) -> Path:
@@ -281,13 +294,16 @@ def build_catalog(
     entries.sort(key=lambda entry: entry["id"])
     _assign_route_slugs(entries)
 
-    # Convert covers to lossless AVIF into the web app's public/ so they ship with
-    # the static export; media.cover_avif points at the local copy while cover_url
-    # stays remote for the .adx download and OG/social images.
-    if download_media and fetch_bytes is not None:
+    # Cover handling is switchable before a push via ASTRODX_COVERS (or the
+    # download_media arg): "remote" leaves cover_url pointing at the remote host;
+    # otherwise covers are mirrored to public/covers as lossless AVIF and exposed
+    # via media.cover_avif (cover_url stays remote for the .adx download and OG).
+    if _mirror_covers_enabled(download_media) and fetch_bytes is not None:
         target = media_root or (root / "apps" / "web" / "public" / "covers")
         saved = _download_covers(entries, target, fetch_bytes, to_avif, max_workers)
         print(f"[catalog] mirrored {saved}/{len(entries)} cover images (AVIF) to {target}")
+    else:
+        print("[catalog] covers: using remote image links (no local mirror)")
 
     catalog = {
         "generated_at": generated_at,

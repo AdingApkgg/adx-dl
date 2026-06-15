@@ -27,11 +27,16 @@ jobs:
         with:
           python-version: "3.11"
 
+      # Cover mode switch: set repo variable ASTRODX_COVERS=remote to skip the
+      # local mirror and use remote image links (default/unset = local AVIF).
       - name: Install libavif (avifenc for lossless cover conversion)
+        if: vars.ASTRODX_COVERS != 'remote'
         run: sudo apt-get update && sudo apt-get install -y libavif-bin
 
       - name: Build catalog
         working-directory: pipeline
+        env:
+          ASTRODX_COVERS: ${{ vars.ASTRODX_COVERS }}
         run: python3 -c "from pathlib import Path; from tools.build_catalog import build_catalog; print(build_catalog(Path('..').resolve(), max_workers=16))"
 
       - name: Install dependencies
