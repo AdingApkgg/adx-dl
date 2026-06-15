@@ -13,6 +13,11 @@ import {
 } from "@/lib/catalog-shared";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
+import { cn } from "@/lib/utils";
+
+// Keep compact cards tidy: show a few alias chips inline, the rest as a "+N"
+// overflow. The full list is still on the detail page and in the title tooltip.
+const MAX_VISIBLE_ALIASES = 3;
 
 type ChartCardProps = {
   entry: CatalogEntry;
@@ -35,7 +40,18 @@ export function ChartCard({
   aliasHit = null,
 }: ChartCardProps) {
   const href = buildLocalePath(`/charts/${entrySlug(entry)}`, locale);
-  const aliasMatchLabel = getDictionary(locale).catalogBrowser.aliasMatchLabel;
+  const dictionary = getDictionary(locale);
+  const aliasMatchLabel = dictionary.catalogBrowser.aliasMatchLabel;
+  const aliasesLabel = dictionary.detail.aliasesLabel;
+
+  const aliases = entry.aliases ?? [];
+  // Float the search-matched alias first so it's always visible within the cap.
+  const orderedAliases =
+    aliasHit && aliases.includes(aliasHit)
+      ? [aliasHit, ...aliases.filter((alias) => alias !== aliasHit)]
+      : aliases;
+  const visibleAliases = orderedAliases.slice(0, MAX_VISIBLE_ALIASES);
+  const overflowCount = orderedAliases.length - visibleAliases.length;
 
   return (
     <Link
@@ -59,16 +75,34 @@ export function ChartCard({
           <p className="line-clamp-1 text-sm text-muted-foreground">
             {formatEntryArtist(entry, locale)}
           </p>
-          {aliasHit ? (
-            <p
-              className="mt-1 line-clamp-1 text-xs text-muted-foreground"
-              title={`${aliasMatchLabel}: ${aliasHit}`}
+          {aliases.length > 0 ? (
+            <ul
+              className="mt-1.5 flex flex-wrap gap-1"
+              title={`${aliasesLabel}: ${aliases.join("、")}`}
             >
-              <span className="mr-1 rounded bg-primary/10 px-1 py-0.5 font-medium text-primary">
-                {aliasMatchLabel}
-              </span>
-              {aliasHit}
-            </p>
+              {visibleAliases.map((alias) => {
+                const matched = alias === aliasHit;
+                return (
+                  <li
+                    key={alias}
+                    title={matched ? `${aliasMatchLabel}: ${alias}` : undefined}
+                    className={cn(
+                      "max-w-full truncate rounded border px-1.5 py-0.5 text-[11px] leading-tight",
+                      matched
+                        ? "border-primary/40 bg-primary/10 font-medium text-primary"
+                        : "border-border/60 bg-muted/50 text-muted-foreground"
+                    )}
+                  >
+                    {alias}
+                  </li>
+                );
+              })}
+              {overflowCount > 0 ? (
+                <li className="rounded border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[11px] leading-tight text-muted-foreground">
+                  +{overflowCount}
+                </li>
+              ) : null}
+            </ul>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
