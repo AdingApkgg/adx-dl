@@ -72,6 +72,41 @@ export type Catalog = {
   entries: CatalogEntry[];
 };
 
+export type ChartAssetFile = { name: string; url: string };
+
+/**
+ * The files packed into a chart's .adx download, named as the AstroDX app expects.
+ * Shared by the single-chart download and the batch (multi-chart) download.
+ */
+export function getChartAssetFiles(
+  entry: CatalogEntry,
+  options: { includeVideo?: boolean } = {}
+): ChartAssetFile[] {
+  const includeVideo = options.includeVideo ?? true;
+  const candidates: (ChartAssetFile | null)[] = [
+    { name: "maidata.txt", url: entry.files.maidata },
+    { name: "track.mp3", url: entry.media.audio_url },
+    { name: "bg.png", url: entry.media.cover_url },
+    includeVideo ? { name: "pv.mp4", url: entry.media.pv_url } : null,
+  ];
+  return candidates.filter((file): file is ChartAssetFile => Boolean(file && file.url));
+}
+
+/** Background-animation (BGA) movie extensions; offered as an optional batch exclusion. */
+export const CHART_VIDEO_EXTENSIONS = [".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v"];
+
+export function isChartVideoFile(name: string): boolean {
+  const lower = name.toLowerCase();
+  return CHART_VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
+/** A chart's in-archive folder name plus its packable asset files (full set, incl. video). */
+export type ChartDownloadSpec = { dir: string; files: ChartAssetFile[] };
+
+export function getChartDownloadSpec(entry: CatalogEntry): ChartDownloadSpec {
+  return { dir: entry.remote_dir_name, files: getChartAssetFiles(entry) };
+}
+
 export function formatEntryTitle(entry: CatalogEntry, locale: "zh" | "en" | "ja"): string {
   if (locale === "en" && entry.title_en) {
     return entry.title_en;

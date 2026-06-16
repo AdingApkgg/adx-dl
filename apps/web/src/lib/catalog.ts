@@ -1,7 +1,13 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { cache } from "react";
-import type { Catalog, CatalogEntry, VersionGroup } from "@/lib/catalog-shared";
+import type {
+  Catalog,
+  CatalogEntry,
+  ChartDownloadSpec,
+  VersionGroup,
+} from "@/lib/catalog-shared";
+import { getChartDownloadSpec } from "@/lib/catalog-shared";
 import { entrySlug } from "@/lib/route-slug";
 import { MAIMAI_VERSIONS, versionImageIndex } from "@/lib/version-image";
 
@@ -109,6 +115,27 @@ export async function readVersionGroups(): Promise<VersionGroup[]> {
   }
 
   return groups;
+}
+
+// Per-version slim download specs (dir + asset urls), keyed by version slug. Embedded on
+// the versions index so whole versions can be batch-downloaded client-side. Only versions
+// that actually have charts (+ unknown) get an entry.
+export async function readVersionChartSpecs(): Promise<Record<string, ChartDownloadSpec[]>> {
+  const { byIndex, unknown } = await readVersionData();
+  const specs: Record<string, ChartDownloadSpec[]> = {};
+
+  for (const version of MAIMAI_VERSIONS) {
+    const entries = byIndex.get(version.index);
+    if (entries && entries.length > 0) {
+      specs[version.slug] = entries.map(getChartDownloadSpec);
+    }
+  }
+
+  if (unknown.length > 0) {
+    specs[UNKNOWN_VERSION_SLUG] = unknown.map(getChartDownloadSpec);
+  }
+
+  return specs;
 }
 
 export async function readVersionGroup(slug: string): Promise<VersionDetail | undefined> {

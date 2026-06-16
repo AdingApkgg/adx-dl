@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   formatEntrySubcategory,
+  getChartAssetFiles,
   type CatalogEntry,
 } from "@/lib/catalog-shared";
 
@@ -55,6 +56,33 @@ function buildEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
 describe("catalog shared helpers", () => {
   test("keeps the original subcategory label for non-remote entries", () => {
     expect(formatEntrySubcategory(buildEntry())).toBe("BUDDiES");
+  });
+
+  test("getChartAssetFiles maps the AstroDX asset names and can drop the video", () => {
+    const entry = buildEntry();
+
+    expect(getChartAssetFiles(entry)).toEqual([
+      { name: "maidata.txt", url: "maidata-1.txt" },
+      { name: "track.mp3", url: "/covers/song-1/track.mp3" },
+      { name: "bg.png", url: "/covers/song-1/bg.jpg" },
+      { name: "pv.mp4", url: "/covers/song-1/pv.mp4" },
+    ]);
+
+    expect(getChartAssetFiles(entry, { includeVideo: false }).map((file) => file.name)).toEqual([
+      "maidata.txt",
+      "track.mp3",
+      "bg.png",
+    ]);
+
+    // Missing assets (empty url) are skipped.
+    const noAudio = buildEntry({
+      media: { ...buildEntry().media, audio_url: "" },
+    });
+    expect(getChartAssetFiles(noAudio).map((file) => file.name)).toEqual([
+      "maidata.txt",
+      "bg.png",
+      "pv.mp4",
+    ]);
   });
 
   test("prefers version and cabinet for remote entries", () => {

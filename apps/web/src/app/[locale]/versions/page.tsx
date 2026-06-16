@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { VersionsIndexView } from "@/components/site/version-views";
-import { readVersionGroups } from "@/lib/catalog";
+import { readVersionChartSpecs, readVersionGroups } from "@/lib/catalog";
 import { buildVersionsPageMetadata } from "@/lib/page-metadata";
 
 import { generatePrefixedLocaleParams, getPrefixedRouteLocale } from "../route-locale";
@@ -27,6 +27,15 @@ export default async function LocalizedVersionsPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const groups = await readVersionGroups();
-  return <VersionsIndexView groups={groups} locale={getPrefixedRouteLocale(locale)} />;
+  const [groups, versionCharts] = await Promise.all([
+    readVersionGroups(),
+    readVersionChartSpecs(),
+  ]);
+  return (
+    <VersionsIndexView
+      groups={groups}
+      versionCharts={versionCharts}
+      locale={getPrefixedRouteLocale(locale)}
+    />
+  );
 }

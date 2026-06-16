@@ -24,6 +24,7 @@ import {
   type ArchiveFormat,
 } from "@/lib/adx-archive";
 import type { AdxRemoteFile } from "@/lib/adx-directory";
+import { isChartVideoFile } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 type AdxDownloadButtonProps = {
@@ -35,14 +36,6 @@ type AdxDownloadButtonProps = {
 };
 
 type DownloadStatus = "idle" | "packing" | "success" | "error";
-
-/** Background-animation (BGA) movie extensions — offered as an optional exclusion. */
-const VIDEO_EXTENSIONS = [".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v"];
-
-function isVideoFile(name: string): boolean {
-  const lower = name.toLowerCase();
-  return VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext));
-}
 
 /** Compact human-readable size, used when the server doesn't report Content-Length. */
 function formatBytes(bytes: number): string {
@@ -68,10 +61,10 @@ export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButton
   const canDownload = files.length > 0 && normalizedFileName.length > 0;
   const isBusy = status === "packing";
 
-  const hasVideo = files.some((file) => isVideoFile(file.name));
+  const hasVideo = files.some((file) => isChartVideoFile(file.name));
   // The BGA movie is usually the heaviest asset; let users skip it to shrink the archive.
   const selectedFiles =
-    hasVideo && !includeVideo ? files.filter((file) => !isVideoFile(file.name)) : files;
+    hasVideo && !includeVideo ? files.filter((file) => !isChartVideoFile(file.name)) : files;
 
   // Byte-level progress fires many times per file; coalesce to one render per frame.
   const pendingFileProgress = React.useRef<AdxFileProgress[] | null>(null);

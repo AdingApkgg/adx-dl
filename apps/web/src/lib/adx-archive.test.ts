@@ -3,6 +3,7 @@ import { gunzipSync, strFromU8, unzipSync } from "fflate";
 
 import {
   buildArchiveBlob,
+  buildNestedArchiveBlob,
   downloadAdxArchiveInputs,
   getArchiveDownloadFileName,
   saveBlobAsFile,
@@ -66,6 +67,71 @@ describe("adx archive", () => {
     expect(decoder.decode(tar.subarray(257, 262))).toBe("ustar");
     expect(decoder.decode(tar.subarray(124, 135))).toBe("00000000011"); // 9 bytes = octal 11
     expect(decoder.decode(tar.subarray(512, 521))).toBe("&title=39"); // file data follows header
+  });
+
+  test("batch packs one .adx per chart inside an outer zip", async () => {
+    const blob = await buildNestedArchiveBlob(
+      [
+        {
+          name: "Song A",
+          files: [
+            { name: "maidata.txt", bytes: new TextEncoder().encode("&title=A") },
+            { name: "track.mp3", bytes: new Uint8Array([1, 2, 3]) },
+          ],
+        },
+        {
+          name: "Song B",
+          files: [{ name: "maidata.txt", bytes: new TextEncoder().encode("&title=B") }],
+        },
+      ],
+      "zip"
+    );
+
+    const outer = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+    expect(Object.keys(outer).sort()).toEqual(["Song A.adx", "Song B.adx"]);
+
+    // Each entry is itself a zip with the chart's files at the root.
+    const adxA = unzipSync(outer["Song A.adx"]);
+    expect(Object.keys(adxA).sort()).toEqual(["maidata.txt", "track.mp3"]);
+    expect(strFromU8(adxA["maidata.txt"])).toBe("&title=A");
+
+    const adxB = unzipSync(outer["Song B.adx"]);
+    expect(Object.keys(adxB)).toEqual(["maidata.txt"]);
+  });
+
+  test("batch disambiguates duplicate chart directory names", async () => {
+    const blob = await buildNestedArchiveBlob(
+      [
+        { name: "Dup", files: [{ name: "maidata.txt", bytes: new Uint8Array([1]) }] },
+        { name: "Dup", files: [{ name: "maidata.txt", bytes: new Uint8Array([2]) }] },
+      ],
+      "zip"
+    );
+
+    const outer = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+    expect(Object.keys(outer).sort()).toEqual(["Dup (2).adx", "Dup.adx"]);
+  });
+
+  test("packs nested batch paths, using the USTAR prefix for long ones", async () => {
+    const longDir = "x".repeat(110); // forces the >100-byte path into the prefix field
+    const blob = await buildArchiveBlob(
+      [
+        { name: "39/maidata.txt", bytes: new TextEncoder().encode("&title=39") },
+        { name: `${longDir}/track.mp3`, bytes: new Uint8Array([1, 2, 3]) },
+      ],
+      "tar.gz"
+    );
+
+    const tar = gunzipSync(new Uint8Array(await blob.arrayBuffer()));
+    const field = (start: number, length: number) =>
+      new TextDecoder().decode(tar.subarray(start, start + length)).replace(/\0+$/, "");
+
+    // Short nested path fits in the 100-byte name field as-is.
+    expect(field(0, 100)).toBe("39/maidata.txt");
+
+    // Second entry header is at 1024 (first header 512 + first data padded to 512).
+    expect(field(1024, 100)).toBe("track.mp3"); // basename in the name field
+    expect(field(1024 + 345, 155)).toBe(longDir); // directory in the USTAR prefix field
   });
 
   test("downloads files with bounded concurrency and reports progress", async () => {

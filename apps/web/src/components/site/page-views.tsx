@@ -44,6 +44,7 @@ import {
   formatEntrySubcategory,
   formatEntryTitle,
   genreLabel,
+  getChartAssetFiles,
   sortByReleaseDesc,
 } from "@/lib/catalog-shared";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
@@ -347,12 +348,7 @@ export function ChartDetailPageView({
   const description = buildChartDescription(entry, locale);
 
   // Files packed into the downloaded .adx, named as the AstroDX app expects.
-  const downloadFiles = [
-    { name: "maidata.txt", url: entry.files.maidata },
-    { name: "track.mp3", url: entry.media.audio_url },
-    { name: "bg.png", url: entry.media.cover_url },
-    { name: "pv.mp4", url: entry.media.pv_url },
-  ].filter((file) => file.url);
+  const downloadFiles = getChartAssetFiles(entry);
 
   return (
     <main

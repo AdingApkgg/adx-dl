@@ -163,6 +163,54 @@ export async function buildArchiveBlob(
   return new Blob([bytes], { type: "application/octet-stream" });
 }
 
+/** Outer container formats for a batch download (`.adx` is per-chart only, so excluded). */
+export type BatchArchiveFormat = Exclude<ArchiveFormat, "adx">;
+
+export const BATCH_FORMATS: readonly BatchArchiveFormat[] = ["zip", "tar.gz"];
+
+/** One chart in a batch: a folder name plus its asset files (packed into a single `.adx`). */
+export type NestedChart = { name: string; files: AdxArchiveInput[] };
+
+/**
+ * Builds a batch archive: each chart becomes its own `.adx` (a zip of that chart's files),
+ * and all the `.adx` files are packed into one outer container (`.zip` by default).
+ */
+export async function buildNestedArchiveBlob(
+  charts: NestedChart[],
+  format: BatchArchiveFormat = "zip"
+): Promise<Blob> {
+  if (charts.length === 0) {
+    throw new Error("No charts selected");
+  }
+
+  const used = new Set<string>();
+  const entries: AdxArchiveInput[] = charts.map((chart) => {
+    if (chart.files.length === 0) {
+      throw new Error(`Chart has no files: ${chart.name}`);
+    }
+
+    const adxBytes = zipSync(
+      Object.fromEntries(chart.files.map((file) => [file.name, file.bytes]))
+    );
+
+    // Disambiguate the rare case where two selected charts share a directory name.
+    let name = `${chart.name}.adx`;
+    for (let copy = 2; used.has(name); copy += 1) {
+      name = `${chart.name} (${copy}).adx`;
+    }
+    used.add(name);
+
+    return { name, bytes: adxBytes };
+  });
+
+  const bytes =
+    format === "tar.gz"
+      ? gzipSync(buildTar(entries), { mtime: 0 })
+      : zipSync(Object.fromEntries(entries.map((entry) => [entry.name, entry.bytes])));
+
+  return new Blob([bytes], { type: "application/octet-stream" });
+}
+
 /** Builds a USTAR tar archive with files at the root. Deterministic (no timestamps/owners). */
 function buildTar(files: AdxArchiveInput[]): Uint8Array {
   const encoder = new TextEncoder();
@@ -172,14 +220,29 @@ function buildTar(files: AdxArchiveInput[]): Uint8Array {
     encoder.encode(value.toString(8).padStart(length - 1, "0") + "\0");
 
   for (const file of files) {
-    const nameBytes = encoder.encode(file.name);
+    // USTAR splits long paths into a 155-byte prefix (dir) + 100-byte name (basename),
+    // which keeps nested batch paths like "<chart dir>/maidata.txt" within the format.
+    let namePart = file.name;
+    let prefixPart = "";
+    if (encoder.encode(namePart).length > 100) {
+      const slash = file.name.lastIndexOf("/");
+      if (slash > 0) {
+        prefixPart = file.name.slice(0, slash);
+        namePart = file.name.slice(slash + 1);
+      }
+    }
+    const nameBytes = encoder.encode(namePart);
+    const prefixBytes = encoder.encode(prefixPart);
 
-    if (nameBytes.length > 100) {
+    if (nameBytes.length > 100 || prefixBytes.length > 155) {
       throw new Error(`File name too long for tar: ${file.name}`);
     }
 
     const header = new Uint8Array(512);
     header.set(nameBytes, 0);
+    if (prefixBytes.length > 0) {
+      header.set(prefixBytes, 345); // USTAR prefix field
+    }
     header.set(octalField(0o644, 8), 100); // mode
     header.set(octalField(0, 8), 108); // uid
     header.set(octalField(0, 8), 116); // gid

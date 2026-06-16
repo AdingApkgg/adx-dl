@@ -5,6 +5,7 @@ import Image from "next/image";
 import { SearchIcon } from "lucide-react";
 
 import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
+import { BatchDownloadBar } from "@/components/site/batch-download-bar";
 import { ChartCard } from "@/components/site/chart-card";
 import {
   ALL_CATEGORIES,
@@ -15,7 +16,12 @@ import {
   getSubcategoryOptions,
 } from "@/lib/catalog-search";
 import type { CatalogEntry } from "@/lib/catalog-shared";
-import { GENRES, resolveGenreId, sortByReleaseDesc } from "@/lib/catalog-shared";
+import {
+  getChartDownloadSpec,
+  GENRES,
+  resolveGenreId,
+  sortByReleaseDesc,
+} from "@/lib/catalog-shared";
 import { getDictionary } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
@@ -41,6 +47,8 @@ type CatalogBrowserProps = {
   initialCategory?: string;
   locale?: "zh" | "en" | "ja";
   detailPathPrefix?: string;
+  /** Base name for a multi-select batch download (e.g. the version label). */
+  collectionName?: string;
 };
 
 const PAGE_SIZE = 24;
@@ -49,6 +57,7 @@ export function CatalogBrowser({
   entries,
   initialCategory = "Remote",
   locale = "zh",
+  collectionName,
 }: CatalogBrowserProps) {
   const dictionary = getDictionary(locale).catalogBrowser;
   const [query, setQuery] = React.useState("");
@@ -57,6 +66,8 @@ export function CatalogBrowser({
   const [genre, setGenre] = React.useState("all");
   const [hasUserSelectedCategory, setHasUserSelectedCategory] = React.useState(false);
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [selectMode, setSelectMode] = React.useState(false);
+  const [selectedIds, setSelectedIds] = React.useState<ReadonlySet<string>>(new Set());
 
   const search = React.useMemo(() => buildCatalogSearchWithMatches(entries), [entries]);
   const hasQuery = query.trim().length > 0;
@@ -119,8 +130,43 @@ export function CatalogBrowser({
     visibleEntries.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(safeCurrentPage * PAGE_SIZE, visibleEntries.length);
 
+  // Selection persists by id across pagination and filters, so a batch can span pages.
+  const selectedEntries = React.useMemo(
+    () => entries.filter((entry) => selectedIds.has(entry.id)),
+    [entries, selectedIds]
+  );
+
+  const toggleSelection = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+
+  const selectAllFiltered = () =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const entry of orderedEntries) {
+        next.add(entry.id);
+      }
+      return next;
+    });
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const showBatchBar = selectMode && selectedEntries.length > 0;
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className={cn("flex flex-col gap-6", showBatchBar && "pb-24")}>
       {categories.length > 2 ? (
         <Tabs
           value={effectiveCategory}
@@ -254,6 +300,22 @@ export function CatalogBrowser({
         </div>
       ) : null}
 
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant={selectMode ? "default" : "outline"}
+          size="sm"
+          onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+        >
+          {selectMode ? dictionary.exitSelectMode : dictionary.selectMode}
+        </Button>
+        {selectMode ? (
+          <Button type="button" variant="outline" size="sm" onClick={selectAllFiltered}>
+            {dictionary.selectAll}
+          </Button>
+        ) : null}
+      </div>
+
       {visibleEntries.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -287,6 +349,9 @@ export function CatalogBrowser({
                   entry={entry}
                   locale={locale}
                   aliasHit={hasQuery ? aliasHitById.get(entry.id) ?? null : null}
+                  selectable={selectMode}
+                  selected={selectedIds.has(entry.id)}
+                  onToggleSelect={() => toggleSelection(entry.id)}
                 />
               </motion.div>
             ))}
@@ -325,6 +390,17 @@ export function CatalogBrowser({
           ) : null}
         </motion.div>
       )}
+
+      <AnimatePresence>
+        {showBatchBar ? (
+          <BatchDownloadBar
+            charts={selectedEntries.map(getChartDownloadSpec)}
+            collectionName={collectionName ?? dictionary.batchDefaultName}
+            locale={locale}
+            onClear={clearSelection}
+          />
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

@@ -129,6 +129,13 @@ export type SiteDictionary = {
     nextPage: string;
     pageLabel: (current: number, total: number) => string;
     rangeLabel: (start: number, end: number, total: number) => string;
+    selectMode: string;
+    exitSelectMode: string;
+    selectAll: string;
+    clearSelection: string;
+    selectedCount: (count: number) => string;
+    batchDownload: string;
+    batchDefaultName: string;
   };
   detail: {
     onsiteDownload: string;
@@ -200,6 +207,7 @@ export type SiteDictionary = {
     unknownLabel: string;
     detailTitle: (label: string) => string;
     detailIntro: (label: string, count: number) => string;
+    selectedVersionsCount: (count: number) => string;
   };
   guestbook: {
     navLabel: string;
@@ -353,6 +361,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       nextPage: "下一页",
       pageLabel: (current, total) => `第 ${current} / ${total} 页`,
       rangeLabel: (start, end, total) => `显示 ${start}-${end} / 共 ${total} 条`,
+      selectMode: "多选",
+      exitSelectMode: "退出多选",
+      selectAll: "全选当前结果",
+      clearSelection: "清空",
+      selectedCount: (count) => `已选 ${count} 首`,
+      batchDownload: "打包下载",
+      batchDefaultName: "AstroDX 选集",
     },
     detail: {
       onsiteDownload: "站内下载",
@@ -420,6 +435,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       detailTitle: (label) => `${label} 谱面`,
       detailIntro: (label, count) =>
         `「${label}」版本下的 ${count} 首 AstroDX 谱面,可在线浏览与下载。`,
+      selectedVersionsCount: (count) => `已选 ${count} 个版本`,
     },
     guestbook: {
       navLabel: "留言板",
@@ -568,6 +584,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       nextPage: "Next",
       pageLabel: (current, total) => `Page ${current} of ${total}`,
       rangeLabel: (start, end, total) => `Showing ${start}-${end} of ${total}`,
+      selectMode: "Select",
+      exitSelectMode: "Done",
+      selectAll: "Select all results",
+      clearSelection: "Clear",
+      selectedCount: (count) => `${count} selected`,
+      batchDownload: "Download",
+      batchDefaultName: "AstroDX selection",
     },
     detail: {
       onsiteDownload: "Onsite Download",
@@ -636,6 +659,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       detailTitle: (label) => `${label} charts`,
       detailIntro: (label, count) =>
         `${count} AstroDX charts in the "${label}" version, available to browse and download.`,
+      selectedVersionsCount: (count) => `${count} versions selected`,
     },
     guestbook: {
       navLabel: "Guestbook",
@@ -783,6 +807,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       nextPage: "次へ",
       pageLabel: (current, total) => `${current} / ${total} ページ`,
       rangeLabel: (start, end, total) => `${total} 件中 ${start}-${end} 件を表示`,
+      selectMode: "複数選択",
+      exitSelectMode: "選択終了",
+      selectAll: "現在の結果を全選択",
+      clearSelection: "クリア",
+      selectedCount: (count) => `${count} 曲選択中`,
+      batchDownload: "まとめてダウンロード",
+      batchDefaultName: "AstroDX セレクション",
     },
     detail: {
       onsiteDownload: "サイト内ダウンロード",
@@ -850,6 +881,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       detailTitle: (label) => `${label} の譜面`,
       detailIntro: (label, count) =>
         `「${label}」バージョンの ${count} 曲の AstroDX 譜面。オンラインで閲覧・ダウンロードできます。`,
+      selectedVersionsCount: (count) => `${count} バージョン選択中`,
     },
     guestbook: {
       navLabel: "ゲストブック",

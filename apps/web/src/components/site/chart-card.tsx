@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CheckIcon } from "lucide-react";
 
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { DifficultyPill } from "@/components/site/difficulty-pill";
@@ -27,6 +28,10 @@ type ChartCardProps = {
   sizes?: string;
   /** The alias that matched the current search, shown as a hint to explain the hit. */
   aliasHit?: string | null;
+  /** In select mode the card toggles selection instead of navigating to the detail page. */
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 };
 
 // The single chart card used on the home page and in the catalog browser. The
@@ -38,6 +43,9 @@ export function ChartCard({
   priority = false,
   sizes,
   aliasHit = null,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }: ChartCardProps) {
   const href = buildLocalePath(`/charts/${entrySlug(entry)}`, locale);
   const dictionary = getDictionary(locale);
@@ -53,20 +61,46 @@ export function ChartCard({
   const visibleAliases = orderedAliases.slice(0, MAX_VISIBLE_ALIASES);
   const overflowCount = orderedAliases.length - visibleAliases.length;
 
-  return (
-    <Link
-      href={href}
-      className="group flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card/80 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10"
-    >
-      <div className="aspect-square overflow-hidden border-b border-border/60">
-        <EntryCover
-          entry={entry}
-          locale={locale}
-          priority={priority}
-          sizes={sizes}
-          className="h-full w-full"
-        />
-      </div>
+  const cardClassName = cn(
+    "group flex h-full flex-col overflow-hidden rounded-xl border bg-card/80 transition-all",
+    selectable
+      ? cn(
+          "cursor-pointer",
+          selected
+            ? "border-primary ring-2 ring-primary"
+            : "border-border/70 hover:border-primary/40"
+        )
+      : "border-border/70 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10"
+  );
+
+  const cover = (
+    <div className="relative aspect-square overflow-hidden border-b border-border/60">
+      <EntryCover
+        entry={entry}
+        locale={locale}
+        priority={priority}
+        sizes={sizes}
+        className="h-full w-full"
+      />
+      {selectable ? (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "absolute top-2 left-2 flex size-6 items-center justify-center rounded-md border shadow-sm transition-colors",
+            selected
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border/70 bg-background/80 text-transparent"
+          )}
+        >
+          <CheckIcon className="size-4" />
+        </span>
+      ) : null}
+    </div>
+  );
+
+  const body = (
+    <>
+      {cover}
       <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3 sm:p-4">
         <div className="min-w-0">
           <h3 className="line-clamp-1 font-semibold leading-snug">
@@ -116,6 +150,32 @@ export function ChartCard({
           ))}
         </div>
       </div>
+    </>
+  );
+
+  if (selectable) {
+    return (
+      <div
+        role="checkbox"
+        aria-checked={selected}
+        tabIndex={0}
+        onClick={onToggleSelect}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onToggleSelect?.();
+          }
+        }}
+        className={cardClassName}
+      >
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <Link href={href} className={cardClassName}>
+      {body}
     </Link>
   );
 }
