@@ -99,9 +99,9 @@ describe("i18n helpers", () => {
 
     expect(typeof i18n.getStaticPageMetadata).toBe("function");
 
-    const zhPages = i18n.getStaticPageMetadata?.("zh") ?? {};
-    const enPages = i18n.getStaticPageMetadata?.("en") ?? {};
-    const jaPages = i18n.getStaticPageMetadata?.("ja") ?? {};
+    const zhPages: Record<string, unknown> = i18n.getStaticPageMetadata?.("zh") ?? {};
+    const enPages: Record<string, unknown> = i18n.getStaticPageMetadata?.("en") ?? {};
+    const jaPages: Record<string, unknown> = i18n.getStaticPageMetadata?.("ja") ?? {};
 
     expect(zhPages.home).toEqual({
       pathname: "/",
@@ -134,6 +134,7 @@ describe("i18n helpers", () => {
       title: "Search",
       description:
         "Built from remote AstroDX directory scans, with per-song metadata, chart parsing, and a unified catalog for static deployment.",
+      keywords: [],
     });
 
     expect(metadata?.title).toBe("Search | ADX 谱面资源");

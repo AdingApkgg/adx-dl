@@ -90,7 +90,7 @@ describe("adx directory probing", () => {
 
   test("fetches and parses a remote directory listing", async () => {
     const fetchMock = mock(() => Promise.resolve(new Response(listingHtml)));
-    globalThis.fetch = fetchMock as typeof fetch;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     const files = await fetchAdxDirectoryFiles("39");
 

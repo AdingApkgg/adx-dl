@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { describe, expect, mock, test } from "bun:test";
 
 import { buildChartDescription, type CatalogEntry } from "@/lib/catalog-shared";
@@ -99,31 +100,7 @@ mock.module("@/lib/catalog", () => ({
 }));
 
 function expectLocalizedAlternates(
-  metadata: {
-    metadataBase?: URL | null;
-    keywords?: string[] | null;
-    robots?: {
-      index?: boolean;
-      follow?: boolean;
-    };
-    alternates?: {
-      canonical?: string | URL;
-      languages?: Record<string, string | URL | undefined>;
-    };
-    openGraph?: {
-      title?: string;
-      description?: string;
-      url?: string | URL;
-      siteName?: string;
-      locale?: string;
-      images?: Array<string | URL | { url: string | URL; alt?: string }>;
-    };
-    twitter?: {
-      title?: string;
-      description?: string;
-      images?: Array<string | URL | { url: string | URL; alt?: string }>;
-    };
-  },
+  metadata: Metadata,
   canonical: string,
   expected: {
     title: string;

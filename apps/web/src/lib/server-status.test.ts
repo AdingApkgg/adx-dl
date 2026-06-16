@@ -138,10 +138,10 @@ describe("server status parser", () => {
     }
 
     const snapshot = await fetchServerStatus({
-      fetchImpl: async () => {
+      fetchImpl: (async () => {
         throw new Error("html fallback should not run");
-      },
-      webSocketImpl: MockWebSocket as unknown as typeof WebSocket,
+      }) as unknown as typeof fetch,
+      webSocketImpl: MockWebSocket,
     });
 
     expect(snapshot.name).toBe("Alice");

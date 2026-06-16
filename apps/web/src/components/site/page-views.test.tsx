@@ -216,9 +216,14 @@ describe("page views locale-driven content", () => {
     };
 
     const html = renderToStaticMarkup(<ChartDetailPageView entry={entry} locale="zh" />);
+    const detail = getDictionary("zh").detail;
 
     expect(html).not.toContain("<video");
     expect(html).not.toContain("<audio");
-    expect(html).not.toContain("预览");
+    // The media (PV/audio) preview section is gone. The separate "谱面预览" chart-preview
+    // card still renders (it only needs maidata), so anchor on the media section's unique
+    // description rather than the bare "预览" substring, which "谱面预览" would also match.
+    expect(html).not.toContain(detail.previewDescription);
+    expect(html).toContain(detail.chartPreview);
   });
 });

@@ -133,6 +133,8 @@ export type SiteDictionary = {
   detail: {
     onsiteDownload: string;
     onsitePending: string;
+    downloadFormatLabel: string;
+    downloadFormatRecommended: string;
     downloadPreparing: string;
     downloadPacking: (completed: number, total: number) => string;
     downloadSuccess: string;
@@ -347,6 +349,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     detail: {
       onsiteDownload: "站内下载",
       onsitePending: "站内下载待接入",
+      downloadFormatLabel: "选择格式",
+      downloadFormatRecommended: "推荐",
       downloadPreparing: "正在读取目录",
       downloadPacking: (completed, total) => `正在下载并打包（${completed}/${total}）`,
       downloadSuccess: "下载已开始",
@@ -551,6 +555,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     detail: {
       onsiteDownload: "Onsite Download",
       onsitePending: "Onsite Download Pending",
+      downloadFormatLabel: "Choose format",
+      downloadFormatRecommended: "Recommended",
       downloadPreparing: "Reading directory",
       downloadPacking: (completed, total) => `Downloading and packing (${completed}/${total})`,
       downloadSuccess: "Download started",
@@ -755,6 +761,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     detail: {
       onsiteDownload: "サイト内ダウンロード",
       onsitePending: "サイト内ダウンロード準備中",
+      downloadFormatLabel: "形式を選択",
+      downloadFormatRecommended: "推奨",
       downloadPreparing: "ディレクトリを読み込み中",
       downloadPacking: (completed, total) => `ダウンロードして圧縮中（${completed}/${total}）`,
       downloadSuccess: "ダウンロードを開始しました",
