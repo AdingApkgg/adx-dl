@@ -135,6 +135,7 @@ export type SiteDictionary = {
     onsitePending: string;
     downloadFormatLabel: string;
     downloadFormatRecommended: string;
+    downloadIncludeVideo: string;
     downloadPreparing: string;
     downloadPacking: (completed: number, total: number) => string;
     downloadSuccess: string;
@@ -358,6 +359,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       onsitePending: "站内下载待接入",
       downloadFormatLabel: "选择格式",
       downloadFormatRecommended: "推荐",
+      downloadIncludeVideo: "包含 BGA 视频",
       downloadPreparing: "正在读取目录",
       downloadPacking: (completed, total) => `正在下载并打包（${completed}/${total}）`,
       downloadSuccess: "下载已开始",
@@ -572,6 +574,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       onsitePending: "Onsite Download Pending",
       downloadFormatLabel: "Choose format",
       downloadFormatRecommended: "Recommended",
+      downloadIncludeVideo: "Include BGA video",
       downloadPreparing: "Reading directory",
       downloadPacking: (completed, total) => `Downloading and packing (${completed}/${total})`,
       downloadSuccess: "Download started",
@@ -786,6 +789,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       onsitePending: "サイト内ダウンロード準備中",
       downloadFormatLabel: "形式を選択",
       downloadFormatRecommended: "推奨",
+      downloadIncludeVideo: "BGA 動画を含める",
       downloadPreparing: "ディレクトリを読み込み中",
       downloadPacking: (completed, total) => `ダウンロードして圧縮中（${completed}/${total}）`,
       downloadSuccess: "ダウンロードを開始しました",

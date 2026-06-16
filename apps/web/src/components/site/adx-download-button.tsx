@@ -7,9 +7,11 @@ import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -34,6 +36,14 @@ type AdxDownloadButtonProps = {
 
 type DownloadStatus = "idle" | "packing" | "success" | "error";
 
+/** Background-animation (BGA) movie extensions — offered as an optional exclusion. */
+const VIDEO_EXTENSIONS = [".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v"];
+
+function isVideoFile(name: string): boolean {
+  const lower = name.toLowerCase();
+  return VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
 /** Compact human-readable size, used when the server doesn't report Content-Length. */
 function formatBytes(bytes: number): string {
   if (bytes < 1024) {
@@ -53,9 +63,15 @@ export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButton
   const [progress, setProgress] = React.useState({ completed: 0, total: 0 });
   const [fileProgress, setFileProgress] = React.useState<AdxFileProgress[]>([]);
   const [errorMessage, setErrorMessage] = React.useState("");
+  const [includeVideo, setIncludeVideo] = React.useState(true);
   const normalizedFileName = typeof fileName === "string" ? fileName.trim() : "";
   const canDownload = files.length > 0 && normalizedFileName.length > 0;
   const isBusy = status === "packing";
+
+  const hasVideo = files.some((file) => isVideoFile(file.name));
+  // The BGA movie is usually the heaviest asset; let users skip it to shrink the archive.
+  const selectedFiles =
+    hasVideo && !includeVideo ? files.filter((file) => !isVideoFile(file.name)) : files;
 
   // Byte-level progress fires many times per file; coalesce to one render per frame.
   const pendingFileProgress = React.useRef<AdxFileProgress[] | null>(null);
@@ -90,8 +106,8 @@ export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButton
 
     try {
       setErrorMessage("");
-      setProgress({ completed: 0, total: files.length });
-      setFileProgress(files.map((file) => ({
+      setProgress({ completed: 0, total: selectedFiles.length });
+      setFileProgress(selectedFiles.map((file) => ({
         name: file.name,
         received: 0,
         total: null,
@@ -99,7 +115,7 @@ export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButton
       })));
       setStatus("packing");
 
-      const archiveInputs = await downloadAdxArchiveInputs(files, {
+      const archiveInputs = await downloadAdxArchiveInputs(selectedFiles, {
         concurrency: 4,
         onProgress: (completed, total) => setProgress({ completed, total }),
         onFileProgress: scheduleFileProgress,
@@ -159,6 +175,18 @@ export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButton
               ) : null}
             </DropdownMenuItem>
           ))}
+          {hasVideo ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={includeVideo}
+                onCheckedChange={(value) => setIncludeVideo(value === true)}
+                onSelect={(event) => event.preventDefault()}
+              >
+                {detailDictionary.downloadIncludeVideo}
+              </DropdownMenuCheckboxItem>
+            </>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
       <AnimatePresence>
