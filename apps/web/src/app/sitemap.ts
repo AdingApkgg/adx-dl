@@ -8,7 +8,7 @@ import { resolveSiteUrl } from "@/lib/site-url";
 export const dynamic = "force-static";
 
 const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL).replace(/\/+$/, "");
-const staticPaths = ["/", "/charts", "/search", "/status", "/versions", "/comments"] as const;
+const staticPaths = ["/", "/charts", "/search", "/status", "/versions", "/comments", "/links"] as const;
 
 function toAbsoluteUrl(pathname: string): string {
   if (pathname === "/") {

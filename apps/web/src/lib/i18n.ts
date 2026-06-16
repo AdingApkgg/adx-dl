@@ -206,6 +206,13 @@ export type SiteDictionary = {
     description: string;
     intro: string;
   };
+  links: {
+    navLabel: string;
+    title: string;
+    description: string;
+    intro: string;
+    visit: string;
+  };
 };
 
 export type StaticPageMetadataKey = "home" | "charts" | "search" | "status";
@@ -418,6 +425,14 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "在这里留言、反馈或闲聊。",
       intro: "欢迎留下你的想法、建议或问题。评论由 Artalk 提供支持，可匿名或登录后发表。",
     },
+    links: {
+      navLabel: "友情链接",
+      title: "友情链接",
+      description: "一些 maimai / AstroDX 相关的优秀站点与工具。",
+      intro:
+        "以下站点与工具均与本站无隶属关系，仅作社区分享。外部内容请自行甄别。",
+      visit: "访问",
+    },
   },
   en: {
     localeLabel: "English",
@@ -626,6 +641,14 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       intro:
         "Share your thoughts, suggestions, or questions. Comments are powered by Artalk — post anonymously or sign in.",
     },
+    links: {
+      navLabel: "Links",
+      title: "Friend Links",
+      description: "A handful of great maimai / AstroDX-related sites and tools.",
+      intro:
+        "These sites and tools are not affiliated with this archive — shared for the community. Use external links at your own discretion.",
+      visit: "Visit",
+    },
   },
   ja: {
     localeLabel: "日本語",
@@ -830,6 +853,14 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "メッセージやフィードバック、雑談などお気軽にどうぞ。",
       intro:
         "ご意見・ご提案・ご質問をお寄せください。コメントは Artalk によって提供され、匿名でもサインインしても投稿できます。",
+    },
+    links: {
+      navLabel: "リンク",
+      title: "リンク集",
+      description: "maimai / AstroDX 関連のおすすめサイト・ツール。",
+      intro:
+        "これらのサイト・ツールは当アーカイブとは無関係で、コミュニティ向けに紹介しています。外部リンクのご利用はご自身の判断でお願いします。",
+      visit: "アクセス",
     },
   },
 };

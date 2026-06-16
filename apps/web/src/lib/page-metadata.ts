@@ -158,6 +158,17 @@ export function buildGuestbookPageMetadata(locale: Locale): Metadata {
   });
 }
 
+export function buildLinksPageMetadata(locale: Locale): Metadata {
+  const links = getDictionary(locale).links;
+  return buildPageMetadata({
+    locale,
+    pathname: "/links",
+    title: links.title,
+    description: links.description,
+    keywords: ["AstroDX", siteName, links.title, "maimai", "友情链接", "friend links"],
+  });
+}
+
 export function buildChartDetailMetadata(locale: Locale, entry: CatalogEntry): Metadata {
   return buildPageMetadata({
     locale,

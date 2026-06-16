@@ -7,7 +7,7 @@ export type IndexNowPayload = {
   urlList: string[];
 };
 
-const staticPaths = ["/", "/charts", "/versions", "/search", "/status"] as const;
+const staticPaths = ["/", "/charts", "/versions", "/search", "/status", "/links"] as const;
 
 // The IndexNow key is public by protocol design — it is served at
 // `/indexnow-<key>.txt` on the site — so it lives in the repo as a default and

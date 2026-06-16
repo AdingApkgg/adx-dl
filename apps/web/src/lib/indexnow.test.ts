@@ -35,6 +35,7 @@ describe("indexnow helpers", () => {
       "https://adxdls.saop.cc/versions",
       "https://adxdls.saop.cc/search",
       "https://adxdls.saop.cc/status",
+      "https://adxdls.saop.cc/links",
       "https://adxdls.saop.cc/charts/e-1-a",
       "https://adxdls.saop.cc/charts/e-1-b",
       "https://adxdls.saop.cc/en",
@@ -42,6 +43,7 @@ describe("indexnow helpers", () => {
       "https://adxdls.saop.cc/en/versions",
       "https://adxdls.saop.cc/en/search",
       "https://adxdls.saop.cc/en/status",
+      "https://adxdls.saop.cc/en/links",
       "https://adxdls.saop.cc/en/charts/e-1-a",
       "https://adxdls.saop.cc/en/charts/e-1-b",
       "https://adxdls.saop.cc/ja",
@@ -49,6 +51,7 @@ describe("indexnow helpers", () => {
       "https://adxdls.saop.cc/ja/versions",
       "https://adxdls.saop.cc/ja/search",
       "https://adxdls.saop.cc/ja/status",
+      "https://adxdls.saop.cc/ja/links",
       "https://adxdls.saop.cc/ja/charts/e-1-a",
       "https://adxdls.saop.cc/ja/charts/e-1-b",
     ]);

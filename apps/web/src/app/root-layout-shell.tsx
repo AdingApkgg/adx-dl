@@ -92,6 +92,9 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
                       <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/comments", locale)}>
                         {dictionary.guestbook.navLabel}
                       </Link>
+                      <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/links", locale)}>
+                        {dictionary.links.navLabel}
+                      </Link>
                       <a
                         className="text-muted-foreground hover:text-foreground"
                         href={TELEGRAM_COMMUNITY}
