@@ -72,7 +72,7 @@ describe("structured data builders", () => {
           "@id": "https://adxdls.saop.cc/#website",
           name: "ADX 谱面资源",
           description:
-            "Built from remote AstroDX directory scans, with per-song metadata, chart parsing, and a unified catalog for static deployment.",
+            "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM, ready to browse by version, search, preview online and download.",
           url: "https://adxdls.saop.cc/en",
           inLanguage: "en",
           publisher: { "@id": "https://adxdls.saop.cc/#organization" },

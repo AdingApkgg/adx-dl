@@ -222,6 +222,21 @@ export type SiteDictionary = {
     intro: string;
     visit: string;
   };
+  /**
+   * Long-form SEO meta descriptions (~150 chars), kept separate from the short
+   * on-page `description` subtitles. Consumed only by the metadata builders so
+   * crawlers get a rich summary while the visible UI stays concise.
+   */
+  seo: {
+    home: string;
+    charts: string;
+    search: string;
+    status: string;
+    versions: string;
+    versionDetail: (label: string, count: number) => string;
+    guestbook: string;
+    links: string;
+  };
 };
 
 export type StaticPageMetadataKey = "home" | "charts" | "search" | "status";
@@ -451,6 +466,23 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "以下站点与工具均与本站无隶属关系，仅作社区分享。外部内容请自行甄别。",
       visit: "访问",
     },
+    seo: {
+      home: "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
+      charts:
+        "浏览本站收录的全部 AstroDX 谱面，可按 maimai DX 版本分支、谱面分类与显示语言筛选，每首曲目均提供封面、难度等级、谱面定数与 BPM 等信息，支持在线预览并下载导入 AstroDX 模拟器。",
+      search:
+        "在本站收录的全部 AstroDX 谱面中，按曲名、曲师、关键字、maimai DX 版本分支与谱面难度等信息快速搜索筛选，实时定位目标谱面并查看封面与定数详情，支持在线预览与下载。",
+      status:
+        "实时查看本站与下载服务的运行状态，包括服务器在线情况、响应延迟、网络指标与关键健康数据，数据来自公开监控页面，便于了解 AstroDX 谱面浏览与下载服务当前是否可用。",
+      versions:
+        "按 maimai DX 版本分支浏览全部 AstroDX 谱面，从初代 maimai 到最新版本逐一分类整理，可快速定位某个版本收录的曲目，查看谱面数量、封面与难度信息，支持在线预览与下载。",
+      versionDetail: (label, count) =>
+        `浏览 maimai DX「${label}」版本收录的全部 ${count} 首 AstroDX 谱面，含每首曲目的封面、难度等级、谱面定数与 BPM 等完整信息，支持在线预览谱面并一键下载导入 AstroDX 模拟器，是查找与收藏该版本 maimai 谱面资源的完整归档目录。`,
+      guestbook:
+        "欢迎在 ADX 谱面资源留言板留下你的想法、建议、问题或反馈，与其他 maimai 与 AstroDX 玩家交流。评论系统由 Artalk 提供支持，可匿名发表，也可登录后留言。",
+      links:
+        "这里收集了一些与 maimai 和 AstroDX 相关的优秀站点、工具与资源，包括查分器、谱面工具、社群与教程等友情链接，方便你发现更多 maimai 玩家常用的实用资源。",
+    },
   },
   en: {
     localeLabel: "English",
@@ -676,6 +708,23 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "These sites and tools are not affiliated with this archive — shared for the community. Use external links at your own discretion.",
       visit: "Visit",
     },
+    seo: {
+      home: "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM, ready to browse by version, search, preview online and download.",
+      charts:
+        "Browse the AstroDX chart catalog by maimai DX version, category and language — entries include cover art, difficulty levels, chart constants and BPM to preview and download.",
+      search:
+        "Search the entire AstroDX catalog by song title, artist, keyword, maimai DX version and chart difficulty — instantly find a chart, preview its details, and download.",
+      status:
+        "Check the live status of this site and its download service — server uptime, response latency, network metrics and key health data from the public monitor page.",
+      versions:
+        "Browse every AstroDX chart grouped by maimai DX version, from the original maimai to the latest release — jump to any version for its song count, covers and downloads.",
+      versionDetail: (label, count) =>
+        `Browse all ${count} AstroDX charts in the maimai DX "${label}" version — cover art, difficulty levels, chart constants and BPM, ready to preview online and download into AstroDX.`,
+      guestbook:
+        "Leave your thoughts, suggestions, questions or feedback and chat with other maimai and AstroDX players. Comments are powered by Artalk — post anonymously or sign in.",
+      links:
+        "A curated collection of great maimai- and AstroDX-related sites, tools and resources — score trackers, chart utilities, communities and guides for maimai players.",
+    },
   },
   ja: {
     localeLabel: "日本語",
@@ -898,6 +947,23 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "これらのサイト・ツールは当アーカイブとは無関係で、コミュニティ向けに紹介しています。外部リンクのご利用はご自身の判断でお願いします。",
       visit: "アクセス",
     },
+    seo: {
+      home: "maimai 系譜面を収録する非公式の AstroDX 譜面アーカイブ。楽曲メタデータ、ジャケット、難易度定数、BPM を掲載し、バージョン別の閲覧、検索、オンラインプレビュー、AstroDX シミュレーターへのダウンロードに対応しています。",
+      charts:
+        "収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。",
+      search:
+        "収録済みの AstroDX 譜面全体を、曲名、アーティスト、キーワード、maimai DX バージョン分類、譜面難易度などの情報で検索・絞り込み。目的の譜面をすぐに見つけ、詳細を確認してオンラインでプレビュー・ダウンロードできます。",
+      status:
+        "本サイトとダウンロードサービスの稼働状況をリアルタイムで確認。サーバーの稼働状態、応答遅延、ネットワーク指標などの主要な健全性データを公開監視ページから取得し、AstroDX 譜面の閲覧・ダウンロードが利用可能か把握できます。",
+      versions:
+        "すべての AstroDX 譜面を maimai DX のバージョン分類別に閲覧。初代 maimai から最新バージョンまで整理し、各バージョンの収録曲数、ジャケット、難易度を確認しながらオンラインでプレビュー・ダウンロードできます。",
+      versionDetail: (label, count) =>
+        `maimai DX「${label}」バージョンに収録された ${count} 曲の AstroDX 譜面を一覧。各曲のジャケット、難易度レベル、譜面定数、BPM などの情報を掲載し、オンラインでの譜面プレビューと AstroDX シミュレーターへのダウンロードに対応しています。`,
+      guestbook:
+        "ADX 谱面资源のゲストブックで、ご意見・ご提案・ご質問・フィードバックをお気軽にどうぞ。ほかの maimai・AstroDX プレイヤーと交流できます。コメントは Artalk によって提供され、匿名でもサインインしても投稿できます。",
+      links:
+        "maimai と AstroDX に関連するおすすめのサイト、ツール、リソースをまとめたリンク集。スコア管理ツール、譜面ツール、コミュニティ、ガイドなど、maimai プレイヤーに役立つ情報を見つけやすくまとめています。",
+    },
   },
 };
 
@@ -937,7 +1003,7 @@ export function getStaticPageMetadata(
     home: {
       pathname: "/",
       title: dictionary.home.title,
-      description: dictionary.home.description,
+      description: dictionary.seo.home,
       keywords:
         normalizedLocale === "en"
           ? ["AstroDX", "ADX 谱面资源", "chart archive", "downloads", "catalog index"]
@@ -948,7 +1014,7 @@ export function getStaticPageMetadata(
     charts: {
       pathname: "/charts",
       title: dictionary.charts.title,
-      description: dictionary.charts.description,
+      description: dictionary.seo.charts,
       keywords:
         normalizedLocale === "en"
           ? ["AstroDX", "ADX 谱面资源", "browse charts", "category filter", "display language"]
@@ -959,7 +1025,7 @@ export function getStaticPageMetadata(
     search: {
       pathname: "/search",
       title: dictionary.searchPage.title,
-      description: dictionary.searchPage.description,
+      description: dictionary.seo.search,
       keywords:
         normalizedLocale === "en"
           ? ["AstroDX", "ADX 谱面资源", "search", "chart search", "branch filter"]
@@ -970,7 +1036,7 @@ export function getStaticPageMetadata(
     status: {
       pathname: "/status",
       title: dictionary.statusPage.title,
-      description: dictionary.statusPage.description,
+      description: dictionary.seo.status,
       keywords:
         normalizedLocale === "en"
           ? ["AstroDX", "ADX 谱面资源", "server status", "monitor page", "network metrics"]

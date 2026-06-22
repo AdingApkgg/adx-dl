@@ -148,23 +148,25 @@ export function buildStatusPageMetadata(locale: Locale): Metadata {
 }
 
 export function buildGuestbookPageMetadata(locale: Locale): Metadata {
-  const guestbook = getDictionary(locale).guestbook;
+  const dictionary = getDictionary(locale);
+  const guestbook = dictionary.guestbook;
   return buildPageMetadata({
     locale,
     pathname: "/comments",
     title: guestbook.title,
-    description: guestbook.description,
+    description: dictionary.seo.guestbook,
     keywords: ["AstroDX", siteName, guestbook.title, "guestbook", "留言板", "comments"],
   });
 }
 
 export function buildLinksPageMetadata(locale: Locale): Metadata {
-  const links = getDictionary(locale).links;
+  const dictionary = getDictionary(locale);
+  const links = dictionary.links;
   return buildPageMetadata({
     locale,
     pathname: "/links",
     title: links.title,
-    description: links.description,
+    description: dictionary.seo.links,
     keywords: ["AstroDX", siteName, links.title, "maimai", "友情链接", "friend links"],
   });
 }
@@ -182,12 +184,13 @@ export function buildChartDetailMetadata(locale: Locale, entry: CatalogEntry): M
 }
 
 export function buildVersionsPageMetadata(locale: Locale): Metadata {
-  const versions = getDictionary(locale).versions;
+  const dictionary = getDictionary(locale);
+  const versions = dictionary.versions;
   return buildPageMetadata({
     locale,
     pathname: "/versions",
     title: versions.title,
-    description: versions.description,
+    description: dictionary.seo.versions,
     keywords: ["AstroDX", siteName, versions.title, "maimai DX"],
   });
 }
@@ -198,13 +201,14 @@ export function buildVersionDetailMetadata(
   slug: string,
   count: number
 ): Metadata {
-  const versions = getDictionary(locale).versions;
+  const dictionary = getDictionary(locale);
+  const versions = dictionary.versions;
   const label = name === "Unknown" ? versions.unknownLabel : name;
   return buildPageMetadata({
     locale,
     pathname: `/versions/${slug}`,
     title: versions.detailTitle(label),
-    description: versions.detailIntro(label, count),
+    description: dictionary.seo.versionDetail(label, count),
     keywords: ["AstroDX", siteName, label, "maimai DX"],
   });
 }

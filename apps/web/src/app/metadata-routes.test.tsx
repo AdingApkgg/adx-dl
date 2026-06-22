@@ -153,39 +153,39 @@ describe("route metadata", () => {
 
     expect(homeModule.metadata?.title).toBe("AstroDX 谱面资料站与下载入口。 | ADX 谱面资源");
     expect(homeModule.metadata?.description).toBe(
-      "构建时扫描远端 AstroDX 目录，提取单曲元数据、谱面信息与统一索引。"
+      "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。"
     );
     expectLocalizedAlternates(homeModule.metadata ?? {}, "/", {
       title: "AstroDX 谱面资料站与下载入口。",
-      description: "构建时扫描远端 AstroDX 目录，提取单曲元数据、谱面信息与统一索引。",
+      description: "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
       keywords: ["AstroDX", "ADX 谱面资源", "谱面资料站", "下载入口", "目录索引"],
     });
 
     expect(chartsModule.metadata?.title).toBe("浏览曲目 | ADX 谱面资源");
     expect(chartsModule.metadata?.description).toBe(
-      "按分类、分支与显示语言浏览 AstroDX 目录条目。"
+      "浏览本站收录的全部 AstroDX 谱面，可按 maimai DX 版本分支、谱面分类与显示语言筛选，每首曲目均提供封面、难度等级、谱面定数与 BPM 等信息，支持在线预览并下载导入 AstroDX 模拟器。"
     );
     expectLocalizedAlternates(chartsModule.metadata ?? {}, "/charts", {
       title: "浏览曲目",
-      description: "按分类、分支与显示语言浏览 AstroDX 目录条目。",
+      description: "浏览本站收录的全部 AstroDX 谱面，可按 maimai DX 版本分支、谱面分类与显示语言筛选，每首曲目均提供封面、难度等级、谱面定数与 BPM 等信息，支持在线预览并下载导入 AstroDX 模拟器。",
       keywords: ["AstroDX", "ADX 谱面资源", "浏览曲目", "分类筛选", "显示语言"],
     });
 
     expect(searchModule.metadata?.title).toBe("搜索 | ADX 谱面资源");
-    expect(searchModule.metadata?.description).toBe("按关键字、版本分支与谱面信息筛选目录。");
+    expect(searchModule.metadata?.description).toBe("在本站收录的全部 AstroDX 谱面中，按曲名、曲师、关键字、maimai DX 版本分支与谱面难度等信息快速搜索筛选，实时定位目标谱面并查看封面与定数详情，支持在线预览与下载。");
     expectLocalizedAlternates(searchModule.metadata ?? {}, "/search", {
       title: "搜索",
-      description: "按关键字、版本分支与谱面信息筛选目录。",
+      description: "在本站收录的全部 AstroDX 谱面中，按曲名、曲师、关键字、maimai DX 版本分支与谱面难度等信息快速搜索筛选，实时定位目标谱面并查看封面与定数详情，支持在线预览与下载。",
       keywords: ["AstroDX", "ADX 谱面资源", "搜索", "关键字筛选", "版本分支"],
     });
 
     expect(statusModule.metadata?.title).toBe("服务器状态 | ADX 谱面资源");
     expect(statusModule.metadata?.description).toBe(
-      "查看公开监控页中的服务器关键状态与网络指标。"
+      "实时查看本站与下载服务的运行状态，包括服务器在线情况、响应延迟、网络指标与关键健康数据，数据来自公开监控页面，便于了解 AstroDX 谱面浏览与下载服务当前是否可用。"
     );
     expectLocalizedAlternates(statusModule.metadata ?? {}, "/status", {
       title: "服务器状态",
-      description: "查看公开监控页中的服务器关键状态与网络指标。",
+      description: "实时查看本站与下载服务的运行状态，包括服务器在线情况、响应延迟、网络指标与关键健康数据，数据来自公开监控页面，便于了解 AstroDX 谱面浏览与下载服务当前是否可用。",
       keywords: ["AstroDX", "ADX 谱面资源", "服务器状态", "监控页", "网络指标"],
     });
   });
@@ -210,32 +210,32 @@ describe("route metadata", () => {
       "AstroDX chart archive for browsing, indexing, and downloads. | ADX 谱面资源"
     );
     expect(enHomeMetadata?.description).toBe(
-      "Built from remote AstroDX directory scans, with per-song metadata, chart parsing, and a unified catalog for static deployment."
+      "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM, ready to browse by version, search, preview online and download."
     );
     expectLocalizedAlternates(enHomeMetadata ?? {}, "/en", {
       title: "AstroDX chart archive for browsing, indexing, and downloads.",
       description:
-        "Built from remote AstroDX directory scans, with per-song metadata, chart parsing, and a unified catalog for static deployment.",
+        "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM, ready to browse by version, search, preview online and download.",
       keywords: ["AstroDX", "ADX 谱面资源", "chart archive", "downloads", "catalog index"],
     });
 
     expect(enChartsMetadata?.title).toBe("Browse Charts | ADX 谱面资源");
     expect(enChartsMetadata?.description).toBe(
-      "Explore AstroDX directory entries by category, branch, and display language."
+      "Browse the AstroDX chart catalog by maimai DX version, category and language — entries include cover art, difficulty levels, chart constants and BPM to preview and download."
     );
     expectLocalizedAlternates(enChartsMetadata ?? {}, "/en/charts", {
       title: "Browse Charts",
-      description: "Explore AstroDX directory entries by category, branch, and display language.",
+      description: "Browse the AstroDX chart catalog by maimai DX version, category and language — entries include cover art, difficulty levels, chart constants and BPM to preview and download.",
       keywords: ["AstroDX", "ADX 谱面资源", "browse charts", "category filter", "display language"],
     });
 
     expect(jaSearchMetadata?.title).toBe("検索 | ADX 谱面资源");
     expect(jaSearchMetadata?.description).toBe(
-      "キーワード、バージョン、譜面情報でカタログを絞り込みます。"
+      "収録済みの AstroDX 譜面全体を、曲名、アーティスト、キーワード、maimai DX バージョン分類、譜面難易度などの情報で検索・絞り込み。目的の譜面をすぐに見つけ、詳細を確認してオンラインでプレビュー・ダウンロードできます。"
     );
     expectLocalizedAlternates(jaSearchMetadata ?? {}, "/ja/search", {
       title: "検索",
-      description: "キーワード、バージョン、譜面情報でカタログを絞り込みます。",
+      description: "収録済みの AstroDX 譜面全体を、曲名、アーティスト、キーワード、maimai DX バージョン分類、譜面難易度などの情報で検索・絞り込み。目的の譜面をすぐに見つけ、詳細を確認してオンラインでプレビュー・ダウンロードできます。",
       keywords: ["AstroDX", "ADX 谱面资源", "検索", "キーワード", "譜面情報"],
     });
 
@@ -244,11 +244,11 @@ describe("route metadata", () => {
     });
     expect(enStatusMetadata?.title).toBe("Server Status | ADX 谱面资源");
     expect(enStatusMetadata?.description).toBe(
-      "View key server health and network metrics from the public monitor page."
+      "Check the live status of this site and its download service — server uptime, response latency, network metrics and key health data from the public monitor page."
     );
     expectLocalizedAlternates(enStatusMetadata ?? {}, "/en/status", {
       title: "Server Status",
-      description: "View key server health and network metrics from the public monitor page.",
+      description: "Check the live status of this site and its download service — server uptime, response latency, network metrics and key health data from the public monitor page.",
       keywords: ["AstroDX", "ADX 谱面资源", "server status", "monitor page", "network metrics"],
     });
   });

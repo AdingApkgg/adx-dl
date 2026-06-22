@@ -182,7 +182,7 @@ export function buildVersionsIndexStructuredData(
         "@id": listUrl,
         url: listUrl,
         name: versions.title,
-        description: versions.description,
+        description: dictionary.seo.versions,
         inLanguage: getStructuredDataLanguage(locale),
         isPartOf: { "@id": websiteId },
         mainEntity: (() => {
@@ -235,7 +235,7 @@ export function buildVersionDetailStructuredData(
         "@id": url,
         url,
         name: versions.detailTitle(label),
-        description: versions.detailIntro(label, entries.length),
+        description: dictionary.seo.versionDetail(label, entries.length),
         inLanguage: getStructuredDataLanguage(locale),
         isPartOf: { "@id": websiteId },
         mainEntity: {

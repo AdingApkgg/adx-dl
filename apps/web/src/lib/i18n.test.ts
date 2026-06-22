@@ -106,19 +106,21 @@ describe("i18n helpers", () => {
     expect(zhPages.home).toEqual({
       pathname: "/",
       title: "AstroDX 谱面资料站与下载入口。",
-      description: "构建时扫描远端 AstroDX 目录，提取单曲元数据、谱面信息与统一索引。",
+      description:
+        "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
       keywords: ["AstroDX", "ADX 谱面资源", "谱面资料站", "下载入口", "目录索引"],
     });
     expect(enPages.search).toEqual({
       pathname: "/search",
       title: "Search",
-      description: "Filter the catalog by keyword, branch, and display language.",
+      description:
+        "Search the entire AstroDX catalog by song title, artist, keyword, maimai DX version and chart difficulty — instantly find a chart, preview its details, and download.",
       keywords: ["AstroDX", "ADX 谱面资源", "search", "chart search", "branch filter"],
     });
     expect(jaPages.status).toEqual({
       pathname: "/status",
       title: "サーバー状態",
-      description: "公開監視ページの主要なサーバー状態とネットワーク指標を確認します。",
+      description: "本サイトとダウンロードサービスの稼働状況をリアルタイムで確認。サーバーの稼働状態、応答遅延、ネットワーク指標などの主要な健全性データを公開監視ページから取得し、AstroDX 譜面の閲覧・ダウンロードが利用可能か把握できます。",
       keywords: ["AstroDX", "ADX 谱面资源", "サーバー状態", "監視ページ", "ネットワーク指標"],
     });
   });
@@ -185,7 +187,7 @@ describe("i18n helpers", () => {
     const metadata = pageMetadata.buildLocalizedPageMetadata?.("ja", "status");
 
     expect(metadata?.title).toBe("サーバー状態 | ADX 谱面资源");
-    expect(metadata?.description).toBe("公開監視ページの主要なサーバー状態とネットワーク指標を確認します。");
+    expect(metadata?.description).toBe("本サイトとダウンロードサービスの稼働状況をリアルタイムで確認。サーバーの稼働状態、応答遅延、ネットワーク指標などの主要な健全性データを公開監視ページから取得し、AstroDX 譜面の閲覧・ダウンロードが利用可能か把握できます。");
     expect(metadata?.keywords).toEqual([
       "AstroDX",
       "ADX 谱面资源",
@@ -206,13 +208,13 @@ describe("i18n helpers", () => {
     });
     expect(metadata?.openGraph).toMatchObject({
       title: "サーバー状態 | ADX 谱面资源",
-      description: "公開監視ページの主要なサーバー状態とネットワーク指標を確認します。",
+      description: "本サイトとダウンロードサービスの稼働状況をリアルタイムで確認。サーバーの稼働状態、応答遅延、ネットワーク指標などの主要な健全性データを公開監視ページから取得し、AstroDX 譜面の閲覧・ダウンロードが利用可能か把握できます。",
       url: "https://adxdls.saop.cc/ja/status",
       siteName: "ADX 谱面资源",
     });
     expect(metadata?.twitter).toMatchObject({
       title: "サーバー状態 | ADX 谱面资源",
-      description: "公開監視ページの主要なサーバー状態とネットワーク指標を確認します。",
+      description: "本サイトとダウンロードサービスの稼働状況をリアルタイムで確認。サーバーの稼働状態、応答遅延、ネットワーク指標などの主要な健全性データを公開監視ページから取得し、AstroDX 譜面の閲覧・ダウンロードが利用可能か把握できます。",
     });
   });
 });
