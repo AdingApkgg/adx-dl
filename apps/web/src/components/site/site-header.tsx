@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { DownloadIcon, LayersIcon, LibraryBigIcon, SearchIcon, SendIcon } from "lucide-react";
+import { DownloadIcon, LayersIcon, LibraryBigIcon, SendIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { motion, springSoft } from "@/components/motion";
@@ -31,7 +31,6 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
   const homeHref = switchLocale("/", locale);
   const browseHref = switchLocale("/charts", locale);
   const versionsHref = switchLocale("/versions", locale);
-  const searchHref = switchLocale("/search", locale);
 
   return (
     <header className="sticky top-0 z-20 border-b border-border/60 bg-background/90 backdrop-blur">
@@ -81,12 +80,6 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             <Link href={versionsHref}>
               <LayersIcon data-icon="inline-start" />
               {dictionary.versions.navLabel}
-            </Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={searchHref}>
-              <SearchIcon data-icon="inline-start" />
-              {dictionary.nav.search}
             </Link>
           </Button>
         </nav>

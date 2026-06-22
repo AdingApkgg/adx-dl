@@ -148,7 +148,6 @@ describe("route metadata", () => {
   test("default zh pages expose static metadata with alternates", async () => {
     const homeModule = await import("./(default)/page");
     const chartsModule = await import("./(default)/charts/page");
-    const searchModule = await import("./(default)/search/page");
     const statusModule = await import("./(default)/status/page");
 
     expect(homeModule.metadata?.title).toBe("AstroDX 谱面资料站与下载入口。 | ADX 谱面资源");
@@ -171,14 +170,6 @@ describe("route metadata", () => {
       keywords: ["AstroDX", "ADX 谱面资源", "浏览曲目", "分类筛选", "显示语言"],
     });
 
-    expect(searchModule.metadata?.title).toBe("搜索 | ADX 谱面资源");
-    expect(searchModule.metadata?.description).toBe("在本站收录的全部 AstroDX 谱面中，按曲名、曲师、关键字、maimai DX 版本分支与谱面难度等信息快速搜索筛选，实时定位目标谱面并查看封面与定数详情，支持在线预览与下载。");
-    expectLocalizedAlternates(searchModule.metadata ?? {}, "/search", {
-      title: "搜索",
-      description: "在本站收录的全部 AstroDX 谱面中，按曲名、曲师、关键字、maimai DX 版本分支与谱面难度等信息快速搜索筛选，实时定位目标谱面并查看封面与定数详情，支持在线预览与下载。",
-      keywords: ["AstroDX", "ADX 谱面资源", "搜索", "关键字筛选", "版本分支"],
-    });
-
     expect(statusModule.metadata?.title).toBe("服务器状态 | ADX 谱面资源");
     expect(statusModule.metadata?.description).toBe(
       "实时查看本站与下载服务的运行状态，包括服务器在线情况、响应延迟、网络指标与关键健康数据，数据来自公开监控页面，便于了解 AstroDX 谱面浏览与下载服务当前是否可用。"
@@ -193,7 +184,6 @@ describe("route metadata", () => {
   test("localized en and ja pages generate locale aware metadata with alternates", async () => {
     const homeModule = await import("./[locale]/page");
     const chartsModule = await import("./[locale]/charts/page");
-    const searchModule = await import("./[locale]/search/page");
     const localizedStatusModule = await import("./[locale]/status/page");
 
     const enHomeMetadata = await homeModule.generateMetadata?.({
@@ -201,9 +191,6 @@ describe("route metadata", () => {
     });
     const enChartsMetadata = await chartsModule.generateMetadata?.({
       params: Promise.resolve({ locale: "en" }),
-    });
-    const jaSearchMetadata = await searchModule.generateMetadata?.({
-      params: Promise.resolve({ locale: "ja" }),
     });
 
     expect(enHomeMetadata?.title).toBe(
@@ -227,16 +214,6 @@ describe("route metadata", () => {
       title: "Browse Charts",
       description: "Browse the AstroDX chart catalog by maimai DX version, category and language — entries include cover art, difficulty levels, chart constants and BPM to preview and download.",
       keywords: ["AstroDX", "ADX 谱面资源", "browse charts", "category filter", "display language"],
-    });
-
-    expect(jaSearchMetadata?.title).toBe("検索 | ADX 谱面资源");
-    expect(jaSearchMetadata?.description).toBe(
-      "収録済みの AstroDX 譜面全体を、曲名、アーティスト、キーワード、maimai DX バージョン分類、譜面難易度などの情報で検索・絞り込み。目的の譜面をすぐに見つけ、詳細を確認してオンラインでプレビュー・ダウンロードできます。"
-    );
-    expectLocalizedAlternates(jaSearchMetadata ?? {}, "/ja/search", {
-      title: "検索",
-      description: "収録済みの AstroDX 譜面全体を、曲名、アーティスト、キーワード、maimai DX バージョン分類、譜面難易度などの情報で検索・絞り込み。目的の譜面をすぐに見つけ、詳細を確認してオンラインでプレビュー・ダウンロードできます。",
-      keywords: ["AstroDX", "ADX 谱面资源", "検索", "キーワード", "譜面情報"],
     });
 
     const enStatusMetadata = await localizedStatusModule.generateMetadata?.({

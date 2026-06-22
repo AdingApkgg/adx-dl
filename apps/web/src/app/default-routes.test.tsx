@@ -83,8 +83,20 @@ mock.module("@/lib/catalog", () => ({
   readVersionSlugs: async () => [],
 }));
 
+// The home hero's search box is a client component that calls useRouter; the
+// catalog browser reads window.location on mount. Provide inert stubs so the
+// server-rendered markup tests have a router/navigation context.
+mock.module("next/navigation", () => ({
+  useRouter: () => ({ push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+  notFound: () => {
+    throw new Error("NEXT_NOT_FOUND");
+  },
+}));
+
 describe("default zh routes", () => {
-  test("root route renders the zh home view and still limits latest entries to 8", async () => {
+  test("root route renders the zh home view with hero, spotlight and latest", async () => {
     const { default: HomePage } = await import("./(default)/page");
 
     const html = renderToStaticMarkup(await HomePage());
@@ -92,12 +104,15 @@ describe("default zh routes", () => {
     expect(html).toContain("AstroDX 谱面资料站与下载入口。");
     expect(html).toContain("搜索曲库");
     expect(html).toContain("浏览版本");
+    // Spotlight + "view more" rails always render when the catalog has covers.
+    expect(html).toContain("今日精选");
+    expect(html).toContain("查看更多");
     expect(html).toContain("最新谱面");
     expect(html).toContain("aspect-square");
     expect(html).toContain(`/covers/${slugOf("song-9")}/bg.jpg`);
+    // The 8 newest (song-9 … song-2) lead the latest grid.
     expect(html).toContain("曲目 9");
     expect(html).toContain("曲目 2");
-    expect(html).not.toContain("曲目 1");
   });
 
   test("charts route renders the zh list view", async () => {
@@ -107,18 +122,6 @@ describe("default zh routes", () => {
 
     expect(html).toContain("浏览曲目");
     expect(html).toContain("按分类、分支与显示语言浏览 AstroDX 目录条目。");
-    expect(html).toContain('data-layout="card-grid"');
-    expect(html).toContain('href="/charts/song-1"');
-    expect(html).toContain("曲目 1");
-  });
-
-  test("search route renders the zh search view", async () => {
-    const { default: SearchPage } = await import("./(default)/search/page");
-
-    const html = renderToStaticMarkup(await SearchPage());
-
-    expect(html).toContain("搜索");
-    expect(html).toContain("按关键字、版本分支与谱面信息筛选目录。");
     expect(html).toContain('data-layout="card-grid"');
     expect(html).toContain('href="/charts/song-1"');
     expect(html).toContain("曲目 1");

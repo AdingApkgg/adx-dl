@@ -83,9 +83,6 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
                       <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/versions", locale)}>
                         {dictionary.versions.navLabel}
                       </Link>
-                      <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/search", locale)}>
-                        {dictionary.nav.search}
-                      </Link>
                       <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/status", locale)}>
                         {dictionary.statusPage.title}
                       </Link>

@@ -69,6 +69,27 @@ export function CatalogBrowser({
   const [selectMode, setSelectMode] = React.useState(false);
   const [selectedIds, setSelectedIds] = React.useState<ReadonlySet<string>>(new Set());
 
+  // Apply a landing query/genre passed via the URL (e.g. from the home page
+  // search box and genre chips). Read once on mount via window.location — this
+  // keeps the static export free of a useSearchParams Suspense boundary.
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q");
+    const genreParam = params.get("genre");
+    // Intentional one-time sync from the URL (an external system) after mount —
+    // it can't run during render without an SSR hydration mismatch.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (q) {
+      setQuery(q);
+      setSubcategory(ALL_SUBCATEGORIES);
+    }
+    if (genreParam && GENRES[Number(genreParam)]) {
+      setGenre(genreParam);
+    }
+    setCurrentPage(1);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
   const search = React.useMemo(() => buildCatalogSearchWithMatches(entries), [entries]);
   const hasQuery = query.trim().length > 0;
   const categories = React.useMemo(() => getCategoryOptions(entries), [entries]);

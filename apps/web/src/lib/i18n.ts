@@ -14,7 +14,6 @@ export type SiteDictionary = {
   nav: {
     home: string;
     browse: string;
-    search: string;
     community: string;
     skipToContent: string;
     primaryLabel: string;
@@ -37,6 +36,11 @@ export type SiteDictionary = {
     description: string;
     searchCta: string;
     browseCta: string;
+    quickGenresLabel: string;
+    spotlightLabel: string;
+    featuredTitle: string;
+    featuredDescription: string;
+    viewMore: string;
     tagline: string;
     entriesBadge: (count: number) => string;
     metricsTotal: string;
@@ -66,11 +70,6 @@ export type SiteDictionary = {
     title: string;
     description: string;
     intro: (count: number, versions: number) => string;
-  };
-  searchPage: {
-    title: string;
-    description: string;
-    intro: (count: number) => string;
   };
   statusPage: {
     title: string;
@@ -230,7 +229,6 @@ export type SiteDictionary = {
   seo: {
     home: string;
     charts: string;
-    search: string;
     status: string;
     versions: string;
     versionDetail: (label: string, count: number) => string;
@@ -239,9 +237,9 @@ export type SiteDictionary = {
   };
 };
 
-export type StaticPageMetadataKey = "home" | "charts" | "search" | "status";
+export type StaticPageMetadataKey = "home" | "charts" | "status";
 export type StaticPageMetadataEntry = {
-  pathname: "/" | "/charts" | "/search" | "/status";
+  pathname: "/" | "/charts" | "/status";
   title: string;
   description: string;
   keywords: string[];
@@ -253,7 +251,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     nav: {
       home: "首页",
       browse: "曲库",
-      search: "搜索",
       community: "Telegram 社群",
       skipToContent: "跳到主要内容",
       primaryLabel: "主导航",
@@ -267,6 +264,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "构建时扫描远端 AstroDX 目录，提取单曲元数据、谱面信息与统一索引。",
       searchCta: "搜索曲库",
       browseCta: "浏览版本",
+      quickGenresLabel: "热门分类",
+      spotlightLabel: "今日精选",
+      featuredTitle: "随机精选",
+      featuredDescription: "随目录更新轮换的随机推荐，发现冷门好谱。",
+      viewMore: "查看更多",
       tagline: "资料与下载入口",
       entriesBadge: (count) => `${count} 条目`,
       metricsTotal: "收录谱面",
@@ -314,11 +316,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "按分类、分支与显示语言浏览 AstroDX 目录条目。",
       intro: (count, versions) =>
         `本目录共收录 ${count} 首谱面，覆盖 ${versions} 个 maimai DX 版本分支，可按分类、分支与显示语言浏览。`,
-    },
-    searchPage: {
-      title: "搜索",
-      description: "按关键字、版本分支与谱面信息筛选目录。",
-      intro: (count) => `在 ${count} 首已收录谱面中，按关键字、版本分支与谱面信息进行筛选。`,
     },
     statusPage: {
       title: "服务器状态",
@@ -470,8 +467,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       home: "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
       charts:
         "浏览本站收录的全部 AstroDX 谱面，可按 maimai DX 版本分支、谱面分类与显示语言筛选，每首曲目均提供封面、难度等级、谱面定数与 BPM 等信息，支持在线预览并下载导入 AstroDX 模拟器。",
-      search:
-        "在本站收录的全部 AstroDX 谱面中，按曲名、曲师、关键字、maimai DX 版本分支与谱面难度等信息快速搜索筛选，实时定位目标谱面并查看封面与定数详情，支持在线预览与下载。",
       status:
         "实时查看本站与下载服务的运行状态，包括服务器在线情况、响应延迟、网络指标与关键健康数据，数据来自公开监控页面，便于了解 AstroDX 谱面浏览与下载服务当前是否可用。",
       versions:
@@ -489,7 +484,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     nav: {
       home: "Home",
       browse: "Browse",
-      search: "Search",
       community: "Telegram Community",
       skipToContent: "Skip to main content",
       primaryLabel: "Primary",
@@ -504,6 +498,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "Built from remote AstroDX directory scans, with per-song metadata, chart parsing, and a unified catalog for static deployment.",
       searchCta: "Search Catalog",
       browseCta: "Browse Releases",
+      quickGenresLabel: "Popular genres",
+      spotlightLabel: "Today's pick",
+      featuredTitle: "Random picks",
+      featuredDescription: "A rotating random selection refreshed with each catalog update — discover hidden gems.",
+      viewMore: "View more",
       tagline: "Archive & Download Portal",
       entriesBadge: (count) => `${count} entries`,
       metricsTotal: "Charts",
@@ -553,11 +552,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "Explore AstroDX directory entries by category, branch, and display language.",
       intro: (count, versions) =>
         `This catalog lists ${count} charts across ${versions} maimai DX version branches. Browse by category, branch, and display language.`,
-    },
-    searchPage: {
-      title: "Search",
-      description: "Filter the catalog by keyword, branch, and display language.",
-      intro: (count) => `Search across ${count} archived charts by keyword, branch, and chart details.`,
     },
     statusPage: {
       title: "Server Status",
@@ -712,8 +706,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       home: "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM, ready to browse by version, search, preview online and download.",
       charts:
         "Browse the AstroDX chart catalog by maimai DX version, category and language — entries include cover art, difficulty levels, chart constants and BPM to preview and download.",
-      search:
-        "Search the entire AstroDX catalog by song title, artist, keyword, maimai DX version and chart difficulty — instantly find a chart, preview its details, and download.",
       status:
         "Check the live status of this site and its download service — server uptime, response latency, network metrics and key health data from the public monitor page.",
       versions:
@@ -731,7 +723,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     nav: {
       home: "ホーム",
       browse: "曲一覧",
-      search: "検索",
       community: "Telegram コミュニティ",
       skipToContent: "メインコンテンツへ移動",
       primaryLabel: "メインナビ",
@@ -746,6 +737,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "ビルド時に遠端 AstroDX ディレクトリを走査し、楽曲メタデータ、譜面解析、統合カタログを提供します。",
       searchCta: "カタログ検索",
       browseCta: "バージョン一覧",
+      quickGenresLabel: "人気ジャンル",
+      spotlightLabel: "今日のおすすめ",
+      featuredTitle: "ランダムセレクト",
+      featuredDescription: "カタログ更新ごとに入れ替わるランダムなおすすめ。隠れた名曲を見つけよう。",
+      viewMore: "もっと見る",
       tagline: "アーカイブとダウンロード入口",
       entriesBadge: (count) => `${count} 件`,
       metricsTotal: "譜面数",
@@ -793,11 +789,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "分類、バージョン、表示言語で AstroDX エントリを閲覧します。",
       intro: (count, versions) =>
         `本カタログは ${count} 曲の譜面を ${versions} 個の maimai DX バージョン分類で収録しています。分類・バージョン・表示言語で閲覧できます。`,
-    },
-    searchPage: {
-      title: "検索",
-      description: "キーワード、バージョン、譜面情報でカタログを絞り込みます。",
-      intro: (count) => `収録済みの ${count} 曲から、キーワード・バージョン・譜面情報で絞り込めます。`,
     },
     statusPage: {
       title: "サーバー状態",
@@ -951,8 +942,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       home: "maimai 系譜面を収録する非公式の AstroDX 譜面アーカイブ。楽曲メタデータ、ジャケット、難易度定数、BPM を掲載し、バージョン別の閲覧、検索、オンラインプレビュー、AstroDX シミュレーターへのダウンロードに対応しています。",
       charts:
         "収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。",
-      search:
-        "収録済みの AstroDX 譜面全体を、曲名、アーティスト、キーワード、maimai DX バージョン分類、譜面難易度などの情報で検索・絞り込み。目的の譜面をすぐに見つけ、詳細を確認してオンラインでプレビュー・ダウンロードできます。",
       status:
         "本サイトとダウンロードサービスの稼働状況をリアルタイムで確認。サーバーの稼働状態、応答遅延、ネットワーク指標などの主要な健全性データを公開監視ページから取得し、AstroDX 譜面の閲覧・ダウンロードが利用可能か把握できます。",
       versions:
@@ -1021,17 +1010,6 @@ export function getStaticPageMetadata(
           : normalizedLocale === "ja"
             ? ["AstroDX", "ADX 谱面资源", "譜面一覧", "分類フィルタ", "表示言語"]
             : ["AstroDX", "ADX 谱面资源", "浏览曲目", "分类筛选", "显示语言"],
-    },
-    search: {
-      pathname: "/search",
-      title: dictionary.searchPage.title,
-      description: dictionary.seo.search,
-      keywords:
-        normalizedLocale === "en"
-          ? ["AstroDX", "ADX 谱面资源", "search", "chart search", "branch filter"]
-          : normalizedLocale === "ja"
-            ? ["AstroDX", "ADX 谱面资源", "検索", "キーワード", "譜面情報"]
-            : ["AstroDX", "ADX 谱面资源", "搜索", "关键字筛选", "版本分支"],
     },
     status: {
       pathname: "/status",

@@ -1,11 +1,21 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
+
+// The home hero search box is a client component that calls useRouter; stub the
+// navigation hooks so the server-rendered markup tests have a router context.
+mock.module("next/navigation", () => ({
+  useRouter: () => ({ push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+  notFound: () => {
+    throw new Error("NEXT_NOT_FOUND");
+  },
+}));
 
 import {
   ChartDetailPageView,
   ChartsPageView,
   HomePageView,
-  SearchPageView,
 } from "@/components/site/page-views";
 import type { Catalog } from "@/lib/catalog-shared";
 import type { CatalogEntry } from "@/lib/catalog-shared";
@@ -180,21 +190,6 @@ describe("page views locale-driven content", () => {
     // The branded placeholder is now an accessible image with a localized label.
     expect(html).toContain('role="img"');
     expect(html).toContain("AstroDX 封面占位图");
-  });
-
-  test("search view keeps localized browser copy and localized detail links", () => {
-    const entry = buildEntry();
-
-    const enHtml = renderToStaticMarkup(<SearchPageView entries={[entry]} locale="en" />);
-    const zhHtml = renderToStaticMarkup(<SearchPageView entries={[entry]} locale="zh" />);
-
-    // The category tab bar only renders with >2 categories; with a single
-    // category the localized browser copy lives in the search placeholder.
-    expect(enHtml).toContain("Search title, alias, artist, version...");
-    expect(enHtml).toContain(`href="/en/charts/song-1"`);
-
-    expect(zhHtml).toContain("搜索曲名、别名、曲师、版本...");
-    expect(zhHtml).toContain(`href="/charts/song-1"`);
   });
 
   test("detail view renders PV and audio players when media is available", () => {

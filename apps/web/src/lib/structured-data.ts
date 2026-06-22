@@ -14,7 +14,6 @@ import {
   getDictionary,
   getStaticPageMetadata,
   type Locale,
-  type StaticPageMetadataKey,
 } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 import { resolveSiteUrl } from "@/lib/site-url";
@@ -61,7 +60,8 @@ function buildOrganization(): JsonLdValue {
 export function buildHomeStructuredData(locale: Locale): JsonLdValue {
   const pageMetadata = getStaticPageMetadata(locale).home;
   const homePath = buildLocalePath("/", locale);
-  const searchPath = buildLocalePath("/search", locale);
+  // Sitelinks-searchbox target: the catalog page hosts the in-page search box.
+  const searchPath = buildLocalePath("/charts", locale);
 
   return {
     "@context": "https://schema.org",
@@ -112,11 +112,10 @@ export function buildHomeFaqStructuredData(
 
 export function buildListingStructuredData(
   locale: Locale,
-  entries: CatalogEntry[],
-  pageKey: Extract<StaticPageMetadataKey, "charts" | "search">
+  entries: CatalogEntry[]
 ): JsonLdValue {
   const dictionary = getDictionary(locale);
-  const meta = getStaticPageMetadata(locale)[pageKey];
+  const meta = getStaticPageMetadata(locale).charts;
   const listPath = buildLocalePath(meta.pathname, locale);
   const listUrl = toAbsoluteUrl(listPath);
 

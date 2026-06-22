@@ -88,6 +88,9 @@ const notFound = mock(() => {
 
 mock.module("next/navigation", () => ({
   notFound,
+  useRouter: () => ({ push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 describe("localized routes", () => {
@@ -111,22 +114,19 @@ describe("localized routes", () => {
     expect(jaHtml).toContain("AstroDX 譜面アーカイブとダウンロード入口。");
   });
 
-  test("localized charts and search routes render shared en and ja views", async () => {
+  test("localized charts route renders shared en and ja views", async () => {
     const { default: LocalizedChartsPage, generateStaticParams: chartStaticParams } =
       await import("./[locale]/charts/page");
-    const { default: LocalizedSearchPage, generateStaticParams: searchStaticParams } =
-      await import("./[locale]/search/page");
 
     expect(await chartStaticParams()).toEqual([{ locale: "en" }, { locale: "ja" }]);
-    expect(await searchStaticParams()).toEqual([{ locale: "en" }, { locale: "ja" }]);
 
     const chartsHtml = renderToStaticMarkup(
       await LocalizedChartsPage({
         params: Promise.resolve({ locale: "en" }),
       })
     );
-    const searchHtml = renderToStaticMarkup(
-      await LocalizedSearchPage({
+    const jaChartsHtml = renderToStaticMarkup(
+      await LocalizedChartsPage({
         params: Promise.resolve({ locale: "ja" }),
       })
     );
@@ -135,10 +135,9 @@ describe("localized routes", () => {
     expect(chartsHtml).toContain('data-layout="card-grid"');
     expect(chartsHtml).toContain('href="/en/charts/song-1"');
     expect(chartsHtml).toContain("Song 1");
-    expect(searchHtml).toContain('data-layout="card-grid"');
-    expect(searchHtml).toContain('href="/ja/charts/song-1"');
-    expect(searchHtml).toContain("検索");
-    expect(searchHtml).toContain("曲目 1");
+    expect(jaChartsHtml).toContain('data-layout="card-grid"');
+    expect(jaChartsHtml).toContain('href="/ja/charts/song-1"');
+    expect(jaChartsHtml).toContain("曲目 1");
   });
 
   test("localized chart detail route renders shared localized view and generates en ja params", async () => {

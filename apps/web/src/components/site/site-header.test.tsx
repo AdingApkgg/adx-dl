@@ -16,10 +16,9 @@ describe("SiteHeader", () => {
 
     expect(html).toContain("ホーム");
     expect(html).toContain("曲一覧");
-    expect(html).toContain("検索");
     expect(html).toContain('href="/ja"');
     expect(html).toContain('href="/ja/charts"');
-    expect(html).toContain('href="/ja/search"');
+    expect(html).not.toContain('href="/ja/search"');
     // The locale + theme switchers are dropdown triggers; their menus mount on
     // open, so only the trigger buttons appear in the server-rendered markup.
     // Cross-locale discovery is handled by hreflang alternates, not these links.
@@ -37,10 +36,9 @@ describe("SiteHeader", () => {
 
     expect(html).toContain("首页");
     expect(html).toContain("曲库");
-    expect(html).toContain("搜索");
     expect(html).toContain('href="/"');
     expect(html).toContain('href="/charts"');
-    expect(html).toContain('href="/search"');
+    expect(html).not.toContain('href="/search"');
     expect(html).toContain('aria-label="语言切换"');
     expect(html).toContain('aria-label="切换主题"');
   });

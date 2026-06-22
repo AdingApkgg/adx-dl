@@ -110,12 +110,12 @@ describe("i18n helpers", () => {
         "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
       keywords: ["AstroDX", "ADX 谱面资源", "谱面资料站", "下载入口", "目录索引"],
     });
-    expect(enPages.search).toEqual({
-      pathname: "/search",
-      title: "Search",
+    expect(enPages.charts).toEqual({
+      pathname: "/charts",
+      title: "Browse Charts",
       description:
-        "Search the entire AstroDX catalog by song title, artist, keyword, maimai DX version and chart difficulty — instantly find a chart, preview its details, and download.",
-      keywords: ["AstroDX", "ADX 谱面资源", "search", "chart search", "branch filter"],
+        "Browse the AstroDX chart catalog by maimai DX version, category and language — entries include cover art, difficulty levels, chart constants and BPM to preview and download.",
+      keywords: ["AstroDX", "ADX 谱面资源", "browse charts", "category filter", "display language"],
     });
     expect(jaPages.status).toEqual({
       pathname: "/status",
@@ -156,7 +156,7 @@ describe("i18n helpers", () => {
     const pageMetadata = (await loadPageMetadataModule()) as Partial<PageMetadataModule> & {
       buildLocalizedPageMetadata?: (
         locale: "zh" | "en" | "ja",
-        page: "home" | "charts" | "search" | "status"
+        page: "home" | "charts" | "status"
       ) => {
         title?: string;
         description?: string;

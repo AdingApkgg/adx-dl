@@ -2,11 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRightIcon,
-  BoxesIcon,
   DownloadIcon,
   ExternalLinkIcon,
   LayersIcon,
-  SearchIcon,
+  SparklesIcon,
 } from "lucide-react";
 
 import { Reveal, RevealGroup, RevealItem } from "@/components/motion";
@@ -22,6 +21,7 @@ import { DifficultyPill } from "@/components/site/difficulty-pill";
 import { EntryAssetBadges } from "@/components/site/entry-asset-badges";
 import { EntryCover } from "@/components/site/entry-cover";
 import { GenreBadge } from "@/components/site/genre-badge";
+import { HomeHeroSearch } from "@/components/site/home-hero-search";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { VersionBadge } from "@/components/site/version-badge";
 import { Badge } from "@/components/ui/badge";
@@ -43,8 +43,10 @@ import {
   formatEntryArtist,
   formatEntrySubcategory,
   formatEntryTitle,
+  GENRES,
   genreLabel,
   getChartAssetFiles,
+  resolveGenreId,
   sortByReleaseDesc,
 } from "@/lib/catalog-shared";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
@@ -76,12 +78,93 @@ type CatalogPageViewProps = SharedViewProps & {
   title: string;
   description: string;
   intro: string;
-  pageKey: "charts" | "search";
 };
 
 type ChartDetailPageViewProps = SharedViewProps & {
   entry: CatalogEntry;
 };
+
+// FNV-1a hash: turn the catalog timestamp into a stable seed so the spotlight
+// and random picks stay fixed within a build but rotate when the catalog updates.
+function seedFromString(value: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+// Deterministic Fisher-Yates shuffle driven by a mulberry32 PRNG, so the same
+// seed always yields the same order (required for a stable static export).
+function seededShuffle<T>(items: readonly T[], seed: number): T[] {
+  const arr = items.slice();
+  let state = seed >>> 0;
+  const random = () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// The hero's "today's pick": a larger featured card with a big cover, sitting
+// beside the search column on wide screens.
+function HomeSpotlightCard({
+  entry,
+  locale,
+  label,
+}: {
+  entry: CatalogEntry;
+  locale: Locale;
+  label: string;
+}) {
+  const href = buildLocalePath(`/charts/${entrySlug(entry)}`, locale);
+  return (
+    <Link
+      href={href}
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-lg shadow-primary/5 backdrop-blur transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10"
+    >
+      <div className="relative aspect-square overflow-hidden border-b border-border/60">
+        <EntryCover
+          entry={entry}
+          locale={locale}
+          priority
+          sizes="(max-width: 1024px) 100vw, 360px"
+          className="h-full w-full transition-transform duration-500 group-hover:scale-105"
+        />
+        <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-background/85 px-3 py-1 text-xs font-medium text-foreground shadow-sm backdrop-blur">
+          <SparklesIcon className="size-3.5 text-primary" aria-hidden="true" />
+          {label}
+        </span>
+      </div>
+      <div className="flex flex-col gap-2 p-4">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <VersionBadge version={entry.version} label={formatEntrySubcategory(entry)} />
+          <GenreBadge entry={entry} locale={locale} />
+        </div>
+        <div className="min-w-0">
+          <h3 className="line-clamp-1 text-lg font-semibold">{formatEntryTitle(entry, locale)}</h3>
+          <p className="line-clamp-1 text-sm text-muted-foreground">
+            {formatEntryArtist(entry, locale)}
+          </p>
+        </div>
+        {entry.difficulties.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {entry.difficulties.slice(0, 5).map((difficulty) => (
+              <DifficultyPill key={`${entry.id}-${difficulty.slot}`} difficulty={difficulty} />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </Link>
+  );
+}
 
 export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
   const dictionary = getDictionary(locale);
@@ -93,7 +176,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
   ).size;
   const updatedDate = catalog.generated_at.slice(0, 10);
   const faqItems = home.faq(catalog.total_entries, versionCount);
-  const searchHref = buildLocalePath("/search", locale);
+  const searchHref = buildLocalePath("/charts", locale);
   const versionsHref = buildLocalePath("/versions", locale);
 
   // "Browse by version" teaser: newest first, only versions that have charts.
@@ -111,11 +194,37 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
 
   const countUnit = locale === "zh" ? "首" : locale === "ja" ? "曲" : "charts";
   const stats = [
-    { label: home.metricsTotal, value: `${catalog.total_entries}`, compact: false },
-    { label: home.metricsVersions, value: `${versionCount}`, compact: false },
-    { label: home.metricsArtists, value: `${artistCount}`, compact: false },
-    { label: home.metricsUpdated, value: updatedDate, compact: true },
+    { label: home.metricsTotal, value: `${catalog.total_entries}` },
+    { label: home.metricsVersions, value: `${versionCount}` },
+    { label: home.metricsArtists, value: `${artistCount}` },
+    { label: home.metricsUpdated, value: updatedDate },
   ];
+
+  // Genre quick-filter chips for the hero search: only genres present in the
+  // catalog, ordered by their stable id. Each deep-links to ?genre=.
+  const heroGenreIds = new Set<number>();
+  for (const entry of catalog.entries) {
+    const id = resolveGenreId(entry);
+    if (id !== null) heroGenreIds.add(id);
+  }
+  const heroGenres = [...heroGenreIds]
+    .sort((a, b) => a - b)
+    .map((id) => ({ id, label: GENRES[id][locale], badge: GENRES[id].badge }));
+
+  // Spotlight + "random picks" rail: a build-stable shuffle seeded by the
+  // catalog timestamp, so the selection rotates whenever the catalog updates.
+  // Prefer entries that actually have cover art for the big featured card.
+  const seed = seedFromString(catalog.generated_at);
+  const coveredEntries = catalog.entries.filter((entry) => entry.media.cover_url);
+  const shuffled = seededShuffle(
+    coveredEntries.length >= 9 ? coveredEntries : catalog.entries,
+    seed
+  );
+  const spotlight = shuffled[0] ?? null;
+  const latestIds = new Set(latestEntries.map((entry) => entry.id));
+  const featuredEntries = shuffled
+    .filter((entry) => entry.id !== spotlight?.id && !latestIds.has(entry.id))
+    .slice(0, 8);
 
   return (
     <main
@@ -133,47 +242,47 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
           <div className="absolute -top-24 -left-24 size-[420px] rounded-full bg-primary/25 blur-3xl" />
           <div className="absolute -bottom-32 right-0 size-[380px] rounded-full bg-fuchsia-500/20 blur-3xl" />
         </div>
-        <div className="flex max-w-3xl flex-col gap-5">
-          <Badge variant="secondary" className="w-fit">
-            {home.badge}
-          </Badge>
-          <h1 className="bg-gradient-to-r from-primary via-violet-500 to-fuchsia-500 bg-clip-text text-4xl leading-tight font-bold text-transparent md:text-6xl">
-            {home.title}
-          </h1>
-          <p className="max-w-2xl text-base text-muted-foreground md:text-lg">{home.description}</p>
-          <div className="flex flex-wrap gap-3">
-            <Button size="lg" asChild>
-              <Link href={searchHref}>
-                <SearchIcon data-icon="inline-start" aria-hidden="true" />
-                {home.searchCta}
-              </Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild>
-              <Link href={versionsHref}>
-                <LayersIcon data-icon="inline-start" aria-hidden="true" />
-                {home.browseCta}
-              </Link>
-            </Button>
-          </div>
-        </div>
-        <dl className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-2xl border border-border/50 bg-background/50 px-4 py-3 backdrop-blur"
-            >
-              <dt className="text-xs tracking-wide text-muted-foreground uppercase">{stat.label}</dt>
-              <dd
-                className={cn(
-                  "mt-1 font-semibold tabular-nums",
-                  stat.compact ? "text-base md:text-lg" : "text-2xl md:text-3xl"
-                )}
-              >
-                {stat.value}
-              </dd>
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="flex flex-col gap-5">
+            <Badge variant="secondary" className="w-fit">
+              {home.badge}
+            </Badge>
+            <h1 className="bg-gradient-to-r from-primary via-violet-500 to-fuchsia-500 bg-clip-text text-4xl leading-tight font-bold text-transparent md:text-5xl">
+              {home.title}
+            </h1>
+            <p className="max-w-2xl text-base text-muted-foreground md:text-lg">
+              {home.description}
+            </p>
+            <HomeHeroSearch
+              searchHref={searchHref}
+              placeholder={dictionary.catalogBrowser.searchPlaceholder}
+              submitLabel={home.searchCta}
+              quickLabel={home.quickGenresLabel}
+              genres={heroGenres}
+            />
+            <div className="mt-1 flex flex-wrap items-center gap-x-5 gap-y-3">
+              <Button variant="outline" size="sm" asChild>
+                <Link href={versionsHref}>
+                  <LayersIcon data-icon="inline-start" aria-hidden="true" />
+                  {home.browseCta}
+                </Link>
+              </Button>
+              <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                {stats.map((stat) => (
+                  <div key={stat.label} className="flex items-baseline gap-1.5">
+                    <dt>{stat.label}</dt>
+                    <dd className="font-semibold tabular-nums text-foreground">{stat.value}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
-          ))}
-        </dl>
+          </div>
+          {spotlight ? (
+            <div className="mx-auto w-full max-w-sm lg:mx-0 lg:max-w-none">
+              <HomeSpotlightCard entry={spotlight} locale={locale} label={home.spotlightLabel} />
+            </div>
+          ) : null}
+        </div>
       </section>
 
       <section className="flex flex-col gap-5">
@@ -217,11 +326,17 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
       </section>
 
       <section className="flex flex-col gap-5">
-        <Reveal className="flex items-center justify-between gap-3">
+        <Reveal className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-col gap-1">
             <h2 className="text-2xl font-semibold">{home.latestTitle}</h2>
             <p className="text-sm text-muted-foreground">{home.latestDescription}</p>
           </div>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={searchHref}>
+              {home.viewMore}
+              <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
+            </Link>
+          </Button>
         </Reveal>
         <RevealGroup className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {latestEntries.map((entry, index) => (
@@ -237,44 +352,33 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
         </RevealGroup>
       </section>
 
-      <RevealGroup className="grid gap-4 md:grid-cols-3">
-        <RevealItem className="h-full">
-          <Card size="sm" className="h-full">
-            <CardHeader>
-              <CardTitle>{home.pipelineTitle}</CardTitle>
-              <CardDescription>{home.pipelineDescription}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="secondary">
-                <BoxesIcon data-icon="inline-start" aria-hidden="true" />
-                {home.pipelineBadge}
-              </Badge>
-            </CardContent>
-          </Card>
-        </RevealItem>
-        <RevealItem className="h-full">
-          <Card size="sm" className="h-full">
-            <CardHeader>
-              <CardTitle>{home.staticTitle}</CardTitle>
-              <CardDescription>{home.staticDescription}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="secondary">{home.staticBadge}</Badge>
-            </CardContent>
-          </Card>
-        </RevealItem>
-        <RevealItem className="h-full">
-          <Card size="sm" className="h-full">
-            <CardHeader>
-              <CardTitle>{home.downloadsTitle}</CardTitle>
-              <CardDescription>{home.downloadsDescription}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="secondary">{home.downloadsBadge}</Badge>
-            </CardContent>
-          </Card>
-        </RevealItem>
-      </RevealGroup>
+      {featuredEntries.length > 0 ? (
+        <section className="flex flex-col gap-5">
+          <Reveal className="flex flex-wrap items-end justify-between gap-3">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-2xl font-semibold">{home.featuredTitle}</h2>
+              <p className="text-sm text-muted-foreground">{home.featuredDescription}</p>
+            </div>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={searchHref}>
+                {home.viewMore}
+                <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
+              </Link>
+            </Button>
+          </Reveal>
+          <RevealGroup className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+            {featuredEntries.map((entry) => (
+              <RevealItem key={entry.id} className="h-full">
+                <ChartCard
+                  entry={entry}
+                  locale={locale}
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                />
+              </RevealItem>
+            ))}
+          </RevealGroup>
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-4">
         <Reveal>
@@ -315,25 +419,6 @@ export function ChartsPageView({
       title={dictionary.charts.title}
       description={dictionary.charts.description}
       intro={dictionary.charts.intro(entries.length, versionCount)}
-      pageKey="charts"
-    />
-  );
-}
-
-export function SearchPageView({
-  entries,
-  locale = "zh",
-}: SharedViewProps & { entries: CatalogEntry[] }) {
-  const dictionary = getDictionary(locale);
-
-  return (
-    <CatalogPageView
-      entries={entries}
-      locale={locale}
-      title={dictionary.searchPage.title}
-      description={dictionary.searchPage.description}
-      intro={dictionary.searchPage.intro(entries.length)}
-      pageKey="search"
     />
   );
 }
@@ -610,14 +695,13 @@ function CatalogPageView({
   title,
   description,
   intro,
-  pageKey,
 }: CatalogPageViewProps) {
   return (
     <main
       id="main-content"
       className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
     >
-      <SeoJsonLd data={buildListingStructuredData(locale, entries, pageKey)} />
+      <SeoJsonLd data={buildListingStructuredData(locale, entries)} />
       <Reveal className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">{title}</h1>
         <p className="text-muted-foreground">{description}</p>

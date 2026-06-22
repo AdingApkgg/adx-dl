@@ -80,7 +80,7 @@ describe("structured data builders", () => {
             "@type": "SearchAction",
             target: {
               "@type": "EntryPoint",
-              urlTemplate: "https://adxdls.saop.cc/en/search?q={search_term_string}",
+              urlTemplate: "https://adxdls.saop.cc/en/charts?q={search_term_string}",
             },
             "query-input": "required name=search_term_string",
           },
@@ -108,7 +108,7 @@ describe("structured data builders", () => {
     const { buildListingStructuredData } = await import("./structured-data");
     const entry = buildEntry();
 
-    const data = buildListingStructuredData("en", [entry], "charts") as {
+    const data = buildListingStructuredData("en", [entry]) as {
       "@graph": Array<Record<string, unknown>>;
     };
 

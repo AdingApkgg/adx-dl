@@ -139,10 +139,6 @@ export function buildChartsPageMetadata(locale: Locale): Metadata {
   return buildLocalizedPageMetadata(locale, "charts");
 }
 
-export function buildSearchPageMetadata(locale: Locale): Metadata {
-  return buildLocalizedPageMetadata(locale, "search");
-}
-
 export function buildStatusPageMetadata(locale: Locale): Metadata {
   return buildLocalizedPageMetadata(locale, "status");
 }
