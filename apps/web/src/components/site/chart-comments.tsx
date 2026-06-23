@@ -31,6 +31,7 @@ type ArtalkConf = Record<string, unknown>;
 type ArtalkInstance = {
   destroy: () => void;
   setDarkMode: (value: boolean) => void;
+  reload: () => void;
 };
 type ArtalkGlobal = {
   init: (conf: ArtalkConf) => ArtalkInstance;
@@ -119,7 +120,7 @@ export function ChartComments({
         if (cancelled || !containerRef.current) {
           return;
         }
-        instanceRef.current = Artalk.init({
+        const instance = Artalk.init({
           el: containerRef.current,
           pageKey,
           pageTitle,
@@ -135,6 +136,10 @@ export function ChartComments({
             conf.locale = artalkLocale;
           },
         });
+        instanceRef.current = instance;
+        // `remoteConfModifier` suppresses Artalk's initial comment-list auto-load;
+        // trigger it explicitly or the thread renders blank (no count, no list).
+        instance.reload();
       })
       .catch(() => {
         // Network/load failure: leave the container empty rather than throwing.
