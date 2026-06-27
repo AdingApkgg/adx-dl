@@ -14,7 +14,7 @@ type RootLayoutShellProps = Readonly<{
   locale: Locale;
 }>;
 
-const COVER_HOST = "https://adx-dl.larx.cc";
+const COVER_HOST = "https://adxcs.saop.cc";
 const SOURCE_REPOSITORY = "https://github.com/AdingApkgg/adx-dl";
 const TELEGRAM_COMMUNITY = "https://t.me/FullDiveSAO";
 // Third-party services warmed early: the pageview counter (fetched on every

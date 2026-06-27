@@ -157,29 +157,29 @@ describe("adx archive", () => {
 
     const downloadPromise = downloadAdxArchiveInputs(
       [
-        { name: "bg.jpg", url: "https://adx-dl.larx.cc/39/bg.jpg" },
-        { name: "maidata.txt", url: "https://adx-dl.larx.cc/39/maidata.txt" },
-        { name: "track.mp3", url: "https://adx-dl.larx.cc/39/track.mp3" },
+        { name: "bg.jpg", url: "https://adxcs.saop.cc/39/bg.jpg" },
+        { name: "maidata.txt", url: "https://adxcs.saop.cc/39/maidata.txt" },
+        { name: "track.mp3", url: "https://adxcs.saop.cc/39/track.mp3" },
       ],
       { concurrency: 2, onProgress: (completed, total) => progress.push([completed, total]) }
     );
 
     await flushAsyncWork();
     expect(started).toEqual([
-      "https://adx-dl.larx.cc/39/bg.jpg",
-      "https://adx-dl.larx.cc/39/maidata.txt",
+      "https://adxcs.saop.cc/39/bg.jpg",
+      "https://adxcs.saop.cc/39/maidata.txt",
     ]);
 
-    pending.get("https://adx-dl.larx.cc/39/bg.jpg")?.();
+    pending.get("https://adxcs.saop.cc/39/bg.jpg")?.();
     await flushAsyncWork();
     expect(started).toEqual([
-      "https://adx-dl.larx.cc/39/bg.jpg",
-      "https://adx-dl.larx.cc/39/maidata.txt",
-      "https://adx-dl.larx.cc/39/track.mp3",
+      "https://adxcs.saop.cc/39/bg.jpg",
+      "https://adxcs.saop.cc/39/maidata.txt",
+      "https://adxcs.saop.cc/39/track.mp3",
     ]);
 
-    pending.get("https://adx-dl.larx.cc/39/maidata.txt")?.();
-    pending.get("https://adx-dl.larx.cc/39/track.mp3")?.();
+    pending.get("https://adxcs.saop.cc/39/maidata.txt")?.();
+    pending.get("https://adxcs.saop.cc/39/track.mp3")?.();
 
     const files = await downloadPromise;
 
@@ -194,7 +194,7 @@ describe("adx archive", () => {
 
   test("streams per-file byte progress and marks each file done", async () => {
     const bodies: Record<string, Uint8Array[]> = {
-      "https://adx-dl.larx.cc/39/maidata.txt": [
+      "https://adxcs.saop.cc/39/maidata.txt": [
         new Uint8Array([1, 2, 3]),
         new Uint8Array([4, 5]),
       ],
@@ -221,7 +221,7 @@ describe("adx archive", () => {
     const snapshots: AdxFileProgress[][] = [];
 
     const files = await downloadAdxArchiveInputs(
-      [{ name: "maidata.txt", url: "https://adx-dl.larx.cc/39/maidata.txt" }],
+      [{ name: "maidata.txt", url: "https://adxcs.saop.cc/39/maidata.txt" }],
       { onFileProgress: (progress) => snapshots.push(progress) }
     );
 

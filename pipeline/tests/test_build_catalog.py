@@ -269,7 +269,7 @@ class BuildCatalogTests(unittest.TestCase):
             return FakeResponse()
 
         with patch("tools.remote_catalog.urlopen", side_effect=fake_urlopen):
-            self.assertEqual(fetch_text("https://adx-dl.larx.cc/"), "ok")
+            self.assertEqual(fetch_text("https://adxcs.saop.cc/"), "ok")
 
         self.assertIsNone(calls[0])
         self.assertIsNotNone(calls[1])

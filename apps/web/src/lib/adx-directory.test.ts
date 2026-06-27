@@ -26,7 +26,7 @@ const realListingHtml = `
         <a href="javascript:updateColorScheme(&quot;default&quot;)">Default theme</a>
       </nav>
       <h1>
-        <a href="/">adx-dl.larx.cc</a>
+        <a href="/">adxcs.saop.cc</a>
         <span>39</span>
       </h1>
       <table>
@@ -54,26 +54,26 @@ const realListingHtml = `
 
 describe("adx directory probing", () => {
   test("builds a trailing-slash directory url", () => {
-    expect(buildAdxDirectoryUrl("39")).toBe("https://adx-dl.larx.cc/39/");
+    expect(buildAdxDirectoryUrl("39")).toBe("https://adxcs.saop.cc/39/");
     expect(buildAdxDirectoryUrl("[X] 人マニア")).toBe(
-      "https://adx-dl.larx.cc/%5BX%5D%20%E4%BA%BA%E3%83%9E%E3%83%8B%E3%82%A2/"
+      "https://adxcs.saop.cc/%5BX%5D%20%E4%BA%BA%E3%83%9E%E3%83%8B%E3%82%A2/"
     );
   });
 
   test("keeps only direct child files from a directory listing", () => {
-    expect(parseAdxDirectoryFiles(listingHtml, "https://adx-dl.larx.cc/39/")).toEqual([
-      { name: "bg.jpg", url: "https://adx-dl.larx.cc/39/bg.jpg" },
-      { name: "maidata.txt", url: "https://adx-dl.larx.cc/39/maidata.txt" },
-      { name: "track.mp3", url: "https://adx-dl.larx.cc/39/track.mp3" },
+    expect(parseAdxDirectoryFiles(listingHtml, "https://adxcs.saop.cc/39/")).toEqual([
+      { name: "bg.jpg", url: "https://adxcs.saop.cc/39/bg.jpg" },
+      { name: "maidata.txt", url: "https://adxcs.saop.cc/39/maidata.txt" },
+      { name: "track.mp3", url: "https://adxcs.saop.cc/39/track.mp3" },
     ]);
   });
 
   test("ignores theme and site links outside the probed directory", () => {
-    expect(parseAdxDirectoryFiles(realListingHtml, "https://adx-dl.larx.cc/39/")).toEqual([
-      { name: "bg.jpg", url: "https://adx-dl.larx.cc/39/bg.jpg" },
-      { name: "maidata.txt", url: "https://adx-dl.larx.cc/39/maidata.txt" },
-      { name: "pv.mp4", url: "https://adx-dl.larx.cc/39/pv.mp4" },
-      { name: "track.mp3", url: "https://adx-dl.larx.cc/39/track.mp3" },
+    expect(parseAdxDirectoryFiles(realListingHtml, "https://adxcs.saop.cc/39/")).toEqual([
+      { name: "bg.jpg", url: "https://adxcs.saop.cc/39/bg.jpg" },
+      { name: "maidata.txt", url: "https://adxcs.saop.cc/39/maidata.txt" },
+      { name: "pv.mp4", url: "https://adxcs.saop.cc/39/pv.mp4" },
+      { name: "track.mp3", url: "https://adxcs.saop.cc/39/track.mp3" },
     ]);
   });
 
@@ -84,7 +84,7 @@ describe("adx directory probing", () => {
     `;
 
     expect(() =>
-      parseAdxDirectoryFiles(duplicateHtml, "https://adx-dl.larx.cc/39/")
+      parseAdxDirectoryFiles(duplicateHtml, "https://adxcs.saop.cc/39/")
     ).toThrow("Duplicate file name");
   });
 
@@ -94,7 +94,7 @@ describe("adx directory probing", () => {
 
     const files = await fetchAdxDirectoryFiles("39");
 
-    expect(fetchMock).toHaveBeenCalledWith("https://adx-dl.larx.cc/39/", { cache: "no-store" });
+    expect(fetchMock).toHaveBeenCalledWith("https://adxcs.saop.cc/39/", { cache: "no-store" });
     expect(files).toHaveLength(3);
   });
 });

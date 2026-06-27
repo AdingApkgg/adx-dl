@@ -14,7 +14,7 @@ type ChartMediaPlayerProps = {
   locale: Locale;
 };
 
-// Sources are remote (adx-dl.larx.cc); we preconnect to that host in the root
+// Sources are remote (adxcs.saop.cc); we preconnect to that host in the root
 // layout. The PV ships without an audio track and the song lives in a separate
 // track.mp3 of identical length, so when both exist we render a single player
 // (<SyncedVideoAudio>) that slaves the audio to the video — playing the video

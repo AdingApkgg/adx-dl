@@ -16,8 +16,8 @@ from tools.remote_catalog import fetch_bytes as default_fetch_bytes
 from tools.remote_catalog import fetch_text as default_fetch_text
 
 # Authoritative, version-complete chart index (replaces the old flat-directory scrape).
-INDEX_URL = "https://adx-dl.larx.cc/tmp/astrodx-charts/index.json"
-MEDIA_BASE = "https://adx-dl.larx.cc/tmp/astrodx-charts/"
+INDEX_URL = "https://adxcs.saop.cc/index.json"
+MEDIA_BASE = "https://adxcs.saop.cc/"
 
 # Song aliases (别名) — community nicknames used to find a chart by an alternate
 # name, the same idea as nonebot-plugin-maimaidx's alias lookup. Both sources are
