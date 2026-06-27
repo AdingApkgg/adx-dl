@@ -1,12 +1,54 @@
 from __future__ import annotations
 
+import http.client
 import re
 import ssl
+import time
 from html import unescape
-from typing import TypedDict
-from urllib.error import URLError
+from typing import Callable, TypedDict, TypeVar
+from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urljoin, urlparse
 from urllib.request import Request, urlopen
+
+_T = TypeVar("_T")
+
+# The remote index/mirror is occasionally flaky; retry transient failures
+# (read timeouts, dropped connections, 5xx/429) with exponential backoff so a
+# single blip doesn't fail the whole catalog build. Permanent failures (404,
+# certificate verification) are not retried.
+_MAX_ATTEMPTS = 3
+_RETRY_BACKOFF = 1.5  # seconds; doubles each retry (1.5s, then 3.0s)
+_RETRYABLE_HTTP_STATUS = frozenset({408, 425, 429, 500, 502, 503, 504})
+
+
+def _is_retryable(error: Exception) -> bool:
+    if isinstance(error, HTTPError):
+        return error.code in _RETRYABLE_HTTP_STATUS
+    if isinstance(error, ssl.SSLCertVerificationError):
+        return False  # handled by the unverified-context fallback, never by retry
+    if isinstance(error, URLError):
+        return not isinstance(error.reason, ssl.SSLCertVerificationError)
+    return isinstance(
+        error,
+        (TimeoutError, ConnectionError, ssl.SSLError, http.client.HTTPException),
+    )
+
+
+def _with_retry(attempt: Callable[[], _T], url: str) -> _T:
+    for attempt_number in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            return attempt()
+        except Exception as error:
+            if attempt_number >= _MAX_ATTEMPTS or not _is_retryable(error):
+                raise
+            delay = _RETRY_BACKOFF * (2 ** (attempt_number - 1))
+            print(
+                f"[remote_catalog] {type(error).__name__} fetching {url!r}; "
+                f"retrying in {delay:.1f}s ({attempt_number}/{_MAX_ATTEMPTS - 1})",
+                flush=True,
+            )
+            time.sleep(delay)
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 class RemoteDirectory(TypedDict):
@@ -31,38 +73,48 @@ _TAG_RE = re.compile(r"<[^>]+>")
 
 
 def fetch_text(url: str) -> str:
-    request = Request(url, headers={"User-Agent": "AstroDX catalog builder"})
-    try:
-        with urlopen(request, timeout=20) as response:
-            return response.read().decode("utf-8", errors="replace")
-    except ssl.SSLCertVerificationError:
-        insecure_context = ssl._create_unverified_context()
-        with urlopen(request, context=insecure_context, timeout=20) as response:
-            return response.read().decode("utf-8", errors="replace")
-    except URLError as error:
-        if isinstance(error.reason, ssl.SSLCertVerificationError):
+    def attempt() -> str:
+        request = Request(url, headers={"User-Agent": "AstroDX catalog builder"})
+        try:
+            with urlopen(request, timeout=20) as response:
+                return response.read().decode("utf-8", errors="replace")
+        except ssl.SSLCertVerificationError:
             insecure_context = ssl._create_unverified_context()
             with urlopen(request, context=insecure_context, timeout=20) as response:
                 return response.read().decode("utf-8", errors="replace")
-        raise
+        except URLError as error:
+            if isinstance(error.reason, ssl.SSLCertVerificationError):
+                insecure_context = ssl._create_unverified_context()
+                with urlopen(request, context=insecure_context, timeout=20) as response:
+                    return response.read().decode("utf-8", errors="replace")
+            raise
+
+    return _with_retry(attempt, url)
 
 
 def fetch_bytes(url: str, timeout: int = 60) -> bytes:
-    """Download a remote file as raw bytes, with the same SSL fallback as fetch_text."""
-    request = Request(url, headers={"User-Agent": "AstroDX catalog builder"})
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            return response.read()
-    except ssl.SSLCertVerificationError:
-        insecure_context = ssl._create_unverified_context()
-        with urlopen(request, context=insecure_context, timeout=timeout) as response:
-            return response.read()
-    except URLError as error:
-        if isinstance(error.reason, ssl.SSLCertVerificationError):
+    """Download a remote file as raw bytes, with the same SSL fallback and
+    transient-failure retry as fetch_text."""
+
+    def attempt() -> bytes:
+        request = Request(url, headers={"User-Agent": "AstroDX catalog builder"})
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                return response.read()
+        except ssl.SSLCertVerificationError:
             insecure_context = ssl._create_unverified_context()
             with urlopen(request, context=insecure_context, timeout=timeout) as response:
                 return response.read()
-        raise
+        except URLError as error:
+            if isinstance(error.reason, ssl.SSLCertVerificationError):
+                insecure_context = ssl._create_unverified_context()
+                with urlopen(
+                    request, context=insecure_context, timeout=timeout
+                ) as response:
+                    return response.read()
+            raise
+
+    return _with_retry(attempt, url)
 
 
 def _clean_text(value: str) -> str:

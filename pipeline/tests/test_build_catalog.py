@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 
 from tools.build_catalog import MEDIA_BASE, _aliases_for, build_catalog, fetch_alias_map
@@ -273,6 +273,49 @@ class BuildCatalogTests(unittest.TestCase):
 
         self.assertIsNone(calls[0])
         self.assertIsNotNone(calls[1])
+
+    def test_fetch_text_retries_on_transient_timeout(self) -> None:
+        class FakeResponse:
+            def __enter__(self) -> "FakeResponse":
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return b"recovered"
+
+        attempts = {"n": 0}
+
+        def flaky_urlopen(request, context=None, timeout=0):
+            attempts["n"] += 1
+            if attempts["n"] < 3:
+                raise TimeoutError("The read operation timed out")
+            return FakeResponse()
+
+        with patch("tools.remote_catalog.time.sleep") as sleep, patch(
+            "tools.remote_catalog.urlopen", side_effect=flaky_urlopen
+        ):
+            self.assertEqual(fetch_text("https://adxcs.saop.cc/"), "recovered")
+
+        self.assertEqual(attempts["n"], 3)  # failed twice, then succeeded
+        self.assertEqual(sleep.call_count, 2)  # backed off between attempts
+
+    def test_fetch_text_does_not_retry_on_permanent_http_error(self) -> None:
+        attempts = {"n": 0}
+
+        def not_found(request, context=None, timeout=0):
+            attempts["n"] += 1
+            raise HTTPError("https://adxcs.saop.cc/", 404, "Not Found", {}, None)
+
+        with patch("tools.remote_catalog.time.sleep") as sleep, patch(
+            "tools.remote_catalog.urlopen", side_effect=not_found
+        ):
+            with self.assertRaises(HTTPError):
+                fetch_text("https://adxcs.saop.cc/")
+
+        self.assertEqual(attempts["n"], 1)  # 404 is permanent — no retry
+        sleep.assert_not_called()
 
     def test_aliases_resolve_with_dx_and_utage_offset_fallback(self) -> None:
         # Lxns keys aliases on the base maimai song id; AstroDX short_ids carry
