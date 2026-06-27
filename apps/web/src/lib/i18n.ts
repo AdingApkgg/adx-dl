@@ -174,6 +174,7 @@ export type SiteDictionary = {
     volumeLabel: string;
     muteLabel: string;
     comments: string;
+    commentsLoading: string;
   };
   assets: {
     audio: string;
@@ -419,6 +420,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       volumeLabel: "音量",
       muteLabel: "静音",
       comments: "评论",
+      commentsLoading: "评论加载中…",
     },
     assets: { audio: "音频", jacket: "封面图", pv: "PV", dxChart: "DX 谱面" },
     cover: {
@@ -656,6 +658,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       volumeLabel: "Volume",
       muteLabel: "Mute",
       comments: "Comments",
+      commentsLoading: "Loading comments…",
     },
     assets: { audio: "Audio", jacket: "Jacket", pv: "PV", dxChart: "DX Chart" },
     cover: {
@@ -893,6 +896,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       volumeLabel: "音量",
       muteLabel: "ミュート",
       comments: "コメント",
+      commentsLoading: "コメントを読み込み中…",
     },
     assets: { audio: "音源", jacket: "ジャケット", pv: "PV", dxChart: "DX 譜面" },
     cover: {

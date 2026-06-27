@@ -2,8 +2,9 @@
 
 import * as React from "react";
 
+import { CommentsSkeleton } from "@/components/site/comments-skeleton";
 import { useTheme } from "@/components/site/theme-provider";
-import type { Locale } from "@/lib/i18n";
+import { getDictionary, type Locale } from "@/lib/i18n";
 
 // Self-hosted Artalk comment backend. The UMD bundle served from `/dist` exposes
 // a `window.Artalk` global and is version-matched to this backend.
@@ -103,9 +104,21 @@ export function ChartComments({
   const instanceRef = React.useRef<ArtalkInstance | null>(null);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+  // Drives the loading skeleton: stays up until Artalk's own UI is mounted (or
+  // the load fails), so the comment area never flashes blank during the
+  // third-party script fetch.
+  const [ready, setReady] = React.useState(false);
+  const loadingLabel = getDictionary(locale).detail.commentsLoading;
 
   React.useEffect(() => {
     let cancelled = false;
+    // Re-show the skeleton when the thread is re-initialized (e.g. client-side
+    // navigation between chart pages tears down and rebuilds the instance).
+    // Intentional reset: the prior instance was just destroyed, so without this
+    // the area would sit blank through the next load instead of showing the
+    // skeleton.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setReady(false);
     const artalkLocale = ARTALK_LOCALE[locale] ?? "zh-CN";
     // Read the live theme at init so the first paint matches; the effect below
     // keeps it in sync afterwards without tearing the instance down.
@@ -140,9 +153,15 @@ export function ChartComments({
         // `remoteConfModifier` suppresses Artalk's initial comment-list auto-load;
         // trigger it explicitly or the thread renders blank (no count, no list).
         instance.reload();
+        // Artalk's editor + list shell is mounted now; drop the skeleton.
+        setReady(true);
       })
       .catch(() => {
         // Network/load failure: leave the container empty rather than throwing.
+        // Drop the skeleton too so it doesn't pulse forever.
+        if (!cancelled) {
+          setReady(true);
+        }
       });
 
     return () => {
@@ -157,5 +176,17 @@ export function ChartComments({
     instanceRef.current?.setDarkMode(isDark);
   }, [isDark]);
 
-  return <div ref={containerRef} />;
+  return (
+    <div className="relative">
+      {/* Always mounted so the ref exists when Artalk.init runs; stays empty
+          (zero height) until the widget paints into it. */}
+      <div ref={containerRef} />
+      {ready ? null : (
+        <div role="status" aria-busy="true">
+          <span className="sr-only">{loadingLabel}</span>
+          <CommentsSkeleton />
+        </div>
+      )}
+    </div>
+  );
 }

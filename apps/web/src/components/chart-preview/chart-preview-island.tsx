@@ -1,6 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
+
+import { Skeleton } from "@/components/ui/skeleton";
 import type { ChartPreviewProps } from "./chart-preview";
 
 // The player is canvas + Web Audio + localStorage only — never server-render it.
@@ -10,8 +12,8 @@ const ChartPreview = dynamic(() => import("./chart-preview").then((m) => m.Chart
   ssr: false,
   loading: () => (
     <div className="flex flex-col gap-4">
-      <div className="mx-auto aspect-square w-full max-w-[600px] animate-pulse rounded-lg bg-muted" />
-      <div className="h-9 w-full animate-pulse rounded-md bg-muted" />
+      <Skeleton className="mx-auto aspect-square w-full max-w-[600px] rounded-lg" />
+      <Skeleton className="h-9 w-full" />
     </div>
   ),
 });
