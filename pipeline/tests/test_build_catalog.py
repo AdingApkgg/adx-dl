@@ -139,6 +139,9 @@ class BuildCatalogTests(unittest.TestCase):
             seen_exts.append(src_ext)
             return b"AVIFDATA"
 
+        def fake_webp(data: bytes, src_ext: str) -> bytes:
+            return b"WEBPDATA"
+
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             media_root = root / "media"
@@ -147,14 +150,16 @@ class BuildCatalogTests(unittest.TestCase):
                 fetch_text=lambda _url: SAMPLE_INDEX,
                 fetch_bytes=lambda _url: b"PNGDATA",
                 to_avif=fake_avif,
+                to_webp=fake_webp,
                 download_media=True,
                 media_root=media_root,
             )
             catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
 
             konekto = catalog["entries"][0]  # slug "10146"
-            # Display points at the local lossless-AVIF copy (one flat file/chart)...
+            # Display points at the local AVIF (primary) + WebP (fallback) copies...
             self.assertEqual(konekto["media"]["cover_avif"], "/covers/10146.avif")
+            self.assertEqual(konekto["media"]["cover_webp"], "/covers/10146.webp")
             # ...while cover_url and files.background keep the remote original
             # (used by the .adx download and OG/social images).
             self.assertEqual(
@@ -173,6 +178,9 @@ class BuildCatalogTests(unittest.TestCase):
             saved = media_root / "10146.avif"
             self.assertTrue(saved.exists())
             self.assertEqual(saved.read_bytes(), b"AVIFDATA")
+            saved_webp = media_root / "10146.webp"
+            self.assertTrue(saved_webp.exists())
+            self.assertEqual(saved_webp.read_bytes(), b"WEBPDATA")
 
         self.assertIn(".png", seen_exts)  # the source ext is passed to the converter
 
@@ -187,19 +195,21 @@ class BuildCatalogTests(unittest.TestCase):
                 fetch_text=lambda _url: SAMPLE_INDEX,
                 fetch_bytes=boom,
                 to_avif=lambda _data, _ext: b"AVIFDATA",
+                to_webp=lambda _data, _ext: b"WEBPDATA",
                 download_media=True,
                 media_root=root / "media",
             )
             konekto = json.loads(catalog_path.read_text(encoding="utf-8"))["entries"][0]
 
-        # A failed download leaves cover_avif empty and the remote URL intact.
+        # A failed download leaves both local copies empty and the remote URL intact.
         self.assertEqual(konekto["media"]["cover_avif"], "")
+        self.assertEqual(konekto["media"]["cover_webp"], "")
         self.assertEqual(
             konekto["media"]["cover_url"],
             _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
         )
 
-    def test_keeps_remote_cover_when_avif_conversion_unavailable(self) -> None:
+    def test_keeps_remote_cover_when_conversion_unavailable(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             catalog_path = build_catalog(
@@ -207,17 +217,41 @@ class BuildCatalogTests(unittest.TestCase):
                 fetch_text=lambda _url: SAMPLE_INDEX,
                 fetch_bytes=lambda _url: b"PNGDATA",
                 to_avif=lambda _data, _ext: None,  # avifenc missing / encode failed
+                to_webp=lambda _data, _ext: None,  # cwebp missing / encode failed
                 download_media=True,
                 media_root=root / "media",
             )
             konekto = json.loads(catalog_path.read_text(encoding="utf-8"))["entries"][0]
 
-        # No AVIF written; display falls back to the remote cover.
+        # Neither local copy written; display falls back to the remote cover.
         self.assertEqual(konekto["media"]["cover_avif"], "")
+        self.assertEqual(konekto["media"]["cover_webp"], "")
         self.assertEqual(
             konekto["media"]["cover_url"],
             _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
         )
+
+    def test_uses_webp_when_only_avif_conversion_fails(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media_root = root / "media"
+            catalog_path = build_catalog(
+                root,
+                fetch_text=lambda _url: SAMPLE_INDEX,
+                fetch_bytes=lambda _url: b"PNGDATA",
+                to_avif=lambda _data, _ext: None,  # avif encode failed
+                to_webp=lambda _data, _ext: b"WEBPDATA",  # but webp succeeds
+                download_media=True,
+                media_root=media_root,
+            )
+            konekto = json.loads(catalog_path.read_text(encoding="utf-8"))["entries"][0]
+
+            # AVIF missing but WebP succeeded: display uses the local WebP tier; the
+            # two formats are converted independently from the single download.
+            self.assertEqual(konekto["media"]["cover_avif"], "")
+            self.assertEqual(konekto["media"]["cover_webp"], "/covers/10146.webp")
+            self.assertTrue((media_root / "10146.webp").exists())
+            self.assertFalse((media_root / "10146.avif").exists())
 
     def test_remote_mode_env_skips_local_mirror(self) -> None:
         def fetch_should_not_run(_url: str) -> bytes:
@@ -232,12 +266,14 @@ class BuildCatalogTests(unittest.TestCase):
                     fetch_text=lambda _url: SAMPLE_INDEX,
                     fetch_bytes=fetch_should_not_run,
                     to_avif=lambda _data, _ext: b"AVIFDATA",
+                    to_webp=lambda _data, _ext: b"WEBPDATA",
                     media_root=media_root,
                     # download_media omitted -> ASTRODX_COVERS decides
                 )
             konekto = json.loads(catalog_path.read_text(encoding="utf-8"))["entries"][0]
             # Remote mode: nothing downloaded; cover stays the remote link.
             self.assertEqual(konekto["media"]["cover_avif"], "")
+            self.assertEqual(konekto["media"]["cover_webp"], "")
             self.assertEqual(
                 konekto["media"]["cover_url"],
                 _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),

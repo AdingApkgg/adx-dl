@@ -39,10 +39,10 @@ jobs:
           python-version: "3.11"
 
       # Cover mode switch: set repo variable ASTRODX_COVERS=remote to skip the
-      # local mirror and use remote image links (default/unset = local AVIF).
-      - name: Install libavif (avifenc for lossless cover conversion)
+      # local mirror and use remote image links (default/unset = local AVIF+WebP).
+      - name: Install libavif + libwebp (avifenc/cwebp for cover conversion)
         if: vars.ASTRODX_COVERS != 'remote'
-        run: sudo apt-get update && sudo apt-get install -y libavif-bin
+        run: sudo apt-get update && sudo apt-get install -y libavif-bin webp
 
       - name: Build catalog
         working-directory: pipeline

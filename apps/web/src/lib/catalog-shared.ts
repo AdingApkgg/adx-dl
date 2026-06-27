@@ -10,8 +10,10 @@ export type CatalogEntryMedia = {
   entry_base_url: string;
   /** Remote original cover (used by the .adx download and OG/social images). */
   cover_url: string;
-  /** Local lossless-AVIF copy for on-page display; empty when unconverted. */
+  /** Local AVIF copy for on-page display (primary); empty when unconverted. */
   cover_avif?: string;
+  /** Local WebP copy — fallback for browsers without AVIF; empty when unconverted. */
+  cover_webp?: string;
   audio_url: string;
   pv_url: string;
 };

@@ -27,18 +27,25 @@ MEDIA_BASE = "https://adxcs.saop.cc/"
 LXNS_ALIAS_URL = "https://maimai.lxns.net/api/v0/maimai/alias/list"
 YUZUCHAN_ALIAS_URL = "https://www.yuzuchan.moe/api/maimaidx/maimaidxalias"
 
-# Cover images are converted to lossless AVIF and mirrored into the web app's
-# public/ during the build so the static site serves a small local copy instead
-# of hot-linking the remote host. The remote original is kept on the entry (for
-# the .adx download and OG/social images); audio and PV always stay remote.
+# Cover images are mirrored into the web app's public/ during the build so the
+# static site serves small local copies instead of hot-linking the remote host.
+# Two formats are written per cover: AVIF (primary) and WebP (compatibility
+# fallback for browsers without AVIF, e.g. Safari < 16.4), both at COVER_QUALITY.
+# The remote original is kept on the entry (for the .adx download, OG/social
+# images, and as the final <img> fallback); audio and PV always stay remote.
 LOCAL_MEDIA_ROUTE = "/covers"
 COVER_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
-# Formats avifenc can decode as input. Other source formats are left remote.
+# Raster formats avifenc / cwebp can decode as input. Others are left remote.
 AVIF_SOURCE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
+WEBP_SOURCE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
+# Lossy quality (0–100) for both mirrored formats; the same target keeps AVIF
+# (primary) and WebP (fallback) visually consistent. ~70 stays clean on jacket
+# art while keeping files small.
+COVER_QUALITY = 70
 # Build-time switch (set before a push): ASTRODX_COVERS=remote uses the remote
 # image links directly (no download/convert); any other value (default "local")
-# mirrors covers to public/covers as lossless AVIF. The web layer falls back to
-# the remote cover_url automatically when no local AVIF exists, so both modes work.
+# mirrors covers to public/covers as AVIF + WebP. The web layer falls back to the
+# remote cover_url automatically when no local copy exists, so both modes work.
 COVERS_MODE_ENV = "ASTRODX_COVERS"
 
 # Canonical maimai version names by versionid (matches the site's MAIMAI_VERSIONS).
@@ -191,8 +198,10 @@ def _build_entry(item: dict[str, Any], generated_at: str) -> dict[str, Any]:
         "media": {
             "entry_base_url": _media_url(path) + "/" if path else "",
             "cover_url": cover_url,
-            # Local lossless-AVIF copy for on-page display; set during the build.
+            # Local copies for on-page display; set during the build. AVIF is the
+            # primary tier, WebP the fallback for browsers without AVIF.
             "cover_avif": "",
+            "cover_webp": "",
             "audio_url": audio_url,
             "pv_url": pv_url,
         },
@@ -205,10 +214,11 @@ def _cover_extension(remote_url: str) -> str:
     return ext if ext in COVER_EXTENSIONS else ".png"
 
 
-def _to_avif_lossless(data: bytes, src_ext: str) -> bytes | None:
-    """Convert image bytes to lossless AVIF via avifenc. Returns None when the
-    source format can't be decoded, avifenc is missing, or the encode fails — the
-    caller then keeps the remote cover as a graceful fallback."""
+def _to_avif(data: bytes, src_ext: str) -> bytes | None:
+    """Convert image bytes to AVIF via avifenc at COVER_QUALITY (the primary
+    display tier). Returns None when the source format can't be decoded, avifenc
+    is missing, or the encode fails — the caller then keeps the remote cover as a
+    graceful fallback."""
     if src_ext not in AVIF_SOURCE_EXTENSIONS:
         return None
     with tempfile.TemporaryDirectory() as tmp:
@@ -217,7 +227,7 @@ def _to_avif_lossless(data: bytes, src_ext: str) -> bytes | None:
         src.write_bytes(data)
         try:
             subprocess.run(
-                ["avifenc", "--lossless", str(src), str(dst)],
+                ["avifenc", "-q", str(COVER_QUALITY), str(src), str(dst)],
                 check=True,
                 capture_output=True,
                 timeout=180,
@@ -228,42 +238,81 @@ def _to_avif_lossless(data: bytes, src_ext: str) -> bytes | None:
         return dst.read_bytes()
 
 
+def _to_webp(data: bytes, src_ext: str) -> bytes | None:
+    """Convert image bytes to WebP via cwebp at COVER_QUALITY. WebP is the
+    compatibility fallback tier (browsers without AVIF, e.g. Safari < 16.4).
+    Returns None when the source can't be decoded, cwebp is missing, or the
+    encode fails — the caller then keeps the remote cover as a fallback."""
+    if src_ext not in WEBP_SOURCE_EXTENSIONS:
+        return None
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / f"in{src_ext}"
+        dst = Path(tmp) / "out.webp"
+        src.write_bytes(data)
+        try:
+            subprocess.run(
+                ["cwebp", "-quiet", "-q", str(COVER_QUALITY), str(src), "-o", str(dst)],
+                check=True,
+                capture_output=True,
+                timeout=180,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            print(f"[catalog] cwebp failed ({src_ext}): {error}", file=sys.stderr)
+            return None
+        return dst.read_bytes()
+
+
 def _download_cover(
     entry: dict[str, Any],
     media_root: Path,
     fetch_bytes: Callable[[str], bytes],
     to_avif: Callable[[bytes, str], bytes | None],
-) -> bool:
-    """Mirror one entry's cover as a lossless AVIF at media_root/<slug>.avif and
-    point media.cover_avif at it (for on-page display). cover_url and
-    files.background keep the remote original, so the .adx download and OG/social
-    images still pull the unconverted file. Returns True when the local AVIF is in
-    place; any failure leaves cover_avif empty and the remote cover untouched."""
+    to_webp: Callable[[bytes, str], bytes | None],
+) -> tuple[bool, bool]:
+    """Mirror one entry's cover into media_root as AVIF (<slug>.avif) and WebP
+    (<slug>.webp), pointing media.cover_avif/cover_webp at them for on-page
+    display. The remote original is downloaded once and
+    encoded to both formats. cover_url and files.background keep the remote
+    original (used by the .adx download, OG/social images, and as the final
+    <img> fallback). Returns (avif_ok, webp_ok); either failing just leaves its
+    field empty so display falls back to the next tier."""
     remote_url = entry["media"]["cover_url"]
     if not remote_url or remote_url.startswith("/"):
-        return False  # no cover, or already local
+        return (False, False)  # no cover, or already local
 
     slug = entry["slug"]
     src_ext = _cover_extension(remote_url)
-    target_file = media_root / f"{slug}.avif"
-    local_url = f"{LOCAL_MEDIA_ROUTE}/{slug}.avif"
+    avif_file = media_root / f"{slug}.avif"
+    webp_file = media_root / f"{slug}.webp"
+    avif_ok = avif_file.exists()
+    webp_ok = webp_file.exists()
 
-    if not target_file.exists():
+    # Download the remote original once if either local copy is still missing.
+    if not avif_ok or not webp_ok:
         try:
             data = fetch_bytes(remote_url)
         except Exception as error:  # noqa: BLE001 - one bad cover shouldn't fail the build
             print(f"[catalog] cover download failed for {slug}: {error}", file=sys.stderr)
-            return False
+            return (avif_ok, webp_ok)
         if not data:
-            return False
-        avif = to_avif(data, src_ext)
-        if not avif:
-            return False  # unconvertible source or encode failure; keep remote cover
-        target_file.parent.mkdir(parents=True, exist_ok=True)
-        target_file.write_bytes(avif)
+            return (avif_ok, webp_ok)
 
-    entry["media"]["cover_avif"] = local_url
-    return True
+        if not avif_ok:
+            avif = to_avif(data, src_ext)
+            if avif:
+                avif_file.write_bytes(avif)
+                avif_ok = True
+        if not webp_ok:
+            webp = to_webp(data, src_ext)
+            if webp:
+                webp_file.write_bytes(webp)
+                webp_ok = True
+
+    if avif_ok:
+        entry["media"]["cover_avif"] = f"{LOCAL_MEDIA_ROUTE}/{slug}.avif"
+    if webp_ok:
+        entry["media"]["cover_webp"] = f"{LOCAL_MEDIA_ROUTE}/{slug}.webp"
+    return (avif_ok, webp_ok)
 
 
 def _download_covers(
@@ -271,14 +320,22 @@ def _download_covers(
     media_root: Path,
     fetch_bytes: Callable[[str], bytes],
     to_avif: Callable[[bytes, str], bytes | None],
+    to_webp: Callable[[bytes, str], bytes | None],
     max_workers: int,
-) -> int:
+) -> tuple[int, int]:
     media_root.mkdir(parents=True, exist_ok=True)
     with ThreadPoolExecutor(max_workers=max(1, max_workers)) as pool:
-        results = pool.map(
-            lambda entry: _download_cover(entry, media_root, fetch_bytes, to_avif), entries
+        results = list(
+            pool.map(
+                lambda entry: _download_cover(
+                    entry, media_root, fetch_bytes, to_avif, to_webp
+                ),
+                entries,
+            )
         )
-        return sum(1 for ok in results if ok)
+    avif = sum(1 for avif_ok, _ in results if avif_ok)
+    webp = sum(1 for _, webp_ok in results if webp_ok)
+    return (avif, webp)
 
 
 def _mirror_covers_enabled(explicit: bool | None) -> bool:
@@ -415,7 +472,8 @@ def build_catalog(
     root: Path,
     fetch_text: Callable[[str], str] = default_fetch_text,
     fetch_bytes: Callable[[str], bytes] | None = default_fetch_bytes,
-    to_avif: Callable[[bytes, str], bytes | None] = _to_avif_lossless,
+    to_avif: Callable[[bytes, str], bytes | None] = _to_avif,
+    to_webp: Callable[[bytes, str], bytes | None] = _to_webp,
     download_media: bool | None = None,
     media_root: Path | None = None,
     max_workers: int = 8,
@@ -433,12 +491,18 @@ def build_catalog(
 
     # Cover handling is switchable before a push via ASTRODX_COVERS (or the
     # download_media arg): "remote" leaves cover_url pointing at the remote host;
-    # otherwise covers are mirrored to public/covers as lossless AVIF and exposed
-    # via media.cover_avif (cover_url stays remote for the .adx download and OG).
+    # otherwise covers are mirrored to public/covers as AVIF + WebP and exposed
+    # via media.cover_avif/cover_webp (cover_url stays remote for the .adx
+    # download, OG images, and as the final <img> fallback).
     if _mirror_covers_enabled(download_media) and fetch_bytes is not None:
         target = media_root or (root / "apps" / "web" / "public" / "covers")
-        saved = _download_covers(entries, target, fetch_bytes, to_avif, max_workers)
-        print(f"[catalog] mirrored {saved}/{len(entries)} cover images (AVIF) to {target}")
+        avif_n, webp_n = _download_covers(
+            entries, target, fetch_bytes, to_avif, to_webp, max_workers
+        )
+        print(
+            f"[catalog] mirrored covers to {target}: "
+            f"{avif_n}/{len(entries)} AVIF, {webp_n}/{len(entries)} WebP"
+        )
     else:
         print("[catalog] covers: using remote image links (no local mirror)")
 

@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 import {
   formatEntrySubcategory,
   formatEntryTitle,
@@ -26,24 +24,31 @@ export function EntryCover({
 }: EntryCoverProps) {
   const title = formatEntryTitle(entry, locale);
   const cover = getDictionary(locale).cover;
-  // Prefer the small local AVIF; fall back to the remote original when a chart
-  // has no converted copy.
-  const coverSrc = entry.media.cover_avif || entry.media.cover_url;
+  // Ordered format fallback via <picture>: local AVIF (smallest) → local WebP
+  // (for browsers without AVIF) → the remote original as the final <img> src.
+  // The <img> fill styling mirrors what next/image fill emitted (the site is a
+  // static export, so Image was unoptimized and bought us nothing over <picture>).
+  const avif = entry.media.cover_avif;
+  const webp = entry.media.cover_webp;
+  const original = entry.media.cover_url;
+  const imgSrc = original || avif || webp;
 
-  if (coverSrc) {
+  if (imgSrc) {
     return (
       <div className={cn("relative overflow-hidden rounded-xl", className)}>
-        <Image
-          src={coverSrc}
-          alt={cover.alt(title)}
-          fill
-          unoptimized
-          sizes={sizes}
-          className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-          loading={priority ? "eager" : "lazy"}
-          fetchPriority={priority ? "high" : "auto"}
-          decoding="async"
-        />
+        <picture>
+          {avif ? <source srcSet={avif} type="image/avif" /> : null}
+          {webp ? <source srcSet={webp} type="image/webp" /> : null}
+          <img
+            src={imgSrc}
+            alt={cover.alt(title)}
+            sizes={sizes}
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
+            decoding="async"
+          />
+        </picture>
       </div>
     );
   }
