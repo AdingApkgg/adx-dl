@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 import { MotionProvider } from "@/components/motion";
+import { DownloadDock } from "@/components/site/downloads/download-dock";
 import { PageViewsProvider, SitePageViews } from "@/components/site/page-view-counter";
+import { ServiceWorkerRegistrar } from "@/components/site/service-worker-registrar";
 import { SiteHeader } from "@/components/site/site-header";
 import { SWRProvider } from "@/components/site/swr-provider";
 import { ThemeProvider } from "@/components/site/theme-provider";
@@ -56,6 +58,7 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
         <link rel="dns-prefetch" href={COMMENT_HOST} />
         <script dangerouslySetInnerHTML={{ __html: noFlashThemeScript }} />
         <script type="speculationrules" dangerouslySetInnerHTML={{ __html: speculationRules }} />
+        <ServiceWorkerRegistrar />
         <a
           href="#main-content"
           className="sr-only rounded-md bg-primary px-4 py-2 text-primary-foreground focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50"
@@ -120,6 +123,9 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
                   </div>
                 </footer>
               </div>
+              {/* Lives above the page subtree so an in-flight download keeps
+                  rendering progress after a client-side navigation. */}
+              <DownloadDock locale={locale} />
             </PageViewsProvider>
             </SWRProvider>
           </TooltipProvider>

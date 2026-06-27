@@ -1,0 +1,10 @@
+{
+  "//": "Editor/typecheck config for the service worker. It runs in a WebWorker (not DOM) scope, and is excluded from the main tsconfig so `next build` doesn't typecheck it against the DOM lib. The actual bundle is produced by `serwist build` (esbuild), which does not typecheck.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["esnext", "webworker"],
+    "types": []
+  },
+  "include": ["src/sw.ts"],
+  "exclude": []
+}

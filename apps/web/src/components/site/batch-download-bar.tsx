@@ -14,17 +14,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  BATCH_FORMATS,
-  buildNestedArchiveBlob,
-  downloadAdxArchiveInputs,
-  getArchiveDownloadFileName,
-  saveBlobAsFile,
-  type AdxArchiveInput,
-  type BatchArchiveFormat,
-} from "@/lib/adx-archive";
-import { isChartVideoFile, type ChartDownloadSpec } from "@/lib/catalog-shared";
+import { BATCH_FORMATS, type BatchArchiveFormat } from "@/lib/adx-archive";
+import { type ChartDownloadSpec } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { batchJobId, useDownloadsStore } from "./downloads/downloads-store";
 
 type BatchDownloadBarProps = {
   /** The selected charts to pack, one folder per chart. */
@@ -35,8 +28,6 @@ type BatchDownloadBarProps = {
   onClear: () => void;
 };
 
-type DownloadStatus = "idle" | "packing" | "success" | "error";
-
 export function BatchDownloadBar({
   charts,
   collectionName,
@@ -46,69 +37,38 @@ export function BatchDownloadBar({
   const dictionary = getDictionary(locale);
   const detail = dictionary.detail;
   const browser = dictionary.catalogBrowser;
-  const [status, setStatus] = React.useState<DownloadStatus>("idle");
-  const [progress, setProgress] = React.useState({ completed: 0, total: 0 });
-  const [errorMessage, setErrorMessage] = React.useState("");
   const [includeVideo, setIncludeVideo] = React.useState(true);
 
+  // The pack+download runs in a module-level store so it keeps going after the
+  // user navigates away from this page; we read the job back to drive the bar.
+  const jobId = batchJobId(collectionName);
+  const job = useDownloadsStore((state) => state.jobs.find((entry) => entry.id === jobId));
+  const startBatch = useDownloadsStore((state) => state.startBatch);
+  const presentInline = useDownloadsStore((state) => state.presentInline);
+  const unpresentInline = useDownloadsStore((state) => state.unpresentInline);
+
   const count = charts.length;
+  const status = job?.status ?? "idle";
   const isBusy = status === "packing";
+  const progress = { completed: job?.completed ?? 0, total: job?.total ?? 0 };
+  const errorMessage = job?.error ?? "";
   const canDownload = count > 0 && !isBusy;
 
-  async function handleSelect(format: BatchArchiveFormat) {
+  // Hide this job from the floating tray while the bar itself is on screen.
+  const hasJob = job != null;
+  React.useEffect(() => {
+    if (!hasJob) {
+      return;
+    }
+    presentInline(jobId);
+    return () => unpresentInline(jobId);
+  }, [hasJob, jobId, presentInline, unpresentInline]);
+
+  function handleSelect(format: BatchArchiveFormat) {
     if (!canDownload) {
       return;
     }
-
-    // Download flat (one fetch per file), tagging each by chart index so results can be
-    // regrouped — an opaque numeric prefix avoids any clash with chart names containing "/".
-    const dirByIndex: string[] = [];
-    const files: { name: string; url: string }[] = [];
-    charts.forEach((chart, index) => {
-      dirByIndex[index] = chart.dir;
-      for (const file of chart.files) {
-        if (includeVideo || !isChartVideoFile(file.name)) {
-          files.push({ name: `${index}/${file.name}`, url: file.url });
-        }
-      }
-    });
-
-    if (files.length === 0) {
-      return;
-    }
-
-    try {
-      setErrorMessage("");
-      setProgress({ completed: 0, total: files.length });
-      setStatus("packing");
-
-      const archiveInputs = await downloadAdxArchiveInputs(files, {
-        concurrency: 6,
-        onProgress: (completed, total) => setProgress({ completed, total }),
-      });
-
-      // Regroup downloaded files by chart, then pack one `.adx` per chart.
-      const grouped = new Map<number, AdxArchiveInput[]>();
-      for (const input of archiveInputs) {
-        const slash = input.name.indexOf("/");
-        const index = Number(input.name.slice(0, slash));
-        const baseName = input.name.slice(slash + 1);
-        const bucket = grouped.get(index) ?? [];
-        bucket.push({ name: baseName, bytes: input.bytes });
-        grouped.set(index, bucket);
-      }
-      const nestedCharts = [...grouped.entries()]
-        .sort(([a], [b]) => a - b)
-        .map(([index, chartFiles]) => ({ name: dirByIndex[index], files: chartFiles }));
-
-      const archiveBlob = await buildNestedArchiveBlob(nestedCharts, format);
-
-      saveBlobAsFile(archiveBlob, getArchiveDownloadFileName(collectionName, format));
-      setStatus("success");
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unknown error");
-      setStatus("error");
-    }
+    startBatch({ id: jobId, title: collectionName, charts, includeVideo, format });
   }
 
   const percent =

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDownIcon, DownloadIcon } from "lucide-react";
+import { ChevronDownIcon, DownloadIcon, RotateCwIcon, XIcon } from "lucide-react";
 
 import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
 import { Button } from "@/components/ui/button";
@@ -14,18 +14,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  ARCHIVE_FORMATS,
-  buildArchiveBlob,
-  downloadAdxArchiveInputs,
-  getArchiveDownloadFileName,
-  saveBlobAsFile,
-  type AdxFileProgress,
-  type ArchiveFormat,
-} from "@/lib/adx-archive";
+import { ARCHIVE_FORMATS, type ArchiveFormat } from "@/lib/adx-archive";
 import type { AdxRemoteFile } from "@/lib/adx-directory";
 import { isChartVideoFile } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { singleJobId, useDownloadsStore } from "./downloads/downloads-store";
 
 type AdxDownloadButtonProps = {
   /** Files to pack into the .adx (maidata + assets), with their in-archive names. */
@@ -34,8 +27,6 @@ type AdxDownloadButtonProps = {
   fileName?: string;
   locale: Locale;
 };
-
-type DownloadStatus = "idle" | "packing" | "success" | "error";
 
 /** Compact human-readable size, used when the server doesn't report Content-Length. */
 function formatBytes(bytes: number): string {
@@ -51,76 +42,55 @@ function formatBytes(bytes: number): string {
 }
 
 export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButtonProps) {
-  const detailDictionary = getDictionary(locale).detail;
-  const [status, setStatus] = React.useState<DownloadStatus>("idle");
-  const [progress, setProgress] = React.useState({ completed: 0, total: 0 });
-  const [fileProgress, setFileProgress] = React.useState<AdxFileProgress[]>([]);
-  const [errorMessage, setErrorMessage] = React.useState("");
+  const dictionary = getDictionary(locale);
+  const detailDictionary = dictionary.detail;
+  const downloadsDictionary = dictionary.downloads;
   const [includeVideo, setIncludeVideo] = React.useState(true);
   const normalizedFileName = typeof fileName === "string" ? fileName.trim() : "";
   const canDownload = files.length > 0 && normalizedFileName.length > 0;
+
+  // The download runs in a module-level store, so it (and this state) survives a
+  // client-side navigation away from the chart page. We read the job back here to
+  // keep rendering the same inline progress while the user stays on the page.
+  const jobId = singleJobId(normalizedFileName);
+  const job = useDownloadsStore((state) => state.jobs.find((entry) => entry.id === jobId));
+  const startSingle = useDownloadsStore((state) => state.startSingle);
+  const resume = useDownloadsStore((state) => state.resume);
+  const dismiss = useDownloadsStore((state) => state.dismiss);
+
+  const status = job?.status ?? "idle";
   const isBusy = status === "packing";
+  // After a full reload an interrupted job comes back as `paused`; an in-session
+  // failure is `error`. Both keep their partial bytes and can resume from offset.
+  const isResumable = status === "paused" || status === "error";
+  const progress = { completed: job?.completed ?? 0, total: job?.total ?? 0 };
+  const fileProgress = job?.fileProgress ?? [];
+  const errorMessage = job?.error ?? "";
+  const resumePercent =
+    job && job.totalBytes > 0
+      ? Math.min(100, Math.round((job.receivedBytes / job.totalBytes) * 100))
+      : 0;
 
   const hasVideo = files.some((file) => isChartVideoFile(file.name));
-  // The BGA movie is usually the heaviest asset; let users skip it to shrink the archive.
-  const selectedFiles =
-    hasVideo && !includeVideo ? files.filter((file) => !isChartVideoFile(file.name)) : files;
 
-  // Byte-level progress fires many times per file; coalesce to one render per frame.
-  const pendingFileProgress = React.useRef<AdxFileProgress[] | null>(null);
-  const rafId = React.useRef<number | null>(null);
-
-  React.useEffect(
-    () => () => {
-      if (rafId.current !== null) {
-        cancelAnimationFrame(rafId.current);
-      }
-    },
-    []
-  );
-
-  function scheduleFileProgress(next: AdxFileProgress[]) {
-    pendingFileProgress.current = next;
-    if (rafId.current !== null) {
+  // While this job is shown inline, claim it so the floating tray doesn't also
+  // render it; once we unmount (navigation) the tray takes over its progress.
+  const hasJob = job != null;
+  const presentInline = useDownloadsStore((state) => state.presentInline);
+  const unpresentInline = useDownloadsStore((state) => state.unpresentInline);
+  React.useEffect(() => {
+    if (!hasJob) {
       return;
     }
-    rafId.current = requestAnimationFrame(() => {
-      rafId.current = null;
-      if (pendingFileProgress.current) {
-        setFileProgress(pendingFileProgress.current);
-      }
-    });
-  }
+    presentInline(jobId);
+    return () => unpresentInline(jobId);
+  }, [hasJob, jobId, presentInline, unpresentInline]);
 
-  async function handleSelect(format: ArchiveFormat) {
+  function handleSelect(format: ArchiveFormat) {
     if (!canDownload || isBusy) {
       return;
     }
-
-    try {
-      setErrorMessage("");
-      setProgress({ completed: 0, total: selectedFiles.length });
-      setFileProgress(selectedFiles.map((file) => ({
-        name: file.name,
-        received: 0,
-        total: null,
-        status: "pending",
-      })));
-      setStatus("packing");
-
-      const archiveInputs = await downloadAdxArchiveInputs(selectedFiles, {
-        concurrency: 4,
-        onProgress: (completed, total) => setProgress({ completed, total }),
-        onFileProgress: scheduleFileProgress,
-      });
-      const archiveBlob = await buildArchiveBlob(archiveInputs, format);
-
-      saveBlobAsFile(archiveBlob, getArchiveDownloadFileName(normalizedFileName, format));
-      setStatus("success");
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unknown error");
-      setStatus("error");
-    }
+    startSingle({ id: jobId, title: normalizedFileName, files, includeVideo, format });
   }
 
   const label =
@@ -132,7 +102,25 @@ export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButton
 
   return (
     <div className="flex flex-col gap-2">
-      <DropdownMenu>
+      {isResumable ? (
+        <div className="flex items-center gap-2">
+          <Button type="button" onClick={() => resume(jobId)}>
+            <RotateCwIcon data-icon="inline-start" />
+            {downloadsDictionary.resume}
+            {resumePercent > 0 ? ` · ${resumePercent}%` : null}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={downloadsDictionary.cancel}
+            onClick={() => dismiss(jobId)}
+          >
+            <XIcon />
+          </Button>
+        </div>
+      ) : (
+        <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button type="button" disabled={!canDownload || isBusy}>
             <motion.span
@@ -182,6 +170,7 @@ export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButton
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
+      )}
       <AnimatePresence>
         {isBusy && fileProgress.length > 0 ? (
           <motion.ul

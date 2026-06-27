@@ -176,6 +176,14 @@ export type SiteDictionary = {
     comments: string;
     commentsLoading: string;
   };
+  /** Floating tray that keeps download progress visible after navigating between pages. */
+  downloads: {
+    trayTitle: string;
+    dismiss: string;
+    resume: string;
+    cancel: string;
+    paused: string;
+  };
   assets: {
     audio: string;
     jacket: string;
@@ -422,6 +430,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       comments: "评论",
       commentsLoading: "评论加载中…",
     },
+    downloads: {
+      trayTitle: "下载",
+      dismiss: "关闭",
+      resume: "继续",
+      cancel: "取消",
+      paused: "已暂停",
+    },
     assets: { audio: "音频", jacket: "封面图", pv: "PV", dxChart: "DX 谱面" },
     cover: {
       alt: (title) => `${title} 封面`,
@@ -660,6 +675,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       comments: "Comments",
       commentsLoading: "Loading comments…",
     },
+    downloads: {
+      trayTitle: "Downloads",
+      dismiss: "Dismiss",
+      resume: "Resume",
+      cancel: "Cancel",
+      paused: "Paused",
+    },
     assets: { audio: "Audio", jacket: "Jacket", pv: "PV", dxChart: "DX Chart" },
     cover: {
       alt: (title) => `${title} cover`,
@@ -897,6 +919,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       muteLabel: "ミュート",
       comments: "コメント",
       commentsLoading: "コメントを読み込み中…",
+    },
+    downloads: {
+      trayTitle: "ダウンロード",
+      dismiss: "閉じる",
+      resume: "再開",
+      cancel: "キャンセル",
+      paused: "一時停止",
     },
     assets: { audio: "音源", jacket: "ジャケット", pv: "PV", dxChart: "DX 譜面" },
     cover: {

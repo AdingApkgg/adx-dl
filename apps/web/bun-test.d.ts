@@ -83,4 +83,10 @@ declare module "bun:test" {
   export const test: (name: string, fn: () => void | Promise<void>) => void;
   export const expect: BunExpect;
   export const mock: BunMock;
+
+  type LifecycleHook = (fn: () => void | Promise<void>) => void;
+  export const beforeEach: LifecycleHook;
+  export const afterEach: LifecycleHook;
+  export const beforeAll: LifecycleHook;
+  export const afterAll: LifecycleHook;
 }
