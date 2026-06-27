@@ -6,12 +6,23 @@ on:
       - main
   workflow_dispatch:
 
+# Artifact-based GitHub Pages deploy (no gh-pages branch).
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; let an in-progress run finish.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout
@@ -46,13 +57,17 @@ jobs:
         working-directory: apps/web
         run: bun run build
 
-      - name: Publish to gh-pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./apps/web/out
-          publish_branch: gh-pages
-          force_orphan: true
+          path: ./apps/web/out
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
 
       - name: Submit IndexNow
         continue-on-error: true

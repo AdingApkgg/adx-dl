@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && node scripts/prune-rsc-payloads.mjs",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "bun test",
