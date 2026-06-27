@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import useSWR from "swr";
 import {
   getAvailableDifficulties,
   type ChartDifficulty,
   type Note,
 } from "@lxns-network/maimai-chart-engine";
 import { cn } from "@/lib/utils";
+import { textFetcher } from "@/lib/swr-fetcher";
 import type { Locale } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { ChartCanvas } from "./chart-canvas";
@@ -102,45 +104,45 @@ export function ChartPreview({
   const exportRange = useExportRange(totalMs);
   const gifRangeMode = exportRange.range !== null;
 
-  // Load + parse the chart on mount / when the source changes.
+  // The raw simai text is immutable and cached by URL, so revisiting a chart (or
+  // remounting the player) reuses the cache with no refetch. One shot per source
+  // like the original: a missing maidata won't self-heal, so no retry/revalidate
+  // storm against the (cross-origin) chart host.
+  const { data: simai } = useSWR(maidataUrl, textFetcher, {
+    revalidateIfStale: false,
+    shouldRetryOnError: false,
+    onError: (error) => console.error("Failed to load chart:", error),
+  });
+
+  // Source lifecycle: point the player at the audio and clear the store between
+  // charts. reset() runs on unmount or when the source changes.
   useEffect(() => {
-    let cancelled = false;
-    const { setMusicUrl, setRawSimaiText, setAvailableDifficulties, reset } =
-      useGameStore.getState();
-
+    const { setMusicUrl, reset } = useGameStore.getState();
     if (audioUrl) setMusicUrl(audioUrl);
+    return () => reset();
+  }, [maidataUrl, audioUrl]);
 
-    (async () => {
-      try {
-        const response = await fetch(maidataUrl);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const simai = await response.text();
-        if (cancelled) return;
+  // Parse + pick a difficulty once the chart text is available (re-applies when
+  // the requested difficulty changes, without refetching the cached text).
+  useEffect(() => {
+    if (simai === undefined) return;
+    const { setRawSimaiText, setAvailableDifficulties } = useGameStore.getState();
 
-        setRawSimaiText(simai);
-        const available = getAvailableDifficulties(simai);
-        setAvailableDifficulties(available);
+    setRawSimaiText(simai);
+    const available = getAvailableDifficulties(simai);
+    setAvailableDifficulties(available);
 
-        const preferred = defaultDifficulty as ChartDifficulty | undefined;
-        let diff: ChartDifficulty | null = preferred && available[preferred] ? preferred : null;
-        if (!diff) {
-          const highest = (Object.keys(available) as unknown as string[])
-            .map(Number)
-            .filter((d) => available[d as ChartDifficulty])
-            .sort((a, b) => b - a)[0];
-          diff = (highest as ChartDifficulty) ?? null;
-        }
-        if (diff) applyDifficulty(diff);
-      } catch (error) {
-        console.error("Failed to load chart:", error);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      reset();
-    };
-  }, [maidataUrl, audioUrl, defaultDifficulty]);
+    const preferred = defaultDifficulty as ChartDifficulty | undefined;
+    let diff: ChartDifficulty | null = preferred && available[preferred] ? preferred : null;
+    if (!diff) {
+      const highest = (Object.keys(available) as unknown as string[])
+        .map(Number)
+        .filter((d) => available[d as ChartDifficulty])
+        .sort((a, b) => b - a)[0];
+      diff = (highest as ChartDifficulty) ?? null;
+    }
+    if (diff) applyDifficulty(diff);
+  }, [simai, defaultDifficulty]);
 
   // Transient toast driven by the canvas's notify events (export/copy results).
   useEffect(() => {

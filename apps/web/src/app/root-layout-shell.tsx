@@ -3,6 +3,7 @@ import Link from "next/link";
 import { MotionProvider } from "@/components/motion";
 import { PageViewsProvider, SitePageViews } from "@/components/site/page-view-counter";
 import { SiteHeader } from "@/components/site/site-header";
+import { SWRProvider } from "@/components/site/swr-provider";
 import { ThemeProvider } from "@/components/site/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { readCatalog } from "@/lib/catalog";
@@ -64,6 +65,7 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
         <ThemeProvider>
           <MotionProvider>
           <TooltipProvider>
+            <SWRProvider>
             <PageViewsProvider>
               <div className="flex min-h-screen flex-col bg-[radial-gradient(circle_at_top,rgba(64,123,255,0.18),transparent_30%),linear-gradient(180deg,rgba(6,23,66,0.08),transparent_30%)]">
                 <SiteHeader totalEntries={catalog.total_entries} />
@@ -119,6 +121,7 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
                 </footer>
               </div>
             </PageViewsProvider>
+            </SWRProvider>
           </TooltipProvider>
           </MotionProvider>
         </ThemeProvider>

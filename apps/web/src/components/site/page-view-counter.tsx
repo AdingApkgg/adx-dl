@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
+import useSWR from "swr";
 import { EyeIcon } from "lucide-react";
 
 import { defaultLocale, locales } from "@/lib/i18n";
@@ -50,8 +51,7 @@ async function recordView(referer: string): Promise<PageViews | null> {
 // of a page share one busuanzi page key — keeping per-page counts aggregated
 // across locales, exactly like the (locale-independent) comment thread. Query
 // and hash are dropped so cache-busting params don't fragment the key.
-function canonicalReferer(): string {
-  const { origin, pathname } = window.location;
+function canonicalReferer(pathname: string): string {
   const segments = pathname.split("/");
   const maybeLocale = segments[1];
   if (
@@ -61,7 +61,7 @@ function canonicalReferer(): string {
   ) {
     segments.splice(1, 1);
   }
-  return `${origin}${segments.join("/") || "/"}`;
+  return `${window.location.origin}${segments.join("/") || "/"}`;
 }
 
 /**
@@ -70,24 +70,21 @@ function canonicalReferer(): string {
  * backs them all instead of each widget counting independently.
  */
 export function PageViewsProvider({ children }: { children: React.ReactNode }) {
+  // usePathname re-renders on navigation; we derive the canonical referer key
+  // from it (the SWR key IS the thing that determines the response, so localized
+  // variants share one cache entry). window is absent during the static
+  // prerender, so the key is null there — SWR skips fetching and the first
+  // client render matches the server markup.
   const pathname = usePathname();
-  const [views, setViews] = React.useState<PageViews | null>(null);
+  const refererKey = typeof window === "undefined" ? null : canonicalReferer(pathname);
 
-  React.useEffect(() => {
-    let active = true;
+  const { data } = useSWR<PageViews | null>(refererKey, recordView, {
     // Keep the previous totals visible while the next page's numbers load to
     // avoid a flash of empty counters in the footer on every navigation.
-    recordView(canonicalReferer()).then((next) => {
-      if (active && next) {
-        setViews(next);
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, [pathname]);
+    keepPreviousData: true,
+  });
 
-  return <PageViewsContext.Provider value={views}>{children}</PageViewsContext.Provider>;
+  return <PageViewsContext.Provider value={data ?? null}>{children}</PageViewsContext.Provider>;
 }
 
 function usePageViews(): PageViews | null {
