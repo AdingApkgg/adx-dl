@@ -44,6 +44,20 @@ jobs:
         if: vars.ASTRODX_COVERS != 'remote'
         run: sudo apt-get update && sudo apt-get install -y libavif-bin webp
 
+      # Reuse already-converted covers across runs: build_catalog skips any cover
+      # whose AVIF+WebP already exist, so a restored cache turns the catalog step
+      # from "download + encode 1562×2" into "only new/changed covers". Rolling
+      # key (run_id) always saves a fresh cache; restore-keys grabs the latest.
+      # Bump `covers-v1` -> `covers-v2` to force a full re-encode (e.g. quality
+      # change, or an upstream cover swapped under the same slug).
+      - name: Cache converted covers
+        if: vars.ASTRODX_COVERS != 'remote'
+        uses: actions/cache@v4
+        with:
+          path: apps/web/public/covers
+          key: covers-v1-${{ github.run_id }}
+          restore-keys: covers-v1-
+
       - name: Build catalog
         working-directory: pipeline
         env:
@@ -52,6 +66,14 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      # Next.js build cache (module graph, compiled pages) across runs.
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: next-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: next-${{ hashFiles('bun.lock') }}-
 
       - name: Build site
         working-directory: apps/web
