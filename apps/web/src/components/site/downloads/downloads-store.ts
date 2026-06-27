@@ -6,13 +6,16 @@ import {
   getArchiveDownloadFileName,
   saveBlobAsFile,
   type AdxArchiveInput,
-  type AdxFileProgress,
   type ArchiveFormat,
   type BatchArchiveFormat,
 } from "@/lib/adx-archive";
 import type { AdxRemoteFile } from "@/lib/adx-directory";
 import { isChartVideoFile, type ChartDownloadSpec } from "@/lib/catalog-shared";
-import { runResumableDownload, type ResumeFileInput } from "./download-engine";
+import {
+  runResumableDownload,
+  type AdxFileProgress,
+  type ResumeFileInput,
+} from "./download-engine";
 import {
   deleteJob,
   fileKey,
@@ -370,7 +373,7 @@ function regroupBatch(
     const index = Number(input.name.slice(0, slash));
     const baseName = input.name.slice(slash + 1);
     const bucket = grouped.get(index) ?? [];
-    bucket.push({ name: baseName, bytes: input.bytes });
+    bucket.push({ name: baseName, blob: input.blob });
     grouped.set(index, bucket);
   }
   return [...grouped.entries()]

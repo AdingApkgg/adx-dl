@@ -1,4 +1,14 @@
-import type { AdxArchiveInput, AdxFileProgress } from "@/lib/adx-archive";
+import type { AdxArchiveInput } from "@/lib/adx-archive";
+
+/** Per-file download state, surfaced so the UI can render a progress bar per file. */
+export type AdxFileProgress = {
+  name: string;
+  /** Bytes received so far. */
+  received: number;
+  /** Total bytes when known, or null until the size is learned. */
+  total: number | null;
+  status: "pending" | "downloading" | "done";
+};
 
 /**
  * A resumable multi-file downloader. Each file carries whatever bytes were
@@ -136,13 +146,15 @@ export async function runResumableDownload(
     }
   };
 
-  const flush = (file: LiveFile): void => {
-    if (file.pendingBytes === 0) {
+  const flush = (file: LiveFile, force = false): void => {
+    if (file.pendingBytes === 0 && !force) {
       return;
     }
-    file.blob = new Blob([file.blob, ...(file.pending as BlobPart[])]);
-    file.pending = [];
-    file.pendingBytes = 0;
+    if (file.pendingBytes > 0) {
+      file.blob = new Blob([file.blob, ...(file.pending as BlobPart[])]);
+      file.pending = [];
+      file.pendingBytes = 0;
+    }
     file.lastFlush = Date.now();
     callbacks.onFlush?.({
       name: file.name,
@@ -174,14 +186,26 @@ export async function runResumableDownload(
     file.status = "downloading";
     scheduleEmit();
 
-    const response = await fetch(file.url, { cache: "no-store", mode: "cors", headers, signal });
+    let response = await fetch(file.url, { cache: "no-store", mode: "cors", headers, signal });
+
+    // 416 = our start offset is at/beyond EOF. This happens for CDN-compressed
+    // files (e.g. a gzip'd maidata.txt) that arrive with no Content-Length, so we
+    // never learned the size and can't tell a finished file from an unfinished
+    // one. Drop the prefix and re-fetch the whole file from byte 0. Re-fetching a
+    // fully-downloaded file is cheap, and the completion handler below records
+    // its size so the next resume skips it outright.
+    if (response.status === 416) {
+      file.blob = new Blob([]);
+      response = await fetch(file.url, { cache: "no-store", mode: "cors", signal });
+    }
+
     if (!response.ok && response.status !== 206) {
       throw new Error(`File download failed: ${file.url}`);
     }
 
     // We asked to resume but the server sent the whole file (changed, or it
     // ignores Range): drop the stale prefix and take this response from byte 0.
-    if (received > 0 && response.status === 200) {
+    if (file.blob.size > 0 && response.status === 200) {
       file.blob = new Blob([]);
     }
 
@@ -205,6 +229,9 @@ export async function runResumableDownload(
       file.blob = new Blob([file.blob, buffered]);
     } else {
       const reader = response.body.getReader();
+      // Seed the flush clock so the time-based flush fires after a real interval,
+      // not on the very first chunk.
+      file.lastFlush = Date.now();
       for (;;) {
         const { done, value } = await reader.read();
         if (done) {
@@ -219,7 +246,15 @@ export async function runResumableDownload(
       }
     }
 
-    flush(file);
+    // If the server never told us the size (compressed response, no
+    // Content-Length, Content-Range not CORS-exposed), the bytes we just finished
+    // streaming ARE the full size. Recording it lets the next resume recognise the
+    // file as complete instead of range-requesting past its end (→ 416).
+    if (file.total == null) {
+      file.total = file.blob.size + file.pendingBytes;
+    }
+
+    flush(file, true);
     file.status = "done";
   }
 
@@ -245,9 +280,8 @@ export async function runResumableDownload(
     }
   }
 
-  const results: AdxArchiveInput[] = [];
-  for (const file of files) {
-    results.push({ name: file.name, bytes: new Uint8Array(await file.blob.arrayBuffer()) });
-  }
-  return results;
+  // Hand back the accumulated Blobs as-is — the streaming packer reads them
+  // chunk by chunk, so we never materialise a whole file (let alone the whole
+  // archive) in RAM.
+  return files.map((file): AdxArchiveInput => ({ name: file.name, blob: file.blob }));
 }

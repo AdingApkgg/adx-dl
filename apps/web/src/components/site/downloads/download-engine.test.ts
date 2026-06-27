@@ -42,7 +42,7 @@ describe("runResumableDownload", () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0].headers.Range).toBeUndefined();
-    expect([...result.bytes]).toEqual([...FULL]);
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
   });
 
   test("resumes from offset via Range + If-Range and appends a 206 body", async () => {
@@ -62,7 +62,7 @@ describe("runResumableDownload", () => {
 
     expect(calls[0].headers.Range).toBe("bytes=4-");
     expect(calls[0].headers["If-Range"]).toBe('"v1"');
-    expect([...result.bytes]).toEqual([...FULL]);
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
   });
 
   test("a changed file (200 to a Range request) discards the stale prefix", async () => {
@@ -79,7 +79,41 @@ describe("runResumableDownload", () => {
     ]);
 
     expect(calls[0].headers.Range).toBe("bytes=4-");
-    expect([...result.bytes]).toEqual([...fresh]);
+    expect([...(await bytesOf(result.blob))]).toEqual([...fresh]);
+  });
+
+  test("a 416 (offset past EOF) restarts the file from byte 0", async () => {
+    // Mirrors a CDN-compressed file we fully downloaded but recorded with an
+    // unknown size: resume range-requests past the end and the server says 416.
+    const prefix = FULL; // we already hold all 10 bytes, but total was unknown
+    const calls = stubFetch((captured) =>
+      captured.headers.Range
+        ? new Response(null, { status: 416 })
+        : new Response(FULL, { status: 200 })
+    );
+
+    const [result] = await runResumableDownload([
+      { name: "a", url: "https://x/a", etag: null, total: null, blob: new Blob([prefix]) },
+    ]);
+
+    expect(calls).toHaveLength(2); // ranged attempt → 416 → full re-fetch
+    expect(calls[0].headers.Range).toBe("bytes=10-");
+    expect(calls[1].headers.Range).toBeUndefined();
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+  });
+
+  test("records the size when the server omits Content-Length", async () => {
+    // No content-length header (e.g. a gzip'd response) → the engine should still
+    // persist the finished size so a later resume can skip it.
+    stubFetch(() => new Response(FULL, { status: 200 }));
+    const flushes: EngineFlush[] = [];
+
+    await runResumableDownload(
+      [{ name: "a", url: "https://x/a", etag: null, total: null, blob: new Blob([]) }],
+      { onFlush: (file) => flushes.push(file) }
+    );
+
+    expect(flushes[flushes.length - 1].total).toBe(10);
   });
 
   test("an already-complete file is returned without any fetch", async () => {
@@ -90,7 +124,7 @@ describe("runResumableDownload", () => {
     ]);
 
     expect(calls).toHaveLength(0);
-    expect([...result.bytes]).toEqual([...FULL]);
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
   });
 
   test("flushes the completed bytes through the persistence hook", async () => {
