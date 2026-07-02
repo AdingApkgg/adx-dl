@@ -6,9 +6,22 @@ export type FriendLink = {
   description: Record<Locale, string>;
 };
 
+// The AstroDX app itself — linked from the home hero, the footer, and /links.
+// Official repo (README: "the ONLY official source"); formerly named MaipadDX.
+export const ASTRODX_APP_REPOSITORY = "https://github.com/2394425147/astrodx";
+
 // Curated maimai / AstroDX community sites and tools. External and unaffiliated;
 // rendered on /links and surfaced in the sitemap. Order follows editorial intent.
 export const friendLinks: FriendLink[] = [
+  {
+    name: "AstroDX",
+    url: ASTRODX_APP_REPOSITORY,
+    description: {
+      zh: "AstroDX 模拟器本体的开源仓库，可下载最新版应用。",
+      en: "The open-source repository of the AstroDX simulator itself — grab the latest release here.",
+      ja: "AstroDX シミュレーター本体のオープンソースリポジトリ。最新版はこちらから。",
+    },
+  },
   {
     name: "AWMC 下载站",
     url: "https://download.awmc.cc/",

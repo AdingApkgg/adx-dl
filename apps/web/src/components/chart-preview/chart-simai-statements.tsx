@@ -154,10 +154,12 @@ export function ChartSimaiStatements({
   simaiText,
   difficulty,
   title = "Simai 语句",
+  resumeAutoScrollLabel = "恢复自动滚动",
 }: {
   simaiText: string;
   difficulty: ChartDifficulty | null;
   title?: string;
+  resumeAutoScrollLabel?: string;
 }) {
   const statements = useMemo(
     () => parseSimaiStatements(simaiText, difficulty),
@@ -264,6 +266,7 @@ export function ChartSimaiStatements({
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
         className="flex w-full items-center justify-between gap-2 px-4 py-3 text-sm font-medium"
       >
         <span className="flex items-center gap-2">
@@ -304,7 +307,7 @@ export function ChartSimaiStatements({
             <button
               type="button"
               onClick={() => setAutoScroll(true)}
-              aria-label="恢复自动滚动"
+              aria-label={resumeAutoScrollLabel}
               className="absolute right-3 top-1 rounded-md border border-border/60 bg-background/70 p-1 backdrop-blur"
             >
               <LocateFixedIcon className="size-3.5" aria-hidden="true" />

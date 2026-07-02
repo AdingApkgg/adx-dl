@@ -54,6 +54,13 @@ const REVEAL_VIEWPORT = { once: true, amount: 0.2, margin: "0px 0px -8% 0px" };
 type RevealProps = Omit<HTMLMotionProps<"div">, "ref"> & {
   /** Delay before the reveal starts (seconds) — handy for manual sequencing. */
   delay?: number;
+  /**
+   * Content-bearing sections must be readable before hydration: `ssrVisible`
+   * skips the hidden initial state so no `opacity:0` is serialized into the
+   * static HTML (same idea as the catalog grid's `initial={false}`), trading
+   * the rise-in for content that never depends on JS.
+   */
+  ssrVisible?: boolean;
 };
 
 /**
@@ -62,10 +69,10 @@ type RevealProps = Omit<HTMLMotionProps<"div">, "ref"> & {
  * `motion.div`. The OS "reduce motion" preference is honored globally by
  * `MotionProvider` (the rise is dropped, a gentle fade remains).
  */
-export function Reveal({ delay = 0, transition, children, ...props }: RevealProps) {
+export function Reveal({ delay = 0, transition, ssrVisible = false, children, ...props }: RevealProps) {
   return (
     <motion.div
-      initial="hidden"
+      initial={ssrVisible ? false : "hidden"}
       whileInView="visible"
       viewport={REVEAL_VIEWPORT}
       variants={revealVariants}
@@ -109,14 +116,16 @@ export function RevealGroup({ stagger = 0.06, children, ...props }: RevealGroupP
 type RevealItemProps = Omit<HTMLMotionProps<"div">, "ref"> & {
   /** Extra delay (seconds) on top of any cascade position from `RevealGroup`. */
   delay?: number;
+  /** See `Reveal`: render visible in the SSR HTML, skipping the hidden initial state. */
+  ssrVisible?: boolean;
 };
 
 /** A self-contained staggered child — rises + fades in as it scrolls into view. */
-export function RevealItem({ delay = 0, transition, children, ...props }: RevealItemProps) {
+export function RevealItem({ delay = 0, transition, ssrVisible = false, children, ...props }: RevealItemProps) {
   const cascadeDelay = React.useContext(RevealIndexContext);
   return (
     <motion.div
-      initial="hidden"
+      initial={ssrVisible ? false : "hidden"}
       whileInView="visible"
       viewport={REVEAL_VIEWPORT}
       variants={revealVariants}

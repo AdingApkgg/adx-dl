@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { CommentsSkeleton } from "@/components/site/comments-skeleton";
 import { useTheme } from "@/components/site/theme-provider";
+import { Button } from "@/components/ui/button";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 // Self-hosted Artalk comment backend. The UMD bundle served from `/dist` exposes
@@ -104,11 +105,14 @@ export function ChartComments({
   const instanceRef = React.useRef<ArtalkInstance | null>(null);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
-  // Drives the loading skeleton: stays up until Artalk's own UI is mounted (or
-  // the load fails), so the comment area never flashes blank during the
-  // third-party script fetch.
-  const [ready, setReady] = React.useState(false);
-  const loadingLabel = getDictionary(locale).detail.commentsLoading;
+  // Drives the loading skeleton and the failure card: "loading" keeps the
+  // skeleton up until Artalk's own UI is mounted, "error" swaps in a retry
+  // card so the section never sits blank after a failed third-party fetch.
+  const [status, setStatus] = React.useState<"loading" | "ready" | "error">("loading");
+  // Bumped by the retry button to re-run the load effect (loadScriptOnce
+  // evicts failed script promises, so a new attempt actually refetches).
+  const [attempt, setAttempt] = React.useState(0);
+  const labels = getDictionary(locale).detail;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -118,7 +122,7 @@ export function ChartComments({
     // the area would sit blank through the next load instead of showing the
     // skeleton.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setReady(false);
+    setStatus("loading");
     const artalkLocale = ARTALK_LOCALE[locale] ?? "zh-CN";
     // Read the live theme at init so the first paint matches; the effect below
     // keeps it in sync afterwards without tearing the instance down.
@@ -133,34 +137,50 @@ export function ChartComments({
         if (cancelled || !containerRef.current) {
           return;
         }
-        const instance = Artalk.init({
-          el: containerRef.current,
-          pageKey,
-          pageTitle,
-          server: ARTALK_SERVER,
-          site: ARTALK_SITE,
-          locale: artalkLocale,
-          darkMode: initialDark,
-          // The backend ships `darkMode: "inherit"` with `useBackendConf`; re-assert
-          // our values so the widget tracks the site theme and locale, not system
-          // defaults.
-          remoteConfModifier: (conf: ArtalkConf) => {
-            conf.darkMode = initialDark;
-            conf.locale = artalkLocale;
-          },
-        });
-        instanceRef.current = instance;
-        // `remoteConfModifier` suppresses Artalk's initial comment-list auto-load;
-        // trigger it explicitly or the thread renders blank (no count, no list).
-        instance.reload();
-        // Artalk's editor + list shell is mounted now; drop the skeleton.
-        setReady(true);
+        // init/reload can throw synchronously (e.g. a version-mismatched
+        // bundle); route that into the same error card as a failed fetch.
+        try {
+          const instance = Artalk.init({
+            el: containerRef.current,
+            pageKey,
+            pageTitle,
+            server: ARTALK_SERVER,
+            site: ARTALK_SITE,
+            locale: artalkLocale,
+            darkMode: initialDark,
+            // The backend ships `darkMode: "inherit"` with `useBackendConf`; re-assert
+            // our values so the widget tracks the site theme and locale, not system
+            // defaults.
+            remoteConfModifier: (conf: ArtalkConf) => {
+              conf.darkMode = initialDark;
+              conf.locale = artalkLocale;
+            },
+          });
+          instanceRef.current = instance;
+          // `remoteConfModifier` suppresses Artalk's initial comment-list auto-load;
+          // trigger it explicitly or the thread renders blank (no count, no list).
+          instance.reload();
+          // Artalk's editor + list shell is mounted now; drop the skeleton.
+          setStatus("ready");
+        } catch {
+          // A half-initialized widget may have painted; tear it down so a
+          // retry starts from an empty mount point.
+          try {
+            instanceRef.current?.destroy();
+          } catch {
+            // A broken instance may also fail to destroy; the container reset
+            // below still leaves a clean mount point.
+          }
+          instanceRef.current = null;
+          containerRef.current.replaceChildren();
+          setStatus("error");
+        }
       })
       .catch(() => {
-        // Network/load failure: leave the container empty rather than throwing.
-        // Drop the skeleton too so it doesn't pulse forever.
+        // Network/load failure: swap the skeleton for the retry card instead of
+        // leaving a blank section under the comments heading.
         if (!cancelled) {
-          setReady(true);
+          setStatus("error");
         }
       });
 
@@ -169,7 +189,7 @@ export function ChartComments({
       instanceRef.current?.destroy();
       instanceRef.current = null;
     };
-  }, [pageKey, pageTitle, locale]);
+  }, [pageKey, pageTitle, locale, attempt]);
 
   // Follow the site's light/dark toggle without re-initializing the widget.
   React.useEffect(() => {
@@ -181,12 +201,28 @@ export function ChartComments({
       {/* Always mounted so the ref exists when Artalk.init runs; stays empty
           (zero height) until the widget paints into it. */}
       <div ref={containerRef} />
-      {ready ? null : (
+      {status === "loading" ? (
         <div role="status" aria-busy="true">
-          <span className="sr-only">{loadingLabel}</span>
+          <span className="sr-only">{labels.commentsLoading}</span>
           <CommentsSkeleton />
         </div>
-      )}
+      ) : null}
+      {status === "error" ? (
+        <div
+          role="alert"
+          className="flex flex-col items-start gap-3 rounded-lg border border-border/70 bg-card/50 p-4"
+        >
+          <p className="text-sm text-muted-foreground">{labels.commentsError}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setAttempt((current) => current + 1)}
+          >
+            {labels.commentsRetry}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

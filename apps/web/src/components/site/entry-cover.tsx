@@ -1,3 +1,7 @@
+"use client";
+
+import * as React from "react";
+
 import {
   formatEntrySubcategory,
   formatEntryTitle,
@@ -24,31 +28,63 @@ export function EntryCover({
 }: EntryCoverProps) {
   const title = formatEntryTitle(entry, locale);
   const cover = getDictionary(locale).cover;
-  // Ordered format fallback via <picture>: local AVIF (smallest) → local WebP
-  // (for browsers without AVIF) → the remote original as the final <img> src.
-  // The <img> fill styling mirrors what next/image fill emitted (the site is a
-  // static export, so Image was unoptimized and bought us nothing over <picture>).
+  // Local AVIF/WebP (smallest) are build artifacts emitted by the pipeline; a
+  // fresh worktree or any dev checkout that hasn't generated them serves 404s
+  // for /covers/*, and <picture> does NOT fall back from a matched-but-failed
+  // <source> to the <img src>. So we walk a fallback ladder on error:
+  //   optimized local <picture> → the remote original → styled placeholder.
   const avif = entry.media.cover_avif;
   const webp = entry.media.cover_webp;
   const original = entry.media.cover_url;
-  const imgSrc = original || avif || webp;
+  const hasOptimized = Boolean(avif || webp);
+  const [stage, setStage] = React.useState<"optimized" | "original" | "failed">(
+    hasOptimized ? "optimized" : original ? "original" : "failed"
+  );
 
-  if (imgSrc) {
+  const handleError = () =>
+    setStage((current) => (current === "optimized" && original ? "original" : "failed"));
+
+  if (stage !== "failed") {
+    // The fill styling mirrors what next/image fill emitted (the site is a
+    // static export, so Image was unoptimized and bought us nothing over <img>).
+    const alt = cover.alt(title);
+    const imgClassName =
+      "absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105";
+    const loading = priority ? ("eager" as const) : ("lazy" as const);
+    const fetchPriority = priority ? ("high" as const) : ("auto" as const);
     return (
       <div className={cn("relative overflow-hidden rounded-xl", className)}>
-        <picture>
-          {avif ? <source srcSet={avif} type="image/avif" /> : null}
-          {webp ? <source srcSet={webp} type="image/webp" /> : null}
+        {stage === "optimized" ? (
+          <picture>
+            {avif ? <source srcSet={avif} type="image/avif" /> : null}
+            {webp ? <source srcSet={webp} type="image/webp" /> : null}
+            {/* src is the remote original: the fallback for browsers with no
+                AVIF/WebP support. When a chosen <source> 404s instead, onError
+                drops to the plain <img src={original}> branch below. */}
+            <img
+              src={original || avif || webp}
+              alt={alt}
+              sizes={sizes}
+              className={imgClassName}
+              loading={loading}
+              fetchPriority={fetchPriority}
+              decoding="async"
+              onError={handleError}
+            />
+          </picture>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element -- static export: next/image is unoptimized here
           <img
-            src={imgSrc}
-            alt={cover.alt(title)}
+            src={original}
+            alt={alt}
             sizes={sizes}
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-            loading={priority ? "eager" : "lazy"}
-            fetchPriority={priority ? "high" : "auto"}
+            className={imgClassName}
+            loading={loading}
+            fetchPriority={fetchPriority}
             decoding="async"
+            onError={handleError}
           />
-        </picture>
+        )}
       </div>
     );
   }

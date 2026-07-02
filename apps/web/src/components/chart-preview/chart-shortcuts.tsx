@@ -38,7 +38,14 @@ const ROWS: Record<Locale, [string, string][]> = {
   ],
 };
 
-export function ChartShortcuts({ locale = "zh" }: { locale?: Locale }) {
+export function ChartShortcuts({
+  locale = "zh",
+  hint,
+}: {
+  locale?: Locale;
+  /** Localized note that shortcuts require the player to be focused. */
+  hint?: string;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -46,6 +53,7 @@ export function ChartShortcuts({ locale = "zh" }: { locale?: Locale }) {
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
         className="flex w-full items-center justify-between gap-2 px-4 py-3 text-sm font-medium"
       >
         <span className="flex items-center gap-2">
@@ -59,16 +67,19 @@ export function ChartShortcuts({ locale = "zh" }: { locale?: Locale }) {
       </button>
 
       {expanded ? (
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 px-4 pb-4 sm:grid-cols-2">
-          {ROWS[locale].map(([key, desc]) => (
-            <div key={key} className="flex items-center justify-between gap-3">
-              <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
-                {key}
-              </kbd>
-              <span className="text-xs text-muted-foreground">{desc}</span>
-            </div>
-          ))}
-        </dl>
+        <>
+          {hint ? <p className="px-4 pb-2 text-xs text-muted-foreground">{hint}</p> : null}
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-2 px-4 pb-4 sm:grid-cols-2">
+            {ROWS[locale].map(([key, desc]) => (
+              <div key={key} className="flex items-center justify-between gap-3">
+                <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs">
+                  {key}
+                </kbd>
+                <span className="text-xs text-muted-foreground">{desc}</span>
+              </div>
+            ))}
+          </dl>
+        </>
       ) : null}
     </div>
   );

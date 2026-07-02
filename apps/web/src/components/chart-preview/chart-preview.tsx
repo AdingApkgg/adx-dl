@@ -9,12 +9,13 @@ import {
 } from "@lxns-network/maimai-chart-engine";
 import { cn } from "@/lib/utils";
 import { textFetcher } from "@/lib/swr-fetcher";
-import type { Locale } from "@/lib/i18n";
+import { getDictionary, type Locale } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ChartCanvas } from "./chart-canvas";
 import { ChartControls } from "./chart-controls";
 import { ChartSettings } from "./chart-settings";
-import { ChartDensityTimeline } from "./chart-density-timeline";
+import { ChartDensityTimeline, type DensityLegendLabels } from "./chart-density-timeline";
 import { ChartExportRangeOverlay } from "./chart-export-range-overlay";
 import { ChartSimaiStatements } from "./chart-simai-statements";
 import { ChartShortcuts } from "./chart-shortcuts";
@@ -41,6 +42,14 @@ export type ChartPreviewProps = {
 
 type Toast = { title: string; message: string; color: string } | null;
 
+type FullscreenElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+};
+type FullscreenDocument = Document & {
+  webkitExitFullscreen?: () => Promise<void> | void;
+  webkitFullscreenElement?: Element | null;
+};
+
 /** Density timeline that tracks the live playhead in an isolated subtree so the
  *  per-frame update doesn't re-render the whole player. */
 function DensityWithPlayhead({
@@ -48,12 +57,14 @@ function DensityWithPlayhead({
   durationMs,
   onSeek,
   interactive,
+  legendLabels,
   children,
 }: {
   notes: Note[];
   durationMs: number;
   onSeek: (ms: number) => void;
   interactive: boolean;
+  legendLabels?: DensityLegendLabels;
   children?: React.ReactNode;
 }) {
   const liveBeats = useLiveBeats();
@@ -68,6 +79,7 @@ function DensityWithPlayhead({
       playheadMs={playheadMs}
       onSeek={onSeek}
       interactive={interactive}
+      legendLabels={legendLabels}
     >
       {children}
     </ChartDensityTimeline>
@@ -83,12 +95,21 @@ export function ChartPreview({
   levels,
   locale = "zh",
 }: ChartPreviewProps) {
+  const t = getDictionary(locale).preview;
   const containerRef = useRef<HTMLDivElement>(null);
+  const gifAbortRef = useRef<AbortController | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gifExporting, setGifExporting] = useState(false);
   const [gifProgress, setGifProgress] = useState(0);
   const [toast, setToast] = useState<Toast>(null);
   const [showControls, setShowControls] = useState(true);
+  // The Fullscreen API is a silent no-op on iOS Safari (no requestFullscreen,
+  // no webkit fallback on <div>), so the entry points hide there.
+  const [fullscreenSupported] = useState(() => {
+    if (typeof document === "undefined") return false;
+    const el = document.documentElement as FullscreenElement;
+    return Boolean(document.fullscreenEnabled || typeof el.webkitRequestFullscreen === "function");
+  });
 
   const isFullscreen = useGameStore((s) => s.isFullscreen);
   const setIsFullscreen = useGameStore((s) => s.setIsFullscreen);
@@ -107,8 +128,14 @@ export function ChartPreview({
   // The raw simai text is immutable and cached by URL, so revisiting a chart (or
   // remounting the player) reuses the cache with no refetch. One shot per source
   // like the original: a missing maidata won't self-heal, so no retry/revalidate
-  // storm against the (cross-origin) chart host.
-  const { data: simai } = useSWR(maidataUrl, textFetcher, {
+  // storm against the (cross-origin) chart host — retries stay manual (the error
+  // card's button below).
+  const {
+    data: simai,
+    error: simaiError,
+    isValidating: simaiValidating,
+    mutate: retrySimai,
+  } = useSWR(maidataUrl, textFetcher, {
     revalidateIfStale: false,
     shouldRetryOnError: false,
     onError: (error) => console.error("Failed to load chart:", error),
@@ -160,19 +187,29 @@ export function ChartPreview({
     };
   }, []);
 
-  const showToast = useCallback((t: NonNullable<Toast>) => {
-    setToast(t);
+  const showToast = useCallback((next: NonNullable<Toast>) => {
+    setToast(next);
     window.setTimeout(() => setToast(null), 2500);
   }, []);
 
   useEffect(() => {
-    const onChange = () => setIsFullscreen(document.fullscreenElement === containerRef.current);
+    const doc = document as FullscreenDocument;
+    const onChange = () =>
+      setIsFullscreen(
+        (doc.fullscreenElement ?? doc.webkitFullscreenElement) === containerRef.current,
+      );
     document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+    };
   }, [setIsFullscreen]);
 
-  // Auto-hide the fullscreen control overlay: show on pointer move, fade after 3s.
-  // (showControls is only read while fullscreen, so no reset is needed otherwise.)
+  // Auto-hide the fullscreen control overlay: show on pointer/keyboard activity,
+  // fade after 3s. (showControls is only read while fullscreen, so no reset is
+  // needed otherwise.) Keydown counts as activity so keyboard users can reach the
+  // controls; while hidden they are also `invisible` (out of the tab order).
   useEffect(() => {
     if (!isFullscreen) return;
     let timer: number | undefined;
@@ -184,22 +221,31 @@ export function ChartPreview({
     reveal();
     window.addEventListener("pointermove", reveal);
     window.addEventListener("pointerdown", reveal);
+    window.addEventListener("keydown", reveal);
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener("pointermove", reveal);
       window.removeEventListener("pointerdown", reveal);
+      window.removeEventListener("keydown", reveal);
     };
   }, [isFullscreen]);
 
   const toggleFullscreen = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => {});
-    } else {
+    const el = containerRef.current as FullscreenElement | null;
+    if (!el || !fullscreenSupported) return;
+    const doc = document as FullscreenDocument;
+    if (doc.fullscreenElement ?? doc.webkitFullscreenElement) {
+      if (doc.exitFullscreen) {
+        void doc.exitFullscreen().catch(() => {});
+      } else {
+        void doc.webkitExitFullscreen?.();
+      }
+    } else if (el.requestFullscreen) {
       void el.requestFullscreen().catch(() => {});
+    } else {
+      void el.webkitRequestFullscreen?.();
     }
-  }, []);
+  }, [fullscreenSupported]);
 
   const seekToMs = useCallback(
     (ms: number) => {
@@ -230,6 +276,8 @@ export function ChartPreview({
       if (!chart || gifExporting) return;
       const settings = useGameSettingsStore.getState();
 
+      const abortController = new AbortController();
+      gifAbortRef.current = abortController;
       setGifExporting(true);
       setGifProgress(0);
       try {
@@ -239,6 +287,7 @@ export function ChartPreview({
           beatsPerMeasure: state.timeline.beatsPerMeasure,
           settings,
           onProgress: setGifProgress,
+          signal: abortController.signal,
           video:
             settings.showVideo && videoUrl
               ? {
@@ -249,18 +298,30 @@ export function ChartPreview({
               : undefined,
         });
         downloadBlob(blob, `maimai-chart-${sanitizeFilenameId(chartName)}.gif`);
-        showToast({ title: "已导出", message: "GIF 已下载", color: "green" });
+        showToast({ title: t.gifExportedTitle, message: t.gifExportedBody, color: "green" });
         exportRange.clear();
       } catch (error) {
-        console.error("GIF export failed:", error);
-        showToast({ title: "导出失败", message: "GIF 生成出错", color: "red" });
+        // User cancel: keep the selected range so the export can be retried.
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          console.error("GIF export failed:", error);
+          showToast({ title: t.gifFailedTitle, message: t.gifFailedBody, color: "red" });
+        }
       } finally {
+        gifAbortRef.current = null;
         setGifExporting(false);
         setGifProgress(0);
       }
     },
-    [gifExporting, videoUrl, chartName, showToast, exportRange],
+    [gifExporting, videoUrl, chartName, showToast, exportRange, t],
   );
+
+  const cancelGif = useCallback(() => {
+    if (gifExporting) {
+      gifAbortRef.current?.abort();
+    } else {
+      exportRange.clear();
+    }
+  }, [gifExporting, exportRange]);
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -270,6 +331,9 @@ export function ChartPreview({
       const settings = useGameSettingsStore.getState();
       switch (e.key) {
         case " ":
+          // Space on a focused control must keep activating that control; only
+          // treat it as play/pause when it targets the player surface itself.
+          if (target.closest("button, input, select, a, [role='slider']")) return;
           e.preventDefault();
           store.togglePlayback();
           break;
@@ -308,6 +372,33 @@ export function ChartPreview({
     [toggleFullscreen],
   );
 
+  if (simai === undefined) {
+    return simaiError ? (
+      <div
+        role="alert"
+        className="flex flex-col items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-6 py-10 text-center"
+      >
+        <p className="text-sm font-semibold text-destructive">{t.loadFailedTitle}</p>
+        <p className="text-xs text-muted-foreground">{t.loadFailedBody}</p>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => void retrySimai()}
+          disabled={simaiValidating}
+        >
+          {t.retry}
+        </Button>
+      </div>
+    ) : (
+      <div className="flex flex-col gap-4" role="status">
+        <Skeleton className="mx-auto aspect-square w-full max-w-[600px] rounded-lg" />
+        <Skeleton className="h-9 w-full" />
+        <p className="sr-only">{t.loading}</p>
+      </div>
+    );
+  }
+
   const densityNotes = chartData?.notes ?? [];
 
   const controls = (
@@ -316,11 +407,13 @@ export function ChartPreview({
       onToggleSettings={() => setSettingsOpen((v) => !v)}
       isFullscreen={isFullscreen}
       onToggleFullscreen={toggleFullscreen}
+      fullscreenSupported={fullscreenSupported}
       onToggleGifRange={toggleGifRange}
       gifRangeMode={gifRangeMode}
       gifExporting={gifExporting}
       gifProgress={gifProgress}
       levels={levels}
+      t={t}
     />
   );
 
@@ -333,13 +426,15 @@ export function ChartPreview({
         "outline-none",
         isFullscreen
           ? cn(
-              "relative flex h-full w-full items-center justify-center bg-black",
+              // `dark` so the overlay controls resolve dark-theme tokens on the
+              // hardcoded black backdrop even for light-mode users.
+              "dark relative flex h-full w-full items-center justify-center bg-black",
               !showControls && "cursor-none",
             )
           : "flex flex-col gap-4",
       )}
     >
-      <ChartCanvas videoUrl={videoUrl} chartName={chartName} />
+      <ChartCanvas videoUrl={videoUrl} chartName={chartName} t={t} />
 
       {!isFullscreen ? (
         <>
@@ -349,6 +444,14 @@ export function ChartPreview({
               durationMs={totalMs}
               onSeek={seekToMs}
               interactive={!gifRangeMode}
+              legendLabels={{
+                label: t.legendLabel,
+                tap: t.noteTap,
+                hold: t.noteHold,
+                slide: t.noteSlide,
+                touch: t.noteTouch,
+                break: t.noteBreak,
+              }}
             >
               {exportRange.range ? (
                 <ChartExportRangeOverlay
@@ -364,8 +467,7 @@ export function ChartPreview({
           {gifRangeMode && exportRange.range ? (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-muted-foreground">
-                GIF 区间 {formatDuration(exportRange.range.endMs - exportRange.range.startMs)}
-                ,拖动时间轴上的手柄调整
+                {t.gifRangeHint(formatDuration(exportRange.range.endMs - exportRange.range.startMs))}
               </span>
               <span className="flex-1" />
               <Button
@@ -374,16 +476,10 @@ export function ChartPreview({
                 onClick={() => exportRange.range && runGifExport(exportRange.range)}
                 disabled={gifExporting}
               >
-                {gifExporting ? `导出中 ${Math.round(gifProgress * 100)}%` : "导出 GIF"}
+                {gifExporting ? t.exportingPercent(Math.round(gifProgress * 100)) : t.exportGif}
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => exportRange.clear()}
-                disabled={gifExporting}
-              >
-                取消
+              <Button type="button" size="sm" variant="outline" onClick={cancelGif}>
+                {t.cancel}
               </Button>
             </div>
           ) : null}
@@ -396,18 +492,25 @@ export function ChartPreview({
             </div>
           ) : null}
 
-          <ChartSimaiStatements simaiText={rawSimaiText} difficulty={selectedDifficulty} />
-          <ChartShortcuts locale={locale} />
+          <ChartSimaiStatements
+            simaiText={rawSimaiText}
+            difficulty={selectedDifficulty}
+            title={t.simaiTitle}
+            resumeAutoScrollLabel={t.resumeAutoScroll}
+          />
+          <ChartShortcuts locale={locale} hint={t.keyboardHint} />
         </>
       ) : (
         // Fullscreen: canvas stays flex-centered; controls float as an
         // auto-hiding bottom overlay so they never squeeze the 100vmin canvas.
+        // While hidden they turn `invisible` (unfocusable), but keyboard focus
+        // landing inside keeps them shown via focus-within.
         <div
           className={cn(
             "fixed inset-x-0 bottom-0 z-10 flex flex-col items-center gap-3 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-4 pb-5 pt-16 transition-all duration-300",
             showControls
               ? "translate-y-0 opacity-100"
-              : "pointer-events-none translate-y-full opacity-0",
+              : "invisible pointer-events-none translate-y-full opacity-0 focus-within:visible focus-within:pointer-events-auto focus-within:translate-y-0 focus-within:opacity-100",
           )}
         >
           {settingsOpen ? (

@@ -28,6 +28,8 @@ type ExportChartGifOptions = {
   size?: number;
   fps?: number;
   onProgress?: (progress: number) => void;
+  /** Checked between frames; aborting rejects with an "AbortError" DOMException. */
+  signal?: AbortSignal;
   video?: {
     url: string;
     leadInMs: number;
@@ -93,6 +95,7 @@ export async function exportChartGif({
   size = DEFAULT_EXPORT_SIZE,
   fps = DEFAULT_EXPORT_FPS,
   onProgress,
+  signal,
   video: videoOption,
 }: ExportChartGifOptions): Promise<Blob> {
   const durationMs = Math.max(0, range.endMs - range.startMs);
@@ -133,45 +136,51 @@ export async function exportChartGif({
 
   let lastReportedPercent = -1;
 
-  for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
-    const currentMs = Math.min(range.endMs, range.startMs + frameIndex * frameDurationMs);
-    const currentBeats = msToBeats(currentMs, chart.bpmEvents, chart.bpm);
+  try {
+    for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+      if (signal?.aborted) {
+        throw new DOMException("GIF export aborted", "AbortError");
+      }
 
-    if (bgVideo && videoOption) {
-      const videoTime = (currentMs - videoOption.leadInMs - videoOption.musicOffset) / 1000;
-      const dur = bgVideo.duration;
-      if (videoTime > 0 && (!Number.isFinite(dur) || videoTime < dur)) {
-        await seekExportVideo(bgVideo, videoTime);
-        renderer.setBackgroundVideo(bgVideo);
-      } else {
-        renderer.setBackgroundVideo(null);
+      const currentMs = Math.min(range.endMs, range.startMs + frameIndex * frameDurationMs);
+      const currentBeats = msToBeats(currentMs, chart.bpmEvents, chart.bpm);
+
+      if (bgVideo && videoOption) {
+        const videoTime = (currentMs - videoOption.leadInMs - videoOption.musicOffset) / 1000;
+        const dur = bgVideo.duration;
+        if (videoTime > 0 && (!Number.isFinite(dur) || videoTime < dur)) {
+          await seekExportVideo(bgVideo, videoTime);
+          renderer.setBackgroundVideo(bgVideo);
+        } else {
+          renderer.setBackgroundVideo(null);
+        }
+      }
+
+      renderer.renderFrame(chart, currentBeats, beatsPerMeasure);
+
+      const imageData = ctx.getImageData(0, 0, size, size);
+      const palette = quantize(imageData.data, 256);
+      const indexedPixels = applyPalette(imageData.data, palette);
+      gif.writeFrame(indexedPixels, size, size, {
+        palette,
+        delay: frameDurationMs,
+        repeat: 0,
+      });
+
+      const percent = Math.round(((frameIndex + 1) / frameCount) * 100);
+      if (percent !== lastReportedPercent) {
+        lastReportedPercent = percent;
+        onProgress?.((frameIndex + 1) / frameCount);
+      }
+      if (frameIndex % EXPORT_YIELD_INTERVAL_FRAMES === EXPORT_YIELD_INTERVAL_FRAMES - 1) {
+        await yieldToBrowser();
       }
     }
-
-    renderer.renderFrame(chart, currentBeats, beatsPerMeasure);
-
-    const imageData = ctx.getImageData(0, 0, size, size);
-    const palette = quantize(imageData.data, 256);
-    const indexedPixels = applyPalette(imageData.data, palette);
-    gif.writeFrame(indexedPixels, size, size, {
-      palette,
-      delay: frameDurationMs,
-      repeat: 0,
-    });
-
-    const percent = Math.round(((frameIndex + 1) / frameCount) * 100);
-    if (percent !== lastReportedPercent) {
-      lastReportedPercent = percent;
-      onProgress?.((frameIndex + 1) / frameCount);
+  } finally {
+    if (bgVideo) {
+      bgVideo.removeAttribute("src");
+      bgVideo.load();
     }
-    if (frameIndex % EXPORT_YIELD_INTERVAL_FRAMES === EXPORT_YIELD_INTERVAL_FRAMES - 1) {
-      await yieldToBrowser();
-    }
-  }
-
-  if (bgVideo) {
-    bgVideo.removeAttribute("src");
-    bgVideo.load();
   }
 
   gif.finish();

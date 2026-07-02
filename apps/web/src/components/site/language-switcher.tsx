@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CheckIcon, GlobeIcon } from "lucide-react";
 
+import { storePreferredLocale } from "@/app/locale-preference";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,6 +34,32 @@ const localeShortLabel: Record<Locale, string> = {
 export function LanguageSwitcher({ locale, pathname }: LanguageSwitcherProps) {
   const dictionary = getDictionary(locale);
 
+  const handleSelect = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    targetLocale: Locale
+  ) => {
+    // Remember the explicit pick even for modified clicks (new tab, etc.).
+    storePreferredLocale(targetLocale);
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    // The Link href only carries the pathname; re-read the location at click
+    // time so active filters (?q=&genre=…) and anchors survive the switch.
+    const { search, hash } = window.location;
+    if (!search && !hash) {
+      return;
+    }
+    event.preventDefault();
+    window.location.assign(`${switchLocale(pathname, targetLocale)}${search}${hash}`);
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -59,6 +86,7 @@ export function LanguageSwitcher({ locale, pathname }: LanguageSwitcherProps) {
                 lang={getHtmlLang(targetLocale)}
                 aria-current={isActive ? "true" : undefined}
                 data-state={isActive ? "checked" : undefined}
+                onClick={(event) => handleSelect(event, targetLocale)}
               >
                 {dictionary.language[targetLocale]}
                 {isActive ? <CheckIcon className="ml-auto" /> : null}

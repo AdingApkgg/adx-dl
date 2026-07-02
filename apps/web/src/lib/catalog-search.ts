@@ -4,9 +4,33 @@ import type { CatalogEntry } from "@/lib/catalog-shared";
 
 export const ALL_CATEGORIES = "all";
 export const ALL_SUBCATEGORIES = "all";
+export const ALL_LEVELS = "all";
 const maxAcceptedScore = 0.4;
 
-const fuseOptions: IFuseOptions<CatalogEntry> = {
+/**
+ * The minimal slice an entry needs to go through the Fuse index. Full catalog
+ * entries, card entries and the slim hero-suggestion index all satisfy it.
+ */
+export type SearchableEntry = {
+  id: string;
+  title: string;
+  title_en?: string;
+  artist: string;
+  artist_en?: string;
+  /** Community nicknames (别名). */
+  aliases?: string[];
+  version?: string;
+  subcategory?: string;
+  genre?: string;
+};
+
+/** One row of the prebuilt client search index (hero instant suggestions). */
+export type CatalogSearchIndexEntry = SearchableEntry & {
+  /** Canonical chart route slug. */
+  slug: string;
+};
+
+const fuseOptions = {
   includeScore: true,
   includeMatches: true,
   threshold: 0.35,
@@ -24,19 +48,19 @@ const fuseOptions: IFuseOptions<CatalogEntry> = {
     { name: "subcategory", weight: 0.04 },
     { name: "genre", weight: 0.03 },
   ],
-};
+} satisfies IFuseOptions<SearchableEntry>;
 
 /** A search result paired with the alias that matched, when the hit came via an
  * alias (别名) rather than the title — used to explain why a result surfaced. */
-export type CatalogSearchResult = {
-  entry: CatalogEntry;
+export type CatalogSearchResult<T extends SearchableEntry = CatalogEntry> = {
+  entry: T;
   aliasHit: string | null;
 };
 
 // Surface the matched alias only when the visible title didn't also match, so the
 // hint is never redundant with what the card already shows.
 function pickAliasHit(
-  entry: CatalogEntry,
+  entry: SearchableEntry,
   matches: readonly { key?: string; value?: string }[] | undefined,
   loweredQuery: string
 ): string | null {
@@ -52,10 +76,10 @@ function pickAliasHit(
   return titleAlreadyMatches ? null : aliasMatch.value;
 }
 
-export function buildCatalogSearchWithMatches(entries: CatalogEntry[]) {
-  const fuse = new Fuse(entries, fuseOptions);
+export function buildCatalogSearchWithMatches<T extends SearchableEntry>(entries: T[]) {
+  const fuse = new Fuse<T>(entries, fuseOptions);
 
-  return (query: string): CatalogSearchResult[] => {
+  return (query: string): CatalogSearchResult<T>[] => {
     const normalizedQuery = query.trim();
     if (!normalizedQuery) {
       return entries.map((entry) => ({ entry, aliasHit: null }));
@@ -72,16 +96,19 @@ export function buildCatalogSearchWithMatches(entries: CatalogEntry[]) {
   };
 }
 
-export function buildCatalogSearch(entries: CatalogEntry[]) {
+export function buildCatalogSearch<T extends SearchableEntry>(entries: T[]) {
   const search = buildCatalogSearchWithMatches(entries);
-  return (query: string): CatalogEntry[] => search(query).map((result) => result.entry);
+  return (query: string): T[] => search(query).map((result) => result.entry);
 }
 
-export function applyCatalogFilters(
-  entries: CatalogEntry[],
+/** The category/version slice used by the browse filters. */
+type CategorizedEntry = Pick<CatalogEntry, "category" | "subcategory">;
+
+export function applyCatalogFilters<T extends CategorizedEntry>(
+  entries: T[],
   category: string,
   subcategory: string
-): CatalogEntry[] {
+): T[] {
   return entries.filter((entry) => {
     if (category !== ALL_CATEGORIES && entry.category !== category) {
       return false;
@@ -95,14 +122,17 @@ export function applyCatalogFilters(
   });
 }
 
-export function getCategoryOptions(entries: CatalogEntry[]): string[] {
+export function getCategoryOptions(entries: readonly CategorizedEntry[]): string[] {
   return [
     ALL_CATEGORIES,
     ...Array.from(new Set(entries.map((entry) => entry.category))).sort(),
   ];
 }
 
-export function getSubcategoryOptions(entries: CatalogEntry[], category: string): string[] {
+export function getSubcategoryOptions(
+  entries: readonly CategorizedEntry[],
+  category: string
+): string[] {
   const scopedEntries =
     category === ALL_CATEGORIES
       ? entries

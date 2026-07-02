@@ -59,7 +59,18 @@ export function SyncedVideoAudio({
       }
     };
 
+    // The song only starts downloading on first play (preload="none" below):
+    // loading it eagerly would double-download the same mp3 alongside the
+    // chart-preview player on the page.
+    const ensureAudioLoading = () => {
+      if (audio.preload === "none") {
+        audio.preload = "auto";
+        audio.load();
+      }
+    };
+
     const startAudio = () => {
+      ensureAudioLoading();
       audio.currentTime = video.currentTime;
       audio.playbackRate = video.playbackRate;
       // play() rejects if the gesture is lost; the video is still usable, just muted.
@@ -141,7 +152,7 @@ export function SyncedVideoAudio({
       >
         {unsupportedLabel}
       </video>
-      <audio ref={audioRef} src={audioSrc} preload="auto" aria-hidden="true" tabIndex={-1} className="sr-only" />
+      <audio ref={audioRef} src={audioSrc} preload="none" aria-hidden="true" tabIndex={-1} className="sr-only" />
       <div className="flex items-center gap-3 self-start rounded-full border border-border/60 bg-muted/40 px-3 py-1.5">
         <button
           type="button"

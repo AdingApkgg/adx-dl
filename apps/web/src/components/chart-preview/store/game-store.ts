@@ -399,7 +399,13 @@ export const useGameStore = create<GameStore>()(
 
     setMusicUrl: (url: string) => {
       if (!url) {
-        set({ musicUrl: "", musicLoaded: false, musicLoading: false, musicError: null });
+        set({
+          musicUrl: "",
+          musicLoaded: false,
+          musicLoading: false,
+          musicError: null,
+          pendingPlay: false,
+        });
       } else {
         set({ musicUrl: url });
       }
@@ -414,7 +420,9 @@ export const useGameStore = create<GameStore>()(
         musicLoading: loading,
         musicError: error,
         // 在 set 这一拍清掉 pendingPlay：放到 play() 后才清，会让中间的 useEffect 误以为还在等。
-        ...(shouldAutoPlay ? { pendingPlay: false } : {}),
+        // 加载失败也要清：pendingPlay 卡在 true 会让下一次 play() 无状态变化，加载 effect
+        // 永远不会重跑（死锁）；清掉后再点播放就是一次干净的重试。
+        ...(shouldAutoPlay || error ? { pendingPlay: false } : {}),
       });
 
       if (shouldAutoPlay) {

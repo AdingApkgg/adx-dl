@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import type { CatalogEntry } from "@/lib/catalog-shared";
+import { toCatalogCardEntry, type CatalogEntry } from "@/lib/catalog-shared";
 import { CatalogBrowser } from "./catalog-browser";
 
 function buildEntry(overrides: Partial<CatalogEntry>): CatalogEntry {
@@ -73,7 +73,25 @@ describe("CatalogBrowser", () => {
 
     expect(html).toContain("All Categories");
     expect(html).toContain("All Versions");
+    expect(html).toContain("All Levels");
     expect(html).toContain("Search title, alias, artist, version...");
+  });
+
+  test("renders slim card entries without the download payload (payload-slimming contract)", () => {
+    const html = renderToStaticMarkup(
+      <CatalogBrowser
+        entries={[
+          toCatalogCardEntry(buildEntry({ aliases: ["阿尔法"] })),
+          toCatalogCardEntry(buildEntry({ id: "official-gamma", title: "月光列车" })),
+        ]}
+        locale="zh"
+        detailPathPrefix="/charts"
+      />
+    );
+
+    expect(html).toContain("Alpha Star");
+    expect(html).toContain("月光列车");
+    expect(html).toContain("阿尔法");
   });
 
   test("renders localized pagination labels when result set spans multiple pages", () => {

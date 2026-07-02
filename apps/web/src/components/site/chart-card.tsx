@@ -10,6 +10,7 @@ import {
   formatEntryArtist,
   formatEntrySubcategory,
   formatEntryTitle,
+  type CatalogCardEntry,
   type CatalogEntry,
 } from "@/lib/catalog-shared";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
@@ -20,8 +21,35 @@ import { cn } from "@/lib/utils";
 // overflow. The full list is still on the detail page and in the title tooltip.
 const MAX_VISIBLE_ALIASES = 3;
 
+// EntryCover and GenreBadge type their prop as the full CatalogEntry, but they
+// only read fields present on the card slice (cover media, title, branch,
+// genre). Stub the heavy fields so slim card entries can reuse them. Runs at
+// render time only, so the stubs never inflate a serialized page payload.
+function toFullEntryStub(entry: CatalogCardEntry): CatalogEntry {
+  return {
+    ...entry,
+    remote_dir_name: "",
+    source_archive: "",
+    source_folder: "",
+    bpm: null,
+    offset: null,
+    download_mode: "onsite",
+    download_url: "",
+    source_url: "",
+    license_note: "",
+    files: { maidata: "", maidata_dx: "", audio: "", background: "", pv: "" },
+    assets: {
+      has_audio: false,
+      has_background: false,
+      has_pv: false,
+      has_dx_chart: false,
+    },
+    media: { entry_base_url: "", audio_url: "", pv_url: "", ...entry.media },
+  };
+}
+
 type ChartCardProps = {
-  entry: CatalogEntry;
+  entry: CatalogCardEntry;
   locale: Locale;
   /** Eagerly load above-the-fold covers (LCP). */
   priority?: boolean;
@@ -48,6 +76,7 @@ export function ChartCard({
   onToggleSelect,
 }: ChartCardProps) {
   const href = buildLocalePath(`/charts/${entrySlug(entry)}`, locale);
+  const fullEntry = toFullEntryStub(entry);
   const dictionary = getDictionary(locale);
   const aliasMatchLabel = dictionary.catalogBrowser.aliasMatchLabel;
   const aliasesLabel = dictionary.detail.aliasesLabel;
@@ -76,7 +105,7 @@ export function ChartCard({
   const cover = (
     <div className="relative aspect-square overflow-hidden border-b border-border/60">
       <EntryCover
-        entry={entry}
+        entry={fullEntry}
         locale={locale}
         priority={priority}
         sizes={sizes}
@@ -142,7 +171,7 @@ export function ChartCard({
         <div className="flex flex-wrap items-center gap-1.5">
           <VersionBadge version={entry.version} label={formatEntrySubcategory(entry)} />
           <CabinetBadge cabinet={entry.cabinet} />
-          <GenreBadge entry={entry} locale={locale} />
+          <GenreBadge entry={fullEntry} locale={locale} />
         </div>
         <div className="mt-auto flex flex-wrap gap-1.5">
           {entry.difficulties.slice(0, 5).map((difficulty) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useGameStore, playbackTimeRef, audioMasterTimeMsRef } from "./store/game-store";
 import { useGameSettingsStore, FULLSCREEN_QUALITY_MP } from "./store/settings-store";
 import { MainRenderer, ANSWER_SOUND_BASE_OFFSET_MS } from "@lxns-network/maimai-chart-engine";
@@ -11,6 +11,9 @@ import { formatChartTimeForFilename } from "./lib/format";
 import { sanitizeFilenameId, downloadBlob } from "./lib/file-download";
 import classes from "./chart-canvas.module.css";
 import { cn } from "@/lib/utils";
+import type { SiteDictionary } from "@/lib/i18n";
+
+type PreviewDict = SiteDictionary["preview"];
 
 // Window events the controls dispatch to ask the canvas to export the current
 // frame (kept as events so the controls don't need a ref to the canvas).
@@ -22,9 +25,11 @@ export type ChartCanvasProps = {
   videoUrl?: string;
   /** Used to name exported PNG files. */
   chartName?: string;
+  /** Localized strings for toasts and the canvas label. */
+  t: PreviewDict;
 };
 
-export function ChartCanvas({ videoUrl, chartName = "chart" }: ChartCanvasProps) {
+export function ChartCanvas({ videoUrl, chartName = "chart", t }: ChartCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<MainRenderer | null>(null);
@@ -303,7 +308,7 @@ export function ChartCanvas({ videoUrl, chartName = "chart" }: ChartCanvasProps)
       try {
         blob = await canvasToBlob(canvas);
       } catch {
-        notify("导出失败", "无法获取当前帧", "red");
+        notify(t.frameFailedTitle, t.frameFailedBody, "red");
         return;
       }
 
@@ -317,7 +322,7 @@ export function ChartCanvas({ videoUrl, chartName = "chart" }: ChartCanvasProps)
         if (err instanceof DOMException && err.name === "AbortError") return;
       }
       downloadBlob(blob, filename);
-      notify("已保存", "当前帧已下载为 PNG", "green");
+      notify(t.frameSavedTitle, t.frameSavedBody, "green");
     };
 
     const copyFrame = async () => {
@@ -327,9 +332,9 @@ export function ChartCanvas({ videoUrl, chartName = "chart" }: ChartCanvasProps)
         await navigator.clipboard.write([
           new ClipboardItem({ "image/png": canvasToBlob(canvas) }),
         ]);
-        notify("已复制", "当前帧已复制到剪贴板", "green");
+        notify(t.copiedTitle, t.copiedBody, "green");
       } catch {
-        notify("复制失败", "剪贴板不可用", "red");
+        notify(t.copyFailedTitle, t.copyFailedBody, "red");
       }
     };
 
@@ -339,7 +344,7 @@ export function ChartCanvas({ videoUrl, chartName = "chart" }: ChartCanvasProps)
       window.removeEventListener(EXPORT_FRAME_EVENT, exportFrame);
       window.removeEventListener(COPY_FRAME_EVENT, copyFrame);
     };
-  }, [chartName]);
+  }, [chartName, t]);
 
   useEffect(() => {
     if (rendererRef.current) {
@@ -628,9 +633,21 @@ export function ChartCanvas({ videoUrl, chartName = "chart" }: ChartCanvasProps)
     getPlaybackMs,
   ]);
 
+  // 画布滚出视口时暂停空闲预览循环（正播放时不动主循环，音频还在走）。
+  const [inView, setInView] = useState(true);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setInView(entry?.isIntersecting ?? true);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   // 暂停态：进度条拖动时实时预览（rAF 节流，只在时间变了重渲染）。
   useEffect(() => {
-    if (isPlaying) return;
+    if (isPlaying || !inView) return;
 
     let previewAnimationFrameId: number | null = null;
     let lastPreviewedTime = -1;
@@ -652,7 +669,7 @@ export function ChartCanvas({ videoUrl, chartName = "chart" }: ChartCanvasProps)
         cancelAnimationFrame(previewAnimationFrameId);
       }
     };
-  }, [isPlaying, renderFrame]);
+  }, [isPlaying, inView, renderFrame]);
 
   return (
     <div ref={containerRef} className={cn(classes.container, isFullscreen && classes.fullscreen)}>
@@ -674,6 +691,8 @@ export function ChartCanvas({ videoUrl, chartName = "chart" }: ChartCanvasProps)
       />
       <canvas
         ref={canvasRef}
+        role="img"
+        aria-label={t.canvasLabel(chartName)}
         className={cn(classes.canvas, isFullscreen && classes.fullscreen)}
       />
     </div>

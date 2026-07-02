@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { VersionsIndexView } from "@/components/site/version-views";
-import { readVersionChartSpecs, readVersionGroups } from "@/lib/catalog";
+import { readVersionGroups } from "@/lib/catalog";
 import { buildVersionsPageMetadata } from "@/lib/page-metadata";
 
 import { generatePrefixedLocaleParams, getPrefixedRouteLocale } from "../route-locale";
@@ -21,21 +21,14 @@ export async function generateMetadata({
   return buildVersionsPageMetadata(getPrefixedRouteLocale(locale));
 }
 
+// Tiles only need name/slug/icon/count; the per-version download specs load
+// lazily from /versions/specs.json when select mode is entered.
 export default async function LocalizedVersionsPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const [groups, versionCharts] = await Promise.all([
-    readVersionGroups(),
-    readVersionChartSpecs(),
-  ]);
-  return (
-    <VersionsIndexView
-      groups={groups}
-      versionCharts={versionCharts}
-      locale={getPrefixedRouteLocale(locale)}
-    />
-  );
+  const groups = await readVersionGroups();
+  return <VersionsIndexView groups={groups} locale={getPrefixedRouteLocale(locale)} />;
 }

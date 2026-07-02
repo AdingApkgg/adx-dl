@@ -5,6 +5,7 @@ import { StatusHistoryCharts } from "@/components/site/status-history-charts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import type { ServerStatusHistoryPoint } from "@/lib/server-status-history";
 import { STATUS_SOURCE_URL, type ServerStatusSnapshot } from "@/lib/server-status";
@@ -20,6 +21,32 @@ type StatusPageViewProps = {
 
 function DisplayValue({ value, fallback }: { value: string | null; fallback: string }) {
   return <span>{value ?? fallback}</span>;
+}
+
+// Mirrors the three metric-card groups below (overview / resources / network)
+// so the first load doesn't jump from a single small card to ~20 cards.
+const METRIC_SKELETON_GROUP_SIZES = [7, 6, 7] as const;
+
+function MetricsSkeleton({ label }: { label: string }) {
+  return (
+    <div role="status" aria-busy="true" className="flex flex-col gap-6">
+      <span className="sr-only">{label}</span>
+      {METRIC_SKELETON_GROUP_SIZES.map((size, groupIndex) => (
+        <div key={groupIndex} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: size }, (_, index) => (
+            <Card key={index} size="sm" className="h-full">
+              <CardHeader>
+                <Skeleton className="h-5 w-24" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-4 w-36" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function MetricCard({
@@ -127,14 +154,16 @@ export function StatusPageView({
             <MetricCard label={labels.udpLabel} value={snapshot.udpCount} fallback={labels.unavailable} />
           </RevealGroup>
         </>
-      ) : (
+      ) : errorMessage ? (
         <Card>
           <CardHeader>
             <CardTitle>{labels.title}</CardTitle>
             <CardDescription>{labels.description}</CardDescription>
           </CardHeader>
-          <CardContent>{errorMessage ?? labels.loading}</CardContent>
+          <CardContent>{errorMessage}</CardContent>
         </Card>
+      ) : (
+        <MetricsSkeleton label={labels.loading} />
       )}
     </main>
   );

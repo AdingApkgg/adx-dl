@@ -1,10 +1,17 @@
 import Image from "next/image";
+import Link from "next/link";
+import { ArrowLeftIcon } from "lucide-react";
 
 import { Reveal } from "@/components/motion";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { VersionsBatchGrid } from "@/components/site/versions-batch-grid";
-import type { CatalogEntry, ChartDownloadSpec, VersionGroup } from "@/lib/catalog-shared";
+import {
+  toCatalogCardEntry,
+  type CatalogEntry,
+  type ChartDownloadSpec,
+  type VersionGroup,
+} from "@/lib/catalog-shared";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import {
   buildVersionDetailStructuredData,
@@ -41,7 +48,7 @@ export function VersionsIndexView({
       className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
     >
       <SeoJsonLd data={buildVersionsIndexStructuredData(locale, groups)} />
-      <Reveal className="flex flex-col gap-2">
+      <Reveal ssrVisible className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">{versions.title}</h1>
         <p className="text-muted-foreground">{versions.description}</p>
         <p className="text-sm text-muted-foreground">{versions.intro(withCharts)}</p>
@@ -68,7 +75,14 @@ export function VersionDetailView({
       className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
     >
       <SeoJsonLd data={buildVersionDetailStructuredData(locale, name, slug, entries)} />
-      <Reveal className="flex flex-col gap-3">
+      <Reveal ssrVisible className="flex flex-col gap-3">
+        <Link
+          href={buildLocalePath("/versions", locale)}
+          className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeftIcon className="size-4" aria-hidden="true" />
+          {versions.backToIndex}
+        </Link>
         <div className="flex flex-wrap items-center gap-3">
           {src ? (
             <Image
@@ -86,8 +100,10 @@ export function VersionDetailView({
           {versions.detailIntro(label, entries.length)}
         </p>
       </Reveal>
+      {/* Card-level slice only — the full entries stay server-side for the
+          JSON-LD above; batch download fetches /charts/specs.json lazily. */}
       <CatalogBrowser
-        entries={entries}
+        entries={entries.map(toCatalogCardEntry)}
         locale={locale}
         detailPathPrefix={buildLocalePath("/charts", locale)}
         collectionName={label}

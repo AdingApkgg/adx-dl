@@ -9,6 +9,7 @@ import {
   buildCatalogSearchWithMatches,
   getCategoryOptions,
   getSubcategoryOptions,
+  type CatalogSearchIndexEntry,
 } from "./catalog-search";
 
 function buildEntry(overrides: Partial<CatalogEntry>): CatalogEntry {
@@ -143,6 +144,26 @@ describe("catalog-search", () => {
     expect(
       applyCatalogFilters(search("moonlight"), "Official", "DX 2024").map((entry) => entry.id)
     ).toEqual(["official-gamma"]);
+  });
+
+  test("支持精简的搜索索引条目（hero 联想，无完整目录字段）", () => {
+    const index: CatalogSearchIndexEntry[] = [
+      {
+        id: "official-gamma",
+        slug: "11223",
+        title: "月光列车",
+        title_en: "Moonlight Train",
+        artist: "夜色",
+        aliases: ["月车"],
+      },
+      { id: "official-alpha", slug: "11224", title: "Alpha Star", artist: "星野" },
+    ];
+    const search = buildCatalogSearchWithMatches(index);
+
+    const byAlias = search("月车");
+    expect(byAlias.map((result) => result.entry.slug)).toEqual(["11223"]);
+    expect(byAlias[0].aliasHit).toBe("月车");
+    expect(search("alpha").map((result) => result.entry.slug)).toEqual(["11224"]);
   });
 
   test("分类和子分类选项包含 all 作用域", () => {

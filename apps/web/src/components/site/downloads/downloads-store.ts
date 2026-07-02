@@ -40,17 +40,26 @@ export type DownloadJob = {
   /** Display name — the chart directory name or the batch collection name. */
   title: string;
   format: ArchiveFormat;
-  /** `paused` = rehydrated from storage after a reload, awaiting manual resume. */
-  status: "packing" | "success" | "error" | "paused";
+  /**
+   * `packing` = fetching files; `archiving` = all bytes on hand, building the
+   * archive blob (can take a while for big batches — distinct so the UI doesn't
+   * look frozen at 100%). `paused` = interrupted (reload or manual pause),
+   * awaiting manual resume.
+   */
+  status: "packing" | "archiving" | "success" | "error" | "paused";
   /** Files finished downloading so far / total files to fetch. */
   completed: number;
   total: number;
   /** Aggregate byte progress (0 total when any file's size is unknown). */
   receivedBytes: number;
   totalBytes: number;
+  /** Smoothed transfer rate in bytes/second (0 until measured). */
+  speedBps: number;
   /** Per-file byte progress; only populated for single-chart downloads. */
   fileProgress: AdxFileProgress[];
   error: string | null;
+  /** Coarse cause so the UI can show a friendly, localized message. */
+  errorKind: "offline" | "network" | "unknown" | null;
   /** Disambiguates a restart from a stale auto-dismiss timer. */
   startedAt: number;
 };
@@ -78,13 +87,22 @@ type DownloadsState = {
    * the floating tray can avoid showing the same progress twice.
    */
   presented: Record<string, number>;
+  /**
+   * Ref-count of full-width bottom bars on screen (the batch download bar), so
+   * the floating tray can lift itself above them instead of overlapping.
+   */
+  bottomBars: number;
   startSingle: (params: StartSingleParams) => void;
   startBatch: (params: StartBatchParams) => void;
   resume: (id: string) => void;
+  /** Aborts an in-flight job but keeps its spec and partial bytes for resume. */
+  pause: (id: string) => void;
   dismiss: (id: string) => void;
   hydrateFromStorage: () => void;
   presentInline: (id: string) => void;
   unpresentInline: (id: string) => void;
+  presentBottomBar: () => void;
+  unpresentBottomBar: () => void;
 };
 
 /** How long a finished (success) job lingers before the tray auto-clears it. */
@@ -94,7 +112,35 @@ const AUTO_DISMISS_MS = 6000;
 // out of React's snapshot: the durable job spec and any in-flight abort handle.
 const jobSpecs = new Map<string, PersistedJob>();
 const abortControllers = new Map<string, AbortController>();
+/** Byte samples for the smoothed transfer-rate estimate, keyed by job id. */
+const speedSamples = new Map<string, { time: number; bytes: number; ema: number }>();
 let hydrated = false;
+
+/** Minimum sampling window before updating the rate estimate. */
+const SPEED_SAMPLE_MS = 500;
+
+/** Fraction 0–100, preferring byte-level totals and falling back to file counts. */
+export function jobPercent(job: DownloadJob): number {
+  if (job.totalBytes > 0) {
+    return Math.min(100, Math.round((job.receivedBytes / job.totalBytes) * 100));
+  }
+  if (job.total > 0) {
+    return Math.min(100, Math.round((job.completed / job.total) * 100));
+  }
+  return 0;
+}
+
+/** Coarse failure classification for a friendly, localized error message. */
+function classifyError(error: unknown): DownloadJob["errorKind"] {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return "offline";
+  }
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("download failed") || error instanceof TypeError) {
+    return "network";
+  }
+  return "unknown";
+}
 
 export const useDownloadsStore = create<DownloadsState>((set, get) => {
   const patchJob = (id: string, patch: Partial<DownloadJob>): void => {
@@ -146,14 +192,32 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
 
     const controller = new AbortController();
     abortControllers.set(id, controller);
-    patchJob(id, { status: "packing", error: null });
+    speedSamples.delete(id);
+    patchJob(id, { status: "packing", error: null, errorKind: null, speedBps: 0 });
 
     try {
       const archiveInputs = await runResumableDownload(inputs, {
         concurrency: spec.kind === "batch" ? 6 : 4,
         signal: controller.signal,
         onFileComplete: (completed, total) => patchJob(id, { completed, total }),
-        onBytes: (receivedBytes, totalBytes) => patchJob(id, { receivedBytes, totalBytes }),
+        onBytes: (receivedBytes, totalBytes) => {
+          const now = Date.now();
+          const sample = speedSamples.get(id);
+          if (!sample) {
+            speedSamples.set(id, { time: now, bytes: receivedBytes, ema: 0 });
+            patchJob(id, { receivedBytes, totalBytes });
+            return;
+          }
+          const elapsed = now - sample.time;
+          if (elapsed >= SPEED_SAMPLE_MS) {
+            const instant = ((receivedBytes - sample.bytes) / elapsed) * 1000;
+            const ema = sample.ema === 0 ? instant : sample.ema * 0.7 + instant * 0.3;
+            speedSamples.set(id, { time: now, bytes: receivedBytes, ema });
+            patchJob(id, { receivedBytes, totalBytes, speedBps: Math.max(0, ema) });
+            return;
+          }
+          patchJob(id, { receivedBytes, totalBytes });
+        },
         onFileProgress:
           spec.kind === "single"
             ? (fileProgress) => patchJob(id, { fileProgress })
@@ -172,6 +236,10 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         },
       });
 
+      // All bytes are on hand; building the archive can take a while for big
+      // batches, so surface it as its own phase instead of a full, frozen bar.
+      patchJob(id, { status: "archiving", speedBps: 0 });
+
       const format = spec.format as ArchiveFormat;
       const archiveBlob =
         spec.kind === "batch"
@@ -184,14 +252,17 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       saveBlobAsFile(archiveBlob, getArchiveDownloadFileName(spec.title, format));
 
       abortControllers.delete(id);
+      speedSamples.delete(id);
       jobSpecs.delete(id);
       void deleteJob(id);
       patchJob(id, { status: "success" });
       scheduleAutoDismiss(id, startedAt);
     } catch (error) {
       abortControllers.delete(id);
-      // A cancel aborts the engine; dismiss() has already removed the job and its
-      // persisted bytes, so there is nothing to report.
+      speedSamples.delete(id);
+      // An abort comes from pause() (which has already set the job to `paused`,
+      // keeping spec + bytes) or dismiss() (which removed the job entirely) —
+      // either way there is nothing to report.
       if (controller.signal.aborted) {
         return;
       }
@@ -199,12 +270,15 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       patchJob(id, {
         status: "error",
         error: error instanceof Error ? error.message : "Unknown error",
+        errorKind: classifyError(error),
+        speedBps: 0,
       });
     }
   };
 
   const beginJob = (spec: PersistedJob): void => {
-    if (get().jobs.find((job) => job.id === spec.id)?.status === "packing") {
+    const existing = get().jobs.find((job) => job.id === spec.id)?.status;
+    if (existing === "packing" || existing === "archiving") {
       return;
     }
     jobSpecs.set(spec.id, spec);
@@ -219,6 +293,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       total: spec.files.length,
       receivedBytes: 0,
       totalBytes: 0,
+      speedBps: 0,
       fileProgress:
         spec.kind === "single"
           ? spec.files.map((file) => ({
@@ -229,6 +304,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
             }))
           : [],
       error: null,
+      errorKind: null,
       startedAt: Date.now(),
     });
     void runJob(spec.id);
@@ -237,6 +313,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
   return {
     jobs: [],
     presented: {},
+    bottomBars: 0,
 
     startSingle: ({ id, title, files, includeVideo, format }) => {
       const selected = includeVideo ? files : files.filter((file) => !isChartVideoFile(file.name));
@@ -284,9 +361,23 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       void runJob(id);
     },
 
+    pause: (id) => {
+      const job = get().jobs.find((entry) => entry.id === id);
+      if (!job || job.status !== "packing") {
+        return;
+      }
+      // Abort the engine but keep the spec and the flushed partial bytes; the
+      // runJob catch sees the abort and leaves the status we set here alone.
+      abortControllers.get(id)?.abort();
+      abortControllers.delete(id);
+      speedSamples.delete(id);
+      patchJob(id, { status: "paused", speedBps: 0 });
+    },
+
     dismiss: (id) => {
       abortControllers.get(id)?.abort();
       abortControllers.delete(id);
+      speedSamples.delete(id);
       jobSpecs.delete(id);
       void deleteJob(id);
       set((state) => ({ jobs: state.jobs.filter((job) => job.id !== id) }));
@@ -333,8 +424,10 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
             total: spec.files.length,
             receivedBytes,
             totalBytes: totalKnown ? totalBytes : 0,
+            speedBps: 0,
             fileProgress: [],
             error: null,
+            errorKind: null,
             startedAt: Date.now(),
           });
         }
@@ -358,6 +451,14 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         }
         return { presented };
       });
+    },
+
+    presentBottomBar: () => {
+      set((state) => ({ bottomBars: state.bottomBars + 1 }));
+    },
+
+    unpresentBottomBar: () => {
+      set((state) => ({ bottomBars: Math.max(0, state.bottomBars - 1) }));
     },
   };
 });

@@ -98,10 +98,10 @@ describe("structured data builders", () => {
     };
 
     expect(faq["@type"]).toBe("FAQPage");
-    expect(faq.mainEntity).toHaveLength(4);
+    expect(faq.mainEntity).toHaveLength(5);
     expect(faq.mainEntity[0]["@type"]).toBe("Question");
-    expect(faq.mainEntity[3].acceptedAnswer.text).toContain("1561");
-    expect(faq.mainEntity[3].acceptedAnswer.text).toContain("17");
+    expect(faq.mainEntity[4].acceptedAnswer.text).toContain("1561");
+    expect(faq.mainEntity[4].acceptedAnswer.text).toContain("17");
   });
 
   test("buildListingStructuredData emits CollectionPage + ItemList + BreadcrumbList", async () => {

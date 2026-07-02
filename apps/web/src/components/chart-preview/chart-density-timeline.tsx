@@ -12,6 +12,9 @@ type NoteCountData = Record<NoteCountKey, number> & {
   total: number;
 };
 
+/** Localized names for the color legend under the timeline. */
+export type DensityLegendLabels = Record<NoteCountKey, string> & { label: string };
+
 type ChartDensityTimelineProps = {
   notes: Note[];
   durationMs: number;
@@ -25,6 +28,8 @@ type ChartDensityTimelineProps = {
   onSeek?: (ms: number) => void;
   /** Disable seeking (e.g. while the GIF range overlay owns the pointer). */
   interactive?: boolean;
+  /** When provided, renders a color legend for the note-type stack colors. */
+  legendLabels?: DensityLegendLabels;
   /** Overlay rendered on top (e.g. the export-range selector). */
   children?: ReactNode;
   className?: string;
@@ -130,6 +135,7 @@ export function ChartDensityTimeline({
   playheadMs,
   onSeek,
   interactive = true,
+  legendLabels,
   children,
   className,
   style,
@@ -180,7 +186,7 @@ export function ChartDensityTimeline({
   const playheadPercent =
     playheadMs !== undefined ? Math.max(0, Math.min((playheadMs / durationMs) * 100, 100)) : null;
 
-  return (
+  const timeline = (
     <div
       ref={rootRef}
       className={cn(classes.timeline, seekable && classes.seekable, className)}
@@ -253,6 +259,29 @@ export function ChartDensityTimeline({
       ) : null}
 
       {children}
+    </div>
+  );
+
+  if (!legendLabels) return timeline;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {timeline}
+      <ul
+        aria-label={legendLabels.label}
+        className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] leading-none text-muted-foreground"
+      >
+        {NOTE_COLOR_ENTRIES.map(([key, color]) => (
+          <li key={key} className="flex items-center gap-1">
+            <span
+              aria-hidden="true"
+              className="size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: color }}
+            />
+            {legendLabels[key]}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

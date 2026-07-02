@@ -3,34 +3,54 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import useSWR from "swr";
 import { CheckIcon } from "lucide-react";
 
-import { AnimatePresence, RevealGroup, RevealItem } from "@/components/motion";
+import { AnimatePresence } from "@/components/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { ChartDownloadSpec, VersionGroup } from "@/lib/catalog-shared";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
+import { jsonFetcher } from "@/lib/swr-fetcher";
 import { VERSION_IMAGE_DIMENSIONS, versionImageSrcByIndex } from "@/lib/version-image";
 import { cn } from "@/lib/utils";
 
+// Static (build-time) manifest: per-version chart download specs keyed by
+// version slug. Fetched only when select mode is first enabled, so the versions
+// index page doesn't embed file URLs for the whole catalog.
+const VERSION_SPECS_PATH = "/versions/specs.json";
+
 type VersionsBatchGridProps = {
   groups: VersionGroup[];
-  /** Per-version chart download specs (dir + asset urls), keyed by version slug. */
-  versionCharts: Record<string, ChartDownloadSpec[]>;
+  /** Optional pre-embedded specs (legacy path); when absent they load lazily. */
+  versionCharts?: Record<string, ChartDownloadSpec[]>;
   locale: Locale;
 };
 
-export function VersionsBatchGrid({ groups, versionCharts, locale }: VersionsBatchGridProps) {
+export function VersionsBatchGrid({
+  groups,
+  versionCharts,
+  locale,
+}: VersionsBatchGridProps) {
   const versions = getDictionary(locale).versions;
   const browser = getDictionary(locale).catalogBrowser;
   const [selectMode, setSelectMode] = React.useState(false);
   const [selectedSlugs, setSelectedSlugs] = React.useState<ReadonlySet<string>>(new Set());
 
+  const hasEmbeddedSpecs = Boolean(versionCharts && Object.keys(versionCharts).length > 0);
+  const { data: fetchedSpecs, error: specsError } = useSWR<
+    Record<string, ChartDownloadSpec[]>
+  >(selectMode && !hasEmbeddedSpecs ? VERSION_SPECS_PATH : null, jsonFetcher);
+  const specs = hasEmbeddedSpecs ? versionCharts : fetchedSpecs;
+  const specsPending = selectMode && !specs && !specsError;
+
+  // Selectability comes from the chart count (known statically); the specs
+  // manifest is only needed once a download actually starts.
   const selectableSlugs = React.useMemo(
-    () => groups.filter((group) => versionCharts[group.slug]?.length).map((group) => group.slug),
-    [groups, versionCharts]
+    () => groups.filter((group) => group.count > 0).map((group) => group.slug),
+    [groups]
   );
 
   const toggle = (slug: string) =>
@@ -52,8 +72,8 @@ export function VersionsBatchGrid({ groups, versionCharts, locale }: VersionsBat
 
   // Flatten the selected versions into one chart list for the batch archive.
   const selectedCharts = React.useMemo(
-    () => [...selectedSlugs].flatMap((slug) => versionCharts[slug] ?? []),
-    [selectedSlugs, versionCharts]
+    () => (specs ? [...selectedSlugs].flatMap((slug) => specs[slug] ?? []) : []),
+    [selectedSlugs, specs]
   );
 
   const selectedNames = groups
@@ -85,14 +105,27 @@ export function VersionsBatchGrid({ groups, versionCharts, locale }: VersionsBat
             </span>
           </>
         ) : null}
+        {/* The batch manifest loads lazily the first time select mode opens. */}
+        {specsPending ? (
+          <span role="status" className="text-sm text-muted-foreground">
+            {browser.specsLoading}
+          </span>
+        ) : null}
+        {selectMode && specsError && !specs ? (
+          <span role="status" className="text-sm text-destructive">
+            {browser.specsError}
+          </span>
+        ) : null}
       </div>
 
-      <RevealGroup className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {/* The tile grid is the page's main content: render it visible in the
+          prerendered HTML (no hidden-until-hydration reveal animation). */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {groups.map((group) => {
           const label = group.name === "Unknown" ? versions.unknownLabel : group.name;
           const src = group.imageIndex !== null ? versionImageSrcByIndex(group.imageIndex) : null;
           const hasCharts = group.count > 0;
-          const selectableHere = selectMode && Boolean(versionCharts[group.slug]?.length);
+          const selectableHere = selectMode && hasCharts;
           const selected = selectedSlugs.has(group.slug);
 
           const card = (
@@ -154,13 +187,13 @@ export function VersionsBatchGrid({ groups, versionCharts, locale }: VersionsBat
             // 0-chart versions can't be selected; render them dimmed and inert.
             if (!selectableHere) {
               return (
-                <RevealItem key={group.slug} className="h-full" aria-disabled="true">
+                <div key={group.slug} className="h-full" aria-disabled="true">
                   {card}
-                </RevealItem>
+                </div>
               );
             }
             return (
-              <RevealItem key={group.slug} className="h-full">
+              <div key={group.slug} className="h-full">
                 <div
                   role="checkbox"
                   aria-checked={selected}
@@ -176,30 +209,30 @@ export function VersionsBatchGrid({ groups, versionCharts, locale }: VersionsBat
                 >
                   {card}
                 </div>
-              </RevealItem>
+              </div>
             );
           }
 
           if (!hasCharts) {
             return (
-              <RevealItem key={group.slug} className="h-full" aria-disabled="true">
+              <div key={group.slug} className="h-full" aria-disabled="true">
                 {card}
-              </RevealItem>
+              </div>
             );
           }
 
           return (
-            <RevealItem key={group.slug} className="h-full">
+            <div key={group.slug} className="h-full">
               <Link
                 href={buildLocalePath(`/versions/${group.slug}`, locale)}
                 className="group/version block h-full rounded-xl transition-transform hover:-translate-y-0.5"
               >
                 {card}
               </Link>
-            </RevealItem>
+            </div>
           );
         })}
-      </RevealGroup>
+      </div>
 
       <AnimatePresence>
         {showBar ? (

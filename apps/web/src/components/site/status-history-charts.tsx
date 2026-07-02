@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type CSSProperties } from "react";
 
 import {
   CartesianGrid,
@@ -20,6 +20,18 @@ type StatusHistoryChartsProps = {
   locale?: Locale;
   history: ServerStatusHistoryPoint[];
 };
+
+// Recharts takes inline styles, not classes, so route every color through the
+// design tokens to keep both themes readable (its defaults are light-only).
+const AXIS_TICK_STYLE = { fill: "var(--muted-foreground)", fontSize: 12 };
+const TOOLTIP_CONTENT_STYLE: CSSProperties = {
+  backgroundColor: "var(--popover)",
+  color: "var(--popover-foreground)",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius)",
+};
+const TOOLTIP_LABEL_STYLE: CSSProperties = { color: "var(--popover-foreground)" };
+const TOOLTIP_CURSOR = { stroke: "var(--border)" };
 
 function subscribe() {
   return () => {};
@@ -54,28 +66,35 @@ export function StatusHistoryCharts({
           {isMounted ? (
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={288}>
               <LineChart data={history}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="timeLabel" />
-                <YAxis />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="timeLabel" stroke="var(--border)" tick={AXIS_TICK_STYLE} />
+                <YAxis stroke="var(--border)" tick={AXIS_TICK_STYLE} />
+                <Tooltip
+                  contentStyle={TOOLTIP_CONTENT_STYLE}
+                  labelStyle={TOOLTIP_LABEL_STYLE}
+                  cursor={TOOLTIP_CURSOR}
+                />
                 <Line
                   type="monotone"
                   dataKey="cpuPercent"
-                  stroke="#8b5cf6"
+                  name={labels.cpuLabel}
+                  stroke="var(--chart-1)"
                   dot={false}
                   isAnimationActive={false}
                 />
                 <Line
                   type="monotone"
                   dataKey="memoryPercent"
-                  stroke="#06b6d4"
+                  name={labels.memoryLabel}
+                  stroke="var(--chart-2)"
                   dot={false}
                   isAnimationActive={false}
                 />
                 <Line
                   type="monotone"
                   dataKey="diskPercent"
-                  stroke="#f59e0b"
+                  name={labels.diskLabel}
+                  stroke="var(--chart-3)"
                   dot={false}
                   isAnimationActive={false}
                 />
@@ -96,21 +115,27 @@ export function StatusHistoryCharts({
           {isMounted ? (
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={288}>
               <LineChart data={history}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="timeLabel" />
-                <YAxis />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="timeLabel" stroke="var(--border)" tick={AXIS_TICK_STYLE} />
+                <YAxis stroke="var(--border)" tick={AXIS_TICK_STYLE} />
+                <Tooltip
+                  contentStyle={TOOLTIP_CONTENT_STYLE}
+                  labelStyle={TOOLTIP_LABEL_STYLE}
+                  cursor={TOOLTIP_CURSOR}
+                />
                 <Line
                   type="monotone"
                   dataKey="uploadSpeed"
-                  stroke="#22c55e"
+                  name={labels.uploadSpeedLabel}
+                  stroke="var(--chart-4)"
                   dot={false}
                   isAnimationActive={false}
                 />
                 <Line
                   type="monotone"
                   dataKey="downloadSpeed"
-                  stroke="#ef4444"
+                  name={labels.downloadSpeedLabel}
+                  stroke="var(--chart-5)"
                   dot={false}
                   isAnimationActive={false}
                 />

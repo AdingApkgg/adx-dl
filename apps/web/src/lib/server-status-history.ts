@@ -73,3 +73,76 @@ export function appendHistoryPoint(
 
   return nextHistory.slice(-maxPoints);
 }
+
+const HISTORY_POINT_NUMERIC_FIELDS = [
+  "timestamp",
+  "cpuPercent",
+  "memoryPercent",
+  "diskPercent",
+  "load1",
+  "load5",
+  "load15",
+  "uploadSpeed",
+  "downloadSpeed",
+] as const;
+
+function isHistoryPoint(value: unknown): value is ServerStatusHistoryPoint {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.timeLabel === "string" &&
+    HISTORY_POINT_NUMERIC_FIELDS.every(
+      (field) => typeof record[field] === "number" && Number.isFinite(record[field])
+    )
+  );
+}
+
+/**
+ * Revives a history array persisted as JSON (e.g. in sessionStorage). Entries
+ * are validated field-by-field — the payload is external state that may be
+ * stale or malformed — pruned to the age window, sorted, and capped.
+ */
+export function parseStoredHistory(
+  raw: string | null,
+  maxPoints: number,
+  maxAgeMs: number,
+  now: number = Date.now()
+): ServerStatusHistoryPoint[] {
+  if (!raw || maxPoints <= 0) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    // Timestamps derive from the monitor's clock, so allow mild future skew
+    // while still dropping garbage that would otherwise never age out.
+    const cutoff = now - maxAgeMs;
+    const horizon = now + maxAgeMs;
+    return parsed
+      .filter(isHistoryPoint)
+      .filter((point) => point.timestamp >= cutoff && point.timestamp <= horizon)
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .slice(-maxPoints);
+  } catch {
+    return [];
+  }
+}
+
+/** Merges stored history into the live one, deduped by timestamp and capped. */
+export function mergeHistory(
+  stored: ServerStatusHistoryPoint[],
+  current: ServerStatusHistoryPoint[],
+  maxPoints: number
+): ServerStatusHistoryPoint[] {
+  if (stored.length === 0) {
+    return current;
+  }
+  const liveTimestamps = new Set(current.map((point) => point.timestamp));
+  const merged = [...stored.filter((point) => !liveTimestamps.has(point.timestamp)), ...current];
+  merged.sort((a, b) => a.timestamp - b.timestamp);
+  return merged.slice(-maxPoints);
+}

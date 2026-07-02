@@ -65,6 +65,62 @@ export type CatalogEntry = {
   imported_at?: string;
 };
 
+/**
+ * The card-level slice of a catalog entry: exactly what the browse grid, the
+ * client search index and `ChartCard` consume. The heavy per-chart payload
+ * (file specs, media/audio/PV URLs, license and source text) stays server-side;
+ * batch downloads fetch it lazily from the static specs JSON endpoints.
+ */
+export type CatalogCardEntry = Pick<
+  CatalogEntry,
+  | "id"
+  | "slug"
+  | "title"
+  | "title_en"
+  | "artist"
+  | "artist_en"
+  | "category"
+  | "subcategory"
+  | "version"
+  | "versionid"
+  | "genre"
+  | "genreid"
+  | "cabinet"
+  | "short_id"
+  | "aliases"
+  | "difficulties"
+> & {
+  media: Pick<CatalogEntryMedia, "cover_url" | "cover_avif" | "cover_webp">;
+};
+
+/** Project a full entry down to the card slice (optional keys omitted when empty
+ * so they don't cost bytes in the serialized page payload). */
+export function toCatalogCardEntry(entry: CatalogEntry): CatalogCardEntry {
+  return {
+    id: entry.id,
+    ...(entry.slug ? { slug: entry.slug } : {}),
+    title: entry.title,
+    ...(entry.title_en ? { title_en: entry.title_en } : {}),
+    artist: entry.artist,
+    ...(entry.artist_en ? { artist_en: entry.artist_en } : {}),
+    category: entry.category,
+    subcategory: entry.subcategory,
+    version: entry.version,
+    ...(entry.versionid !== undefined ? { versionid: entry.versionid } : {}),
+    genre: entry.genre,
+    ...(entry.genreid !== undefined ? { genreid: entry.genreid } : {}),
+    cabinet: entry.cabinet,
+    short_id: entry.short_id,
+    ...(entry.aliases?.length ? { aliases: entry.aliases } : {}),
+    difficulties: entry.difficulties,
+    media: {
+      cover_url: entry.media.cover_url,
+      ...(entry.media.cover_avif ? { cover_avif: entry.media.cover_avif } : {}),
+      ...(entry.media.cover_webp ? { cover_webp: entry.media.cover_webp } : {}),
+    },
+  };
+}
+
 export type CatalogCategories = Record<string, string[]>;
 
 export type Catalog = {
@@ -109,21 +165,29 @@ export function getChartDownloadSpec(entry: CatalogEntry): ChartDownloadSpec {
   return { dir: entry.remote_dir_name, files: getChartAssetFiles(entry) };
 }
 
-export function formatEntryTitle(entry: CatalogEntry, locale: "zh" | "en" | "ja"): string {
+export function formatEntryTitle(
+  entry: Pick<CatalogEntry, "title" | "title_en">,
+  locale: "zh" | "en" | "ja"
+): string {
   if (locale === "en" && entry.title_en) {
     return entry.title_en;
   }
   return entry.title;
 }
 
-export function formatEntryArtist(entry: CatalogEntry, locale: "zh" | "en" | "ja"): string {
+export function formatEntryArtist(
+  entry: Pick<CatalogEntry, "artist" | "artist_en">,
+  locale: "zh" | "en" | "ja"
+): string {
   if (locale === "en" && entry.artist_en) {
     return entry.artist_en;
   }
   return entry.artist;
 }
 
-export function formatEntrySubcategory(entry: CatalogEntry): string {
+export function formatEntrySubcategory(
+  entry: Pick<CatalogEntry, "category" | "version" | "cabinet" | "subcategory">
+): string {
   if (entry.category === "Remote") {
     const remoteBranch = [entry.version, entry.cabinet].filter(Boolean).join(" / ");
     if (remoteBranch) {
@@ -134,7 +198,10 @@ export function formatEntrySubcategory(entry: CatalogEntry): string {
   return entry.subcategory;
 }
 
-function isUtageEntry(entry: CatalogEntry): boolean {
+/** The release-ordering slice; both full and card entries satisfy it. */
+type ReleaseOrderable = Pick<CatalogEntry, "versionid" | "cabinet" | "short_id">;
+
+function isUtageEntry(entry: Pick<CatalogEntry, "cabinet">): boolean {
   const cabinet = entry.cabinet?.trim();
   return Boolean(cabinet) && cabinet !== "DX" && cabinet !== "ST";
 }
@@ -143,7 +210,7 @@ function isUtageEntry(entry: CatalogEntry): boolean {
 // maimai version era (versionid, newest first). Within a version, show standard
 // (DX/ST) charts before UTAGE specials — UTAGE song ids carry a large offset
 // that would otherwise push these niche charts to the very top — then by song id.
-export function compareByReleaseDesc(a: CatalogEntry, b: CatalogEntry): number {
+export function compareByReleaseDesc(a: ReleaseOrderable, b: ReleaseOrderable): number {
   const versionA = a.versionid ?? -1;
   const versionB = b.versionid ?? -1;
   if (versionA !== versionB) {
@@ -159,7 +226,7 @@ export function compareByReleaseDesc(a: CatalogEntry, b: CatalogEntry): number {
   return idB - idA;
 }
 
-export function sortByReleaseDesc(entries: CatalogEntry[]): CatalogEntry[] {
+export function sortByReleaseDesc<T extends ReleaseOrderable>(entries: T[]): T[] {
   return [...entries].sort(compareByReleaseDesc);
 }
 
@@ -397,6 +464,52 @@ export function difficultyLevelRange(
   }
   const sorted = [...levels].sort((a, b) => levelSortValue(a) - levelSortValue(b));
   return { low: sorted[0], high: sorted[sorted.length - 1] };
+}
+
+/**
+ * Collapse a raw level value into the display level players filter by.
+ * The catalog stores chart constants ("13.4") and unverified markers ("13+?"),
+ * over a hundred distinct strings — as a filter they group into "13"/"13+"
+ * (a "+" level is a constant of x.6–x.9, or an explicit "+" suffix; official
+ * "+" levels only exist from 7 up). Returns null for non-numeric levels.
+ */
+export function difficultyDisplayLevel(level: string): string | null {
+  const match = level.trim().match(/^(\d+)(?:\.(\d))?(\+)?/);
+  if (!match) {
+    return null;
+  }
+  const base = Number(match[1]);
+  const plus = match[3] === "+" || (match[2] !== undefined && Number(match[2]) >= 6);
+  return base >= 7 && plus ? `${base}+` : `${base}`;
+}
+
+/**
+ * Distinct display levels across entries, sorted ascending in play order
+ * ("12" < "12+" < "13"). Drives the level filter's option list.
+ */
+export function collectDifficultyLevels(
+  entries: ReadonlyArray<Pick<CatalogEntry, "difficulties">>
+): string[] {
+  const levels = new Set<string>();
+  for (const entry of entries) {
+    for (const difficulty of entry.difficulties) {
+      const level = difficultyDisplayLevel(difficulty.level ?? "");
+      if (level) {
+        levels.add(level);
+      }
+    }
+  }
+  return [...levels].sort((a, b) => levelSortValue(a) - levelSortValue(b));
+}
+
+/** True when any of the entry's difficulties displays as the given level. */
+export function entryHasLevel(
+  entry: Pick<CatalogEntry, "difficulties">,
+  level: string
+): boolean {
+  return entry.difficulties.some(
+    (difficulty) => difficultyDisplayLevel(difficulty.level ?? "") === level
+  );
 }
 
 const CATEGORY_LABELS: Record<string, { zh: string; ja: string }> = {

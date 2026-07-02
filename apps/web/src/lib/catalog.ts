@@ -8,6 +8,7 @@ import type {
   VersionGroup,
 } from "@/lib/catalog-shared";
 import { getChartDownloadSpec } from "@/lib/catalog-shared";
+import type { CatalogSearchIndexEntry } from "@/lib/catalog-search";
 import { entrySlug } from "@/lib/route-slug";
 import { MAIMAI_VERSIONS, versionImageIndex } from "@/lib/version-image";
 
@@ -62,6 +63,34 @@ export async function readCanonicalSlugs(): Promise<string[]> {
   const entries = await readCatalogEntries();
   return entries.map((entry) => entrySlug(entry));
 }
+
+// Per-chart download specs keyed by entry id. Served as a static JSON endpoint
+// (/charts/specs.json) and fetched lazily by the catalog browser's select mode,
+// so the browse pages don't embed file URLs for every chart.
+export const readChartSpecsById = cache(
+  async (): Promise<Record<string, ChartDownloadSpec>> => {
+    const entries = await readCatalogEntries();
+    return Object.fromEntries(entries.map((entry) => [entry.id, getChartDownloadSpec(entry)]));
+  }
+);
+
+// Minimal client search index (id/slug/titles/artists/aliases) for the home
+// hero's instant suggestions, served as a static JSON endpoint. English fields
+// are dropped when they duplicate the primary ones to keep the file small.
+export const readSearchIndex = cache(async (): Promise<CatalogSearchIndexEntry[]> => {
+  const entries = await readCatalogEntries();
+  return entries.map((entry) => ({
+    id: entry.id,
+    slug: entrySlug(entry),
+    title: entry.title,
+    ...(entry.title_en && entry.title_en !== entry.title ? { title_en: entry.title_en } : {}),
+    artist: entry.artist,
+    ...(entry.artist_en && entry.artist_en !== entry.artist
+      ? { artist_en: entry.artist_en }
+      : {}),
+    ...(entry.aliases?.length ? { aliases: entry.aliases } : {}),
+  }));
+});
 
 // --- Version grouping for the /versions browse pages ---
 // Charts are bucketed by canonical maimai version (via the version icon index),

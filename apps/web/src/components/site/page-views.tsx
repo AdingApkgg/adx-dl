@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRightIcon,
+  ChevronRightIcon,
   DownloadIcon,
   ExternalLinkIcon,
   LayersIcon,
@@ -49,6 +50,7 @@ import {
   resolveGenreId,
   sortByReleaseDesc,
 } from "@/lib/catalog-shared";
+import { ASTRODX_APP_REPOSITORY } from "@/lib/friend-links";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 import { cn } from "@/lib/utils";
@@ -261,12 +263,26 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
               genres={heroGenres}
             />
             <div className="mt-1 flex flex-wrap items-center gap-x-5 gap-y-3">
-              <Button variant="outline" size="sm" asChild>
-                <Link href={versionsHref}>
-                  <LayersIcon data-icon="inline-start" aria-hidden="true" />
-                  {home.browseCta}
-                </Link>
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" asChild>
+                  <a href={ASTRODX_APP_REPOSITORY} target="_blank" rel="noreferrer">
+                    <ExternalLinkIcon data-icon="inline-start" aria-hidden="true" />
+                    {home.getAppCta}
+                  </a>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={versionsHref}>
+                    <LayersIcon data-icon="inline-start" aria-hidden="true" />
+                    {home.browseCta}
+                  </Link>
+                </Button>
+                <a
+                  href="#faq"
+                  className="text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+                >
+                  {home.whatIsAstroDX}
+                </a>
+              </div>
               <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                 {stats.map((stat) => (
                   <div key={stat.label} className="flex items-baseline gap-1.5">
@@ -300,7 +316,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
         </Reveal>
         <RevealGroup className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {versionTiles.map((version) => (
-            <RevealItem key={version.index} className="h-full">
+            <RevealItem key={version.index} ssrVisible className="h-full">
               <Link
                 href={buildLocalePath(`/versions/${version.slug}`, locale)}
                 className="group flex h-full flex-col items-center gap-3 rounded-2xl border border-border/60 bg-card/70 p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10"
@@ -340,7 +356,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
         </Reveal>
         <RevealGroup className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {latestEntries.map((entry, index) => (
-            <RevealItem key={entry.id} className="h-full">
+            <RevealItem key={entry.id} ssrVisible className="h-full">
               <ChartCard
                 entry={entry}
                 locale={locale}
@@ -368,7 +384,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
           </Reveal>
           <RevealGroup className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {featuredEntries.map((entry) => (
-              <RevealItem key={entry.id} className="h-full">
+              <RevealItem key={entry.id} ssrVisible className="h-full">
                 <ChartCard
                   entry={entry}
                   locale={locale}
@@ -381,12 +397,15 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
       ) : null}
 
       <section className="flex flex-col gap-4">
-        <Reveal>
-          <h2 className="text-2xl font-semibold">{home.faqHeading}</h2>
+        <Reveal ssrVisible>
+          {/* Anchor target for the hero's "What is AstroDX?" link. */}
+          <h2 id="faq" className="scroll-mt-24 text-2xl font-semibold">
+            {home.faqHeading}
+          </h2>
         </Reveal>
         <RevealGroup className="grid gap-4 md:grid-cols-2">
           {faqItems.map((item) => (
-            <RevealItem key={item.q} className="h-full">
+            <RevealItem key={item.q} ssrVisible className="h-full">
               <Card size="sm" className="h-full border border-border/70 bg-card/85">
                 <CardHeader>
                   <CardTitle asChild>
@@ -431,6 +450,19 @@ export function ChartDetailPageView({
   const detail = dictionary.detail;
   const branchLabel = formatEntrySubcategory(entry);
   const description = buildChartDescription(entry, locale);
+  const title = formatEntryTitle(entry, locale);
+  const chartsHref = buildLocalePath("/charts", locale);
+
+  // Deep links out of the metadata table: entries with an unmapped version land
+  // in the "unknown" bucket, so /versions/unknown always exists for them.
+  const versionIndex = versionImageIndex(entry.version);
+  const versionGroupSlug =
+    versionIndex !== null
+      ? (MAIMAI_VERSIONS.find((version) => version.index === versionIndex)?.slug ?? "unknown")
+      : "unknown";
+  const versionHref = buildLocalePath(`/versions/${versionGroupSlug}`, locale);
+  const genreId = resolveGenreId(entry);
+  const genreHref = genreId !== null ? `${chartsHref}?genre=${genreId}` : undefined;
 
   // Files packed into the downloaded .adx, named as the AstroDX app expects.
   const downloadFiles = getChartAssetFiles(entry);
@@ -441,6 +473,18 @@ export function ChartDetailPageView({
       className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
     >
       <SeoJsonLd data={buildChartDetailStructuredData(locale, entry)} />
+      <nav
+        aria-label={detail.breadcrumbLabel}
+        className="flex items-center gap-1.5 text-sm text-muted-foreground"
+      >
+        <Link href={chartsHref} className="shrink-0 transition-colors hover:text-foreground">
+          {dictionary.nav.browse}
+        </Link>
+        <ChevronRightIcon className="size-3.5 shrink-0" aria-hidden="true" />
+        <span aria-current="page" className="line-clamp-1 text-foreground">
+          {title}
+        </span>
+      </nav>
       <section className="relative isolate overflow-hidden rounded-3xl border border-border/60">
         <div aria-hidden="true" className="absolute inset-0 -z-10">
           {entry.media.cover_url ? (
@@ -554,7 +598,7 @@ export function ChartDetailPageView({
         </Reveal>
       ) : null}
 
-      <Reveal className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_320px]">
+      <Reveal ssrVisible className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_320px]">
         <Card>
           <CardHeader>
             <CardTitle>{detail.metadata}</CardTitle>
@@ -562,10 +606,15 @@ export function ChartDetailPageView({
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
             <div className="grid gap-4 md:grid-cols-2">
-              <MetadataItem label={detail.versionLabel} value={entry.version || detail.unknownValue} />
+              <MetadataItem
+                label={detail.versionLabel}
+                value={entry.version || detail.unknownValue}
+                href={versionHref}
+              />
               <MetadataItem
                 label={detail.genreLabel}
                 value={genreLabel(entry, locale) || detail.unknownValue}
+                href={genreHref}
               />
               <MetadataItem
                 label={detail.bpmLabel}
@@ -702,7 +751,7 @@ function CatalogPageView({
       className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
     >
       <SeoJsonLd data={buildListingStructuredData(locale, entries)} />
-      <Reveal className="flex flex-col gap-2">
+      <Reveal ssrVisible className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">{title}</h1>
         <p className="text-muted-foreground">{description}</p>
         <p className="text-sm text-muted-foreground">{intro}</p>
@@ -716,11 +765,30 @@ function CatalogPageView({
   );
 }
 
-function MetadataItem({ label, value }: { label: string; value: string }) {
+function MetadataItem({
+  label,
+  value,
+  href,
+}: {
+  label: string;
+  value: string;
+  href?: string;
+}) {
   return (
     <div className="rounded-xl border border-border/70 bg-background/70 p-4">
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-2 text-base font-medium">{value}</p>
+      <p className="mt-2 text-base font-medium">
+        {href ? (
+          <Link
+            href={href}
+            className="underline decoration-border underline-offset-4 transition-colors hover:text-primary hover:decoration-current"
+          >
+            {value}
+          </Link>
+        ) : (
+          value
+        )}
+      </p>
     </div>
   );
 }

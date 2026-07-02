@@ -269,12 +269,12 @@ export function useMusicPlayer() {
     }
   }, [musicUrl, stopSource]);
 
-  // 仅在 pendingPlay 或 URL 变化时拉音频；同 URL 已 in-flight 时不重发。
+  // 仅在 pendingPlay 时才拉音频（用户真正点了播放）；挂载即下载会为每次浏览
+  // 多付几 MB 整曲流量。同 URL 已 in-flight 时不重发。
   useEffect(() => {
     const state = audioStateRef.current;
     if (!musicUrl) return;
-    const shouldLoad = pendingPlay || musicUrl !== lastUrlRef.current || !state.audioBuffer;
-    if (!shouldLoad) return;
+    if (!pendingPlay) return;
     if (state.audioBuffer && musicUrl === lastUrlRef.current) return;
     if (loadingUrlRef.current === musicUrl) return;
 

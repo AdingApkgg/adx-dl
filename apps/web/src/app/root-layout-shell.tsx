@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { LocaleSuggestionBanner } from "@/app/locale-suggestion-banner";
 import { MotionProvider } from "@/components/motion";
 import { DownloadDock } from "@/components/site/downloads/download-dock";
 import { PageViewsProvider, SitePageViews } from "@/components/site/page-view-counter";
@@ -9,6 +10,7 @@ import { SWRProvider } from "@/components/site/swr-provider";
 import { ThemeProvider } from "@/components/site/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { readCatalog } from "@/lib/catalog";
+import { ASTRODX_APP_REPOSITORY } from "@/lib/friend-links";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 
 type RootLayoutShellProps = Readonly<{
@@ -71,6 +73,8 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
             <SWRProvider>
             <PageViewsProvider>
               <div className="flex min-h-screen flex-col bg-[radial-gradient(circle_at_top,rgba(64,123,255,0.18),transparent_30%),linear-gradient(180deg,rgba(6,23,66,0.08),transparent_30%)]">
+                {/* Only the zh (default) tree suggests switching: prefixed trees were an explicit choice. */}
+                {locale === "zh" ? <LocaleSuggestionBanner /> : null}
                 <SiteHeader totalEntries={catalog.total_entries} />
                 {children}
                 <footer className="mt-auto border-t border-border/60 bg-background/60">
@@ -97,6 +101,14 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
                       <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/links", locale)}>
                         {dictionary.links.navLabel}
                       </Link>
+                      <a
+                        className="text-muted-foreground hover:text-foreground"
+                        href={ASTRODX_APP_REPOSITORY}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {dictionary.footer.getAppLabel}
+                      </a>
                       <a
                         className="text-muted-foreground hover:text-foreground"
                         href={TELEGRAM_COMMUNITY}

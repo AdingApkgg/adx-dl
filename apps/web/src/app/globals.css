@@ -147,7 +147,16 @@
   html {
     @apply font-sans;
   }
+  /* Keep mouse-focus outlines off, but keyboard focus (:focus-visible) must be
+     visible on every link — cards, chips and footer links are plain <a> with no
+     button classes. Plain CSS (not @apply outline-*) because Tailwind v4's
+     outline-none sets --tw-outline-style:none, which would blank later
+     outline-<width> utilities. `outline` follows each element's own radius. */
   a {
-    @apply outline-none;
+    outline: none;
+  }
+  a:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 }

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import useSWR from "swr";
 import { EyeIcon } from "lucide-react";
 
-import { defaultLocale, locales } from "@/lib/i18n";
+import { defaultLocale, getDictionary, isSupportedLocale, locales } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 // Self-hosted busuanzi-compatible counter. `POST /api` increments and returns
@@ -24,7 +24,9 @@ type BszResponse = {
   data?: { site_pv?: number; site_uv?: number; page_pv?: number };
 };
 
-const PageViewsContext = React.createContext<PageViews | null>(null);
+// `undefined` = no response yet (loading), `null` = the backend answered with a
+// failure (recordView swallows errors), a value = live totals.
+const PageViewsContext = React.createContext<PageViews | null | undefined>(undefined);
 
 async function recordView(referer: string): Promise<PageViews | null> {
   try {
@@ -84,11 +86,21 @@ export function PageViewsProvider({ children }: { children: React.ReactNode }) {
     keepPreviousData: true,
   });
 
-  return <PageViewsContext.Provider value={data ?? null}>{children}</PageViewsContext.Provider>;
+  return <PageViewsContext.Provider value={data}>{children}</PageViewsContext.Provider>;
 }
 
-function usePageViews(): PageViews | null {
+function usePageViews(): PageViews | null | undefined {
   return React.useContext(PageViewsContext);
+}
+
+// The counter widgets receive their visible labels as props from server
+// parents, so resolve the locale for the failure fallback from the URL the
+// same way the provider does.
+function usePageViewsDictionary() {
+  const pathname = usePathname();
+  const maybeLocale = pathname.split("/")[1];
+  const locale = maybeLocale && isSupportedLocale(maybeLocale) ? maybeLocale : defaultLocale;
+  return getDictionary(locale).pageViews;
 }
 
 const numberFormatter = new Intl.NumberFormat("en-US");
@@ -98,6 +110,34 @@ function formatCount(value: number): string {
 }
 
 const LOADING_PLACEHOLDER = "···";
+const UNAVAILABLE_PLACEHOLDER = "—";
+
+/**
+ * One counter value in all three states: the loading ellipsis, the formatted
+ * total, or a quiet em-dash once the backend has failed. The dash is hidden
+ * from the aria-live announcement in favor of a localized description.
+ */
+function CountValue({
+  views,
+  field,
+  unavailableLabel,
+}: {
+  views: PageViews | null | undefined;
+  field: keyof PageViews;
+  unavailableLabel: string;
+}) {
+  if (views === null) {
+    return (
+      <span className="font-medium">
+        <span aria-hidden="true">{UNAVAILABLE_PLACEHOLDER}</span>
+        <span className="sr-only">{unavailableLabel}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="font-medium">{views ? formatCount(views[field]) : LOADING_PLACEHOLDER}</span>
+  );
+}
 
 /** Site-wide PV/UV totals, rendered in the footer on every page. */
 export function SitePageViews({
@@ -108,16 +148,17 @@ export function SitePageViews({
   siteVisitorsLabel: string;
 }) {
   const views = usePageViews();
+  const { unavailable } = usePageViewsDictionary();
 
   return (
     <p className="text-xs text-muted-foreground tabular-nums" aria-live="polite">
       {siteViewsLabel}{" "}
-      <span className="font-medium">{views ? formatCount(views.sitePv) : LOADING_PLACEHOLDER}</span>
+      <CountValue views={views} field="sitePv" unavailableLabel={unavailable} />
       <span aria-hidden="true" className="px-2">
         ·
       </span>
       {siteVisitorsLabel}{" "}
-      <span className="font-medium">{views ? formatCount(views.siteUv) : LOADING_PLACEHOLDER}</span>
+      <CountValue views={views} field="siteUv" unavailableLabel={unavailable} />
     </p>
   );
 }
@@ -125,6 +166,7 @@ export function SitePageViews({
 /** Per-page view count, rendered on chart detail pages. */
 export function ChartPageViews({ label, className }: { label: string; className?: string }) {
   const views = usePageViews();
+  const { unavailable } = usePageViewsDictionary();
 
   return (
     <span
@@ -136,7 +178,7 @@ export function ChartPageViews({ label, className }: { label: string; className?
     >
       <EyeIcon className="size-4" aria-hidden="true" />
       {label}{" "}
-      <span className="font-medium">{views ? formatCount(views.pagePv) : LOADING_PLACEHOLDER}</span>
+      <CountValue views={views} field="pagePv" unavailableLabel={unavailable} />
     </span>
   );
 }
