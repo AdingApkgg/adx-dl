@@ -97,7 +97,7 @@ describe("page views locale-driven content", () => {
     expect(jaDetail.downloadErrorPrefix).toBe("ダウンロード失敗: ");
   });
 
-  test("charts view uses the route locale for copy, detail links, and renders the version + level filter selects", () => {
+  test("charts view uses the route locale for copy, detail links, and renders the direct-select filter rows", () => {
     const entry = buildEntry();
 
     const enHtml = renderToStaticMarkup(<ChartsPageView entries={[entry]} locale="en" />);
@@ -109,12 +109,15 @@ describe("page views locale-driven content", () => {
     expect(enHtml).toContain('data-layout="card-grid"');
     expect(enHtml).toContain('alt="Song 1 cover"');
     expect(enHtml).toContain("aspect-square");
-    expect(enHtml.match(/role="combobox"/g)?.length).toBe(2);
+    // Version and level are chip rows now, not dropdowns.
+    expect(enHtml).toContain("Version");
+    expect(enHtml).toContain("Level");
 
     expect(jaHtml).toContain("曲目 1");
     expect(jaHtml).toContain("歌手 1");
     expect(jaHtml).toContain(`href="/ja/charts/song-1"`);
-    expect(jaHtml.match(/role="combobox"/g)?.length).toBe(2);
+    expect(jaHtml).toContain("バージョン");
+    expect(jaHtml).toContain("レベル");
   });
 
   test("detail view uses english fallback fields only for en and original fields for ja", () => {

@@ -88,6 +88,8 @@ export type CatalogCardEntry = Pick<
   | "cabinet"
   | "short_id"
   | "aliases"
+  | "bpm"
+  | "assets"
   | "difficulties"
 > & {
   media: Pick<CatalogEntryMedia, "cover_url" | "cover_avif" | "cover_webp">;
@@ -112,6 +114,8 @@ export function toCatalogCardEntry(entry: CatalogEntry): CatalogCardEntry {
     cabinet: entry.cabinet,
     short_id: entry.short_id,
     ...(entry.aliases?.length ? { aliases: entry.aliases } : {}),
+    bpm: entry.bpm,
+    assets: entry.assets,
     difficulties: entry.difficulties,
     media: {
       cover_url: entry.media.cover_url,
@@ -523,6 +527,35 @@ export function entryHasLevel(
   return entry.difficulties.some(
     (difficulty) => difficultyDisplayLevel(difficulty.level ?? "") === level
   );
+}
+
+/** Cabinet grouped into the three player-facing buckets used by the filter:
+ *  DX (でらっくす), ST (standard), and everything else → UTG (宴 / Utage). */
+export type CabinetBucket = "DX" | "ST" | "UTG";
+export function cabinetBucket(cabinet: string): CabinetBucket {
+  const key = cabinet.trim();
+  if (key === "DX") return "DX";
+  if (key === "ST") return "ST";
+  return "UTG";
+}
+
+/** BPM buckets (ids match the `bpm` URL param values). */
+export const BPM_BUCKETS: ReadonlyArray<{ id: string; label: string; min: number; max: number }> = [
+  { id: "0", label: "≤ 120", min: 0, max: 120 },
+  { id: "1", label: "121–160", min: 121, max: 160 },
+  { id: "2", label: "161–200", min: 161, max: 200 },
+  { id: "3", label: "201+", min: 201, max: Infinity },
+];
+export function bpmBucketId(bpm: number | null | undefined): string | null {
+  if (typeof bpm !== "number" || !Number.isFinite(bpm)) return null;
+  const bucket = BPM_BUCKETS.find((b) => bpm >= b.min && bpm <= b.max);
+  return bucket ? bucket.id : null;
+}
+
+/** Version name without its "maimai" / "maimai DX" era prefix ("maimai DX
+ *  CiRCLE" → "CiRCLE"); base versions keep their full name. */
+export function versionShortName(name: string): string {
+  return name.replace(/^maimai(?:\s+DX)?\s*/i, "").trim() || name;
 }
 
 const CATEGORY_LABELS: Record<string, { zh: string; ja: string }> = {

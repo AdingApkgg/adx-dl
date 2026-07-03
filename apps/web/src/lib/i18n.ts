@@ -134,6 +134,17 @@ export type SiteDictionary = {
     clearFilters: string;
     activeFiltersLabel: string;
     removeFilter: (label: string) => string;
+    filterAll: string;
+    filterVersion: string;
+    filterLevel: string;
+    filterGenre: string;
+    filterCabinet: string;
+    filterBpm: string;
+    filterAssets: string;
+    cabinetStandard: string;
+    cabinetUtage: string;
+    assetHasPv: string;
+    assetHasDx: string;
     resultsSummary: (count: number) => string;
     previousPage: string;
     nextPage: string;
@@ -501,6 +512,17 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       clearFilters: "清除全部筛选",
       activeFiltersLabel: "已应用筛选",
       removeFilter: (label) => `移除筛选：${label}`,
+      filterAll: "全部",
+      filterVersion: "版本",
+      filterLevel: "等级",
+      filterGenre: "曲风",
+      filterCabinet: "机种",
+      filterBpm: "BPM",
+      filterAssets: "资源",
+      cabinetStandard: "标准",
+      cabinetUtage: "宴会场",
+      assetHasPv: "含 PV",
+      assetHasDx: "含 DX 谱",
       resultsSummary: (count) => `共 ${count} 首谱面`,
       previousPage: "上一页",
       nextPage: "下一页",
@@ -851,6 +873,17 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       clearFilters: "Clear all filters",
       activeFiltersLabel: "Active filters",
       removeFilter: (label) => `Remove filter: ${label}`,
+      filterAll: "All",
+      filterVersion: "Version",
+      filterLevel: "Level",
+      filterGenre: "Genre",
+      filterCabinet: "Type",
+      filterBpm: "BPM",
+      filterAssets: "Assets",
+      cabinetStandard: "Standard",
+      cabinetUtage: "Utage",
+      assetHasPv: "Has PV",
+      assetHasDx: "Has DX chart",
       resultsSummary: (count) => (count === 1 ? "1 chart" : `${count} charts`),
       previousPage: "Previous",
       nextPage: "Next",
@@ -1211,6 +1244,17 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       clearFilters: "フィルターをすべて解除",
       activeFiltersLabel: "適用中のフィルター",
       removeFilter: (label) => `フィルターを解除：${label}`,
+      filterAll: "すべて",
+      filterVersion: "バージョン",
+      filterLevel: "レベル",
+      filterGenre: "ジャンル",
+      filterCabinet: "種別",
+      filterBpm: "BPM",
+      filterAssets: "収録",
+      cabinetStandard: "スタンダード",
+      cabinetUtage: "宴会場",
+      assetHasPv: "PV あり",
+      assetHasDx: "DX 譜面あり",
       resultsSummary: (count) => `全 ${count} 譜面`,
       previousPage: "前へ",
       nextPage: "次へ",

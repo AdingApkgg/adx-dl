@@ -10,7 +10,6 @@ import { BatchDownloadBar } from "@/components/site/batch-download-bar";
 import { ChartCard } from "@/components/site/chart-card";
 import {
   ALL_CATEGORIES,
-  ALL_LEVELS,
   ALL_SUBCATEGORIES,
   applyCatalogFilters,
   buildCatalogSearchWithMatches,
@@ -19,11 +18,15 @@ import {
 } from "@/lib/catalog-search";
 import type { CatalogCardEntry, ChartDownloadSpec } from "@/lib/catalog-shared";
 import {
+  BPM_BUCKETS,
+  bpmBucketId,
+  cabinetBucket,
   collectDifficultyLevels,
   entryHasLevel,
   GENRES,
   resolveGenreId,
   sortByReleaseDesc,
+  versionShortName,
 } from "@/lib/catalog-shared";
 import { getDictionary } from "@/lib/i18n";
 import { jsonFetcher } from "@/lib/swr-fetcher";
@@ -36,14 +39,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { tabsListVariants, tabsTriggerClassName } from "@/components/ui/tabs";
 
 type CatalogBrowserProps = {
@@ -79,10 +74,14 @@ export function CatalogBrowser({
   const [inputValue, setInputValue] = React.useState("");
   const [query, setQuery] = React.useState("");
   const [category, setCategory] = React.useState(initialCategory);
-  const [subcategory, setSubcategory] = React.useState(ALL_SUBCATEGORIES);
-  // Genres are multi-select (OR): an empty set means "all genres".
+  // Every dimension is a multi-select chip row: an empty set means "all", and
+  // selections are OR within a dimension, AND across dimensions.
+  const [versionSet, setVersionSet] = React.useState<ReadonlySet<string>>(new Set());
+  const [levelSet, setLevelSet] = React.useState<ReadonlySet<string>>(new Set());
   const [genreIds, setGenreIds] = React.useState<ReadonlySet<string>>(new Set());
-  const [level, setLevel] = React.useState(ALL_LEVELS);
+  const [cabinetSet, setCabinetSet] = React.useState<ReadonlySet<string>>(new Set());
+  const [bpmSet, setBpmSet] = React.useState<ReadonlySet<string>>(new Set());
+  const [assetSet, setAssetSet] = React.useState<ReadonlySet<string>>(new Set());
   const [hasUserSelectedCategory, setHasUserSelectedCategory] = React.useState(false);
   const [currentPage, setCurrentPage] = React.useState(1);
   const [selectMode, setSelectMode] = React.useState(false);
@@ -104,30 +103,32 @@ export function CatalogBrowser({
   React.useLayoutEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const q = params.get("q");
-    const genreParam = params.get("genre");
-    const versionParam = params.get("version");
-    const levelParam = params.get("level");
     const pageParam = Number(params.get("page") ?? "");
+    // Each dimension param is a comma-separated list; the home page still
+    // deep-links a single genre id, which parses as a one-item set.
+    const readSet = (key: string): ReadonlySet<string> | null => {
+      const raw = params.get(key);
+      if (!raw) return null;
+      const items = raw.split(",").filter(Boolean);
+      return items.length > 0 ? new Set(items) : null;
+    };
     /* eslint-disable react-hooks/set-state-in-effect */
     if (q) {
       setInputValue(q);
       setQuery(q);
     }
-    if (genreParam) {
-      // Comma-separated genre ids; the home page still deep-links a single id.
-      const ids = genreParam.split(",").filter((id) => GENRES[Number(id)]);
-      if (ids.length > 0) {
-        setGenreIds(new Set(ids));
-      }
-    }
-    if (versionParam) {
-      // Invalid values resolve back to "all versions" via resolvedSubcategory.
-      setSubcategory(versionParam);
-    }
-    if (levelParam) {
-      // Invalid values resolve back to "all levels" via resolvedLevel.
-      setLevel(levelParam);
-    }
+    const genreSet = readSet("genre");
+    if (genreSet) setGenreIds(new Set([...genreSet].filter((id) => GENRES[Number(id)])));
+    const version = readSet("version");
+    if (version) setVersionSet(version);
+    const level = readSet("level");
+    if (level) setLevelSet(level);
+    const cabinet = readSet("cabinet");
+    if (cabinet) setCabinetSet(cabinet);
+    const bpm = readSet("bpm");
+    if (bpm) setBpmSet(bpm);
+    const asset = readSet("asset");
+    if (asset) setAssetSet(asset);
     if (Number.isInteger(pageParam) && pageParam > 1) {
       setCurrentPage(pageParam);
     }
@@ -185,20 +186,16 @@ export function CatalogBrowser({
     () => new Map(searchResults.map((result) => [result.entry.id, result.aliasHit])),
     [searchResults]
   );
-  const subcategories = React.useMemo(() => {
-    const options = getSubcategoryOptions(baseEntries, effectiveCategory);
-    // Order versions newest-first (matches the release-order sort everywhere else).
-    const versions = options
-      .filter((value) => value !== ALL_SUBCATEGORIES)
-      .sort((a, b) => (versionImageIndex(b) ?? -1) - (versionImageIndex(a) ?? -1));
-    return [ALL_SUBCATEGORIES, ...versions];
-  }, [baseEntries, effectiveCategory]);
-  // The selected version stays in state even when the current search narrows
-  // the option set past it — it resolves back automatically once it matches
-  // again, so typing a query never wipes the user's version choice.
-  const resolvedSubcategory = subcategories.includes(subcategory)
-    ? subcategory
-    : ALL_SUBCATEGORIES;
+  // Dimension chip option lists. Derived from the full catalog (not the current
+  // search) so the chip rows stay stable while you type or narrow other filters.
+  const versionOptions = React.useMemo(
+    () =>
+      getSubcategoryOptions(entries, effectiveCategory)
+        .filter((value) => value !== ALL_SUBCATEGORIES)
+        .sort((a, b) => (versionImageIndex(b) ?? -1) - (versionImageIndex(a) ?? -1)),
+    [entries, effectiveCategory]
+  );
+  const levelOptions = React.useMemo(() => collectDifficultyLevels(entries), [entries]);
   const genreOptions = React.useMemo(() => {
     const ids = new Set<number>();
     for (const entry of entries) {
@@ -207,33 +204,69 @@ export function CatalogBrowser({
     }
     return [...ids].sort((a, b) => a - b);
   }, [entries]);
-  // Level filter options come from the data itself (distinct levels, play order).
-  const levelOptions = React.useMemo(() => collectDifficultyLevels(entries), [entries]);
-  // Like the version select: an unknown level (stale URL, narrowed data set)
-  // resolves to "all" without wiping the user's stored choice.
-  const resolvedLevel = levelOptions.includes(level) ? level : ALL_LEVELS;
+  const cabinetOptions = React.useMemo(() => {
+    const present = new Set<string>();
+    for (const entry of entries) present.add(cabinetBucket(entry.cabinet));
+    return (["DX", "ST", "UTG"] as const).filter((value) => present.has(value));
+  }, [entries]);
+  const bpmOptions = React.useMemo(() => {
+    const present = new Set<string>();
+    for (const entry of entries) {
+      const id = bpmBucketId(entry.bpm);
+      if (id) present.add(id);
+    }
+    return BPM_BUCKETS.filter((bucket) => present.has(bucket.id));
+  }, [entries]);
+  const assetOptions = React.useMemo(() => {
+    const options: Array<{ id: "pv" | "dx"; label: string }> = [];
+    if (entries.some((entry) => entry.assets?.has_pv)) {
+      options.push({ id: "pv", label: dictionary.assetHasPv });
+    }
+    if (entries.some((entry) => entry.assets?.has_dx_chart)) {
+      options.push({ id: "dx", label: dictionary.assetHasDx });
+    }
+    return options;
+  }, [entries, dictionary.assetHasPv, dictionary.assetHasDx]);
+
   const visibleEntries = React.useMemo(() => {
-    let filtered = applyCatalogFilters(baseEntries, effectiveCategory, resolvedSubcategory);
+    let filtered = applyCatalogFilters(baseEntries, effectiveCategory, ALL_SUBCATEGORIES);
+    // OR within each dimension, AND across dimensions.
+    if (versionSet.size > 0) {
+      filtered = filtered.filter((entry) => versionSet.has(entry.subcategory));
+    }
+    if (levelSet.size > 0) {
+      filtered = filtered.filter((entry) =>
+        [...levelSet].some((level) => entryHasLevel(entry, level))
+      );
+    }
     if (genreIds.size > 0) {
-      // Multi-select genres are OR: an entry matches any selected genre.
       filtered = filtered.filter((entry) => genreIds.has(String(resolveGenreId(entry))));
     }
-    if (resolvedLevel !== ALL_LEVELS) {
-      // An entry matches when ANY of its difficulties carries the level.
-      filtered = filtered.filter((entry) => entryHasLevel(entry, resolvedLevel));
+    if (cabinetSet.size > 0) {
+      filtered = filtered.filter((entry) => cabinetSet.has(cabinetBucket(entry.cabinet)));
+    }
+    if (bpmSet.size > 0) {
+      filtered = filtered.filter((entry) => {
+        const id = bpmBucketId(entry.bpm);
+        return id !== null && bpmSet.has(id);
+      });
+    }
+    if (assetSet.size > 0) {
+      // Asset toggles are requirements (AND): each selected asset must be present.
+      filtered = filtered.filter(
+        (entry) =>
+          (!assetSet.has("pv") || Boolean(entry.assets?.has_pv)) &&
+          (!assetSet.has("dx") || Boolean(entry.assets?.has_dx_chart))
+      );
     }
     return filtered;
-  }, [baseEntries, effectiveCategory, resolvedSubcategory, genreIds, resolvedLevel]);
+  }, [baseEntries, effectiveCategory, versionSet, levelSet, genreIds, cabinetSet, bpmSet, assetSet]);
   // Default browse order is newest-first by release (version era, then song id);
   // a text query keeps the search relevance ranking instead.
   const orderedEntries = React.useMemo(
     () => (hasQuery ? visibleEntries : sortByReleaseDesc(visibleEntries)),
     [hasQuery, visibleEntries]
   );
-  const selectedSubcategoryLabel =
-    resolvedSubcategory === ALL_SUBCATEGORIES
-      ? dictionary.allSubcategories
-      : resolvedSubcategory;
   const totalPages = Math.max(1, Math.ceil(visibleEntries.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const paginatedEntries = React.useMemo(() => {
@@ -246,30 +279,48 @@ export function CatalogBrowser({
 
   const hasActiveFilters =
     hasQuery ||
+    versionSet.size > 0 ||
+    levelSet.size > 0 ||
     genreIds.size > 0 ||
-    resolvedSubcategory !== ALL_SUBCATEGORIES ||
-    resolvedLevel !== ALL_LEVELS ||
+    cabinetSet.size > 0 ||
+    bpmSet.size > 0 ||
+    assetSet.size > 0 ||
     (hasUserSelectedCategory && effectiveCategory !== ALL_CATEGORIES);
 
-  const toggleGenre = (id: string) =>
-    setGenreIds((prev) => {
+  // Toggle a value in a dimension set and reset to page 1. `clearSet` empties a
+  // whole dimension (its "all" chip).
+  type SetState = React.Dispatch<React.SetStateAction<ReadonlySet<string>>>;
+  const toggleIn = (setter: SetState) => (id: string) => {
+    setter((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
+    setCurrentPage(1);
+  };
+  const clearSet = (setter: SetState) => () => {
+    setter(new Set());
+    setCurrentPage(1);
+  };
+  const toggleVersion = toggleIn(setVersionSet);
+  const toggleLevel = toggleIn(setLevelSet);
+  const toggleGenre = toggleIn(setGenreIds);
+  const toggleCabinet = toggleIn(setCabinetSet);
+  const toggleBpm = toggleIn(setBpmSet);
+  const toggleAsset = toggleIn(setAssetSet);
 
   const clearAllFilters = () => {
     if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
     debounceRef.current = null;
     setInputValue("");
     setQuery("");
+    setVersionSet(new Set());
+    setLevelSet(new Set());
     setGenreIds(new Set());
-    setSubcategory(ALL_SUBCATEGORIES);
-    setLevel(ALL_LEVELS);
+    setCabinetSet(new Set());
+    setBpmSet(new Set());
+    setAssetSet(new Set());
     setCategory(initialCategory);
     setHasUserSelectedCategory(false);
     setCurrentPage(1);
@@ -285,10 +336,14 @@ export function CatalogBrowser({
       if (value !== null) params.set(key, value);
       else params.delete(key);
     };
+    const joinSet = (set: ReadonlySet<string>) => (set.size > 0 ? [...set].join(",") : null);
     apply("q", hasQuery ? query : null);
-    apply("genre", genreIds.size > 0 ? [...genreIds].join(",") : null);
-    apply("version", resolvedSubcategory !== ALL_SUBCATEGORIES ? resolvedSubcategory : null);
-    apply("level", resolvedLevel !== ALL_LEVELS ? resolvedLevel : null);
+    apply("version", joinSet(versionSet));
+    apply("level", joinSet(levelSet));
+    apply("genre", joinSet(genreIds));
+    apply("cabinet", joinSet(cabinetSet));
+    apply("bpm", joinSet(bpmSet));
+    apply("asset", joinSet(assetSet));
     apply("page", safeCurrentPage > 1 ? String(safeCurrentPage) : null);
     const queryString = params.toString();
     const next = `${window.location.pathname}${queryString ? `?${queryString}` : ""}${window.location.hash}`;
@@ -296,7 +351,18 @@ export function CatalogBrowser({
     if (next !== current) {
       window.history.replaceState(window.history.state, "", next);
     }
-  }, [urlReady, hasQuery, query, genreIds, resolvedSubcategory, resolvedLevel, safeCurrentPage]);
+  }, [
+    urlReady,
+    hasQuery,
+    query,
+    versionSet,
+    levelSet,
+    genreIds,
+    cabinetSet,
+    bpmSet,
+    assetSet,
+    safeCurrentPage,
+  ]);
 
   const goToPage = (page: number) => {
     setCurrentPage(page);
@@ -380,7 +446,7 @@ export function CatalogBrowser({
                   className={tabsTriggerClassName}
                   onClick={() => {
                     setCategory(value);
-                    setSubcategory(ALL_SUBCATEGORIES);
+                    setVersionSet(new Set());
                     setHasUserSelectedCategory(true);
                     setCurrentPage(1);
                   }}
@@ -393,177 +459,175 @@ export function CatalogBrowser({
         </div>
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_200px_150px]">
-        <div className="relative">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            ref={searchInputRef}
-            className={cn("pl-9", inputValue && "pr-9")}
-            placeholder={dictionary.searchPlaceholder}
-            value={inputValue}
-            onChange={(event) => {
-              const nextValue = event.target.value;
-              setInputValue(nextValue);
-              // Mid-composition updates are IME buffer states (e.g. "dongfang"
-              // on the way to 东方) — commit only once composition ends.
-              if (isComposingRef.current) return;
-              scheduleCommit(nextValue);
-            }}
-            onCompositionStart={() => {
-              isComposingRef.current = true;
-            }}
-            onCompositionEnd={(event) => {
-              isComposingRef.current = false;
-              scheduleCommit(event.currentTarget.value);
-            }}
-          />
-          {inputValue ? (
-            <button
-              type="button"
-              aria-label={dictionary.clearSearch}
-              onClick={clearSearch}
-              className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <XIcon className="size-4" />
-            </button>
-          ) : null}
-        </div>
-
-        <Select
-          value={resolvedSubcategory}
-          onValueChange={(value) => {
-            setSubcategory(value);
-            setCurrentPage(1);
+      <div className="relative">
+        <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          ref={searchInputRef}
+          className={cn("pl-9", inputValue && "pr-9")}
+          placeholder={dictionary.searchPlaceholder}
+          value={inputValue}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            setInputValue(nextValue);
+            // Mid-composition updates are IME buffer states (e.g. "dongfang"
+            // on the way to 东方) — commit only once composition ends.
+            if (isComposingRef.current) return;
+            scheduleCommit(nextValue);
           }}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder={dictionary.allSubcategories}>
-              <span className="flex items-center gap-2 truncate">
-                {resolvedSubcategory !== ALL_SUBCATEGORIES && versionImageSrc(resolvedSubcategory) ? (
-                  <Image
-                    src={versionImageSrc(resolvedSubcategory)!}
-                    alt=""
-                    width={VERSION_IMAGE_DIMENSIONS.width}
-                    height={VERSION_IMAGE_DIMENSIONS.height}
-                    unoptimized
-                    className="h-5 w-auto shrink-0"
-                  />
-                ) : null}
-                <span className="truncate">{selectedSubcategoryLabel}</span>
-              </span>
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {subcategories.map((value) => {
-                const iconSrc = value === ALL_SUBCATEGORIES ? null : versionImageSrc(value);
-                return (
-                  <SelectItem key={value} value={value}>
-                    <span className="flex items-center gap-2">
-                      {iconSrc ? (
-                        <Image
-                          src={iconSrc}
-                          alt=""
-                          width={VERSION_IMAGE_DIMENSIONS.width}
-                          height={VERSION_IMAGE_DIMENSIONS.height}
-                          unoptimized
-                          className="h-5 w-auto shrink-0"
-                        />
-                      ) : null}
-                      {value === ALL_SUBCATEGORIES ? dictionary.allSubcategories : value}
-                    </span>
-                  </SelectItem>
-                );
-              })}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-
-        {/* Level filter: options derived from the data; matches an entry when
-            ANY of its difficulties carries the selected level. */}
-        <Select
-          value={resolvedLevel}
-          onValueChange={(value) => {
-            setLevel(value);
-            setCurrentPage(1);
+          onCompositionStart={() => {
+            isComposingRef.current = true;
           }}
-        >
-          <SelectTrigger className="w-full" aria-label={dictionary.levelFilterLabel}>
-            {/* Explicit children (not item-text lookup) so the label is present
-                in the prerendered HTML, like the version select above. */}
-            <SelectValue placeholder={dictionary.allLevels}>
-              <span className="truncate">
-                {resolvedLevel === ALL_LEVELS
-                  ? dictionary.allLevels
-                  : dictionary.levelOption(resolvedLevel)}
-              </span>
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value={ALL_LEVELS}>{dictionary.allLevels}</SelectItem>
-              {levelOptions.map((value) => (
-                <SelectItem key={value} value={value}>
-                  {dictionary.levelOption(value)}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+          onCompositionEnd={(event) => {
+            isComposingRef.current = false;
+            scheduleCommit(event.currentTarget.value);
+          }}
+        />
+        {inputValue ? (
+          <button
+            type="button"
+            aria-label={dictionary.clearSearch}
+            onClick={clearSearch}
+            className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <XIcon className="size-4" />
+          </button>
+        ) : null}
       </div>
 
-      {genreOptions.length > 0 ? (
-        // Multi-select genre chips (OR). "All genres" clears the set; the others
-        // toggle, so several genres can be combined.
-        <div className="flex flex-wrap gap-2" role="group" aria-label={dictionary.allGenres}>
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.93 }}
-            aria-pressed={genreIds.size === 0}
-            onClick={() => {
-              setGenreIds(new Set());
-              setCurrentPage(1);
-            }}
-            className={cn(
-              "min-h-8 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-              genreIds.size === 0
-                ? "border-primary bg-primary/15 text-primary"
-                : "border-border text-muted-foreground hover:bg-muted/60"
-            )}
-          >
-            {dictionary.allGenres}
-          </motion.button>
-          {genreOptions.map((id) => {
-            const active = genreIds.has(String(id));
-            return (
-              <motion.button
-                key={id}
-                type="button"
-                whileTap={{ scale: 0.93 }}
-                aria-pressed={active}
-                onClick={() => {
-                  toggleGenre(String(id));
-                  setCurrentPage(1);
-                }}
-                className={cn(
-                  "flex min-h-8 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                  GENRES[id].badge,
-                  active ? "ring-2 ring-current" : "opacity-70 hover:opacity-100"
-                )}
+      {/* One chip row per dimension — pick directly, combine across rows. Each
+          row's "all" chip clears just that dimension. */}
+      <div className="flex flex-col gap-2.5">
+        {versionOptions.length > 0 ? (
+          <ChipFilterRow label={dictionary.filterVersion}>
+            <AllChip active={versionSet.size === 0} onClick={clearSet(setVersionSet)}>
+              {dictionary.filterAll}
+            </AllChip>
+            {versionOptions.map((value) => {
+              const iconSrc = versionImageSrc(value);
+              return (
+                <ToggleChip
+                  key={value}
+                  active={versionSet.has(value)}
+                  onClick={() => toggleVersion(value)}
+                >
+                  {iconSrc ? (
+                    <Image
+                      src={iconSrc}
+                      alt=""
+                      width={VERSION_IMAGE_DIMENSIONS.width}
+                      height={VERSION_IMAGE_DIMENSIONS.height}
+                      unoptimized
+                      className="h-4 w-auto shrink-0"
+                    />
+                  ) : null}
+                  {versionShortName(value)}
+                </ToggleChip>
+              );
+            })}
+          </ChipFilterRow>
+        ) : null}
+
+        {levelOptions.length > 0 ? (
+          <ChipFilterRow label={dictionary.filterLevel}>
+            <AllChip active={levelSet.size === 0} onClick={clearSet(setLevelSet)}>
+              {dictionary.filterAll}
+            </AllChip>
+            {levelOptions.map((value) => (
+              <ToggleChip
+                key={value}
+                active={levelSet.has(value)}
+                onClick={() => toggleLevel(value)}
               >
-                {active ? <CheckIcon className="size-3.5" aria-hidden="true" /> : null}
-                {GENRES[id][locale]}
-              </motion.button>
-            );
-          })}
-        </div>
-      ) : null}
+                {value}
+              </ToggleChip>
+            ))}
+          </ChipFilterRow>
+        ) : null}
+
+        {genreOptions.length > 0 ? (
+          <ChipFilterRow label={dictionary.filterGenre}>
+            <AllChip active={genreIds.size === 0} onClick={clearSet(setGenreIds)}>
+              {dictionary.filterAll}
+            </AllChip>
+            {genreOptions.map((id) => {
+              const active = genreIds.has(String(id));
+              return (
+                <ToggleChip
+                  key={id}
+                  active={active}
+                  onClick={() => toggleGenre(String(id))}
+                  // Genre chips carry the genre's own tint when active.
+                  className={cn(
+                    GENRES[id].badge,
+                    active ? "ring-2 ring-current" : "border-transparent opacity-70 hover:opacity-100"
+                  )}
+                  plain
+                >
+                  {GENRES[id][locale]}
+                </ToggleChip>
+              );
+            })}
+          </ChipFilterRow>
+        ) : null}
+
+        {cabinetOptions.length > 0 ? (
+          <ChipFilterRow label={dictionary.filterCabinet}>
+            <AllChip active={cabinetSet.size === 0} onClick={clearSet(setCabinetSet)}>
+              {dictionary.filterAll}
+            </AllChip>
+            {cabinetOptions.map((value) => (
+              <ToggleChip
+                key={value}
+                active={cabinetSet.has(value)}
+                onClick={() => toggleCabinet(value)}
+              >
+                {value === "DX"
+                  ? "DX"
+                  : value === "ST"
+                    ? dictionary.cabinetStandard
+                    : dictionary.cabinetUtage}
+              </ToggleChip>
+            ))}
+          </ChipFilterRow>
+        ) : null}
+
+        {bpmOptions.length > 0 ? (
+          <ChipFilterRow label={dictionary.filterBpm}>
+            <AllChip active={bpmSet.size === 0} onClick={clearSet(setBpmSet)}>
+              {dictionary.filterAll}
+            </AllChip>
+            {bpmOptions.map((bucket) => (
+              <ToggleChip
+                key={bucket.id}
+                active={bpmSet.has(bucket.id)}
+                onClick={() => toggleBpm(bucket.id)}
+              >
+                {bucket.label}
+              </ToggleChip>
+            ))}
+          </ChipFilterRow>
+        ) : null}
+
+        {assetOptions.length > 0 ? (
+          <ChipFilterRow label={dictionary.filterAssets}>
+            {assetOptions.map((option) => (
+              <ToggleChip
+                key={option.id}
+                active={assetSet.has(option.id)}
+                onClick={() => toggleAsset(option.id)}
+              >
+                {option.label}
+              </ToggleChip>
+            ))}
+          </ChipFilterRow>
+        ) : null}
+      </div>
 
       {hasActiveFilters ? (
         // A single place to see every applied condition and drop any one of
         // them — the fast path for narrowing by several criteria at once.
         <div
-          className="flex flex-wrap items-center gap-2"
+          className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3"
           role="group"
           aria-label={dictionary.activeFiltersLabel}
         >
@@ -576,17 +640,15 @@ export function CatalogBrowser({
               {query}
             </FilterChip>
           ) : null}
-          {resolvedSubcategory !== ALL_SUBCATEGORIES ? (
+          {[...versionSet].map((value) => (
             <FilterChip
-              onRemove={() => {
-                setSubcategory(ALL_SUBCATEGORIES);
-                setCurrentPage(1);
-              }}
-              removeLabel={dictionary.removeFilter(resolvedSubcategory)}
+              key={`v-${value}`}
+              onRemove={() => toggleVersion(value)}
+              removeLabel={dictionary.removeFilter(value)}
               icon={
-                versionImageSrc(resolvedSubcategory) ? (
+                versionImageSrc(value) ? (
                   <Image
-                    src={versionImageSrc(resolvedSubcategory)!}
+                    src={versionImageSrc(value)!}
                     alt=""
                     width={VERSION_IMAGE_DIMENSIONS.width}
                     height={VERSION_IMAGE_DIMENSIONS.height}
@@ -596,34 +658,70 @@ export function CatalogBrowser({
                 ) : undefined
               }
             >
-              {resolvedSubcategory}
+              {versionShortName(value)}
             </FilterChip>
-          ) : null}
-          {resolvedLevel !== ALL_LEVELS ? (
+          ))}
+          {[...levelSet].map((value) => (
             <FilterChip
-              onRemove={() => {
-                setLevel(ALL_LEVELS);
-                setCurrentPage(1);
-              }}
-              removeLabel={dictionary.removeFilter(dictionary.levelOption(resolvedLevel))}
+              key={`l-${value}`}
+              onRemove={() => toggleLevel(value)}
+              removeLabel={dictionary.removeFilter(dictionary.levelOption(value))}
             >
-              {dictionary.levelOption(resolvedLevel)}
+              {dictionary.levelOption(value)}
             </FilterChip>
-          ) : null}
+          ))}
           {[...genreIds].map((id) => {
             const info = GENRES[Number(id)];
             if (!info) return null;
             return (
               <FilterChip
-                key={id}
-                onRemove={() => {
-                  toggleGenre(id);
-                  setCurrentPage(1);
-                }}
+                key={`g-${id}`}
+                onRemove={() => toggleGenre(id)}
                 removeLabel={dictionary.removeFilter(info[locale])}
                 className={info.badge}
               >
                 {info[locale]}
+              </FilterChip>
+            );
+          })}
+          {[...cabinetSet].map((value) => {
+            const label =
+              value === "DX"
+                ? "DX"
+                : value === "ST"
+                  ? dictionary.cabinetStandard
+                  : dictionary.cabinetUtage;
+            return (
+              <FilterChip
+                key={`c-${value}`}
+                onRemove={() => toggleCabinet(value)}
+                removeLabel={dictionary.removeFilter(label)}
+              >
+                {label}
+              </FilterChip>
+            );
+          })}
+          {[...bpmSet].map((value) => {
+            const label = BPM_BUCKETS.find((b) => b.id === value)?.label ?? value;
+            return (
+              <FilterChip
+                key={`b-${value}`}
+                onRemove={() => toggleBpm(value)}
+                removeLabel={dictionary.removeFilter(label)}
+              >
+                {label}
+              </FilterChip>
+            );
+          })}
+          {[...assetSet].map((value) => {
+            const label = value === "pv" ? dictionary.assetHasPv : dictionary.assetHasDx;
+            return (
+              <FilterChip
+                key={`a-${value}`}
+                onRemove={() => toggleAsset(value)}
+                removeLabel={dictionary.removeFilter(label)}
+              >
+                {label}
               </FilterChip>
             );
           })}
@@ -800,6 +898,83 @@ export function CatalogBrowser({
         ) : null}
       </AnimatePresence>
     </div>
+  );
+}
+
+// A labeled row of filter chips (one dimension). The label sits left of a
+// wrapping chip group so several rows stack into a compact filter panel.
+function ChipFilterRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-start gap-x-2 gap-y-2">
+      <span className="w-14 shrink-0 pt-1.5 text-xs font-medium text-muted-foreground">
+        {label}
+      </span>
+      <div className="flex flex-1 flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
+// The "all" chip that clears a whole dimension (active when nothing is picked).
+function AllChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <motion.button
+      type="button"
+      whileTap={{ scale: 0.93 }}
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "min-h-8 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+        active
+          ? "border-primary bg-primary/15 text-primary"
+          : "border-border text-muted-foreground hover:bg-muted/60"
+      )}
+    >
+      {children}
+    </motion.button>
+  );
+}
+
+// A single multi-select filter chip. `plain` drops the default tint so a genre
+// chip can carry its own color via `className`.
+function ToggleChip({
+  active,
+  onClick,
+  children,
+  className,
+  plain,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+  plain?: boolean;
+}) {
+  return (
+    <motion.button
+      type="button"
+      whileTap={{ scale: 0.93 }}
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "flex min-h-8 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+        !plain &&
+          (active
+            ? "border-primary bg-primary/15 text-primary"
+            : "border-border text-muted-foreground hover:bg-muted/60"),
+        className
+      )}
+    >
+      {active ? <CheckIcon className="size-3.5 shrink-0" aria-hidden="true" /> : null}
+      {children}
+    </motion.button>
   );
 }
 
