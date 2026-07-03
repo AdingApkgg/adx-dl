@@ -8,7 +8,6 @@ import { CheckIcon } from "lucide-react";
 
 import { AnimatePresence } from "@/components/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { ChartDownloadSpec, VersionGroup } from "@/lib/catalog-shared";
@@ -165,6 +164,8 @@ export function VersionsBatchGrid({
                     {label}
                   </span>
                 )}
+                {/* Top-left: the selection checkbox in select mode, otherwise
+                    the version's chronological index as a compact id. */}
                 {selectableHere ? (
                   <span
                     aria-hidden="true"
@@ -177,13 +178,26 @@ export function VersionsBatchGrid({
                   >
                     <CheckIcon className="size-4" />
                   </span>
+                ) : group.imageIndex !== null ? (
+                  <span className="absolute top-2 left-2 rounded-md bg-background/85 px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground shadow-sm ring-1 ring-border/60 backdrop-blur-sm">
+                    #{group.imageIndex}
+                  </span>
                 ) : null}
-              </div>
-              <div className="flex items-center justify-between gap-1.5 px-3 pb-1">
-                <span className="min-w-0 truncate text-sm font-medium">{label}</span>
-                <Badge variant={hasCharts ? "secondary" : "outline"} className="shrink-0">
+                {/* Top-right: chart count, overlaid so the name below gets the
+                    full width to scroll. */}
+                <span
+                  className={cn(
+                    "absolute top-2 right-2 rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums shadow-sm ring-1 backdrop-blur-sm",
+                    hasCharts
+                      ? "bg-background/85 text-foreground ring-border/60"
+                      : "bg-background/70 text-muted-foreground ring-border/50"
+                  )}
+                >
                   {versions.chartCount(group.count)}
-                </Badge>
+                </span>
+              </div>
+              <div className="px-3 pb-1">
+                <ScrollingLabel text={label} className="text-sm font-medium" />
               </div>
             </Card>
           );
@@ -249,6 +263,59 @@ export function VersionsBatchGrid({
           />
         ) : null}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/**
+ * A single-line label that gently auto-scrolls to reveal its full text when it
+ * overflows the tile, then returns — so long version names ("maimai DX BUDDiES
+ * PLUS") aren't clipped on a narrow two-column mobile layout. Only overflowing
+ * labels animate; the full name is always in the `title`, and reduced-motion
+ * users get the static (non-scrolling) label via the CSS guard in globals.css.
+ */
+function ScrollingLabel({ text, className }: { text: string; className?: string }) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const textRef = React.useRef<HTMLSpanElement>(null);
+  const [shift, setShift] = React.useState(0);
+
+  React.useEffect(() => {
+    const container = containerRef.current;
+    const textEl = textRef.current;
+    if (!container || !textEl) {
+      return;
+    }
+    const measure = () => {
+      setShift(Math.max(0, Math.ceil(textEl.scrollWidth - container.clientWidth)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [text]);
+
+  const scrolling = shift > 1;
+  // Scale the cycle to the travel distance (~28px/s over the ~60% of the cycle
+  // spent moving) with a floor so short overflows don't whip past.
+  const duration = Math.max(6, Math.round((shift / 28) * 3 + 3));
+
+  return (
+    <div ref={containerRef} className="overflow-hidden" title={text}>
+      <span
+        ref={textRef}
+        data-marquee={scrolling ? "on" : undefined}
+        className={cn("inline-block whitespace-nowrap", className)}
+        style={
+          scrolling
+            ? ({
+                animation: `marquee-reveal ${duration}s ease-in-out infinite`,
+                ["--marquee-shift"]: `-${shift}px`,
+              } as React.CSSProperties)
+            : undefined
+        }
+      >
+        {text}
+      </span>
     </div>
   );
 }

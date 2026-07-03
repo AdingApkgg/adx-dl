@@ -12,10 +12,33 @@
   navigation: auto;
 }
 
+/* Auto-scroll a clipped label to reveal an overflowing name and return.
+   `--marquee-shift` (negative px, set inline per element) is how far to travel;
+   the dwell keyframes hold each end still so it reads as a gentle reveal, not a
+   constant crawl. Applied only to elements the JS marks as actually overflowing. */
+@keyframes marquee-reveal {
+  0%,
+  12% {
+    transform: translateX(0);
+  }
+  48%,
+  60% {
+    transform: translateX(var(--marquee-shift, 0px));
+  }
+  92%,
+  100% {
+    transform: translateX(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*),
   ::view-transition-old(*),
   ::view-transition-new(*) {
+    animation: none !important;
+  }
+  /* No auto-scroll for reduced-motion users; the full name stays in the title. */
+  [data-marquee="on"] {
     animation: none !important;
   }
 }
