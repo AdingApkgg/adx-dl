@@ -119,8 +119,10 @@ export function VersionsBatchGrid({
       </div>
 
       {/* The tile grid is the page's main content: render it visible in the
-          prerendered HTML (no hidden-until-hydration reveal animation). */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          prerendered HTML (no hidden-until-hydration reveal animation).
+          Two columns from the smallest screens up (the version logos are wide,
+          so two fit comfortably even on a 360px phone). */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
         {groups.map((group) => {
           const label = group.name === "Unknown" ? versions.unknownLabel : group.name;
           const src = group.imageIndex !== null ? versionImageSrcByIndex(group.imageIndex) : null;
@@ -149,7 +151,10 @@ export function VersionsBatchGrid({
                     height={VERSION_IMAGE_DIMENSIONS.height}
                     unoptimized
                     className={cn(
-                      "h-full w-auto object-contain",
+                      // max-w-full guards against a logo whose aspect is wider
+                      // than the tile ever exceeding the column (w-auto alone
+                      // isn't capped by object-contain).
+                      "h-full w-auto max-w-full object-contain",
                       !selectMode &&
                         hasCharts &&
                         "transition-transform group-hover/version:scale-[1.03]"
@@ -174,9 +179,9 @@ export function VersionsBatchGrid({
                   </span>
                 ) : null}
               </div>
-              <div className="flex items-center justify-between gap-2 px-3 pb-1">
+              <div className="flex items-center justify-between gap-1.5 px-3 pb-1">
                 <span className="min-w-0 truncate text-sm font-medium">{label}</span>
-                <Badge variant={hasCharts ? "secondary" : "outline"}>
+                <Badge variant={hasCharts ? "secondary" : "outline"} className="shrink-0">
                   {versions.chartCount(group.count)}
                 </Badge>
               </div>
