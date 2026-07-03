@@ -235,15 +235,17 @@ export function CatalogBrowser({
     }
     return BPM_BUCKETS.filter((bucket) => present.has(bucket.id));
   }, [entries]);
-  // Only PV: "has DX chart" is exactly the DX cabinet/type, so it would just
-  // duplicate the Type row's DX chip.
+  // BGA (background video) presence — a single-select pair: with / without.
   const assetOptions = React.useMemo(() => {
-    const options: Array<{ id: "pv"; label: string }> = [];
+    const options: Array<{ id: "pv" | "nopv"; label: string }> = [];
     if (entries.some((entry) => entry.assets?.has_pv)) {
       options.push({ id: "pv", label: dictionary.assetHasPv });
     }
+    if (entries.some((entry) => !entry.assets?.has_pv)) {
+      options.push({ id: "nopv", label: dictionary.assetNoPv });
+    }
     return options;
-  }, [entries, dictionary.assetHasPv]);
+  }, [entries, dictionary.assetHasPv, dictionary.assetNoPv]);
 
   const visibleEntries = React.useMemo(() => {
     let filtered = applyCatalogFilters(baseEntries, effectiveCategory, ALL_SUBCATEGORIES);
@@ -270,6 +272,8 @@ export function CatalogBrowser({
     }
     if (assetSet.has("pv")) {
       filtered = filtered.filter((entry) => Boolean(entry.assets?.has_pv));
+    } else if (assetSet.has("nopv")) {
+      filtered = filtered.filter((entry) => !entry.assets?.has_pv);
     }
     return filtered;
   }, [baseEntries, effectiveCategory, versionSet, levelSet, genreIds, cabinetSet, bpmSet, assetSet]);
@@ -323,7 +327,12 @@ export function CatalogBrowser({
   const toggleGenre = toggleIn(setGenreIds);
   const toggleCabinet = toggleIn(setCabinetSet);
   const toggleBpm = toggleIn(setBpmSet);
-  const toggleAsset = toggleIn(setAssetSet);
+  // BGA is single-select (with / without are mutually exclusive): picking one
+  // replaces the set; re-picking it clears back to "all".
+  const selectAsset = (id: string) => {
+    setAssetSet((prev) => (prev.has(id) ? new Set() : new Set([id])));
+    setCurrentPage(1);
+  };
 
   const clearAllFilters = () => {
     if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
@@ -665,11 +674,14 @@ export function CatalogBrowser({
 
         {assetOptions.length > 0 ? (
           <ChipFilterRow label={dictionary.filterAssets}>
+            <AllChip active={assetSet.size === 0} onClick={clearSet(setAssetSet)}>
+              {dictionary.filterAll}
+            </AllChip>
             {assetOptions.map((option) => (
               <ToggleChip
                 key={option.id}
                 active={assetSet.has(option.id)}
-                onClick={() => toggleAsset(option.id)}
+                onClick={() => selectAsset(option.id)}
               >
                 {option.label}
               </ToggleChip>
@@ -771,15 +783,18 @@ export function CatalogBrowser({
               </FilterChip>
             );
           })}
-          {[...assetSet].map((value) => (
-            <FilterChip
-              key={`a-${value}`}
-              onRemove={() => toggleAsset(value)}
-              removeLabel={dictionary.removeFilter(dictionary.assetHasPv)}
-            >
-              {dictionary.assetHasPv}
-            </FilterChip>
-          ))}
+          {[...assetSet].map((value) => {
+            const label = value === "pv" ? dictionary.assetHasPv : dictionary.assetNoPv;
+            return (
+              <FilterChip
+                key={`a-${value}`}
+                onRemove={() => selectAsset(value)}
+                removeLabel={dictionary.removeFilter(label)}
+              >
+                {label}
+              </FilterChip>
+            );
+          })}
           {hasUserSelectedCategory && effectiveCategory !== ALL_CATEGORIES ? (
             <FilterChip
               onRemove={() => {

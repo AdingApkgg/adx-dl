@@ -145,6 +145,7 @@ export type SiteDictionary = {
     cabinetStandard: string;
     cabinetUtage: string;
     assetHasPv: string;
+    assetNoPv: string;
     resultsSummary: (count: number) => string;
     previousPage: string;
     nextPage: string;
@@ -522,7 +523,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       filterAssets: "资源",
       cabinetStandard: "标准",
       cabinetUtage: "宴会场",
-      assetHasPv: "含 PV",
+      assetHasPv: "包含 BGA 视频",
+      assetNoPv: "不含 BGA 视频",
       resultsSummary: (count) => `共 ${count} 首谱面`,
       previousPage: "上一页",
       nextPage: "下一页",
@@ -883,7 +885,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       filterAssets: "Assets",
       cabinetStandard: "Standard",
       cabinetUtage: "Utage",
-      assetHasPv: "Has PV",
+      assetHasPv: "With BGA video",
+      assetNoPv: "Without BGA video",
       resultsSummary: (count) => (count === 1 ? "1 chart" : `${count} charts`),
       previousPage: "Previous",
       nextPage: "Next",
@@ -1254,7 +1257,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       filterAssets: "収録",
       cabinetStandard: "スタンダード",
       cabinetUtage: "宴会場",
-      assetHasPv: "PV あり",
+      assetHasPv: "BGA 動画あり",
+      assetNoPv: "BGA 動画なし",
       resultsSummary: (count) => `全 ${count} 譜面`,
       previousPage: "前へ",
       nextPage: "次へ",
