@@ -3,7 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import useSWR from "swr";
-import { SearchIcon, XIcon } from "lucide-react";
+import { CheckIcon, SearchIcon, XIcon } from "lucide-react";
 
 import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
@@ -80,7 +80,8 @@ export function CatalogBrowser({
   const [query, setQuery] = React.useState("");
   const [category, setCategory] = React.useState(initialCategory);
   const [subcategory, setSubcategory] = React.useState(ALL_SUBCATEGORIES);
-  const [genre, setGenre] = React.useState("all");
+  // Genres are multi-select (OR): an empty set means "all genres".
+  const [genreIds, setGenreIds] = React.useState<ReadonlySet<string>>(new Set());
   const [level, setLevel] = React.useState(ALL_LEVELS);
   const [hasUserSelectedCategory, setHasUserSelectedCategory] = React.useState(false);
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -112,8 +113,12 @@ export function CatalogBrowser({
       setInputValue(q);
       setQuery(q);
     }
-    if (genreParam && GENRES[Number(genreParam)]) {
-      setGenre(genreParam);
+    if (genreParam) {
+      // Comma-separated genre ids; the home page still deep-links a single id.
+      const ids = genreParam.split(",").filter((id) => GENRES[Number(id)]);
+      if (ids.length > 0) {
+        setGenreIds(new Set(ids));
+      }
     }
     if (versionParam) {
       // Invalid values resolve back to "all versions" via resolvedSubcategory.
@@ -209,15 +214,16 @@ export function CatalogBrowser({
   const resolvedLevel = levelOptions.includes(level) ? level : ALL_LEVELS;
   const visibleEntries = React.useMemo(() => {
     let filtered = applyCatalogFilters(baseEntries, effectiveCategory, resolvedSubcategory);
-    if (genre !== "all") {
-      filtered = filtered.filter((entry) => String(resolveGenreId(entry)) === genre);
+    if (genreIds.size > 0) {
+      // Multi-select genres are OR: an entry matches any selected genre.
+      filtered = filtered.filter((entry) => genreIds.has(String(resolveGenreId(entry))));
     }
     if (resolvedLevel !== ALL_LEVELS) {
       // An entry matches when ANY of its difficulties carries the level.
       filtered = filtered.filter((entry) => entryHasLevel(entry, resolvedLevel));
     }
     return filtered;
-  }, [baseEntries, effectiveCategory, resolvedSubcategory, genre, resolvedLevel]);
+  }, [baseEntries, effectiveCategory, resolvedSubcategory, genreIds, resolvedLevel]);
   // Default browse order is newest-first by release (version era, then song id);
   // a text query keeps the search relevance ranking instead.
   const orderedEntries = React.useMemo(
@@ -240,17 +246,28 @@ export function CatalogBrowser({
 
   const hasActiveFilters =
     hasQuery ||
-    genre !== "all" ||
+    genreIds.size > 0 ||
     resolvedSubcategory !== ALL_SUBCATEGORIES ||
     resolvedLevel !== ALL_LEVELS ||
     (hasUserSelectedCategory && effectiveCategory !== ALL_CATEGORIES);
+
+  const toggleGenre = (id: string) =>
+    setGenreIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
 
   const clearAllFilters = () => {
     if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
     debounceRef.current = null;
     setInputValue("");
     setQuery("");
-    setGenre("all");
+    setGenreIds(new Set());
     setSubcategory(ALL_SUBCATEGORIES);
     setLevel(ALL_LEVELS);
     setCategory(initialCategory);
@@ -269,7 +286,7 @@ export function CatalogBrowser({
       else params.delete(key);
     };
     apply("q", hasQuery ? query : null);
-    apply("genre", genre !== "all" ? genre : null);
+    apply("genre", genreIds.size > 0 ? [...genreIds].join(",") : null);
     apply("version", resolvedSubcategory !== ALL_SUBCATEGORIES ? resolvedSubcategory : null);
     apply("level", resolvedLevel !== ALL_LEVELS ? resolvedLevel : null);
     apply("page", safeCurrentPage > 1 ? String(safeCurrentPage) : null);
@@ -279,7 +296,7 @@ export function CatalogBrowser({
     if (next !== current) {
       window.history.replaceState(window.history.state, "", next);
     }
-  }, [urlReady, hasQuery, query, genre, resolvedSubcategory, resolvedLevel, safeCurrentPage]);
+  }, [urlReady, hasQuery, query, genreIds, resolvedSubcategory, resolvedLevel, safeCurrentPage]);
 
   const goToPage = (page: number) => {
     setCurrentPage(page);
@@ -496,18 +513,20 @@ export function CatalogBrowser({
       </div>
 
       {genreOptions.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
+        // Multi-select genre chips (OR). "All genres" clears the set; the others
+        // toggle, so several genres can be combined.
+        <div className="flex flex-wrap gap-2" role="group" aria-label={dictionary.allGenres}>
           <motion.button
             type="button"
             whileTap={{ scale: 0.93 }}
-            aria-pressed={genre === "all"}
+            aria-pressed={genreIds.size === 0}
             onClick={() => {
-              setGenre("all");
+              setGenreIds(new Set());
               setCurrentPage(1);
             }}
             className={cn(
               "min-h-8 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-              genre === "all"
+              genreIds.size === 0
                 ? "border-primary bg-primary/15 text-primary"
                 : "border-border text-muted-foreground hover:bg-muted/60"
             )}
@@ -515,7 +534,7 @@ export function CatalogBrowser({
             {dictionary.allGenres}
           </motion.button>
           {genreOptions.map((id) => {
-            const active = genre === String(id);
+            const active = genreIds.has(String(id));
             return (
               <motion.button
                 key={id}
@@ -523,19 +542,106 @@ export function CatalogBrowser({
                 whileTap={{ scale: 0.93 }}
                 aria-pressed={active}
                 onClick={() => {
-                  setGenre(active ? "all" : String(id));
+                  toggleGenre(String(id));
                   setCurrentPage(1);
                 }}
                 className={cn(
-                  "min-h-8 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                  "flex min-h-8 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                   GENRES[id].badge,
                   active ? "ring-2 ring-current" : "opacity-70 hover:opacity-100"
                 )}
               >
+                {active ? <CheckIcon className="size-3.5" aria-hidden="true" /> : null}
                 {GENRES[id][locale]}
               </motion.button>
             );
           })}
+        </div>
+      ) : null}
+
+      {hasActiveFilters ? (
+        // A single place to see every applied condition and drop any one of
+        // them — the fast path for narrowing by several criteria at once.
+        <div
+          className="flex flex-wrap items-center gap-2"
+          role="group"
+          aria-label={dictionary.activeFiltersLabel}
+        >
+          {hasQuery ? (
+            <FilterChip
+              onRemove={clearSearch}
+              removeLabel={dictionary.removeFilter(query)}
+              icon={<SearchIcon className="size-3 shrink-0 text-muted-foreground" />}
+            >
+              {query}
+            </FilterChip>
+          ) : null}
+          {resolvedSubcategory !== ALL_SUBCATEGORIES ? (
+            <FilterChip
+              onRemove={() => {
+                setSubcategory(ALL_SUBCATEGORIES);
+                setCurrentPage(1);
+              }}
+              removeLabel={dictionary.removeFilter(resolvedSubcategory)}
+              icon={
+                versionImageSrc(resolvedSubcategory) ? (
+                  <Image
+                    src={versionImageSrc(resolvedSubcategory)!}
+                    alt=""
+                    width={VERSION_IMAGE_DIMENSIONS.width}
+                    height={VERSION_IMAGE_DIMENSIONS.height}
+                    unoptimized
+                    className="h-4 w-auto shrink-0"
+                  />
+                ) : undefined
+              }
+            >
+              {resolvedSubcategory}
+            </FilterChip>
+          ) : null}
+          {resolvedLevel !== ALL_LEVELS ? (
+            <FilterChip
+              onRemove={() => {
+                setLevel(ALL_LEVELS);
+                setCurrentPage(1);
+              }}
+              removeLabel={dictionary.removeFilter(dictionary.levelOption(resolvedLevel))}
+            >
+              {dictionary.levelOption(resolvedLevel)}
+            </FilterChip>
+          ) : null}
+          {[...genreIds].map((id) => {
+            const info = GENRES[Number(id)];
+            if (!info) return null;
+            return (
+              <FilterChip
+                key={id}
+                onRemove={() => {
+                  toggleGenre(id);
+                  setCurrentPage(1);
+                }}
+                removeLabel={dictionary.removeFilter(info[locale])}
+                className={info.badge}
+              >
+                {info[locale]}
+              </FilterChip>
+            );
+          })}
+          {hasUserSelectedCategory && effectiveCategory !== ALL_CATEGORIES ? (
+            <FilterChip
+              onRemove={() => {
+                setCategory(initialCategory);
+                setHasUserSelectedCategory(false);
+                setCurrentPage(1);
+              }}
+              removeLabel={dictionary.removeFilter(effectiveCategory)}
+            >
+              {effectiveCategory}
+            </FilterChip>
+          ) : null}
+          <Button type="button" variant="ghost" size="sm" onClick={clearAllFilters}>
+            {dictionary.clearFilters}
+          </Button>
         </div>
       ) : null}
 
@@ -694,6 +800,43 @@ export function CatalogBrowser({
         ) : null}
       </AnimatePresence>
     </div>
+  );
+}
+
+// One applied filter shown in the active-filters bar: a label + a remove (×).
+// `className` tints it to match a genre chip; `icon` prefixes it (search glyph
+// or version logo).
+function FilterChip({
+  children,
+  onRemove,
+  removeLabel,
+  icon,
+  className,
+}: {
+  children: React.ReactNode;
+  onRemove: () => void;
+  removeLabel: string;
+  icon?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex min-h-8 items-center gap-1.5 rounded-full border py-1 pr-1 pl-2.5 text-xs font-medium",
+        className ?? "border-border bg-muted/50"
+      )}
+    >
+      {icon}
+      <span className="max-w-[12rem] truncate">{children}</span>
+      <button
+        type="button"
+        aria-label={removeLabel}
+        onClick={onRemove}
+        className="rounded-full p-0.5 text-current/70 transition-colors hover:bg-background/60 hover:text-current"
+      >
+        <XIcon className="size-3.5" />
+      </button>
+    </span>
   );
 }
 

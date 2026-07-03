@@ -132,6 +132,8 @@ export type SiteDictionary = {
     emptyState: string;
     clearSearch: string;
     clearFilters: string;
+    activeFiltersLabel: string;
+    removeFilter: (label: string) => string;
     resultsSummary: (count: number) => string;
     previousPage: string;
     nextPage: string;
@@ -497,6 +499,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       emptyState: "没有匹配到曲目，请尝试别名、曲师或英文标题。",
       clearSearch: "清空搜索",
       clearFilters: "清除全部筛选",
+      activeFiltersLabel: "已应用筛选",
+      removeFilter: (label) => `移除筛选：${label}`,
       resultsSummary: (count) => `共 ${count} 首谱面`,
       previousPage: "上一页",
       nextPage: "下一页",
@@ -845,6 +849,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "No matching charts were found. Try an alias, artist, or English title.",
       clearSearch: "Clear search",
       clearFilters: "Clear all filters",
+      activeFiltersLabel: "Active filters",
+      removeFilter: (label) => `Remove filter: ${label}`,
       resultsSummary: (count) => (count === 1 ? "1 chart" : `${count} charts`),
       previousPage: "Previous",
       nextPage: "Next",
@@ -1203,6 +1209,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "一致する譜面は見つかりませんでした。別名、アーティスト名、英語タイトルも試してください。",
       clearSearch: "検索をクリア",
       clearFilters: "フィルターをすべて解除",
+      activeFiltersLabel: "適用中のフィルター",
+      removeFilter: (label) => `フィルターを解除：${label}`,
       resultsSummary: (count) => `全 ${count} 譜面`,
       previousPage: "前へ",
       nextPage: "次へ",
