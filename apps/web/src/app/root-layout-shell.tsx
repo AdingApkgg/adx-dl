@@ -53,9 +53,10 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
   return (
     <html lang={lang} className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full bg-background text-foreground">
-        {/* Resource hints — every cover image is served from this cross-origin host. */}
+        {/* Resource hints — every cover image is served from this cross-origin
+            host; preconnect already implies DNS resolution, so no dns-prefetch
+            fallback for it. The dns-prefetch below are for hosts we only warm. */}
         <link rel="preconnect" href={COVER_HOST} crossOrigin="" />
-        <link rel="dns-prefetch" href={COVER_HOST} />
         <link rel="dns-prefetch" href={COUNTER_HOST} />
         <link rel="dns-prefetch" href={COMMENT_HOST} />
         <script dangerouslySetInnerHTML={{ __html: noFlashThemeScript }} />
@@ -82,7 +83,10 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
                     <p className="max-w-2xl text-sm text-muted-foreground">
                       {dictionary.footer.description}
                     </p>
-                    <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                    <nav
+                      aria-label={dictionary.footer.navLabel}
+                      className="flex flex-wrap gap-x-5 gap-y-2 text-sm"
+                    >
                       <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/", locale)}>
                         {dictionary.nav.home}
                       </Link>
@@ -125,7 +129,7 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
                       >
                         {dictionary.footer.sourceLabel}
                       </a>
-                    </div>
+                    </nav>
                     <p className="text-xs text-muted-foreground">{dictionary.footer.lastUpdated(updatedDate)}</p>
                     <SitePageViews
                       siteViewsLabel={dictionary.pageViews.siteViews}

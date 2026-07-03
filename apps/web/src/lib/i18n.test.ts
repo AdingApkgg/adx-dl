@@ -114,7 +114,7 @@ describe("i18n helpers", () => {
       pathname: "/charts",
       title: "Browse Charts",
       description:
-        "Browse the AstroDX chart catalog by maimai DX version, category and language — entries include cover art, difficulty levels, chart constants and BPM to preview and download.",
+        "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download.",
       keywords: ["AstroDX", "ADX 谱面资源", "browse charts", "category filter", "display language"],
     });
     expect(jaPages.status).toEqual({
@@ -143,7 +143,7 @@ describe("i18n helpers", () => {
     expect(metadata?.description).toBe(
       "Built from remote AstroDX directory scans, with per-song metadata, chart parsing, and a unified catalog for static deployment."
     );
-    expect(metadata?.alternates?.canonical).toBe("/en/search");
+    expect(metadata?.alternates?.canonical).toBe("https://adxdls.saop.cc/en/search");
     expect(metadata?.alternates?.languages).toEqual({
       "x-default": "/search",
       "zh-CN": "/search",
@@ -199,7 +199,7 @@ describe("i18n helpers", () => {
       index: true,
       follow: true,
     });
-    expect(metadata?.alternates?.canonical).toBe("/ja/status");
+    expect(metadata?.alternates?.canonical).toBe("https://adxdls.saop.cc/ja/status");
     expect(metadata?.alternates?.languages).toEqual({
       "x-default": "/status",
       "zh-CN": "/status",

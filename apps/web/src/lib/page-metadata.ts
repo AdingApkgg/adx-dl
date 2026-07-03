@@ -33,6 +33,8 @@ const ogLocaleMap: Record<Locale, string> = {
   ja: "ja_JP",
 };
 
+type OpenGraphType = "website" | "music.song";
+
 type PageMetadataOptions = {
   locale: Locale;
   pathname: string;
@@ -41,6 +43,7 @@ type PageMetadataOptions = {
   keywords: string[];
   image?: string;
   imageAlt?: string;
+  ogType?: OpenGraphType;
 };
 
 function buildLanguageAlternates(pathname: string) {
@@ -81,8 +84,8 @@ export function buildPageMetadata({
   keywords,
   image,
   imageAlt,
+  ogType = "website",
 }: PageMetadataOptions): Metadata {
-  const canonicalPath = buildLocalePath(pathname, locale);
   const canonicalUrl = buildCanonicalUrl(pathname, locale);
   const fullTitle = `${title} | ${siteName}`;
   const ogImage = { url: image ?? openGraphImageUrl, alt: imageAlt ?? fullTitle };
@@ -94,11 +97,11 @@ export function buildPageMetadata({
     keywords,
     robots,
     alternates: {
-      canonical: canonicalPath,
+      canonical: canonicalUrl,
       languages: buildLanguageAlternates(pathname),
     },
     openGraph: {
-      type: "website",
+      type: ogType,
       title: fullTitle,
       description,
       url: canonicalUrl,
@@ -176,6 +179,7 @@ export function buildChartDetailMetadata(locale: Locale, entry: CatalogEntry): M
     keywords: buildDetailKeywords(locale, entry),
     image: entry.media.cover_url || openGraphImageUrl,
     imageAlt: formatEntryTitle(entry, locale),
+    ogType: "music.song",
   });
 }
 

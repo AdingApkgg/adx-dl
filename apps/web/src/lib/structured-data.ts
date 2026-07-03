@@ -6,6 +6,7 @@ import {
   formatEntrySubcategory,
   formatEntryTitle,
   genreLabel,
+  uniqueChartDesigners,
   versionRouteId,
   type CatalogEntry,
   type VersionGroup,
@@ -24,6 +25,8 @@ const siteName = "ADX 谱面资源";
 const organizationId = `${siteUrl}/#organization`;
 const websiteId = `${siteUrl}/#website`;
 const sourceRepository = "https://github.com/AdingApkgg/adx-dl";
+const maintainerProfile = "https://github.com/AdingApkgg";
+const communityUrl = "https://t.me/FullDiveSAO";
 
 type JsonLdValue = Record<string, unknown>;
 
@@ -54,7 +57,44 @@ function buildOrganization(): JsonLdValue {
     name: siteName,
     url: siteUrl,
     logo: `${siteUrl}/opengraph-image.png`,
-    sameAs: [sourceRepository],
+    // Profiles that represent this archive's operator — the source repo, the
+    // maintainer's GitHub, and the Telegram community.
+    sameAs: [sourceRepository, maintainerProfile, communityUrl],
+    contactPoint: {
+      "@type": "ContactPoint",
+      contactType: "customer support",
+      url: communityUrl,
+    },
+  };
+}
+
+// Google Dataset Search + AI-grounding node: the whole chart catalog modeled as
+// a schema.org Dataset, cross-linked to the Organization/WebSite by @id.
+export function buildCatalogDatasetStructuredData(
+  locale: Locale,
+  dateModified?: string
+): JsonLdValue {
+  const chartsUrl = toAbsoluteUrl(buildLocalePath("/charts", locale));
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "Dataset",
+    "@id": `${siteUrl}/#dataset`,
+    name: `${siteName} — AstroDX chart catalog`,
+    description: getStaticPageMetadata(locale).home.description,
+    url: chartsUrl,
+    inLanguage: getStructuredDataLanguage(locale),
+    isAccessibleForFree: true,
+    creator: { "@id": organizationId },
+    publisher: { "@id": organizationId },
+    isPartOf: { "@id": websiteId },
+    keywords: ["AstroDX", "maimai", "maimai DX", "rhythm game charts", "谱面"],
+    ...(dateModified ? { dateModified } : {}),
+    distribution: {
+      "@type": "DataDownload",
+      encodingFormat: "text/html",
+      contentUrl: chartsUrl,
+    },
   };
 }
 
@@ -273,6 +313,65 @@ export function buildVersionDetailStructuredData(
   };
 }
 
+// A simple content page (status / guestbook / links): CollectionPage +
+// BreadcrumbList, plus an optional ItemList (used by /links for its outbound
+// links) — keeps breadcrumb + entity coverage consistent across every route.
+export function buildInfoPageStructuredData(
+  locale: Locale,
+  args: {
+    pathname: string;
+    title: string;
+    description: string;
+    items?: { name: string; url: string }[];
+  }
+): JsonLdValue {
+  const dictionary = getDictionary(locale);
+  const url = toAbsoluteUrl(buildLocalePath(args.pathname, locale));
+
+  const collectionPage: JsonLdValue = {
+    "@type": "CollectionPage",
+    "@id": url,
+    url,
+    name: args.title,
+    description: args.description,
+    inLanguage: getStructuredDataLanguage(locale),
+    isPartOf: { "@id": websiteId },
+    ...(args.items && args.items.length > 0
+      ? {
+          mainEntity: {
+            "@type": "ItemList",
+            numberOfItems: args.items.length,
+            itemListElement: args.items.map((item, index) => ({
+              "@type": "ListItem",
+              position: index + 1,
+              url: item.url,
+              name: item.name,
+            })),
+          },
+        }
+      : {}),
+  };
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      collectionPage,
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: dictionary.nav.home,
+            item: toAbsoluteUrl(buildLocalePath("/", locale)),
+          },
+          { "@type": "ListItem", position: 2, name: args.title, item: url },
+        ],
+      },
+    ],
+  };
+}
+
 export function buildChartDetailStructuredData(
   locale: Locale,
   entry: CatalogEntry
@@ -290,6 +389,7 @@ export function buildChartDetailStructuredData(
     ),
   ];
   const range = difficultyLevelRange(entry);
+  const designers = uniqueChartDesigners(entry);
   const difficultyNames = entry.difficulties
     .map((difficulty) => difficultySlotLabel(difficulty))
     .join(", ");
@@ -328,8 +428,26 @@ export function buildChartDetailStructuredData(
       "@type": "MusicGroup",
       name: artist,
     },
+    // The chart designers (谱师) are the charts' actual authors — shown on-page
+    // but otherwise invisible to machines. Deduped and placeholder-filtered.
+    ...(designers.length > 0
+      ? { creator: designers.map((name) => ({ "@type": "Person", name })) }
+      : {}),
     ...(entry.genre ? { genre: genreLabel(entry, locale) } : {}),
     ...(entry.media.cover_url ? { image: toAbsoluteUrl(entry.media.cover_url) } : {}),
+    ...(entry.media.audio_url
+      ? {
+          audio: {
+            "@type": "AudioObject",
+            name: `${title} — audio`,
+            contentUrl: toAbsoluteUrl(entry.media.audio_url),
+            encodingFormat: "audio/mpeg",
+            inLanguage: getStructuredDataLanguage(locale),
+          },
+        }
+      : {}),
+    // When this chart was added to the archive (imported_at is clean ISO-8601).
+    ...(entry.imported_at ? { datePublished: entry.imported_at } : {}),
     isFamilyFriendly: true,
     isAccessibleForFree: true,
     keywords,

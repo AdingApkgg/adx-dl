@@ -37,6 +37,33 @@ export async function readEntryById(id: string): Promise<CatalogEntry | undefine
   return entries.find((entry) => entry.id === id);
 }
 
+// Up to `limit` sibling charts for a detail page's "related" rail — prioritizing
+// same artist (most relevant), then same genre, then same version. Builds the
+// chart-to-chart internal link graph (crawl depth + answer-engine context) that
+// the client-side browse grid can't, since it only links ~24 charts at a time.
+export async function readRelatedEntries(
+  entry: CatalogEntry,
+  limit = 12
+): Promise<CatalogEntry[]> {
+  const entries = await readCatalogEntries();
+  const picked = new Map<string, CatalogEntry>();
+  const take = (candidates: CatalogEntry[], max: number) => {
+    let added = 0;
+    for (const candidate of candidates) {
+      if (added >= max || picked.size >= limit) break;
+      if (candidate.id === entry.id || picked.has(candidate.id)) continue;
+      picked.set(candidate.id, candidate);
+      added += 1;
+    }
+  };
+
+  take(entry.artist ? entries.filter((e) => e.artist === entry.artist) : [], 6);
+  take(entry.genreid != null ? entries.filter((e) => e.genreid === entry.genreid) : [], 6);
+  take(entry.versionid != null ? entries.filter((e) => e.versionid === entry.versionid) : [], 12);
+
+  return [...picked.values()].slice(0, limit);
+}
+
 const readEntryByRouteSlugMap = cache(async () => {
   const entries = await readCatalogEntries();
   const map = new Map<string, CatalogEntry>();

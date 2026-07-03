@@ -76,6 +76,7 @@ mock.module("@/lib/catalog", () => ({
   readEntryById: async (id: string) => entries.find((entry) => entry.id === id),
   readEntryByRouteSlug: async (slug: string) =>
     entries.find((entry) => entry.slug === slug),
+  readRelatedEntries: async () => [],
   readRouteSlugs: async () => entries.map((entry) => entry.slug!),
   readCanonicalSlugs: async () => entries.map((entry) => entry.slug!),
   readVersionGroups: async () => [],

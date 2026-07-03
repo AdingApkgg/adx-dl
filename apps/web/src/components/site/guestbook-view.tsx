@@ -1,19 +1,28 @@
 import { Reveal } from "@/components/motion";
 import { ChartComments } from "@/components/site/chart-comments";
+import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { buildInfoPageStructuredData } from "@/lib/structured-data";
 
 // Standalone guestbook: one shared Artalk thread keyed by the locale-independent
 // `/comments` path, so every language posts into the same board.
 const GUESTBOOK_PAGE_KEY = "/comments";
 
 export function GuestbookView({ locale = "zh" }: { locale?: Locale }) {
-  const { guestbook } = getDictionary(locale);
+  const { guestbook, seo } = getDictionary(locale);
 
   return (
     <main
       id="main-content"
       className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
     >
+      <SeoJsonLd
+        data={buildInfoPageStructuredData(locale, {
+          pathname: "/comments",
+          title: guestbook.title,
+          description: seo.guestbook,
+        })}
+      />
       <Reveal className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">{guestbook.title}</h1>
         <p className="text-muted-foreground">{guestbook.description}</p>

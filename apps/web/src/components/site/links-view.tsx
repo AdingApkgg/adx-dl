@@ -1,9 +1,11 @@
 import { ArrowUpRightIcon } from "lucide-react";
 
 import { Reveal } from "@/components/motion";
+import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { friendLinks } from "@/lib/friend-links";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { buildInfoPageStructuredData } from "@/lib/structured-data";
 
 function hostnameOf(url: string): string {
   try {
@@ -14,13 +16,21 @@ function hostnameOf(url: string): string {
 }
 
 export function LinksView({ locale = "zh" }: { locale?: Locale }) {
-  const { links } = getDictionary(locale);
+  const { links, seo } = getDictionary(locale);
 
   return (
     <main
       id="main-content"
       className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
     >
+      <SeoJsonLd
+        data={buildInfoPageStructuredData(locale, {
+          pathname: "/links",
+          title: links.title,
+          description: seo.links,
+          items: friendLinks.map((link) => ({ name: link.name, url: link.url })),
+        })}
+      />
       <Reveal className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">{links.title}</h1>
         <p className="text-muted-foreground">{links.description}</p>

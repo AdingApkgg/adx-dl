@@ -87,6 +87,7 @@ mock.module("@/lib/catalog", () => ({
   readEntryById: async (id: string) => entries.find((entry) => entry.id === id),
   readEntryByRouteSlug: async (slug: string) =>
     entries.find((entry) => entry.slug === slug),
+  readRelatedEntries: async () => [],
   readRouteSlugs: async () => entries.map((entry) => entry.slug!),
   readCanonicalSlugs: async () => entries.map((entry) => entry.slug!),
   readVersionGroups: async () => [
@@ -123,7 +124,7 @@ function expectLocalizedAlternates(
     index: true,
     follow: true,
   });
-  expect(metadata.alternates?.canonical).toBe(canonical);
+  expect(metadata.alternates?.canonical).toBe(absoluteCanonical);
   expect(metadata.alternates?.languages).toEqual({
     "x-default": basePath,
     "zh-CN": basePath,
@@ -197,22 +198,22 @@ describe("route metadata", () => {
       "AstroDX chart archive for browsing, indexing, and downloads. | ADX 谱面资源"
     );
     expect(enHomeMetadata?.description).toBe(
-      "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM, ready to browse by version, search, preview online and download."
+      "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download."
     );
     expectLocalizedAlternates(enHomeMetadata ?? {}, "/en", {
       title: "AstroDX chart archive for browsing, indexing, and downloads.",
       description:
-        "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM, ready to browse by version, search, preview online and download.",
+        "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download.",
       keywords: ["AstroDX", "ADX 谱面资源", "chart archive", "downloads", "catalog index"],
     });
 
     expect(enChartsMetadata?.title).toBe("Browse Charts | ADX 谱面资源");
     expect(enChartsMetadata?.description).toBe(
-      "Browse the AstroDX chart catalog by maimai DX version, category and language — entries include cover art, difficulty levels, chart constants and BPM to preview and download."
+      "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download."
     );
     expectLocalizedAlternates(enChartsMetadata ?? {}, "/en/charts", {
       title: "Browse Charts",
-      description: "Browse the AstroDX chart catalog by maimai DX version, category and language — entries include cover art, difficulty levels, chart constants and BPM to preview and download.",
+      description: "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download.",
       keywords: ["AstroDX", "ADX 谱面资源", "browse charts", "category filter", "display language"],
     });
 
@@ -321,11 +322,11 @@ describe("route metadata", () => {
 
 describe("metadata files", () => {
   test("sitemap exposes localized static routes and chart detail alternates", async () => {
-    const sitemapModule = await import("./sitemap").catch(() => null);
+    const { getSitemapShard } = await import("@/lib/sitemap");
 
-    expect(sitemapModule).not.toBeNull();
-
-    const sitemap = await sitemapModule?.default?.();
+    // Sharded now: shard 0 holds the static/version routes and the first charts;
+    // the tiny test catalog fits entirely in one shard.
+    const sitemap = await getSitemapShard(0);
 
     expect(sitemap).toEqual(
       expect.arrayContaining([

@@ -616,6 +616,26 @@ export function buildChartDescription(entry: CatalogEntry, locale: EntryLocale):
     return head + body;
   }
   const head = `"${title}" is an AstroDX chart by ${artist}, archived under the "${branch}" branch${genre ? `, genre ${genre}` : ""}${bpm ? `, BPM ${bpm}` : ""}.`;
-  const body = ` ADX 谱面资源 lists ${count} difficult${count === 1 ? "y" : "ies"}${range ? ` (levels ${range.low}–${range.high})` : ""}${assetClause}, available to browse and download.`;
+  const body = ` This archive lists ${count} difficult${count === 1 ? "y" : "ies"}${range ? ` (levels ${range.low}–${range.high})` : ""}${assetClause}, available to browse and download.`;
   return head + body;
+}
+
+// Unique real chart-designer (谱师) names across an entry's difficulties, in slot
+// order. Skips the "-"/empty placeholders the source uses when a designer is
+// unknown and dedupes names shared across difficulty slots — so JSON-LD credits
+// each author once and never emits a bogus "-" Person.
+export function uniqueChartDesigners(entry: {
+  difficulties: { designer?: string }[];
+}): string[] {
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const difficulty of entry.difficulties) {
+    const name = (difficulty.designer ?? "").trim();
+    if (!name || name === "-" || seen.has(name)) {
+      continue;
+    }
+    seen.add(name);
+    names.push(name);
+  }
+  return names;
 }
