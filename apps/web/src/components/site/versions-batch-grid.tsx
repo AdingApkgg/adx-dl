@@ -8,6 +8,7 @@ import { CheckIcon } from "lucide-react";
 
 import { AnimatePresence } from "@/components/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
+import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { versionRouteId, type ChartDownloadSpec, type VersionGroup } from "@/lib/catalog-shared";
@@ -128,6 +129,15 @@ export function VersionsBatchGrid({
           const hasCharts = group.count > 0;
           const selectableHere = selectMode && hasCharts;
           const selected = selectedSlugs.has(group.slug);
+          // Bottom label: drop the "maimai"/"maimai DX" era prefix (it's shown
+          // as a でらっくす / スタンダード icon instead), leaving just the
+          // sub-version (CiRCLE, PRiSM PLUS, GreeN…). Base versions have no
+          // sub-name, so they fall back to the full name (id 0 → "maimai").
+          const eraCabinet = versionEraCabinet(group.imageIndex);
+          const shortName =
+            group.name === "Unknown"
+              ? versions.unknownLabel
+              : versionShortName(group.name) || group.name;
 
           const card = (
             <Card
@@ -196,8 +206,17 @@ export function VersionsBatchGrid({
                   {versions.chartCount(group.count)}
                 </span>
               </div>
-              <div className="px-3 pb-1">
-                <ScrollingLabel text={label} className="text-sm font-medium" />
+              <div className="flex items-center gap-1.5 px-3 pb-1" title={label}>
+                {eraCabinet ? (
+                  <CabinetBadge cabinet={eraCabinet} className="h-4 shrink-0" />
+                ) : null}
+                {shortName ? (
+                  <ScrollingLabel
+                    text={shortName}
+                    className="text-sm font-medium"
+                    containerClassName="min-w-0 flex-1"
+                  />
+                ) : null}
               </div>
             </Card>
           );
@@ -274,7 +293,31 @@ export function VersionsBatchGrid({
  * labels animate; the full name is always in the `title`, and reduced-motion
  * users get the static (non-scrolling) label via the CSS guard in globals.css.
  */
-function ScrollingLabel({ text, className }: { text: string; className?: string }) {
+// versionid 13 = "maimai DX" (first DX-era version); 0–12 are classic maimai.
+const DX_ERA_MIN_INDEX = 13;
+
+/** Which cabinet badge marks a version's era: DX (でらっくす) or ST (スタンダード). */
+function versionEraCabinet(imageIndex: number | null): "DX" | "ST" | null {
+  if (imageIndex === null) {
+    return null;
+  }
+  return imageIndex >= DX_ERA_MIN_INDEX ? "DX" : "ST";
+}
+
+/** Version name without its "maimai" / "maimai DX" era prefix (shown as an icon). */
+function versionShortName(name: string): string {
+  return name.replace(/^maimai(?:\s+DX)?\s*/i, "").trim();
+}
+
+function ScrollingLabel({
+  text,
+  className,
+  containerClassName,
+}: {
+  text: string;
+  className?: string;
+  containerClassName?: string;
+}) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const textRef = React.useRef<HTMLSpanElement>(null);
   const [shift, setShift] = React.useState(0);
@@ -300,7 +343,7 @@ function ScrollingLabel({ text, className }: { text: string; className?: string 
   const duration = Math.max(6, Math.round((shift / 28) * 3 + 3));
 
   return (
-    <div ref={containerRef} className="overflow-hidden" title={text}>
+    <div ref={containerRef} className={cn("overflow-hidden", containerClassName)} title={text}>
       <span
         ref={textRef}
         data-marquee={scrolling ? "on" : undefined}
