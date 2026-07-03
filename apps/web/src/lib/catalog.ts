@@ -7,7 +7,11 @@ import type {
   ChartDownloadSpec,
   VersionGroup,
 } from "@/lib/catalog-shared";
-import { getChartDownloadSpec } from "@/lib/catalog-shared";
+import {
+  getChartDownloadSpec,
+  UNKNOWN_VERSION_ROUTE_ID,
+  versionRouteId,
+} from "@/lib/catalog-shared";
 import type { CatalogSearchIndexEntry } from "@/lib/catalog-search";
 import { entrySlug } from "@/lib/route-slug";
 import { MAIMAI_VERSIONS, versionImageIndex } from "@/lib/version-image";
@@ -167,35 +171,41 @@ export async function readVersionChartSpecs(): Promise<Record<string, ChartDownl
   return specs;
 }
 
-export async function readVersionGroup(slug: string): Promise<VersionDetail | undefined> {
+// Resolves a version by its route id — the maimai versionid (0–25 as a string)
+// or "unknown" for the untagged bucket.
+export async function readVersionGroup(routeId: string): Promise<VersionDetail | undefined> {
   const { byIndex, unknown } = await readVersionData();
 
-  if (slug === UNKNOWN_VERSION_SLUG) {
+  if (routeId === UNKNOWN_VERSION_ROUTE_ID) {
     return unknown.length > 0
-      ? { name: "Unknown", slug, imageIndex: null, entries: unknown }
+      ? { name: "Unknown", slug: UNKNOWN_VERSION_SLUG, imageIndex: null, entries: unknown }
       : undefined;
   }
 
-  const version = MAIMAI_VERSIONS.find((candidate) => candidate.slug === slug);
+  const index = Number(routeId);
+  const version = Number.isInteger(index)
+    ? MAIMAI_VERSIONS.find((candidate) => candidate.index === index)
+    : undefined;
   const entries = version ? byIndex.get(version.index) : undefined;
   if (!version || !entries || entries.length === 0) {
     return undefined;
   }
 
-  return { name: version.name, slug, imageIndex: version.index, entries };
+  return { name: version.name, slug: version.slug, imageIndex: version.index, entries };
 }
 
-// Slugs for versions that actually have charts (+ unknown) — for static params,
-// sitemap and IndexNow. Excludes the empty (0-chart) versions shown in the grid.
-export async function readVersionSlugs(): Promise<string[]> {
+// Route ids for versions that actually have charts (+ unknown) — for static
+// params, sitemap and IndexNow. Excludes the empty (0-chart) versions shown in
+// the grid.
+export async function readVersionRouteIds(): Promise<string[]> {
   const { byIndex, unknown } = await readVersionData();
-  const slugs = MAIMAI_VERSIONS.filter(
+  const ids = MAIMAI_VERSIONS.filter(
     (version) => (byIndex.get(version.index)?.length ?? 0) > 0
-  ).map((version) => version.slug);
+  ).map((version) => versionRouteId(version.index));
 
   if (unknown.length > 0) {
-    slugs.push(UNKNOWN_VERSION_SLUG);
+    ids.push(UNKNOWN_VERSION_ROUTE_ID);
   }
 
-  return slugs;
+  return ids;
 }

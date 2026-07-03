@@ -80,7 +80,7 @@ mock.module("@/lib/catalog", () => ({
   readCanonicalSlugs: async () => entries.map((entry) => entry.slug!),
   readVersionGroups: async () => [],
   readVersionGroup: async () => undefined,
-  readVersionSlugs: async () => [],
+  readVersionRouteIds: async () => [],
 }));
 
 // The home hero's search box is a client component that calls useRouter; the

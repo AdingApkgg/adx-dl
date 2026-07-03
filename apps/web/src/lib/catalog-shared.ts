@@ -352,6 +352,19 @@ export type VersionGroup = {
   count: number;
 };
 
+/** Route slug for the untagged version bucket (imageIndex === null). */
+export const UNKNOWN_VERSION_ROUTE_ID = "unknown";
+
+/**
+ * URL path segment for a version's detail route: the maimai versionid (0–25,
+ * the same value stored in each chart's maidata `&versionid=`), or "unknown"
+ * for the untagged bucket. Stable numeric ids, so the route survives a version
+ * being renamed.
+ */
+export function versionRouteId(imageIndex: number | null): string {
+  return imageIndex === null ? UNKNOWN_VERSION_ROUTE_ID : String(imageIndex);
+}
+
 // Version/subcategory strings are Latin (maimai version names), so an ASCII slug
 // is safe and avoids the non-ASCII static-export routing pitfalls of chart slugs.
 export function versionSlug(subcategory: string): string {

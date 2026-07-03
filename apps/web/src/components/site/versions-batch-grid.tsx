@@ -10,7 +10,7 @@ import { AnimatePresence } from "@/components/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import type { ChartDownloadSpec, VersionGroup } from "@/lib/catalog-shared";
+import { versionRouteId, type ChartDownloadSpec, type VersionGroup } from "@/lib/catalog-shared";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { jsonFetcher } from "@/lib/swr-fetcher";
 import { VERSION_IMAGE_DIMENSIONS, versionImageSrcByIndex } from "@/lib/version-image";
@@ -243,7 +243,7 @@ export function VersionsBatchGrid({
           return (
             <div key={group.slug} className="h-full">
               <Link
-                href={buildLocalePath(`/versions/${group.slug}`, locale)}
+                href={buildLocalePath(`/versions/${versionRouteId(group.imageIndex)}`, locale)}
                 className="group/version block h-full rounded-xl transition-transform hover:-translate-y-0.5"
               >
                 {card}

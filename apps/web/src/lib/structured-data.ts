@@ -6,6 +6,7 @@ import {
   formatEntrySubcategory,
   formatEntryTitle,
   genreLabel,
+  versionRouteId,
   type CatalogEntry,
   type VersionGroup,
 } from "@/lib/catalog-shared";
@@ -192,7 +193,7 @@ export function buildVersionsIndexStructuredData(
             itemListElement: linkable.map((group, index) => ({
               "@type": "ListItem",
               position: index + 1,
-              url: toAbsoluteUrl(buildLocalePath(`/versions/${group.slug}`, locale)),
+              url: toAbsoluteUrl(buildLocalePath(`/versions/${versionRouteId(group.imageIndex)}`, locale)),
               name: group.name === "Unknown" ? versions.unknownLabel : group.name,
             })),
           };

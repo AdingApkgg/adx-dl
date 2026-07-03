@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { VersionDetailView } from "@/components/site/version-views";
-import { readVersionGroup, readVersionSlugs } from "@/lib/catalog";
+import { readVersionGroup, readVersionRouteIds } from "@/lib/catalog";
 import { buildVersionDetailMetadata } from "@/lib/page-metadata";
 import { prefixedLocales } from "@/lib/i18n";
 
@@ -11,8 +11,8 @@ import { getPrefixedRouteLocale } from "../../route-locale";
 export const dynamicParams = false;
 
 export async function generateStaticParams() {
-  const slugs = await readVersionSlugs();
-  return prefixedLocales.flatMap((locale) => slugs.map((version) => ({ locale, version })));
+  const ids = await readVersionRouteIds();
+  return prefixedLocales.flatMap((locale) => ids.map((version) => ({ locale, version })));
 }
 
 export async function generateMetadata({

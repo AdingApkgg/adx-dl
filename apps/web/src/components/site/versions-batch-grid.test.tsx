@@ -22,8 +22,10 @@ describe("VersionsBatchGrid", () => {
   test("links versions with charts and dims empty ones", () => {
     const html = renderToStaticMarkup(<VersionsBatchGrid groups={groups} locale="zh" />);
 
-    expect(html).toContain('href="/versions/maimai-dx-circle"');
-    expect(html).not.toContain('href="/versions/maimai"');
+    // The route uses the version id (0–25), not the slug.
+    expect(html).toContain('href="/versions/25"');
+    // The 0-chart "maimai" tile (id 0) is dimmed, not linked.
+    expect(html).not.toContain('href="/versions/0"');
     expect(html).toContain('aria-disabled="true"');
   });
 });

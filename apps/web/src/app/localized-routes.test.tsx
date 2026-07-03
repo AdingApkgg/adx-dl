@@ -79,7 +79,7 @@ mock.module("@/lib/catalog", () => ({
   readCanonicalSlugs: async () => entries.map((entry) => entry.slug!),
   readVersionGroups: async () => [],
   readVersionGroup: async () => undefined,
-  readVersionSlugs: async () => [],
+  readVersionRouteIds: async () => [],
 }));
 
 const notFound = mock(() => {

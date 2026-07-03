@@ -49,6 +49,7 @@ import {
   getChartAssetFiles,
   resolveGenreId,
   sortByReleaseDesc,
+  versionRouteId,
 } from "@/lib/catalog-shared";
 import { ASTRODX_APP_REPOSITORY } from "@/lib/friend-links";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
@@ -318,7 +319,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
           {versionTiles.map((version) => (
             <RevealItem key={version.index} ssrVisible className="h-full">
               <Link
-                href={buildLocalePath(`/versions/${version.slug}`, locale)}
+                href={buildLocalePath(`/versions/${versionRouteId(version.index)}`, locale)}
                 className="group flex h-full flex-col items-center gap-3 rounded-2xl border border-border/60 bg-card/70 p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10"
               >
                 <Image
@@ -456,11 +457,7 @@ export function ChartDetailPageView({
   // Deep links out of the metadata table: entries with an unmapped version land
   // in the "unknown" bucket, so /versions/unknown always exists for them.
   const versionIndex = versionImageIndex(entry.version);
-  const versionGroupSlug =
-    versionIndex !== null
-      ? (MAIMAI_VERSIONS.find((version) => version.index === versionIndex)?.slug ?? "unknown")
-      : "unknown";
-  const versionHref = buildLocalePath(`/versions/${versionGroupSlug}`, locale);
+  const versionHref = buildLocalePath(`/versions/${versionRouteId(versionIndex)}`, locale);
   const genreId = resolveGenreId(entry);
   const genreHref = genreId !== null ? `${chartsHref}?genre=${genreId}` : undefined;
 

@@ -19,7 +19,7 @@ mock.module("@/lib/catalog", () => {
     readCanonicalSlugs: async () => [],
     readVersionGroups: async () => [],
     readVersionGroup: async () => undefined,
-    readVersionSlugs: async () => [],
+    readVersionRouteIds: async () => [],
   };
 });
 
