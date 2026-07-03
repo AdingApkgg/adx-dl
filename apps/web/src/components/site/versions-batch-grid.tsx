@@ -143,7 +143,10 @@ export function VersionsBatchGrid({
             <Card
               size="sm"
               className={cn(
-                "h-full overflow-hidden border border-border/70 bg-card/85 transition-all",
+                // pt-0: the image header fills to the card's rounded top corners
+                // (Card only auto-drops top padding for a first-child <img>, not
+                // our <div>), so the corner badges sit in the actual R-corners.
+                "h-full overflow-hidden border border-border/70 bg-card/85 pt-0 transition-all",
                 !selectMode &&
                   hasCharts &&
                   "group-hover/version:border-primary/40 group-hover/version:shadow-lg group-hover/version:shadow-primary/10",
