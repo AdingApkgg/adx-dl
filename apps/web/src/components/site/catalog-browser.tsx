@@ -218,7 +218,9 @@ export function CatalogBrowser({
     const ids = new Set<number>();
     for (const entry of entries) {
       const id = resolveGenreId(entry);
-      if (id !== null) ids.add(id);
+      // The 宴会场 genre (107) equals the Type row's Utage chip, so it's only
+      // offered there (as the 宴会場 icon) to avoid a duplicate 宴 chip.
+      if (id !== null && id !== 107) ids.add(id);
     }
     return [...ids].sort((a, b) => a - b);
   }, [entries]);
