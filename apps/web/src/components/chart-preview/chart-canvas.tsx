@@ -205,7 +205,9 @@ export function ChartCanvas({ videoUrl, chartName = "chart", t }: ChartCanvasPro
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const renderer = new MainRenderer(canvas, chartData?.bpm ?? 120);
+    // 上游 #48 后 MainRenderer 不再收 bpm 构造参数，BPM 由 renderFrame 的 chart
+    // 经内部 TimingTimeline 推导（setBpm 也随之移除）。
+    const renderer = new MainRenderer(canvas);
     renderer.setIsPlaying(useGameStore.getState().isPlaying);
     rendererRef.current = renderer;
 
@@ -245,7 +247,8 @@ export function ChartCanvas({ videoUrl, chartName = "chart", t }: ChartCanvasPro
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [renderFrame, chartData?.bpm]);
+    // 渲染器不再依赖 bpm 构造，创建一次即可（bpm 每帧由 chart 传入）。
+  }, [renderFrame]);
 
   // 全屏 / 画质：重设最大像素并 resize。
   useEffect(() => {
@@ -468,12 +471,6 @@ export function ChartCanvas({ videoUrl, chartName = "chart", t }: ChartCanvasPro
       renderFrame(playbackTimeRef.current);
     }
   }, [showHitEffect, renderFrame]);
-
-  useEffect(() => {
-    if (rendererRef.current && chartData) {
-      rendererRef.current.setBpm(chartData.bpm);
-    }
-  }, [chartData]);
 
   useEffect(() => {
     answerSoundRefs.current.setEnabled(soundEnabled);

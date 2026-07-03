@@ -106,9 +106,9 @@ export async function exportChartGif({
   const bgVideo = videoOption ? await loadExportVideo(videoOption.url) : null;
 
   const canvas = document.createElement("canvas");
-  const renderer = new MainRenderer(canvas, chart.bpm);
+  // #48 后 MainRenderer 不收 bpm 构造参数、无 setBpm——bpm 由 renderFrame 的 chart 推导。
+  const renderer = new MainRenderer(canvas);
   renderer.resizeToSize(size);
-  renderer.setBpm(chart.bpm);
   renderer.setHiSpeed(settings.hiSpeed);
   renderer.setAlwaysKeepHiSpeed(settings.alwaysKeepHiSpeed);
   renderer.setPlaybackSpeed(1);

@@ -3,13 +3,22 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import {
   AudioManager,
-  type AudioManagerConfig,
+  prepareAudioEvents,
+  type PreparedAudioEvent,
   type Note,
   type AudioConfig,
   ANSWER_SOUND_BASE_OFFSET_MS,
 } from "@lxns-network/maimai-chart-engine";
+import { registerAudioContextForUnlock } from "../lib/audio-unlock";
 
-export interface UseAudioOptions extends AudioManagerConfig {
+// 上游 #48 后 AudioManager 不再自建 AudioContext，构造时需外部传入
+// { audioContext, outputNode }，且 schedule() 改吃 prepareAudioEvents(notes) 的预处理事件、
+// 删除了 resume()。本 hook 自持一个 AudioContext（正解音专用，与音乐播放的 context 分离），
+// 对外接口保持不变，schedule 仍收 notes 并在内部按引用缓存预处理结果。
+export interface UseAudioOptions {
+  answerSoundPath?: string;
+  initialVolume?: number;
+  initialTimingOffset?: number;
   autoInit?: boolean;
 }
 
@@ -43,41 +52,76 @@ const defaultConfig: AudioConfig = {
 export function useAudio(options: UseAudioOptions = {}): UseAudioReturn {
   const { autoInit = false, ...managerConfig } = options;
   const managerRef = useRef<AudioManager | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const managerConfigRef = useRef(managerConfig);
   const autoInitRef = useRef(autoInit);
+  // 按 notes 数组引用缓存 prepareAudioEvents 结果，避免每帧重算（长谱昂贵）。
+  const preparedRef = useRef<{ notes: Note[] | null; events: PreparedAudioEvent[] }>({
+    notes: null,
+    events: [],
+  });
   const [isInitialized, setIsInitialized] = useState(false);
   const [config, setConfig] = useState<AudioConfig>(defaultConfig);
 
   useEffect(() => {
-    managerRef.current = new AudioManager(managerConfigRef.current);
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AudioContextClass();
+    const outputNode = ctx.createGain();
+    outputNode.connect(ctx.destination);
+    audioContextRef.current = ctx;
+    // Safari/iOS：context 创建即 suspended，注册到手势解锁（点播放等手势内 resume）。
+    const unregisterUnlock = registerAudioContextForUnlock(ctx);
+
+    const manager = new AudioManager({ audioContext: ctx, outputNode, ...managerConfigRef.current });
+    managerRef.current = manager;
 
     if (autoInitRef.current) {
-      managerRef.current.init().then(() => {
-        setIsInitialized(true);
-        if (managerRef.current) setConfig(managerRef.current.getConfig());
+      // init() 期间若 StrictMode 立刻卸载：cleanup 关闭 ctx，进行中的 decodeAudioData
+      // 会 reject 并被 AudioManager.init 内部 try/catch 吞掉（不再需要旧的 init 竞态守卫）。
+      manager.init().then(() => {
+        if (managerRef.current !== manager) return;
+        setIsInitialized(manager.isInitialized());
+        setConfig(manager.getConfig());
       });
     }
 
     return () => {
-      managerRef.current?.dispose();
+      unregisterUnlock();
+      manager.dispose();
       managerRef.current = null;
+      preparedRef.current = { notes: null, events: [] };
+      audioContextRef.current = null;
+      void ctx.close().catch(() => {});
     };
   }, []);
 
   const init = useCallback(async () => {
-    if (!managerRef.current) return;
-    await managerRef.current.init();
-    setIsInitialized(managerRef.current.isInitialized());
-    setConfig(managerRef.current.getConfig());
+    const manager = managerRef.current;
+    if (!manager) return;
+    await manager.init();
+    setIsInitialized(manager.isInitialized());
+    setConfig(manager.getConfig());
   }, []);
 
   const resume = useCallback(async () => {
-    await managerRef.current?.resume();
+    const ctx = audioContextRef.current;
+    if (ctx && ctx.state === "suspended") {
+      await ctx.resume();
+    }
   }, []);
 
   const schedule = useCallback(
     (notes: Note[] | null, currentTimeMs: number, playbackSpeed?: number, lookAheadMs?: number) => {
-      managerRef.current?.schedule(notes, currentTimeMs, playbackSpeed, lookAheadMs);
+      const manager = managerRef.current;
+      if (!manager) return;
+      const cache = preparedRef.current;
+      if (cache.notes !== notes) {
+        cache.notes = notes;
+        cache.events = prepareAudioEvents(notes);
+      }
+      manager.schedule(cache.events, currentTimeMs, playbackSpeed, lookAheadMs);
     },
     [],
   );

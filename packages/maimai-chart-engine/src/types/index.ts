@@ -97,7 +97,10 @@ export type MirrorMode = "none" | "horizontal" | "vertical" | "rotate180";
  */
 export type JudgmentLineDesign = "blind" | "noLine" | "simple" | "sensor";
 
-export type ChartDifficulty = 1 | 2 | 3 | 4 | 5 | 6;
+// 本地补丁：7 = 宴 (UTAGE)。simai 用 &inote_7= 存宴谱，须与 1–6 一同支持，否则
+// 宴会场谱面（只有槽 7）会被误判为单难度谱、退化成默认 MASTER(4)，解析时抛
+// "Difficulty 4 not found. Available: 7"。上游至今仍只支持 1–6，re-sync 时须重打。
+export type ChartDifficulty = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export const DIFFICULTY_NAMES: Record<ChartDifficulty, string> = {
   1: "EASY",
@@ -106,6 +109,7 @@ export const DIFFICULTY_NAMES: Record<ChartDifficulty, string> = {
   4: "EXPERT",
   5: "MASTER",
   6: "Re:MASTER",
+  7: "宴",
 };
 
 export const DIFFICULTY_COLORS: Record<ChartDifficulty, string> = {
@@ -115,6 +119,7 @@ export const DIFFICULTY_COLORS: Record<ChartDifficulty, string> = {
   4: "#EF4444",
   5: "#A855F7",
   6: "#F8FAFC",
+  7: "#EC4899",
 };
 
 export interface SlideArcLutPoint {
@@ -133,6 +138,8 @@ export interface SlideSegment {
   startPos: ButtonPosition;
   /** 结束按钮位置（1-8） */
   endPos: ButtonPosition;
+  /** V（大写折返）滑条的拐点按钮（仅 type==="V" 时存在），detectSlideShape 用它判 L/R 侧 */
+  midPos?: ButtonPosition;
   /** 缓存长度（懒计算） */
   cachedLength?: number;
   /** 缓存弧长 LUT（懒计算，star 头部按弧长定位） */
@@ -164,16 +171,6 @@ export interface BaseNote {
   bpm: number;
   /** 此 Note 是否有延迟标记（simai 中的反引号） */
   hasDelayMarker?: boolean;
-  /** 同时出现的 Note 数量 */
-  simultaneousNoteCount?: number;
-  /** 同时出现的滑条数量 */
-  simultaneousSlideCount?: number;
-  /** 同时出现的非触摸 Note 数量 */
-  simultaneousNonTouchCount?: number;
-  /** 同时出现的触摸 Note 数量 */
-  simultaneousTouchCount?: number;
-  /** 绝赞索引（不包含绝赞 Note） */
-  noExBreakIndex?: number;
 }
 
 export interface TapNote extends BaseNote {
@@ -255,8 +252,6 @@ export interface TouchNote extends BaseNote {
   position: TouchPosition;
   /** 是否有烟花效果 */
   hasFirework?: boolean;
-  /** 此位置可见的触摸数量 */
-  visibleTouchCount?: number;
 }
 
 export interface TouchHoldStartNote extends BaseNote {
@@ -270,8 +265,6 @@ export interface TouchHoldStartNote extends BaseNote {
   hasFirework?: boolean;
   /** 是否为 Hold 开始 */
   isHoldStart: true;
-  /** 此位置可见的触摸数量 */
-  visibleTouchCount?: number;
 }
 
 export interface TouchHoldEndNote extends BaseNote {
@@ -315,6 +308,7 @@ export interface ChartLevels {
   lv_4?: string;
   lv_5?: string;
   lv_6?: string;
+  lv_7?: string; // 本地补丁：宴 (UTAGE)
 }
 
 export interface ChartDesigners {
@@ -324,6 +318,7 @@ export interface ChartDesigners {
   des_4?: string;
   des_5?: string;
   des_6?: string;
+  des_7?: string; // 本地补丁：宴 (UTAGE)
 }
 
 export interface AvailableDifficulties {
@@ -333,6 +328,7 @@ export interface AvailableDifficulties {
   4?: boolean;
   5?: boolean;
   6?: boolean;
+  7?: boolean; // 本地补丁：宴 (UTAGE)
 }
 
 export interface Chart {

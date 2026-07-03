@@ -7,6 +7,7 @@ import { useGameSettingsStore } from "../store/settings-store";
 import type { BpmEvent } from "@lxns-network/maimai-chart-engine";
 import { beatsToMs } from "../lib/time-conversion";
 import { clamp } from "../lib/math";
+import { registerAudioContextForUnlock } from "../lib/audio-unlock";
 
 const LEAD_IN_BEATS = 4;
 const SEEK_THROTTLE_MS = 50;
@@ -228,11 +229,23 @@ export function useMusicPlayer() {
     setMusicState(isLoaded, isLoading, error);
   }, [isLoaded, isLoading, error, setMusicState]);
 
-  // 卸载清理：停 source、abort 进行中的下载、关 AudioContext。
+  // 挂载即建 AudioContext（suspended）并注册手势解锁：Safari/iOS 上 context 必须在用户手势
+  // 同步栈内 resume 才解锁，而音乐 context 原本在点播放后的 effect 里才懒建（晚于手势那一拍）→
+  // 首次播放音乐全哑。提前建好，点「播放」的 pointerdown 便能在同一手势内 resume 它。
+  // 卸载时注销解锁、停 source、abort 下载、关 context。
   useEffect(() => {
-    const currentState = audioStateRef.current;
+    const state = audioStateRef.current;
+    if (!state.audioContext) {
+      const ctx = new AudioContext();
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = useGameSettingsStore.getState().musicVolume;
+      gainNode.connect(ctx.destination);
+      state.audioContext = ctx;
+      state.gainNode = gainNode;
+    }
+    const unregisterUnlock = registerAudioContextForUnlock(state.audioContext);
     return () => {
-      const state = currentState;
+      unregisterUnlock();
       stopSource();
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
