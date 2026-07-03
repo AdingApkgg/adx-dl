@@ -235,16 +235,15 @@ export function CatalogBrowser({
     }
     return BPM_BUCKETS.filter((bucket) => present.has(bucket.id));
   }, [entries]);
+  // Only PV: "has DX chart" is exactly the DX cabinet/type, so it would just
+  // duplicate the Type row's DX chip.
   const assetOptions = React.useMemo(() => {
-    const options: Array<{ id: "pv" | "dx"; label: string }> = [];
+    const options: Array<{ id: "pv"; label: string }> = [];
     if (entries.some((entry) => entry.assets?.has_pv)) {
       options.push({ id: "pv", label: dictionary.assetHasPv });
     }
-    if (entries.some((entry) => entry.assets?.has_dx_chart)) {
-      options.push({ id: "dx", label: dictionary.assetHasDx });
-    }
     return options;
-  }, [entries, dictionary.assetHasPv, dictionary.assetHasDx]);
+  }, [entries, dictionary.assetHasPv]);
 
   const visibleEntries = React.useMemo(() => {
     let filtered = applyCatalogFilters(baseEntries, effectiveCategory, ALL_SUBCATEGORIES);
@@ -269,13 +268,8 @@ export function CatalogBrowser({
         return id !== null && bpmSet.has(id);
       });
     }
-    if (assetSet.size > 0) {
-      // Asset toggles are requirements (AND): each selected asset must be present.
-      filtered = filtered.filter(
-        (entry) =>
-          (!assetSet.has("pv") || Boolean(entry.assets?.has_pv)) &&
-          (!assetSet.has("dx") || Boolean(entry.assets?.has_dx_chart))
-      );
+    if (assetSet.has("pv")) {
+      filtered = filtered.filter((entry) => Boolean(entry.assets?.has_pv));
     }
     return filtered;
   }, [baseEntries, effectiveCategory, versionSet, levelSet, genreIds, cabinetSet, bpmSet, assetSet]);
@@ -777,18 +771,15 @@ export function CatalogBrowser({
               </FilterChip>
             );
           })}
-          {[...assetSet].map((value) => {
-            const label = value === "pv" ? dictionary.assetHasPv : dictionary.assetHasDx;
-            return (
-              <FilterChip
-                key={`a-${value}`}
-                onRemove={() => toggleAsset(value)}
-                removeLabel={dictionary.removeFilter(label)}
-              >
-                {label}
-              </FilterChip>
-            );
-          })}
+          {[...assetSet].map((value) => (
+            <FilterChip
+              key={`a-${value}`}
+              onRemove={() => toggleAsset(value)}
+              removeLabel={dictionary.removeFilter(dictionary.assetHasPv)}
+            >
+              {dictionary.assetHasPv}
+            </FilterChip>
+          ))}
           {hasUserSelectedCategory && effectiveCategory !== ALL_CATEGORIES ? (
             <FilterChip
               onRemove={() => {
