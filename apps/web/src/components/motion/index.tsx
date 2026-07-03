@@ -94,13 +94,15 @@ export function Reveal({ delay = 0, transition, ssrVisible = false, children, ..
 
 const RevealIndexContext = React.createContext(0);
 
-type RevealGroupProps = React.ComponentProps<"div"> & {
+type RevealGroupProps = React.HTMLAttributes<HTMLElement> & {
   /** Seconds between consecutive item reveals. */
   stagger?: number;
+  /** Wrapper element — set to "ul" for a semantic list (pair with `RevealItem as="li"`). */
+  as?: "div" | "ul";
 };
 
 /** Container whose `RevealItem` descendants cascade in on mount. */
-export function RevealGroup({ stagger = 0.06, children, ...props }: RevealGroupProps) {
+export function RevealGroup({ stagger = 0.06, as = "div", children, ...props }: RevealGroupProps) {
   let index = 0;
   const indexed = React.Children.map(children, (child) => {
     if (!React.isValidElement(child)) return child;
@@ -110,7 +112,9 @@ export function RevealGroup({ stagger = 0.06, children, ...props }: RevealGroupP
       </RevealIndexContext.Provider>
     );
   });
-  return <div {...props}>{indexed}</div>;
+  // createElement avoids the JSX union-tag typing pitfall while still rendering
+  // a plain (non-motion) wrapper — only the RevealItem children animate.
+  return React.createElement(as, props, indexed);
 }
 
 type RevealItemProps = Omit<HTMLMotionProps<"div">, "ref"> & {
@@ -118,13 +122,18 @@ type RevealItemProps = Omit<HTMLMotionProps<"div">, "ref"> & {
   delay?: number;
   /** See `Reveal`: render visible in the SSR HTML, skipping the hidden initial state. */
   ssrVisible?: boolean;
+  /** Element — set to "li" for a semantic list item (pair with `RevealGroup as="ul"`). */
+  as?: "div" | "li";
 };
 
 /** A self-contained staggered child — rises + fades in as it scrolls into view. */
-export function RevealItem({ delay = 0, transition, ssrVisible = false, children, ...props }: RevealItemProps) {
+export function RevealItem({ delay = 0, transition, ssrVisible = false, as = "div", children, ...props }: RevealItemProps) {
   const cascadeDelay = React.useContext(RevealIndexContext);
+  // motion.li at runtime when as="li"; cast to the div motion type so the shared
+  // animation props (which are identical across elements) type-check as one tag.
+  const MotionTag = (as === "li" ? motion.li : motion.div) as typeof motion.div;
   return (
-    <motion.div
+    <MotionTag
       initial={ssrVisible ? false : "hidden"}
       whileInView="visible"
       viewport={REVEAL_VIEWPORT}
@@ -133,6 +142,6 @@ export function RevealItem({ delay = 0, transition, ssrVisible = false, children
       {...props}
     >
       {children}
-    </motion.div>
+    </MotionTag>
   );
 }

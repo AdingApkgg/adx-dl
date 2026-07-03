@@ -209,6 +209,7 @@ export type SiteDictionary = {
     volumeLabel: string;
     muteLabel: string;
     comments: string;
+    relatedTitle: string;
     commentsLoading: string;
     commentsError: string;
     commentsRetry: string;
@@ -301,6 +302,7 @@ export type SiteDictionary = {
     sourceLabel: string;
     communityLabel: string;
     getAppLabel: string;
+    navLabel: string;
   };
   pageViews: {
     siteViews: string;
@@ -584,6 +586,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       volumeLabel: "音量",
       muteLabel: "静音",
       comments: "评论",
+      relatedTitle: "相关谱面",
       commentsLoading: "评论加载中…",
       commentsError: "评论加载失败，请检查网络连接后重试。",
       commentsRetry: "重试",
@@ -669,6 +672,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       sourceLabel: "源代码",
       communityLabel: "Telegram 社群",
       getAppLabel: "获取 AstroDX",
+      navLabel: "页脚导航",
     },
     pageViews: {
       siteViews: "本站总访问量",
@@ -946,6 +950,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       volumeLabel: "Volume",
       muteLabel: "Mute",
       comments: "Comments",
+      relatedTitle: "Related charts",
       commentsLoading: "Loading comments…",
       commentsError: "Comments failed to load. Check your connection and try again.",
       commentsRetry: "Retry",
@@ -1035,6 +1040,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       sourceLabel: "Source",
       communityLabel: "Telegram Community",
       getAppLabel: "Get AstroDX",
+      navLabel: "Footer",
     },
     pageViews: {
       siteViews: "Site views",
@@ -1092,9 +1098,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       dismiss: "Dismiss",
     },
     seo: {
-      home: "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM, ready to browse by version, search, preview online and download.",
+      home: "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download.",
       charts:
-        "Browse the AstroDX chart catalog by maimai DX version, category and language — entries include cover art, difficulty levels, chart constants and BPM to preview and download.",
+        "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download.",
       status:
         "Check the live status of this site and its download service — server uptime, response latency, network metrics and key health data from the public monitor page.",
       versions:
@@ -1104,9 +1110,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
           ? `Browse the AstroDX chart in the maimai DX "${label}" version — cover art, difficulty levels, chart constants and BPM, ready to preview online and download into AstroDX.`
           : `Browse all ${count} AstroDX charts in the maimai DX "${label}" version — cover art, difficulty levels, chart constants and BPM, ready to preview online and download into AstroDX.`,
       guestbook:
-        "Leave your thoughts, suggestions, questions or feedback and chat with other maimai and AstroDX players. Comments are powered by Artalk — post anonymously or sign in.",
+        "Share thoughts, suggestions and feedback, and chat with other maimai and AstroDX players. Comments are powered by Artalk — post anonymously or sign in.",
       links:
-        "A curated collection of great maimai- and AstroDX-related sites, tools and resources — score trackers, chart utilities, communities and guides for maimai players.",
+        "A curated collection of maimai- and AstroDX-related sites, tools and resources — score trackers, chart utilities, communities and guides for players.",
     },
   },
   ja: {
@@ -1318,6 +1324,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       volumeLabel: "音量",
       muteLabel: "ミュート",
       comments: "コメント",
+      relatedTitle: "関連する譜面",
       commentsLoading: "コメントを読み込み中…",
       commentsError: "コメントを読み込めませんでした。接続を確認して再試行してください。",
       commentsRetry: "再試行",
@@ -1404,6 +1411,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       sourceLabel: "ソース",
       communityLabel: "Telegram コミュニティ",
       getAppLabel: "AstroDX を入手",
+      navLabel: "フッター",
     },
     pageViews: {
       siteViews: "総アクセス数",

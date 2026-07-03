@@ -870,14 +870,15 @@ export function CatalogBrowser({
           </Card>
         </motion.div>
       ) : (
-        <motion.div
+        <motion.ul
           layout
+          role="list"
           data-layout="card-grid"
-          className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
+          className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
         >
           <AnimatePresence mode="popLayout" initial={false}>
             {paginatedEntries.map((entry, index) => (
-              <motion.div
+              <motion.li
                 key={entry.id}
                 layout
                 initial={{ opacity: 0, scale: 0.96 }}
@@ -896,11 +897,14 @@ export function CatalogBrowser({
                   selected={selectedIds.has(entry.id)}
                   onToggleSelect={() => toggleSelection(entry.id)}
                 />
-              </motion.div>
+              </motion.li>
             ))}
           </AnimatePresence>
           {totalPages > 1 ? (
-            <Card size="sm" className="col-span-full border border-border/70 bg-card/70">
+            // Presentational so it isn't announced as a list item, but stays a
+            // valid <ul> child while spanning the full grid row.
+            <li role="presentation" className="col-span-full">
+            <Card size="sm" className="border border-border/70 bg-card/70">
               <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-col gap-1 text-sm text-muted-foreground">
                   <p>{dictionary.rangeLabel(pageStart, pageEnd, visibleEntries.length)}</p>
@@ -955,8 +959,9 @@ export function CatalogBrowser({
                 </nav>
               </CardContent>
             </Card>
+            </li>
           ) : null}
-        </motion.div>
+        </motion.ul>
       )}
 
       <AnimatePresence>

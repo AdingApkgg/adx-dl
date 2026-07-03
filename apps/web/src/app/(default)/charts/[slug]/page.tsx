@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { ChartDetailPageView } from "@/components/site/page-views";
-import { readEntryByRouteSlug, readRouteSlugs } from "@/lib/catalog";
+import { readEntryByRouteSlug, readRelatedEntries, readRouteSlugs } from "@/lib/catalog";
 import { buildChartDetailMetadata } from "@/lib/page-metadata";
 
 export const dynamicParams = false;
@@ -39,5 +39,6 @@ export default async function ChartDetailPage({
     notFound();
   }
 
-  return <ChartDetailPageView entry={entry} locale="zh" />;
+  const related = await readRelatedEntries(entry);
+  return <ChartDetailPageView entry={entry} related={related} locale="zh" />;
 }

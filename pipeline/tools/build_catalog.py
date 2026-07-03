@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 import os
 import re
@@ -468,6 +470,62 @@ def enrich_aliases(
     return catalog_path
 
 
+# Fields excluded from an entry's content fingerprint. imported_at is the value
+# we're deciding. cover_avif/cover_webp flip with the ASTRODX_COVERS build flag
+# (mirror vs. remote) rather than with content. aliases and slug come from
+# best-effort/deterministic post-processing — a flaky alias source or a shifted
+# slug tie-break shouldn't restamp <lastmod>.
+def _content_fingerprint(entry: dict[str, Any]) -> str:
+    clone = copy.deepcopy(entry)
+    clone.pop("imported_at", None)
+    clone.pop("aliases", None)
+    clone.pop("slug", None)
+    media = clone.get("media")
+    if isinstance(media, dict):
+        media.pop("cover_avif", None)
+        media.pop("cover_webp", None)
+    encoded = json.dumps(clone, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+# Keep imported_at stable across rebuilds so <lastmod> is a real per-entry
+# freshness signal. An entry inherits its previous timestamp when its content
+# fingerprint is unchanged and only takes the current build time when it is new
+# or genuinely changed. Without this, every rebuild restamps all 1500+ entries to
+# the same instant, which trains crawlers to ignore lastmod entirely.
+def _carry_forward_timestamps(
+    entries: list[dict[str, Any]], previous_entries: list[dict[str, Any]]
+) -> int:
+    previous_by_id = {
+        entry["id"]: entry
+        for entry in previous_entries
+        if isinstance(entry, dict) and entry.get("id")
+    }
+    carried = 0
+    for entry in entries:
+        previous = previous_by_id.get(entry.get("id"))
+        if not previous:
+            continue
+        prior_imported_at = previous.get("imported_at")
+        if not prior_imported_at:
+            continue
+        if _content_fingerprint(previous) == _content_fingerprint(entry):
+            entry["imported_at"] = prior_imported_at
+            carried += 1
+    return carried
+
+
+def _load_previous_entries(catalog_path: Path) -> list[dict[str, Any]]:
+    if not catalog_path.exists():
+        return []
+    try:
+        previous = json.loads(catalog_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    entries = previous.get("entries") if isinstance(previous, dict) else None
+    return entries if isinstance(entries, list) else []
+
+
 def build_catalog(
     root: Path,
     fetch_text: Callable[[str], str] = default_fetch_text,
@@ -506,6 +564,16 @@ def build_catalog(
     else:
         print("[catalog] covers: using remote image links (no local mirror)")
 
+    catalog_path = root / "data" / "catalog" / "index.json"
+
+    # Preserve per-entry lastmod across rebuilds: only new or changed entries take
+    # the current build time; unchanged ones keep their prior imported_at.
+    carried = _carry_forward_timestamps(entries, _load_previous_entries(catalog_path))
+    print(
+        f"[catalog] lastmod: kept {carried}/{len(entries)} timestamps, "
+        f"stamped {len(entries) - carried} at {generated_at}"
+    )
+
     catalog = {
         "generated_at": generated_at,
         "total_entries": len(entries),
@@ -513,7 +581,6 @@ def build_catalog(
         "entries": entries,
     }
 
-    catalog_path = root / "data" / "catalog" / "index.json"
     catalog_path.parent.mkdir(parents=True, exist_ok=True)
     catalog_path.write_text(
         json.dumps(catalog, ensure_ascii=False, indent=2) + "\n",

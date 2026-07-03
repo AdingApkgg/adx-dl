@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 
+import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { StatusPageView } from "@/components/site/status-page-view";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { buildInfoPageStructuredData } from "@/lib/structured-data";
 import {
   appendHistoryPoint,
   mergeHistory,
@@ -38,7 +40,8 @@ function readStoredHistory(): ServerStatusHistoryPoint[] {
 }
 
 export function ServerStatusClient({ locale = "zh" }: { locale?: Locale }) {
-  const labels = getDictionary(locale).statusPage;
+  const dictionary = getDictionary(locale);
+  const labels = dictionary.statusPage;
   // SWR owns the snapshot/loading/error lifecycle; we only keep the rolling
   // history locally since SWR replaces (rather than accumulates) data.
   const [history, setHistory] = useState<ServerStatusHistoryPoint[]>([]);
@@ -91,13 +94,22 @@ export function ServerStatusClient({ locale = "zh" }: { locale?: Locale }) {
     : null;
 
   return (
-    <StatusPageView
-      locale={locale}
-      snapshot={snapshot}
-      history={history}
-      isRefreshing={isValidating}
-      errorMessage={errorMessage}
-      onRefresh={() => void mutate()}
-    />
+    <>
+      <SeoJsonLd
+        data={buildInfoPageStructuredData(locale, {
+          pathname: "/status",
+          title: labels.title,
+          description: dictionary.seo.status,
+        })}
+      />
+      <StatusPageView
+        locale={locale}
+        snapshot={snapshot}
+        history={history}
+        isRefreshing={isValidating}
+        errorMessage={errorMessage}
+        onRefresh={() => void mutate()}
+      />
+    </>
   );
 }

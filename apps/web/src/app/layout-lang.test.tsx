@@ -15,6 +15,7 @@ mock.module("@/lib/catalog", () => {
     readCatalogEntries: async () => [],
     readEntryById: async () => undefined,
     readEntryByRouteSlug: async () => undefined,
+    readRelatedEntries: async () => [],
     readRouteSlugs: async () => [],
     readCanonicalSlugs: async () => [],
     readVersionGroups: async () => [],

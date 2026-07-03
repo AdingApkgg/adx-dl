@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { preload } from "react-dom";
 import {
   ArrowRightIcon,
   ChevronRightIcon,
@@ -62,6 +63,7 @@ import {
   versionImageSrcByIndex,
 } from "@/lib/version-image";
 import {
+  buildCatalogDatasetStructuredData,
   buildChartDetailStructuredData,
   buildHomeFaqStructuredData,
   buildHomeStructuredData,
@@ -85,6 +87,8 @@ type CatalogPageViewProps = SharedViewProps & {
 
 type ChartDetailPageViewProps = SharedViewProps & {
   entry: CatalogEntry;
+  /** Sibling charts (same artist/genre/version) for the "related" cross-link rail. */
+  related?: CatalogEntry[];
 };
 
 // FNV-1a hash: turn the catalog timestamp into a stable seed so the spotlight
@@ -224,6 +228,18 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
     seed
   );
   const spotlight = shuffled[0] ?? null;
+  // Preload the above-the-fold spotlight cover — the home LCP element. It renders
+  // as a raw <img> (static export makes next/image unoptimized), so nothing else
+  // emits a head preload. Prefer the optimized AVIF and type-gate it so non-AVIF
+  // browsers (which fetch the webp/original instead) don't double-download.
+  if (spotlight?.media.cover_avif || spotlight?.media.cover_url) {
+    const avif = spotlight.media.cover_avif;
+    preload(avif || spotlight.media.cover_url, {
+      as: "image",
+      fetchPriority: "high",
+      ...(avif ? { type: "image/avif" } : {}),
+    });
+  }
   const latestIds = new Set(latestEntries.map((entry) => entry.id));
   const featuredEntries = shuffled
     .filter((entry) => entry.id !== spotlight?.id && !latestIds.has(entry.id))
@@ -238,6 +254,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
         data={[
           buildHomeStructuredData(locale),
           buildHomeFaqStructuredData(locale, catalog.total_entries, versionCount),
+          buildCatalogDatasetStructuredData(locale, catalog.generated_at),
         ]}
       />
       <section className="relative isolate overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card/50 to-fuchsia-500/10 px-6 py-12 md:px-12 md:py-16">
@@ -315,9 +332,9 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
             </Link>
           </Button>
         </Reveal>
-        <RevealGroup className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <RevealGroup as="ul" role="list" className="grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 lg:grid-cols-4">
           {versionTiles.map((version) => (
-            <RevealItem key={version.index} ssrVisible className="h-full">
+            <RevealItem as="li" key={version.index} ssrVisible className="h-full">
               <Link
                 href={buildLocalePath(`/versions/${versionRouteId(version.index)}`, locale)}
                 className="group flex h-full flex-col items-center gap-3 rounded-2xl border border-border/60 bg-card/70 p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10"
@@ -355,9 +372,9 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
             </Link>
           </Button>
         </Reveal>
-        <RevealGroup className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+        <RevealGroup as="ul" role="list" className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {latestEntries.map((entry, index) => (
-            <RevealItem key={entry.id} ssrVisible className="h-full">
+            <RevealItem as="li" key={entry.id} ssrVisible className="h-full">
               <ChartCard
                 entry={entry}
                 locale={locale}
@@ -383,9 +400,9 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
               </Link>
             </Button>
           </Reveal>
-          <RevealGroup className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+          <RevealGroup as="ul" role="list" className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {featuredEntries.map((entry) => (
-              <RevealItem key={entry.id} ssrVisible className="h-full">
+              <RevealItem as="li" key={entry.id} ssrVisible className="h-full">
                 <ChartCard
                   entry={entry}
                   locale={locale}
@@ -446,6 +463,7 @@ export function ChartsPageView({
 export function ChartDetailPageView({
   entry,
   locale = "zh",
+  related = [],
 }: ChartDetailPageViewProps) {
   const dictionary = getDictionary(locale);
   const detail = dictionary.detail;
@@ -482,6 +500,8 @@ export function ChartDetailPageView({
           {title}
         </span>
       </nav>
+      {/* The whole chart page is one self-contained article about the chart. */}
+      <article className="flex flex-col gap-6">
       <section className="relative isolate overflow-hidden rounded-3xl border border-border/60">
         <div aria-hidden="true" className="absolute inset-0 -z-10">
           {entry.media.cover_url ? (
@@ -723,6 +743,31 @@ export function ChartDetailPageView({
         </div>
       </Reveal>
 
+      {related.length > 0 ? (
+        <section className="flex flex-col gap-4">
+          <h2 className="text-2xl font-semibold">{detail.relatedTitle}</h2>
+          {/* Real <a href> cross-links to sibling chart pages — the internal link
+              graph the client-side browse grid (24 cards, button paging) can't give. */}
+          <ul className="grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2">
+            {related.map((item) => (
+              <li key={item.id}>
+                <Link
+                  href={buildLocalePath(`/charts/${entrySlug(item)}`, locale)}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-card/60 px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-card"
+                >
+                  <span className="line-clamp-1 font-medium">
+                    {formatEntryTitle(item, locale)}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {formatEntrySubcategory(item)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <section className="flex flex-col gap-4">
         <h2 className="text-2xl font-semibold">{detail.comments}</h2>
         <ChartComments
@@ -731,6 +776,7 @@ export function ChartDetailPageView({
           locale={locale}
         />
       </section>
+      </article>
     </main>
   );
 }

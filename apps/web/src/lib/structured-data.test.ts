@@ -65,14 +65,23 @@ describe("structured data builders", () => {
           name: "ADX 谱面资源",
           url: "https://adxdls.saop.cc",
           logo: "https://adxdls.saop.cc/opengraph-image.png",
-          sameAs: ["https://github.com/AdingApkgg/adx-dl"],
+          sameAs: [
+            "https://github.com/AdingApkgg/adx-dl",
+            "https://github.com/AdingApkgg",
+            "https://t.me/FullDiveSAO",
+          ],
+          contactPoint: {
+            "@type": "ContactPoint",
+            contactType: "customer support",
+            url: "https://t.me/FullDiveSAO",
+          },
         },
         {
           "@type": "WebSite",
           "@id": "https://adxdls.saop.cc/#website",
           name: "ADX 谱面资源",
           description:
-            "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM, ready to browse by version, search, preview online and download.",
+            "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download.",
           url: "https://adxdls.saop.cc/en",
           inLanguage: "en",
           publisher: { "@id": "https://adxdls.saop.cc/#organization" },

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { ChartDetailPageView } from "@/components/site/page-views";
-import { readEntryByRouteSlug, readRouteSlugs } from "@/lib/catalog";
+import { readEntryByRouteSlug, readRelatedEntries, readRouteSlugs } from "@/lib/catalog";
 import { buildChartDetailMetadata } from "@/lib/page-metadata";
 
 import {
@@ -44,5 +44,12 @@ export default async function LocalizedChartDetailPage({
     notFound();
   }
 
-  return <ChartDetailPageView entry={entry} locale={getPrefixedRouteLocale(locale)} />;
+  const related = await readRelatedEntries(entry);
+  return (
+    <ChartDetailPageView
+      entry={entry}
+      related={related}
+      locale={getPrefixedRouteLocale(locale)}
+    />
+  );
 }
