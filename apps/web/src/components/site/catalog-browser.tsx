@@ -3,10 +3,11 @@
 import * as React from "react";
 import Image from "next/image";
 import useSWR from "swr";
-import { CheckIcon, SearchIcon, XIcon } from "lucide-react";
+import { SearchIcon, XIcon } from "lucide-react";
 
 import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
+import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { ChartCard } from "@/components/site/chart-card";
 import {
   ALL_CATEGORIES,
@@ -22,6 +23,8 @@ import {
   bpmBucketId,
   cabinetBucket,
   collectDifficultyLevels,
+  DIFFICULTY_TONE_CLASS,
+  type DifficultyTone,
   entryHasLevel,
   GENRES,
   resolveGenreId,
@@ -195,7 +198,12 @@ export function CatalogBrowser({
         .sort((a, b) => (versionImageIndex(b) ?? -1) - (versionImageIndex(a) ?? -1)),
     [entries, effectiveCategory]
   );
-  const levelOptions = React.useMemo(() => collectDifficultyLevels(entries), [entries]);
+  // Highest level first (15 → 1) so the hard charts most people filter for sit
+  // at the front of the row.
+  const levelOptions = React.useMemo(
+    () => [...collectDifficultyLevels(entries)].reverse(),
+    [entries]
+  );
   const genreOptions = React.useMemo(() => {
     const ids = new Set<number>();
     for (const entry of entries) {
@@ -504,11 +512,16 @@ export function CatalogBrowser({
             </AllChip>
             {versionOptions.map((value) => {
               const iconSrc = versionImageSrc(value);
+              // Icon-only: the version logo is the identity; name lives in the
+              // aria-label / title for a11y and hover.
               return (
                 <ToggleChip
                   key={value}
                   active={versionSet.has(value)}
                   onClick={() => toggleVersion(value)}
+                  className="px-2 py-1"
+                  ariaLabel={value}
+                  title={value}
                 >
                   {iconSrc ? (
                     <Image
@@ -517,10 +530,11 @@ export function CatalogBrowser({
                       width={VERSION_IMAGE_DIMENSIONS.width}
                       height={VERSION_IMAGE_DIMENSIONS.height}
                       unoptimized
-                      className="h-4 w-auto shrink-0"
+                      className="h-9 w-auto"
                     />
-                  ) : null}
-                  {versionShortName(value)}
+                  ) : (
+                    versionShortName(value)
+                  )}
                 </ToggleChip>
               );
             })}
@@ -537,6 +551,7 @@ export function CatalogBrowser({
                 key={value}
                 active={levelSet.has(value)}
                 onClick={() => toggleLevel(value)}
+                tone={levelTone(value)}
               >
                 {value}
               </ToggleChip>
@@ -549,24 +564,16 @@ export function CatalogBrowser({
             <AllChip active={genreIds.size === 0} onClick={clearSet(setGenreIds)}>
               {dictionary.filterAll}
             </AllChip>
-            {genreOptions.map((id) => {
-              const active = genreIds.has(String(id));
-              return (
-                <ToggleChip
-                  key={id}
-                  active={active}
-                  onClick={() => toggleGenre(String(id))}
-                  // Genre chips carry the genre's own tint when active.
-                  className={cn(
-                    GENRES[id].badge,
-                    active ? "ring-2 ring-current" : "border-transparent opacity-70 hover:opacity-100"
-                  )}
-                  plain
-                >
-                  {GENRES[id][locale]}
-                </ToggleChip>
-              );
-            })}
+            {genreOptions.map((id) => (
+              <ToggleChip
+                key={id}
+                active={genreIds.has(String(id))}
+                onClick={() => toggleGenre(String(id))}
+                tone={GENRES[id].badge}
+              >
+                {GENRES[id][locale]}
+              </ToggleChip>
+            ))}
           </ChipFilterRow>
         ) : null}
 
@@ -575,19 +582,26 @@ export function CatalogBrowser({
             <AllChip active={cabinetSet.size === 0} onClick={clearSet(setCabinetSet)}>
               {dictionary.filterAll}
             </AllChip>
-            {cabinetOptions.map((value) => (
-              <ToggleChip
-                key={value}
-                active={cabinetSet.has(value)}
-                onClick={() => toggleCabinet(value)}
-              >
-                {value === "DX"
+            {cabinetOptions.map((value) => {
+              const label =
+                value === "DX"
                   ? "DX"
                   : value === "ST"
                     ? dictionary.cabinetStandard
-                    : dictionary.cabinetUtage}
-              </ToggleChip>
-            ))}
+                    : dictionary.cabinetUtage;
+              return (
+                <ToggleChip
+                  key={value}
+                  active={cabinetSet.has(value)}
+                  onClick={() => toggleCabinet(value)}
+                  className="px-2"
+                  ariaLabel={label}
+                  title={label}
+                >
+                  <CabinetBadge cabinet={value} className="h-4" />
+                </ToggleChip>
+              );
+            })}
           </ChipFilterRow>
         ) : null}
 
@@ -601,6 +615,7 @@ export function CatalogBrowser({
                 key={bucket.id}
                 active={bpmSet.has(bucket.id)}
                 onClick={() => toggleBpm(bucket.id)}
+                tone={BPM_TONE[bucket.id]}
               >
                 {bucket.label}
               </ToggleChip>
@@ -901,15 +916,18 @@ export function CatalogBrowser({
   );
 }
 
-// A labeled row of filter chips (one dimension). The label sits left of a
-// wrapping chip group so several rows stack into a compact filter panel.
+// A labeled row of filter chips (one dimension). Chips never wrap — the group
+// scrolls horizontally (swipe on touch, trackpad/shift-wheel on desktop) so a
+// long dimension like version stays a single compact line. Scrollbar hidden.
 function ChipFilterRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-start gap-x-2 gap-y-2">
-      <span className="w-14 shrink-0 pt-1.5 text-xs font-medium text-muted-foreground">
-        {label}
-      </span>
-      <div className="flex flex-1 flex-wrap gap-2">{children}</div>
+    <div className="flex items-center gap-x-2">
+      <span className="w-12 shrink-0 text-xs font-medium text-muted-foreground">{label}</span>
+      {/* overflow-x also clips overflow-y, so pad vertically (and a touch right)
+          to give the selected chip's ring room instead of shearing its edge. */}
+      <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto py-1.5 pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {children}
+      </div>
     </div>
   );
 }
@@ -931,7 +949,7 @@ function AllChip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "min-h-8 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+        "min-h-8 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
         active
           ? "border-primary bg-primary/15 text-primary"
           : "border-border text-muted-foreground hover:bg-muted/60"
@@ -942,41 +960,66 @@ function AllChip({
   );
 }
 
-// A single multi-select filter chip. `plain` drops the default tint so a genre
-// chip can carry its own color via `className`.
+// A single multi-select filter chip. `tone` (a border/bg/text class set) makes
+// it always-colored — active then adds a ring and inactive dims — for genre,
+// level and BPM. Without a tone it uses the neutral → primary style.
 function ToggleChip({
   active,
   onClick,
   children,
+  tone,
   className,
-  plain,
+  ariaLabel,
+  title,
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
+  tone?: string;
   className?: string;
-  plain?: boolean;
+  ariaLabel?: string;
+  title?: string;
 }) {
   return (
     <motion.button
       type="button"
       whileTap={{ scale: 0.93 }}
       aria-pressed={active}
+      aria-label={ariaLabel}
+      title={title}
       onClick={onClick}
       className={cn(
-        "flex min-h-8 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-        !plain &&
-          (active
+        "flex min-h-8 shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+        tone
+          ? cn(tone, active ? "ring-2 ring-current" : "opacity-70 hover:opacity-100")
+          : active
             ? "border-primary bg-primary/15 text-primary"
-            : "border-border text-muted-foreground hover:bg-muted/60"),
+            : "border-border text-muted-foreground hover:bg-muted/60",
         className
       )}
     >
-      {active ? <CheckIcon className="size-3.5 shrink-0" aria-hidden="true" /> : null}
       {children}
     </motion.button>
   );
 }
+
+// Tint a level chip with maimai's real difficulty palette (the same tones the
+// difficulty pills use): the level a chart sits at tracks its difficulty slot,
+// so low levels read Basic-green and top levels Master/Re:Master-violet.
+function levelTone(level: string): string {
+  const n = Number.parseInt(level, 10);
+  const tone: DifficultyTone =
+    n <= 5 ? "basic" : n <= 8 ? "advanced" : n <= 11 ? "expert" : n <= 13 ? "master" : "remaster";
+  return DIFFICULTY_TONE_CLASS[tone];
+}
+
+// BPM buckets, slow (cool) → fast (warm), keyed by bucket id.
+const BPM_TONE: Record<string, string> = {
+  "0": "border-sky-500/40 bg-sky-500/12 text-sky-700 dark:text-sky-300",
+  "1": "border-teal-500/40 bg-teal-500/12 text-teal-700 dark:text-teal-300",
+  "2": "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  "3": "border-rose-500/40 bg-rose-500/12 text-rose-700 dark:text-rose-300",
+};
 
 // One applied filter shown in the active-filters bar: a label + a remove (×).
 // `className` tints it to match a genre chip; `icon` prefixes it (search glyph
