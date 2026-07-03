@@ -134,6 +134,7 @@ export type SiteDictionary = {
     clearFilters: string;
     activeFiltersLabel: string;
     removeFilter: (label: string) => string;
+    advancedFilters: string;
     filterAll: string;
     filterVersion: string;
     filterLevel: string;
@@ -512,6 +513,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       clearFilters: "清除全部筛选",
       activeFiltersLabel: "已应用筛选",
       removeFilter: (label) => `移除筛选：${label}`,
+      advancedFilters: "高级筛选",
       filterAll: "全部",
       filterVersion: "版本",
       filterLevel: "等级",
@@ -873,6 +875,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       clearFilters: "Clear all filters",
       activeFiltersLabel: "Active filters",
       removeFilter: (label) => `Remove filter: ${label}`,
+      advancedFilters: "Advanced filters",
       filterAll: "All",
       filterVersion: "Version",
       filterLevel: "Level",
@@ -1244,6 +1247,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       clearFilters: "フィルターをすべて解除",
       activeFiltersLabel: "適用中のフィルター",
       removeFilter: (label) => `フィルターを解除：${label}`,
+      advancedFilters: "詳細フィルター",
       filterAll: "すべて",
       filterVersion: "バージョン",
       filterLevel: "レベル",

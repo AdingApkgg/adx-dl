@@ -109,15 +109,13 @@ describe("page views locale-driven content", () => {
     expect(enHtml).toContain('data-layout="card-grid"');
     expect(enHtml).toContain('alt="Song 1 cover"');
     expect(enHtml).toContain("aspect-square");
-    // Version and level are chip rows now, not dropdowns.
-    expect(enHtml).toContain("Version");
-    expect(enHtml).toContain("Level");
+    // Filter dimensions live in the collapsed-by-default advanced panel.
+    expect(enHtml).toContain("Advanced filters");
 
     expect(jaHtml).toContain("曲目 1");
     expect(jaHtml).toContain("歌手 1");
     expect(jaHtml).toContain(`href="/ja/charts/song-1"`);
-    expect(jaHtml).toContain("バージョン");
-    expect(jaHtml).toContain("レベル");
+    expect(jaHtml).toContain("詳細フィルター");
   });
 
   test("detail view uses english fallback fields only for en and original fields for ja", () => {

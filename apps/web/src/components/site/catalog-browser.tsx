@@ -3,7 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import useSWR from "swr";
-import { SearchIcon, XIcon } from "lucide-react";
+import { ChevronDownIcon, ListFilterIcon, SearchIcon, XIcon } from "lucide-react";
 
 import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
@@ -39,6 +39,7 @@ import {
   versionImageIndex,
   versionImageSrc,
 } from "@/lib/version-image";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -85,6 +86,10 @@ export function CatalogBrowser({
   const [cabinetSet, setCabinetSet] = React.useState<ReadonlySet<string>>(new Set());
   const [bpmSet, setBpmSet] = React.useState<ReadonlySet<string>>(new Set());
   const [assetSet, setAssetSet] = React.useState<ReadonlySet<string>>(new Set());
+  // The filter picker rows are tucked into a collapsible "advanced filters"
+  // panel, closed by default (opened automatically when a deep link arrives
+  // with filters already applied).
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [hasUserSelectedCategory, setHasUserSelectedCategory] = React.useState(false);
   const [currentPage, setCurrentPage] = React.useState(1);
   const [selectMode, setSelectMode] = React.useState(false);
@@ -132,6 +137,11 @@ export function CatalogBrowser({
     if (bpm) setBpmSet(bpm);
     const asset = readSet("asset");
     if (asset) setAssetSet(asset);
+    // Landed with dimension filters already applied → reveal the picker so the
+    // user can see and adjust them.
+    if (version || level || genreSet || cabinet || bpm || asset) {
+      setFiltersOpen(true);
+    }
     if (Number.isInteger(pageParam) && pageParam > 1) {
       setCurrentPage(pageParam);
     }
@@ -285,14 +295,17 @@ export function CatalogBrowser({
     visibleEntries.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(safeCurrentPage * PAGE_SIZE, visibleEntries.length);
 
+  // Number of picked dimension values, shown as a badge on the panel toggle.
+  const dimensionFilterCount =
+    versionSet.size +
+    levelSet.size +
+    genreIds.size +
+    cabinetSet.size +
+    bpmSet.size +
+    assetSet.size;
   const hasActiveFilters =
     hasQuery ||
-    versionSet.size > 0 ||
-    levelSet.size > 0 ||
-    genreIds.size > 0 ||
-    cabinetSet.size > 0 ||
-    bpmSet.size > 0 ||
-    assetSet.size > 0 ||
+    dimensionFilterCount > 0 ||
     (hasUserSelectedCategory && effectiveCategory !== ALL_CATEGORIES);
 
   // Toggle a value in a dimension set and reset to page 1. `clearSet` empties a
@@ -471,7 +484,9 @@ export function CatalogBrowser({
         <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={searchInputRef}
-          className={cn("pl-9", inputValue && "pr-9")}
+          // Solid card fill + shadow so the box reads clearly against the page's
+          // tinted gradient (a transparent input blends into it).
+          className={cn("h-10 border-border bg-card pl-9 shadow-sm", inputValue && "pr-9")}
           placeholder={dictionary.searchPlaceholder}
           value={inputValue}
           onChange={(event) => {
@@ -502,9 +517,40 @@ export function CatalogBrowser({
         ) : null}
       </div>
 
-      {/* One chip row per dimension — pick directly, combine across rows. Each
-          row's "all" chip clears just that dimension. */}
-      <div className="flex flex-col gap-2.5">
+      {/* Advanced filters are tucked into a collapsible panel (closed by
+          default) so the browse page stays uncluttered. */}
+      <button
+        type="button"
+        onClick={() => setFiltersOpen((open) => !open)}
+        aria-expanded={filtersOpen}
+        className="flex w-fit items-center gap-1.5 rounded-lg py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ListFilterIcon className="size-4" />
+        {dictionary.advancedFilters}
+        {dimensionFilterCount > 0 ? (
+          <Badge variant="secondary" className="tabular-nums">
+            {dimensionFilterCount}
+          </Badge>
+        ) : null}
+        <ChevronDownIcon
+          className={cn("size-4 transition-transform", filtersOpen && "rotate-180")}
+          aria-hidden="true"
+        />
+      </button>
+
+      <AnimatePresence initial={false}>
+        {filtersOpen ? (
+          <motion.div
+            key="filter-rows"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: EASE_OUT }}
+            className="overflow-hidden"
+          >
+            {/* One chip row per dimension — pick directly, combine across rows.
+                Each row's "all" chip clears just that dimension. */}
+            <div className="flex flex-col gap-2.5 pt-1">
         {versionOptions.length > 0 ? (
           <ChipFilterRow label={dictionary.filterVersion}>
             <AllChip active={versionSet.size === 0} onClick={clearSet(setVersionSet)}>
@@ -636,7 +682,10 @@ export function CatalogBrowser({
             ))}
           </ChipFilterRow>
         ) : null}
-      </div>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       {hasActiveFilters ? (
         // A single place to see every applied condition and drop any one of

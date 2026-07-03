@@ -72,9 +72,8 @@ describe("CatalogBrowser", () => {
     );
 
     expect(html).toContain("All Categories");
-    // Filters are direct-select chip rows now, one labeled row per dimension.
-    expect(html).toContain("Version");
-    expect(html).toContain("Level");
+    // Dimension chip rows live inside the collapsed-by-default advanced panel.
+    expect(html).toContain("Advanced filters");
     expect(html).toContain("Search title, alias, artist, version...");
   });
 
