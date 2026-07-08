@@ -186,7 +186,7 @@ describe("i18n helpers", () => {
 
     const metadata = pageMetadata.buildLocalizedPageMetadata?.("ja", "status");
 
-    expect(metadata?.title).toBe("サーバー状態 | ADX 谱面资源");
+    expect(metadata?.title).toBe("ADX サーバー状態とダウンロード監視 | ADX 谱面资源");
     expect(metadata?.description).toBe("本サイトとダウンロードサービスの稼働状況をリアルタイムで確認。サーバーの稼働状態、応答遅延、ネットワーク指標などの主要な健全性データを公開監視ページから取得し、AstroDX 譜面の閲覧・ダウンロードが利用可能か把握できます。");
     expect(metadata?.keywords).toEqual([
       "AstroDX",
@@ -207,13 +207,13 @@ describe("i18n helpers", () => {
       ja: "/ja/status",
     });
     expect(metadata?.openGraph).toMatchObject({
-      title: "サーバー状態 | ADX 谱面资源",
+      title: "ADX サーバー状態とダウンロード監視 | ADX 谱面资源",
       description: "本サイトとダウンロードサービスの稼働状況をリアルタイムで確認。サーバーの稼働状態、応答遅延、ネットワーク指標などの主要な健全性データを公開監視ページから取得し、AstroDX 譜面の閲覧・ダウンロードが利用可能か把握できます。",
       url: "https://adxdls.saop.cc/ja/status",
       siteName: "ADX 谱面资源",
     });
     expect(metadata?.twitter).toMatchObject({
-      title: "サーバー状態 | ADX 谱面资源",
+      title: "ADX サーバー状態とダウンロード監視 | ADX 谱面资源",
       description: "本サイトとダウンロードサービスの稼働状況をリアルタイムで確認。サーバーの稼働状態、応答遅延、ネットワーク指標などの主要な健全性データを公開監視ページから取得し、AstroDX 譜面の閲覧・ダウンロードが利用可能か把握できます。",
     });
   });

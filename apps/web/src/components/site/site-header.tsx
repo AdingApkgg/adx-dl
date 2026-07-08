@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import {
   DownloadIcon,
   EllipsisIcon,
@@ -13,6 +12,7 @@ import {
 import { usePathname } from "next/navigation";
 
 import { motion, springSoft } from "@/components/motion";
+import { CompatibleImage, compatibleSourcesFromPng } from "@/components/site/compatible-image";
 import { LanguageSwitcher } from "@/components/site/language-switcher";
 import { ThemeToggle } from "@/components/site/theme-toggle";
 import {
@@ -93,8 +93,8 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               transition={springSoft}
               className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20"
             >
-              <Image
-                src="/brand-icon.png"
+              <CompatibleImage
+                sources={compatibleSourcesFromPng("/brand-icon.png")}
                 alt=""
                 aria-hidden="true"
                 className="size-7 rounded-md"

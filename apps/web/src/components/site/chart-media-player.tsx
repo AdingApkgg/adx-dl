@@ -30,6 +30,9 @@ export function ChartMediaPlayer({ entry, locale }: ChartMediaPlayerProps) {
 
   const detail = getDictionary(locale).detail;
   const title = formatEntryTitle(entry, locale);
+  // The video `poster` attribute cannot express an AVIF -> WebP -> PNG fallback
+  // chain like <picture>, so use the original cover URL for broad compatibility.
+  const poster = entry.media.cover_url || undefined;
 
   return (
     <Card>
@@ -44,7 +47,7 @@ export function ChartMediaPlayer({ entry, locale }: ChartMediaPlayerProps) {
             <SyncedVideoAudio
               videoSrc={entry.media.pv_url}
               audioSrc={entry.media.audio_url}
-              poster={entry.media.cover_url || undefined}
+              poster={poster}
               ariaLabel={`${title} ${detail.pvLabel}`}
               unsupportedLabel={detail.mediaUnsupported}
               volumeLabel={detail.volumeLabel}
@@ -59,7 +62,7 @@ export function ChartMediaPlayer({ entry, locale }: ChartMediaPlayerProps) {
               controls
               playsInline
               preload="metadata"
-              poster={entry.media.cover_url || undefined}
+              poster={poster}
               src={entry.media.pv_url}
               aria-label={`${title} ${detail.pvLabel}`}
               className="aspect-video w-full rounded-xl border border-border/60 bg-black [color-scheme:dark]"

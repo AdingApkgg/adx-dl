@@ -9,6 +9,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 
 from tools.build_catalog import MEDIA_BASE, _aliases_for, build_catalog, fetch_alias_map
+from tools.mirror_chart_assets import mirror_chart_assets
 from tools.remote_catalog import fetch_text
 
 
@@ -131,6 +132,30 @@ class BuildCatalogTests(unittest.TestCase):
         self.assertEqual(
             catalog["categories"]["Remote"], ["maimai DX PLUS", "maimai FiNALE"]
         )
+
+    def test_mirrors_download_assets_by_route_id(self) -> None:
+        seen_urls: list[str] = []
+
+        def fake_fetch_bytes(url: str) -> bytes:
+            seen_urls.append(url)
+            return f"bytes:{url}".encode()
+
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            mirror_chart_assets(
+                root,
+                fetch_text=lambda _url: SAMPLE_INDEX,
+                fetch_bytes=fake_fetch_bytes,
+                max_workers=1,
+            )
+
+            self.assertTrue((root / "apps/web/public/adxcs/10146/maidata.txt").exists())
+            self.assertTrue((root / "apps/web/public/adxcs/10146/bg.png").exists())
+            self.assertTrue((root / "apps/web/public/adxcs/bare-song/maidata.txt").exists())
+            self.assertTrue((root / "apps/web/public/adxcs/bare-song/bg.png").exists())
+
+        self.assertIn(_media_url("でらっくす PLUS/[DX] コネクト/maidata.txt"), seen_urls)
+        self.assertIn(_media_url("でらっくす PLUS/[DX] コネクト/bg.png"), seen_urls)
 
     def test_downloads_cover_images_as_local_avif(self) -> None:
         seen_exts: list[str] = []

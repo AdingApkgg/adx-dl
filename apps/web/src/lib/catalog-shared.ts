@@ -1,3 +1,5 @@
+import { MAIMAI_VERSIONS, versionImageIndex } from "@/lib/version-image";
+
 export type CatalogDifficulty = {
   slot: number;
   /** Official difficulty name from the source (Basic/Advanced/Expert/Master/Re:Master/Utage). */
@@ -8,7 +10,7 @@ export type CatalogDifficulty = {
 
 export type CatalogEntryMedia = {
   entry_base_url: string;
-  /** Remote original cover (used by the .adx download and OG/social images). */
+  /** Remote original cover (used for page display and OG/social images). */
   cover_url: string;
   /** Local AVIF copy for on-page display (primary); empty when unconverted. */
   cover_avif?: string;
@@ -136,6 +138,17 @@ export type Catalog = {
 
 export type ChartAssetFile = { name: string; url: string };
 
+function chartRouteId(entry: Pick<CatalogEntry, "id" | "slug" | "short_id">): string {
+  return entry.slug?.trim() || entry.short_id?.trim() || entry.id;
+}
+
+function localChartAssetUrl(
+  entry: Pick<CatalogEntry, "id" | "slug" | "short_id">,
+  fileName: "bg.png" | "maidata.txt"
+): string {
+  return `/adxcs/${encodeURIComponent(chartRouteId(entry))}/${fileName}`;
+}
+
 /**
  * The files packed into a chart's .adx download, named as the AstroDX app expects.
  * Shared by the single-chart download and the batch (multi-chart) download.
@@ -146,9 +159,11 @@ export function getChartAssetFiles(
 ): ChartAssetFile[] {
   const includeVideo = options.includeVideo ?? true;
   const candidates: (ChartAssetFile | null)[] = [
-    { name: "maidata.txt", url: entry.files.maidata },
+    entry.files.maidata
+      ? { name: "maidata.txt", url: localChartAssetUrl(entry, "maidata.txt") }
+      : null,
     { name: "track.mp3", url: entry.media.audio_url },
-    { name: "bg.png", url: entry.media.cover_url },
+    entry.media.cover_url ? { name: "bg.png", url: localChartAssetUrl(entry, "bg.png") } : null,
     includeVideo ? { name: "pv.mp4", url: entry.media.pv_url } : null,
   ];
   return candidates.filter((file): file is ChartAssetFile => Boolean(file && file.url));
@@ -162,11 +177,19 @@ export function isChartVideoFile(name: string): boolean {
   return CHART_VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
-/** A chart's in-archive folder name plus its packable asset files (full set, incl. video). */
-export type ChartDownloadSpec = { dir: string; files: ChartAssetFile[] };
+/**
+ * A chart's in-archive folder name plus its packable asset files (full set,
+ * incl. video). `groupDir` optionally inserts a grouping folder between the
+ * batch root and the chart folder, e.g. a version name in multi-version packs.
+ */
+export type ChartDownloadSpec = { dir: string; files: ChartAssetFile[]; groupDir?: string };
 
 export function getChartDownloadSpec(entry: CatalogEntry): ChartDownloadSpec {
-  return { dir: entry.remote_dir_name, files: getChartAssetFiles(entry) };
+  return {
+    dir: entry.remote_dir_name,
+    files: getChartAssetFiles(entry),
+    groupDir: versionGroupFolderName(entry.version),
+  };
 }
 
 export function formatEntryTitle(
@@ -552,10 +575,53 @@ export function bpmBucketId(bpm: number | null | undefined): string | null {
   return bucket ? bucket.id : null;
 }
 
-/** Version name without its "maimai" / "maimai DX" era prefix ("maimai DX
- *  CiRCLE" → "CiRCLE"); base versions keep their full name. */
+function compactVersionName(name: string): string {
+  const trimmed = name.trim();
+  if (/^maimai$/i.test(trimmed)) {
+    return "maimai";
+  }
+  if (/^maimai\s+DX$/i.test(trimmed)) {
+    return "DX";
+  }
+  if (/^maimai\s+DX\s+PLUS$/i.test(trimmed)) {
+    return "DX PLUS";
+  }
+  if (/^maimai\s+DX\s+/i.test(trimmed)) {
+    return trimmed.replace(/^maimai\s+DX\s+/i, "").trim() || trimmed;
+  }
+  return trimmed.replace(/^maimai\s+/i, "").trim() || trimmed;
+}
+
+/**
+ * Compact version folder name for downloads: a stable 00-25 order prefix plus
+ * the agreed short version name.
+ */
+export function versionFolderName(name: string): string {
+  const compact = compactVersionName(name);
+  const index = versionImageIndex(name);
+  return index === null ? compact : `${String(index).padStart(2, "0")} ${compact}`;
+}
+
+/** Folder inserted above chart folders in every archive, including single-chart downloads. */
+export function versionGroupFolderName(
+  version: string | null | undefined,
+  unknownLabel = "Unknown"
+): string {
+  const index = versionImageIndex(version);
+  if (index === null) {
+    return unknownLabel;
+  }
+
+  const canonicalName =
+    MAIMAI_VERSIONS.find((candidate) => candidate.index === index)?.name ??
+    version ??
+    unknownLabel;
+  return versionFolderName(canonicalName);
+}
+
+/** Version name shortened for tight UI spaces, without the download order prefix. */
 export function versionShortName(name: string): string {
-  return name.replace(/^maimai(?:\s+DX)?\s*/i, "").trim() || name;
+  return compactVersionName(name);
 }
 
 const CATEGORY_LABELS: Record<string, { zh: string; ja: string }> = {

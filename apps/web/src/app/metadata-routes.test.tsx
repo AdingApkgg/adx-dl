@@ -151,32 +151,32 @@ describe("route metadata", () => {
     const chartsModule = await import("./(default)/charts/page");
     const statusModule = await import("./(default)/status/page");
 
-    expect(homeModule.metadata?.title).toBe("AstroDX 谱面资料站与下载入口。 | ADX 谱面资源");
+    expect(homeModule.metadata?.title).toBe("AstroDX 谱面资料站与下载入口 | ADX 谱面资源");
     expect(homeModule.metadata?.description).toBe(
       "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。"
     );
     expectLocalizedAlternates(homeModule.metadata ?? {}, "/", {
-      title: "AstroDX 谱面资料站与下载入口。",
+      title: "AstroDX 谱面资料站与下载入口",
       description: "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
       keywords: ["AstroDX", "ADX 谱面资源", "谱面资料站", "下载入口", "目录索引"],
     });
 
-    expect(chartsModule.metadata?.title).toBe("浏览曲目 | ADX 谱面资源");
+    expect(chartsModule.metadata?.title).toBe("AstroDX 谱面浏览与下载目录 | ADX 谱面资源");
     expect(chartsModule.metadata?.description).toBe(
       "浏览本站收录的全部 AstroDX 谱面，可按 maimai DX 版本分支、谱面分类与显示语言筛选，每首曲目均提供封面、难度等级、谱面定数与 BPM 等信息，支持在线预览并下载导入 AstroDX 模拟器。"
     );
     expectLocalizedAlternates(chartsModule.metadata ?? {}, "/charts", {
-      title: "浏览曲目",
+      title: "AstroDX 谱面浏览与下载目录",
       description: "浏览本站收录的全部 AstroDX 谱面，可按 maimai DX 版本分支、谱面分类与显示语言筛选，每首曲目均提供封面、难度等级、谱面定数与 BPM 等信息，支持在线预览并下载导入 AstroDX 模拟器。",
       keywords: ["AstroDX", "ADX 谱面资源", "浏览曲目", "分类筛选", "显示语言"],
     });
 
-    expect(statusModule.metadata?.title).toBe("服务器状态 | ADX 谱面资源");
+    expect(statusModule.metadata?.title).toBe("ADX 谱面资源服务器状态监控 | ADX 谱面资源");
     expect(statusModule.metadata?.description).toBe(
       "实时查看本站与下载服务的运行状态，包括服务器在线情况、响应延迟、网络指标与关键健康数据，数据来自公开监控页面，便于了解 AstroDX 谱面浏览与下载服务当前是否可用。"
     );
     expectLocalizedAlternates(statusModule.metadata ?? {}, "/status", {
-      title: "服务器状态",
+      title: "ADX 谱面资源服务器状态监控",
       description: "实时查看本站与下载服务的运行状态，包括服务器在线情况、响应延迟、网络指标与关键健康数据，数据来自公开监控页面，便于了解 AstroDX 谱面浏览与下载服务当前是否可用。",
       keywords: ["AstroDX", "ADX 谱面资源", "服务器状态", "监控页", "网络指标"],
     });
@@ -195,24 +195,26 @@ describe("route metadata", () => {
     });
 
     expect(enHomeMetadata?.title).toBe(
-      "AstroDX chart archive for browsing, indexing, and downloads. | ADX 谱面资源"
+      "AstroDX Chart Archive, Browser and Download Portal | ADX 谱面资源"
     );
     expect(enHomeMetadata?.description).toBe(
       "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download."
     );
     expectLocalizedAlternates(enHomeMetadata ?? {}, "/en", {
-      title: "AstroDX chart archive for browsing, indexing, and downloads.",
+      title: "AstroDX Chart Archive, Browser and Download Portal",
       description:
         "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download.",
       keywords: ["AstroDX", "ADX 谱面资源", "chart archive", "downloads", "catalog index"],
     });
 
-    expect(enChartsMetadata?.title).toBe("Browse Charts | ADX 谱面资源");
+    expect(enChartsMetadata?.title).toBe(
+      "AstroDX Chart Browser and Download Catalog | ADX 谱面资源"
+    );
     expect(enChartsMetadata?.description).toBe(
       "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download."
     );
     expectLocalizedAlternates(enChartsMetadata ?? {}, "/en/charts", {
-      title: "Browse Charts",
+      title: "AstroDX Chart Browser and Download Catalog",
       description: "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download.",
       keywords: ["AstroDX", "ADX 谱面资源", "browse charts", "category filter", "display language"],
     });
@@ -220,12 +222,14 @@ describe("route metadata", () => {
     const enStatusMetadata = await localizedStatusModule.generateMetadata?.({
       params: Promise.resolve({ locale: "en" }),
     });
-    expect(enStatusMetadata?.title).toBe("Server Status | ADX 谱面资源");
+    expect(enStatusMetadata?.title).toBe(
+      "ADX Server Status and Download Service Monitor | ADX 谱面资源"
+    );
     expect(enStatusMetadata?.description).toBe(
       "Check the live status of this site and its download service — server uptime, response latency, network metrics and key health data from the public monitor page."
     );
     expectLocalizedAlternates(enStatusMetadata ?? {}, "/en/status", {
-      title: "Server Status",
+      title: "ADX Server Status and Download Service Monitor",
       description: "Check the live status of this site and its download service — server uptime, response latency, network metrics and key health data from the public monitor page.",
       keywords: ["AstroDX", "ADX 谱面资源", "server status", "monitor page", "network metrics"],
     });
@@ -248,26 +252,28 @@ describe("route metadata", () => {
     const zhDescription = buildChartDescription(entry3, "zh");
     const enDescription = buildChartDescription(entry3, "en");
 
-    expect(zhMetadata?.title).toBe("曲目 3 | ADX 谱面资源");
+    expect(zhMetadata?.title).toBe("曲目 3 AstroDX 谱面预览与下载 | ADX 谱面资源");
     expect(zhMetadata?.description).toBe(zhDescription);
     expectLocalizedAlternates(
       zhMetadata ?? {},
       `/charts/${song3Slug}`,
       {
-        title: "曲目 3",
+        title: "曲目 3 AstroDX 谱面预览与下载",
         description: zhDescription,
         keywords: ["AstroDX", "ADX 谱面资源", "曲目 3", "歌手 3", "舞萌DX 2025", "Anime", "maimai"],
       },
       { url: song3Cover, alt: "曲目 3" }
     );
 
-    expect(enMetadata?.title).toBe("Song 3 | ADX 谱面资源");
+    expect(enMetadata?.title).toBe(
+      "Song 3 AstroDX Chart Preview and Download | ADX 谱面资源"
+    );
     expect(enMetadata?.description).toBe(enDescription);
     expectLocalizedAlternates(
       enMetadata ?? {},
       `/en/charts/${song3Slug}`,
       {
-        title: "Song 3",
+        title: "Song 3 AstroDX Chart Preview and Download",
         description: enDescription,
         keywords: ["AstroDX", "ADX 谱面资源", "Song 3", "Artist 3", "舞萌DX 2025", "Anime", "maimai"],
       },
@@ -302,19 +308,21 @@ describe("route metadata", () => {
     const enDescription = buildChartDescription(entry5, "en");
 
     // Remote branch label (version / cabinet) must appear in the synthesized prose.
-    expect(zhMetadata?.title).toBe("远端曲目 5 | ADX 谱面资源");
+    expect(zhMetadata?.title).toBe("远端曲目 5 AstroDX 谱面预览与下载 | ADX 谱面资源");
     expect(zhMetadata?.description).toBe(zhDescription);
     expect(zhDescription).toContain("maimai DX PRiSM / DX");
-    expect(enMetadata?.title).toBe("Remote Song 5 | ADX 谱面资源");
+    expect(enMetadata?.title).toBe(
+      "Remote Song 5 AstroDX Chart Preview and Download | ADX 谱面资源"
+    );
     expect(enMetadata?.description).toBe(enDescription);
     expect(zhMetadata?.openGraph).toMatchObject({
-      title: "远端曲目 5 | ADX 谱面资源",
+      title: "远端曲目 5 AstroDX 谱面预览与下载 | ADX 谱面资源",
       description: zhDescription,
       url: `https://adxdls.saop.cc/charts/remote-song-5`,
       siteName: "ADX 谱面资源",
     });
     expect(enMetadata?.twitter).toMatchObject({
-      title: "Remote Song 5 | ADX 谱面资源",
+      title: "Remote Song 5 AstroDX Chart Preview and Download | ADX 谱面资源",
       description: enDescription,
     });
   });

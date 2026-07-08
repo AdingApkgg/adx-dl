@@ -1,8 +1,7 @@
-import Image from "next/image";
-
 import { Badge } from "@/components/ui/badge";
+import { CompatibleImage } from "@/components/site/compatible-image";
 import { cn } from "@/lib/utils";
-import { VERSION_IMAGE_DIMENSIONS, versionImageSrc } from "@/lib/version-image";
+import { VERSION_IMAGE_DIMENSIONS, versionImageSources } from "@/lib/version-image";
 
 type VersionBadgeProps = {
   /** Raw catalog version string used to resolve the version icon. */
@@ -15,10 +14,10 @@ type VersionBadgeProps = {
 // Shows the maimai version icon when the version maps to one; otherwise renders
 // the version/branch text as a regular outline Badge.
 export function VersionBadge({ version, label, className }: VersionBadgeProps) {
-  const src = versionImageSrc(version);
+  const sources = versionImageSources(version);
   const text = (label ?? version ?? "").trim();
 
-  if (!src) {
+  if (!sources) {
     return text ? (
       <Badge variant="outline" className={className}>
         {text}
@@ -27,13 +26,12 @@ export function VersionBadge({ version, label, className }: VersionBadgeProps) {
   }
 
   return (
-    <Image
-      src={src}
+    <CompatibleImage
+      sources={sources}
       alt={text || "maimai version"}
       title={text || undefined}
       width={VERSION_IMAGE_DIMENSIONS.width}
       height={VERSION_IMAGE_DIMENSIONS.height}
-      unoptimized
       className={cn("h-7 w-auto rounded-md", className)}
     />
   );

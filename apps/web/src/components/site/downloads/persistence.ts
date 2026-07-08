@@ -14,8 +14,12 @@ export type PersistedJob = {
   createdAt: number;
   /** The flat fetch list. For batch, `name` carries the `${index}/...` prefix. */
   files: { name: string; url: string }[];
+  /** Single-chart jobs: optional version folder above the chart folder. */
+  groupDir?: string;
   /** Batch only: maps the numeric index prefix back to a chart directory name. */
   dirByIndex?: string[];
+  /** Batch only: optional grouping folder for each chart, e.g. a version name. */
+  groupByIndex?: string[];
 };
 
 export type PersistedFile = {

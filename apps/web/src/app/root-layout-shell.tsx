@@ -26,6 +26,11 @@ const TELEGRAM_COMMUNITY = "https://t.me/FullDiveSAO";
 // page) and the comment backend (fetched on chart detail pages).
 const COUNTER_HOST = "https://bsz.saop.cc";
 const COMMENT_HOST = "https://artalk.saop.cc";
+const licenseLinkLabel: Record<Locale, string> = {
+  zh: "许可与来源",
+  en: "License & Sources",
+  ja: "ライセンスと出典",
+};
 
 // Runs synchronously during HTML parse (before first paint) so the persisted
 // theme is applied with no flash. Mirrors ThemeProvider's logic: an explicit
@@ -104,6 +109,9 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
                       </Link>
                       <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/links", locale)}>
                         {dictionary.links.navLabel}
+                      </Link>
+                      <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/license", locale)}>
+                        {licenseLinkLabel[locale]}
                       </Link>
                       <a
                         className="text-muted-foreground hover:text-foreground"

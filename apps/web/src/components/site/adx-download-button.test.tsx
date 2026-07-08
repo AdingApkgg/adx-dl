@@ -8,16 +8,14 @@ describe("AdxDownloadButton", () => {
 
   test("renders localized idle copy", () => {
     const html = renderToStaticMarkup(
-      <AdxDownloadButton files={files} fileName="39" locale="en" />
+      <AdxDownloadButton spec={{ dir: "39", files, groupDir: "00 maimai" }} locale="en" />
     );
 
     expect(html).toContain("Onsite Download");
   });
 
   test("renders pending copy when there are no files", () => {
-    const html = renderToStaticMarkup(
-      <AdxDownloadButton files={[]} fileName={undefined} locale="zh" />
-    );
+    const html = renderToStaticMarkup(<AdxDownloadButton spec={undefined} locale="zh" />);
 
     expect(html).toContain("站内下载待接入");
     expect(html).toContain("disabled");

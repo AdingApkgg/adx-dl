@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { toCatalogCardEntry, type CatalogEntry } from "@/lib/catalog-shared";
-import { CatalogBrowser } from "./catalog-browser";
+import {
+  toCatalogCardEntry,
+  type CatalogEntry,
+  type ChartDownloadSpec,
+} from "@/lib/catalog-shared";
+import { buildSelectedCatalogCharts, CatalogBrowser } from "./catalog-browser";
 
 function buildEntry(overrides: Partial<CatalogEntry>): CatalogEntry {
   return {
@@ -162,5 +166,88 @@ describe("CatalogBrowser", () => {
     );
 
     expect(html).toContain("一致する譜面は見つかりませんでした");
+  });
+
+  test("keeps the global version folders when a browse-page batch spans versions", () => {
+    const entries = [
+      toCatalogCardEntry(
+        buildEntry({
+          id: "circle-song",
+          version: "maimai DX CiRCLE",
+          subcategory: "maimai DX CiRCLE",
+        })
+      ),
+      toCatalogCardEntry(
+        buildEntry({
+          id: "prism-song",
+          version: "maimai DX PRiSM PLUS",
+          subcategory: "maimai DX PRiSM PLUS",
+        })
+      ),
+    ];
+    const specs: Record<string, ChartDownloadSpec> = {
+      "circle-song": {
+        dir: "Same Song",
+        files: [{ name: "maidata.txt", url: "/circle" }],
+        groupDir: "25 CiRCLE",
+      },
+      "prism-song": {
+        dir: "Same Song",
+        files: [{ name: "maidata.txt", url: "/prism" }],
+        groupDir: "24 PRiSM PLUS",
+      },
+    };
+
+    expect(
+      buildSelectedCatalogCharts(entries, specs, new Set(["circle-song", "prism-song"]))
+    ).toEqual([
+      {
+        dir: "Same Song",
+        files: [{ name: "maidata.txt", url: "/circle" }],
+        groupDir: "25 CiRCLE",
+      },
+      {
+        dir: "Same Song",
+        files: [{ name: "maidata.txt", url: "/prism" }],
+        groupDir: "24 PRiSM PLUS",
+      },
+    ]);
+  });
+
+  test("keeps the global version folder even when selected charts share one version", () => {
+    const entries = [
+      toCatalogCardEntry(
+        buildEntry({
+          id: "circle-a",
+          version: "maimai DX CiRCLE",
+          subcategory: "maimai DX CiRCLE",
+        })
+      ),
+      toCatalogCardEntry(
+        buildEntry({
+          id: "circle-b",
+          title: "Beta Star",
+          version: "maimai DX CiRCLE",
+          subcategory: "maimai DX CiRCLE",
+        })
+      ),
+    ];
+    const specs: Record<string, ChartDownloadSpec> = {
+      "circle-a": {
+        dir: "Alpha Star",
+        files: [{ name: "maidata.txt", url: "/a" }],
+        groupDir: "25 CiRCLE",
+      },
+      "circle-b": {
+        dir: "Beta Star",
+        files: [{ name: "maidata.txt", url: "/b" }],
+        groupDir: "25 CiRCLE",
+      },
+    };
+
+    expect(buildSelectedCatalogCharts(entries, specs, new Set(["circle-a", "circle-b"]))).toEqual([
+      { dir: "Alpha Star", files: [{ name: "maidata.txt", url: "/a" }], groupDir: "25 CiRCLE" },
+      { dir: "Beta Star", files: [{ name: "maidata.txt", url: "/b" }], groupDir: "25 CiRCLE" },
+    ]);
   });
 });

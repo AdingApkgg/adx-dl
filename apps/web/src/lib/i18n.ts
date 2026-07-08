@@ -155,6 +155,8 @@ export type SiteDictionary = {
     selectMode: string;
     exitSelectMode: string;
     selectAll: string;
+    selectAllFiltered: (count: number) => string;
+    selectAllVersions: (count: number) => string;
     clearSelection: string;
     selectedCount: (count: number) => string;
     batchDownload: string;
@@ -232,7 +234,11 @@ export type SiteDictionary = {
     errorOffline: string;
     errorNetwork: string;
     errorGeneric: string;
-    batchConfirm: (count: number) => string;
+    batchSummary: (charts: number, files: number) => string;
+    batchVideoSummary: (count: number) => string;
+    batchNoVideoSummary: string;
+    batchVideoLargeHint: string;
+    batchConfirm: (count: number, includeVideo: boolean) => string;
     batchConfirmStart: string;
   };
   /** In-browser playable chart preview player on chart detail pages. */
@@ -536,10 +542,12 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       selectMode: "多选",
       exitSelectMode: "退出多选",
       selectAll: "全选当前结果",
+      selectAllFiltered: (count) => `全选 ${count} 首结果`,
+      selectAllVersions: (count) => `全选 ${count} 个版本`,
       clearSelection: "清空",
       selectedCount: (count) => `已选 ${count} 首`,
       batchDownload: "打包下载",
-      batchDefaultName: "AstroDX 选集",
+      batchDefaultName: "AstroDX Charts",
       levelFilterLabel: "等级筛选",
       allLevels: "全部等级",
       levelOption: (level) => `等级 ${level}`,
@@ -608,7 +616,14 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       errorOffline: "网络已断开，恢复联网后点「继续」即可续传",
       errorNetwork: "下载失败，已保留进度，可点「继续」重试",
       errorGeneric: "下载出错，已保留进度，可点「继续」重试",
-      batchConfirm: (count) => `将打包下载 ${count} 首谱面，体积可能很大，确认开始？`,
+      batchSummary: (charts, files) => `将打包 ${charts} 首谱面，共 ${files} 个文件`,
+      batchVideoSummary: (count) => `包含 ${count} 个 BGA 视频文件`,
+      batchNoVideoSummary: "不包含 BGA 视频，下载会更轻",
+      batchVideoLargeHint: "包含 BGA 会显著增大体积，网络慢或手机流量下建议关闭。",
+      batchConfirm: (count, includeVideo) =>
+        includeVideo
+          ? `确认开始下载 ${count} 首谱面？当前包含 BGA 视频。`
+          : `确认开始下载 ${count} 首谱面？`,
       batchConfirmStart: "确认开始",
     },
     preview: {
@@ -900,10 +915,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       selectMode: "Select",
       exitSelectMode: "Done",
       selectAll: "Select all results",
+      selectAllFiltered: (count) => (count === 1 ? "Select 1 result" : `Select ${count} results`),
+      selectAllVersions: (count) =>
+        count === 1 ? "Select 1 version" : `Select ${count} versions`,
       clearSelection: "Clear",
       selectedCount: (count) => `${count} selected`,
       batchDownload: "Download",
-      batchDefaultName: "AstroDX selection",
+      batchDefaultName: "AstroDX Charts",
       levelFilterLabel: "Filter by level",
       allLevels: "All Levels",
       levelOption: (level) => `Level ${level}`,
@@ -972,10 +990,23 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       errorOffline: "You're offline — Resume continues once you're back online",
       errorNetwork: "Download failed — your progress is kept, hit Resume to retry",
       errorGeneric: "Download error — your progress is kept, hit Resume to retry",
-      batchConfirm: (count) =>
-        count === 1
-          ? "Pack and download 1 chart? The archive may be very large."
-          : `Pack and download ${count} charts? The archive may be very large.`,
+      batchSummary: (charts, files) =>
+        charts === 1
+          ? `Packing 1 chart, ${files} files total`
+          : `Packing ${charts} charts, ${files} files total`,
+      batchVideoSummary: (count) =>
+        count === 1 ? "Includes 1 BGA video file" : `Includes ${count} BGA video files`,
+      batchNoVideoSummary: "BGA video excluded for a lighter download",
+      batchVideoLargeHint:
+        "BGA video can make the archive much larger. Turn it off on slow networks or mobile data.",
+      batchConfirm: (count, includeVideo) =>
+        includeVideo
+          ? count === 1
+            ? "Start downloading 1 chart with BGA video included?"
+            : `Start downloading ${count} charts with BGA video included?`
+          : count === 1
+            ? "Start downloading 1 chart?"
+            : `Start downloading ${count} charts?`,
       batchConfirmStart: "Start download",
     },
     preview: {
@@ -1274,10 +1305,12 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       selectMode: "複数選択",
       exitSelectMode: "選択終了",
       selectAll: "現在の結果を全選択",
+      selectAllFiltered: (count) => `${count} 件の結果を全選択`,
+      selectAllVersions: (count) => `${count} バージョンを全選択`,
       clearSelection: "クリア",
       selectedCount: (count) => `${count} 曲選択中`,
       batchDownload: "まとめてダウンロード",
-      batchDefaultName: "AstroDX セレクション",
+      batchDefaultName: "AstroDX Charts",
       levelFilterLabel: "レベルで絞り込み",
       allLevels: "すべてのレベル",
       levelOption: (level) => `レベル ${level}`,
@@ -1346,8 +1379,15 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       errorOffline: "オフラインです — 接続後に「再開」で続行できます",
       errorNetwork: "ダウンロードに失敗しました — 進捗は保持されています。「再開」で再試行してください",
       errorGeneric: "ダウンロードエラー — 進捗は保持されています。「再開」で再試行してください",
-      batchConfirm: (count) =>
-        `${count} 譜面をまとめてダウンロードします。サイズが大きくなる可能性があります。開始しますか？`,
+      batchSummary: (charts, files) => `${charts} 譜面、合計 ${files} ファイルをまとめます`,
+      batchVideoSummary: (count) => `${count} 件の BGA 動画を含みます`,
+      batchNoVideoSummary: "BGA 動画なしで軽めにダウンロードします",
+      batchVideoLargeHint:
+        "BGA 動画を含めるとサイズが大きくなります。低速回線やモバイル通信ではオフ推奨です。",
+      batchConfirm: (count, includeVideo) =>
+        includeVideo
+          ? `${count} 譜面を BGA 動画込みで開始しますか？`
+          : `${count} 譜面のダウンロードを開始しますか？`,
       batchConfirmStart: "開始する",
     },
     preview: {

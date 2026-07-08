@@ -22,6 +22,27 @@ async function bytes(blob: Blob): Promise<Uint8Array> {
   return new Uint8Array(await blob.arrayBuffer());
 }
 
+function tarEntries(tar: Uint8Array): Record<string, Uint8Array> {
+  const decoder = new TextDecoder();
+  const entries: Record<string, Uint8Array> = {};
+  for (let offset = 0; offset + 512 <= tar.length; ) {
+    const header = tar.subarray(offset, offset + 512);
+    if (header.every((byte) => byte === 0)) {
+      break;
+    }
+    const field = (start: number, length: number) =>
+      decoder.decode(header.subarray(start, start + length)).replace(/\0+$/, "");
+    const name = field(0, 100);
+    const prefix = field(345, 155);
+    const sizeText = field(124, 12).trim();
+    const size = Number.parseInt(sizeText || "0", 8);
+    const dataStart = offset + 512;
+    entries[prefix ? `${prefix}/${name}` : name] = tar.subarray(dataStart, dataStart + size);
+    offset = dataStart + Math.ceil(size / 512) * 512;
+  }
+  return entries;
+}
+
 describe("adx archive", () => {
   test("appends the chosen format extension to the directory name", () => {
     expect(getArchiveDownloadFileName("39")).toBe("39.adx");
@@ -30,16 +51,17 @@ describe("adx archive", () => {
     expect(getArchiveDownloadFileName("[X] 人マニア", "adx")).toBe("[X] 人マニア.adx");
   });
 
-  test("packs files at the archive root without an extra directory", async () => {
-    const blob = await buildArchiveBlob([
-      entry("maidata.txt", "&title=39"),
-      entry("track.mp3", new Uint8Array([1, 2, 3])),
-    ]);
+  test("packs files inside the chart directory when a directory name is provided", async () => {
+    const blob = await buildArchiveBlob(
+      [entry("maidata.txt", "&title=39"), entry("track.mp3", new Uint8Array([1, 2, 3]))],
+      "adx",
+      "39"
+    );
 
     const entries = unzipSync(await bytes(blob));
 
-    expect(Object.keys(entries).sort()).toEqual(["maidata.txt", "track.mp3"]);
-    expect(strFromU8(entries["maidata.txt"])).toBe("&title=39");
+    expect(Object.keys(entries).sort()).toEqual(["39/maidata.txt", "39/track.mp3"]);
+    expect(strFromU8(entries["39/maidata.txt"])).toBe("&title=39");
   });
 
   test("adx and zip produce byte-identical archives", async () => {
@@ -51,10 +73,11 @@ describe("adx archive", () => {
     expect(adx).toEqual(zip);
   });
 
-  test("builds a gzip-compressed tar with files at the root", async () => {
+  test("builds a gzip-compressed tar with files inside the chart directory", async () => {
     const blob = await buildArchiveBlob(
       [entry("maidata.txt", "&title=39"), entry("track.mp3", new Uint8Array([1, 2, 3, 4, 5]))],
-      "tar.gz"
+      "tar.gz",
+      "39"
     );
 
     const tar = gunzipSync(await bytes(blob));
@@ -64,13 +87,13 @@ describe("adx archive", () => {
 
     const decoder = new TextDecoder();
     // First header: name at offset 0, ustar magic at 257, size (octal) at 124.
-    expect(decoder.decode(tar.subarray(0, 11)).replace(/\0+$/, "")).toBe("maidata.txt");
+    expect(decoder.decode(tar.subarray(0, 14)).replace(/\0+$/, "")).toBe("39/maidata.txt");
     expect(decoder.decode(tar.subarray(257, 262))).toBe("ustar");
     expect(decoder.decode(tar.subarray(124, 135))).toBe("00000000011"); // 9 bytes = octal 11
     expect(decoder.decode(tar.subarray(512, 521))).toBe("&title=39"); // file data follows header
   });
 
-  test("batch packs one .adx per chart inside an outer zip", async () => {
+  test("batch packs chart folders inside the version directory in one adx archive", async () => {
     const blob = await buildNestedArchiveBlob(
       [
         {
@@ -79,19 +102,84 @@ describe("adx archive", () => {
         },
         { name: "Song B", files: [entry("maidata.txt", "&title=B")] },
       ],
-      "zip"
+      "adx",
+      "Version 2026"
     );
 
-    const outer = unzipSync(await bytes(blob));
-    expect(Object.keys(outer).sort()).toEqual(["Song A.adx", "Song B.adx"]);
+    const entries = unzipSync(await bytes(blob));
+    expect(Object.keys(entries).sort()).toEqual([
+      "Version 2026/Song A/maidata.txt",
+      "Version 2026/Song A/track.mp3",
+      "Version 2026/Song B/maidata.txt",
+    ]);
+    expect(strFromU8(entries["Version 2026/Song A/maidata.txt"])).toBe("&title=A");
+    expect(strFromU8(entries["Version 2026/Song B/maidata.txt"])).toBe("&title=B");
+  });
 
-    // Each entry is itself a zip with the chart's files at the root.
-    const adxA = unzipSync(outer["Song A.adx"]);
-    expect(Object.keys(adxA).sort()).toEqual(["maidata.txt", "track.mp3"]);
-    expect(strFromU8(adxA["maidata.txt"])).toBe("&title=A");
+  test("batch adx and zip produce byte-identical archives", async () => {
+    const charts = [
+      { name: "Song A", files: [entry("maidata.txt", "&title=A")] },
+      { name: "Song B", files: [entry("maidata.txt", "&title=B")] },
+    ];
 
-    const adxB = unzipSync(outer["Song B.adx"]);
-    expect(Object.keys(adxB)).toEqual(["maidata.txt"]);
+    const adx = await bytes(await buildNestedArchiveBlob(charts, "adx", "Version 2026"));
+    const zip = await bytes(await buildNestedArchiveBlob(charts, "zip", "Version 2026"));
+
+    expect(adx).toEqual(zip);
+  });
+
+  test("batch tar.gz uses chart folders inside the version directory", async () => {
+    const blob = await buildNestedArchiveBlob(
+      [
+        {
+          name: "Song A",
+          files: [entry("maidata.txt", "&title=A"), entry("track.mp3", new Uint8Array([1, 2, 3]))],
+        },
+        { name: "Song B", files: [entry("maidata.txt", "&title=B")] },
+      ],
+      "tar.gz",
+      "Version 2026"
+    );
+
+    const entries = tarEntries(gunzipSync(await bytes(blob)));
+    expect(Object.keys(entries).sort()).toEqual([
+      "Version 2026/Song A/maidata.txt",
+      "Version 2026/Song A/track.mp3",
+      "Version 2026/Song B/maidata.txt",
+    ]);
+    expect(strFromU8(entries["Version 2026/Song A/maidata.txt"])).toBe("&title=A");
+    expect(strFromU8(entries["Version 2026/Song B/maidata.txt"])).toBe("&title=B");
+  });
+
+  test("multi-version batch keeps version folders between the collection and charts", async () => {
+    const blob = await buildNestedArchiveBlob(
+      [
+        {
+          groupDir: "25 CiRCLE",
+          name: "Same Song",
+          files: [entry("maidata.txt", "&title=Circle")],
+        },
+        {
+          groupDir: "24 PRiSM PLUS",
+          name: "Same Song",
+          files: [entry("maidata.txt", "&title=Prism Plus")],
+        },
+      ],
+      "adx",
+      "AstroDX Charts"
+    );
+
+    const entries = unzipSync(await bytes(blob));
+    expect(Object.keys(entries).sort()).toEqual([
+      "AstroDX Charts/24 PRiSM PLUS/Same Song/maidata.txt",
+      "AstroDX Charts/25 CiRCLE/Same Song/maidata.txt",
+    ]);
+    expect(strFromU8(entries["AstroDX Charts/25 CiRCLE/Same Song/maidata.txt"])).toBe(
+      "&title=Circle"
+    );
+    expect(strFromU8(entries["AstroDX Charts/24 PRiSM PLUS/Same Song/maidata.txt"])).toBe(
+      "&title=Prism Plus"
+    );
   });
 
   test("batch disambiguates duplicate chart directory names", async () => {
@@ -100,11 +188,43 @@ describe("adx archive", () => {
         { name: "Dup", files: [entry("maidata.txt", new Uint8Array([1]))] },
         { name: "Dup", files: [entry("maidata.txt", new Uint8Array([2]))] },
       ],
-      "zip"
+      "zip",
+      "Version 2026"
     );
 
-    const outer = unzipSync(await bytes(blob));
-    expect(Object.keys(outer).sort()).toEqual(["Dup (2).adx", "Dup.adx"]);
+    const entries = unzipSync(await bytes(blob));
+    expect(Object.keys(entries).sort()).toEqual([
+      "Version 2026/Dup (2)/maidata.txt",
+      "Version 2026/Dup/maidata.txt",
+    ]);
+  });
+
+  test("batch disambiguation keeps sanitized version and chart directory names", async () => {
+    const blob = await buildNestedArchiveBlob(
+      [
+        { name: "Bad/Name", files: [entry("maidata.txt", new Uint8Array([1]))] },
+        { name: "Bad/Name", files: [entry("maidata.txt", new Uint8Array([2]))] },
+      ],
+      "zip",
+      "../Version/Name"
+    );
+
+    const entries = unzipSync(await bytes(blob));
+    expect(Object.keys(entries).sort()).toEqual([
+      "_Version_Name/Bad_Name (2)/maidata.txt",
+      "_Version_Name/Bad_Name/maidata.txt",
+    ]);
+  });
+
+  test("sanitizes path separators in archive directory names", async () => {
+    const blob = await buildArchiveBlob(
+      [entry("maidata.txt", "&title=Unsafe")],
+      "adx",
+      "../Bad/Name"
+    );
+
+    const entries = unzipSync(await bytes(blob));
+    expect(Object.keys(entries)).toEqual(["_Bad_Name/maidata.txt"]);
   });
 
   test("packs nested batch paths, using the USTAR prefix for long ones", async () => {

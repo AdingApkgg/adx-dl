@@ -22,6 +22,7 @@ node_modules/
 apps/web/.next/
 apps/web/out/
 apps/web/public/covers/
+apps/web/public/adxcs/
 
 # Large local media archives: keep directory skeleton only
 Community/**

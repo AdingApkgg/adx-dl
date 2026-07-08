@@ -46,6 +46,42 @@ type PageMetadataOptions = {
   ogType?: OpenGraphType;
 };
 
+const staticSeoTitles: Record<Locale, Record<StaticPageMetadataKey, string>> = {
+  zh: {
+    home: "AstroDX 谱面资料站与下载入口",
+    charts: "AstroDX 谱面浏览与下载目录",
+    status: "ADX 谱面资源服务器状态监控",
+  },
+  en: {
+    home: "AstroDX Chart Archive, Browser and Download Portal",
+    charts: "AstroDX Chart Browser and Download Catalog",
+    status: "ADX Server Status and Download Service Monitor",
+  },
+  ja: {
+    home: "AstroDX 譜面アーカイブとダウンロード入口",
+    charts: "AstroDX 譜面一覧とダウンロードカタログ",
+    status: "ADX サーバー状態とダウンロード監視",
+  },
+};
+
+const licensePageMetadata: Record<Locale, { title: string; description: string }> = {
+  zh: {
+    title: "ADX 谱面资源许可、来源与使用说明",
+    description:
+      "说明 ADX 谱面资源的目录索引来源、谱面与媒体资源权利归属、站点代码与数据的使用边界，以及 AstroDX 和 maimai 相关内容的非官方性质。",
+  },
+  en: {
+    title: "ADX Chart Catalog License, Sources and Usage Notes",
+    description:
+      "Explains the ADX chart catalog sources, ownership of chart and media assets, usage boundaries for site data, and the archive's unofficial relationship to AstroDX and maimai.",
+  },
+  ja: {
+    title: "ADX 譜面カタログのライセンス、出典、利用案内",
+    description:
+      "ADX 譜面カタログの出典、譜面とメディア素材の権利帰属、サイトデータの利用範囲、AstroDX と maimai に対する非公式の位置づけを説明します。",
+  },
+};
+
 function buildLanguageAlternates(pathname: string) {
   return {
     "x-default": buildLocalePath(pathname, "zh"),
@@ -74,6 +110,62 @@ function buildDetailKeywords(locale: Locale, entry: CatalogEntry) {
     ...(entry.genre ? [genreLabel(entry, locale)] : []),
     "maimai",
   ].filter(Boolean);
+}
+
+function staticSeoTitle(locale: Locale, page: StaticPageMetadataKey): string {
+  return staticSeoTitles[locale][page];
+}
+
+function buildChartDetailSeoTitle(locale: Locale, entry: CatalogEntry): string {
+  const title = formatEntryTitle(entry, locale);
+
+  if (locale === "zh") {
+    return `${title} AstroDX 谱面预览与下载`;
+  }
+  if (locale === "ja") {
+    return `${title} AstroDX 譜面プレビューとダウンロード`;
+  }
+  return `${title} AstroDX Chart Preview and Download`;
+}
+
+function buildGuestbookSeoTitle(locale: Locale): string {
+  if (locale === "zh") {
+    return "AstroDX 玩家留言板与反馈";
+  }
+  if (locale === "ja") {
+    return "AstroDX プレイヤーのゲストブックとフィードバック";
+  }
+  return "AstroDX Player Guestbook and Feedback";
+}
+
+function buildLinksSeoTitle(locale: Locale): string {
+  if (locale === "zh") {
+    return "maimai 与 AstroDX 友情链接资源";
+  }
+  if (locale === "ja") {
+    return "maimai と AstroDX の関連リンク集";
+  }
+  return "maimai and AstroDX Community Links";
+}
+
+function buildVersionsSeoTitle(locale: Locale): string {
+  if (locale === "zh") {
+    return "maimai DX 版本谱面浏览";
+  }
+  if (locale === "ja") {
+    return "maimai DX バージョン別譜面一覧";
+  }
+  return "maimai DX Version Chart Browser";
+}
+
+function buildVersionDetailSeoTitle(locale: Locale, label: string): string {
+  if (locale === "zh") {
+    return `${label} AstroDX 谱面浏览与下载`;
+  }
+  if (locale === "ja") {
+    return `${label} AstroDX 譜面一覧とダウンロード`;
+  }
+  return `${label} AstroDX Charts and Downloads`;
 }
 
 export function buildPageMetadata({
@@ -128,7 +220,7 @@ export function buildLocalizedPageMetadata(
   return buildPageMetadata({
     locale,
     pathname: pageMetadata.pathname,
-    title: pageMetadata.title,
+    title: staticSeoTitle(locale, page),
     description: pageMetadata.description,
     keywords: pageMetadata.keywords,
   });
@@ -152,7 +244,7 @@ export function buildGuestbookPageMetadata(locale: Locale): Metadata {
   return buildPageMetadata({
     locale,
     pathname: "/comments",
-    title: guestbook.title,
+    title: buildGuestbookSeoTitle(locale),
     description: dictionary.seo.guestbook,
     keywords: ["AstroDX", siteName, guestbook.title, "guestbook", "留言板", "comments"],
   });
@@ -164,7 +256,7 @@ export function buildLinksPageMetadata(locale: Locale): Metadata {
   return buildPageMetadata({
     locale,
     pathname: "/links",
-    title: links.title,
+    title: buildLinksSeoTitle(locale),
     description: dictionary.seo.links,
     keywords: ["AstroDX", siteName, links.title, "maimai", "友情链接", "friend links"],
   });
@@ -174,7 +266,7 @@ export function buildChartDetailMetadata(locale: Locale, entry: CatalogEntry): M
   return buildPageMetadata({
     locale,
     pathname: `/charts/${entrySlug(entry)}`,
-    title: formatEntryTitle(entry, locale),
+    title: buildChartDetailSeoTitle(locale, entry),
     description: buildChartDescription(entry, locale),
     keywords: buildDetailKeywords(locale, entry),
     image: entry.media.cover_url || openGraphImageUrl,
@@ -189,7 +281,7 @@ export function buildVersionsPageMetadata(locale: Locale): Metadata {
   return buildPageMetadata({
     locale,
     pathname: "/versions",
-    title: versions.title,
+    title: buildVersionsSeoTitle(locale),
     description: dictionary.seo.versions,
     keywords: ["AstroDX", siteName, versions.title, "maimai DX"],
   });
@@ -207,8 +299,28 @@ export function buildVersionDetailMetadata(
   return buildPageMetadata({
     locale,
     pathname: `/versions/${slug}`,
-    title: versions.detailTitle(label),
+    title: buildVersionDetailSeoTitle(locale, label),
     description: dictionary.seo.versionDetail(label, count),
     keywords: ["AstroDX", siteName, label, "maimai DX"],
+  });
+}
+
+export function buildLicensePageMetadata(locale: Locale): Metadata {
+  const meta = licensePageMetadata[locale];
+
+  return buildPageMetadata({
+    locale,
+    pathname: "/license",
+    title: meta.title,
+    description: meta.description,
+    keywords: [
+      "AstroDX",
+      siteName,
+      "license",
+      "usage notes",
+      "谱面来源",
+      "许可说明",
+      "maimai",
+    ],
   });
 }

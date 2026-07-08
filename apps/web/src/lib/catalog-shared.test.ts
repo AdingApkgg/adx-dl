@@ -6,13 +6,18 @@ import {
   entryHasLevel,
   formatEntrySubcategory,
   getChartAssetFiles,
+  getChartDownloadSpec,
   toCatalogCardEntry,
+  versionFolderName,
+  versionGroupFolderName,
+  versionShortName,
   type CatalogEntry,
 } from "@/lib/catalog-shared";
 
 function buildEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
   return {
     id: "song-1",
+    slug: "11951",
     remote_dir_name: "song-1",
     title: "曲目 1",
     title_en: "Song 1",
@@ -25,7 +30,7 @@ function buildEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
     version: "maimai DX BUDDiES",
     genre: "Anime",
     cabinet: "DX",
-    short_id: "S1",
+    short_id: "11951",
     bpm: 121,
     offset: null,
     download_mode: "mixed",
@@ -66,9 +71,9 @@ describe("catalog shared helpers", () => {
     const entry = buildEntry();
 
     expect(getChartAssetFiles(entry)).toEqual([
-      { name: "maidata.txt", url: "maidata-1.txt" },
+      { name: "maidata.txt", url: "/adxcs/11951/maidata.txt" },
       { name: "track.mp3", url: "/covers/song-1/track.mp3" },
-      { name: "bg.png", url: "/covers/song-1/bg.jpg" },
+      { name: "bg.png", url: "/adxcs/11951/bg.png" },
       { name: "pv.mp4", url: "/covers/song-1/pv.mp4" },
     ]);
 
@@ -87,6 +92,22 @@ describe("catalog shared helpers", () => {
       "bg.png",
       "pv.mp4",
     ]);
+  });
+
+  test("getChartDownloadSpec carries the global version folder", () => {
+    expect(getChartDownloadSpec(buildEntry({ remote_dir_name: "11951" }))).toEqual({
+      dir: "11951",
+      files: [
+        { name: "maidata.txt", url: "/adxcs/11951/maidata.txt" },
+        { name: "track.mp3", url: "/covers/song-1/track.mp3" },
+        { name: "bg.png", url: "/adxcs/11951/bg.png" },
+        { name: "pv.mp4", url: "/covers/song-1/pv.mp4" },
+      ],
+      groupDir: "21 BUDDiES",
+    });
+
+    expect(versionGroupFolderName("maimai DX CiRCLE")).toBe("25 CiRCLE");
+    expect(versionGroupFolderName("unmapped version", "未知版本")).toBe("未知版本");
   });
 
   test("prefers version and cabinet for remote entries", () => {
@@ -113,6 +134,42 @@ describe("catalog shared helpers", () => {
         })
       )
     ).toBe("maimai DX PRiSM / DX");
+  });
+
+  test("versionFolderName keeps the agreed download folder names", () => {
+    const expected: [string, string, string][] = [
+      ["maimai", "maimai", "00 maimai"],
+      ["maimai PLUS", "PLUS", "01 PLUS"],
+      ["maimai GreeN", "GreeN", "02 GreeN"],
+      ["maimai GreeN PLUS", "GreeN PLUS", "03 GreeN PLUS"],
+      ["maimai ORANGE", "ORANGE", "04 ORANGE"],
+      ["maimai ORANGE PLUS", "ORANGE PLUS", "05 ORANGE PLUS"],
+      ["maimai PiNK", "PiNK", "06 PiNK"],
+      ["maimai PiNK PLUS", "PiNK PLUS", "07 PiNK PLUS"],
+      ["maimai MURASAKi", "MURASAKi", "08 MURASAKi"],
+      ["maimai MURASAKi PLUS", "MURASAKi PLUS", "09 MURASAKi PLUS"],
+      ["maimai MiLK", "MiLK", "10 MiLK"],
+      ["maimai MiLK PLUS", "MiLK PLUS", "11 MiLK PLUS"],
+      ["maimai FiNALE", "FiNALE", "12 FiNALE"],
+      ["maimai DX", "DX", "13 DX"],
+      ["maimai DX PLUS", "DX PLUS", "14 DX PLUS"],
+      ["maimai DX Splash", "Splash", "15 Splash"],
+      ["maimai DX Splash PLUS", "Splash PLUS", "16 Splash PLUS"],
+      ["maimai DX UNiVERSE", "UNiVERSE", "17 UNiVERSE"],
+      ["maimai DX UNiVERSE PLUS", "UNiVERSE PLUS", "18 UNiVERSE PLUS"],
+      ["maimai DX FESTiVAL", "FESTiVAL", "19 FESTiVAL"],
+      ["maimai DX FESTiVAL PLUS", "FESTiVAL PLUS", "20 FESTiVAL PLUS"],
+      ["maimai DX BUDDiES", "BUDDiES", "21 BUDDiES"],
+      ["maimai DX BUDDiES PLUS", "BUDDiES PLUS", "22 BUDDiES PLUS"],
+      ["maimai DX PRiSM", "PRiSM", "23 PRiSM"],
+      ["maimai DX PRiSM PLUS", "PRiSM PLUS", "24 PRiSM PLUS"],
+      ["maimai DX CiRCLE", "CiRCLE", "25 CiRCLE"],
+    ];
+
+    for (const [source, shortName, folder] of expected) {
+      expect(versionFolderName(source)).toBe(folder);
+      expect(versionShortName(source)).toBe(shortName);
+    }
   });
 
   test("toCatalogCardEntry keeps card fields and drops the heavy download payload", () => {

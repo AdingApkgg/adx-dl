@@ -8,11 +8,13 @@ import { resolveSiteUrl } from "@/lib/site-url";
 import { getPrefixedRouteLocale } from "./route-locale";
 
 const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
+const siteDescription =
+  "ADX 谱面资源 is an unofficial AstroDX chart archive with maimai-style catalog indexing, song metadata, cover art, difficulty data, online previews and downloads.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "ADX 谱面资源",
-  description: "Chart archive, indexing, and download portal for AstroDX collections.",
+  title: "ADX 谱面资源 | AstroDX Chart Archive",
+  description: siteDescription,
   manifest: "/site.webmanifest",
 };
 

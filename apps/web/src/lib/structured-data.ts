@@ -7,6 +7,7 @@ import {
   formatEntryTitle,
   genreLabel,
   uniqueChartDesigners,
+  type Catalog,
   versionRouteId,
   type CatalogEntry,
   type VersionGroup,
@@ -24,6 +25,9 @@ const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 const siteName = "ADX 谱面资源";
 const organizationId = `${siteUrl}/#organization`;
 const websiteId = `${siteUrl}/#website`;
+const dataCatalogId = `${siteUrl}/#data-catalog`;
+const datasetId = `${siteUrl}/#chart-catalog-dataset`;
+const licenseUrl = `${siteUrl}/license`;
 const sourceRepository = "https://github.com/AdingApkgg/adx-dl";
 const maintainerProfile = "https://github.com/AdingApkgg";
 const communityUrl = "https://t.me/FullDiveSAO";
@@ -79,7 +83,7 @@ export function buildCatalogDatasetStructuredData(
   return {
     "@context": "https://schema.org",
     "@type": "Dataset",
-    "@id": `${siteUrl}/#dataset`,
+    "@id": datasetId,
     name: `${siteName} — AstroDX chart catalog`,
     description: getStaticPageMetadata(locale).home.description,
     url: chartsUrl,
@@ -87,7 +91,9 @@ export function buildCatalogDatasetStructuredData(
     isAccessibleForFree: true,
     creator: { "@id": organizationId },
     publisher: { "@id": organizationId },
-    isPartOf: { "@id": websiteId },
+    license: licenseUrl,
+    isPartOf: siteUrl,
+    includedInDataCatalog: { "@id": dataCatalogId },
     keywords: ["AstroDX", "maimai", "maimai DX", "rhythm game charts", "谱面"],
     ...(dateModified ? { dateModified } : {}),
     distribution: {
@@ -98,7 +104,81 @@ export function buildCatalogDatasetStructuredData(
   };
 }
 
-export function buildHomeStructuredData(locale: Locale): JsonLdValue {
+function buildChartCatalogStructuredData(
+  locale: Locale,
+  catalog?: Pick<Catalog, "generated_at" | "total_entries" | "categories">
+): JsonLdValue[] {
+  const pageMetadata = getStaticPageMetadata(locale).home;
+  const homePath = buildLocalePath("/", locale);
+  const chartsPath = buildLocalePath("/charts", locale);
+  const language = getStructuredDataLanguage(locale);
+  const versionCount = catalog
+    ? new Set(Object.values(catalog.categories).flat()).size
+    : undefined;
+
+  return [
+    {
+      "@type": "DataCatalog",
+      "@id": dataCatalogId,
+      name: siteName,
+      description: pageMetadata.description,
+      url: toAbsoluteUrl(chartsPath),
+      inLanguage: language,
+      publisher: { "@id": organizationId },
+      license: licenseUrl,
+      dataset: { "@id": datasetId },
+    },
+    {
+      "@type": "Dataset",
+      "@id": datasetId,
+      name: "ADX 谱面资源 — AstroDX chart catalog",
+      alternateName: ["AstroDX chart catalog", "ADX chart catalog"],
+      description: pageMetadata.description,
+      url: toAbsoluteUrl(homePath),
+      inLanguage: language,
+      creator: { "@id": organizationId },
+      publisher: { "@id": organizationId },
+      license: licenseUrl,
+      isAccessibleForFree: true,
+      // Google Dataset rich results accept a URL here; an object that only
+      // points at WebSite can be reported as "invalid object type".
+      isPartOf: siteUrl,
+      includedInDataCatalog: { "@id": dataCatalogId },
+      citation: sourceRepository,
+      ...(catalog?.generated_at ? { dateModified: catalog.generated_at } : {}),
+      ...(catalog?.total_entries ? { size: `${catalog.total_entries} charts` } : {}),
+      additionalProperty: [
+        ...(catalog?.total_entries
+          ? [{ "@type": "PropertyValue", name: "chartCount", value: catalog.total_entries }]
+          : []),
+        ...(versionCount
+          ? [{ "@type": "PropertyValue", name: "versionBranchCount", value: versionCount }]
+          : []),
+      ],
+      keywords: ["AstroDX", "maimai", "chart catalog", "chart download", "maidata"],
+      variableMeasured: [
+        "song title",
+        "artist",
+        "maimai DX version",
+        "genre",
+        "difficulty level",
+        "BPM",
+      ],
+      distribution: [
+        {
+          "@type": "DataDownload",
+          encodingFormat: "application/json",
+          contentUrl: `${siteUrl}/charts/search-index.json`,
+        },
+      ],
+    },
+  ];
+}
+
+export function buildHomeStructuredData(
+  locale: Locale,
+  catalog?: Pick<Catalog, "generated_at" | "total_entries" | "categories">
+): JsonLdValue {
   const pageMetadata = getStaticPageMetadata(locale).home;
   const homePath = buildLocalePath("/", locale);
   // Sitelinks-searchbox target: the catalog page hosts the in-page search box.
@@ -125,6 +205,7 @@ export function buildHomeStructuredData(locale: Locale): JsonLdValue {
           "query-input": "required name=search_term_string",
         },
       },
+      ...buildChartCatalogStructuredData(locale, catalog),
     ],
   };
 }

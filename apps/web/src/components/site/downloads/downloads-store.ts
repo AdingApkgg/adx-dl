@@ -68,6 +68,7 @@ type StartSingleParams = {
   id: string;
   title: string;
   files: AdxRemoteFile[];
+  groupDir?: string;
   includeVideo: boolean;
   format: ArchiveFormat;
 };
@@ -106,7 +107,7 @@ type DownloadsState = {
 };
 
 /** How long a finished (success) job lingers before the tray auto-clears it. */
-const AUTO_DISMISS_MS = 6000;
+const AUTO_DISMISS_MS = 30000;
 
 // Module-level (outside the store value) so they survive store updates but stay
 // out of React's snapshot: the durable job spec and any in-flight abort handle.
@@ -244,10 +245,16 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       const archiveBlob =
         spec.kind === "batch"
           ? await buildNestedArchiveBlob(
-              regroupBatch(archiveInputs, spec.dirByIndex ?? []),
-              format as BatchArchiveFormat
+              regroupBatch(archiveInputs, spec.dirByIndex ?? [], spec.groupByIndex ?? []),
+              format as BatchArchiveFormat,
+              spec.title
             )
-          : await buildArchiveBlob(archiveInputs, format);
+          : spec.groupDir
+            ? await buildNestedArchiveBlob(
+                [{ name: spec.title, groupDir: spec.groupDir, files: archiveInputs }],
+                format
+              )
+          : await buildArchiveBlob(archiveInputs, format, spec.title);
 
       saveBlobAsFile(archiveBlob, getArchiveDownloadFileName(spec.title, format));
 
@@ -315,7 +322,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
     presented: {},
     bottomBars: 0,
 
-    startSingle: ({ id, title, files, includeVideo, format }) => {
+    startSingle: ({ id, title, files, groupDir, includeVideo, format }) => {
       const selected = includeVideo ? files : files.filter((file) => !isChartVideoFile(file.name));
       if (selected.length === 0) {
         return;
@@ -327,6 +334,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         format,
         createdAt: Date.now(),
         files: selected.map((file) => ({ name: file.name, url: file.url })),
+        ...(groupDir ? { groupDir } : {}),
       });
     },
 
@@ -335,9 +343,11 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       // can be regrouped — an opaque numeric prefix avoids clashing with chart
       // names that contain "/".
       const dirByIndex: string[] = [];
+      const groupByIndex: string[] = [];
       const files: { name: string; url: string }[] = [];
       charts.forEach((chart, index) => {
         dirByIndex[index] = chart.dir;
+        groupByIndex[index] = chart.groupDir ?? "";
         for (const file of chart.files) {
           if (includeVideo || !isChartVideoFile(file.name)) {
             files.push({ name: `${index}/${file.name}`, url: file.url });
@@ -347,7 +357,16 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       if (files.length === 0) {
         return;
       }
-      beginJob({ id, kind: "batch", title, format, createdAt: Date.now(), files, dirByIndex });
+      beginJob({
+        id,
+        kind: "batch",
+        title,
+        format,
+        createdAt: Date.now(),
+        files,
+        dirByIndex,
+        ...(groupByIndex.some(Boolean) ? { groupByIndex } : {}),
+      });
     },
 
     resume: (id) => {
@@ -414,6 +433,27 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
               }
             }
           }
+          const fileProgress =
+            spec.kind === "single"
+              ? spec.files.map((file) => {
+                  const prior = byName.get(file.name);
+                  const received = prior?.blob.size ?? 0;
+                  const total = prior?.total ?? null;
+                  const status: AdxFileProgress["status"] =
+                    total !== null && received >= total && received > 0
+                      ? "done"
+                      : received > 0
+                        ? "downloading"
+                        : "pending";
+                  return {
+                    name: file.name,
+                    received,
+                    total,
+                    status,
+                  };
+                })
+              : [];
+
           upsertJob({
             id: spec.id,
             kind: spec.kind,
@@ -425,7 +465,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
             receivedBytes,
             totalBytes: totalKnown ? totalBytes : 0,
             speedBps: 0,
-            fileProgress: [],
+            fileProgress,
             error: null,
             errorKind: null,
             startedAt: Date.now(),
@@ -466,8 +506,9 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
 /** Regroups the flat `${index}/name` download results back into per-chart folders. */
 function regroupBatch(
   archiveInputs: AdxArchiveInput[],
-  dirByIndex: string[]
-): { name: string; files: AdxArchiveInput[] }[] {
+  dirByIndex: string[],
+  groupByIndex: string[]
+): { name: string; groupDir?: string; files: AdxArchiveInput[] }[] {
   const grouped = new Map<number, AdxArchiveInput[]>();
   for (const input of archiveInputs) {
     const slash = input.name.indexOf("/");
@@ -479,7 +520,11 @@ function regroupBatch(
   }
   return [...grouped.entries()]
     .sort(([a], [b]) => a - b)
-    .map(([index, files]) => ({ name: dirByIndex[index], files }));
+    .map(([index, files]) => ({
+      name: dirByIndex[index],
+      groupDir: groupByIndex[index] || undefined,
+      files,
+    }));
 }
 
 /** Stable job id for a single-chart download, keyed by its archive base name. */

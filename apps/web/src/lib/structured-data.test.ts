@@ -56,45 +56,61 @@ describe("structured data builders", () => {
   test("buildHomeStructuredData emits an Organization + WebSite @graph with EntryPoint SearchAction", async () => {
     const { buildHomeStructuredData } = await import("./structured-data");
 
-    expect(buildHomeStructuredData("en")).toEqual({
-      "@context": "https://schema.org",
-      "@graph": [
-        {
-          "@type": "Organization",
-          "@id": "https://adxdls.saop.cc/#organization",
-          name: "ADX 谱面资源",
-          url: "https://adxdls.saop.cc",
-          logo: "https://adxdls.saop.cc/opengraph-image.png",
-          sameAs: [
-            "https://github.com/AdingApkgg/adx-dl",
-            "https://github.com/AdingApkgg",
-            "https://t.me/FullDiveSAO",
-          ],
-          contactPoint: {
-            "@type": "ContactPoint",
-            contactType: "customer support",
-            url: "https://t.me/FullDiveSAO",
-          },
-        },
-        {
-          "@type": "WebSite",
-          "@id": "https://adxdls.saop.cc/#website",
-          name: "ADX 谱面资源",
-          description:
-            "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download.",
-          url: "https://adxdls.saop.cc/en",
-          inLanguage: "en",
-          publisher: { "@id": "https://adxdls.saop.cc/#organization" },
-          potentialAction: {
-            "@type": "SearchAction",
-            target: {
-              "@type": "EntryPoint",
-              urlTemplate: "https://adxdls.saop.cc/en/charts?q={search_term_string}",
-            },
-            "query-input": "required name=search_term_string",
-          },
-        },
+    const data = buildHomeStructuredData("en") as {
+      "@context": string;
+      "@graph": Array<Record<string, unknown>>;
+    };
+    const [organization, website] = data["@graph"];
+    const catalog = data["@graph"].find((node) => node["@type"] === "DataCatalog");
+    const dataset = data["@graph"].find((node) => node["@type"] === "Dataset");
+
+    expect(data["@context"]).toBe("https://schema.org");
+    expect(organization).toMatchObject({
+      "@type": "Organization",
+      "@id": "https://adxdls.saop.cc/#organization",
+      name: "ADX 谱面资源",
+      url: "https://adxdls.saop.cc",
+      logo: "https://adxdls.saop.cc/opengraph-image.png",
+      sameAs: [
+        "https://github.com/AdingApkgg/adx-dl",
+        "https://github.com/AdingApkgg",
+        "https://t.me/FullDiveSAO",
       ],
+      contactPoint: {
+        "@type": "ContactPoint",
+        contactType: "customer support",
+        url: "https://t.me/FullDiveSAO",
+      },
+    });
+    expect(website).toMatchObject({
+      "@type": "WebSite",
+      "@id": "https://adxdls.saop.cc/#website",
+      name: "ADX 谱面资源",
+      url: "https://adxdls.saop.cc/en",
+      inLanguage: "en",
+      publisher: { "@id": "https://adxdls.saop.cc/#organization" },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: "https://adxdls.saop.cc/en/charts?q={search_term_string}",
+        },
+        "query-input": "required name=search_term_string",
+      },
+    });
+    expect(catalog).toMatchObject({
+      "@type": "DataCatalog",
+      "@id": "https://adxdls.saop.cc/#data-catalog",
+      license: "https://adxdls.saop.cc/license",
+      dataset: { "@id": "https://adxdls.saop.cc/#chart-catalog-dataset" },
+    });
+    expect(dataset).toMatchObject({
+      "@type": "Dataset",
+      "@id": "https://adxdls.saop.cc/#chart-catalog-dataset",
+      name: "ADX 谱面资源 — AstroDX chart catalog",
+      license: "https://adxdls.saop.cc/license",
+      isPartOf: "https://adxdls.saop.cc",
+      includedInDataCatalog: { "@id": "https://adxdls.saop.cc/#data-catalog" },
     });
   });
 

@@ -193,18 +193,20 @@ describe("page views locale-driven content", () => {
     expect(html).toContain("AstroDX 封面占位图");
   });
 
-  test("detail view renders PV and audio players when media is available", () => {
+  test("detail view renders lazy action buttons instead of eager PV and audio players", () => {
     const slug = "song-1";
     const html = renderToStaticMarkup(<ChartDetailPageView entry={buildEntry()} locale="zh" />);
 
-    expect(html).toContain("预览");
-    expect(html).toContain("<video");
-    expect(html).toContain(`src="/covers/${slug}/pv.mp4"`);
-    expect(html).toContain("<audio");
-    expect(html).toContain(`src="/covers/${slug}/track.mp3"`);
+    expect(html).toContain("PV 影像");
+    expect(html).toContain("谱面预览");
+    expect(html).toContain("评论");
+    expect(html).not.toContain("<video");
+    expect(html).not.toContain(`src="/covers/${slug}/pv.mp4"`);
+    expect(html).not.toContain("<audio");
+    expect(html).not.toContain(`src="/covers/${slug}/track.mp3"`);
   });
 
-  test("detail view omits the preview section when no audio or PV", () => {
+  test("detail view omits the media action when no audio or PV", () => {
     const base = buildEntry();
     const entry = {
       ...base,
@@ -216,9 +218,7 @@ describe("page views locale-driven content", () => {
 
     expect(html).not.toContain("<video");
     expect(html).not.toContain("<audio");
-    // The media (PV/audio) preview section is gone. The separate "谱面预览" chart-preview
-    // card still renders (it only needs maidata), so anchor on the media section's unique
-    // description rather than the bare "预览" substring, which "谱面预览" would also match.
+    expect(html).not.toContain(detail.pvLabel);
     expect(html).not.toContain(detail.previewDescription);
     expect(html).toContain(detail.chartPreview);
   });

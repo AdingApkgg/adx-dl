@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { preload } from "react-dom";
 import {
@@ -15,9 +14,8 @@ import { AdxDownloadButton } from "@/components/site/adx-download-button";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
 import { ChartCard } from "@/components/site/chart-card";
-import { ChartComments } from "@/components/site/chart-comments";
-import { ChartMediaPlayer } from "@/components/site/chart-media-player";
-import { ChartPreviewIsland } from "@/components/chart-preview/chart-preview-island";
+import { ChartDetailActions } from "@/components/site/chart-detail-actions";
+import { CompatibleImage } from "@/components/site/compatible-image";
 import { ChartPageViews } from "@/components/site/page-view-counter";
 import { DifficultyPill } from "@/components/site/difficulty-pill";
 import { EntryAssetBadges } from "@/components/site/entry-asset-badges";
@@ -47,7 +45,7 @@ import {
   formatEntryTitle,
   GENRES,
   genreLabel,
-  getChartAssetFiles,
+  getChartDownloadSpec,
   resolveGenreId,
   sortByReleaseDesc,
   versionRouteId,
@@ -60,7 +58,7 @@ import {
   MAIMAI_VERSIONS,
   VERSION_IMAGE_DIMENSIONS,
   versionImageIndex,
-  versionImageSrcByIndex,
+  versionImageSourcesByIndex,
 } from "@/lib/version-image";
 import {
   buildCatalogDatasetStructuredData,
@@ -252,7 +250,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
     >
       <SeoJsonLd
         data={[
-          buildHomeStructuredData(locale),
+          buildHomeStructuredData(locale, catalog),
           buildHomeFaqStructuredData(locale, catalog.total_entries, versionCount),
           buildCatalogDatasetStructuredData(locale, catalog.generated_at),
         ]}
@@ -339,12 +337,11 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
                 href={buildLocalePath(`/versions/${versionRouteId(version.index)}`, locale)}
                 className="group flex h-full flex-col items-center gap-3 rounded-2xl border border-border/60 bg-card/70 p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10"
               >
-                <Image
-                  src={versionImageSrcByIndex(version.index)}
+                <CompatibleImage
+                  sources={versionImageSourcesByIndex(version.index)}
                   alt={version.name}
                   width={VERSION_IMAGE_DIMENSIONS.width}
                   height={VERSION_IMAGE_DIMENSIONS.height}
-                  unoptimized
                   className="h-14 w-auto drop-shadow transition-transform duration-300 group-hover:scale-105"
                 />
                 <div className="flex flex-col items-center gap-0.5 text-center">
@@ -471,6 +468,13 @@ export function ChartDetailPageView({
   const description = buildChartDescription(entry, locale);
   const title = formatEntryTitle(entry, locale);
   const chartsHref = buildLocalePath("/charts", locale);
+  const heroCoverSources = entry.media.cover_url
+    ? {
+        avif: entry.media.cover_avif,
+        webp: entry.media.cover_webp,
+        png: entry.media.cover_url,
+      }
+    : null;
 
   // Deep links out of the metadata table: entries with an unmapped version land
   // in the "unknown" bucket, so /versions/unknown always exists for them.
@@ -479,8 +483,8 @@ export function ChartDetailPageView({
   const genreId = resolveGenreId(entry);
   const genreHref = genreId !== null ? `${chartsHref}?genre=${genreId}` : undefined;
 
-  // Files packed into the downloaded .adx, named as the AstroDX app expects.
-  const downloadFiles = getChartAssetFiles(entry);
+  // Single downloads use the same global chart spec as every batch entry.
+  const downloadSpec = getChartDownloadSpec(entry);
 
   return (
     <main
@@ -504,15 +508,14 @@ export function ChartDetailPageView({
       <article className="flex flex-col gap-6">
       <section className="relative isolate overflow-hidden rounded-3xl border border-border/60">
         <div aria-hidden="true" className="absolute inset-0 -z-10">
-          {entry.media.cover_url ? (
+          {heroCoverSources ? (
             <>
-              <Image
-                src={entry.media.cover_url}
+              <CompatibleImage
+                sources={heroCoverSources}
                 alt=""
-                fill
-                unoptimized
                 sizes="100vw"
-                className="scale-110 object-cover opacity-30 blur-2xl"
+                pictureClassName="absolute inset-0 block"
+                className="h-full w-full scale-110 object-cover opacity-30 blur-2xl"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/85 to-background/55" />
             </>
@@ -560,17 +563,14 @@ export function ChartDetailPageView({
             </div>
             <div className="flex flex-wrap gap-2">
               {entry.download_mode === "onsite" || entry.download_mode === "mixed" ? (
-                <AdxDownloadButton
-                  files={downloadFiles}
-                  fileName={entry.remote_dir_name}
-                  locale={locale}
-                />
+                <AdxDownloadButton spec={downloadSpec} locale={locale} />
               ) : (
                 <Button disabled>
                   <DownloadIcon data-icon="inline-start" aria-hidden="true" />
                   {detail.onsitePending}
                 </Button>
               )}
+              <ChartDetailActions entry={entry} locale={locale} />
               {(entry.download_mode === "external" || entry.download_mode === "mixed") &&
               entry.source_url ? (
                 <Button variant="outline" asChild>
@@ -584,36 +584,6 @@ export function ChartDetailPageView({
           </div>
         </div>
       </section>
-
-      <Reveal>
-        <ChartMediaPlayer entry={entry} locale={locale} />
-      </Reveal>
-
-      {entry.files.maidata ? (
-        <Reveal>
-          <Card>
-            <CardHeader>
-              <CardTitle>{detail.chartPreview}</CardTitle>
-              <CardDescription>{detail.chartPreviewDescription}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChartPreviewIsland
-                maidataUrl={entry.files.maidata}
-                audioUrl={entry.media.audio_url || undefined}
-                videoUrl={entry.media.pv_url || entry.files.pv || undefined}
-                chartName={`${entry.short_id || entry.id}-${formatEntryTitle(entry, locale)}`}
-                locale={locale}
-                levels={Object.fromEntries(entry.difficulties.map((d) => [d.slot, d.level]))}
-                defaultDifficulty={
-                  entry.difficulties.length > 0
-                    ? Math.max(...entry.difficulties.map((d) => d.slot))
-                    : undefined
-                }
-              />
-            </CardContent>
-          </Card>
-        </Reveal>
-      ) : null}
 
       <Reveal ssrVisible className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_320px]">
         <Card>
@@ -767,15 +737,6 @@ export function ChartDetailPageView({
           </ul>
         </section>
       ) : null}
-
-      <section className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold">{detail.comments}</h2>
-        <ChartComments
-          pageKey={`/charts/${entrySlug(entry)}`}
-          pageTitle={formatEntryTitle(entry, locale)}
-          locale={locale}
-        />
-      </section>
       </article>
     </main>
   );

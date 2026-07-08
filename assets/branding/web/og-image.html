@@ -20,10 +20,9 @@
         overflow: hidden;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         background:
-          radial-gradient(circle at 20% 20%, rgba(76, 165, 255, 0.18), transparent 32%),
-          radial-gradient(circle at 78% 18%, rgba(32, 105, 255, 0.22), transparent 28%),
-          radial-gradient(circle at 50% 100%, rgba(10, 52, 168, 0.38), transparent 40%),
-          linear-gradient(180deg, #020617 0%, #06153c 54%, #081a4d 100%);
+          linear-gradient(145deg, rgba(66, 177, 255, 0.28) 0%, transparent 28%),
+          linear-gradient(26deg, transparent 0%, rgba(43, 96, 255, 0.28) 55%, transparent 82%),
+          linear-gradient(180deg, #020617 0%, #06153c 56%, #071f62 100%);
         color: #f8fbff;
       }
 
@@ -31,7 +30,7 @@
         position: relative;
         width: 100%;
         height: 100%;
-        padding: 56px 64px;
+        padding: 54px 72px;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -41,31 +40,31 @@
       .frame::after {
         content: "";
         position: absolute;
-        border-radius: 999px;
-        filter: blur(10px);
-        opacity: 0.8;
+        inset: auto;
+        pointer-events: none;
       }
 
       .frame::before {
-        top: 56px;
-        right: 92px;
-        width: 180px;
-        height: 180px;
-        background: radial-gradient(circle, rgba(98, 191, 255, 0.28), transparent 70%);
+        top: 0;
+        right: 170px;
+        width: 240px;
+        height: 630px;
+        transform: skewX(-18deg);
+        background: linear-gradient(180deg, rgba(108, 206, 255, 0.2), transparent 72%);
       }
 
       .frame::after {
-        bottom: 24px;
-        left: 28px;
-        width: 260px;
-        height: 260px;
-        background: radial-gradient(circle, rgba(39, 98, 255, 0.24), transparent 72%);
+        right: 0;
+        bottom: 0;
+        width: 560px;
+        height: 160px;
+        background: linear-gradient(180deg, transparent, rgba(20, 67, 169, 0.34));
       }
 
       .copy {
         position: relative;
         z-index: 1;
-        max-width: 640px;
+        max-width: 720px;
       }
 
       .eyebrow {
@@ -78,22 +77,23 @@
         background: rgba(8, 19, 53, 0.54);
         color: #b5d9ff;
         font-size: 18px;
-        letter-spacing: 0.08em;
+        letter-spacing: 0;
         text-transform: uppercase;
       }
 
       .title {
         margin: 22px 0 14px;
-        font-size: 88px;
+        font-size: 96px;
         line-height: 0.96;
-        letter-spacing: -0.05em;
+        letter-spacing: 0;
       }
 
       .subtitle {
         margin: 0;
         color: #d6e8ff;
         font-size: 28px;
-        line-height: 1.45;
+        line-height: 1.34;
+        max-width: 690px;
       }
 
       .meta {
@@ -104,7 +104,12 @@
       }
 
       .chip {
-        padding: 10px 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 180px;
+        height: 64px;
+        padding: 0 20px;
         border-radius: 999px;
         background: rgba(255, 255, 255, 0.08);
         border: 1px solid rgba(255, 255, 255, 0.12);
@@ -112,12 +117,17 @@
         font-size: 20px;
       }
 
+      .chip:first-child {
+        min-width: 244px;
+      }
+
       .mark {
         position: relative;
         z-index: 1;
-        width: 320px;
-        height: 320px;
-        border-radius: 40px;
+        width: 300px;
+        height: 300px;
+        margin-right: 12px;
+        border-radius: 44px;
         display: grid;
         place-items: center;
         background:
@@ -131,8 +141,8 @@
       }
 
       .mark img {
-        width: 220px;
-        height: 220px;
+        width: 188px;
+        height: 188px;
         image-rendering: auto;
       }
     </style>
@@ -143,8 +153,8 @@
         <div class="eyebrow">AstroDX Archive</div>
         <h1 class="title">AstroDX</h1>
         <p class="subtitle">
-          Community-driven chart archive, indexing, and download portal built for
-          AstroDX level collections.
+          Community-driven chart archive, indexing, and download portal for
+          AstroDX collections.
         </p>
         <div class="meta">
           <span class="chip">Official Packages</span>

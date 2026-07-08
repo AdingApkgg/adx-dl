@@ -64,6 +64,19 @@ jobs:
           ASTRODX_COVERS: ${{ vars.ASTRODX_COVERS }}
         run: python3 -c "from pathlib import Path; from tools.build_catalog import build_catalog; print(build_catalog(Path('..').resolve(), max_workers=16))"
 
+      # bg.png and maidata.txt are served from the static site for archive
+      # packing, while track.mp3 and pv.mp4 intentionally stay remote.
+      - name: Cache mirrored chart assets
+        uses: actions/cache@v6
+        with:
+          path: apps/web/public/adxcs
+          key: adxcs-v1-${{ github.run_id }}
+          restore-keys: adxcs-v1-
+
+      - name: Mirror chart assets for local downloads
+        working-directory: pipeline
+        run: python3 -m tools.mirror_chart_assets --root .. --max-workers 16
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 

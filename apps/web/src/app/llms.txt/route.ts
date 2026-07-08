@@ -32,6 +32,7 @@ The archive currently lists ${catalog.total_entries} charts across ${versions.le
 - Server status: ${siteUrl}/status
 - Full chart manifest (for machines): ${siteUrl}/llms-full.txt
 - Atom feed (latest charts): ${siteUrl}/feed.xml
+- License, sources and usage notes: ${siteUrl}/license
 - Sitemap: ${siteUrl}/sitemap.xml
 
 ## Localized entry points

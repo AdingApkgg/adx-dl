@@ -1,9 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 
 import { Reveal } from "@/components/motion";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
+import { CompatibleImage } from "@/components/site/compatible-image";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { VersionsBatchGrid } from "@/components/site/versions-batch-grid";
 import {
@@ -17,7 +17,7 @@ import {
   buildVersionDetailStructuredData,
   buildVersionsIndexStructuredData,
 } from "@/lib/structured-data";
-import { VERSION_IMAGE_DIMENSIONS, versionImageSrcByIndex } from "@/lib/version-image";
+import { VERSION_IMAGE_DIMENSIONS, versionImageSourcesByIndex } from "@/lib/version-image";
 
 type VersionsIndexViewProps = {
   groups: VersionGroup[];
@@ -67,7 +67,7 @@ export function VersionDetailView({
 }: VersionDetailViewProps) {
   const versions = getDictionary(locale).versions;
   const label = name === "Unknown" ? versions.unknownLabel : name;
-  const src = imageIndex !== null ? versionImageSrcByIndex(imageIndex) : null;
+  const sources = imageIndex !== null ? versionImageSourcesByIndex(imageIndex) : null;
 
   return (
     <main
@@ -84,13 +84,12 @@ export function VersionDetailView({
           {versions.backToIndex}
         </Link>
         <div className="flex flex-wrap items-center gap-3">
-          {src ? (
-            <Image
-              src={src}
+          {sources ? (
+            <CompatibleImage
+              sources={sources}
               alt={label}
               width={VERSION_IMAGE_DIMENSIONS.width}
               height={VERSION_IMAGE_DIMENSIONS.height}
-              unoptimized
               className="h-9 w-auto rounded-md"
             />
           ) : null}
@@ -106,7 +105,6 @@ export function VersionDetailView({
         entries={entries.map(toCatalogCardEntry)}
         locale={locale}
         detailPathPrefix={buildLocalePath("/charts", locale)}
-        collectionName={label}
       />
     </main>
   );

@@ -1,5 +1,5 @@
 // Maps a maimai version string (from the catalog `version` field) to a version
-// icon hosted at /genrepics/<index>.png. Most-specific (PLUS) variants are
+// icon hosted at /genrepics/<index>.*. Most-specific (PLUS) variants are
 // matched before their base version. Returns null when no version icon applies
 // (e.g. empty/unknown version) so callers fall back to a text label.
 const VERSION_IMAGE_RULES: ReadonlyArray<readonly [RegExp, number]> = [
@@ -33,6 +33,12 @@ const VERSION_IMAGE_RULES: ReadonlyArray<readonly [RegExp, number]> = [
 
 export const VERSION_IMAGE_DIMENSIONS = { width: 332, height: 160 } as const;
 
+export type VersionImageSources = {
+  avif?: string;
+  webp?: string;
+  png: string;
+};
+
 export function versionImageIndex(version: string | null | undefined): number | null {
   const value = (version ?? "").trim();
   if (!value) {
@@ -51,11 +57,25 @@ export function versionImageIndex(version: string | null | undefined): number | 
 
 export function versionImageSrc(version: string | null | undefined): string | null {
   const index = versionImageIndex(version);
-  return index === null ? null : `/genrepics/${index}.png`;
+  return index === null ? null : versionImageSourcesByIndex(index).png;
 }
 
 export function versionImageSrcByIndex(index: number): string {
-  return `/genrepics/${index}.png`;
+  return versionImageSourcesByIndex(index).png;
+}
+
+export function versionImageSources(version: string | null | undefined): VersionImageSources | null {
+  const index = versionImageIndex(version);
+  return index === null ? null : versionImageSourcesByIndex(index);
+}
+
+export function versionImageSourcesByIndex(index: number): VersionImageSources {
+  const base = `/genrepics/${index}`;
+  return {
+    avif: `${base}.avif`,
+    webp: `${base}.webp`,
+    png: `${base}.png`,
+  };
 }
 
 export type MaimaiVersion = { index: number; name: string; slug: string };

@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import useSWR from "swr";
 import { ChevronDownIcon, ListFilterIcon, SearchIcon, XIcon } from "lucide-react";
 
@@ -9,6 +8,7 @@ import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { ChartCard } from "@/components/site/chart-card";
+import { CompatibleImage } from "@/components/site/compatible-image";
 import {
   ALL_CATEGORIES,
   ALL_SUBCATEGORIES,
@@ -37,7 +37,7 @@ import { cn } from "@/lib/utils";
 import {
   VERSION_IMAGE_DIMENSIONS,
   versionImageIndex,
-  versionImageSrc,
+  versionImageSources,
 } from "@/lib/version-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,6 +64,21 @@ const SEARCH_DEBOUNCE_MS = 200;
 const CHART_SPECS_PATH = "/charts/specs.json";
 // Matches the browse grid: 2 columns on phones, 3 from lg, 4 from xl.
 const CARD_SIZES = "(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 25vw";
+
+export function buildSelectedCatalogCharts(
+  entries: readonly CatalogCardEntry[],
+  specs: Record<string, ChartDownloadSpec> | undefined,
+  selectedIds: ReadonlySet<string>
+): ChartDownloadSpec[] {
+  if (!specs) {
+    return [];
+  }
+
+  return entries
+    .filter((entry) => selectedIds.has(entry.id))
+    .map((entry) => specs[entry.id])
+    .filter((spec): spec is ChartDownloadSpec => Boolean(spec));
+}
 
 export function CatalogBrowser({
   entries,
@@ -413,11 +428,7 @@ export function CatalogBrowser({
 
   // Selection persists by id across pagination and filters, so a batch can span pages.
   const selectedCharts = React.useMemo(() => {
-    if (!chartSpecs) return [];
-    return entries
-      .filter((entry) => selectedIds.has(entry.id))
-      .map((entry) => chartSpecs[entry.id])
-      .filter((spec): spec is ChartDownloadSpec => Boolean(spec));
+    return buildSelectedCatalogCharts(entries, chartSpecs, selectedIds);
   }, [chartSpecs, entries, selectedIds]);
 
   const toggleSelection = (id: string) =>
@@ -450,7 +461,12 @@ export function CatalogBrowser({
   const showBatchBar = selectMode && selectedCharts.length > 0;
 
   return (
-    <div className={cn("flex flex-col gap-6", showBatchBar && "pb-24")}>
+    <div
+      className={cn(
+        "flex flex-col gap-6",
+        showBatchBar && "pb-[calc(var(--batch-download-bar-height,6rem)+2rem)]"
+      )}
+    >
       {categories.length > 2 ? (
         // Tab-styled filter buttons; not ARIA tabs because there are no panels —
         // they narrow the one grid below.
@@ -562,7 +578,7 @@ export function CatalogBrowser({
               {dictionary.filterAll}
             </AllChip>
             {versionOptions.map((value) => {
-              const iconSrc = versionImageSrc(value);
+              const iconSources = versionImageSources(value);
               // Icon-only: the version logo is the identity; name lives in the
               // aria-label / title for a11y and hover.
               return (
@@ -574,13 +590,12 @@ export function CatalogBrowser({
                   ariaLabel={value}
                   title={value}
                 >
-                  {iconSrc ? (
-                    <Image
-                      src={iconSrc}
+                  {iconSources ? (
+                    <CompatibleImage
+                      sources={iconSources}
                       alt=""
                       width={VERSION_IMAGE_DIMENSIONS.width}
                       height={VERSION_IMAGE_DIMENSIONS.height}
-                      unoptimized
                       className="h-9 w-auto"
                     />
                   ) : (
@@ -718,13 +733,12 @@ export function CatalogBrowser({
               onRemove={() => toggleVersion(value)}
               removeLabel={dictionary.removeFilter(value)}
               icon={
-                versionImageSrc(value) ? (
-                  <Image
-                    src={versionImageSrc(value)!}
+                versionImageSources(value) ? (
+                  <CompatibleImage
+                    sources={versionImageSources(value)!}
                     alt=""
                     width={VERSION_IMAGE_DIMENSIONS.width}
                     height={VERSION_IMAGE_DIMENSIONS.height}
-                    unoptimized
                     className="h-4 w-auto shrink-0"
                   />
                 ) : undefined
@@ -830,7 +844,7 @@ export function CatalogBrowser({
           </Button>
           {selectMode ? (
             <Button type="button" variant="outline" size="sm" onClick={selectAllFiltered}>
-              {dictionary.selectAll}
+              {dictionary.selectAllFiltered(orderedEntries.length)}
             </Button>
           ) : null}
           {/* The batch manifest loads lazily on entering select mode. */}

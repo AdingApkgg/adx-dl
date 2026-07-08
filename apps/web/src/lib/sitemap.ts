@@ -12,7 +12,15 @@ export const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL).replace(
 // into a few files that grow (and add shards) automatically as it does.
 export const MAX_URLS_PER_SITEMAP = 2000;
 
-const staticPaths = ["/", "/charts", "/status", "/versions", "/comments", "/links"] as const;
+const staticPaths = [
+  "/",
+  "/charts",
+  "/status",
+  "/versions",
+  "/comments",
+  "/links",
+  "/license",
+] as const;
 
 function toAbsoluteUrl(pathname: string): string {
   return pathname === "/" ? `${siteUrl}/` : `${siteUrl}${pathname}`;

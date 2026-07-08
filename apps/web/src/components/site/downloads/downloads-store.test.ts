@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { unzipSync } from "fflate";
 
 import { batchJobId, singleJobId, useDownloadsStore } from "./downloads-store";
 
@@ -7,9 +8,11 @@ import { batchJobId, singleJobId, useDownloadsStore } from "./downloads-store";
 // pipeline can run headless — the point is to prove the download completes while
 // driven purely by the module-level store, with no React component mounted.
 const savedFiles: string[] = [];
+const savedBlobs: Blob[] = [];
 
 function installDomShims() {
   savedFiles.length = 0;
+  savedBlobs.length = 0;
   globalThis.fetch = (async () =>
     new Response(new Uint8Array([1, 2, 3]), {
       status: 200,
@@ -30,16 +33,19 @@ function installDomShims() {
     createObjectURL?: (blob: Blob) => string;
     revokeObjectURL?: (url: string) => void;
   };
-  url.createObjectURL = () => "blob:stub";
+  url.createObjectURL = (blob) => {
+    savedBlobs.push(blob);
+    return "blob:stub";
+  };
   url.revokeObjectURL = () => {};
 }
 
-/** Spin until the job leaves the "packing" state (or we time out). */
+/** Spin until the job leaves the active download/archive states (or we time out). */
 async function waitForSettled(id: string, timeoutMs = 2000): Promise<void> {
   const start = Date.now();
   for (;;) {
     const job = useDownloadsStore.getState().jobs.find((entry) => entry.id === id);
-    if (job && job.status !== "packing") {
+    if (job && job.status !== "packing" && job.status !== "archiving") {
       return;
     }
     if (Date.now() - start > timeoutMs) {
@@ -65,6 +71,7 @@ describe("downloads-store", () => {
       id,
       title: "Tell Your World",
       files: [{ name: "maidata.txt", url: "https://example.test/maidata.txt" }],
+      groupDir: "25 CiRCLE",
       includeVideo: true,
       format: "adx",
     });
@@ -77,6 +84,8 @@ describe("downloads-store", () => {
     const job = useDownloadsStore.getState().jobs.find((j) => j.id === id);
     expect(job?.status).toBe("success");
     expect(savedFiles).toEqual(["Tell Your World.adx"]);
+    const entries = unzipSync(new Uint8Array(await savedBlobs[0].arrayBuffer()));
+    expect(Object.keys(entries)).toEqual(["25 CiRCLE/Tell Your World/maidata.txt"]);
   });
 
   test("re-triggering an in-flight job is a no-op (dedupe)", async () => {
@@ -93,6 +102,37 @@ describe("downloads-store", () => {
 
     await waitForSettled(id);
     expect(savedFiles).toHaveLength(1);
+  });
+
+  test("batch download preserves optional version group folders", async () => {
+    const id = batchJobId("AstroDX Charts");
+    useDownloadsStore.getState().startBatch({
+      id,
+      title: "AstroDX Charts",
+      charts: [
+        {
+          groupDir: "25 CiRCLE",
+          dir: "Same Song",
+          files: [{ name: "maidata.txt", url: "https://example.test/circle/maidata.txt" }],
+        },
+        {
+          groupDir: "24 PRiSM PLUS",
+          dir: "Same Song",
+          files: [{ name: "maidata.txt", url: "https://example.test/prism/maidata.txt" }],
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+    });
+
+    await waitForSettled(id);
+
+    const entries = unzipSync(new Uint8Array(await savedBlobs[0].arrayBuffer()));
+    expect(savedFiles).toEqual(["AstroDX Charts.adx"]);
+    expect(Object.keys(entries).sort()).toEqual([
+      "AstroDX Charts/24 PRiSM PLUS/Same Song/maidata.txt",
+      "AstroDX Charts/25 CiRCLE/Same Song/maidata.txt",
+    ]);
   });
 
   test("present/unpresent ref-counts so the tray only shows orphaned jobs", () => {

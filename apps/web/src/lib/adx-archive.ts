@@ -24,6 +24,22 @@ export function getArchiveDownloadFileName(
   return `${trimmed}.${format}`;
 }
 
+function archivePathSegment(value: string): string {
+  const cleaned = value.trim().replace(/[\\/]+/g, "_").replace(/^\.+/, "");
+  return cleaned.length > 0 && cleaned !== "." ? cleaned : "chart";
+}
+
+function withRootDirectory(
+  files: AdxArchiveInput[],
+  directoryName?: string
+): AdxArchiveInput[] {
+  if (!directoryName) {
+    return files;
+  }
+  const root = archivePathSegment(directoryName);
+  return files.map((file) => ({ ...file, name: `${root}/${file.name}` }));
+}
+
 // Output accumulates into a growing Blob rather than one big buffer, so the
 // browser can spill it to disk and peak memory stays a small constant regardless
 // of how large the archive gets. ~4 MB of streamed chunks per merge keeps the
@@ -174,7 +190,8 @@ async function packTarGz(files: AdxArchiveInput[], type: string): Promise<Blob> 
 
 export async function buildArchiveBlob(
   files: AdxArchiveInput[],
-  format: ArchiveFormat = "adx"
+  format: ArchiveFormat = "adx",
+  directoryName?: string
 ): Promise<Blob> {
   if (files.length === 0) {
     throw new Error("Directory is empty");
@@ -184,51 +201,67 @@ export async function buildArchiveBlob(
   // browsers "correct" the download name by appending the canonical extension
   // (e.g. "39.adx.zip"); octet-stream keeps the extension we set on the anchor.
   const type = "application/octet-stream";
-  return format === "tar.gz" ? packTarGz(files, type) : packZip(files, type);
+  const entries = withRootDirectory(files, directoryName);
+  return format === "tar.gz" ? packTarGz(entries, type) : packZip(entries, type);
 }
 
-/** Outer container formats for a batch download (`.adx` is per-chart only, so excluded). */
-export type BatchArchiveFormat = Exclude<ArchiveFormat, "adx">;
+/** Combined archive formats for a batch download. `.adx` is zip-compatible. */
+export type BatchArchiveFormat = ArchiveFormat;
 
-export const BATCH_FORMATS: readonly BatchArchiveFormat[] = ["zip", "tar.gz"];
-
-/** One chart in a batch: a folder name plus its asset files (packed into a single `.adx`). */
-export type NestedChart = { name: string; files: AdxArchiveInput[] };
+export const BATCH_FORMATS: readonly BatchArchiveFormat[] = ["adx", "zip", "tar.gz"];
 
 /**
- * Builds a batch archive: each chart becomes its own `.adx` (a zip of that chart's files),
- * and all the `.adx` files are packed into one outer container (`.zip` by default). Charts
- * are processed one at a time, so peak memory is bounded by a single chart, not the batch.
+ * One chart in a batch: a folder name plus its asset files. `groupDir` inserts
+ * an optional folder above the chart, such as a maimai version in multi-version
+ * downloads.
+ */
+export type NestedChart = { name: string; files: AdxArchiveInput[]; groupDir?: string };
+
+/**
+ * Builds one archive containing multiple chart folders. When `directoryName`
+ * is provided, it becomes the top-level collection folder. Charts may also
+ * carry `groupDir`, yielding paths like:
+ * <collection>/<version>/<chart>/maidata.txt or <version>/<chart>/maidata.txt.
  */
 export async function buildNestedArchiveBlob(
   charts: NestedChart[],
-  format: BatchArchiveFormat = "zip"
+  format: BatchArchiveFormat = "adx",
+  directoryName?: string
 ): Promise<Blob> {
   if (charts.length === 0) {
     throw new Error("No charts selected");
   }
 
-  const used = new Set<string>();
+  const usedByGroup = new Map<string, Set<string>>();
   const entries: AdxArchiveInput[] = [];
   for (const chart of charts) {
     if (chart.files.length === 0) {
       throw new Error(`Chart has no files: ${chart.name}`);
     }
 
-    const adxBlob = await packZip(chart.files, "application/octet-stream");
+    const safeGroupName = chart.groupDir ? archivePathSegment(chart.groupDir) : "";
+    const usedKey = safeGroupName || ".";
+    const used = usedByGroup.get(usedKey) ?? new Set<string>();
+    usedByGroup.set(usedKey, used);
 
-    // Disambiguate the rare case where two selected charts share a directory name.
-    let name = `${chart.name}.adx`;
-    for (let copy = 2; used.has(name); copy += 1) {
-      name = `${chart.name} (${copy}).adx`;
+    // Disambiguate the case where two selected charts share a directory name in
+    // the same group; identical names in different version folders can stay as-is.
+    const safeChartName = archivePathSegment(chart.name);
+    let directoryName = safeChartName;
+    for (let copy = 2; used.has(directoryName); copy += 1) {
+      directoryName = `${safeChartName} (${copy})`;
     }
-    used.add(name);
+    used.add(directoryName);
 
-    entries.push({ name, blob: adxBlob });
+    const chartEntries = withRootDirectory(chart.files, directoryName);
+    entries.push(
+      ...(safeGroupName ? withRootDirectory(chartEntries, safeGroupName) : chartEntries)
+    );
   }
 
   const type = "application/octet-stream";
-  return format === "tar.gz" ? packTarGz(entries, type) : packZip(entries, type);
+  const rootedEntries = withRootDirectory(entries, directoryName);
+  return format === "tar.gz" ? packTarGz(rootedEntries, type) : packZip(rootedEntries, type);
 }
 
 export function saveBlobAsFile(blob: Blob, fileName: string): void {

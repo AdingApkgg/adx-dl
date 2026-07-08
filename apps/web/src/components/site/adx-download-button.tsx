@@ -15,27 +15,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ARCHIVE_FORMATS, type ArchiveFormat } from "@/lib/adx-archive";
-import type { AdxRemoteFile } from "@/lib/adx-directory";
-import { isChartVideoFile } from "@/lib/catalog-shared";
+import { isChartVideoFile, type ChartDownloadSpec } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { downloadJobStatusText } from "./downloads/download-status-text";
 import { formatBytes } from "./downloads/format-bytes";
-import { singleJobId, useDownloadsStore } from "./downloads/downloads-store";
+import { jobPercent, singleJobId, useDownloadsStore } from "./downloads/downloads-store";
 
 type AdxDownloadButtonProps = {
-  /** Files to pack into the .adx (maidata + assets), with their in-archive names. */
-  files: AdxRemoteFile[];
-  /** Base name for the downloaded .adx file (the chart's directory name). */
-  fileName?: string;
+  /** Global chart download spec: chart folder, version folder and packable assets. */
+  spec?: ChartDownloadSpec;
   locale: Locale;
 };
 
-export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButtonProps) {
+export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
   const dictionary = getDictionary(locale);
   const detailDictionary = dictionary.detail;
   const downloadsDictionary = dictionary.downloads;
   const [includeVideo, setIncludeVideo] = React.useState(true);
   const [confirmDiscard, setConfirmDiscard] = React.useState(false);
-  const normalizedFileName = typeof fileName === "string" ? fileName.trim() : "";
+  const files = spec?.files ?? [];
+  const normalizedFileName = typeof spec?.dir === "string" ? spec.dir.trim() : "";
   const canDownload = files.length > 0 && normalizedFileName.length > 0;
 
   // The download runs in a module-level store, so it (and this state) survives a
@@ -55,18 +54,8 @@ export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButton
   const isResumable = status === "paused" || status === "error";
   const progress = { completed: job?.completed ?? 0, total: job?.total ?? 0 };
   const fileProgress = job?.fileProgress ?? [];
-  const resumePercent =
-    job && job.totalBytes > 0
-      ? Math.min(100, Math.round((job.receivedBytes / job.totalBytes) * 100))
-      : 0;
-  const friendlyError =
-    status === "error"
-      ? job?.errorKind === "offline"
-        ? downloadsDictionary.errorOffline
-        : job?.errorKind === "network"
-          ? downloadsDictionary.errorNetwork
-          : downloadsDictionary.errorGeneric
-      : "";
+  const resumePercent = job ? jobPercent(job) : 0;
+  const statusText = job ? downloadJobStatusText(job, detailDictionary, downloadsDictionary) : "";
 
   const hasVideo = files.some((file) => isChartVideoFile(file.name));
 
@@ -95,7 +84,14 @@ export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButton
     if (!canDownload || isBusy) {
       return;
     }
-    startSingle({ id: jobId, title: normalizedFileName, files, includeVideo, format });
+    startSingle({
+      id: jobId,
+      title: normalizedFileName,
+      files,
+      groupDir: spec?.groupDir,
+      includeVideo,
+      format,
+    });
   }
 
   const label =
@@ -204,7 +200,22 @@ export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButton
         </div>
       )}
       <AnimatePresence>
-        {isBusy && fileProgress.length > 0 ? (
+        {job && (isBusy || status === "paused") ? (
+          <motion.p
+            key="job-status"
+            role="status"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2, ease: EASE_OUT }}
+            className="text-xs text-muted-foreground"
+          >
+            {statusText}
+          </motion.p>
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence>
+        {(isBusy || status === "paused") && fileProgress.length > 0 ? (
           <motion.ul
             key="file-progress"
             initial={{ opacity: 0, height: 0 }}
@@ -243,8 +254,12 @@ export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButton
                     <div
                       className={
                         isIndeterminate
-                          ? "h-full w-full animate-pulse rounded-full bg-primary/40"
-                          : "h-full rounded-full bg-primary transition-[width] duration-150 ease-out"
+                          ? status === "paused"
+                            ? "h-full w-full rounded-full bg-primary/30"
+                            : "h-full w-full animate-pulse rounded-full bg-primary/40"
+                          : status === "paused"
+                            ? "h-full rounded-full bg-primary/40 transition-[width] duration-150 ease-out"
+                            : "h-full rounded-full bg-primary transition-[width] duration-150 ease-out"
                       }
                       style={isIndeterminate ? undefined : { width: `${percent}%` }}
                     />
@@ -280,7 +295,7 @@ export function AdxDownloadButton({ files, fileName, locale }: AdxDownloadButton
             className="text-sm text-destructive"
             title={job?.error ?? undefined}
           >
-            {friendlyError}
+            {statusText}
           </motion.p>
         ) : null}
       </AnimatePresence>

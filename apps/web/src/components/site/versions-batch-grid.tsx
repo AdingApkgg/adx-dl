@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import Link from "next/link";
 import useSWR from "swr";
 import { CheckIcon } from "lucide-react";
@@ -9,12 +8,18 @@ import { CheckIcon } from "lucide-react";
 import { AnimatePresence } from "@/components/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
+import { CompatibleImage } from "@/components/site/compatible-image";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { versionRouteId, type ChartDownloadSpec, type VersionGroup } from "@/lib/catalog-shared";
+import {
+  versionRouteId,
+  versionShortName,
+  type ChartDownloadSpec,
+  type VersionGroup,
+} from "@/lib/catalog-shared";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { jsonFetcher } from "@/lib/swr-fetcher";
-import { VERSION_IMAGE_DIMENSIONS, versionImageSrcByIndex } from "@/lib/version-image";
+import { VERSION_IMAGE_DIMENSIONS, versionImageSourcesByIndex } from "@/lib/version-image";
 import { cn } from "@/lib/utils";
 
 // Static (build-time) manifest: per-version chart download specs keyed by
@@ -28,6 +33,19 @@ type VersionsBatchGridProps = {
   versionCharts?: Record<string, ChartDownloadSpec[]>;
   locale: Locale;
 };
+
+export function buildSelectedVersionCharts(
+  groups: VersionGroup[],
+  specs: Record<string, ChartDownloadSpec[]> | undefined,
+  selectedSlugs: ReadonlySet<string>
+): ChartDownloadSpec[] {
+  if (!specs) {
+    return [];
+  }
+
+  const selectedGroups = groups.filter((group) => selectedSlugs.has(group.slug));
+  return selectedGroups.flatMap((group) => specs[group.slug] ?? []);
+}
 
 export function VersionsBatchGrid({
   groups,
@@ -71,21 +89,18 @@ export function VersionsBatchGrid({
   };
 
   // Flatten the selected versions into one chart list for the batch archive.
-  const selectedCharts = React.useMemo(
-    () => (specs ? [...selectedSlugs].flatMap((slug) => specs[slug] ?? []) : []),
-    [selectedSlugs, specs]
-  );
-
-  const selectedNames = groups
-    .filter((group) => selectedSlugs.has(group.slug))
-    .map((group) => (group.name === "Unknown" ? versions.unknownLabel : group.name));
-  const collectionName =
-    selectedNames.length === 1 ? selectedNames[0] : browser.batchDefaultName;
+  // Version folders are part of each global chart download spec.
+  const selectedCharts = buildSelectedVersionCharts(groups, specs, selectedSlugs);
 
   const showBar = selectMode && selectedCharts.length > 0;
 
   return (
-    <div className={cn("flex flex-col gap-4", showBar && "pb-24")}>
+    <div
+      className={cn(
+        "flex flex-col gap-4",
+        showBar && "pb-[calc(var(--batch-download-bar-height,6rem)+2rem)]"
+      )}
+    >
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
@@ -98,7 +113,7 @@ export function VersionsBatchGrid({
         {selectMode ? (
           <>
             <Button type="button" variant="outline" size="sm" onClick={selectAll}>
-              {browser.selectAll}
+              {browser.selectAllVersions(selectableSlugs.length)}
             </Button>
             <span className="text-sm tabular-nums text-muted-foreground">
               {versions.selectedVersionsCount(selectedSlugs.size)}
@@ -125,7 +140,8 @@ export function VersionsBatchGrid({
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
         {groups.map((group) => {
           const label = group.name === "Unknown" ? versions.unknownLabel : group.name;
-          const src = group.imageIndex !== null ? versionImageSrcByIndex(group.imageIndex) : null;
+          const sources =
+            group.imageIndex !== null ? versionImageSourcesByIndex(group.imageIndex) : null;
           const hasCharts = group.count > 0;
           const selectableHere = selectMode && hasCharts;
           const selected = selectedSlugs.has(group.slug);
@@ -155,13 +171,12 @@ export function VersionsBatchGrid({
               )}
             >
               <div className="relative flex aspect-[332/160] items-center justify-center bg-background/60 p-4">
-                {src ? (
-                  <Image
-                    src={src}
+                {sources ? (
+                  <CompatibleImage
+                    sources={sources}
                     alt={label}
                     width={VERSION_IMAGE_DIMENSIONS.width}
                     height={VERSION_IMAGE_DIMENSIONS.height}
-                    unoptimized
                     className={cn(
                       // max-w-full guards against a logo whose aspect is wider
                       // than the tile ever exceeding the column (w-auto alone
@@ -279,7 +294,7 @@ export function VersionsBatchGrid({
         {showBar ? (
           <BatchDownloadBar
             charts={selectedCharts}
-            collectionName={collectionName}
+            collectionName={browser.batchDefaultName}
             locale={locale}
             onClear={clear}
           />
@@ -305,11 +320,6 @@ function versionEraCabinet(imageIndex: number | null): "DX" | "ST" | null {
     return null;
   }
   return imageIndex >= DX_ERA_MIN_INDEX ? "DX" : "ST";
-}
-
-/** Version name without its "maimai" / "maimai DX" era prefix (shown as an icon). */
-function versionShortName(name: string): string {
-  return name.replace(/^maimai(?:\s+DX)?\s*/i, "").trim();
 }
 
 function ScrollingLabel({

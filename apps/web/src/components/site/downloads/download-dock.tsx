@@ -15,8 +15,8 @@ import {
 import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { formatBytes } from "./format-bytes";
-import { jobPercent, useDownloadsStore, type DownloadJob } from "./downloads-store";
+import { jobPercent, useDownloadsStore } from "./downloads-store";
+import { downloadJobStatusText } from "./download-status-text";
 
 /**
  * Dismissing a job that still holds resumable bytes (paused/error) or is
@@ -66,40 +66,6 @@ function ConfirmDismissButton({
   );
 }
 
-/** Localized status line for a job, with byte counts and speed while active. */
-function jobStatusText(
-  job: DownloadJob,
-  detail: ReturnType<typeof getDictionary>["detail"],
-  tray: ReturnType<typeof getDictionary>["downloads"]
-): string {
-  const percent = jobPercent(job);
-  switch (job.status) {
-    case "packing": {
-      const counts = detail.downloadPacking(job.completed, job.total);
-      const bytes =
-        job.receivedBytes > 0
-          ? job.totalBytes > 0
-            ? ` · ${formatBytes(job.receivedBytes)} / ${formatBytes(job.totalBytes)}`
-            : ` · ${formatBytes(job.receivedBytes)}`
-          : "";
-      const speed = job.speedBps > 1024 ? ` · ${formatBytes(job.speedBps)}/s` : "";
-      return `${counts}${bytes}${speed}`;
-    }
-    case "archiving":
-      return tray.archiving;
-    case "success":
-      return tray.completed;
-    case "paused":
-      return `${tray.paused} · ${percent}%`;
-    case "error":
-      return job.errorKind === "offline"
-        ? tray.errorOffline
-        : job.errorKind === "network"
-          ? tray.errorNetwork
-          : tray.errorGeneric;
-  }
-}
-
 /**
  * A floating tray that keeps download progress visible no matter which page the
  * user is on. It shows jobs whose inline owner (the chart page button or the
@@ -141,10 +107,16 @@ export function DownloadDock({ locale }: { locale: Locale }) {
         // Safe-area aware, and lifted above the batch bar when one is on screen
         // so the two fixed bottom surfaces never overlap on phones.
         "pointer-events-none fixed right-4 z-50 flex w-full max-w-xs flex-col items-end gap-2",
-        bottomBars > 0
-          ? "bottom-[max(6rem,calc(env(safe-area-inset-bottom)+5rem))]"
-          : "bottom-[max(1rem,env(safe-area-inset-bottom))]"
+        bottomBars > 0 ? "" : "bottom-[max(1rem,env(safe-area-inset-bottom))]"
       )}
+      style={
+        bottomBars > 0
+          ? {
+              bottom:
+                "calc(var(--batch-download-bar-height, 5rem) + max(1rem, env(safe-area-inset-bottom)) + 0.75rem)",
+            }
+          : undefined
+      }
     >
       <AnimatePresence initial={false}>
         {visible.length > 0 ? (
@@ -196,7 +168,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                     const percent = jobPercent(job);
                     const resumable = job.status === "paused" || job.status === "error";
                     const active = job.status === "packing";
-                    const statusText = jobStatusText(job, detail, tray);
+                    const statusText = downloadJobStatusText(job, detail, tray);
 
                     return (
                       <motion.li
