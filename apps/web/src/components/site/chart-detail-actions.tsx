@@ -14,7 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { formatEntryTitle, type CatalogEntry } from "@/lib/catalog-shared";
+import { formatEntryTitle, localChartAssetUrl, type CatalogEntry } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,18 @@ type ChartDetailActionsProps = {
   locale: Locale;
 };
 
+export function getChartPreviewAssets(entry: CatalogEntry) {
+  return {
+    maidataUrl: localChartAssetUrl(entry, "maidata.txt"),
+    coverUrl:
+      entry.assets.has_background || Boolean(entry.media.cover_url)
+        ? localChartAssetUrl(entry, "bg.png")
+        : undefined,
+    audioUrl: entry.media.audio_url || undefined,
+    videoUrl: entry.media.pv_url || undefined,
+  };
+}
+
 export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
   const [activePanel, setActivePanel] = React.useState<DetailPanel>(null);
   const dictionary = getDictionary(locale);
@@ -33,6 +45,7 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
   const closeLabel = dictionary.downloads.dismiss;
   const title = formatEntryTitle(entry, locale);
   const mediaLabel = entry.assets.has_pv ? detail.pvLabel : detail.audioLabel;
+  const previewAssets = getChartPreviewAssets(entry);
   const hasMedia =
     (entry.assets.has_pv && Boolean(entry.media.pv_url)) ||
     (entry.assets.has_audio && Boolean(entry.media.audio_url));
@@ -82,11 +95,13 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
         onClose={() => setActivePanel(null)}
       >
         <ChartPreviewIsland
-          maidataUrl={entry.files.maidata}
-          audioUrl={entry.media.audio_url || undefined}
-          videoUrl={entry.media.pv_url || entry.files.pv || undefined}
+          maidataUrl={previewAssets.maidataUrl}
+          audioUrl={previewAssets.audioUrl}
+          videoUrl={previewAssets.videoUrl}
+          coverUrl={previewAssets.coverUrl}
           chartName={`${entry.short_id || entry.id}-${title}`}
           locale={locale}
+          deferUntilNearViewport={false}
           levels={Object.fromEntries(entry.difficulties.map((d) => [d.slot, d.level]))}
           defaultDifficulty={
             entry.difficulties.length > 0

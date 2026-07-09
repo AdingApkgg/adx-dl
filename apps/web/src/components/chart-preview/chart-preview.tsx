@@ -33,6 +33,7 @@ export type ChartPreviewProps = {
   maidataUrl: string;
   audioUrl?: string;
   videoUrl?: string;
+  coverUrl?: string;
   chartName?: string;
   defaultDifficulty?: number;
   /** Difficulty slot (2–6) → level string, from the catalog. */
@@ -90,6 +91,7 @@ export function ChartPreview({
   maidataUrl,
   audioUrl,
   videoUrl,
+  coverUrl,
   chartName = "chart",
   defaultDifficulty,
   levels,
@@ -434,7 +436,7 @@ export function ChartPreview({
           : "flex flex-col gap-4",
       )}
     >
-      <ChartCanvas videoUrl={videoUrl} chartName={chartName} t={t} />
+      <ChartCanvas videoUrl={videoUrl} coverUrl={coverUrl} chartName={chartName} t={t} />
 
       {!isFullscreen ? (
         <>

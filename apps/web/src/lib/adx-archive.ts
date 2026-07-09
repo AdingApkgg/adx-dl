@@ -11,6 +11,16 @@ export type ArchiveFormat = "adx" | "zip" | "tar.gz";
 
 export const ARCHIVE_FORMATS: readonly ArchiveFormat[] = ["adx", "zip", "tar.gz"];
 
+export type ArchiveProgress = {
+  completedFiles: number;
+  totalFiles: number;
+  writtenBytes: number;
+  totalBytes: number;
+  currentFile: string | null;
+};
+
+type ArchiveProgressCallback = (progress: ArchiveProgress) => void;
+
 export function getArchiveDownloadFileName(
   directoryName: string,
   format: ArchiveFormat = "adx"
@@ -50,6 +60,50 @@ type BlobSink = {
   push: (chunk: Uint8Array) => void;
   finish: (type: string) => Blob;
 };
+
+function createProgressReporter(
+  files: AdxArchiveInput[],
+  onProgress?: ArchiveProgressCallback
+) {
+  let completedFiles = 0;
+  let writtenBytes = 0;
+  let currentFile: string | null = null;
+  const totalFiles = files.length;
+  const totalBytes = files.reduce((sum, file) => sum + file.blob.size, 0);
+
+  const emit = () => {
+    onProgress?.({
+      completedFiles,
+      totalFiles,
+      writtenBytes,
+      totalBytes,
+      currentFile,
+    });
+  };
+
+  return {
+    startFile(name: string) {
+      currentFile = name;
+      emit();
+    },
+    addBytes(count: number) {
+      writtenBytes += count;
+      emit();
+    },
+    finishFile(name: string) {
+      completedFiles += 1;
+      currentFile = name;
+      emit();
+    },
+    finish() {
+      completedFiles = totalFiles;
+      writtenBytes = totalBytes;
+      currentFile = null;
+      emit();
+    },
+    emit,
+  };
+}
 
 function createBlobSink(): BlobSink {
   let blob = new Blob([]);
@@ -92,8 +146,14 @@ async function streamBlob(blob: Blob, onChunk: (chunk: Uint8Array) => void): Pro
  * STORE also lets fflate pass bytes straight through with negligible buffering.
  * `.adx` and `.zip` are byte-for-byte the same archive; only the extension differs.
  */
-async function packZip(files: AdxArchiveInput[], type: string): Promise<Blob> {
+async function packZip(
+  files: AdxArchiveInput[],
+  type: string,
+  onProgress?: ArchiveProgressCallback
+): Promise<Blob> {
   const sink = createBlobSink();
+  const progress = createProgressReporter(files, onProgress);
+  progress.emit();
   let zipError: Error | null = null;
   const zip = new Zip((err, data) => {
     if (err) {
@@ -109,14 +169,20 @@ async function packZip(files: AdxArchiveInput[], type: string): Promise<Blob> {
     }
     const entry = new ZipPassThrough(file.name);
     zip.add(entry);
-    await streamBlob(file.blob, (chunk) => entry.push(chunk));
+    progress.startFile(file.name);
+    await streamBlob(file.blob, (chunk) => {
+      entry.push(chunk);
+      progress.addBytes(chunk.length);
+    });
     entry.push(new Uint8Array(0), true);
+    progress.finishFile(file.name);
   }
 
   zip.end();
   if (zipError) {
     throw zipError;
   }
+  progress.finish();
   return sink.finish(type);
 }
 
@@ -170,28 +236,41 @@ function tarHeader(name: string, size: number): Uint8Array {
 }
 
 /** Streams entries into a gzip-compressed USTAR tar, holding only a window in RAM. */
-async function packTarGz(files: AdxArchiveInput[], type: string): Promise<Blob> {
+async function packTarGz(
+  files: AdxArchiveInput[],
+  type: string,
+  onProgress?: ArchiveProgressCallback
+): Promise<Blob> {
   const sink = createBlobSink();
+  const progress = createProgressReporter(files, onProgress);
+  progress.emit();
   const gzip = new Gzip({ mtime: 0 }, (data) => sink.push(data));
 
   for (const file of files) {
     const size = file.blob.size;
+    progress.startFile(file.name);
     gzip.push(tarHeader(file.name, size), false);
-    await streamBlob(file.blob, (chunk) => gzip.push(chunk, false));
+    await streamBlob(file.blob, (chunk) => {
+      gzip.push(chunk, false);
+      progress.addBytes(chunk.length);
+    });
     const remainder = size % 512;
     if (remainder !== 0) {
       gzip.push(new Uint8Array(512 - remainder), false); // pad data to a 512-byte boundary
     }
+    progress.finishFile(file.name);
   }
 
   gzip.push(new Uint8Array(1024), true); // two zero blocks mark end of archive + final flush
+  progress.finish();
   return sink.finish(type);
 }
 
 export async function buildArchiveBlob(
   files: AdxArchiveInput[],
   format: ArchiveFormat = "adx",
-  directoryName?: string
+  directoryName?: string,
+  onProgress?: ArchiveProgressCallback
 ): Promise<Blob> {
   if (files.length === 0) {
     throw new Error("Directory is empty");
@@ -202,7 +281,7 @@ export async function buildArchiveBlob(
   // (e.g. "39.adx.zip"); octet-stream keeps the extension we set on the anchor.
   const type = "application/octet-stream";
   const entries = withRootDirectory(files, directoryName);
-  return format === "tar.gz" ? packTarGz(entries, type) : packZip(entries, type);
+  return format === "tar.gz" ? packTarGz(entries, type, onProgress) : packZip(entries, type, onProgress);
 }
 
 /** Combined archive formats for a batch download. `.adx` is zip-compatible. */
@@ -226,7 +305,8 @@ export type NestedChart = { name: string; files: AdxArchiveInput[]; groupDir?: s
 export async function buildNestedArchiveBlob(
   charts: NestedChart[],
   format: BatchArchiveFormat = "adx",
-  directoryName?: string
+  directoryName?: string,
+  onProgress?: ArchiveProgressCallback
 ): Promise<Blob> {
   if (charts.length === 0) {
     throw new Error("No charts selected");
@@ -261,7 +341,9 @@ export async function buildNestedArchiveBlob(
 
   const type = "application/octet-stream";
   const rootedEntries = withRootDirectory(entries, directoryName);
-  return format === "tar.gz" ? packTarGz(rootedEntries, type) : packZip(rootedEntries, type);
+  return format === "tar.gz"
+    ? packTarGz(rootedEntries, type, onProgress)
+    : packZip(rootedEntries, type, onProgress);
 }
 
 export function saveBlobAsFile(blob: Blob, fileName: string): void {

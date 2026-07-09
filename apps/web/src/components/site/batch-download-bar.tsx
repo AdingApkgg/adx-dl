@@ -204,7 +204,7 @@ export function BatchDownloadBar({
                   <Button type="button" size="sm" disabled={!canDownload || isBusy}>
                     <DownloadIcon data-icon="inline-start" />
                     {status === "archiving"
-                      ? tray.archiving
+                      ? `${tray.archiving} · ${percent}%`
                       : isBusy
                         ? detail.downloadPacking(progress.completed, progress.total)
                         : browser.batchDownload}
@@ -312,10 +312,16 @@ export function BatchDownloadBar({
             >
               <div
                 role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={percent}
                 aria-label={collectionName}
                 className="h-1.5 overflow-hidden rounded-full bg-muted"
               >
-                <div className="h-full w-full animate-pulse rounded-full bg-primary/60" />
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-150 ease-out"
+                  style={{ width: `${percent}%` }}
+                />
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground">{statusText}</p>
             </motion.div>

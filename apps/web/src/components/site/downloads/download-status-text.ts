@@ -24,8 +24,17 @@ export function downloadJobStatusText(
       const speed = job.speedBps > 1024 ? ` · ${formatBytes(job.speedBps)}/s` : "";
       return `${counts}${bytes}${speed}`;
     }
-    case "archiving":
-      return tray.archiving;
+    case "archiving": {
+      const counts = job.total > 0 ? ` · ${job.completed}/${job.total}` : "";
+      const bytes =
+        job.receivedBytes > 0 || job.totalBytes > 0
+          ? job.totalBytes > 0
+            ? ` · ${formatBytes(job.receivedBytes)} / ${formatBytes(job.totalBytes)}`
+            : ` · ${formatBytes(job.receivedBytes)}`
+          : "";
+      const currentFile = job.archiveCurrentFile ? ` · ${job.archiveCurrentFile}` : "";
+      return `${tray.archiving} · ${percent}%${counts}${bytes}${currentFile}`;
+    }
     case "success":
       return tray.completed;
     case "paused":

@@ -6,6 +6,7 @@ import {
   buildNestedArchiveBlob,
   getArchiveDownloadFileName,
   saveBlobAsFile,
+  type ArchiveProgress,
 } from "./adx-archive";
 
 async function flushAsyncWork(): Promise<void> {
@@ -71,6 +72,32 @@ describe("adx archive", () => {
     const zip = await bytes(await buildArchiveBlob(inputs, "zip"));
 
     expect(adx).toEqual(zip);
+  });
+
+  test("reports deterministic archive progress while writing entries", async () => {
+    const progress: ArchiveProgress[] = [];
+    await buildArchiveBlob(
+      [entry("maidata.txt", "&title=39"), entry("track.mp3", new Uint8Array([1, 2, 3]))],
+      "adx",
+      "39",
+      (snapshot) => progress.push({ ...snapshot })
+    );
+
+    expect(progress[0]).toEqual({
+      completedFiles: 0,
+      totalFiles: 2,
+      writtenBytes: 0,
+      totalBytes: 12,
+      currentFile: null,
+    });
+    expect(progress.some((snapshot) => snapshot.currentFile === "39/maidata.txt")).toBe(true);
+    expect(progress.at(-1)).toEqual({
+      completedFiles: 2,
+      totalFiles: 2,
+      writtenBytes: 12,
+      totalBytes: 12,
+      currentFile: null,
+    });
   });
 
   test("builds a gzip-compressed tar with files inside the chart directory", async () => {

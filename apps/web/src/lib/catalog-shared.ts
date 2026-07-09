@@ -142,7 +142,7 @@ function chartRouteId(entry: Pick<CatalogEntry, "id" | "slug" | "short_id">): st
   return entry.slug?.trim() || entry.short_id?.trim() || entry.id;
 }
 
-function localChartAssetUrl(
+export function localChartAssetUrl(
   entry: Pick<CatalogEntry, "id" | "slug" | "short_id">,
   fileName: "bg.png" | "maidata.txt"
 ): string {

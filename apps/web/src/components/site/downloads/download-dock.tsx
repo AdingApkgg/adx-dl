@@ -239,7 +239,9 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                         >
                           {statusText}
                         </p>
-                        {job.status === "packing" || job.status === "paused" ? (
+                        {job.status === "packing" ||
+                        job.status === "paused" ||
+                        job.status === "archiving" ? (
                           <div
                             role="progressbar"
                             aria-valuemin={0}
@@ -256,14 +258,6 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                               }
                               style={{ width: `${percent}%` }}
                             />
-                          </div>
-                        ) : job.status === "archiving" ? (
-                          <div
-                            role="progressbar"
-                            aria-label={job.title}
-                            className="h-1.5 overflow-hidden rounded-full bg-muted"
-                          >
-                            <div className="h-full w-full animate-pulse rounded-full bg-primary/60" />
                           </div>
                         ) : null}
                       </motion.li>

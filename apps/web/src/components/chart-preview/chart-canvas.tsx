@@ -21,19 +21,22 @@ export const EXPORT_FRAME_EVENT = "astrodx-chart-export-frame";
 export const COPY_FRAME_EVENT = "astrodx-chart-copy-frame";
 
 export type ChartCanvasProps = {
-  /** PV video URL (entry.files.pv); drawn behind the chart when `showVideo` is on. */
+  /** PV video URL; drawn behind the chart when `showVideo` is on. */
   videoUrl?: string;
+  /** Local bg.png URL; drawn behind the chart as the static background. */
+  coverUrl?: string;
   /** Used to name exported PNG files. */
   chartName?: string;
   /** Localized strings for toasts and the canvas label. */
   t: PreviewDict;
 };
 
-export function ChartCanvas({ videoUrl, chartName = "chart", t }: ChartCanvasProps) {
+export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: ChartCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<MainRenderer | null>(null);
   const bgVideoRef = useRef<HTMLVideoElement>(null);
+  const bgImageRef = useRef<HTMLImageElement | null>(null);
 
   const animationFrameRef = useRef<number | null>(null);
   const playbackStartTimeRef = useRef<number>(0);
@@ -209,6 +212,9 @@ export function ChartCanvas({ videoUrl, chartName = "chart", t }: ChartCanvasPro
     // 经内部 TimingTimeline 推导（setBpm 也随之移除）。
     const renderer = new MainRenderer(canvas);
     renderer.setIsPlaying(useGameStore.getState().isPlaying);
+    if (bgImageRef.current?.complete && bgImageRef.current.naturalWidth > 0) {
+      renderer.setBackgroundImage(bgImageRef.current);
+    }
     rendererRef.current = renderer;
 
     const settingsState = useGameSettingsStore.getState();
@@ -249,6 +255,44 @@ export function ChartCanvas({ videoUrl, chartName = "chart", t }: ChartCanvasPro
     };
     // 渲染器不再依赖 bpm 构造，创建一次即可（bpm 每帧由 chart 传入）。
   }, [renderFrame]);
+
+  // 背景封面：作为 PV 尚未进入时间窗或未加载时的静态底图。
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    if (!coverUrl) {
+      bgImageRef.current = null;
+      renderer?.setBackgroundImage(null);
+      renderFrame(playbackTimeRef.current);
+      return;
+    }
+
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.decoding = "async";
+    bgImageRef.current = image;
+
+    const refresh = () => {
+      if (bgImageRef.current !== image) return;
+      rendererRef.current?.setBackgroundImage(image);
+      if (!useGameStore.getState().isPlaying) {
+        renderFrame(playbackTimeRef.current);
+      }
+    };
+
+    image.addEventListener("load", refresh);
+    image.addEventListener("error", refresh);
+    image.src = coverUrl;
+    if (image.complete) refresh();
+
+    return () => {
+      image.removeEventListener("load", refresh);
+      image.removeEventListener("error", refresh);
+      if (bgImageRef.current === image) {
+        bgImageRef.current = null;
+        rendererRef.current?.setBackgroundImage(null);
+      }
+    };
+  }, [coverUrl, renderFrame]);
 
   // 全屏 / 画质：重设最大像素并 resize。
   useEffect(() => {

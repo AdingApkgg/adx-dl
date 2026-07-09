@@ -6,6 +6,7 @@ import {
   getArchiveDownloadFileName,
   saveBlobAsFile,
   type AdxArchiveInput,
+  type ArchiveProgress,
   type ArchiveFormat,
   type BatchArchiveFormat,
 } from "@/lib/adx-archive";
@@ -57,6 +58,8 @@ export type DownloadJob = {
   speedBps: number;
   /** Per-file byte progress; only populated for single-chart downloads. */
   fileProgress: AdxFileProgress[];
+  /** Current in-archive file while locally writing the final .adx/.zip/.tar.gz. */
+  archiveCurrentFile: string | null;
   error: string | null;
   /** Coarse cause so the UI can show a friendly, localized message. */
   errorKind: "offline" | "network" | "unknown" | null;
@@ -119,6 +122,7 @@ let hydrated = false;
 
 /** Minimum sampling window before updating the rate estimate. */
 const SPEED_SAMPLE_MS = 500;
+const ARCHIVE_PROGRESS_SAMPLE_MS = 100;
 
 /** Fraction 0–100, preferring byte-level totals and falling back to file counts. */
 export function jobPercent(job: DownloadJob): number {
@@ -194,7 +198,13 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
     const controller = new AbortController();
     abortControllers.set(id, controller);
     speedSamples.delete(id);
-    patchJob(id, { status: "packing", error: null, errorKind: null, speedBps: 0 });
+    patchJob(id, {
+      status: "packing",
+      error: null,
+      errorKind: null,
+      speedBps: 0,
+      archiveCurrentFile: null,
+    });
 
     try {
       const archiveInputs = await runResumableDownload(inputs, {
@@ -239,21 +249,54 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
 
       // All bytes are on hand; building the archive can take a while for big
       // batches, so surface it as its own phase instead of a full, frozen bar.
-      patchJob(id, { status: "archiving", speedBps: 0 });
+      const archiveTotalBytes = archiveInputs.reduce((sum, input) => sum + input.blob.size, 0);
+      patchJob(id, {
+        status: "archiving",
+        completed: 0,
+        total: archiveInputs.length,
+        receivedBytes: 0,
+        totalBytes: archiveTotalBytes,
+        speedBps: 0,
+        archiveCurrentFile: null,
+      });
+
+      let lastArchiveProgressAt = 0;
+      const onArchiveProgress = (progress: ArchiveProgress): void => {
+        const now = Date.now();
+        const isFinal =
+          progress.completedFiles >= progress.totalFiles &&
+          progress.writtenBytes >= progress.totalBytes;
+        if (!isFinal && now - lastArchiveProgressAt < ARCHIVE_PROGRESS_SAMPLE_MS) {
+          return;
+        }
+        lastArchiveProgressAt = now;
+        patchJob(id, {
+          completed: progress.completedFiles,
+          total: progress.totalFiles,
+          receivedBytes: progress.writtenBytes,
+          totalBytes: progress.totalBytes,
+          archiveCurrentFile: progress.currentFile,
+          speedBps: 0,
+        });
+      };
 
       const format = spec.format as ArchiveFormat;
       const archiveBlob =
         spec.kind === "batch"
           ? await buildNestedArchiveBlob(
               regroupBatch(archiveInputs, spec.dirByIndex ?? [], spec.groupByIndex ?? []),
-              format as BatchArchiveFormat
+              format as BatchArchiveFormat,
+              undefined,
+              onArchiveProgress
             )
           : spec.groupDir
             ? await buildNestedArchiveBlob(
                 [{ name: spec.title, groupDir: spec.groupDir, files: archiveInputs }],
-                format
+                format,
+                undefined,
+                onArchiveProgress
               )
-          : await buildArchiveBlob(archiveInputs, format, spec.title);
+          : await buildArchiveBlob(archiveInputs, format, spec.title, onArchiveProgress);
 
       saveBlobAsFile(archiveBlob, getArchiveDownloadFileName(spec.title, format));
 
@@ -278,6 +321,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         error: error instanceof Error ? error.message : "Unknown error",
         errorKind: classifyError(error),
         speedBps: 0,
+        archiveCurrentFile: null,
       });
     }
   };
@@ -309,6 +353,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
               status: "pending",
             }))
           : [],
+      archiveCurrentFile: null,
       error: null,
       errorKind: null,
       startedAt: Date.now(),
@@ -465,6 +510,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
             totalBytes: totalKnown ? totalBytes : 0,
             speedBps: 0,
             fileProgress,
+            archiveCurrentFile: null,
             error: null,
             errorKind: null,
             startedAt: Date.now(),

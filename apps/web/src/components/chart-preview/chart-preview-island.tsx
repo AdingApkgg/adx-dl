@@ -23,14 +23,21 @@ function ChartPreviewPlaceholder() {
   );
 }
 
-export function ChartPreviewIsland(props: ChartPreviewProps) {
+type ChartPreviewIslandProps = ChartPreviewProps & {
+  deferUntilNearViewport?: boolean;
+};
+
+export function ChartPreviewIsland({
+  deferUntilNearViewport = true,
+  ...props
+}: ChartPreviewIslandProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   // Defer the whole player (engine chunk, canvas, chart fetch) until the card
   // scrolls near the viewport; until then only the placeholder is mounted.
-  const [nearViewport, setNearViewport] = useState(false);
+  const [nearViewport, setNearViewport] = useState(!deferUntilNearViewport);
 
   useEffect(() => {
-    if (nearViewport) return;
+    if (!deferUntilNearViewport || nearViewport) return;
     const el = hostRef.current;
     if (!el) return;
     if (typeof IntersectionObserver === "undefined") {
@@ -51,7 +58,7 @@ export function ChartPreviewIsland(props: ChartPreviewProps) {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [nearViewport]);
+  }, [deferUntilNearViewport, nearViewport]);
 
   return (
     <div ref={hostRef}>

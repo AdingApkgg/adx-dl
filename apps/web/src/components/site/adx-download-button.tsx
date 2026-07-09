@@ -54,7 +54,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
   const isResumable = status === "paused" || status === "error";
   const progress = { completed: job?.completed ?? 0, total: job?.total ?? 0 };
   const fileProgress = job?.fileProgress ?? [];
-  const resumePercent = job ? jobPercent(job) : 0;
+  const percent = job ? jobPercent(job) : 0;
   const statusText = job ? downloadJobStatusText(job, detailDictionary, downloadsDictionary) : "";
 
   const hasVideo = files.some((file) => isChartVideoFile(file.name));
@@ -110,7 +110,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
           <Button type="button" onClick={() => resume(jobId)}>
             <RotateCwIcon data-icon="inline-start" />
             {downloadsDictionary.resume}
-            {resumePercent > 0 ? ` · ${resumePercent}%` : null}
+            {percent > 0 ? ` · ${percent}%` : null}
           </Button>
           <Button
             type="button"
@@ -215,7 +215,30 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
         ) : null}
       </AnimatePresence>
       <AnimatePresence>
-        {(isBusy || status === "paused") && fileProgress.length > 0 ? (
+        {status === "archiving" ? (
+          <motion.div
+            key="archive-progress"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: EASE_OUT }}
+            className="overflow-hidden"
+          >
+            <div
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={percent}
+              aria-label={normalizedFileName}
+              className="h-1.5 overflow-hidden rounded-full bg-muted"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-150 ease-out"
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+          </motion.div>
+        ) : (status === "packing" || status === "paused") && fileProgress.length > 0 ? (
           <motion.ul
             key="file-progress"
             initial={{ opacity: 0, height: 0 }}

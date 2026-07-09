@@ -17,6 +17,7 @@ import {
   ChartsPageView,
   HomePageView,
 } from "@/components/site/page-views";
+import { getChartPreviewAssets } from "@/components/site/chart-detail-actions";
 import type { Catalog } from "@/lib/catalog-shared";
 import type { CatalogEntry } from "@/lib/catalog-shared";
 import { getDictionary } from "@/lib/i18n";
@@ -204,6 +205,34 @@ describe("page views locale-driven content", () => {
     expect(html).not.toContain(`src="/covers/${slug}/pv.mp4"`);
     expect(html).not.toContain("<audio");
     expect(html).not.toContain(`src="/covers/${slug}/track.mp3"`);
+  });
+
+  test("detail preview uses local chart assets plus remote media URLs", () => {
+    const entry = buildEntry({
+      id: "source-dir-name",
+      slug: "11951",
+      short_id: "11951",
+      files: {
+        maidata: "nested/maidata.txt",
+        maidata_dx: "nested/maidata-dx.txt",
+        audio: "nested/track.mp3",
+        background: "nested/bg.png",
+        pv: "nested/pv.mp4",
+      },
+      media: {
+        entry_base_url: "https://adxcs.saop.cc/charts/11951",
+        cover_url: "https://adxcs.saop.cc/charts/11951/bg.png",
+        audio_url: "https://adxcs.saop.cc/charts/11951/track.mp3",
+        pv_url: "https://adxcs.saop.cc/charts/11951/pv.mp4",
+      },
+    });
+
+    expect(getChartPreviewAssets(entry)).toEqual({
+      maidataUrl: "/adxcs/11951/maidata.txt",
+      coverUrl: "/adxcs/11951/bg.png",
+      audioUrl: "https://adxcs.saop.cc/charts/11951/track.mp3",
+      videoUrl: "https://adxcs.saop.cc/charts/11951/pv.mp4",
+    });
   });
 
   test("detail view omits the media action when no audio or PV", () => {
