@@ -151,7 +151,7 @@ describe("adx archive", () => {
     expect(strFromU8(entries["Version 2026/Song B/maidata.txt"])).toBe("&title=B");
   });
 
-  test("multi-version batch keeps version folders between the collection and charts", async () => {
+  test("multi-version batch starts at version folders without a collection wrapper", async () => {
     const blob = await buildNestedArchiveBlob(
       [
         {
@@ -165,19 +165,16 @@ describe("adx archive", () => {
           files: [entry("maidata.txt", "&title=Prism Plus")],
         },
       ],
-      "adx",
-      "AstroDX Charts"
+      "adx"
     );
 
     const entries = unzipSync(await bytes(blob));
     expect(Object.keys(entries).sort()).toEqual([
-      "AstroDX Charts/24 PRiSM PLUS/Same Song/maidata.txt",
-      "AstroDX Charts/25 CiRCLE/Same Song/maidata.txt",
+      "24 PRiSM PLUS/Same Song/maidata.txt",
+      "25 CiRCLE/Same Song/maidata.txt",
     ]);
-    expect(strFromU8(entries["AstroDX Charts/25 CiRCLE/Same Song/maidata.txt"])).toBe(
-      "&title=Circle"
-    );
-    expect(strFromU8(entries["AstroDX Charts/24 PRiSM PLUS/Same Song/maidata.txt"])).toBe(
+    expect(strFromU8(entries["25 CiRCLE/Same Song/maidata.txt"])).toBe("&title=Circle");
+    expect(strFromU8(entries["24 PRiSM PLUS/Same Song/maidata.txt"])).toBe(
       "&title=Prism Plus"
     );
   });

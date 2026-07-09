@@ -130,8 +130,8 @@ describe("downloads-store", () => {
     const entries = unzipSync(new Uint8Array(await savedBlobs[0].arrayBuffer()));
     expect(savedFiles).toEqual(["AstroDX Charts.adx"]);
     expect(Object.keys(entries).sort()).toEqual([
-      "AstroDX Charts/24 PRiSM PLUS/Same Song/maidata.txt",
-      "AstroDX Charts/25 CiRCLE/Same Song/maidata.txt",
+      "24 PRiSM PLUS/Same Song/maidata.txt",
+      "25 CiRCLE/Same Song/maidata.txt",
     ]);
   });
 

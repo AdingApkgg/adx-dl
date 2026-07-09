@@ -246,8 +246,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         spec.kind === "batch"
           ? await buildNestedArchiveBlob(
               regroupBatch(archiveInputs, spec.dirByIndex ?? [], spec.groupByIndex ?? []),
-              format as BatchArchiveFormat,
-              spec.title
+              format as BatchArchiveFormat
             )
           : spec.groupDir
             ? await buildNestedArchiveBlob(
