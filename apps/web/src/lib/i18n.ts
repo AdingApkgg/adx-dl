@@ -220,6 +220,8 @@ export type SiteDictionary = {
     commentsLoading: string;
     commentsError: string;
     commentsRetry: string;
+    share: string;
+    shareCopied: string;
   };
   /** Floating tray that keeps download progress visible after navigating between pages. */
   downloads: {
@@ -608,6 +610,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       commentsLoading: "评论加载中…",
       commentsError: "评论加载失败，请检查网络连接后重试。",
       commentsRetry: "重试",
+      share: "分享",
+      shareCopied: "链接已复制",
     },
     downloads: {
       trayTitle: "下载",
@@ -987,6 +991,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       commentsLoading: "Loading comments…",
       commentsError: "Comments failed to load. Check your connection and try again.",
       commentsRetry: "Retry",
+      share: "Share",
+      shareCopied: "Link copied",
     },
     downloads: {
       trayTitle: "Downloads",
@@ -1382,6 +1388,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       commentsLoading: "コメントを読み込み中…",
       commentsError: "コメントを読み込めませんでした。接続を確認して再試行してください。",
       commentsRetry: "再試行",
+      share: "共有",
+      shareCopied: "リンクをコピーしました",
     },
     downloads: {
       trayTitle: "ダウンロード",

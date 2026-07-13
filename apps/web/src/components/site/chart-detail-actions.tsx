@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { FilmIcon, Maximize2Icon, MessageCircleIcon, XIcon } from "lucide-react";
+import { CheckIcon, FilmIcon, Maximize2Icon, MessageCircleIcon, Share2Icon, XIcon } from "lucide-react";
 
 import { ChartPreviewIsland } from "@/components/chart-preview/chart-preview-island";
 import {
@@ -60,6 +60,47 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
     (entry.assets.has_audio && Boolean(entry.media.audio_url));
   const hasChartPreview = Boolean(entry.files.maidata);
   const portalRoot = typeof document === "undefined" ? null : document.body;
+
+  const [shareCopied, setShareCopied] = React.useState(false);
+  const shareResetTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (shareResetTimer.current) {
+        clearTimeout(shareResetTimer.current);
+      }
+    };
+  }, []);
+
+  const handleShare = React.useCallback(async () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const url = window.location.href;
+    // Prefer the native share sheet where available (mostly mobile).
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title, url });
+        return;
+      } catch (error) {
+        // The user dismissing the sheet is a normal outcome, not a failure.
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        // Any other failure falls through to the clipboard path below.
+      }
+    }
+    try {
+      await navigator.clipboard?.writeText(url);
+      setShareCopied(true);
+      if (shareResetTimer.current) {
+        clearTimeout(shareResetTimer.current);
+      }
+      shareResetTimer.current = setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      // Clipboard access denied — nothing more we can do silently.
+    }
+  }, [title]);
 
   React.useEffect(() => {
     if (!activePanel) {
@@ -149,6 +190,16 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
           ) : null}
           <ActionIconButton label={detail.comments} onClick={() => setActivePanel("comments")}>
             <MessageCircleIcon aria-hidden="true" />
+          </ActionIconButton>
+          <ActionIconButton
+            label={shareCopied ? detail.shareCopied : detail.share}
+            onClick={handleShare}
+          >
+            {shareCopied ? (
+              <CheckIcon aria-hidden="true" />
+            ) : (
+              <Share2Icon aria-hidden="true" />
+            )}
           </ActionIconButton>
         </div>
       </TooltipProvider>
