@@ -22,7 +22,11 @@ node_modules/
 apps/web/.next/
 apps/web/out/
 apps/web/public/covers/
-apps/web/public/adxcs/
+# adxcs holds committed maidata.txt (served same-origin); bg.png and any other
+# generated/mirrored assets stay ignored.
+apps/web/public/adxcs/**
+!apps/web/public/adxcs/**/
+!apps/web/public/adxcs/**/maidata.txt
 
 # Large local media archives: keep directory skeleton only
 Community/**
