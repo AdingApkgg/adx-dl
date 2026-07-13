@@ -3,8 +3,9 @@
 import * as React from "react";
 import useSWR from "swr";
 import { ChevronDownIcon, ListFilterIcon, SearchIcon, XIcon } from "lucide-react";
+import type { Variants } from "framer-motion";
 
-import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
+import { AnimatePresence, EASE_OUT, motion, RollingNumber, springSoft } from "@/components/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { ChartCard } from "@/components/site/chart-card";
@@ -64,6 +65,29 @@ const SEARCH_DEBOUNCE_MS = 200;
 const CHART_SPECS_PATH = "/charts/specs.json";
 // Matches the browse grid: 2 columns on phones, 3 from lg, 4 from xl.
 const CARD_SIZES = "(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 25vw";
+// Sticky offset for the results toolbar — clears the sticky site header
+// (~65px tall) with a little breathing room. Must match `top-[4.5rem]` below.
+const STICKY_TOOLBAR_TOP_PX = 72;
+
+// Advanced-filter panel: opening staggers the rows in one by one; collapse
+// runs fast and un-staggered so closing feels immediate.
+const filterPanelVariants: Variants = {
+  collapsed: {
+    height: 0,
+    opacity: 0,
+    transition: { duration: 0.2, ease: EASE_OUT },
+  },
+  open: {
+    height: "auto",
+    opacity: 1,
+    transition: { duration: 0.25, ease: EASE_OUT, staggerChildren: 0.04 },
+  },
+};
+
+const filterRowVariants: Variants = {
+  collapsed: { opacity: 0, x: -8, transition: { duration: 0.15, ease: EASE_OUT } },
+  open: { opacity: 1, x: 0, transition: { duration: 0.3, ease: EASE_OUT } },
+};
 
 export function buildSelectedCatalogCharts(
   entries: readonly CatalogCardEntry[],
@@ -112,11 +136,32 @@ export function CatalogBrowser({
   // URL params are read once after mount; writes are suppressed until then so
   // the landing params aren't clobbered by the initial default state.
   const [urlReady, setUrlReady] = React.useState(false);
+  // Whether the results toolbar is pinned under the site header (drives the
+  // backdrop crossfade — sticky itself is pure CSS).
+  const [toolbarStuck, setToolbarStuck] = React.useState(false);
 
   const isComposingRef = React.useRef(false);
   const debounceRef = React.useRef<number | null>(null);
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
   const listTopRef = React.useRef<HTMLDivElement | null>(null);
+  const toolbarSentinelRef = React.useRef<HTMLDivElement | null>(null);
+
+  // A 1px sentinel just above the toolbar reports when it has scrolled under
+  // the sticky header, i.e. the toolbar is pinned and needs its backdrop.
+  React.useEffect(() => {
+    const sentinel = toolbarSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setToolbarStuck(
+          !entry.isIntersecting && entry.boundingClientRect.top < STICKY_TOOLBAR_TOP_PX
+        );
+      },
+      { rootMargin: `-${STICKY_TOOLBAR_TOP_PX}px 0px 0px 0px` }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
 
   // Apply state passed via the URL (home search, genre chips, shared links,
   // back-navigation from a detail page). Read once via window.location — this
@@ -563,10 +608,10 @@ export function CatalogBrowser({
         {filtersOpen ? (
           <motion.div
             key="filter-rows"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: EASE_OUT }}
+            initial="collapsed"
+            animate="open"
+            exit="collapsed"
+            variants={filterPanelVariants}
             className="overflow-hidden"
           >
             {/* One chip row per dimension — pick directly, combine across rows.
@@ -718,8 +763,12 @@ export function CatalogBrowser({
           role="group"
           aria-label={dictionary.activeFiltersLabel}
         >
+          {/* popLayout pops a removed chip out of flow so its neighbors (all
+              layout chips) spring over on springSoft while it collapses. */}
+          <AnimatePresence mode="popLayout" initial={false}>
           {hasQuery ? (
             <FilterChip
+              key="q"
               onRemove={clearSearch}
               removeLabel={dictionary.removeFilter(query)}
               icon={<SearchIcon className="size-3 shrink-0 text-muted-foreground" />}
@@ -813,6 +862,7 @@ export function CatalogBrowser({
           })}
           {hasUserSelectedCategory && effectiveCategory !== ALL_CATEGORIES ? (
             <FilterChip
+              key="category"
               onRemove={() => {
                 setCategory(initialCategory);
                 setHasUserSelectedCategory(false);
@@ -823,16 +873,37 @@ export function CatalogBrowser({
               {effectiveCategory}
             </FilterChip>
           ) : null}
-          <Button type="button" variant="ghost" size="sm" onClick={clearAllFilters}>
-            {dictionary.clearFilters}
-          </Button>
+          {/* Layout-animated so the clear button slides along with the chips. */}
+          <motion.div key="clear-all" layout transition={springSoft}>
+            <Button type="button" variant="ghost" size="sm" onClick={clearAllFilters}>
+              {dictionary.clearFilters}
+            </Button>
+          </motion.div>
+          </AnimatePresence>
         </div>
       ) : null}
 
+      {/* 1px pin sentinel for the toolbar below; the negative margin swallows
+          its own height plus the column gap so layout is unchanged. */}
+      <div
+        ref={toolbarSentinelRef}
+        aria-hidden="true"
+        className="-mb-[calc(1.5rem+1px)] h-px"
+      />
       <div
         ref={listTopRef}
-        className="flex scroll-mt-24 flex-wrap items-center justify-between gap-2"
+        className="sticky top-[4.5rem] z-10 flex scroll-mt-24 flex-wrap items-center justify-between gap-2"
       >
+        {/* Pre-rendered pinned backdrop (bg + border + shadow), crossfaded via
+            opacity only — never animate shadow/blur directly. Decorative, so
+            opacity:0 in the static HTML is fine. */}
+        <motion.div
+          aria-hidden="true"
+          initial={false}
+          animate={{ opacity: toolbarStuck ? 1 : 0 }}
+          transition={{ duration: 0.2, ease: EASE_OUT }}
+          className="pointer-events-none absolute -inset-x-3 -inset-y-2 -z-10 rounded-xl border border-border/60 bg-background/95 shadow-md"
+        />
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
@@ -859,9 +930,14 @@ export function CatalogBrowser({
             </span>
           ) : null}
         </div>
-        {/* Live so filter/search changes are announced to screen readers. */}
+        {/* Live so filter/search changes are announced to screen readers —
+            RollingNumber keeps its animated digits aria-hidden, so only the
+            final count is ever announced. */}
         <p className="text-sm text-muted-foreground" aria-live="polite">
-          {dictionary.resultsSummary(visibleEntries.length)}
+          <ResultsSummary
+            count={visibleEntries.length}
+            template={dictionary.resultsSummary(visibleEntries.length)}
+          />
           {totalPages > 1 ? ` · ${dictionary.pageLabel(safeCurrentPage, totalPages)}` : null}
         </p>
       </div>
@@ -898,6 +974,9 @@ export function CatalogBrowser({
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
+                // In select mode the whole card is a toggle — give the press
+                // tactile feedback on its owned click surface.
+                whileTap={selectMode ? { scale: 0.97 } : undefined}
                 transition={{ duration: 0.25, ease: EASE_OUT }}
                 className="h-full"
               >
@@ -995,16 +1074,18 @@ export function CatalogBrowser({
 // A labeled row of filter chips (one dimension). Chips never wrap — the group
 // scrolls horizontally (swipe on touch, trackpad/shift-wheel on desktop) so a
 // long dimension like version stays a single compact line. Scrollbar hidden.
+// A motion row so the advanced panel's open stagger cascades through it (the
+// variants are inherited from the panel — no own animate prop).
 function ChipFilterRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-x-2">
+    <motion.div variants={filterRowVariants} className="flex items-center gap-x-2">
       <span className="w-12 shrink-0 text-xs font-medium text-muted-foreground">{label}</span>
       {/* overflow-x also clips overflow-y, so pad vertically (and a touch right)
           to give the selected chip's ring room instead of shearing its edge. */}
       <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto py-1.5 pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {children}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -1097,24 +1178,56 @@ const BPM_TONE: Record<string, string> = {
   "3": "border-rose-500/40 bg-rose-500/12 text-rose-700 dark:text-rose-300",
 };
 
+// The localized results summary is a whole sentence ("共 N 首谱面"); split it
+// around the raw count so only the digits roll while the words stay static.
+// SSR always contains the real value (RollingNumber's initial state).
+function ResultsSummary({ count, template }: { count: number; template: string }) {
+  const raw = String(count);
+  const index = template.indexOf(raw);
+  if (index === -1) {
+    return <>{template}</>;
+  }
+  return (
+    <>
+      {template.slice(0, index)}
+      <RollingNumber
+        value={count}
+        // Pinned locale so the server and client render identical grouping.
+        format={(n) => n.toLocaleString("en-US")}
+        className="tabular-nums"
+      />
+      {template.slice(index + raw.length)}
+    </>
+  );
+}
+
 // One applied filter shown in the active-filters bar: a label + a remove (×).
 // `className` tints it to match a genre chip; `icon` prefixes it (search glyph
-// or version logo).
+// or version logo). A layout motion element so add/remove reflows spring.
 function FilterChip({
   children,
   onRemove,
   removeLabel,
   icon,
   className,
+  ref,
 }: {
   children: React.ReactNode;
   onRemove: () => void;
   removeLabel: string;
   icon?: React.ReactNode;
   className?: string;
+  // popLayout's exit measurement needs a DOM ref through the component.
+  ref?: React.Ref<HTMLSpanElement>;
 }) {
   return (
-    <span
+    <motion.span
+      ref={ref}
+      layout
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.8, opacity: 0 }}
+      transition={springSoft}
       className={cn(
         "inline-flex min-h-8 items-center gap-1.5 rounded-full border py-1 pr-1 pl-2.5 text-xs font-medium",
         className ?? "border-border bg-muted/50"
@@ -1130,7 +1243,7 @@ function FilterChip({
       >
         <XIcon className="size-3.5" />
       </button>
-    </span>
+    </motion.span>
   );
 }
 

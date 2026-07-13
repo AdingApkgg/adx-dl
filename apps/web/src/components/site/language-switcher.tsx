@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CheckIcon, GlobeIcon } from "lucide-react";
 
 import { storePreferredLocale } from "@/app/locale-preference";
+import { EASE_OUT, motion, springSoft } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -29,6 +30,13 @@ const localeShortLabel: Record<Locale, string> = {
   zh: "中",
   en: "EN",
   ja: "日",
+};
+
+// framer-motion 12: motion() is removed, wrap components via motion.create.
+const MotionButton = motion.create(Button);
+
+const globeWobble = {
+  hover: { rotate: [0, -12, 10, 0], transition: { duration: 0.6, ease: EASE_OUT } },
 };
 
 export function LanguageSwitcher({ locale, pathname }: LanguageSwitcherProps) {
@@ -63,18 +71,25 @@ export function LanguageSwitcher({ locale, pathname }: LanguageSwitcherProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
+        <MotionButton
           variant="outline"
           size="icon-sm"
           className="gap-1 sm:w-auto sm:px-2.5"
           aria-label={dictionary.nav.languageLabel}
           title={dictionary.nav.languageLabel}
+          whileHover="hover"
+          whileTap={{ scale: 0.94 }}
+          transition={springSoft}
         >
-          <GlobeIcon />
+          {/* The "hover" variant propagates from the button, so the globe
+              wobbles while the button itself only scales on tap. */}
+          <motion.span variants={globeWobble} className="inline-flex">
+            <GlobeIcon />
+          </motion.span>
           <span className="hidden text-xs font-medium sm:inline">
             {localeShortLabel[locale]}
           </span>
-        </Button>
+        </MotionButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         {locales.map((targetLocale) => {
@@ -89,7 +104,18 @@ export function LanguageSwitcher({ locale, pathname }: LanguageSwitcherProps) {
                 onClick={(event) => handleSelect(event, targetLocale)}
               >
                 {dictionary.language[targetLocale]}
-                {isActive ? <CheckIcon className="ml-auto" /> : null}
+                {/* Menu content mounts on open, so the check pops every time
+                    the menu opens — client-only UI, nothing serialized. */}
+                {isActive ? (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={springSoft}
+                    className="ml-auto inline-flex"
+                  >
+                    <CheckIcon />
+                  </motion.span>
+                ) : null}
               </Link>
             </DropdownMenuItem>
           );

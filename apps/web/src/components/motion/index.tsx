@@ -4,7 +4,11 @@ import * as React from "react";
 import {
   AnimatePresence,
   MotionConfig,
+  animate,
   motion,
+  useMotionValue,
+  useMotionValueEvent,
+  useReducedMotion,
   type HTMLMotionProps,
   type Transition,
   type Variants,
@@ -125,6 +129,127 @@ type RevealItemProps = Omit<HTMLMotionProps<"div">, "ref"> & {
   /** Element — set to "li" for a semantic list item (pair with `RevealGroup as="ul"`). */
   as?: "div" | "li";
 };
+
+// --- Overlay variants: shared enter/exit shapes for dialogs and sheets -----
+//
+// One vocabulary for every modal surface (media dialog, comments, fullscreen
+// preview, confirm layers) so they all breathe the same way. Pair with
+// `AnimatePresence` and `initial="hidden" animate="visible" exit="hidden"`.
+
+export const backdropVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1 },
+};
+
+/** Centered dialog: soft scale + rise. */
+export const dialogVariants: Variants = {
+  hidden: { opacity: 0, y: 12, scale: 0.96 },
+  visible: { opacity: 1, y: 0, scale: 1 },
+};
+
+/** Full-height sheet/overlay: rises like a cover. */
+export const sheetVariants: Variants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0 },
+};
+
+// --- RollingNumber: spring/tween a numeric readout between values ----------
+
+type RollingNumberProps = {
+  value: number;
+  /** Render the (rounded) in-flight number — e.g. toLocaleString. */
+  format?: (n: number) => string;
+  /**
+   * Also count up on first mount (0 → value). The SSR/static HTML always
+   * contains the real final value — the count-up is a post-hydration effect —
+   * so crawlers and no-JS readers never see a 0.
+   */
+  animateOnMount?: boolean;
+  className?: string;
+};
+
+/**
+ * Animated numeric text. The accessible text is always the final value (the
+ * animated digits are aria-hidden), so screen readers and aria-live regions
+ * hear one announcement, not sixty frames of counting.
+ */
+export function RollingNumber({ value, format = String, animateOnMount = false, className }: RollingNumberProps) {
+  const reduced = useReducedMotion();
+  const mv = useMotionValue(value);
+  const [display, setDisplay] = React.useState(() => format(Math.round(value)));
+  const mounted = React.useRef(false);
+  const formatRef = React.useRef(format);
+  formatRef.current = format;
+
+  useMotionValueEvent(mv, "change", (v) => setDisplay(formatRef.current(Math.round(v))));
+
+  React.useEffect(() => {
+    const first = !mounted.current;
+    mounted.current = true;
+    if (reduced || (first && !animateOnMount)) {
+      mv.set(value);
+      setDisplay(formatRef.current(Math.round(value)));
+      return;
+    }
+    if (first) mv.set(0);
+    const controls = animate(mv, value, { duration: 0.8, ease: EASE_OUT });
+    return () => controls.stop();
+  }, [value, reduced, animateOnMount, mv]);
+
+  return (
+    <span className={className}>
+      <span aria-hidden="true">{display}</span>
+      <span className="sr-only">{format(Math.round(value))}</span>
+    </span>
+  );
+}
+
+// --- DrawnCheck: an SVG checkmark that draws itself in ---------------------
+
+type DrawnCheckProps = {
+  size?: number;
+  strokeWidth?: number;
+  /** Draw an enclosing circle before the check stroke. */
+  withCircle?: boolean;
+  className?: string;
+};
+
+/**
+ * Success mark whose stroke draws in via `pathLength` — the payoff moment for
+ * downloads/archives. Under reduced motion the paths render complete (framer
+ * keeps only the opacity fade).
+ */
+export function DrawnCheck({ size = 20, strokeWidth = 2.5, withCircle = true, className }: DrawnCheckProps) {
+  const draw: Variants = {
+    hidden: { pathLength: 0, opacity: 0 },
+    visible: { pathLength: 1, opacity: 1 },
+  };
+  return (
+    <motion.svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      initial="hidden"
+      animate="visible"
+      className={className}
+      aria-hidden="true"
+    >
+      {withCircle ? (
+        <motion.circle cx="12" cy="12" r="10" variants={draw} transition={{ duration: 0.4, ease: EASE_OUT }} />
+      ) : null}
+      <motion.path
+        d="M7.5 12.5l3 3 6-6.5"
+        variants={draw}
+        transition={{ duration: 0.35, ease: EASE_OUT, delay: withCircle ? 0.18 : 0 }}
+      />
+    </motion.svg>
+  );
+}
 
 /** A self-contained staggered child — rises + fades in as it scrolls into view. */
 export function RevealItem({ delay = 0, transition, ssrVisible = false, as = "div", children, ...props }: RevealItemProps) {

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 
+import { AnimatePresence, EASE_OUT, motion, revealTransition } from "@/components/motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ChartPreviewProps } from "./chart-preview";
 
@@ -62,7 +63,29 @@ export function ChartPreviewIsland({
 
   return (
     <div ref={hostRef}>
-      {nearViewport ? <ChartPreview {...props} /> : <ChartPreviewPlaceholder />}
+      {/* mode="wait": the skeleton fades out fully before the player wrapper
+          rises in — the canvas itself is untouched inside. initial={false}
+          keeps the SSR'd skeleton (and an undeferred player) fully visible
+          with no entrance state serialized into the static HTML. */}
+      <AnimatePresence mode="wait" initial={false}>
+        {nearViewport ? (
+          <motion.div
+            key="player"
+            initial={{ opacity: 0, y: 12, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={revealTransition}
+          >
+            <ChartPreview {...props} />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="skeleton"
+            exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE_OUT } }}
+          >
+            <ChartPreviewPlaceholder />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

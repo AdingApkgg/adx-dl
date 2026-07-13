@@ -2,8 +2,10 @@
 
 import * as React from "react";
 import { ChevronDownIcon, DownloadIcon, PauseIcon, RotateCwIcon, XIcon } from "lucide-react";
+import { useReducedMotion, useSpring } from "framer-motion";
 
-import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
+import { AnimatePresence, DrawnCheck, EASE_OUT, motion } from "@/components/motion";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,10 +20,33 @@ import { BATCH_FORMATS, type BatchArchiveFormat } from "@/lib/adx-archive";
 import { isChartVideoFile, type ChartDownloadSpec } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { downloadJobStatusText } from "./downloads/download-status-text";
-import { batchJobId, jobPercent, useDownloadsStore } from "./downloads/downloads-store";
+import { jobPercent, newBatchJobId, useDownloadsStore } from "./downloads/downloads-store";
 
 /** Above this many charts, one click could start a multi-GB transfer — confirm first. */
 const CONFIRM_THRESHOLD = 50;
+
+// Spring-driven progress fill rendered as scaleX (GPU) instead of an animated
+// width, so the bar glides between store updates. The parent track keeps
+// role=progressbar / aria-valuenow bound to the raw store percent.
+function ProgressFill({ percent, className }: { percent: number; className?: string }) {
+  // MotionConfig's reducedMotion doesn't gate style-bound motion values — jump
+  // the spring manually so reduced-motion users get instant updates.
+  const reduced = useReducedMotion();
+  const scaleX = useSpring(percent / 100, { stiffness: 180, damping: 28 });
+  React.useEffect(() => {
+    if (reduced) {
+      scaleX.jump(percent / 100);
+    } else {
+      scaleX.set(percent / 100);
+    }
+  }, [percent, reduced, scaleX]);
+  return (
+    <motion.div
+      className={cn("h-full w-full origin-left", className)}
+      style={{ scaleX }}
+    />
+  );
+}
 
 type BatchDownloadBarProps = {
   /** The selected charts to pack, one folder per chart. */
@@ -49,9 +74,14 @@ export function BatchDownloadBar({
   const barRef = React.useRef<HTMLDivElement | null>(null);
 
   // The pack+download runs in a module-level store so it keeps going after the
-  // user navigates away from this page; we read the job back to drive the bar.
-  const jobId = batchJobId(collectionName);
-  const job = useDownloadsStore((state) => state.jobs.find((entry) => entry.id === jobId));
+  // user navigates away from this page. The bar only tracks the job it started
+  // itself (unique id per start) — a batch running from another page stays in
+  // the floating tray instead of being adopted by (and conflicting with) this
+  // bar's own selection and controls.
+  const [jobId, setJobId] = React.useState<string | null>(null);
+  const job = useDownloadsStore((state) =>
+    jobId !== null ? state.jobs.find((entry) => entry.id === jobId) : undefined
+  );
   const startBatch = useDownloadsStore((state) => state.startBatch);
   const resume = useDownloadsStore((state) => state.resume);
   const pause = useDownloadsStore((state) => state.pause);
@@ -79,6 +109,12 @@ export function BatchDownloadBar({
     ? fileStats.totalFiles
     : fileStats.totalFiles - fileStats.videoFiles;
   const hasVideoFiles = fileStats.videoFiles > 0;
+  // A selection spanning multiple version folders saves one archive per
+  // version (see splitBatchArchives) — tell the user up front.
+  const versionGroupCount = React.useMemo(
+    () => new Set(charts.map((chart) => chart.groupDir ?? "")).size,
+    [charts]
+  );
   const status = job?.status ?? "idle";
   const isBusy = status === "packing" || status === "archiving";
   const isResumable = status === "paused" || status === "error";
@@ -89,7 +125,7 @@ export function BatchDownloadBar({
   // Hide this job from the floating tray while the bar itself is on screen.
   const hasJob = job != null;
   React.useEffect(() => {
-    if (!hasJob) {
+    if (!hasJob || jobId === null) {
       return;
     }
     presentInline(jobId);
@@ -129,6 +165,17 @@ export function BatchDownloadBar({
     return () => window.clearTimeout(timer);
   }, [confirmDiscard]);
 
+  function beginBatch(format: BatchArchiveFormat) {
+    // A finished previous run from this bar is done communicating — clear it
+    // instead of letting it pop into the tray as a stale success row.
+    if (job && job.status === "success") {
+      dismiss(job.id);
+    }
+    const id = newBatchJobId();
+    setJobId(id);
+    startBatch({ id, title: collectionName, charts, includeVideo, format });
+  }
+
   function handleSelect(format: BatchArchiveFormat) {
     if (!canDownload) {
       return;
@@ -139,14 +186,14 @@ export function BatchDownloadBar({
       setPendingFormat(format);
       return;
     }
-    startBatch({ id: jobId, title: collectionName, charts, includeVideo, format });
+    beginBatch(format);
   }
 
   function confirmPending() {
     if (pendingFormat === null) {
       return;
     }
-    startBatch({ id: jobId, title: collectionName, charts, includeVideo, format: pendingFormat });
+    beginBatch(pendingFormat);
     setPendingFormat(null);
   }
 
@@ -175,7 +222,7 @@ export function BatchDownloadBar({
           </Button>
           {isResumable ? (
             <>
-              <Button type="button" size="sm" onClick={() => resume(jobId)}>
+              <Button type="button" size="sm" onClick={() => job && resume(job.id)}>
                 <RotateCwIcon data-icon="inline-start" />
                 {tray.resume}
                 {percent > 0 ? ` · ${percent}%` : null}
@@ -188,7 +235,9 @@ export function BatchDownloadBar({
                 title={confirmDiscard ? tray.confirmDiscard : tray.cancel}
                 onClick={() => {
                   if (confirmDiscard) {
-                    dismiss(jobId);
+                    if (job) {
+                      dismiss(job.id);
+                    }
                   } else {
                     setConfirmDiscard(true);
                   }
@@ -250,7 +299,7 @@ export function BatchDownloadBar({
                   size="icon"
                   aria-label={tray.pause}
                   title={tray.pause}
-                  onClick={() => pause(jobId)}
+                  onClick={() => job && pause(job.id)}
                 >
                   <PauseIcon />
                 </Button>
@@ -268,6 +317,12 @@ export function BatchDownloadBar({
                 ? tray.batchVideoSummary(fileStats.videoFiles)
                 : tray.batchNoVideoSummary}
             </span>
+            {versionGroupCount > 1 ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{tray.batchSplitSummary(versionGroupCount)}</span>
+              </>
+            ) : null}
           </div>
         ) : null}
 
@@ -318,10 +373,7 @@ export function BatchDownloadBar({
                 aria-label={collectionName}
                 className="h-1.5 overflow-hidden rounded-full bg-muted"
               >
-                <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-150 ease-out"
-                  style={{ width: `${percent}%` }}
-                />
+                <ProgressFill percent={percent} className="bg-primary" />
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground">{statusText}</p>
             </motion.div>
@@ -342,29 +394,30 @@ export function BatchDownloadBar({
                 aria-label={collectionName}
                 className="h-1.5 overflow-hidden rounded-full bg-muted"
               >
-                <div
-                  className={
-                    status === "paused"
-                      ? "h-full rounded-full bg-primary/40 transition-[width] duration-150 ease-out"
-                      : "h-full rounded-full bg-primary transition-[width] duration-150 ease-out"
-                  }
-                  style={{ width: `${percent}%` }}
+                <ProgressFill
+                  percent={percent}
+                  className={cn(
+                    "transition-colors",
+                    status === "paused" ? "bg-primary/40" : "bg-primary"
+                  )}
                 />
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground">{statusText}</p>
             </motion.div>
           ) : status === "success" ? (
-            <motion.p
+            <motion.div
               key="success"
               role="status"
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.2, ease: EASE_OUT }}
-              className="text-xs text-muted-foreground"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
             >
-              {tray.completed}
-            </motion.p>
+              {/* Self-drawing check — the payoff moment for a finished batch. */}
+              <DrawnCheck size={14} className="shrink-0 text-primary" />
+              <span>{tray.completed}</span>
+            </motion.div>
           ) : status === "error" ? (
             <motion.p
               key="error"

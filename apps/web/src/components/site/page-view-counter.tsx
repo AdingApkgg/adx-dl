@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import useSWR from "swr";
 import { EyeIcon } from "lucide-react";
 
+import { RollingNumber } from "@/components/motion";
 import { defaultLocale, getDictionary, isSupportedLocale, locales } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -113,9 +114,11 @@ const LOADING_PLACEHOLDER = "···";
 const UNAVAILABLE_PLACEHOLDER = "—";
 
 /**
- * One counter value in all three states: the loading ellipsis, the formatted
- * total, or a quiet em-dash once the backend has failed. The dash is hidden
- * from the aria-live announcement in favor of a localized description.
+ * One counter value in all three states: the loading ellipsis, a rolling
+ * count-up to the live total, or a quiet em-dash once the backend has failed.
+ * The dash and the in-flight digits are hidden from the aria-live announcement
+ * (RollingNumber exposes only the settled value; the dash gets a localized
+ * description) so the live region speaks each total exactly once.
  */
 function CountValue({
   views,
@@ -134,8 +137,16 @@ function CountValue({
       </span>
     );
   }
+  if (views === undefined) {
+    return <span className="font-medium">{LOADING_PLACEHOLDER}</span>;
+  }
+  // Counts up 0 -> total when the first response lands, then rolls previous ->
+  // next when SWR revalidates on navigation (RollingNumber stays mounted —
+  // keepPreviousData keeps `views` truthy between pages).
   return (
-    <span className="font-medium">{views ? formatCount(views[field]) : LOADING_PLACEHOLDER}</span>
+    <span className="font-medium">
+      <RollingNumber value={views[field]} format={formatCount} animateOnMount />
+    </span>
   );
 }
 

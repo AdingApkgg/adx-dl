@@ -3,7 +3,7 @@
 import * as React from "react";
 import { ChevronDownIcon, DownloadIcon, PauseIcon, RotateCwIcon, XIcon } from "lucide-react";
 
-import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
+import { AnimatePresence, DrawnCheck, EASE_OUT, motion } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -17,9 +17,17 @@ import {
 import { ARCHIVE_FORMATS, type ArchiveFormat } from "@/lib/adx-archive";
 import { isChartVideoFile, type ChartDownloadSpec } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import {
+  DOWNLOAD_STARTED_EVENT,
+  DownloadProgressBar,
+  type DownloadStartedDetail,
+} from "./downloads/download-dock";
 import { downloadJobStatusText } from "./downloads/download-status-text";
 import { formatBytes } from "./downloads/format-bytes";
 import { jobPercent, singleJobId, useDownloadsStore } from "./downloads/downloads-store";
+
+// framer-motion 12 removed the motion(Component) call form.
+const MotionButton = motion.create(Button);
 
 type AdxDownloadButtonProps = {
   /** Global chart download spec: chart folder, version folder and packable assets. */
@@ -80,9 +88,21 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
     return () => window.clearTimeout(timer);
   }, [confirmDiscard]);
 
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+
   function handleSelect(format: ArchiveFormat) {
     if (!canDownload || isBusy) {
       return;
+    }
+    // Tell the floating dock where the trigger sits so it can fly a ghost
+    // download icon from this button into its corner.
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) {
+      window.dispatchEvent(
+        new CustomEvent<DownloadStartedDetail>(DOWNLOAD_STARTED_EVENT, {
+          detail: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 },
+        })
+      );
     }
     startSingle({
       id: jobId,
@@ -107,13 +127,14 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
     <div className="flex flex-col gap-2">
       {isResumable ? (
         <div className="flex items-center gap-2">
-          <Button type="button" onClick={() => resume(jobId)}>
+          <MotionButton type="button" whileTap={{ scale: 0.97 }} onClick={() => resume(jobId)}>
             <RotateCwIcon data-icon="inline-start" />
             {downloadsDictionary.resume}
             {percent > 0 ? ` · ${percent}%` : null}
-          </Button>
-          <Button
+          </MotionButton>
+          <MotionButton
             type="button"
+            whileTap={{ scale: 0.92 }}
             variant={confirmDiscard ? "destructive" : "ghost"}
             size="icon"
             aria-label={
@@ -130,14 +151,42 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
               }
             }}
           >
-            <XIcon />
-          </Button>
+            <span className="relative flex items-center justify-center">
+              {confirmDiscard ? (
+                // Countdown ring mirrors the 3s auto-disarm window; the
+                // setTimeout above stays the source of truth.
+                <svg aria-hidden="true" viewBox="0 0 32 32" className="absolute -inset-2 size-8 -rotate-90">
+                  <motion.circle
+                    cx="16"
+                    cy="16"
+                    r="14"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    initial={{ pathLength: 1 }}
+                    animate={{ pathLength: 0 }}
+                    transition={{ duration: 3, ease: "linear" }}
+                  />
+                </svg>
+              ) : null}
+              <motion.span
+                className="flex"
+                animate={confirmDiscard ? { x: [0, -2.5, 2.5, -1.5, 1.5, 0] } : { x: 0 }}
+                transition={
+                  confirmDiscard ? { duration: 0.35, ease: "easeInOut" } : { duration: 0.15 }
+                }
+              >
+                <XIcon />
+              </motion.span>
+            </span>
+          </MotionButton>
         </div>
       ) : (
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button type="button" disabled={!canDownload || isBusy}>
+              <Button ref={triggerRef} type="button" disabled={!canDownload || isBusy}>
                 <motion.span
                   className="inline-flex"
                   animate={isBusy ? { y: [0, 2, 0] } : { y: 0 }}
@@ -185,18 +234,26 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
-          {status === "packing" ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={downloadsDictionary.pause}
-              title={downloadsDictionary.pause}
-              onClick={() => pause(jobId)}
-            >
-              <PauseIcon />
-            </Button>
-          ) : null}
+          <AnimatePresence initial={false} mode="wait">
+            {status === "packing" ? (
+              <MotionButton
+                key="pause"
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={downloadsDictionary.pause}
+                title={downloadsDictionary.pause}
+                onClick={() => pause(jobId)}
+                whileTap={{ scale: 0.92 }}
+                initial={{ opacity: 0, scale: 0.6, rotate: -45 }}
+                animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                exit={{ opacity: 0, scale: 0.6, rotate: -45 }}
+                transition={{ duration: 0.15, ease: EASE_OUT }}
+              >
+                <PauseIcon />
+              </MotionButton>
+            ) : null}
+          </AnimatePresence>
         </div>
       )}
       <AnimatePresence>
@@ -224,19 +281,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
             transition={{ duration: 0.2, ease: EASE_OUT }}
             className="overflow-hidden"
           >
-            <div
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={percent}
-              aria-label={normalizedFileName}
-              className="h-1.5 overflow-hidden rounded-full bg-muted"
-            >
-              <div
-                className="h-full rounded-full bg-primary transition-[width] duration-150 ease-out"
-                style={{ width: `${percent}%` }}
-              />
-            </div>
+            <DownloadProgressBar percent={percent} active label={normalizedFileName} />
           </motion.div>
         ) : (status === "packing" || status === "paused") && fileProgress.length > 0 ? (
           <motion.ul
@@ -266,27 +311,20 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
                       {isIndeterminate ? formatBytes(file.received) : `${percent}%`}
                     </span>
                   </div>
-                  <div
-                    role="progressbar"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={isIndeterminate ? undefined : percent}
-                    aria-label={file.name}
-                    className="h-1.5 overflow-hidden rounded-full bg-muted"
-                  >
-                    <div
-                      className={
-                        isIndeterminate
-                          ? status === "paused"
-                            ? "h-full w-full rounded-full bg-primary/30"
-                            : "h-full w-full animate-pulse rounded-full bg-primary/40"
-                          : status === "paused"
-                            ? "h-full rounded-full bg-primary/40 transition-[width] duration-150 ease-out"
-                            : "h-full rounded-full bg-primary transition-[width] duration-150 ease-out"
-                      }
-                      style={isIndeterminate ? undefined : { width: `${percent}%` }}
-                    />
-                  </div>
+                  <DownloadProgressBar
+                    percent={percent}
+                    active={status === "packing" && file.status === "downloading"}
+                    label={file.name}
+                    fillClassName={
+                      isIndeterminate
+                        ? status === "paused"
+                          ? "bg-primary/30"
+                          : "bg-primary/40"
+                        : status === "paused"
+                          ? "bg-primary/40"
+                          : undefined
+                    }
+                  />
                 </li>
               );
             })}
@@ -304,7 +342,12 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
             transition={{ duration: 0.2, ease: EASE_OUT }}
             className="flex flex-col gap-1 text-sm text-muted-foreground"
           >
-            <p>{downloadsDictionary.completed}</p>
+            <p className="flex items-center gap-1.5">
+              <span className="shrink-0 text-emerald-500">
+                <DrawnCheck size={16} />
+              </span>
+              {downloadsDictionary.completed}
+            </p>
             <p className="text-xs">{downloadsDictionary.importHint}</p>
           </motion.div>
         ) : status === "error" ? (

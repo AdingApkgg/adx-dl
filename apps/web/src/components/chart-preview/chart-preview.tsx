@@ -9,6 +9,7 @@ import {
 } from "@lxns-network/maimai-chart-engine";
 import { cn } from "@/lib/utils";
 import { textFetcher } from "@/lib/swr-fetcher";
+import { AnimatePresence, EASE_OUT, motion, springSoft } from "@/components/motion";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,6 +43,11 @@ export type ChartPreviewProps = {
 };
 
 type Toast = { title: string; message: string; color: string } | null;
+
+// Height-collapse tween shared by the settings panels and the GIF action bar —
+// a springSoft-ish ease so it matches the icon springs without overshoot
+// (springs on `height: auto` can bounce past the content box).
+const collapseTransition = { duration: 0.35, ease: EASE_OUT };
 
 type FullscreenElement = HTMLElement & {
   webkitRequestFullscreen?: () => Promise<void> | void;
@@ -441,58 +447,104 @@ export function ChartPreview({
       {!isFullscreen ? (
         <>
           {totalMs > 0 ? (
-            <DensityWithPlayhead
-              notes={densityNotes}
-              durationMs={totalMs}
-              onSeek={seekToMs}
-              interactive={!gifRangeMode}
-              legendLabels={{
-                label: t.legendLabel,
-                tap: t.noteTap,
-                hold: t.noteHold,
-                slide: t.noteSlide,
-                touch: t.noteTouch,
-                break: t.noteBreak,
-              }}
-            >
-              {exportRange.range ? (
-                <ChartExportRangeOverlay
-                  range={exportRange.range}
-                  totalDurationMs={totalMs}
-                  onChange={exportRange.update}
-                  onPreview={seekToMs}
-                />
-              ) : null}
-            </DensityWithPlayhead>
-          ) : null}
-
-          {gifRangeMode && exportRange.range ? (
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-muted-foreground">
-                {t.gifRangeHint(formatDuration(exportRange.range.endMs - exportRange.range.startMs))}
-              </span>
-              <span className="flex-1" />
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => exportRange.range && runGifExport(exportRange.range)}
-                disabled={gifExporting}
+            // The GIF action bar shares this zero-gap group with the timeline so
+            // its height collapse doesn't leave a dangling parent `gap` behind.
+            <div className="flex w-full flex-col">
+              <DensityWithPlayhead
+                notes={densityNotes}
+                durationMs={totalMs}
+                onSeek={seekToMs}
+                interactive={!gifRangeMode}
+                legendLabels={{
+                  label: t.legendLabel,
+                  tap: t.noteTap,
+                  hold: t.noteHold,
+                  slide: t.noteSlide,
+                  touch: t.noteTouch,
+                  break: t.noteBreak,
+                }}
               >
-                {gifExporting ? t.exportingPercent(Math.round(gifProgress * 100)) : t.exportGif}
-              </Button>
-              <Button type="button" size="sm" variant="outline" onClick={cancelGif}>
-                {t.cancel}
-              </Button>
+                {exportRange.range ? (
+                  <ChartExportRangeOverlay
+                    range={exportRange.range}
+                    totalDurationMs={totalMs}
+                    onChange={exportRange.update}
+                    onPreview={seekToMs}
+                  />
+                ) : null}
+              </DensityWithPlayhead>
+
+              <AnimatePresence initial={false}>
+                {gifRangeMode && exportRange.range ? (
+                  <motion.div
+                    key="gif-actions"
+                    className="overflow-hidden"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={collapseTransition}
+                  >
+                    <div className="flex flex-wrap items-center gap-2 pt-3 text-sm">
+                      <span className="text-muted-foreground">
+                        {t.gifRangeHint(
+                          formatDuration(exportRange.range.endMs - exportRange.range.startMs),
+                        )}
+                      </span>
+                      <span className="flex-1" />
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="relative overflow-hidden"
+                        onClick={() => exportRange.range && runGifExport(exportRange.range)}
+                        disabled={gifExporting}
+                      >
+                        {gifExporting ? (
+                          // Progress fill behind the label — scaleX (not width)
+                          // so it stays a pure transform.
+                          <motion.span
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-0 origin-left bg-primary-foreground/25"
+                            initial={{ scaleX: 0 }}
+                            animate={{ scaleX: gifProgress }}
+                            transition={{ duration: 0.25, ease: EASE_OUT }}
+                          />
+                        ) : null}
+                        <span className="relative">
+                          {gifExporting
+                            ? t.exportingPercent(Math.round(gifProgress * 100))
+                            : t.exportGif}
+                        </span>
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={cancelGif}>
+                        {t.cancel}
+                      </Button>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
             </div>
           ) : null}
 
           <div className="w-full">{controls}</div>
 
-          {settingsOpen ? (
-            <div className="w-full rounded-lg border border-border/60 bg-card/40 p-4">
-              <ChartSettings locale={locale} />
-            </div>
-          ) : null}
+          <AnimatePresence initial={false}>
+            {settingsOpen ? (
+              <motion.div
+                key="settings"
+                className="w-full overflow-hidden"
+                // marginBottom offsets the parent's gap-4 while collapsed so the
+                // unmount doesn't snap the layout by one leftover gap.
+                initial={{ height: 0, opacity: 0, y: -8, marginBottom: -16 }}
+                animate={{ height: "auto", opacity: 1, y: 0, marginBottom: 0 }}
+                exit={{ height: 0, opacity: 0, y: -8, marginBottom: -16 }}
+                transition={collapseTransition}
+              >
+                <div className="rounded-lg border border-border/60 bg-card/40 p-4">
+                  <ChartSettings locale={locale} />
+                </div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
 
           <ChartSimaiStatements
             simaiText={rawSimaiText}
@@ -515,27 +567,50 @@ export function ChartPreview({
               : "invisible pointer-events-none translate-y-full opacity-0 focus-within:visible focus-within:pointer-events-auto focus-within:translate-y-0 focus-within:opacity-100",
           )}
         >
-          {settingsOpen ? (
-            <div className="max-h-[55vh] w-full max-w-2xl overflow-auto rounded-lg border border-border/60 bg-card/90 p-4 backdrop-blur [color-scheme:dark]">
-              <ChartSettings locale={locale} />
-            </div>
-          ) : null}
+          <AnimatePresence initial={false}>
+            {settingsOpen ? (
+              <motion.div
+                key="fullscreen-settings"
+                className="w-full max-w-2xl overflow-hidden"
+                // marginBottom offsets the overlay's gap-3 while collapsed (same
+                // trick as the inline panel).
+                initial={{ height: 0, opacity: 0, y: -8, marginBottom: -12 }}
+                animate={{ height: "auto", opacity: 1, y: 0, marginBottom: 0 }}
+                exit={{ height: 0, opacity: 0, y: -8, marginBottom: -12 }}
+                transition={collapseTransition}
+              >
+                <div className="max-h-[55vh] w-full overflow-auto rounded-lg border border-border/60 bg-card/90 p-4 backdrop-blur [color-scheme:dark]">
+                  <ChartSettings locale={locale} />
+                </div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
           <div className="w-full max-w-2xl">{controls}</div>
         </div>
       )}
 
-      {toast ? (
-        <div
-          role="status"
-          className={cn(
-            "pointer-events-none fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-md px-3 py-2 text-sm text-white shadow-lg",
-            toast.color === "red" ? "bg-red-600" : "bg-emerald-600",
-          )}
-        >
-          <strong className="font-semibold">{toast.title}</strong>
-          <span className="ml-2 opacity-90">{toast.message}</span>
-        </div>
-      ) : null}
+      {/* Keyed by title: a different toast exits down while its successor
+          springs up, so back-to-back results visibly replace each other. The
+          centering -translate-x-1/2 moves into framer's x so it survives the
+          animated transform. */}
+      <AnimatePresence>
+        {toast ? (
+          <motion.div
+            key={toast.title}
+            role="status"
+            initial={{ opacity: 0, y: 16, scale: 0.95, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, scale: 1, x: "-50%", transition: springSoft }}
+            exit={{ opacity: 0, y: 12, x: "-50%", transition: { duration: 0.18, ease: EASE_OUT } }}
+            className={cn(
+              "pointer-events-none fixed bottom-6 left-1/2 z-[60] rounded-md px-3 py-2 text-sm text-white shadow-lg",
+              toast.color === "red" ? "bg-red-600" : "bg-emerald-600",
+            )}
+          >
+            <strong className="font-semibold">{toast.title}</strong>
+            <span className="ml-2 opacity-90">{toast.message}</span>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

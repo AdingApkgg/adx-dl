@@ -212,6 +212,11 @@ export type SiteDictionary = {
     muteLabel: string;
     comments: string;
     relatedTitle: string;
+    relatedDescription: string;
+    /** Chip on a related card explaining why it was picked (shared artist/genre/version). */
+    relatedReasonArtist: string;
+    relatedReasonGenre: string;
+    relatedReasonVersion: string;
     commentsLoading: string;
     commentsError: string;
     commentsRetry: string;
@@ -235,6 +240,7 @@ export type SiteDictionary = {
     errorNetwork: string;
     errorGeneric: string;
     batchSummary: (charts: number, files: number) => string;
+    batchSplitSummary: (archives: number) => string;
     batchVideoSummary: (count: number) => string;
     batchNoVideoSummary: string;
     batchVideoLargeHint: string;
@@ -595,6 +601,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       muteLabel: "静音",
       comments: "评论",
       relatedTitle: "相关谱面",
+      relatedDescription: "来自相同曲师、曲风或版本的更多谱面。",
+      relatedReasonArtist: "同曲师",
+      relatedReasonGenre: "同曲风",
+      relatedReasonVersion: "同版本",
       commentsLoading: "评论加载中…",
       commentsError: "评论加载失败，请检查网络连接后重试。",
       commentsRetry: "重试",
@@ -617,6 +627,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       errorNetwork: "下载失败，已保留进度，可点「继续」重试",
       errorGeneric: "下载出错，已保留进度，可点「继续」重试",
       batchSummary: (charts, files) => `将打包 ${charts} 首谱面，共 ${files} 个文件`,
+      batchSplitSummary: (archives) => `跨版本选择，将按版本分为 ${archives} 个压缩包`,
       batchVideoSummary: (count) => `包含 ${count} 个 BGA 视频文件`,
       batchNoVideoSummary: "不包含 BGA 视频，下载会更轻",
       batchVideoLargeHint: "包含 BGA 会显著增大体积，网络慢或手机流量下建议关闭。",
@@ -969,6 +980,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       muteLabel: "Mute",
       comments: "Comments",
       relatedTitle: "Related charts",
+      relatedDescription: "More charts sharing this one's artist, genre, or version.",
+      relatedReasonArtist: "Same artist",
+      relatedReasonGenre: "Same genre",
+      relatedReasonVersion: "Same version",
       commentsLoading: "Loading comments…",
       commentsError: "Comments failed to load. Check your connection and try again.",
       commentsRetry: "Retry",
@@ -994,6 +1009,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         charts === 1
           ? `Packing 1 chart, ${files} files total`
           : `Packing ${charts} charts, ${files} files total`,
+      batchSplitSummary: (archives) =>
+        `Spans multiple versions — saved as ${archives} archives, one per version`,
       batchVideoSummary: (count) =>
         count === 1 ? "Includes 1 BGA video file" : `Includes ${count} BGA video files`,
       batchNoVideoSummary: "BGA video excluded for a lighter download",
@@ -1358,6 +1375,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       muteLabel: "ミュート",
       comments: "コメント",
       relatedTitle: "関連する譜面",
+      relatedDescription: "同じアーティスト・ジャンル・バージョンから選んだ譜面。",
+      relatedReasonArtist: "同じアーティスト",
+      relatedReasonGenre: "同じジャンル",
+      relatedReasonVersion: "同じバージョン",
       commentsLoading: "コメントを読み込み中…",
       commentsError: "コメントを読み込めませんでした。接続を確認して再試行してください。",
       commentsRetry: "再試行",
@@ -1380,6 +1401,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       errorNetwork: "ダウンロードに失敗しました — 進捗は保持されています。「再開」で再試行してください",
       errorGeneric: "ダウンロードエラー — 進捗は保持されています。「再開」で再試行してください",
       batchSummary: (charts, files) => `${charts} 譜面、合計 ${files} ファイルをまとめます`,
+      batchSplitSummary: (archives) =>
+        `複数バージョンのため、バージョンごとに ${archives} 個のアーカイブに分けて保存します`,
       batchVideoSummary: (count) => `${count} 件の BGA 動画を含みます`,
       batchNoVideoSummary: "BGA 動画なしで軽めにダウンロードします",
       batchVideoLargeHint:

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { XIcon } from "lucide-react";
+import { useReducedMotion } from "framer-motion";
 
 import {
   readLocaleBannerDismissed,
@@ -9,6 +10,7 @@ import {
   storeLocaleBannerDismissed,
   storePreferredLocale,
 } from "@/app/locale-preference";
+import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
 import { buildLocalePath, getDictionary, type PrefixedLocale } from "@/lib/i18n";
 
 /**
@@ -20,6 +22,7 @@ import { buildLocalePath, getDictionary, type PrefixedLocale } from "@/lib/i18n"
 export function LocaleSuggestionBanner() {
   const [target, setTarget] = React.useState<PrefixedLocale | null>(null);
   const [href, setHref] = React.useState<string | null>(null);
+  const prefersReducedMotion = useReducedMotion();
 
   React.useEffect(() => {
     if (readLocaleBannerDismissed()) return;
@@ -43,31 +46,45 @@ export function LocaleSuggestionBanner() {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
-  if (!target || !href) return null;
+  const banner = target ? getDictionary(target).localeBanner : null;
 
-  const banner = getDictionary(target).localeBanner;
-
+  // AnimatePresence stays mounted so the dismissed banner can play its exit
+  // collapse; SSR renders no child (target is null until the mount effect).
   return (
-    <div className="flex items-center justify-center gap-2 border-b border-border/60 bg-primary/10 px-4 py-1.5 text-sm">
-      <a
-        href={href}
-        lang={target}
-        className="font-medium text-primary underline-offset-4 hover:underline"
-        onClick={() => storePreferredLocale(target)}
-      >
-        {banner.continueIn}
-      </a>
-      <button
-        type="button"
-        aria-label={banner.dismiss}
-        className="rounded-sm p-1 text-muted-foreground transition-colors hover:text-foreground"
-        onClick={() => {
-          storeLocaleBannerDismissed();
-          setTarget(null);
-        }}
-      >
-        <XIcon className="size-3.5" aria-hidden="true" />
-      </button>
-    </div>
+    <AnimatePresence>
+      {target && href && banner ? (
+        <motion.div
+          key="locale-suggestion"
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: "auto", opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          // MotionConfig doesn't gate height tweens — zero it out by hand.
+          transition={{ duration: prefersReducedMotion ? 0 : 0.3, ease: EASE_OUT }}
+          className="overflow-hidden"
+        >
+          <div className="flex items-center justify-center gap-2 border-b border-border/60 bg-primary/10 px-4 py-1.5 text-sm">
+            <a
+              href={href}
+              lang={target}
+              className="font-medium text-primary underline-offset-4 hover:underline"
+              onClick={() => storePreferredLocale(target)}
+            >
+              {banner.continueIn}
+            </a>
+            <button
+              type="button"
+              aria-label={banner.dismiss}
+              className="rounded-sm p-1 text-muted-foreground transition-colors hover:text-foreground"
+              onClick={() => {
+                storeLocaleBannerDismissed();
+                setTarget(null);
+              }}
+            >
+              <XIcon className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 }

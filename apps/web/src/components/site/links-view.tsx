@@ -1,8 +1,6 @@
-import { ArrowUpRightIcon } from "lucide-react";
-
 import { Reveal } from "@/components/motion";
+import { FriendLinkCard } from "@/components/site/friend-link-card";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { friendLinks } from "@/lib/friend-links";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { buildInfoPageStructuredData } from "@/lib/structured-data";
@@ -41,29 +39,13 @@ export function LinksView({ locale = "zh" }: { locale?: Locale }) {
       <ul className="grid list-none gap-4 p-0 sm:grid-cols-2">
         {friendLinks.map((link) => (
           <li key={link.url}>
-            <a
+            <FriendLinkCard
               href={link.url}
-              target="_blank"
-              rel="noopener"
-              aria-label={`${links.visit} ${link.name}`}
-              className="group block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <Card className="h-full transition-colors group-hover:ring-primary/40">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-1.5">
-                    <span>{link.name}</span>
-                    <ArrowUpRightIcon
-                      aria-hidden="true"
-                      className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary"
-                    />
-                  </CardTitle>
-                  <CardDescription>{link.description[locale]}</CardDescription>
-                  <span className="text-xs text-muted-foreground/80">
-                    {hostnameOf(link.url)}
-                  </span>
-                </CardHeader>
-              </Card>
-            </a>
+              name={link.name}
+              description={link.description[locale]}
+              hostname={hostnameOf(link.url)}
+              ariaLabel={`${links.visit} ${link.name}`}
+            />
           </li>
         ))}
       </ul>

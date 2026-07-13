@@ -42,4 +42,21 @@ describe("SiteHeader", () => {
     expect(html).toContain('aria-label="语言切换"');
     expect(html).toContain('aria-label="切换主题"');
   });
+
+  test("static HTML is pinned for view transitions and starts expanded", async () => {
+    mock.module("next/navigation", () => ({
+      usePathname: () => "/",
+    }));
+
+    const { SiteHeader } = await import("./site-header");
+    const html = renderToStaticMarkup(<SiteHeader totalEntries={7} />);
+
+    // The chrome stays put during the branded page transition (globals.css).
+    expect(html).toContain("view-transition-name:site-header");
+    // Compact-on-scroll is a client behavior: the prerendered HTML must carry
+    // the expanded paddings and never hide the tagline.
+    expect(html).toContain("py-3");
+    expect(html).not.toContain("py-1.5");
+    expect(html).not.toContain("opacity:0");
+  });
 });

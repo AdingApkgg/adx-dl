@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { CheckIcon } from "lucide-react";
 
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { DifficultyPill } from "@/components/site/difficulty-pill";
 import { EntryCover } from "@/components/site/entry-cover";
 import { GenreBadge } from "@/components/site/genre-badge";
+import { SelectCheckBadge } from "@/components/site/select-check-badge";
 import { VersionBadge } from "@/components/site/version-badge";
 import {
   formatEntryArtist,
@@ -111,19 +111,7 @@ export function ChartCard({
         sizes={sizes}
         className="h-full w-full"
       />
-      {selectable ? (
-        <span
-          aria-hidden="true"
-          className={cn(
-            "absolute top-2 left-2 flex size-6 items-center justify-center rounded-md border shadow-sm transition-colors",
-            selected
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border/70 bg-background/80 text-transparent"
-          )}
-        >
-          <CheckIcon className="size-4" />
-        </span>
-      ) : null}
+      {selectable ? <SelectCheckBadge selected={selected} /> : null}
     </div>
   );
 

@@ -4,23 +4,48 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Tabs as TabsPrimitive } from "radix-ui"
 
+import { motion, springSoft } from "@/components/motion"
 import { cn } from "@/lib/utils"
+
+// Mirrors Radix's active value so each trigger knows whether to host the
+// sliding indicator (Radix exposes it only as a data attribute).
+const TabsValueContext = React.createContext<string | undefined>(undefined)
+
+// Per-list layoutId scope + variant, so multiple lists never share an indicator.
+const TabsIndicatorContext = React.createContext<{
+  layoutId: string
+  variant: "default" | "line"
+} | null>(null)
 
 function Tabs({
   className,
   orientation = "horizontal",
+  value,
+  defaultValue,
+  onValueChange,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Root>) {
+  // Tracks the value for uncontrolled usage; controlled usage reads `value`.
+  const [uncontrolledValue, setUncontrolledValue] = React.useState(defaultValue)
+  const activeValue = value !== undefined ? value : uncontrolledValue
   return (
-    <TabsPrimitive.Root
-      data-slot="tabs"
-      data-orientation={orientation}
-      className={cn(
-        "group/tabs flex gap-2 data-horizontal:flex-col",
-        className
-      )}
-      {...props}
-    />
+    <TabsValueContext.Provider value={activeValue}>
+      <TabsPrimitive.Root
+        data-slot="tabs"
+        data-orientation={orientation}
+        value={value}
+        defaultValue={defaultValue}
+        onValueChange={(nextValue) => {
+          setUncontrolledValue(nextValue)
+          onValueChange?.(nextValue)
+        }}
+        className={cn(
+          "group/tabs flex gap-2 data-horizontal:flex-col",
+          className
+        )}
+        {...props}
+      />
+    </TabsValueContext.Provider>
   )
 }
 
@@ -45,13 +70,20 @@ function TabsList({
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.List> &
   VariantProps<typeof tabsListVariants>) {
+  const layoutId = React.useId()
+  const indicator = React.useMemo(
+    () => ({ layoutId, variant: variant ?? "default" }),
+    [layoutId, variant]
+  )
   return (
-    <TabsPrimitive.List
-      data-slot="tabs-list"
-      data-variant={variant}
-      className={cn(tabsListVariants({ variant }), className)}
-      {...props}
-    />
+    <TabsIndicatorContext.Provider value={indicator}>
+      <TabsPrimitive.List
+        data-slot="tabs-list"
+        data-variant={variant}
+        className={cn(tabsListVariants({ variant }), className)}
+        {...props}
+      />
+    </TabsIndicatorContext.Provider>
   )
 }
 
@@ -66,14 +98,46 @@ const tabsTriggerClassName = cn(
 
 function TabsTrigger({
   className,
+  children,
+  value,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
+  const indicator = React.useContext(TabsIndicatorContext)
+  const activeValue = React.useContext(TabsValueContext)
+  const isActive = indicator !== null && activeValue === value
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
-      className={cn(tabsTriggerClassName, className)}
+      value={value}
+      className={cn(
+        tabsTriggerClassName,
+        // The sliding indicator below owns the active pill/underline, so the
+        // trigger's own static active surface is suppressed (same-variant
+        // overrides so tailwind-merge replaces them deterministically).
+        indicator &&
+          "data-active:bg-transparent dark:data-active:border-transparent dark:data-active:bg-transparent group-data-[variant=default]/tabs-list:data-active:shadow-none after:hidden",
+        className
+      )}
       {...props}
-    />
+    >
+      {isActive ? (
+        <motion.span
+          aria-hidden="true"
+          layoutId={indicator.layoutId}
+          initial={false}
+          transition={springSoft}
+          className={
+            indicator.variant === "line"
+              ? "absolute bg-foreground group-data-horizontal/tabs:inset-x-0 group-data-horizontal/tabs:bottom-[-5px] group-data-horizontal/tabs:h-0.5 group-data-vertical/tabs:inset-y-0 group-data-vertical/tabs:-right-1 group-data-vertical/tabs:w-0.5"
+              : "absolute inset-0 rounded-md bg-background shadow-sm dark:border dark:border-input dark:bg-input/30"
+          }
+        />
+      ) : null}
+      {/* Painted after the indicator so the label rides above the pill. */}
+      <span className="relative inline-flex items-center gap-1.5">
+        {children}
+      </span>
+    </TabsPrimitive.Trigger>
   )
 }
 

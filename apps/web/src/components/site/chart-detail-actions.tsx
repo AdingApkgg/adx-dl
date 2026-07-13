@@ -5,6 +5,15 @@ import { createPortal } from "react-dom";
 import { FilmIcon, Maximize2Icon, MessageCircleIcon, XIcon } from "lucide-react";
 
 import { ChartPreviewIsland } from "@/components/chart-preview/chart-preview-island";
+import {
+  AnimatePresence,
+  EASE_OUT,
+  backdropVariants,
+  dialogVariants,
+  motion,
+  sheetVariants,
+  springSoft,
+} from "@/components/motion";
 import { ChartComments } from "@/components/site/chart-comments";
 import { ChartMediaPlayer } from "@/components/site/chart-media-player";
 import { Button } from "@/components/ui/button";
@@ -70,13 +79,21 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
     };
   }, [activePanel]);
 
+  // Each branch carries a stable key so AnimatePresence can play the exit
+  // animation of the outgoing panel after activePanel goes null (or switches).
   const overlay =
     activePanel === "media" ? (
-      <CenteredDialog title={mediaLabel} closeLabel={closeLabel} onClose={() => setActivePanel(null)}>
+      <CenteredDialog
+        key="media"
+        title={mediaLabel}
+        closeLabel={closeLabel}
+        onClose={() => setActivePanel(null)}
+      >
         <ChartMediaPlayer entry={entry} locale={locale} />
       </CenteredDialog>
     ) : activePanel === "comments" ? (
       <CenteredDialog
+        key="comments"
         title={detail.comments}
         closeLabel={closeLabel}
         className="max-w-3xl"
@@ -90,6 +107,7 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
       </CenteredDialog>
     ) : activePanel === "preview" ? (
       <FullscreenOverlay
+        key="preview"
         title={detail.chartPreview}
         closeLabel={closeLabel}
         onClose={() => setActivePanel(null)}
@@ -134,7 +152,9 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
           </ActionIconButton>
         </div>
       </TooltipProvider>
-      {portalRoot && overlay ? createPortal(overlay, portalRoot) : null}
+      {/* AnimatePresence stays mounted (overlay open/closed state lives above
+          it) so Escape / backdrop close unmounts through the exit animation. */}
+      {portalRoot ? createPortal(<AnimatePresence>{overlay}</AnimatePresence>, portalRoot) : null}
     </>
   );
 }
@@ -174,18 +194,27 @@ function CenteredDialog({
   onClose: () => void;
 }) {
   return (
-    <div
+    <motion.div
       role="dialog"
       aria-modal="true"
       aria-label={title}
       className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+      variants={backdropVariants}
+      initial="hidden"
+      animate="visible"
+      exit="hidden"
+      transition={{ duration: 0.2, ease: EASE_OUT }}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
         }
       }}
     >
-      <div
+      {/* The panel inherits hidden/visible/exit labels from the backdrop and
+          rises on its own spring while the backdrop just fades. */}
+      <motion.div
+        variants={dialogVariants}
+        transition={springSoft}
         className={cn(
           "flex max-h-[min(88vh,760px)] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-border/70 bg-popover shadow-2xl",
           className
@@ -193,8 +222,8 @@ function CenteredDialog({
       >
         <DialogHeader title={title} closeLabel={closeLabel} onClose={onClose} />
         <div className="min-h-0 overflow-y-auto p-4">{children}</div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -210,17 +239,22 @@ function FullscreenOverlay({
   onClose: () => void;
 }) {
   return (
-    <div
+    <motion.div
       role="dialog"
       aria-modal="true"
       aria-label={title}
       className="fixed inset-0 z-[60] flex min-h-dvh flex-col bg-background"
+      variants={sheetVariants}
+      initial="hidden"
+      animate="visible"
+      exit="hidden"
+      transition={springSoft}
     >
       <DialogHeader title={title} closeLabel={closeLabel} onClose={onClose} />
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-4 md:px-6">
         <div className="mx-auto w-full max-w-7xl">{children}</div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

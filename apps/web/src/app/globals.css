@@ -12,6 +12,66 @@
   navigation: auto;
 }
 
+/* Branded page transition on the site's shared ease-out: outgoing content
+   drifts up and fades, incoming rises into place. The site header carries its
+   own view-transition-name ("site-header", set in site-header.tsx) so the
+   chrome reads as pinned while only page content travels. */
+@keyframes vt-page-out {
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@keyframes vt-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+::view-transition-old(root) {
+  animation: vt-page-out 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+::view-transition-new(root) {
+  animation: vt-page-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Theme-toggle radial wipe: theme-toggle.tsx wraps setTheme in
+   document.startViewTransition, stamps <html data-theme-wipe> and sets
+   --theme-wipe-x/y to the toggle's coordinates, so the new palette sweeps out
+   from the button. The initial clip lives inside the keyframe (not on the
+   element) so the reduced-motion `animation: none` guard below leaves the new
+   snapshot fully visible instead of clipped to a point. */
+html[data-theme-wipe] ::view-transition-old(root) {
+  animation: none;
+}
+html[data-theme-wipe] ::view-transition-new(root) {
+  animation: theme-wipe 0.45s ease-in-out both;
+  z-index: 1;
+}
+@keyframes theme-wipe {
+  from {
+    clip-path: circle(0px at var(--theme-wipe-x, 50%) var(--theme-wipe-y, 50%));
+  }
+  to {
+    clip-path: circle(150vmax at var(--theme-wipe-x, 50%) var(--theme-wipe-y, 50%));
+  }
+}
+
+/* Skeleton shimmer: one shared transform-only sweep, applied by skeleton.tsx
+   as an overlay — arbitrarily many instances ride the same compositor
+   animation instead of N framer loops. */
+@keyframes skeleton-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+.shimmer-sweep {
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
 /* Auto-scroll a clipped label to reveal an overflowing name and return.
    `--marquee-shift` (negative px, set inline per element) is how far to travel;
    the dwell keyframes hold each end still so it reads as a gentle reveal, not a
@@ -39,6 +99,9 @@
   }
   /* No auto-scroll for reduced-motion users; the full name stays in the title. */
   [data-marquee="on"] {
+    animation: none !important;
+  }
+  .shimmer-sweep {
     animation: none !important;
   }
 }

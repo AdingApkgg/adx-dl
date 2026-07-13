@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { unzipSync } from "fflate";
 
-import { batchJobId, singleJobId, useDownloadsStore } from "./downloads-store";
+import { newBatchJobId, singleJobId, useDownloadsStore } from "./downloads-store";
 
 // Minimal browser shims: the store's download pipeline ends in saveBlobAsFile,
 // which touches `document` and `URL.createObjectURL`. We stub just enough so the
@@ -104,8 +104,8 @@ describe("downloads-store", () => {
     expect(savedFiles).toHaveLength(1);
   });
 
-  test("batch download preserves optional version group folders", async () => {
-    const id = batchJobId("AstroDX Charts");
+  test("cross-version batch saves one archive per version", async () => {
+    const id = newBatchJobId();
     useDownloadsStore.getState().startBatch({
       id,
       title: "AstroDX Charts",
@@ -127,16 +127,80 @@ describe("downloads-store", () => {
 
     await waitForSettled(id);
 
+    expect(savedFiles).toEqual(["25 CiRCLE.adx", "24 PRiSM PLUS.adx"]);
+    const circle = unzipSync(new Uint8Array(await savedBlobs[0].arrayBuffer()));
+    expect(Object.keys(circle)).toEqual(["25 CiRCLE/Same Song/maidata.txt"]);
+    const prism = unzipSync(new Uint8Array(await savedBlobs[1].arrayBuffer()));
+    expect(Object.keys(prism)).toEqual(["24 PRiSM PLUS/Same Song/maidata.txt"]);
+  });
+
+  test("single-version batch stays one combined archive", async () => {
+    const id = newBatchJobId();
+    useDownloadsStore.getState().startBatch({
+      id,
+      title: "25 CiRCLE selection",
+      charts: [
+        {
+          groupDir: "25 CiRCLE",
+          dir: "Song A",
+          files: [{ name: "maidata.txt", url: "https://example.test/a/maidata.txt" }],
+        },
+        {
+          groupDir: "25 CiRCLE",
+          dir: "Song B",
+          files: [{ name: "maidata.txt", url: "https://example.test/b/maidata.txt" }],
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+    });
+
+    await waitForSettled(id);
+
+    expect(savedFiles).toEqual(["25 CiRCLE selection.adx"]);
     const entries = unzipSync(new Uint8Array(await savedBlobs[0].arrayBuffer()));
-    expect(savedFiles).toEqual(["AstroDX Charts.adx"]);
     expect(Object.keys(entries).sort()).toEqual([
-      "24 PRiSM PLUS/Same Song/maidata.txt",
-      "25 CiRCLE/Same Song/maidata.txt",
+      "25 CiRCLE/Song A/maidata.txt",
+      "25 CiRCLE/Song B/maidata.txt",
     ]);
   });
 
+  test("each batch start gets its own job id so bars never adopt foreign jobs", async () => {
+    const first = newBatchJobId();
+    const second = newBatchJobId();
+    expect(first).not.toBe(second);
+
+    const chartFor = (dir: string, url: string) => ({
+      groupDir: "25 CiRCLE",
+      dir,
+      files: [{ name: "maidata.txt", url }],
+    });
+    useDownloadsStore.getState().startBatch({
+      id: first,
+      title: "AstroDX Charts",
+      charts: [chartFor("Song A", "https://example.test/a/maidata.txt")],
+      includeVideo: true,
+      format: "adx",
+    });
+    useDownloadsStore.getState().startBatch({
+      id: second,
+      title: "AstroDX Charts",
+      charts: [chartFor("Song B", "https://example.test/b/maidata.txt")],
+      includeVideo: true,
+      format: "adx",
+    });
+
+    // Same collection title, still two independent jobs (the old name-keyed id
+    // made the second start a dedupe no-op against the first).
+    expect(useDownloadsStore.getState().jobs).toHaveLength(2);
+
+    await waitForSettled(first);
+    await waitForSettled(second);
+    expect(savedFiles).toHaveLength(2);
+  });
+
   test("present/unpresent ref-counts so the tray only shows orphaned jobs", () => {
-    const id = batchJobId("Festival");
+    const id = newBatchJobId();
     const store = useDownloadsStore.getState();
 
     store.presentInline(id);

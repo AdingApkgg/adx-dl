@@ -7,6 +7,7 @@ import { PageViewsProvider, SitePageViews } from "@/components/site/page-view-co
 import { ServiceWorkerRegistrar } from "@/components/site/service-worker-registrar";
 import { SiteHeader } from "@/components/site/site-header";
 import { SWRProvider } from "@/components/site/swr-provider";
+import { TapRipple } from "@/components/site/tap-ripple";
 import { ThemeProvider } from "@/components/site/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { readCatalog } from "@/lib/catalog";
@@ -150,6 +151,8 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
               {/* Lives above the page subtree so an in-flight download keeps
                   rendering progress after a client-side navigation. */}
               <DownloadDock locale={locale} />
+              {/* Global maimai-style tap feedback rings (decorative). */}
+              <TapRipple />
             </PageViewsProvider>
             </SWRProvider>
           </TooltipProvider>

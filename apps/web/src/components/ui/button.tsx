@@ -1,7 +1,11 @@
+"use client"
+
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
+import type { HTMLMotionProps } from "framer-motion"
 import { Slot } from "radix-ui"
 
+import { motion, springSoft } from "@/components/motion"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
@@ -51,15 +55,27 @@ function Button({
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
   }) {
-  const Comp = asChild ? Slot.Root : "button"
+  const sharedProps = {
+    "data-slot": "button",
+    "data-variant": variant,
+    "data-size": size,
+    className: cn(buttonVariants({ variant, size, className })),
+  }
+
+  // Slot merges onto an arbitrary child (links etc.), so that branch keeps the
+  // pure-CSS press (active:translate-y-px) instead of a motion wrapper.
+  if (asChild) {
+    return <Slot.Root {...sharedProps} {...props} />
+  }
 
   return (
-    <Comp
-      data-slot="button"
-      data-variant={variant}
-      data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
+    <motion.button
+      {...sharedProps}
+      whileTap={{ scale: 0.97 }}
+      transition={springSoft}
+      // React and framer type the drag/animation DOM handlers differently
+      // (onDrag etc.); the runtime props are compatible, so cast the spread.
+      {...(props as HTMLMotionProps<"button">)}
     />
   )
 }

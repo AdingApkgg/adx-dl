@@ -9,6 +9,7 @@ import {
   type ArchiveProgress,
   type ArchiveFormat,
   type BatchArchiveFormat,
+  type NestedChart,
 } from "@/lib/adx-archive";
 import type { AdxRemoteFile } from "@/lib/adx-directory";
 import { isChartVideoFile, type ChartDownloadSpec } from "@/lib/catalog-shared";
@@ -123,6 +124,8 @@ let hydrated = false;
 /** Minimum sampling window before updating the rate estimate. */
 const SPEED_SAMPLE_MS = 500;
 const ARCHIVE_PROGRESS_SAMPLE_MS = 100;
+/** Gap between consecutive archive saves in a cross-version batch. */
+const MULTI_SAVE_SPACING_MS = 250;
 
 /** Fraction 0–100, preferring byte-level totals and falling back to file counts. */
 export function jobPercent(job: DownloadJob): number {
@@ -281,24 +284,53 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       };
 
       const format = spec.format as ArchiveFormat;
-      const archiveBlob =
-        spec.kind === "batch"
+      if (spec.kind === "batch") {
+        // A cross-version selection saves one archive per version instead of
+        // merging every version folder into a single giant archive. Archives
+        // build sequentially with cumulative progress across the whole set.
+        const charts = regroupBatch(archiveInputs, spec.dirByIndex ?? [], spec.groupByIndex ?? []);
+        const groups = splitBatchArchives(charts, spec.title);
+        let fileOffset = 0;
+        let byteOffset = 0;
+        for (const [groupIndex, group] of groups.entries()) {
+          const groupFiles = group.charts.reduce((sum, chart) => sum + chart.files.length, 0);
+          const groupBytes = group.charts.reduce(
+            (sum, chart) => sum + chart.files.reduce((inner, file) => inner + file.blob.size, 0),
+            0
+          );
+          const blob = await buildNestedArchiveBlob(
+            group.charts,
+            format as BatchArchiveFormat,
+            undefined,
+            (progress) =>
+              onArchiveProgress({
+                completedFiles: fileOffset + progress.completedFiles,
+                totalFiles: archiveInputs.length,
+                writtenBytes: byteOffset + progress.writtenBytes,
+                totalBytes: archiveTotalBytes,
+                currentFile: progress.currentFile,
+              })
+          );
+          saveBlobAsFile(blob, getArchiveDownloadFileName(group.name, format));
+          fileOffset += groupFiles;
+          byteOffset += groupBytes;
+          // Space out the save clicks so browsers don't drop back-to-back
+          // programmatic downloads (small versions can archive in a few ms).
+          if (groupIndex < groups.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, MULTI_SAVE_SPACING_MS));
+          }
+        }
+      } else {
+        const archiveBlob = spec.groupDir
           ? await buildNestedArchiveBlob(
-              regroupBatch(archiveInputs, spec.dirByIndex ?? [], spec.groupByIndex ?? []),
-              format as BatchArchiveFormat,
+              [{ name: spec.title, groupDir: spec.groupDir, files: archiveInputs }],
+              format,
               undefined,
               onArchiveProgress
             )
-          : spec.groupDir
-            ? await buildNestedArchiveBlob(
-                [{ name: spec.title, groupDir: spec.groupDir, files: archiveInputs }],
-                format,
-                undefined,
-                onArchiveProgress
-              )
           : await buildArchiveBlob(archiveInputs, format, spec.title, onArchiveProgress);
-
-      saveBlobAsFile(archiveBlob, getArchiveDownloadFileName(spec.title, format));
+        saveBlobAsFile(archiveBlob, getArchiveDownloadFileName(spec.title, format));
+      }
 
       abortControllers.delete(id);
       speedSamples.delete(id);
@@ -572,12 +604,47 @@ function regroupBatch(
     }));
 }
 
+/**
+ * Splits a regrouped batch into the archives to save: one per version folder
+ * when the selection spans multiple versions (each named by that folder, e.g.
+ * "25 CiRCLE"), otherwise a single archive named by the collection title.
+ * Charts without a version folder fall back to the collection title too.
+ */
+export function splitBatchArchives(
+  charts: NestedChart[],
+  collectionTitle: string
+): { name: string; charts: NestedChart[] }[] {
+  const grouped = new Map<string, NestedChart[]>();
+  for (const chart of charts) {
+    const key = chart.groupDir ?? "";
+    const bucket = grouped.get(key) ?? [];
+    bucket.push(chart);
+    grouped.set(key, bucket);
+  }
+  if (grouped.size <= 1) {
+    return [{ name: collectionTitle, charts }];
+  }
+  return [...grouped.entries()].map(([groupDir, groupedCharts]) => ({
+    name: groupDir || collectionTitle,
+    charts: groupedCharts,
+  }));
+}
+
 /** Stable job id for a single-chart download, keyed by its archive base name. */
 export function singleJobId(fileName: string): string {
   return `single:${fileName}`;
 }
 
-/** Stable job id for a batch download, keyed by its collection name. */
-export function batchJobId(collectionName: string): string {
-  return `batch:${collectionName}`;
+let batchJobSeq = 0;
+
+/**
+ * Unique id for each batch download start. Batch ids are deliberately NOT
+ * derived from the collection name: every batch surface shares the same
+ * default name, so a name-keyed id made a bar on one page adopt (and hide from
+ * the tray) a job started on another page. Each bar instance keeps the id it
+ * started; orphaned jobs render in the floating tray instead.
+ */
+export function newBatchJobId(): string {
+  batchJobSeq += 1;
+  return `batch:${Date.now().toString(36)}:${batchJobSeq}`;
 }

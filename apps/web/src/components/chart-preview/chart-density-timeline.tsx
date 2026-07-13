@@ -1,7 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import { useReducedMotion } from "framer-motion";
 import type { Note } from "@lxns-network/maimai-chart-engine";
+import { EASE_OUT, motion } from "@/components/motion";
 import { cn } from "@/lib/utils";
 import classes from "./chart-density-timeline.module.css";
 
@@ -150,6 +160,23 @@ export function ChartDensityTimeline({
   const rootRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
 
+  // clip-path is outside framer's reduced-motion taxonomy (it only drops
+  // transform/layout), so the entrance wipe and the seek ripple gate by hand.
+  const reducedMotion = useReducedMotion();
+  const [ripples, setRipples] = useState<{ id: number; x: number }[]>([]);
+  const rippleIdRef = useRef(0);
+
+  const spawnRipple = useCallback(
+    (clientX: number) => {
+      if (reducedMotion) return;
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (!rect || rect.width <= 0) return;
+      const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+      setRipples((prev) => [...prev, { id: rippleIdRef.current++, x }]);
+    },
+    [reducedMotion],
+  );
+
   const seekFromClientX = useCallback(
     (clientX: number) => {
       const rect = rootRef.current?.getBoundingClientRect();
@@ -196,6 +223,7 @@ export function ChartDensityTimeline({
           ? (e) => {
               draggingRef.current = true;
               seekFromClientX(e.clientX);
+              spawnRipple(e.clientX);
             }
           : undefined
       }
@@ -228,7 +256,14 @@ export function ChartDensityTimeline({
         </div>
       )}
 
-      <div className={classes.graphBars}>
+      {/* One left-to-right wipe on the whole container — never per-bar, there
+          can be 200+ buckets. */}
+      <motion.div
+        className={classes.graphBars}
+        initial={reducedMotion ? false : { clipPath: "inset(0 100% 0 0)" }}
+        animate={{ clipPath: "inset(0 0% 0 0)" }}
+        transition={{ duration: 0.6, ease: EASE_OUT }}
+      >
         {buckets.map((bucket) => {
           if (bucket.total === 0) return null;
           const heightRatio = bucket.total / maxCount;
@@ -252,11 +287,32 @@ export function ChartDensityTimeline({
             </div>
           );
         })}
-      </div>
+      </motion.div>
 
       {playheadPercent !== null ? (
         <div className={classes.playhead} style={{ left: `${playheadPercent}%` }} />
       ) : null}
+
+      {/* Short-lived seek ripples: the static wrapper span owns the centering
+          transform so framer's scale on the inner circle can't clobber it. */}
+      {ripples.map((ripple) => (
+        <span
+          key={ripple.id}
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 z-20 -translate-x-1/2 -translate-y-1/2"
+          style={{ left: `${ripple.x}px` }}
+        >
+          <motion.span
+            className="block size-10 rounded-full bg-primary/30"
+            initial={{ scale: 0, opacity: 0.5 }}
+            animate={{ scale: 1, opacity: 0 }}
+            transition={{ duration: 0.45, ease: EASE_OUT }}
+            onAnimationComplete={() =>
+              setRipples((prev) => prev.filter((entry) => entry.id !== ripple.id))
+            }
+          />
+        </span>
+      ))}
 
       {children}
     </div>

@@ -3,6 +3,8 @@
 import * as React from "react";
 import { Volume1Icon, Volume2Icon, VolumeXIcon } from "lucide-react";
 
+import { AnimatePresence, EASE_OUT, motion, springSoft } from "@/components/motion";
+
 type SyncedVideoAudioProps = {
   /** Silent PV (pv.mp4); ships without an audio track. */
   videoSrc: string;
@@ -135,8 +137,9 @@ export function SyncedVideoAudio({
   }, [volume, muted]);
 
   const effectiveVolume = muted ? 0 : volume;
+  const volumeIconKey = effectiveVolume === 0 ? "muted" : effectiveVolume < 0.5 ? "low" : "high";
   const VolumeIcon =
-    effectiveVolume === 0 ? VolumeXIcon : effectiveVolume < 0.5 ? Volume1Icon : Volume2Icon;
+    volumeIconKey === "muted" ? VolumeXIcon : volumeIconKey === "low" ? Volume1Icon : Volume2Icon;
 
   return (
     <div className="flex flex-col gap-2">
@@ -153,16 +156,37 @@ export function SyncedVideoAudio({
         {unsupportedLabel}
       </video>
       <audio ref={audioRef} src={audioSrc} preload="none" aria-hidden="true" tabIndex={-1} className="sr-only" />
-      <div className="flex items-center gap-3 self-start rounded-full border border-border/60 bg-muted/40 px-3 py-1.5">
-        <button
+      {/* Transform-only entrance (no opacity) — safe even if this ever lands in
+          prerendered HTML. */}
+      <motion.div
+        initial={{ x: -8 }}
+        animate={{ x: 0 }}
+        transition={springSoft}
+        className="flex items-center gap-3 self-start rounded-full border border-border/60 bg-muted/40 px-3 py-1.5"
+      >
+        <motion.button
           type="button"
           onClick={() => setMuted((m) => !m)}
+          whileTap={{ scale: 0.85 }}
           aria-label={muteLabel}
           aria-pressed={muted}
-          className="text-muted-foreground transition-colors hover:text-foreground"
+          className="relative text-muted-foreground transition-colors hover:text-foreground"
         >
-          <VolumeIcon className="size-4" aria-hidden="true" />
-        </button>
+          {/* popLayout lets the outgoing icon scale away in place while the
+              incoming one pops in, crossfading mute states. */}
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.span
+              key={volumeIconKey}
+              className="flex"
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.6, opacity: 0 }}
+              transition={{ duration: 0.15, ease: EASE_OUT }}
+            >
+              <VolumeIcon className="size-4" aria-hidden="true" />
+            </motion.span>
+          </AnimatePresence>
+        </motion.button>
         <input
           type="range"
           min={0}
@@ -176,7 +200,7 @@ export function SyncedVideoAudio({
           aria-label={volumeLabel}
           className="h-1 w-32 cursor-pointer accent-foreground"
         />
-      </div>
+      </motion.div>
     </div>
   );
 }

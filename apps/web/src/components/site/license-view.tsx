@@ -1,5 +1,12 @@
-import { Reveal } from "@/components/motion";
+import { Reveal, RevealGroup, RevealItem } from "@/components/motion";
 import { type Locale } from "@/lib/i18n";
+
+// Transform-only cascade: legal text must stay readable pre-hydration, so the
+// sections never get an opacity-hidden state — they only settle upward.
+const sectionRiseVariants = {
+  hidden: { y: 14 },
+  visible: { y: 0 },
+};
 
 type LicenseSection = {
   title: string;
@@ -110,19 +117,23 @@ export function LicenseView({ locale = "zh" }: { locale?: Locale }) {
       id="main-content"
       className="mx-auto flex w-full max-w-3xl flex-col gap-7 px-4 py-8 md:px-6 md:py-10"
     >
-      <Reveal className="flex flex-col gap-2">
+      {/* ssrVisible: the heading carries legal context, so it must never sit
+          at opacity 0 in the prerendered HTML. */}
+      <Reveal ssrVisible className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold">{content.title}</h1>
         <p className="text-muted-foreground">{content.description}</p>
         <p className="text-sm text-muted-foreground">{content.intro}</p>
       </Reveal>
-      <div className="grid gap-6">
+      <RevealGroup className="grid gap-6">
         {content.sections.map((section) => (
-          <section key={section.title} className="grid gap-2 border-t border-border/60 pt-5">
-            <h2 className="text-lg font-semibold">{section.title}</h2>
-            <p className="text-sm leading-7 text-muted-foreground">{section.body}</p>
-          </section>
+          <RevealItem key={section.title} variants={sectionRiseVariants}>
+            <section className="grid gap-2 border-t border-border/60 pt-5">
+              <h2 className="text-lg font-semibold">{section.title}</h2>
+              <p className="text-sm leading-7 text-muted-foreground">{section.body}</p>
+            </section>
+          </RevealItem>
         ))}
-      </div>
+      </RevealGroup>
     </main>
   );
 }

@@ -16,13 +16,20 @@ import { CatalogBrowser } from "@/components/site/catalog-browser";
 import { ChartCard } from "@/components/site/chart-card";
 import { ChartDetailActions } from "@/components/site/chart-detail-actions";
 import { CompatibleImage } from "@/components/site/compatible-image";
+import {
+  DetailHeroBackdrop,
+  DetailHeroCover,
+  RelatedChartRow,
+} from "@/components/site/detail-hero-parallax";
 import { ChartPageViews } from "@/components/site/page-view-counter";
 import { DifficultyPill } from "@/components/site/difficulty-pill";
 import { EntryAssetBadges } from "@/components/site/entry-asset-badges";
 import { EntryCover } from "@/components/site/entry-cover";
 import { GenreBadge } from "@/components/site/genre-badge";
+import { HeroAurora, HeroStatNumber } from "@/components/site/hero-aurora";
 import { HomeHeroSearch } from "@/components/site/home-hero-search";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
+import { TiltCard } from "@/components/site/tilt-card";
 import { VersionBadge } from "@/components/site/version-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -135,7 +142,7 @@ function HomeSpotlightCard({
       href={href}
       className="group flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-lg shadow-primary/5 backdrop-blur transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10"
     >
-      <div className="relative aspect-square overflow-hidden border-b border-border/60">
+      <TiltCard className="aspect-square overflow-hidden border-b border-border/60">
         <EntryCover
           entry={entry}
           locale={locale}
@@ -147,7 +154,7 @@ function HomeSpotlightCard({
           <SparklesIcon className="size-3.5 text-primary" aria-hidden="true" />
           {label}
         </span>
-      </div>
+      </TiltCard>
       <div className="flex flex-col gap-2 p-4">
         <div className="flex flex-wrap items-center gap-1.5">
           <VersionBadge version={entry.version} label={formatEntrySubcategory(entry)} />
@@ -198,10 +205,12 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
     .slice(0, 8);
 
   const countUnit = locale === "zh" ? "首" : locale === "ja" ? "曲" : "charts";
-  const stats = [
-    { label: home.metricsTotal, value: `${catalog.total_entries}` },
-    { label: home.metricsVersions, value: `${versionCount}` },
-    { label: home.metricsArtists, value: `${artistCount}` },
+  // Numeric stats count up after hydration (RollingNumber keeps the real value
+  // in the SSR HTML); the updated date stays a static string.
+  const stats: { label: string; value: number | string }[] = [
+    { label: home.metricsTotal, value: catalog.total_entries },
+    { label: home.metricsVersions, value: versionCount },
+    { label: home.metricsArtists, value: artistCount },
     { label: home.metricsUpdated, value: updatedDate },
   ];
 
@@ -256,10 +265,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
         ]}
       />
       <section className="relative isolate overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card/50 to-fuchsia-500/10 px-6 py-12 md:px-12 md:py-16">
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-          <div className="absolute -top-24 -left-24 size-[420px] rounded-full bg-primary/25 blur-3xl" />
-          <div className="absolute -bottom-32 right-0 size-[380px] rounded-full bg-fuchsia-500/20 blur-3xl" />
-        </div>
+        <HeroAurora />
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="flex flex-col gap-5">
             <Badge variant="secondary" className="w-fit">
@@ -303,7 +309,13 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
                 {stats.map((stat) => (
                   <div key={stat.label} className="flex items-baseline gap-1.5">
                     <dt>{stat.label}</dt>
-                    <dd className="font-semibold tabular-nums text-foreground">{stat.value}</dd>
+                    <dd className="font-semibold tabular-nums text-foreground">
+                      {typeof stat.value === "number" ? (
+                        <HeroStatNumber value={stat.value} />
+                      ) : (
+                        stat.value
+                      )}
+                    </dd>
                   </div>
                 ))}
               </dl>
@@ -457,6 +469,46 @@ export function ChartsPageView({
   );
 }
 
+// EntryCover types its prop as the full CatalogEntry but a related-card thumb
+// only renders the cover media plus the title/branch placeholder text. EntryCover
+// is a client component, so whatever object we hand it is serialized into the
+// page's RSC payload — blank the heavy download/source fields so a dozen sibling
+// entries don't bloat every statically exported detail page.
+function toRelatedCoverEntry(item: CatalogEntry): CatalogEntry {
+  return {
+    id: item.id,
+    remote_dir_name: "",
+    title: item.title,
+    ...(item.title_en ? { title_en: item.title_en } : {}),
+    artist: "",
+    category: item.category,
+    subcategory: item.subcategory,
+    source_archive: "",
+    source_folder: "",
+    version: item.version,
+    genre: "",
+    cabinet: item.cabinet,
+    short_id: "",
+    bpm: null,
+    offset: null,
+    download_mode: "onsite",
+    download_url: "",
+    source_url: "",
+    license_note: "",
+    files: { maidata: "", maidata_dx: "", audio: "", background: "", pv: "" },
+    assets: { has_audio: false, has_background: false, has_pv: false, has_dx_chart: false },
+    media: {
+      entry_base_url: "",
+      cover_url: item.media.cover_url,
+      ...(item.media.cover_avif ? { cover_avif: item.media.cover_avif } : {}),
+      ...(item.media.cover_webp ? { cover_webp: item.media.cover_webp } : {}),
+      audio_url: "",
+      pv_url: "",
+    },
+    difficulties: [],
+  };
+}
+
 export function ChartDetailPageView({
   entry,
   locale = "zh",
@@ -507,7 +559,7 @@ export function ChartDetailPageView({
       {/* The whole chart page is one self-contained article about the chart. */}
       <article className="flex flex-col gap-6">
       <section className="relative isolate overflow-hidden rounded-3xl border border-border/60">
-        <div aria-hidden="true" className="absolute inset-0 -z-10">
+        <DetailHeroBackdrop>
           {heroCoverSources ? (
             <>
               <CompatibleImage
@@ -522,11 +574,11 @@ export function ChartDetailPageView({
           ) : (
             <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-card/40 to-fuchsia-500/10" />
           )}
-        </div>
+        </DetailHeroBackdrop>
 
         <div className="grid gap-6 p-6 md:p-8 lg:grid-cols-[260px_minmax(0,1fr)]">
           <div className="mx-auto w-full max-w-[260px] lg:mx-0">
-            <div className="aspect-square overflow-hidden rounded-2xl border border-border/60 shadow-xl">
+            <DetailHeroCover>
               <EntryCover
                 entry={entry}
                 locale={locale}
@@ -534,7 +586,7 @@ export function ChartDetailPageView({
                 sizes="(max-width: 1024px) 260px, 260px"
                 className="h-full w-full"
               />
-            </div>
+            </DetailHeroCover>
           </div>
 
           <div className="flex flex-col gap-4">
@@ -715,25 +767,65 @@ export function ChartDetailPageView({
 
       {related.length > 0 ? (
         <section className="flex flex-col gap-4">
-          <h2 className="text-2xl font-semibold">{detail.relatedTitle}</h2>
+          <div className="flex flex-col gap-1">
+            <h2 className="text-2xl font-semibold">{detail.relatedTitle}</h2>
+            <p className="text-sm text-muted-foreground">{detail.relatedDescription}</p>
+          </div>
           {/* Real <a href> cross-links to sibling chart pages — the internal link
               graph the client-side browse grid (24 cards, button paging) can't give. */}
-          <ul className="grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2">
-            {related.map((item) => (
-              <li key={item.id}>
-                <Link
-                  href={buildLocalePath(`/charts/${entrySlug(item)}`, locale)}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-card/60 px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-card"
-                >
-                  <span className="line-clamp-1 font-medium">
-                    {formatEntryTitle(item, locale)}
-                  </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {formatEntrySubcategory(item)}
-                  </span>
-                </Link>
-              </li>
-            ))}
+          <ul className="grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3">
+            {related.map((item, index) => {
+              // Mirrors readRelatedEntries' pick priority, so the chip names
+              // the strongest tie this sibling has to the current chart.
+              const reason =
+                entry.artist && item.artist === entry.artist
+                  ? detail.relatedReasonArtist
+                  : entry.genreid != null && item.genreid === entry.genreid
+                    ? detail.relatedReasonGenre
+                    : detail.relatedReasonVersion;
+              return (
+                <RelatedChartRow key={item.id} index={index}>
+                  <Link
+                    href={buildLocalePath(`/charts/${entrySlug(item)}`, locale)}
+                    className="group flex h-full items-center gap-3 rounded-xl border border-border/60 bg-card/60 p-2.5 transition-[border-color,background-color,box-shadow] hover:border-primary/40 hover:bg-card hover:shadow-lg hover:shadow-primary/10"
+                  >
+                    <div className="relative size-16 shrink-0 overflow-hidden rounded-lg border border-border/60 sm:size-18">
+                      <EntryCover
+                        entry={toRelatedCoverEntry(item)}
+                        locale={locale}
+                        sizes="72px"
+                        className="h-full w-full rounded-lg"
+                      />
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                      <span className="line-clamp-1 text-sm font-semibold leading-snug">
+                        {formatEntryTitle(item, locale)}
+                      </span>
+                      <span className="line-clamp-1 text-xs text-muted-foreground">
+                        {formatEntryArtist(item, locale)}
+                      </span>
+                      <span className="flex flex-wrap items-center gap-1 pt-0.5">
+                        <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-medium leading-tight text-primary">
+                          {reason}
+                        </span>
+                        {item.difficulties.slice(-2).map((difficulty) => (
+                          <DifficultyPill
+                            key={`${item.id}-${difficulty.slot}`}
+                            difficulty={difficulty}
+                            showLabel
+                            className="px-1.5 py-px text-[11px]"
+                          />
+                        ))}
+                      </span>
+                    </div>
+                    <ChevronRightIcon
+                      aria-hidden="true"
+                      className="size-4 shrink-0 -translate-x-1 text-muted-foreground opacity-0 transition-[transform,opacity] duration-200 group-hover:translate-x-0 group-hover:opacity-100"
+                    />
+                  </Link>
+                </RelatedChartRow>
+              );
+            })}
           </ul>
         </section>
       ) : null}

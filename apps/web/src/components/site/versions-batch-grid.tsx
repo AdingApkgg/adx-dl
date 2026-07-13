@@ -5,13 +5,14 @@ import Link from "next/link";
 import useSWR from "swr";
 import { CheckIcon } from "lucide-react";
 
-import { AnimatePresence } from "@/components/motion";
+import { AnimatePresence, motion, springSoft } from "@/components/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { CompatibleImage } from "@/components/site/compatible-image";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
+  versionFolderName,
   versionRouteId,
   versionShortName,
   type ChartDownloadSpec,
@@ -91,6 +92,14 @@ export function VersionsBatchGrid({
   // Flatten the selected versions into one chart list for the batch archive.
   // Version folders are part of each global chart download spec.
   const selectedCharts = buildSelectedVersionCharts(groups, specs, selectedSlugs);
+  // A single-version selection names its job (and archive) after the version,
+  // so concurrent jobs stay distinguishable in the downloads tray. Multi-version
+  // selections split into per-version archives anyway.
+  const selectedGroups = groups.filter((group) => selectedSlugs.has(group.slug));
+  const collectionName =
+    selectedGroups.length === 1
+      ? versionFolderName(selectedGroups[0].name)
+      : browser.batchDefaultName;
 
   const showBar = selectMode && selectedCharts.length > 0;
 
@@ -193,24 +202,47 @@ export function VersionsBatchGrid({
                   </span>
                 )}
                 {/* Top-left: the selection checkbox in select mode, otherwise
-                    the version's chronological index as a compact id. */}
-                {selectableHere ? (
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "absolute top-2 left-2 flex size-6 items-center justify-center rounded-md border shadow-sm transition-colors",
-                      selected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border/70 bg-background/80 text-transparent"
-                    )}
-                  >
-                    <CheckIcon className="size-4" />
-                  </span>
-                ) : group.imageIndex !== null ? (
-                  <span className="absolute top-2 left-2 rounded-md bg-background/85 px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground shadow-sm ring-1 ring-border/60 backdrop-blur-sm">
-                    #{group.imageIndex}
-                  </span>
-                ) : null}
+                    the version's chronological index as a compact id. The two
+                    badges swap with a scale pop; initial={false} keeps the
+                    SSR'd index badge (and the first client render) static. */}
+                <AnimatePresence initial={false}>
+                  {selectableHere ? (
+                    <motion.span
+                      key="select-badge"
+                      aria-hidden="true"
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.5, opacity: 0 }}
+                      transition={springSoft}
+                      className={cn(
+                        "absolute top-2 left-2 flex size-6 items-center justify-center rounded-md border shadow-sm transition-colors",
+                        selected
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border/70 bg-background/80 text-transparent"
+                      )}
+                    >
+                      <motion.span
+                        className="inline-flex"
+                        initial={false}
+                        animate={selected ? { scale: 1 } : { scale: 0 }}
+                        transition={springSoft}
+                      >
+                        <CheckIcon className="size-4" />
+                      </motion.span>
+                    </motion.span>
+                  ) : group.imageIndex !== null ? (
+                    <motion.span
+                      key="index-badge"
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.5, opacity: 0 }}
+                      transition={springSoft}
+                      className="absolute top-2 left-2 rounded-md bg-background/85 px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground shadow-sm ring-1 ring-border/60 backdrop-blur-sm"
+                    >
+                      #{group.imageIndex}
+                    </motion.span>
+                  ) : null}
+                </AnimatePresence>
                 {/* Top-right: chart count, overlaid so the name below gets the
                     full width to scroll. */}
                 <span
@@ -249,7 +281,16 @@ export function VersionsBatchGrid({
               );
             }
             return (
-              <div key={group.slug} className="h-full">
+              // initial={false}: hover/tap only — nothing is serialized into
+              // the prerendered HTML and nothing animates on mount.
+              <motion.div
+                key={group.slug}
+                className="h-full"
+                initial={false}
+                whileHover={{ y: -3 }}
+                whileTap={{ scale: 0.98 }}
+                transition={springSoft}
+              >
                 <div
                   role="checkbox"
                   aria-checked={selected}
@@ -265,7 +306,7 @@ export function VersionsBatchGrid({
                 >
                   {card}
                 </div>
-              </div>
+              </motion.div>
             );
           }
 
@@ -278,14 +319,21 @@ export function VersionsBatchGrid({
           }
 
           return (
-            <div key={group.slug} className="h-full">
+            <motion.div
+              key={group.slug}
+              className="h-full"
+              initial={false}
+              whileHover={{ y: -3 }}
+              whileTap={{ scale: 0.98 }}
+              transition={springSoft}
+            >
               <Link
                 href={buildLocalePath(`/versions/${versionRouteId(group.imageIndex)}`, locale)}
-                className="group/version block h-full rounded-xl transition-transform hover:-translate-y-0.5"
+                className="group/version block h-full rounded-xl"
               >
                 {card}
               </Link>
-            </div>
+            </motion.div>
           );
         })}
       </div>
@@ -294,7 +342,7 @@ export function VersionsBatchGrid({
         {showBar ? (
           <BatchDownloadBar
             charts={selectedCharts}
-            collectionName={browser.batchDefaultName}
+            collectionName={collectionName}
             locale={locale}
             onClear={clear}
           />

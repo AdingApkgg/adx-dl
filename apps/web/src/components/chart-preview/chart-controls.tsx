@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, type ComponentProps } from "react";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -20,6 +20,7 @@ import {
   VolumeXIcon,
 } from "lucide-react";
 import { DIFFICULTY_NAMES, type ChartDifficulty } from "@lxns-network/maimai-chart-engine";
+import { AnimatePresence, motion, springSoft } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { difficultyTone, DIFFICULTY_TONE_CLASS } from "@/lib/catalog-shared";
@@ -33,6 +34,14 @@ import { useLiveBeats } from "./hooks/use-live-beats";
 import { EXPORT_FRAME_EVENT, COPY_FRAME_EVENT } from "./chart-canvas";
 
 type PreviewDict = SiteDictionary["preview"];
+
+// framer-motion 12 removed the motion(Component) call form.
+const MotionButton = motion.create(Button);
+
+/** Transport icon button with a springy press-down. */
+function TapButton(props: ComponentProps<typeof MotionButton>) {
+  return <MotionButton whileTap={{ scale: 0.92 }} transition={springSoft} {...props} />;
+}
 
 const SPEED_STEPS = [1, 0.75, 0.5, 0.25];
 
@@ -136,18 +145,35 @@ export function ChartControls({
                 onClick={() => applyDifficulty(diff)}
                 aria-pressed={active}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold transition",
+                  "relative flex items-center rounded-md border px-2.5 py-1 text-xs font-semibold transition",
                   active
-                    ? cn(DIFFICULTY_TONE_CLASS[tone], "ring-1 ring-current")
+                    ? // Text color comes from the tone class; the tone background/
+                      // border live on the gliding pill below.
+                      cn(DIFFICULTY_TONE_CLASS[tone], "border-transparent bg-transparent")
                     : "border-border/60 text-muted-foreground hover:bg-muted",
                 )}
               >
-                {DIFFICULTY_NAMES[diff]}
-                {level ? (
-                  <span className={cn("tabular-nums", active ? "opacity-80" : "opacity-60")}>
-                    {level}
-                  </span>
+                {active ? (
+                  <motion.span
+                    layoutId="preview-difficulty-pill"
+                    transition={springSoft}
+                    aria-hidden="true"
+                    // layoutId remounts crossfade old/new tone colors while the
+                    // box glides, so per-tone colors never interpolate (smear).
+                    className={cn(
+                      "absolute -inset-px rounded-md border ring-1 ring-current",
+                      DIFFICULTY_TONE_CLASS[tone],
+                    )}
+                  />
                 ) : null}
+                <span className="relative z-10 flex items-center gap-1.5">
+                  {DIFFICULTY_NAMES[diff]}
+                  {level ? (
+                    <span className={cn("tabular-nums", active ? "opacity-80" : "opacity-60")}>
+                      {level}
+                    </span>
+                  ) : null}
+                </span>
               </button>
             );
           })}
@@ -157,37 +183,50 @@ export function ChartControls({
       {/* Transport: wraps on narrow screens so the seek slider drops to its own
           full-width row instead of being clipped by the card. */}
       <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-        <Button type="button" size="icon" variant="outline" onClick={() => stepMeasure(-1)} disabled={disabled} aria-label={t.prevMeasure}>
+        <TapButton type="button" size="icon" variant="outline" onClick={() => stepMeasure(-1)} disabled={disabled} aria-label={t.prevMeasure}>
           <SkipBackIcon aria-hidden="true" />
-        </Button>
-        <Button type="button" size="icon" variant="outline" onClick={() => stepPosition(-1)} disabled={disabled} aria-label={t.prevPosition}>
+        </TapButton>
+        <TapButton type="button" size="icon" variant="outline" onClick={() => stepPosition(-1)} disabled={disabled} aria-label={t.prevPosition}>
           <ChevronLeftIcon aria-hidden="true" />
-        </Button>
-        <Button
+        </TapButton>
+        <TapButton
           type="button"
           size="icon"
           variant="default"
+          // relative: popLayout anchors the exiting icon to the button itself.
+          className="relative"
           onClick={() => (audioPending ? pause() : togglePlayback())}
           disabled={disabled}
           aria-label={isPlaying ? t.pause : audioPending ? t.audioLoading : t.play}
         >
-          {audioPending ? (
-            <Loader2Icon className="animate-spin" aria-hidden="true" />
-          ) : isPlaying ? (
-            <PauseIcon aria-hidden="true" />
-          ) : (
-            <PlayIcon aria-hidden="true" />
-          )}
-        </Button>
-        <Button type="button" size="icon" variant="outline" onClick={() => stepPosition(1)} disabled={disabled} aria-label={t.nextPosition}>
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.span
+              key={audioPending ? "loading" : isPlaying ? "pause" : "play"}
+              className="flex"
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.5, opacity: 0 }}
+              transition={springSoft}
+            >
+              {audioPending ? (
+                <Loader2Icon className="animate-spin" aria-hidden="true" />
+              ) : isPlaying ? (
+                <PauseIcon aria-hidden="true" />
+              ) : (
+                <PlayIcon aria-hidden="true" />
+              )}
+            </motion.span>
+          </AnimatePresence>
+        </TapButton>
+        <TapButton type="button" size="icon" variant="outline" onClick={() => stepPosition(1)} disabled={disabled} aria-label={t.nextPosition}>
           <ChevronRightIcon aria-hidden="true" />
-        </Button>
-        <Button type="button" size="icon" variant="outline" onClick={() => stepMeasure(1)} disabled={disabled} aria-label={t.nextMeasure}>
+        </TapButton>
+        <TapButton type="button" size="icon" variant="outline" onClick={() => stepMeasure(1)} disabled={disabled} aria-label={t.nextMeasure}>
           <SkipForwardIcon aria-hidden="true" />
-        </Button>
-        <Button type="button" size="icon" variant="outline" onClick={restartCurrentMeasure} disabled={disabled} aria-label={t.replayMeasure}>
+        </TapButton>
+        <TapButton type="button" size="icon" variant="outline" onClick={restartCurrentMeasure} disabled={disabled} aria-label={t.replayMeasure}>
           <RotateCcwIcon aria-hidden="true" />
-        </Button>
+        </TapButton>
 
         <span className="ml-1 w-24 shrink-0 text-xs tabular-nums text-muted-foreground">
           {formatClock(currentMs)} / {formatClock(totalMs)}
@@ -213,8 +252,19 @@ export function ChartControls({
           aria-label={t.progress}
         />
 
-        <Button type="button" size="sm" variant="outline" onClick={cycleSpeed} className="w-16 shrink-0 tabular-nums">
-          {playbackSpeed.toFixed(2)}x
+        <Button type="button" size="sm" variant="outline" onClick={cycleSpeed} className="relative w-16 shrink-0 overflow-hidden tabular-nums">
+          {/* Slot-machine slide: the new speed rolls up over the old one. */}
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.span
+              key={playbackSpeed}
+              initial={{ y: 12, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -12, opacity: 0 }}
+              transition={springSoft}
+            >
+              {playbackSpeed.toFixed(2)}x
+            </motion.span>
+          </AnimatePresence>
         </Button>
       </div>
 

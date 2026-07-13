@@ -1,6 +1,8 @@
 "use client";
 
+import * as React from "react";
 import { MonitorIcon, MoonStarIcon, SunMediumIcon } from "lucide-react";
+import { useReducedMotion } from "framer-motion";
 
 import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
 import { Button } from "@/components/ui/button";
@@ -20,14 +22,61 @@ type ThemeToggleLabels = {
   system: string;
 };
 
+type ThemeSetting = "light" | "dark" | "system";
+
+// startViewTransition is not in every TS DOM lib / browser yet — feature-detect.
+type DocumentWithViewTransition = Document & {
+  startViewTransition?: (update: () => void) => { finished: Promise<void> };
+};
+
 export function ThemeToggle({ labels }: { labels: ThemeToggleLabels }) {
   const { theme, resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme !== "light";
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const prefersReducedMotion = useReducedMotion();
+
+  const handleThemeChange = (value: ThemeSetting) => {
+    const doc = document as DocumentWithViewTransition;
+    const nextResolved =
+      value === "system"
+        ? window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light"
+        : value;
+    // Wipe only when the palette actually flips; otherwise (and on unsupported
+    // browsers / reduced motion) fall back to a plain theme change.
+    if (!doc.startViewTransition || prefersReducedMotion || nextResolved === resolvedTheme) {
+      setTheme(value);
+      return;
+    }
+    const root = document.documentElement;
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) {
+      root.style.setProperty("--theme-wipe-x", `${rect.left + rect.width / 2}px`);
+      root.style.setProperty("--theme-wipe-y", `${rect.top + rect.height / 2}px`);
+    }
+    // globals.css swaps the page transition for a radial wipe while this
+    // attribute is present.
+    root.dataset.themeWipe = "";
+    const transition = doc.startViewTransition(() => {
+      // Flip the class synchronously so the "new" snapshot already carries the
+      // next palette; ThemeProvider's effect re-applies the same class later.
+      root.classList.toggle("dark", nextResolved === "dark");
+      setTheme(value);
+    });
+    const cleanup = () => {
+      delete root.dataset.themeWipe;
+      root.style.removeProperty("--theme-wipe-x");
+      root.style.removeProperty("--theme-wipe-y");
+    };
+    transition.finished.then(cleanup, cleanup);
+  };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
+          ref={triggerRef}
           variant="outline"
           size="icon-sm"
           type="button"
@@ -52,9 +101,7 @@ export function ThemeToggle({ labels }: { labels: ThemeToggleLabels }) {
       <DropdownMenuContent>
         <DropdownMenuRadioGroup
           value={theme}
-          onValueChange={(value) =>
-            setTheme(value as "light" | "dark" | "system")
-          }
+          onValueChange={(value) => handleThemeChange(value as ThemeSetting)}
         >
           <DropdownMenuRadioItem value="light">
             <SunMediumIcon />

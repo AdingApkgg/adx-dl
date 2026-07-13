@@ -1,6 +1,8 @@
 "use client";
 
+import { useId } from "react";
 import type { MirrorMode, JudgmentLineDesign } from "@lxns-network/maimai-chart-engine";
+import { motion, springSoft } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -139,21 +141,40 @@ function SegButton<T extends string>({
   value,
   current,
   onSelect,
+  pillId,
   children,
 }: {
   value: T;
   current: T;
   onSelect: (v: T) => void;
+  /** Shared layoutId so the active pill glides between this group's buttons. */
+  pillId: string;
   children: React.ReactNode;
 }) {
+  const active = value === current;
   return (
     <Button
       type="button"
       size="sm"
-      variant={value === current ? "default" : "outline"}
+      variant="outline"
       onClick={() => onSelect(value)}
+      className={cn(
+        "relative",
+        // The active look (bg-primary) lives on the gliding pill; the button
+        // itself only carries the matching text color.
+        active &&
+          "border-transparent text-primary-foreground hover:bg-transparent hover:text-primary-foreground dark:bg-transparent dark:hover:bg-transparent",
+      )}
     >
-      {children}
+      {active ? (
+        <motion.span
+          layoutId={pillId}
+          transition={springSoft}
+          aria-hidden="true"
+          className="absolute -inset-px rounded-[inherit] bg-primary"
+        />
+      ) : null}
+      <span className="relative z-10">{children}</span>
     </Button>
   );
 }
@@ -192,6 +213,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function ChartSettings({ locale = "zh", className }: { locale?: Locale; className?: string }) {
   const s = useGameSettingsStore();
   const t = LABELS[locale];
+  // One layoutId per segmented group, so each group's active pill glides
+  // independently (and two mounted panels never fight over the same id).
+  const pillId = useId();
 
   return (
     <div className={cn("flex flex-col gap-4", className)}>
@@ -223,7 +247,13 @@ export function ChartSettings({ locale = "zh", className }: { locale?: Locale; c
               ["rotate180", t.mirror180],
             ] as [MirrorMode, string][]
           ).map(([v, label]) => (
-            <SegButton key={v} value={v} current={s.mirrorMode} onSelect={s.setMirrorMode}>
+            <SegButton
+              key={v}
+              value={v}
+              current={s.mirrorMode}
+              onSelect={s.setMirrorMode}
+              pillId={`${pillId}-mirror`}
+            >
               {label}
             </SegButton>
           ))}
@@ -245,6 +275,7 @@ export function ChartSettings({ locale = "zh", className }: { locale?: Locale; c
               value={v}
               current={s.judgmentLineDesign}
               onSelect={s.setJudgmentLineDesign}
+              pillId={`${pillId}-judgment`}
             >
               {label}
             </SegButton>
@@ -344,6 +375,7 @@ export function ChartSettings({ locale = "zh", className }: { locale?: Locale; c
               value={v}
               current={s.fullscreenQuality}
               onSelect={s.setFullscreenQuality}
+              pillId={`${pillId}-quality`}
             >
               {label}
             </SegButton>

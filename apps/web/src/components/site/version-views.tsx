@@ -5,6 +5,7 @@ import { Reveal } from "@/components/motion";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
 import { CompatibleImage } from "@/components/site/compatible-image";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
+import { VersionScrollSpine } from "@/components/site/version-scroll-spine";
 import { VersionsBatchGrid } from "@/components/site/versions-batch-grid";
 import {
   toCatalogCardEntry,
@@ -53,7 +54,10 @@ export function VersionsIndexView({
         <p className="text-muted-foreground">{versions.description}</p>
         <p className="text-sm text-muted-foreground">{versions.intro(withCharts)}</p>
       </Reveal>
-      <VersionsBatchGrid groups={groups} versionCharts={versionCharts} locale={locale} />
+      {/* Scroll-progress spine decorating the grid's left gutter (md+ only). */}
+      <VersionScrollSpine>
+        <VersionsBatchGrid groups={groups} versionCharts={versionCharts} locale={locale} />
+      </VersionScrollSpine>
     </main>
   );
 }
@@ -101,11 +105,13 @@ export function VersionDetailView({
       </Reveal>
       {/* Card-level slice only — the full entries stay server-side for the
           JSON-LD above; batch download fetches /charts/specs.json lazily. */}
-      <CatalogBrowser
-        entries={entries.map(toCatalogCardEntry)}
-        locale={locale}
-        detailPathPrefix={buildLocalePath("/charts", locale)}
-      />
+      <VersionScrollSpine>
+        <CatalogBrowser
+          entries={entries.map(toCatalogCardEntry)}
+          locale={locale}
+          detailPathPrefix={buildLocalePath("/charts", locale)}
+        />
+      </VersionScrollSpine>
     </main>
   );
 }

@@ -4,6 +4,7 @@ import * as React from "react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 import { CheckIcon } from "lucide-react"
 
+import { EASE_OUT, motion } from "@/components/motion"
 import { cn } from "@/lib/utils"
 
 function DropdownMenu({
@@ -24,8 +25,27 @@ function DropdownMenuContent({
   className,
   sideOffset = 6,
   align = "end",
+  children,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+  // Radix remounts the content on every open, so a plain initial/animate pair
+  // replays the cascade each time. ~18ms per row, capped so long menus still
+  // settle within ~150ms of stagger; the panel keeps its tw-animate-css
+  // enter/exit while items drop in behind it.
+  let itemIndex = 0
+  const cascadedChildren = React.Children.map(children, (child) => {
+    if (!React.isValidElement(child)) return child
+    const delay = Math.min(itemIndex++ * 0.018, 0.126)
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.12, ease: EASE_OUT, delay }}
+      >
+        {child}
+      </motion.div>
+    )
+  })
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
@@ -37,7 +57,9 @@ function DropdownMenuContent({
           className
         )}
         {...props}
-      />
+      >
+        {cascadedChildren}
+      </DropdownMenuPrimitive.Content>
     </DropdownMenuPrimitive.Portal>
   )
 }
