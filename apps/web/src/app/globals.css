@@ -1,5 +1,4 @@
 @import "@fontsource-variable/noto-sans";
-@import "@fontsource-variable/noto-sans-sc";
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -180,7 +179,13 @@ html[data-theme-wipe] ::view-transition-new(root) {
 }
 
 :root {
-  --site-font-sans: "Noto Sans Variable", "Noto Sans SC Variable", ui-sans-serif, system-ui, sans-serif;
+  /* Latin keeps the self-hosted Noto Sans (~35 KB); CJK falls back to each
+     platform's system font (a Noto Sans SC webfont cost ~1.3-1.5 MB/page).
+     CJK families are named per script rather than left to generic fallback:
+     Chrome resolves generic sans-serif per its own per-script settings, so a
+     browser whose UI language differs from the page (e.g. ja-UI Chrome on the
+     zh tree) could otherwise pick Japanese glyph forms for unified Han. */
+  --site-font-sans: "Noto Sans Variable", ui-sans-serif, system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   --site-font-mono: "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", monospace;
   --background: oklch(0.99 0.01 260);
   --foreground: oklch(0.22 0.03 264);
@@ -214,6 +219,14 @@ html[data-theme-wipe] ::view-transition-new(root) {
   --sidebar-accent-foreground: oklch(0.26 0.04 264);
   --sidebar-border: oklch(0.89 0.02 255);
   --sidebar-ring: oklch(0.72 0.11 259);
+}
+
+/* Japanese tree (html lang="ja"): kana and Han-unified ideographs must render
+   with Japanese glyph forms, so JP system fonts replace the SC ones. The en
+   tree keeps the zh stack: its stray CJK (song titles) rendered as SC before
+   this fallback too. */
+:root:lang(ja) {
+  --site-font-sans: "Noto Sans Variable", ui-sans-serif, system-ui, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic UI", "Meiryo", "Noto Sans CJK JP", sans-serif;
 }
 
 .dark {
