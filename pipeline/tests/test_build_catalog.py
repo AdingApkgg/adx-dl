@@ -17,6 +17,9 @@ def _media_url(relative_path: str) -> str:
     return MEDIA_BASE + quote(relative_path, safe="/")
 
 
+# The remote index now names chart folders by shortid under a numeric versionid
+# dir (e.g. "14/10146"), so cabinet is derived from the shortid, not a folder
+# prefix. See tools.build_catalog._resolve_name_cabinet.
 SAMPLE_INDEX = json.dumps(
     [
         {
@@ -28,12 +31,12 @@ SAMPLE_INDEX = json.dumps(
             "genre": "POPSアニメ",
             "bpm": 175,
             "first": 0,
-            "path": "でらっくす PLUS/[DX] コネクト",
+            "path": "14/10146",
             "files": {
-                "maidata": "でらっくす PLUS/[DX] コネクト/maidata.txt",
-                "audio": "でらっくす PLUS/[DX] コネクト/track.mp3",
-                "bg": "でらっくす PLUS/[DX] コネクト/bg.png",
-                "pv": "でらっくす PLUS/[DX] コネクト/pv.mp4",
+                "maidata": "14/10146/maidata.txt",
+                "audio": "14/10146/track.mp3",
+                "bg": "14/10146/bg.png",
+                "pv": "14/10146/pv.mp4",
             },
             "difficulties": [
                 {"slot": 2, "name": "Basic", "level": "4.0", "designer": None, "has_notes": True},
@@ -44,21 +47,49 @@ SAMPLE_INDEX = json.dumps(
         {
             "title": "Bare Song",
             "artist": "Nobody",
-            "shortid": "",
+            "shortid": "146",
             "version": "FiNALE",
             "versionid": 12,
             "genre": "",
             "bpm": None,
             "first": 0,
-            "path": "FiNALE/[ST] Bare Song",
+            "path": "12/146",
             "files": {
-                "maidata": "FiNALE/[ST] Bare Song/maidata.txt",
-                "audio": "FiNALE/[ST] Bare Song/track.mp3",
-                "bg": "FiNALE/[ST] Bare Song/bg.png",
+                "maidata": "12/146/maidata.txt",
+                "audio": "12/146/track.mp3",
+                "bg": "12/146/bg.png",
                 "pv": "",
             },
             "difficulties": [
                 {"slot": 3, "name": "Advanced", "level": "7.0", "designer": None, "has_notes": True},
+            ],
+        },
+    ],
+    ensure_ascii=False,
+)
+
+# A UTAGE (宴) chart: shortid >= 100000, and the 宴-character rides in the title
+# as a "[X]" prefix (there is no folder prefix to read anymore).
+UTAGE_INDEX = json.dumps(
+    [
+        {
+            "title": "[協]太陽系デスコ",
+            "artist": "ナユタン星人",
+            "shortid": "111069",
+            "version": "PRiSM",
+            "versionid": 23,
+            "genre": "",
+            "bpm": 160,
+            "first": 0,
+            "path": "23/111069",
+            "files": {
+                "maidata": "23/111069/maidata.txt",
+                "audio": "23/111069/track.mp3",
+                "bg": "23/111069/bg.png",
+                "pv": "",
+            },
+            "difficulties": [
+                {"slot": 7, "name": "U·TAGE", "level": "14", "designer": None, "has_notes": True},
             ],
         },
     ],
@@ -79,7 +110,7 @@ class BuildCatalogTests(unittest.TestCase):
     def test_transforms_index_into_catalog_entries(self) -> None:
         catalog = self._build()
         self.assertEqual(catalog["total_entries"], 2)
-        # Entries are sorted by id: "10146" (CJK stripped) < "bare-song".
+        # Entries are sorted by id: "10146" (CJK stripped) < "146-bare-song".
         konekto = catalog["entries"][0]
 
         self.assertEqual(konekto["title"], "コネクト")
@@ -96,11 +127,11 @@ class BuildCatalogTests(unittest.TestCase):
         self.assertEqual(konekto["bpm"], 175)
         self.assertEqual(
             konekto["files"]["maidata"],
-            _media_url("でらっくす PLUS/[DX] コネクト/maidata.txt"),
+            _media_url("14/10146/maidata.txt"),
         )
         self.assertEqual(
             konekto["media"]["cover_url"],
-            _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
+            _media_url("14/10146/bg.png"),
         )
         self.assertTrue(konekto["assets"]["has_pv"])
         self.assertTrue(konekto["assets"]["has_dx_chart"])
@@ -119,13 +150,31 @@ class BuildCatalogTests(unittest.TestCase):
     def test_missing_pv_and_standard_cabinet(self) -> None:
         bare = self._build()["entries"][1]
         self.assertEqual(bare["version"], "maimai FiNALE")
+        # shortid 146 (< 10000) => Standard cabinet.
         self.assertEqual(bare["cabinet"], "ST")
-        self.assertEqual(bare["short_id"], "")
+        self.assertEqual(bare["short_id"], "146")
         self.assertEqual(bare["files"]["pv"], "")
         self.assertEqual(bare["media"]["pv_url"], "")
         self.assertFalse(bare["assets"]["has_pv"])
         self.assertFalse(bare["assets"]["has_dx_chart"])
         self.assertEqual(bare["download_mode"], "onsite")
+
+    def test_utage_cabinet_and_name_from_title_prefix(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            catalog_path = build_catalog(
+                Path(temp_dir),
+                fetch_text=lambda _url: UTAGE_INDEX,
+                download_media=False,
+            )
+            entry = json.loads(catalog_path.read_text(encoding="utf-8"))["entries"][0]
+        # shortid >= 100000 => UTAGE; the 宴-character is recovered from the
+        # title's "[X]" prefix, and the display name drops that prefix.
+        self.assertEqual(entry["cabinet"], "協")
+        self.assertEqual(entry["title"], "[協]太陽系デスコ")
+        self.assertEqual(entry["remote_dir_name"], "太陽系デスコ")
+        self.assertEqual(entry["slug"], "111069")
+        self.assertEqual(entry["version"], "maimai DX PRiSM")
+        self.assertFalse(entry["assets"]["has_dx_chart"])
 
     def test_catalog_categories_list_distinct_versions(self) -> None:
         catalog = self._build()
@@ -151,11 +200,11 @@ class BuildCatalogTests(unittest.TestCase):
 
             self.assertTrue((root / "apps/web/public/adxcs/10146/maidata.txt").exists())
             self.assertTrue((root / "apps/web/public/adxcs/10146/bg.png").exists())
-            self.assertTrue((root / "apps/web/public/adxcs/bare-song/maidata.txt").exists())
-            self.assertTrue((root / "apps/web/public/adxcs/bare-song/bg.png").exists())
+            self.assertTrue((root / "apps/web/public/adxcs/146/maidata.txt").exists())
+            self.assertTrue((root / "apps/web/public/adxcs/146/bg.png").exists())
 
-        self.assertIn(_media_url("でらっくす PLUS/[DX] コネクト/maidata.txt"), seen_urls)
-        self.assertIn(_media_url("でらっくす PLUS/[DX] コネクト/bg.png"), seen_urls)
+        self.assertIn(_media_url("14/10146/maidata.txt"), seen_urls)
+        self.assertIn(_media_url("14/10146/bg.png"), seen_urls)
 
     def test_downloads_cover_images_as_local_avif(self) -> None:
         seen_exts: list[str] = []
@@ -189,16 +238,16 @@ class BuildCatalogTests(unittest.TestCase):
             # (used by the .adx download and OG/social images).
             self.assertEqual(
                 konekto["media"]["cover_url"],
-                _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
+                _media_url("14/10146/bg.png"),
             )
             self.assertEqual(
                 konekto["files"]["background"],
-                _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
+                _media_url("14/10146/bg.png"),
             )
             # Audio/PV always stay remote.
             self.assertEqual(
                 konekto["media"]["audio_url"],
-                _media_url("でらっくす PLUS/[DX] コネクト/track.mp3"),
+                _media_url("14/10146/track.mp3"),
             )
             saved = media_root / "10146.avif"
             self.assertTrue(saved.exists())
@@ -231,7 +280,7 @@ class BuildCatalogTests(unittest.TestCase):
         self.assertEqual(konekto["media"]["cover_webp"], "")
         self.assertEqual(
             konekto["media"]["cover_url"],
-            _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
+            _media_url("14/10146/bg.png"),
         )
 
     def test_keeps_remote_cover_when_conversion_unavailable(self) -> None:
@@ -253,7 +302,7 @@ class BuildCatalogTests(unittest.TestCase):
         self.assertEqual(konekto["media"]["cover_webp"], "")
         self.assertEqual(
             konekto["media"]["cover_url"],
-            _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
+            _media_url("14/10146/bg.png"),
         )
 
     def test_uses_webp_when_only_avif_conversion_fails(self) -> None:
@@ -301,7 +350,7 @@ class BuildCatalogTests(unittest.TestCase):
             self.assertEqual(konekto["media"]["cover_webp"], "")
             self.assertEqual(
                 konekto["media"]["cover_url"],
-                _media_url("でらっくす PLUS/[DX] コネクト/bg.png"),
+                _media_url("14/10146/bg.png"),
             )
             self.assertFalse(media_root.exists())
 

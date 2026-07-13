@@ -78,6 +78,7 @@ CANONICAL_VERSIONS: dict[int, str] = {
     23: "maimai DX PRiSM",
     24: "maimai DX PRiSM PLUS",
     25: "maimai DX CiRCLE",
+    26: "maimai DX CiRCLE PLUS",
 }
 
 
@@ -116,19 +117,37 @@ def _media_url(relative_path: str) -> str:
     return MEDIA_BASE + quote(relative_path, safe="/")
 
 
-def _strip_cabinet_prefix(segment: str) -> tuple[str, str]:
-    # "[DX] 1000年生きてる" -> ("1000年生きてる", "DX"); "[奏]アイドル" -> ("アイドル", "奏")
-    match = re.match(r"^\[([^\]]*)\]\s*(.*)$", segment)
-    if match:
-        name = match.group(2).strip()
-        return (name or segment, match.group(1).strip())
-    return (segment, "")
+def _resolve_name_cabinet(title: str, short_id: str, path: str) -> tuple[str, str]:
+    # The chart folders are named by shortid (e.g. "111069"), so cabinet can no
+    # longer be read off a "[DX]"/"[奏]" folder prefix. Derive it from the stable
+    # maimai shortid convention instead: <10000 ST, 10000–99999 DX, >=100000 UTAGE.
+    # For UTAGE the specific 宴-character survives as the title's "[X]" prefix
+    # (e.g. "[協]太陽系デスコ"), which we strip for the display/download name — the
+    # same name the old "[協] …" folder prefix produced.
+    sid = int(short_id) if short_id.isdigit() else -1
+    if sid >= 100000:
+        match = re.match(r"^\[([^\]]*)\]\s*(.*)$", title)
+        if match:
+            cabinet = match.group(1).strip() or "宴"
+            name = match.group(2).strip() or title
+        else:
+            cabinet, name = "宴", title
+    elif sid >= 10000:
+        cabinet, name = "DX", title
+    elif sid >= 0:
+        cabinet, name = "ST", title
+    else:
+        cabinet, name = "", title
+    if not name:
+        name = (path.split("/")[-1] if path else "") or "chart"
+    return name, cabinet
 
 
 def _build_entry(item: dict[str, Any], generated_at: str) -> dict[str, Any]:
     path = str(item.get("path", "")).strip()
-    segment = path.split("/")[-1] if path else str(item.get("title", ""))
-    name, cabinet = _strip_cabinet_prefix(segment)
+    title = str(item.get("title", "") or "")
+    short_id = str(item.get("shortid", "") or "").strip()
+    name, cabinet = _resolve_name_cabinet(title, short_id, path)
 
     files = item.get("files") or {}
 
@@ -143,7 +162,6 @@ def _build_entry(item: dict[str, Any], generated_at: str) -> dict[str, Any]:
 
     version_id = item.get("versionid")
     version = CANONICAL_VERSIONS.get(version_id, str(item.get("version", "") or "").strip())
-    short_id = str(item.get("shortid", "") or "").strip()
     stable_key = f"{short_id}-{name}" if short_id else name
 
     difficulties = [

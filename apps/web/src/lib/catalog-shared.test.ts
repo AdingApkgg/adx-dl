@@ -164,6 +164,7 @@ describe("catalog shared helpers", () => {
       ["maimai DX PRiSM", "PRiSM", "23 PRiSM"],
       ["maimai DX PRiSM PLUS", "PRiSM PLUS", "24 PRiSM PLUS"],
       ["maimai DX CiRCLE", "CiRCLE", "25 CiRCLE"],
+      ["maimai DX CiRCLE PLUS", "CiRCLE PLUS", "26 CiRCLE PLUS"],
     ];
 
     for (const [source, shortName, folder] of expected) {

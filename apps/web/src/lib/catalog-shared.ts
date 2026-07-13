@@ -34,7 +34,7 @@ export type CatalogEntry = {
   source_archive: string;
   source_folder: string;
   version: string;
-  /** maimai version index (0 = maimai … 25 = CiRCLE); used for release ordering. */
+  /** maimai version index (0 = maimai … 26 = CiRCLE PLUS); used for release ordering. */
   versionid?: number;
   genre: string;
   /** maimai genre id (101–107); stable key for genre color + localized label. */
@@ -383,7 +383,7 @@ export type VersionGroup = {
 export const UNKNOWN_VERSION_ROUTE_ID = "unknown";
 
 /**
- * URL path segment for a version's detail route: the maimai versionid (0–25,
+ * URL path segment for a version's detail route: the maimai versionid (0–26,
  * the same value stored in each chart's maidata `&versionid=`), or "unknown"
  * for the untagged bucket. Stable numeric ids, so the route survives a version
  * being renamed.
@@ -593,7 +593,7 @@ function compactVersionName(name: string): string {
 }
 
 /**
- * Compact version folder name for downloads: a stable 00-25 order prefix plus
+ * Compact version folder name for downloads: a stable 00-26 order prefix plus
  * the agreed short version name.
  */
 export function versionFolderName(name: string): string {
