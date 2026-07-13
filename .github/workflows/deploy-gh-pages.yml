@@ -38,40 +38,23 @@ jobs:
         with:
           python-version: "3.11"
 
-      # Cover mode switch: set repo variable ASTRODX_COVERS=remote to skip the
-      # local mirror and use remote image links (default/unset = local AVIF+WebP).
-      - name: Install libavif + libwebp (avifenc/cwebp for cover conversion)
-        if: vars.ASTRODX_COVERS != 'remote'
-        run: sudo apt-get update && sudo apt-get install -y libavif-bin webp
-
-      # Reuse already-converted covers across runs: build_catalog skips any cover
-      # whose AVIF+WebP already exist, so a restored cache turns the catalog step
-      # from "download + encode 1562×2" into "only new/changed covers". Rolling
-      # key (run_id) always saves a fresh cache; restore-keys grabs the latest.
-      # Bump `covers-v1` -> `covers-v2` to force a full re-encode (e.g. quality
-      # change, or an upstream cover swapped under the same slug).
-      - name: Cache converted covers
-        if: vars.ASTRODX_COVERS != 'remote'
-        uses: actions/cache@v6
-        with:
-          path: apps/web/public/covers
-          key: covers-v1-${{ github.run_id }}
-          restore-keys: covers-v1-
-
+      # Covers (AVIF/WebP) are served from Cloudflare R2, not mirrored into the
+      # Pages build — so no libavif/cwebp install and no cover cache. build_catalog
+      # points cover_avif/webp at R2 by default (ASTRODX_COVERS=local re-enables the
+      # legacy local mirror, which would also need the encoders reinstated).
       - name: Build catalog
         working-directory: pipeline
-        env:
-          ASTRODX_COVERS: ${{ vars.ASTRODX_COVERS }}
         run: python3 -c "from pathlib import Path; from tools.build_catalog import build_catalog; print(build_catalog(Path('..').resolve(), max_workers=16))"
 
-      # bg.png and maidata.txt are served from the static site for archive
-      # packing, while track.mp3 and pv.mp4 intentionally stay remote.
+      # Only maidata.txt is mirrored to the static site now (same-origin fetch for
+      # the .adx download + chart preview); bg.png/audio/video come from R2. The
+      # adxcs-v2 key busts the old cache that still held the ~945 MB of bg.png.
       - name: Cache mirrored chart assets
         uses: actions/cache@v6
         with:
           path: apps/web/public/adxcs
-          key: adxcs-v1-${{ github.run_id }}
-          restore-keys: adxcs-v1-
+          key: adxcs-v2-${{ github.run_id }}
+          restore-keys: adxcs-v2-
 
       - name: Mirror chart assets for local downloads
         working-directory: pipeline
