@@ -1,0 +1,44 @@
+diff --git a/dist/index.js b/dist/index.js
+index 066f52b5afb294441f020ddeb64930423c47478a..2999edda332553f8f283f0adfff0f7a25e0bfb5b 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -48,7 +48,7 @@ function createSlot(ownerName) {
+     let slottableElement = null;
+     let hasSlottable = false;
+     const newChildren = [];
+-    if (isLazyComponent(children) && typeof use === "function") {
++    while (isLazyComponent(children) && typeof use === "function") {
+       children = use(children._payload);
+     }
+     React.Children.forEach(children, (maybeSlottable) => {
+@@ -56,7 +56,7 @@ function createSlot(ownerName) {
+         hasSlottable = true;
+         const slottable = maybeSlottable;
+         let child = "child" in slottable.props ? slottable.props.child : slottable.props.children;
+-        if (isLazyComponent(child) && typeof use === "function") {
++        while (isLazyComponent(child) && typeof use === "function") {
+           child = use(child._payload);
+         }
+         slottableElement = getSlottableElementFromSlottable(slottable, child);
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 8a86d522deab07bfcaa1fa07db14337b6f28a955..62f80f2668085c5e61f0a3a26bdf7c09726b68a0 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -8,7 +8,7 @@ function createSlot(ownerName) {
+     let slottableElement = null;
+     let hasSlottable = false;
+     const newChildren = [];
+-    if (isLazyComponent(children) && typeof use === "function") {
++    while (isLazyComponent(children) && typeof use === "function") {
+       children = use(children._payload);
+     }
+     React.Children.forEach(children, (maybeSlottable) => {
+@@ -16,7 +16,7 @@ function createSlot(ownerName) {
+         hasSlottable = true;
+         const slottable = maybeSlottable;
+         let child = "child" in slottable.props ? slottable.props.child : slottable.props.children;
+-        if (isLazyComponent(child) && typeof use === "function") {
++        while (isLazyComponent(child) && typeof use === "function") {
+           child = use(child._payload);
+         }
+         slottableElement = getSlottableElementFromSlottable(slottable, child);
