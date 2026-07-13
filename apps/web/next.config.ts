@@ -6,6 +6,12 @@ const rootDir = path.resolve(process.cwd(), "..", "..");
 
 const nextConfig: NextConfig = {
   output: "export",
+  // Client-side navigations (the normal case — RSC payloads ship in the static
+  // export) animate via React's <ViewTransition>; see PageTransition in
+  // src/app/page-transition.tsx. Hard loads use @view-transition in globals.css.
+  experimental: {
+    viewTransition: true,
+  },
   images: {
     unoptimized: true,
   },

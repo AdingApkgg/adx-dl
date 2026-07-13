@@ -35,6 +35,33 @@
   animation: vt-page-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Same-document (client-side) navigations: the static export ships full RSC
+   payloads, so in-app links normally do NOT reload the document and the rules
+   above never fire. React's <ViewTransition update="vt-page"> around the page
+   content (src/app/page-transition.tsx, enabled by experimental.viewTransition)
+   runs the browser transition instead — map its class onto the same keyframes
+   so soft and hard navigations share one motion. */
+::view-transition-old(.vt-page) {
+  animation: vt-page-out 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+::view-transition-new(.vt-page) {
+  animation: vt-page-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Keep the chrome pinned while content travels: no animation, rendered above
+   the moving snapshots, and the old header snapshot hidden so identical
+   old/new headers never double up as a brief flash. */
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 60;
+}
+::view-transition-old(site-header) {
+  display: none;
+}
+::view-transition-new(site-header) {
+  animation: none;
+}
+
 /* Theme-toggle radial wipe: theme-toggle.tsx wraps setTheme in
    document.startViewTransition, stamps <html data-theme-wipe> and sets
    --theme-wipe-x/y to the toggle's coordinates, so the new palette sweeps out

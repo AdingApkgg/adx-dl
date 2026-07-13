@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { LocaleSuggestionBanner } from "@/app/locale-suggestion-banner";
+import { PageTransition } from "@/app/page-transition";
 import { MotionProvider } from "@/components/motion";
 import { DownloadDock } from "@/components/site/downloads/download-dock";
 import { PageViewsProvider, SitePageViews } from "@/components/site/page-view-counter";
@@ -38,11 +39,13 @@ const licenseLinkLabel: Record<Locale, string> = {
 // 'light'/'dark' wins, otherwise (unset or 'system') follow the OS preference.
 const noFlashThemeScript = `(function(){try{var t=localStorage.getItem('theme');var m=window.matchMedia('(prefers-color-scheme: dark)').matches;var d=t==='light'?false:(t==='dark'?true:m);document.documentElement.classList.toggle('dark',d);}catch(e){document.documentElement.classList.add('dark');}})();`;
 
-// Speculation Rules: we ship a pure static export (client RSC nav payloads are
-// pruned for the CF Pages 20k-file cap), so links are full-page loads. This
-// tells Chromium to prefetch same-origin pages on hover/pointerdown, so the
-// cross-document navigation feels near-instant and the @view-transition in
-// globals.css animates it. `prefetch` (not `prerender`) on purpose: it caches
+// Speculation Rules: the static export ships full RSC payloads (the CF Pages
+// prune was reverted — see repo history), so in-app links normally client-side
+// navigate and animate via <PageTransition>. This rule covers the remaining
+// cross-document loads (first visit, refresh, middle-click, expired cache):
+// Chromium prefetches same-origin pages on hover/pointerdown so those hard
+// navigations feel near-instant and the @view-transition in globals.css
+// animates them. `prefetch` (not `prerender`) on purpose: it caches
 // the HTML without running page scripts, so the pageview counter / comments
 // backend are NOT triggered for merely-hovered pages. `href_matches: "/*"` only
 // matches same-origin path-absolute URLs, so external links are excluded.
@@ -83,7 +86,7 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
                 {/* Only the zh (default) tree suggests switching: prefixed trees were an explicit choice. */}
                 {locale === "zh" ? <LocaleSuggestionBanner /> : null}
                 <SiteHeader totalEntries={catalog.total_entries} />
-                {children}
+                <PageTransition>{children}</PageTransition>
                 <footer className="mt-auto border-t border-border/60 bg-background/60">
                   <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-8 md:px-6">
                     <p className="max-w-2xl text-sm text-muted-foreground">
