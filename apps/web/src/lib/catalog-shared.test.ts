@@ -71,9 +71,10 @@ describe("catalog shared helpers", () => {
     const entry = buildEntry();
 
     expect(getChartAssetFiles(entry)).toEqual([
+      // maidata stays same-origin (local mirror); bg.png/audio/pv come from R2.
       { name: "maidata.txt", url: "/adxcs/11951/maidata.txt" },
       { name: "track.mp3", url: "/covers/song-1/track.mp3" },
-      { name: "bg.png", url: "/adxcs/11951/bg.png" },
+      { name: "bg.png", url: "/covers/song-1/bg.jpg" },
       { name: "pv.mp4", url: "/covers/song-1/pv.mp4" },
     ]);
 
@@ -100,7 +101,7 @@ describe("catalog shared helpers", () => {
       files: [
         { name: "maidata.txt", url: "/adxcs/11951/maidata.txt" },
         { name: "track.mp3", url: "/covers/song-1/track.mp3" },
-        { name: "bg.png", url: "/adxcs/11951/bg.png" },
+        { name: "bg.png", url: "/covers/song-1/bg.jpg" },
         { name: "pv.mp4", url: "/covers/song-1/pv.mp4" },
       ],
       groupDir: "21 BUDDiES",

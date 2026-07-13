@@ -228,8 +228,9 @@ describe("page views locale-driven content", () => {
     });
 
     expect(getChartPreviewAssets(entry)).toEqual({
+      // Only maidata stays same-origin; cover/audio/video come from R2.
       maidataUrl: "/adxcs/11951/maidata.txt",
-      coverUrl: "/adxcs/11951/bg.png",
+      coverUrl: "https://adxcs.saop.cc/charts/11951/bg.png",
       audioUrl: "https://adxcs.saop.cc/charts/11951/track.mp3",
       videoUrl: "https://adxcs.saop.cc/charts/11951/pv.mp4",
     });

@@ -7,13 +7,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from tools.build_catalog import INDEX_URL, _assign_route_slugs, _build_entry, _media_url
+from tools.build_catalog import INDEX_URL, _assign_route_slugs, _build_entry, _maidata_url
 from tools.remote_catalog import fetch_bytes as default_fetch_bytes
 from tools.remote_catalog import fetch_text as default_fetch_text
 
+# Only maidata.txt is mirrored locally (served same-origin so the .adx download
+# and chart preview can fetch/parse it without CORS). bg.png / audio / video are
+# served from R2 directly — keeping bg.png out of the Pages build saves ~780 MB.
 LOCAL_ASSET_NAMES = {
     "maidata": "maidata.txt",
-    "bg": "bg.png",
 }
 
 
@@ -51,11 +53,12 @@ def mirror_chart_assets(
     fetch_bytes: Callable[[str], bytes] = default_fetch_bytes,
     max_workers: int = 8,
 ) -> Path:
-    """Mirror chart bg + maidata into apps/web/public/adxcs/<route-id>/.
+    """Mirror chart maidata into apps/web/public/adxcs/<route-id>/.
 
     The route id intentionally matches the chart detail URL id (normally the
-    maimai shortid, e.g. /charts/11951), because the web download spec reads
-    /adxcs/<route-id>/bg.png and /adxcs/<route-id>/maidata.txt directly.
+    maimai shortid, e.g. /charts/11951), because the web download spec and chart
+    preview read /adxcs/<route-id>/maidata.txt directly (same-origin, no CORS).
+    bg.png/audio/video come from R2 instead.
     """
 
     target_root = root / "apps" / "web" / "public" / "adxcs"
@@ -69,7 +72,7 @@ def mirror_chart_assets(
         for source_key, local_name in LOCAL_ASSET_NAMES.items():
             relative_path = str(files.get(source_key) or "").strip()
             if relative_path:
-                tasks.append((target_root / route_id / local_name, _media_url(relative_path)))
+                tasks.append((target_root / route_id / local_name, _maidata_url(relative_path)))
 
     downloaded = 0
     cached = 0

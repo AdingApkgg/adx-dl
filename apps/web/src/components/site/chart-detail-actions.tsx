@@ -40,7 +40,7 @@ export function getChartPreviewAssets(entry: CatalogEntry) {
     maidataUrl: localChartAssetUrl(entry, "maidata.txt"),
     coverUrl:
       entry.assets.has_background || Boolean(entry.media.cover_url)
-        ? localChartAssetUrl(entry, "bg.png")
+        ? entry.media.cover_url || undefined
         : undefined,
     audioUrl: entry.media.audio_url || undefined,
     videoUrl: entry.media.pv_url || undefined,

@@ -8,13 +8,23 @@ from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 
-from tools.build_catalog import MEDIA_BASE, _aliases_for, build_catalog, fetch_alias_map
+from tools.build_catalog import (
+    MAIDATA_BASE,
+    MEDIA_BASE,
+    _aliases_for,
+    build_catalog,
+    fetch_alias_map,
+)
 from tools.mirror_chart_assets import mirror_chart_assets
 from tools.remote_catalog import fetch_text
 
 
 def _media_url(relative_path: str) -> str:
     return MEDIA_BASE + quote(relative_path, safe="/")
+
+
+def _maidata_url(relative_path: str) -> str:
+    return MAIDATA_BASE + quote(relative_path, safe="/")
 
 
 # The remote index now names chart folders by shortid under a numeric versionid
@@ -127,12 +137,15 @@ class BuildCatalogTests(unittest.TestCase):
         self.assertEqual(konekto["bpm"], 175)
         self.assertEqual(
             konekto["files"]["maidata"],
-            _media_url("14/10146/maidata.txt"),
+            _maidata_url("14/10146/maidata.txt"),
         )
         self.assertEqual(
             konekto["media"]["cover_url"],
             _media_url("14/10146/bg.png"),
         )
+        # Display covers default to the R2 copies alongside bg.png (no local mirror).
+        self.assertEqual(konekto["media"]["cover_avif"], _media_url("14/10146/bg.avif"))
+        self.assertEqual(konekto["media"]["cover_webp"], _media_url("14/10146/bg.webp"))
         self.assertTrue(konekto["assets"]["has_pv"])
         self.assertTrue(konekto["assets"]["has_dx_chart"])
 
@@ -198,13 +211,16 @@ class BuildCatalogTests(unittest.TestCase):
                 max_workers=1,
             )
 
+            # Only maidata is mirrored locally now; bg.png is served from R2.
             self.assertTrue((root / "apps/web/public/adxcs/10146/maidata.txt").exists())
-            self.assertTrue((root / "apps/web/public/adxcs/10146/bg.png").exists())
             self.assertTrue((root / "apps/web/public/adxcs/146/maidata.txt").exists())
-            self.assertTrue((root / "apps/web/public/adxcs/146/bg.png").exists())
+            self.assertFalse((root / "apps/web/public/adxcs/10146/bg.png").exists())
+            self.assertFalse((root / "apps/web/public/adxcs/146/bg.png").exists())
 
-        self.assertIn(_media_url("14/10146/maidata.txt"), seen_urls)
-        self.assertIn(_media_url("14/10146/bg.png"), seen_urls)
+        # maidata is mirrored from the origin host (not R2, which has no maidata).
+        self.assertIn(_maidata_url("14/10146/maidata.txt"), seen_urls)
+        self.assertNotIn(_media_url("14/10146/bg.png"), seen_urls)
+        self.assertNotIn(_maidata_url("14/10146/bg.png"), seen_urls)
 
     def test_downloads_cover_images_as_local_avif(self) -> None:
         seen_exts: list[str] = []
@@ -327,13 +343,14 @@ class BuildCatalogTests(unittest.TestCase):
             self.assertTrue((media_root / "10146.webp").exists())
             self.assertFalse((media_root / "10146.avif").exists())
 
-    def test_remote_mode_env_skips_local_mirror(self) -> None:
+    def test_covers_point_at_r2_without_local_mirror(self) -> None:
         def fetch_should_not_run(_url: str) -> bytes:
-            raise AssertionError("remote mode must not download covers")
+            raise AssertionError("R2-cover mode must not download covers")
 
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             media_root = root / "media"
+            # Anything other than ASTRODX_COVERS=local skips the mirror -> R2 covers.
             with patch.dict(os.environ, {"ASTRODX_COVERS": "remote"}):
                 catalog_path = build_catalog(
                     root,
@@ -342,12 +359,11 @@ class BuildCatalogTests(unittest.TestCase):
                     to_avif=lambda _data, _ext: b"AVIFDATA",
                     to_webp=lambda _data, _ext: b"WEBPDATA",
                     media_root=media_root,
-                    # download_media omitted -> ASTRODX_COVERS decides
                 )
             konekto = json.loads(catalog_path.read_text(encoding="utf-8"))["entries"][0]
-            # Remote mode: nothing downloaded; cover stays the remote link.
-            self.assertEqual(konekto["media"]["cover_avif"], "")
-            self.assertEqual(konekto["media"]["cover_webp"], "")
+            # No local mirror; display covers point at the R2 bg.avif/bg.webp.
+            self.assertEqual(konekto["media"]["cover_avif"], _media_url("14/10146/bg.avif"))
+            self.assertEqual(konekto["media"]["cover_webp"], _media_url("14/10146/bg.webp"))
             self.assertEqual(
                 konekto["media"]["cover_url"],
                 _media_url("14/10146/bg.png"),

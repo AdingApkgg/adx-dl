@@ -163,7 +163,7 @@ export function getChartAssetFiles(
       ? { name: "maidata.txt", url: localChartAssetUrl(entry, "maidata.txt") }
       : null,
     { name: "track.mp3", url: entry.media.audio_url },
-    entry.media.cover_url ? { name: "bg.png", url: localChartAssetUrl(entry, "bg.png") } : null,
+    entry.media.cover_url ? { name: "bg.png", url: entry.media.cover_url } : null,
     includeVideo ? { name: "pv.mp4", url: entry.media.pv_url } : null,
   ];
   return candidates.filter((file): file is ChartAssetFile => Boolean(file && file.url));
