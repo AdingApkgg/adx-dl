@@ -33,6 +33,7 @@ import { RandomChartButton } from "@/components/site/random-chart-button";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { TiltCard } from "@/components/site/tilt-card";
 import { VersionBadge } from "@/components/site/version-badge";
+import { VersionTileCard } from "@/components/site/version-tile-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,12 +66,7 @@ import { DEMO_VIDEO_URL } from "@/lib/resource-links";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 import { cn } from "@/lib/utils";
-import {
-  MAIMAI_VERSIONS,
-  VERSION_IMAGE_DIMENSIONS,
-  versionImageIndex,
-  versionImageSourcesByIndex,
-} from "@/lib/version-image";
+import { MAIMAI_VERSIONS, versionImageIndex } from "@/lib/version-image";
 import {
   buildCatalogDatasetStructuredData,
   buildChartDetailStructuredData,
@@ -185,7 +181,7 @@ function HomeSpotlightCard({
 export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
   const dictionary = getDictionary(locale);
   const home = dictionary.home;
-  const latestEntries = sortByReleaseDesc(catalog.entries).slice(0, 8);
+  const latestEntries = sortByReleaseDesc(catalog.entries).slice(0, 12);
   const versionCount = new Set(Object.values(catalog.categories).flat()).size;
   const artistCount = new Set(
     catalog.entries.map((entry) => entry.artist.trim()).filter(Boolean)
@@ -206,9 +202,8 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
     .reverse()
     .map((version) => ({ ...version, count: versionCharts.get(version.index) ?? 0 }))
     .filter((version) => version.count > 0)
-    .slice(0, 8);
+    .slice(0, 12);
 
-  const countUnit = locale === "zh" ? "首" : locale === "ja" ? "曲" : "charts";
   // Numeric stats count up after hydration (RollingNumber keeps the real value
   // in the SSR HTML); the updated date stays a static string.
   const stats: { label: string; value: number | string }[] = [
@@ -254,7 +249,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
   const latestIds = new Set(latestEntries.map((entry) => entry.id));
   const featuredEntries = shuffled
     .filter((entry) => entry.id !== spotlight?.id && !latestIds.has(entry.id))
-    .slice(0, 8);
+    .slice(0, 12);
 
   return (
     <main
@@ -353,26 +348,19 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
             </Link>
           </Button>
         </Reveal>
-        <RevealGroup as="ul" role="list" className="grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 lg:grid-cols-4">
+        <RevealGroup as="ul" role="list" className="grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {versionTiles.map((version) => (
             <RevealItem as="li" key={version.index} ssrVisible className="h-full">
               <Link
                 href={buildLocalePath(`/versions/${versionRouteId(version.index)}`, locale)}
-                className="group flex h-full flex-col items-center gap-3 rounded-2xl border border-border/60 bg-card/70 p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10"
+                className="group/version block h-full rounded-xl transition-transform hover:-translate-y-0.5"
               >
-                <CompatibleImage
-                  sources={versionImageSourcesByIndex(version.index)}
-                  alt={version.name}
-                  width={VERSION_IMAGE_DIMENSIONS.width}
-                  height={VERSION_IMAGE_DIMENSIONS.height}
-                  className="h-14 w-auto drop-shadow transition-transform duration-300 group-hover:scale-105"
+                <VersionTileCard
+                  name={version.name}
+                  imageIndex={version.index}
+                  count={version.count}
+                  locale={locale}
                 />
-                <div className="flex flex-col items-center gap-0.5 text-center">
-                  <span className="line-clamp-1 text-sm font-medium">{version.name}</span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {version.count} {countUnit}
-                  </span>
-                </div>
               </Link>
             </RevealItem>
           ))}
@@ -392,13 +380,13 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
             </Link>
           </Button>
         </Reveal>
-        <RevealGroup as="ul" role="list" className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+        <RevealGroup as="ul" role="list" className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {latestEntries.map((entry, index) => (
             <RevealItem as="li" key={entry.id} ssrVisible className="h-full">
               <ChartCard
                 entry={entry}
                 locale={locale}
-                priority={index < 4}
+                priority={index < 6}
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               />
             </RevealItem>
@@ -420,7 +408,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
               </Link>
             </Button>
           </Reveal>
-          <RevealGroup as="ul" role="list" className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+          <RevealGroup as="ul" role="list" className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {featuredEntries.map((entry) => (
               <RevealItem as="li" key={entry.id} ssrVisible className="h-full">
                 <ChartCard

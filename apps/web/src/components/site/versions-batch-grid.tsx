@@ -3,24 +3,19 @@
 import * as React from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { CheckIcon } from "lucide-react";
 
 import { AnimatePresence, motion, springSoft } from "@/components/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
-import { CabinetBadge } from "@/components/site/cabinet-badge";
-import { CompatibleImage } from "@/components/site/compatible-image";
+import { VersionTileCard } from "@/components/site/version-tile-card";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   versionFolderName,
   versionRouteId,
-  versionShortName,
   type ChartDownloadSpec,
   type VersionGroup,
 } from "@/lib/catalog-shared";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { jsonFetcher } from "@/lib/swr-fetcher";
-import { VERSION_IMAGE_DIMENSIONS, versionImageSourcesByIndex } from "@/lib/version-image";
 import { cn } from "@/lib/utils";
 
 // Static (build-time) manifest: per-version chart download specs keyed by
@@ -146,129 +141,21 @@ export function VersionsBatchGrid({
           prerendered HTML (no hidden-until-hydration reveal animation).
           Two columns from the smallest screens up (the version logos are wide,
           so two fit comfortably even on a 360px phone). */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
         {groups.map((group) => {
-          const label = group.name === "Unknown" ? versions.unknownLabel : group.name;
-          const sources =
-            group.imageIndex !== null ? versionImageSourcesByIndex(group.imageIndex) : null;
           const hasCharts = group.count > 0;
           const selectableHere = selectMode && hasCharts;
           const selected = selectedSlugs.has(group.slug);
-          // Bottom label: drop the "maimai"/"maimai DX" era prefix (it's shown
-          // as a でらっくす / スタンダード icon instead), leaving just the
-          // sub-version (CiRCLE, PRiSM PLUS, GreeN…). Base versions have no
-          // sub-name, so they fall back to the full name (id 0 → "maimai").
-          const eraCabinet = versionEraCabinet(group.imageIndex);
-          const shortName =
-            group.name === "Unknown"
-              ? versions.unknownLabel
-              : versionShortName(group.name) || group.name;
 
           const card = (
-            <Card
-              size="sm"
-              className={cn(
-                // pt-0: the image header fills to the card's rounded top corners
-                // (Card only auto-drops top padding for a first-child <img>, not
-                // our <div>), so the corner badges sit in the actual R-corners.
-                "h-full overflow-hidden border border-border/70 bg-card/85 pt-0 transition-all",
-                !selectMode &&
-                  hasCharts &&
-                  "group-hover/version:border-primary/40 group-hover/version:shadow-lg group-hover/version:shadow-primary/10",
-                !hasCharts && "opacity-45",
-                selectableHere && selected && "border-primary ring-2 ring-primary"
-              )}
-            >
-              <div className="relative flex aspect-[332/160] items-center justify-center bg-background/60 p-4">
-                {sources ? (
-                  <CompatibleImage
-                    sources={sources}
-                    alt={label}
-                    width={VERSION_IMAGE_DIMENSIONS.width}
-                    height={VERSION_IMAGE_DIMENSIONS.height}
-                    className={cn(
-                      // max-w-full guards against a logo whose aspect is wider
-                      // than the tile ever exceeding the column (w-auto alone
-                      // isn't capped by object-contain).
-                      "h-full w-auto max-w-full object-contain",
-                      !selectMode &&
-                        hasCharts &&
-                        "transition-transform group-hover/version:scale-[1.03]"
-                    )}
-                  />
-                ) : (
-                  <span className="text-center text-lg font-semibold text-muted-foreground">
-                    {label}
-                  </span>
-                )}
-                {/* Top-left: the selection checkbox in select mode, otherwise
-                    the version's chronological index as a compact id. The two
-                    badges swap with a scale pop; initial={false} keeps the
-                    SSR'd index badge (and the first client render) static. */}
-                <AnimatePresence initial={false}>
-                  {selectableHere ? (
-                    <motion.span
-                      key="select-badge"
-                      aria-hidden="true"
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.5, opacity: 0 }}
-                      transition={springSoft}
-                      className={cn(
-                        "absolute top-2 left-2 flex size-6 items-center justify-center rounded-md border shadow-sm transition-colors",
-                        selected
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border/70 bg-background/80 text-transparent"
-                      )}
-                    >
-                      <motion.span
-                        className="inline-flex"
-                        initial={false}
-                        animate={selected ? { scale: 1 } : { scale: 0 }}
-                        transition={springSoft}
-                      >
-                        <CheckIcon className="size-4" />
-                      </motion.span>
-                    </motion.span>
-                  ) : group.imageIndex !== null ? (
-                    <motion.span
-                      key="index-badge"
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.5, opacity: 0 }}
-                      transition={springSoft}
-                      className="absolute top-2 left-2 rounded-md bg-background/85 px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground shadow-sm ring-1 ring-border/60 backdrop-blur-sm"
-                    >
-                      #{group.imageIndex}
-                    </motion.span>
-                  ) : null}
-                </AnimatePresence>
-                {/* Top-right: chart count, overlaid so the name below gets the
-                    full width to scroll. */}
-                <span
-                  className={cn(
-                    "absolute top-2 right-2 rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums shadow-sm ring-1 backdrop-blur-sm",
-                    hasCharts
-                      ? "bg-background/85 text-foreground ring-border/60"
-                      : "bg-background/70 text-muted-foreground ring-border/50"
-                  )}
-                >
-                  {versions.chartCount(group.count)}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 px-3 pb-1" title={label}>
-                {eraCabinet ? (
-                  <CabinetBadge cabinet={eraCabinet} className="h-4 shrink-0" />
-                ) : null}
-                {shortName ? (
-                  <ScrollingLabel
-                    text={shortName}
-                    className="text-sm font-medium"
-                    containerClassName="min-w-0 flex-1"
-                  />
-                ) : null}
-              </div>
-            </Card>
+            <VersionTileCard
+              name={group.name}
+              imageIndex={group.imageIndex}
+              count={group.count}
+              locale={locale}
+              selectMode={selectMode}
+              selected={selected}
+            />
           );
 
           if (selectMode) {
@@ -348,78 +235,6 @@ export function VersionsBatchGrid({
           />
         ) : null}
       </AnimatePresence>
-    </div>
-  );
-}
-
-/**
- * A single-line label that gently auto-scrolls to reveal its full text when it
- * overflows the tile, then returns — so long version names ("maimai DX BUDDiES
- * PLUS") aren't clipped on a narrow two-column mobile layout. Only overflowing
- * labels animate; the full name is always in the `title`, and reduced-motion
- * users get the static (non-scrolling) label via the CSS guard in globals.css.
- */
-// versionid 13 = "maimai DX" (first DX-era version); 0–12 are classic maimai.
-const DX_ERA_MIN_INDEX = 13;
-
-/** Which cabinet badge marks a version's era: DX (でらっくす) or ST (スタンダード). */
-function versionEraCabinet(imageIndex: number | null): "DX" | "ST" | null {
-  if (imageIndex === null) {
-    return null;
-  }
-  return imageIndex >= DX_ERA_MIN_INDEX ? "DX" : "ST";
-}
-
-function ScrollingLabel({
-  text,
-  className,
-  containerClassName,
-}: {
-  text: string;
-  className?: string;
-  containerClassName?: string;
-}) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const textRef = React.useRef<HTMLSpanElement>(null);
-  const [shift, setShift] = React.useState(0);
-
-  React.useEffect(() => {
-    const container = containerRef.current;
-    const textEl = textRef.current;
-    if (!container || !textEl) {
-      return;
-    }
-    const measure = () => {
-      setShift(Math.max(0, Math.ceil(textEl.scrollWidth - container.clientWidth)));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [text]);
-
-  const scrolling = shift > 1;
-  // Scale the cycle to the travel distance (~28px/s over the ~60% of the cycle
-  // spent moving) with a floor so short overflows don't whip past.
-  const duration = Math.max(6, Math.round((shift / 28) * 3 + 3));
-
-  return (
-    <div ref={containerRef} className={cn("overflow-hidden", containerClassName)} title={text}>
-      <span
-        ref={textRef}
-        data-marquee={scrolling ? "on" : undefined}
-        className={cn("inline-block whitespace-nowrap", className)}
-        style={
-          scrolling
-            ? ({
-                animation: `marquee-reveal ${duration}s ease-in-out infinite`,
-                ["--marquee-shift"]: `-${shift}px`,
-              } as React.CSSProperties)
-            : undefined
-        }
-      >
-        {text}
-      </span>
     </div>
   );
 }
