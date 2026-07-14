@@ -132,6 +132,20 @@ html[data-theme-wipe] ::view-transition-new(root) {
   }
 }
 
+/* The in-site "reduce motion" toggle (header) mirrors the OS media query above:
+   MotionProvider stamps `data-reduced-motion` on <html> when it's on. */
+html[data-reduced-motion] ::view-transition-group(*),
+html[data-reduced-motion] ::view-transition-old(*),
+html[data-reduced-motion] ::view-transition-new(*) {
+  animation: none !important;
+}
+html[data-reduced-motion] [data-marquee="on"] {
+  animation: none !important;
+}
+html[data-reduced-motion] .shimmer-sweep {
+  animation: none !important;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

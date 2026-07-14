@@ -3,24 +3,31 @@
 import * as React from "react";
 import Link from "next/link";
 import {
+  ArrowUpRightIcon,
   DownloadIcon,
   EllipsisIcon,
   LayersIcon,
   LibraryBigIcon,
   MenuIcon,
-  SendIcon,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import {
   useMotionValueEvent,
-  useReducedMotion,
   useScroll,
   useSpring,
 } from "framer-motion";
 
-import { EASE_OUT, motion, springSoft } from "@/components/motion";
+import { EASE_OUT, motion, springSoft, useReducedMotion } from "@/components/motion";
+import {
+  ASTRODX_SITE_URL,
+  CLOUD_DRIVE_URL,
+  DEMO_VIDEO_URL,
+  NET_DISK_URL,
+  wikiUrl,
+} from "@/lib/resource-links";
 import { CompatibleImage, compatibleSourcesFromPng } from "@/components/site/compatible-image";
 import { LanguageSwitcher } from "@/components/site/language-switcher";
+import { MotionToggle } from "@/components/site/motion-toggle";
 import { ThemeToggle } from "@/components/site/theme-toggle";
 import {
   defaultLocale,
@@ -40,7 +47,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-const TELEGRAM_COMMUNITY = "https://t.me/FullDiveSAO";
+// External monitor page; the in-site /status route was removed in favour of a
+// direct link to the public dashboard.
+const SERVER_STATUS_URL = "https://s.saop.cc/server/66";
 
 // Compact-on-scroll thresholds (px). Enter/exit differ by ~16px of hysteresis
 // so the header doesn't flicker when the page rests near the boundary.
@@ -56,6 +65,7 @@ type NavItem = {
   label: string;
   icon?: React.ReactNode;
   exact?: boolean;
+  external?: boolean;
 };
 
 export function SiteHeader({ totalEntries }: SiteHeaderProps) {
@@ -102,13 +112,33 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
       icon: <LayersIcon data-icon="inline-start" />,
     },
   ];
-  const secondaryNav: NavItem[] = [
-    { href: switchLocale("/status", locale), label: dictionary.statusPage.title },
-    { href: switchLocale("/comments", locale), label: dictionary.guestbook.navLabel },
-    { href: switchLocale("/links", locale), label: dictionary.links.navLabel },
+  // The "more" menu, grouped: resources / community / site. Rendered with a
+  // separator between groups in both the desktop dropdown and the mobile menu.
+  const secondaryNavGroups: NavItem[][] = [
+    [
+      { href: ASTRODX_SITE_URL, label: dictionary.resources.official, external: true },
+      { href: wikiUrl(locale), label: dictionary.resources.wiki, external: true },
+      { href: DEMO_VIDEO_URL, label: dictionary.resources.video, external: true },
+      { href: CLOUD_DRIVE_URL, label: dictionary.resources.cloudDrive, external: true },
+      { href: NET_DISK_URL, label: dictionary.resources.netDisk, external: true },
+    ],
+    [
+      { href: switchLocale("/community", locale), label: dictionary.community.navLabel },
+      { href: switchLocale("/comments", locale), label: dictionary.guestbook.navLabel },
+      { href: switchLocale("/post", locale), label: dictionary.post.navLabel },
+      { href: switchLocale("/survey", locale), label: dictionary.survey.navLabel },
+    ],
+    [
+      { href: switchLocale("/links", locale), label: dictionary.links.navLabel },
+      { href: switchLocale("/donate", locale), label: dictionary.donate.navLabel },
+      { href: switchLocale("/about", locale), label: dictionary.about.navLabel },
+      { href: SERVER_STATUS_URL, label: dictionary.statusPage.title, external: true },
+    ],
   ];
+  const secondaryNav: NavItem[] = secondaryNavGroups.flat();
 
   const isActive = (item: NavItem) => {
+    if (item.external) return false;
     const current = trimTrailingSlash(pathname);
     const target = trimTrailingSlash(item.href);
     if (item.exact) return current === target;
@@ -206,29 +236,32 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {secondaryNav.map((item) => (
-                <DropdownMenuItem key={item.href} asChild>
-                  <Link href={item.href} aria-current={isActive(item) ? "page" : undefined}>
-                    {item.label}
-                  </Link>
-                </DropdownMenuItem>
+              {secondaryNavGroups.map((group, groupIndex) => (
+                <React.Fragment key={group[0].href}>
+                  {groupIndex > 0 ? <DropdownMenuSeparator /> : null}
+                  {group.map((item) => (
+                    <DropdownMenuItem key={item.href} asChild>
+                      {item.external ? (
+                        <a href={item.href} target="_blank" rel="noreferrer">
+                          {item.label}
+                          {/* New-tab hint so external items read differently from route links. */}
+                          <ArrowUpRightIcon aria-hidden="true" className="ml-auto text-muted-foreground" />
+                        </a>
+                      ) : (
+                        <Link href={item.href} aria-current={isActive(item) ? "page" : undefined}>
+                          {item.label}
+                        </Link>
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                </React.Fragment>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
         </nav>
         <div className="flex shrink-0 items-center gap-2">
           <LanguageSwitcher locale={locale} pathname={pathname} />
-          <Button variant="outline" size="icon-sm" asChild className="hidden sm:inline-flex">
-            <a
-              href={TELEGRAM_COMMUNITY}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={dictionary.nav.community}
-              title={dictionary.nav.community}
-            >
-              <SendIcon />
-            </a>
-          </Button>
+          <MotionToggle labels={dictionary.motionToggle} />
           <ThemeToggle labels={dictionary.theme} />
           {/* Mobile: the primary nav above is hidden below md, so every page must
               stay reachable from this menu. */}
@@ -259,27 +292,33 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
                   </DropdownMenuItem>
                 );
               })}
-              <DropdownMenuSeparator />
-              {secondaryNav.map((item) => {
-                const active = isActive(item);
-                return (
-                  <DropdownMenuItem key={item.href} asChild>
-                    <Link
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      data-state={active ? "checked" : undefined}
-                    >
-                      {item.label}
-                    </Link>
-                  </DropdownMenuItem>
-                );
-              })}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <a href={TELEGRAM_COMMUNITY} target="_blank" rel="noreferrer">
-                  {dictionary.nav.community}
-                </a>
-              </DropdownMenuItem>
+              {secondaryNavGroups.map((group) => (
+                <React.Fragment key={group[0].href}>
+                  <DropdownMenuSeparator />
+                  {group.map((item) => {
+                    const active = isActive(item);
+                    return (
+                      <DropdownMenuItem key={item.href} asChild>
+                        {item.external ? (
+                          <a href={item.href} target="_blank" rel="noreferrer">
+                            {item.label}
+                            {/* New-tab hint so external items read differently from route links. */}
+                            <ArrowUpRightIcon aria-hidden="true" className="ml-auto text-muted-foreground" />
+                          </a>
+                        ) : (
+                          <Link
+                            href={item.href}
+                            aria-current={active ? "page" : undefined}
+                            data-state={active ? "checked" : undefined}
+                          >
+                            {item.label}
+                          </Link>
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

@@ -22,8 +22,8 @@ export function RouteLoadingSkeleton({ label }: { label: string }) {
         <div className="h-8 w-56 max-w-full animate-pulse rounded-lg bg-muted/70" />
         <div className="h-4 w-80 max-w-full animate-pulse rounded bg-muted/60" />
       </div>
-      <div aria-hidden="true" className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-        {Array.from({ length: 8 }, (_, index) => (
+      <div aria-hidden="true" className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+        {Array.from({ length: 12 }, (_, index) => (
           <motion.div
             key={index}
             initial={{ opacity: 0.6, y: 6 }}

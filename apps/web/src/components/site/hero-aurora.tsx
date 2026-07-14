@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { useInView, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { useInView, useScroll, useTransform } from "framer-motion";
 
-import { motion, RollingNumber } from "@/components/motion";
+import { motion, RollingNumber, useReducedMotion } from "@/components/motion";
 
 // Two-keyframe mirrored drifts (long, offset durations) so the orbs breathe
 // rather than orbit. The rest state is the identity pose the SSR HTML renders.

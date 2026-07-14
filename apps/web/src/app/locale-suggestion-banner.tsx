@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { XIcon } from "lucide-react";
-import { useReducedMotion } from "framer-motion";
+
 
 import {
   readLocaleBannerDismissed,
@@ -10,7 +10,7 @@ import {
   storeLocaleBannerDismissed,
   storePreferredLocale,
 } from "@/app/locale-preference";
-import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
+import { AnimatePresence, EASE_OUT, motion, useReducedMotion } from "@/components/motion";
 import { buildLocalePath, getDictionary, type PrefixedLocale } from "@/lib/i18n";
 
 /**

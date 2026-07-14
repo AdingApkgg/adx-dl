@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { animate, motionValue, useMotionValue, useReducedMotion, useTransform } from "framer-motion";
+import { animate, motionValue, useMotionValue, useTransform } from "framer-motion";
 
-import { EASE_OUT, motion } from "@/components/motion";
+import { EASE_OUT, motion, useReducedMotion } from "@/components/motion";
 import { CompatibleImage } from "@/components/site/compatible-image";
 import { SyncedVideoAudio } from "@/components/site/synced-video-audio";
 import {

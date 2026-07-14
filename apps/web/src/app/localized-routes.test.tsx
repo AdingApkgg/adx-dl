@@ -177,28 +177,68 @@ describe("localized routes", () => {
     expect(jaHtml).toContain("譜面情報");
   });
 
-  test("localized status route renders shared en and ja status shell", async () => {
-    const { default: LocalizedStatusPage, generateStaticParams } = await import(
-      "./[locale]/status/page"
+  test("localized community and donate routes render shared en and ja views", async () => {
+    const { default: LocalizedCommunityPage, generateStaticParams } = await import(
+      "./[locale]/community/page"
     );
+    const { default: LocalizedDonatePage } = await import("./[locale]/donate/page");
 
     expect(await generateStaticParams()).toEqual([{ locale: "en" }, { locale: "ja" }]);
 
-    const enHtml = renderToStaticMarkup(
-      await LocalizedStatusPage({ params: Promise.resolve({ locale: "en" }) })
+    const enCommunityHtml = renderToStaticMarkup(
+      await LocalizedCommunityPage({ params: Promise.resolve({ locale: "en" }) })
     );
-    const jaHtml = renderToStaticMarkup(
-      await LocalizedStatusPage({ params: Promise.resolve({ locale: "ja" }) })
+    const jaCommunityHtml = renderToStaticMarkup(
+      await LocalizedCommunityPage({ params: Promise.resolve({ locale: "ja" }) })
     );
 
-    expect(enHtml).toContain("Server Status");
-    expect(enHtml).toContain("Refresh Now");
-    expect(enHtml).toContain("Resource Trends");
-    expect(enHtml).toContain("Waiting for more data");
-    expect(jaHtml).toContain("サーバー状態");
-    expect(jaHtml).toContain("今すぐ更新");
-    expect(jaHtml).toContain("リソース推移");
-    expect(jaHtml).toContain("より多くのデータを待っています");
+    expect(enCommunityHtml).toContain("Community");
+    expect(enCommunityHtml).toContain("QQ Group");
+    expect(enCommunityHtml).toContain("Telegram Group");
+    expect(jaCommunityHtml).toContain("コミュニティ");
+    expect(jaCommunityHtml).toContain("QQ グループ");
+
+    const enDonateHtml = renderToStaticMarkup(
+      await LocalizedDonatePage({ params: Promise.resolve({ locale: "en" }) })
+    );
+    const jaDonateHtml = renderToStaticMarkup(
+      await LocalizedDonatePage({ params: Promise.resolve({ locale: "ja" }) })
+    );
+
+    expect(enDonateHtml).toContain("Support Us");
+    expect(enDonateHtml).toContain("Afdian");
+    expect(enDonateHtml).toContain("TGXpGgXBrFGjQLX8WuS3QAswCGzFyrnp1r");
+    expect(jaDonateHtml).toContain("寄付・サポート");
+    expect(jaDonateHtml).toContain("アドレスをコピー");
+  });
+
+  test("localized about, post and survey routes render shared en and ja views", async () => {
+    const { default: LocalizedAboutPage } = await import("./[locale]/about/page");
+    const { default: LocalizedPostPage } = await import("./[locale]/post/page");
+    const { default: LocalizedSurveyPage } = await import("./[locale]/survey/page");
+
+    const enAboutHtml = renderToStaticMarkup(
+      await LocalizedAboutPage({ params: Promise.resolve({ locale: "en" }) })
+    );
+    const jaAboutHtml = renderToStaticMarkup(
+      await LocalizedAboutPage({ params: Promise.resolve({ locale: "ja" }) })
+    );
+    expect(enAboutHtml).toContain("About This Site");
+    expect(enAboutHtml).toContain("Credits");
+    expect(jaAboutHtml).toContain("本サイトについて");
+    expect(jaAboutHtml).toContain("免責事項");
+
+    const enPostHtml = renderToStaticMarkup(
+      await LocalizedPostPage({ params: Promise.resolve({ locale: "en" }) })
+    );
+    expect(enPostHtml).toContain("Submit a Chart");
+    expect(enPostHtml).toContain("Submit via Guestbook");
+
+    const jaSurveyHtml = renderToStaticMarkup(
+      await LocalizedSurveyPage({ params: Promise.resolve({ locale: "ja" }) })
+    );
+    expect(jaSurveyHtml).toContain("アンケート");
+    expect(jaSurveyHtml).toContain("ゲストブックで送信する");
   });
 
   test("zh and invalid locale routes throw notFound", async () => {

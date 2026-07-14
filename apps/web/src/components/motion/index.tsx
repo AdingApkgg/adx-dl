@@ -8,7 +8,7 @@ import {
   motion,
   useMotionValue,
   useMotionValueEvent,
-  useReducedMotion,
+  useReducedMotion as useOsReducedMotion,
   type HTMLMotionProps,
   type Transition,
   type Variants,
@@ -30,15 +30,85 @@ export const springSoft: Transition = {
   mass: 0.7,
 };
 
+// --- Motion preference: OS setting + an in-site "reduce motion" toggle -----
+
+// localStorage key for the user's explicit site-level preference.
+const REDUCE_MOTION_STORAGE_KEY = "adx-reduce-motion";
+
+type MotionPreference = {
+  /** The user's explicit site toggle (independent of the OS setting). */
+  userReduced: boolean;
+  setUserReduced: (value: boolean) => void;
+};
+
+const MotionPreferenceContext = React.createContext<MotionPreference>({
+  userReduced: false,
+  setUserReduced: () => {},
+});
+
+/** The header toggle's read/write handle for the site-level preference. */
+export function useMotionPreference(): MotionPreference {
+  return React.useContext(MotionPreferenceContext);
+}
+
 /**
- * Opts every descendant animation into the OS "reduce motion" preference, so we
+ * Site-wide reduced-motion signal: the OS preference OR the in-site toggle.
+ * Import this instead of framer-motion's own `useReducedMotion` so hand-gated
+ * animations (parallax, marquees, springs) also honor the site toggle.
+ */
+export function useReducedMotion(): boolean {
+  const os = useOsReducedMotion();
+  const { userReduced } = React.useContext(MotionPreferenceContext);
+  return Boolean(os) || userReduced;
+}
+
+/**
+ * Opts every descendant animation into the "reduce motion" preference, so we
  * don't have to gate each component by hand. With `reducedMotion="user"`,
  * framer-motion drops transform/layout animations (keeping only opacity) when
- * the user asks for reduced motion — mirroring the `@view-transition` guard in
- * globals.css.
+ * the OS asks for reduced motion — mirroring the `@view-transition` guard in
+ * globals.css. The in-site toggle escalates that to `"always"` and stamps
+ * `data-reduced-motion` on <html> so the CSS guards fire too.
+ *
+ * The stored preference is read after mount (not during hydration), so the
+ * first paint of a full page load may briefly animate — the trade for
+ * mismatch-free hydration. Client-side navigations see the settled value.
  */
 export function MotionProvider({ children }: { children: React.ReactNode }) {
-  return <MotionConfig reducedMotion="user">{children}</MotionConfig>;
+  const [userReduced, setUserReducedState] = React.useState(false);
+
+  React.useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time localStorage sync after hydration
+      setUserReducedState(window.localStorage.getItem(REDUCE_MOTION_STORAGE_KEY) === "1");
+    } catch {
+      // Storage unavailable (private mode) — keep animations on.
+    }
+  }, []);
+
+  React.useEffect(() => {
+    document.documentElement.toggleAttribute("data-reduced-motion", userReduced);
+  }, [userReduced]);
+
+  const setUserReduced = React.useCallback((value: boolean) => {
+    setUserReducedState(value);
+    try {
+      window.localStorage.setItem(REDUCE_MOTION_STORAGE_KEY, value ? "1" : "0");
+    } catch {
+      // Storage unavailable — the toggle still works for this session.
+    }
+  }, []);
+
+  const preference = React.useMemo(
+    () => ({ userReduced, setUserReduced }),
+    [userReduced, setUserReduced]
+  );
+
+  return (
+    <MotionPreferenceContext.Provider value={preference}>
+      <MotionConfig reducedMotion={userReduced ? "always" : "user"}>{children}</MotionConfig>
+    </MotionPreferenceContext.Provider>
+  );
 }
 
 // --- Reveal: fade + rise as it scrolls into view --------------------------
@@ -174,12 +244,14 @@ type RollingNumberProps = {
  * hear one announcement, not sixty frames of counting.
  */
 export function RollingNumber({ value, format = String, animateOnMount = false, className }: RollingNumberProps) {
-  const reduced = useReducedMotion();
+  const reduced = useReducedMotion(); // the combined (OS + site toggle) hook above
   const mv = useMotionValue(value);
   const [display, setDisplay] = React.useState(() => format(Math.round(value)));
   const mounted = React.useRef(false);
   const formatRef = React.useRef(format);
-  formatRef.current = format;
+  React.useEffect(() => {
+    formatRef.current = format;
+  });
 
   useMotionValueEvent(mv, "change", (v) => setDisplay(formatRef.current(Math.round(v))));
 

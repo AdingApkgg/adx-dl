@@ -152,15 +152,66 @@ describe("default zh routes", () => {
     expect(html).toContain("来源链接");
   });
 
-  test("status route renders the zh status shell", async () => {
-    const { default: StatusPage } = await import("./(default)/status/page");
+  test("community route renders the zh community view", async () => {
+    const { default: CommunityPage } = await import("./(default)/community/page");
 
-    const html = renderToStaticMarkup(await StatusPage());
+    const html = renderToStaticMarkup(<CommunityPage />);
 
-    expect(html).toContain("服务器状态");
-    expect(html).toContain("查看原监控页");
-    expect(html).toContain("立即刷新");
-    expect(html).toContain("资源趋势");
-    expect(html).toContain("等待更多数据");
+    expect(html).toContain("社区");
+    expect(html).toContain("QQ 交流群");
+    expect(html).toContain("Telegram 群组");
+    expect(html).toContain("https://qm.qq.com/q/xltNzTdL1u");
+    expect(html).toContain("https://t.me/FullDiveSAO");
+  });
+
+  test("donate route renders the zh donate view with methods and TRC20 address", async () => {
+    const { default: DonatePage } = await import("./(default)/donate/page");
+
+    const html = renderToStaticMarkup(<DonatePage />);
+
+    expect(html).toContain("捐赠支持");
+    expect(html).toContain("爱发电");
+    expect(html).toContain("Patreon");
+    expect(html).toContain("https://afdian.com/a/scale");
+    expect(html).toContain("https://patreon.com/KirigayaAsuna");
+    expect(html).toContain("TGXpGgXBrFGjQLX8WuS3QAswCGzFyrnp1r");
+    expect(html).toContain("复制地址");
+    expect(html).toContain("https://tronscan.org/address/TGXpGgXBrFGjQLX8WuS3QAswCGzFyrnp1r");
+    expect(html).toContain("在 Tronscan 查看");
+  });
+
+  test("about route renders the zh about view", async () => {
+    const { default: AboutPage } = await import("./(default)/about/page");
+
+    const html = renderToStaticMarkup(<AboutPage />);
+
+    expect(html).toContain("关于本站");
+    expect(html).toContain("联系方式");
+    expect(html).toContain("开源与技术");
+    expect(html).toContain("鸣谢");
+    expect(html).toContain("免责声明");
+    expect(html).toContain("https://github.com/AdingApkgg/adx-dl");
+  });
+
+  test("post route renders the zh submission form", async () => {
+    const { default: PostPage } = await import("./(default)/post/page");
+
+    const html = renderToStaticMarkup(<PostPage />);
+
+    expect(html).toContain("谱面投稿");
+    expect(html).toContain("曲名（可含别名）");
+    expect(html).toContain("谱面来源 / 下载链接");
+    expect(html).toContain("前往留言板投稿");
+  });
+
+  test("survey route renders the zh survey form", async () => {
+    const { default: SurveyPage } = await import("./(default)/survey/page");
+
+    const html = renderToStaticMarkup(<SurveyPage />);
+
+    expect(html).toContain("问卷调查");
+    expect(html).toContain("你在哪个平台游玩 AstroDX？");
+    expect(html).toContain("对本站的整体满意度？");
+    expect(html).toContain("前往留言板提交");
   });
 });

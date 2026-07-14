@@ -6,6 +6,15 @@ export type FriendLink = {
   description: Record<Locale, string>;
 };
 
+// Display-friendly hostname for external-link cards (/links, /community, /donate).
+export function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
 // The AstroDX app itself — linked from the home hero, the footer, and /links.
 // Official repo (README: "the ONLY official source"); formerly named MaipadDX.
 export const ASTRODX_APP_REPOSITORY = "https://github.com/2394425147/astrodx";
@@ -29,6 +38,15 @@ export const friendLinks: FriendLink[] = [
       zh: "AWMC 社区的谱面与资源下载站。",
       en: "Chart and resource downloads from the AWMC community.",
       ja: "AWMC コミュニティの譜面・リソース配布サイト。",
+    },
+  },
+  {
+    name: "OneCat 下载站",
+    url: "https://dw.moant.cn:34225/onecat/#/official",
+    description: {
+      zh: "OneCat 的 ADX 谱面下载站。",
+      en: "OneCat's ADX chart download site.",
+      ja: "OneCat の ADX 譜面ダウンロードサイト。",
     },
   },
   {

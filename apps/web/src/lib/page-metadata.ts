@@ -50,17 +50,14 @@ const staticSeoTitles: Record<Locale, Record<StaticPageMetadataKey, string>> = {
   zh: {
     home: "AstroDX 谱面资料站与下载入口",
     charts: "AstroDX 谱面浏览与下载目录",
-    status: "ADX 谱面资源服务器状态监控",
   },
   en: {
     home: "AstroDX Chart Archive, Browser and Download Portal",
     charts: "AstroDX Chart Browser and Download Catalog",
-    status: "ADX Server Status and Download Service Monitor",
   },
   ja: {
     home: "AstroDX 譜面アーカイブとダウンロード入口",
     charts: "AstroDX 譜面一覧とダウンロードカタログ",
-    status: "ADX サーバー状態とダウンロード監視",
   },
 };
 
@@ -146,6 +143,56 @@ function buildLinksSeoTitle(locale: Locale): string {
     return "maimai と AstroDX の関連リンク集";
   }
   return "maimai and AstroDX Community Links";
+}
+
+function buildCommunitySeoTitle(locale: Locale): string {
+  if (locale === "zh") {
+    return "AstroDX 玩家社区与交流群组";
+  }
+  if (locale === "ja") {
+    return "AstroDX プレイヤーコミュニティと交流グループ";
+  }
+  return "AstroDX Player Community and Groups";
+}
+
+function buildDonateSeoTitle(locale: Locale): string {
+  if (locale === "zh") {
+    return "捐赠支持 ADX 谱面资源";
+  }
+  if (locale === "ja") {
+    return "ADX 譜面アーカイブへの寄付・サポート";
+  }
+  return "Support the ADX Chart Archive";
+}
+
+function buildAboutSeoTitle(locale: Locale): string {
+  if (locale === "zh") {
+    return "关于 ADX 谱面资源";
+  }
+  if (locale === "ja") {
+    return "ADX 譜面アーカイブについて";
+  }
+  return "About the ADX Chart Archive";
+}
+
+function buildPostSeoTitle(locale: Locale): string {
+  if (locale === "zh") {
+    return "AstroDX 谱面投稿";
+  }
+  if (locale === "ja") {
+    return "AstroDX 譜面の投稿";
+  }
+  return "Submit an AstroDX Chart";
+}
+
+function buildSurveySeoTitle(locale: Locale): string {
+  if (locale === "zh") {
+    return "ADX 谱面资源问卷调查";
+  }
+  if (locale === "ja") {
+    return "ADX 譜面アーカイブのアンケート";
+  }
+  return "ADX Chart Archive Survey";
 }
 
 function buildVersionsSeoTitle(locale: Locale): string {
@@ -234,10 +281,6 @@ export function buildChartsPageMetadata(locale: Locale): Metadata {
   return buildLocalizedPageMetadata(locale, "charts");
 }
 
-export function buildStatusPageMetadata(locale: Locale): Metadata {
-  return buildLocalizedPageMetadata(locale, "status");
-}
-
 export function buildGuestbookPageMetadata(locale: Locale): Metadata {
   const dictionary = getDictionary(locale);
   const guestbook = dictionary.guestbook;
@@ -259,6 +302,63 @@ export function buildLinksPageMetadata(locale: Locale): Metadata {
     title: buildLinksSeoTitle(locale),
     description: dictionary.seo.links,
     keywords: ["AstroDX", siteName, links.title, "maimai", "友情链接", "friend links"],
+  });
+}
+
+export function buildCommunityPageMetadata(locale: Locale): Metadata {
+  const dictionary = getDictionary(locale);
+  const community = dictionary.community;
+  return buildPageMetadata({
+    locale,
+    pathname: "/community",
+    title: buildCommunitySeoTitle(locale),
+    description: dictionary.seo.community,
+    keywords: ["AstroDX", siteName, community.title, "maimai", "QQ 群", "Telegram", "community"],
+  });
+}
+
+export function buildDonatePageMetadata(locale: Locale): Metadata {
+  const dictionary = getDictionary(locale);
+  const donate = dictionary.donate;
+  return buildPageMetadata({
+    locale,
+    pathname: "/donate",
+    title: buildDonateSeoTitle(locale),
+    description: dictionary.seo.donate,
+    keywords: ["AstroDX", siteName, donate.title, "爱发电", "Patreon", "USDT", "donate"],
+  });
+}
+
+export function buildAboutPageMetadata(locale: Locale): Metadata {
+  const dictionary = getDictionary(locale);
+  return buildPageMetadata({
+    locale,
+    pathname: "/about",
+    title: buildAboutSeoTitle(locale),
+    description: dictionary.seo.about,
+    keywords: ["AstroDX", siteName, dictionary.about.title, "maimai", "关于", "about"],
+  });
+}
+
+export function buildPostPageMetadata(locale: Locale): Metadata {
+  const dictionary = getDictionary(locale);
+  return buildPageMetadata({
+    locale,
+    pathname: "/post",
+    title: buildPostSeoTitle(locale),
+    description: dictionary.seo.post,
+    keywords: ["AstroDX", siteName, dictionary.post.title, "maimai", "投稿", "submit"],
+  });
+}
+
+export function buildSurveyPageMetadata(locale: Locale): Metadata {
+  const dictionary = getDictionary(locale);
+  return buildPageMetadata({
+    locale,
+    pathname: "/survey",
+    title: buildSurveySeoTitle(locale),
+    description: dictionary.seo.survey,
+    keywords: ["AstroDX", siteName, dictionary.survey.title, "maimai", "问卷", "survey", "feedback"],
   });
 }
 

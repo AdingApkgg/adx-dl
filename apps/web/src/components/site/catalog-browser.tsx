@@ -10,6 +10,7 @@ import { BatchDownloadBar } from "@/components/site/batch-download-bar";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { ChartCard } from "@/components/site/chart-card";
 import { CompatibleImage } from "@/components/site/compatible-image";
+import { RandomChartButton } from "@/components/site/random-chart-button";
 import {
   ALL_CATEGORIES,
   ALL_SUBCATEGORIES,
@@ -63,8 +64,10 @@ const SEARCH_DEBOUNCE_MS = 200;
 // Fetched only when the user enters select mode — card entries deliberately do
 // not carry the file URLs a batch download needs.
 const CHART_SPECS_PATH = "/charts/specs.json";
-// Matches the browse grid: 2 columns on phones, 3 from lg, 4 from xl.
-const CARD_SIZES = "(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 25vw";
+// Matches the browse grid: 2 columns on phones, 3 from md, 4 from lg, 6 from
+// xl (content is capped at max-w-7xl, so xl cards are ~200px wide).
+const CARD_SIZES =
+  "(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 200px";
 // Sticky offset for the results toolbar — clears the sticky site header
 // (~65px tall) with a little breathing room. Must match `top-[4.5rem]` below.
 const STICKY_TOOLBAR_TOP_PX = 72;
@@ -546,7 +549,8 @@ export function CatalogBrowser({
         </div>
       ) : null}
 
-      <div className="relative">
+      <div className="flex items-center gap-2">
+      <div className="relative min-w-0 flex-1">
         <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={searchInputRef}
@@ -581,6 +585,8 @@ export function CatalogBrowser({
             <XIcon className="size-4" />
           </button>
         ) : null}
+      </div>
+      <RandomChartButton locale={locale} label={dictionary.randomChart} iconOnly />
       </div>
 
       {/* Advanced filters are tucked into a collapsible panel (closed by
@@ -964,7 +970,7 @@ export function CatalogBrowser({
           layout
           role="list"
           data-layout="card-grid"
-          className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
+          className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
         >
           <AnimatePresence mode="popLayout" initial={false}>
             {paginatedEntries.map((entry, index) => (
@@ -983,7 +989,7 @@ export function CatalogBrowser({
                 <ChartCard
                   entry={entry}
                   locale={locale}
-                  priority={safeCurrentPage === 1 && index < 4}
+                  priority={safeCurrentPage === 1 && index < 6}
                   sizes={CARD_SIZES}
                   aliasHit={hasQuery ? aliasHitById.get(entry.id) ?? null : null}
                   selectable={selectMode}

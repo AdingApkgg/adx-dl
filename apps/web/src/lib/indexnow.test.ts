@@ -33,22 +33,28 @@ describe("indexnow helpers", () => {
       "https://adxdls.saop.cc/",
       "https://adxdls.saop.cc/charts",
       "https://adxdls.saop.cc/versions",
-      "https://adxdls.saop.cc/status",
+      "https://adxdls.saop.cc/community",
       "https://adxdls.saop.cc/links",
+      "https://adxdls.saop.cc/donate",
+      "https://adxdls.saop.cc/about",
       "https://adxdls.saop.cc/charts/e-1-a",
       "https://adxdls.saop.cc/charts/e-1-b",
       "https://adxdls.saop.cc/en",
       "https://adxdls.saop.cc/en/charts",
       "https://adxdls.saop.cc/en/versions",
-      "https://adxdls.saop.cc/en/status",
+      "https://adxdls.saop.cc/en/community",
       "https://adxdls.saop.cc/en/links",
+      "https://adxdls.saop.cc/en/donate",
+      "https://adxdls.saop.cc/en/about",
       "https://adxdls.saop.cc/en/charts/e-1-a",
       "https://adxdls.saop.cc/en/charts/e-1-b",
       "https://adxdls.saop.cc/ja",
       "https://adxdls.saop.cc/ja/charts",
       "https://adxdls.saop.cc/ja/versions",
-      "https://adxdls.saop.cc/ja/status",
+      "https://adxdls.saop.cc/ja/community",
       "https://adxdls.saop.cc/ja/links",
+      "https://adxdls.saop.cc/ja/donate",
+      "https://adxdls.saop.cc/ja/about",
       "https://adxdls.saop.cc/ja/charts/e-1-a",
       "https://adxdls.saop.cc/ja/charts/e-1-b",
     ]);
@@ -65,13 +71,13 @@ describe("indexnow helpers", () => {
   test("buildIndexNowUrlList keeps static routes before detail routes for every locale", () => {
     const urls = buildIndexNowUrlList("https://adxdls.saop.cc", ["e-1-a"]);
 
-    expect(urls.indexOf("https://adxdls.saop.cc/status")).toBeLessThan(
+    expect(urls.indexOf("https://adxdls.saop.cc/links")).toBeLessThan(
       urls.indexOf("https://adxdls.saop.cc/charts/e-1-a")
     );
-    expect(urls.indexOf("https://adxdls.saop.cc/en/status")).toBeLessThan(
+    expect(urls.indexOf("https://adxdls.saop.cc/en/links")).toBeLessThan(
       urls.indexOf("https://adxdls.saop.cc/en/charts/e-1-a")
     );
-    expect(urls.indexOf("https://adxdls.saop.cc/ja/status")).toBeLessThan(
+    expect(urls.indexOf("https://adxdls.saop.cc/ja/links")).toBeLessThan(
       urls.indexOf("https://adxdls.saop.cc/ja/charts/e-1-a")
     );
   });

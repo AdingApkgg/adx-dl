@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { SearchIcon } from "lucide-react";
-import { useMotionValue, useReducedMotion, useSpring, type Variants } from "framer-motion";
+import { useMotionValue, useSpring, type Variants } from "framer-motion";
 
-import { AnimatePresence, EASE_OUT, motion, springSoft } from "@/components/motion";
+import { AnimatePresence, EASE_OUT, motion, springSoft, useReducedMotion } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {

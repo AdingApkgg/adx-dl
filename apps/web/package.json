@@ -7,8 +7,9 @@
     "build": "next build && serwist build serwist.config.mjs",
     "build:sw": "serwist build serwist.config.mjs",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --cache",
     "test": "bun test",
+    "check": "tsc --noEmit && bun test",
     "submit:indexnow": "bun run scripts/submit-indexnow.ts"
   },
   "dependencies": {

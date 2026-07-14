@@ -9,9 +9,9 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { useReducedMotion } from "framer-motion";
+
 import type { Note } from "@lxns-network/maimai-chart-engine";
-import { EASE_OUT, motion } from "@/components/motion";
+import { EASE_OUT, motion, useReducedMotion } from "@/components/motion";
 import { cn } from "@/lib/utils";
 import classes from "./chart-density-timeline.module.css";
 

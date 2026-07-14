@@ -29,7 +29,9 @@ The archive currently lists ${catalog.total_entries} charts across ${versions.le
 - Home: ${siteUrl}/
 - Browse charts: ${siteUrl}/charts
 - Browse by version: ${siteUrl}/versions
-- Server status: ${siteUrl}/status
+- Player community (QQ / Telegram groups): ${siteUrl}/community
+- Support the site (donations): ${siteUrl}/donate
+- About the site (maintainer, contact, credits): ${siteUrl}/about
 - Full chart manifest (for machines): ${siteUrl}/llms-full.txt
 - Atom feed (latest charts): ${siteUrl}/feed.xml
 - License, sources and usage notes: ${siteUrl}/license

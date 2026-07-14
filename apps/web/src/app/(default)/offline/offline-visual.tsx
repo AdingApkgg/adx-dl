@@ -1,9 +1,9 @@
 "use client";
 
-import { useReducedMotion } from "framer-motion";
+
 import { WifiOffIcon } from "lucide-react";
 
-import { motion } from "@/components/motion";
+import { motion, useReducedMotion } from "@/components/motion";
 
 /**
  * WifiOff icon ringed by two expanding radar pulses — the loop is tied to the

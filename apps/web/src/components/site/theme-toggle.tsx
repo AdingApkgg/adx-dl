@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import { MonitorIcon, MoonStarIcon, SunMediumIcon } from "lucide-react";
-import { useReducedMotion } from "framer-motion";
 
-import { AnimatePresence, EASE_OUT, motion } from "@/components/motion";
+
+import { AnimatePresence, EASE_OUT, motion, useReducedMotion } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,

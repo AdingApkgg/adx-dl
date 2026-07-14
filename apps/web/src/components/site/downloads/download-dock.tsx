@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { animate, useMotionValue, useReducedMotion, useSpring } from "framer-motion";
+import { animate, useMotionValue, useSpring } from "framer-motion";
 import {
   AlertCircleIcon,
   ChevronDownIcon,
@@ -20,6 +20,7 @@ import {
   RollingNumber,
   motion,
   springSoft,
+  useReducedMotion,
 } from "@/components/motion";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";

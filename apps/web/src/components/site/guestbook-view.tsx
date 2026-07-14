@@ -1,5 +1,8 @@
+import * as React from "react";
+
 import { Reveal } from "@/components/motion";
 import { ChartComments } from "@/components/site/chart-comments";
+import { GuestbookPrefill } from "@/components/site/guestbook-prefill";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { buildInfoPageStructuredData } from "@/lib/structured-data";
@@ -28,6 +31,10 @@ export function GuestbookView({ locale = "zh" }: { locale?: Locale }) {
         <p className="text-muted-foreground">{guestbook.description}</p>
         <p className="text-sm text-muted-foreground">{guestbook.intro}</p>
       </Reveal>
+      {/* Applies ?draft= from /post and /survey into the Artalk editor. */}
+      <React.Suspense fallback={null}>
+        <GuestbookPrefill />
+      </React.Suspense>
       <ChartComments pageKey={GUESTBOOK_PAGE_KEY} pageTitle={guestbook.title} locale={locale} />
     </main>
   );

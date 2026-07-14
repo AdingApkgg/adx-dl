@@ -1,10 +1,10 @@
 "use client";
 
-import { useInView, useReducedMotion } from "framer-motion";
+import { useInView } from "framer-motion";
 import Link from "next/link";
 import * as React from "react";
 
-import { RevealItem, motion } from "@/components/motion";
+import { RevealItem, motion, useReducedMotion } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import {
   buildLocalePath,

@@ -13,6 +13,7 @@ import { ThemeProvider } from "@/components/site/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { readCatalog } from "@/lib/catalog";
 import { ASTRODX_APP_REPOSITORY } from "@/lib/friend-links";
+import { ASTRODX_SITE_URL, wikiUrl } from "@/lib/resource-links";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 
 type RootLayoutShellProps = Readonly<{
@@ -23,7 +24,9 @@ type RootLayoutShellProps = Readonly<{
 
 const COVER_HOST = "https://adxcs.saop.cc";
 const SOURCE_REPOSITORY = "https://github.com/AdingApkgg/adx-dl";
-const TELEGRAM_COMMUNITY = "https://t.me/FullDiveSAO";
+// External monitor page; the in-site /status route was removed in favour of a
+// direct link to the public dashboard.
+const SERVER_STATUS_URL = "https://s.saop.cc/server/66";
 // Third-party services warmed early: the pageview counter (fetched on every
 // page) and the comment backend (fetched on chart detail pages).
 const COUNTER_HOST = "https://bsz.saop.cc";
@@ -105,14 +108,50 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
                       <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/versions", locale)}>
                         {dictionary.versions.navLabel}
                       </Link>
-                      <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/status", locale)}>
+                      <a
+                        className="text-muted-foreground hover:text-foreground"
+                        href={ASTRODX_SITE_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {dictionary.resources.official}
+                      </a>
+                      <a
+                        className="text-muted-foreground hover:text-foreground"
+                        href={wikiUrl(locale)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {dictionary.resources.wiki}
+                      </a>
+                      <a
+                        className="text-muted-foreground hover:text-foreground"
+                        href={SERVER_STATUS_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
                         {dictionary.statusPage.title}
+                      </a>
+                      <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/community", locale)}>
+                        {dictionary.community.navLabel}
                       </Link>
                       <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/comments", locale)}>
                         {dictionary.guestbook.navLabel}
                       </Link>
+                      <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/post", locale)}>
+                        {dictionary.post.navLabel}
+                      </Link>
+                      <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/survey", locale)}>
+                        {dictionary.survey.navLabel}
+                      </Link>
                       <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/links", locale)}>
                         {dictionary.links.navLabel}
+                      </Link>
+                      <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/donate", locale)}>
+                        {dictionary.donate.navLabel}
+                      </Link>
+                      <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/about", locale)}>
+                        {dictionary.about.navLabel}
                       </Link>
                       <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/license", locale)}>
                         {licenseLinkLabel[locale]}
@@ -124,14 +163,6 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
                         rel="noreferrer"
                       >
                         {dictionary.footer.getAppLabel}
-                      </a>
-                      <a
-                        className="text-muted-foreground hover:text-foreground"
-                        href={TELEGRAM_COMMUNITY}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {dictionary.footer.communityLabel}
                       </a>
                       <a
                         className="text-muted-foreground hover:text-foreground"

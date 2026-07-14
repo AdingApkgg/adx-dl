@@ -4,12 +4,11 @@ import * as React from "react";
 import {
   useMotionTemplate,
   useMotionValue,
-  useReducedMotion,
   useSpring,
   useTransform,
 } from "framer-motion";
 
-import { motion } from "@/components/motion";
+import { motion, useReducedMotion } from "@/components/motion";
 import { cn } from "@/lib/utils";
 
 const MAX_TILT = 5; // degrees

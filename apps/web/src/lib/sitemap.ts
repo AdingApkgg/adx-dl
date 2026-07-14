@@ -15,10 +15,14 @@ export const MAX_URLS_PER_SITEMAP = 2000;
 const staticPaths = [
   "/",
   "/charts",
-  "/status",
   "/versions",
+  "/community",
   "/comments",
+  "/post",
+  "/survey",
   "/links",
+  "/donate",
+  "/about",
   "/license",
 ] as const;
 

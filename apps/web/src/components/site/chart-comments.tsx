@@ -34,6 +34,7 @@ type ArtalkInstance = {
   destroy: () => void;
   setDarkMode: (value: boolean) => void;
   reload: () => void;
+  on: (event: string, handler: () => void) => void;
 };
 type ArtalkGlobal = {
   init: (conf: ArtalkConf) => ArtalkInstance;
@@ -105,6 +106,10 @@ export function ChartComments({
   const instanceRef = React.useRef<ArtalkInstance | null>(null);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+  // Latest theme, readable from the async init flow. `resolvedTheme` is the
+  // canonical site theme (useSyncExternalStore reads it synchronously), so it's
+  // a more reliable dark-mode source than a DOM class read that can race.
+  const isDarkRef = React.useRef(isDark);
   // Drives the loading skeleton and the failure card: "loading" keeps the
   // skeleton up until Artalk's own UI is mounted, "error" swaps in a retry
   // card so the section never sits blank after a failed third-party fetch.
@@ -124,10 +129,6 @@ export function ChartComments({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatus("loading");
     const artalkLocale = ARTALK_LOCALE[locale] ?? "zh-CN";
-    // Read the live theme at init so the first paint matches; the effect below
-    // keeps it in sync afterwards without tearing the instance down.
-    const initialDark =
-      typeof document !== "undefined" && document.documentElement.classList.contains("dark");
 
     // `ja` (and any non-bundled locale) self-registers into window.ArtalkI18n
     // once its file loads, so pull it in alongside the main bundle before init.
@@ -147,19 +148,39 @@ export function ChartComments({
             server: ARTALK_SERVER,
             site: ARTALK_SITE,
             locale: artalkLocale,
-            darkMode: initialDark,
-            // The backend ships `darkMode: "inherit"` with `useBackendConf`; re-assert
-            // our values so the widget tracks the site theme and locale, not system
-            // defaults.
+            darkMode: isDarkRef.current,
+            // The backend ships `darkMode: "inherit"` + `locale: "zh-CN"` with
+            // `useBackendConf`; re-assert our values so the widget tracks the site
+            // theme and page locale, not the backend/system defaults.
             remoteConfModifier: (conf: ArtalkConf) => {
-              conf.darkMode = initialDark;
+              conf.darkMode = isDarkRef.current;
               conf.locale = artalkLocale;
             },
           });
           instanceRef.current = instance;
-          // `remoteConfModifier` suppresses Artalk's initial comment-list auto-load;
-          // trigger it explicitly or the thread renders blank (no count, no list).
-          instance.reload();
+          // Load the comment list only after the backend conf is merged, not
+          // synchronously. Artalk fetches the backend conf asynchronously and,
+          // when `remoteConfModifier` is set, skips its own post-conf auto-load
+          // (see `remoteConfModifier || fetch()` in the bundle) — so we must
+          // fetch the list ourselves. Doing it here, before the conf lands,
+          // races a cold (uncached) conf fetch: the first load would render the
+          // list against the pre-merge conf (default Gravatar host + stale dark
+          // mode) and only self-correct on a later refresh once the conf
+          // response is cached. The `mounted` event fires right after
+          // `updateConf()` applies the merged conf (avatar mirror, locale, dark
+          // mode), so the list renders correctly on the very first load.
+          instance.on("mounted", () => {
+            if (cancelled) {
+              return;
+            }
+            // Re-assert the theme onto the now-ready instance before loading the
+            // list: the standalone setDarkMode effect below runs once at mount
+            // while `instanceRef` is still null (Artalk loads async), so it never
+            // reaches the live instance, which would otherwise keep whatever dark
+            // mode the init/backend conf produced.
+            instance.setDarkMode(isDarkRef.current);
+            instance.reload();
+          });
           // Artalk's editor + list shell is mounted now; drop the skeleton.
           setStatus("ready");
         } catch {
@@ -191,8 +212,10 @@ export function ChartComments({
     };
   }, [pageKey, pageTitle, locale, attempt]);
 
-  // Follow the site's light/dark toggle without re-initializing the widget.
+  // Follow the site's light/dark toggle without re-initializing the widget, and
+  // keep the ref current for the async init flow's "mounted" handler above.
   React.useEffect(() => {
+    isDarkRef.current = isDark;
     instanceRef.current?.setDarkMode(isDark);
   }, [isDark]);
 

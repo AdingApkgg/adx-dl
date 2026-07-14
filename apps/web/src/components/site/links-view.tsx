@@ -1,17 +1,9 @@
 import { Reveal } from "@/components/motion";
 import { FriendLinkCard } from "@/components/site/friend-link-card";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
-import { friendLinks } from "@/lib/friend-links";
+import { friendLinks, hostnameOf } from "@/lib/friend-links";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { buildInfoPageStructuredData } from "@/lib/structured-data";
-
-function hostnameOf(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-}
 
 export function LinksView({ locale = "zh" }: { locale?: Locale }) {
   const { links, seo } = getDictionary(locale);

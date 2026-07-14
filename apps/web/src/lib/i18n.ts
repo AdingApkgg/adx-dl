@@ -14,7 +14,6 @@ export type SiteDictionary = {
   nav: {
     home: string;
     browse: string;
-    community: string;
     skipToContent: string;
     primaryLabel: string;
     languageLabel: string;
@@ -32,6 +31,10 @@ export type SiteDictionary = {
     dark: string;
     system: string;
   };
+  motionToggle: {
+    label: string;
+    enabledHint: string;
+  };
   home: {
     badge: string;
     title: string;
@@ -39,6 +42,8 @@ export type SiteDictionary = {
     searchCta: string;
     browseCta: string;
     getAppCta: string;
+    videoCta: string;
+    randomCta: string;
     whatIsAstroDX: string;
     quickGenresLabel: string;
     /** Accessible name for the hero search's instant-suggestion listbox. */
@@ -78,49 +83,15 @@ export type SiteDictionary = {
     intro: (count: number, versions: number) => string;
   };
   statusPage: {
+    // The in-site status page was removed; `title` labels the external monitor
+    // link in the nav/footer, and `loading` doubles as the generic route-loading
+    // skeleton label (see app/(default)/loading.tsx).
     title: string;
-    description: string;
-    sourceLink: string;
     loading: string;
-    refreshing: string;
-    lastUpdated: (value: string) => string;
-    refreshNow: string;
-    refreshFailed: string;
-    parseFailed: string;
-    networkUnavailable: string;
-    overviewTitle: string;
-    resourcesTitle: string;
-    networkTitle: string;
-    stateLabel: string;
-    regionLabel: string;
-    systemLabel: string;
-    archLabel: string;
-    lastReportLabel: string;
-    cpuLabel: string;
-    memoryLabel: string;
-    swapLabel: string;
-    diskLabel: string;
-    loadLabel: string;
-    processLabel: string;
-    uploadTotalLabel: string;
-    downloadTotalLabel: string;
-    uploadSpeedLabel: string;
-    downloadSpeedLabel: string;
-    tcpLabel: string;
-    udpLabel: string;
-    resourceChartsTitle: string;
-    resourceChartsDescription: string;
-    networkChartsTitle: string;
-    networkChartsDescription: string;
-    waitingForHistory: string;
-    cpuTrendLabel: string;
-    loadTrendLabel: string;
-    uploadSpeedTrendLabel: string;
-    downloadSpeedTrendLabel: string;
-    unavailable: string;
   };
   catalogBrowser: {
     searchPlaceholder: string;
+    randomChart: string;
     allCategories: string;
     allSubcategories: string;
     allGenres: string;
@@ -314,7 +285,6 @@ export type SiteDictionary = {
     lastUpdated: (date: string) => string;
     disclaimer: string;
     sourceLabel: string;
-    communityLabel: string;
     getAppLabel: string;
     navLabel: string;
   };
@@ -350,6 +320,76 @@ export type SiteDictionary = {
     intro: string;
     visit: string;
   };
+  community: {
+    navLabel: string;
+    title: string;
+    description: string;
+    intro: string;
+    // Card aria-label CTA. A template (not a "verb + name" concat) so ja can
+    // put the object first: 「QQ グループに参加」.
+    join: (name: string) => string;
+  };
+  donate: {
+    navLabel: string;
+    title: string;
+    description: string;
+    intro: string;
+    // Same template rationale as community.join: ja reads 「爱发电を開く」.
+    open: (name: string) => string;
+    viewOnExplorer: string;
+    addressTitle: string;
+    addressDescription: string;
+    copyAddress: string;
+    copied: string;
+    thanks: string;
+  };
+  resources: {
+    official: string;
+    wiki: string;
+    video: string;
+    cloudDrive: string;
+    netDisk: string;
+  };
+  about: {
+    navLabel: string;
+    title: string;
+    description: string;
+  };
+  post: {
+    navLabel: string;
+    title: string;
+    description: string;
+    intro: string;
+    songTitleLabel: string;
+    songTitlePlaceholder: string;
+    sourceLabel: string;
+    sourcePlaceholder: string;
+    notesLabel: string;
+    notesPlaceholder: string;
+    requiredHint: string;
+    submit: string;
+    composedTitle: string;
+  };
+  survey: {
+    navLabel: string;
+    title: string;
+    description: string;
+    intro: string;
+    selectPlaceholder: string;
+    platformLabel: string;
+    platformOptions: { value: string; label: string }[];
+    discoverLabel: string;
+    discoverPlaceholder: string;
+    satisfactionLabel: string;
+    satisfactionOptions: { value: string; label: string }[];
+    wishLabel: string;
+    wishPlaceholder: string;
+    otherLabel: string;
+    otherPlaceholder: string;
+    requiredHint: string;
+    submit: string;
+    composedTitle: string;
+  };
   notFound: {
     title: string;
     description: string;
@@ -375,17 +415,21 @@ export type SiteDictionary = {
   seo: {
     home: string;
     charts: string;
-    status: string;
     versions: string;
     versionDetail: (label: string, count: number) => string;
     guestbook: string;
     links: string;
+    community: string;
+    donate: string;
+    about: string;
+    post: string;
+    survey: string;
   };
 };
 
-export type StaticPageMetadataKey = "home" | "charts" | "status";
+export type StaticPageMetadataKey = "home" | "charts";
 export type StaticPageMetadataEntry = {
-  pathname: "/" | "/charts" | "/status";
+  pathname: "/" | "/charts";
   title: string;
   description: string;
   keywords: string[];
@@ -397,7 +441,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     nav: {
       home: "首页",
       browse: "曲库",
-      community: "Telegram 社群",
       skipToContent: "跳到主要内容",
       primaryLabel: "主导航",
       languageLabel: "语言切换",
@@ -406,6 +449,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "切换主题", light: "浅色", dark: "深色", system: "跟随系统" },
+    motionToggle: { label: "减弱动画", enabledHint: "恢复动画" },
     home: {
       badge: "为 AstroDX 玩家打造",
       title: "AstroDX 谱面资料站与下载入口。",
@@ -414,6 +458,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       searchCta: "搜索曲库",
       browseCta: "浏览版本",
       getAppCta: "获取 AstroDX",
+      videoCta: "观看演示视频",
+      randomCta: "随机来一首",
       whatIsAstroDX: "什么是 AstroDX？",
       quickGenresLabel: "热门分类",
       searchSuggestionsLabel: "搜索建议",
@@ -475,48 +521,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     },
     statusPage: {
       title: "服务器状态",
-      description: "查看公开监控页中的服务器关键状态与网络指标。",
-      sourceLink: "查看原监控页",
       loading: "加载中",
-      refreshing: "刷新中",
-      lastUpdated: (value) => `上次刷新：${value}`,
-      refreshNow: "立即刷新",
-      refreshFailed: "刷新失败，显示的是上次成功数据",
-      parseFailed: "监控页面结构已变化",
-      networkUnavailable: "监控页面暂时无法访问",
-      overviewTitle: "概览",
-      resourcesTitle: "资源指标",
-      networkTitle: "网络指标",
-      stateLabel: "状态",
-      regionLabel: "区域",
-      systemLabel: "系统",
-      archLabel: "架构",
-      lastReportLabel: "最后上报时间",
-      cpuLabel: "CPU",
-      memoryLabel: "内存",
-      swapLabel: "虚拟内存",
-      diskLabel: "磁盘",
-      loadLabel: "负载",
-      processLabel: "进程数",
-      uploadTotalLabel: "上传总量",
-      downloadTotalLabel: "下载总量",
-      uploadSpeedLabel: "上传速率",
-      downloadSpeedLabel: "下载速率",
-      tcpLabel: "TCP",
-      udpLabel: "UDP",
-      resourceChartsTitle: "资源趋势",
-      resourceChartsDescription: "CPU、内存与磁盘占用趋势",
-      networkChartsTitle: "网络趋势",
-      networkChartsDescription: "上传与下载速率趋势",
-      waitingForHistory: "等待更多数据",
-      cpuTrendLabel: "CPU 趋势",
-      loadTrendLabel: "负载趋势",
-      uploadSpeedTrendLabel: "上传速率",
-      downloadSpeedTrendLabel: "下载速率",
-      unavailable: "暂无数据",
     },
     catalogBrowser: {
       searchPlaceholder: "搜索曲名、别名、曲师、版本...",
+      randomChart: "随机谱面",
       allCategories: "全部分类",
       allSubcategories: "全部版本",
       allGenres: "全部曲风",
@@ -700,7 +709,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       lastUpdated: (date) => `目录更新于 ${date}`,
       disclaimer: "非官方爱好者资料站。AstroDX 与 maimai 的相关权利归各自所有者所有。",
       sourceLabel: "源代码",
-      communityLabel: "Telegram 社群",
       getAppLabel: "获取 AstroDX",
       navLabel: "页脚导航",
     },
@@ -737,6 +745,85 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "以下站点与工具均与本站无隶属关系，仅作社区分享。外部内容请自行甄别。",
       visit: "访问",
     },
+    community: {
+      navLabel: "社区",
+      title: "社区",
+      description: "加入玩家社区，交流谱面与游戏心得。",
+      intro: "以下是本站相关的玩家交流群组，点击卡片即可加入。",
+      join: (name) => `加入 ${name}`,
+    },
+    donate: {
+      navLabel: "捐赠",
+      title: "捐赠支持",
+      description: "如果本站对你有帮助，欢迎请我们喝杯咖啡。",
+      intro: "本站的服务器与流量成本均为个人承担，你的支持能帮助本站持续运营。",
+      open: (name) => `前往 ${name}`,
+      viewOnExplorer: "在 Tronscan 查看",
+      addressTitle: "USDT (TRC20)",
+      addressDescription: "使用 TRC20 网络向以下地址转账 USDT。",
+      copyAddress: "复制地址",
+      copied: "已复制",
+      thanks: "感谢每一位支持者！",
+    },
+    resources: {
+      official: "AstroDX",
+      wiki: "维基",
+      video: "演示视频",
+      cloudDrive: "云盘",
+      netDisk: "网盘",
+    },
+    about: {
+      navLabel: "关于",
+      title: "关于本站",
+      description: "站点介绍、联系方式、开源信息与鸣谢。",
+    },
+    post: {
+      navLabel: "投稿",
+      title: "谱面投稿",
+      description: "想让某首谱面被收录？把它推荐给我们。",
+      intro:
+        "填写下方信息并提交，内容会自动预填到留言板的评论框中，确认无误后发布即完成投稿。站长看到后会尽快处理。",
+      songTitleLabel: "曲名（可含别名）",
+      songTitlePlaceholder: "例：系ぎて / Tsunagite",
+      sourceLabel: "谱面来源 / 下载链接",
+      sourcePlaceholder: "例：majdata.net 链接、网盘链接等",
+      notesLabel: "补充说明（可选）",
+      notesPlaceholder: "例：谱面作者、难度、版本归属等",
+      requiredHint: "请先填写曲名与谱面来源。",
+      submit: "前往留言板投稿",
+      composedTitle: "【谱面投稿】",
+    },
+    survey: {
+      navLabel: "问卷",
+      title: "问卷调查",
+      description: "花一分钟告诉我们你的使用体验。",
+      intro:
+        "你的回答对本站今后的发展很重要！提交后内容会自动预填到留言板的评论框中，确认无误后发布即可。",
+      selectPlaceholder: "请选择…",
+      platformLabel: "你在哪个平台游玩 AstroDX？",
+      platformOptions: [
+        { value: "Android", label: "Android" },
+        { value: "iOS", label: "iOS / iPadOS" },
+        { value: "其他", label: "其他 / 尚未游玩" },
+      ],
+      discoverLabel: "你是如何得知本站的？",
+      discoverPlaceholder: "例：朋友推荐、搜索引擎、QQ 群等",
+      satisfactionLabel: "对本站的整体满意度？",
+      satisfactionOptions: [
+        { value: "5", label: "5 - 非常满意" },
+        { value: "4", label: "4 - 满意" },
+        { value: "3", label: "3 - 一般" },
+        { value: "2", label: "2 - 不满意" },
+        { value: "1", label: "1 - 很不满意" },
+      ],
+      wishLabel: "最希望本站增加什么功能或内容？",
+      wishPlaceholder: "例：更多谱面、更好的搜索、深色模式优化等",
+      otherLabel: "其他建议（可选）",
+      otherPlaceholder: "任何想说的话都可以写在这里",
+      requiredHint: "请先选择平台并填写满意度。",
+      submit: "前往留言板提交",
+      composedTitle: "【问卷反馈】",
+    },
     notFound: {
       title: "页面不存在",
       description: "你访问的页面不存在或已被移动，试试从首页或曲库重新出发。",
@@ -757,8 +844,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       home: "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
       charts:
         "浏览本站收录的全部 AstroDX 谱面，可按 maimai DX 版本分支、谱面分类与显示语言筛选，每首曲目均提供封面、难度等级、谱面定数与 BPM 等信息，支持在线预览并下载导入 AstroDX 模拟器。",
-      status:
-        "实时查看本站与下载服务的运行状态，包括服务器在线情况、响应延迟、网络指标与关键健康数据，数据来自公开监控页面，便于了解 AstroDX 谱面浏览与下载服务当前是否可用。",
       versions:
         "按 maimai DX 版本分支浏览全部 AstroDX 谱面，从初代 maimai 到最新版本逐一分类整理，可快速定位某个版本收录的曲目，查看谱面数量、封面与难度信息，支持在线预览与下载。",
       versionDetail: (label, count) =>
@@ -767,6 +852,16 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "欢迎在 ADX 谱面资源留言板留下你的想法、建议、问题或反馈，与其他 maimai 与 AstroDX 玩家交流。评论系统由 Artalk 提供支持，可匿名发表，也可登录后留言。",
       links:
         "这里收集了一些与 maimai 和 AstroDX 相关的优秀站点、工具与资源，包括查分器、谱面工具、社群与教程等友情链接，方便你发现更多 maimai 玩家常用的实用资源。",
+      community:
+        "加入 AstroDX 玩家社区：QQ 交流群与 Telegram 群组，交流 maimai 谱面、反馈问题，并获取本站与 AstroDX 模拟器的最新动态。",
+      donate:
+        "如果 ADX 谱面资源对你有帮助，欢迎通过爱发电、Patreon 或 USDT (TRC20) 捐赠支持，帮助本站持续承担服务器与流量成本。",
+      about:
+        "了解 ADX 谱面资源：非官方 AstroDX 谱面资料站的定位与维护理念、联系方式、开源仓库与技术栈、鸣谢名单及免责声明。",
+      post:
+        "向 ADX 谱面资源投稿谱面：填写曲名与谱面来源，内容会预填到留言板评论框，发布即完成投稿，帮助更多 AstroDX 玩家找到好谱。",
+      survey:
+        "参与 ADX 谱面资源问卷调查：告诉我们你的游玩平台与使用体验，你的反馈将直接影响本站的功能规划与内容方向。",
     },
   },
   en: {
@@ -774,7 +869,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     nav: {
       home: "Home",
       browse: "Browse",
-      community: "Telegram Community",
       skipToContent: "Skip to main content",
       primaryLabel: "Primary",
       languageLabel: "Language",
@@ -783,6 +877,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "Toggle theme", light: "Light", dark: "Dark", system: "System" },
+    motionToggle: { label: "Reduce motion", enabledHint: "Restore motion" },
     home: {
       badge: "Built for AstroDX players",
       title: "AstroDX chart archive for browsing, indexing, and downloads.",
@@ -791,6 +886,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       searchCta: "Search Catalog",
       browseCta: "Browse Releases",
       getAppCta: "Get AstroDX",
+      videoCta: "Watch the Demo",
+      randomCta: "Surprise Me",
       whatIsAstroDX: "What is AstroDX?",
       quickGenresLabel: "Popular genres",
       searchSuggestionsLabel: "Search suggestions",
@@ -854,48 +951,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     },
     statusPage: {
       title: "Server Status",
-      description: "View key server health and network metrics from the public monitor page.",
-      sourceLink: "Open Original Monitor",
       loading: "Loading",
-      refreshing: "Refreshing",
-      lastUpdated: (value) => `Last updated: ${value}`,
-      refreshNow: "Refresh Now",
-      refreshFailed: "Refresh failed. Showing the last successful snapshot.",
-      parseFailed: "The monitor page structure has changed.",
-      networkUnavailable: "The monitor page is temporarily unavailable.",
-      overviewTitle: "Overview",
-      resourcesTitle: "Resources",
-      networkTitle: "Network",
-      stateLabel: "State",
-      regionLabel: "Region",
-      systemLabel: "System",
-      archLabel: "Architecture",
-      lastReportLabel: "Last Report",
-      cpuLabel: "CPU",
-      memoryLabel: "Memory",
-      swapLabel: "Swap",
-      diskLabel: "Disk",
-      loadLabel: "Load",
-      processLabel: "Processes",
-      uploadTotalLabel: "Upload Total",
-      downloadTotalLabel: "Download Total",
-      uploadSpeedLabel: "Upload Speed",
-      downloadSpeedLabel: "Download Speed",
-      tcpLabel: "TCP",
-      udpLabel: "UDP",
-      resourceChartsTitle: "Resource Trends",
-      resourceChartsDescription: "CPU, memory, and disk usage over time",
-      networkChartsTitle: "Network Trends",
-      networkChartsDescription: "Upload and download throughput over time",
-      waitingForHistory: "Waiting for more data",
-      cpuTrendLabel: "CPU Trend",
-      loadTrendLabel: "Load Trend",
-      uploadSpeedTrendLabel: "Upload Speed",
-      downloadSpeedTrendLabel: "Download Speed",
-      unavailable: "Unavailable",
     },
     catalogBrowser: {
       searchPlaceholder: "Search title, alias, artist, version...",
+      randomChart: "Random chart",
       allCategories: "All Categories",
       allSubcategories: "All Versions",
       allGenres: "All Genres",
@@ -1092,7 +1152,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       disclaimer:
         "Unofficial fan-made archive. AstroDX and maimai are the property of their respective owners.",
       sourceLabel: "Source",
-      communityLabel: "Telegram Community",
       getAppLabel: "Get AstroDX",
       navLabel: "Footer",
     },
@@ -1133,6 +1192,86 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "These sites and tools are not affiliated with this archive — shared for the community. Use external links at your own discretion.",
       visit: "Visit",
     },
+    community: {
+      navLabel: "Community",
+      title: "Community",
+      description: "Join the player community to chat about charts and the game.",
+      intro: "These are the player groups around this archive — click a card to join.",
+      join: (name) => `Join ${name}`,
+    },
+    donate: {
+      navLabel: "Donate",
+      title: "Support Us",
+      description: "If this archive helps you, consider buying us a coffee.",
+      intro:
+        "Servers and bandwidth are paid out of pocket — your support keeps this archive running.",
+      open: (name) => `Open ${name}`,
+      viewOnExplorer: "View on Tronscan",
+      addressTitle: "USDT (TRC20)",
+      addressDescription: "Send USDT to the address below via the TRC20 network.",
+      copyAddress: "Copy address",
+      copied: "Copied",
+      thanks: "Thank you to every supporter!",
+    },
+    resources: {
+      official: "AstroDX",
+      wiki: "Wiki",
+      video: "Demo Video",
+      cloudDrive: "Cloud Storage",
+      netDisk: "Download Mirror",
+    },
+    about: {
+      navLabel: "About",
+      title: "About",
+      description: "What this site is, how to reach us, open-source info and credits.",
+    },
+    post: {
+      navLabel: "Submit",
+      title: "Submit a Chart",
+      description: "Want a chart added to the archive? Recommend it here.",
+      intro:
+        "Fill in the form and submit — your entry is prefilled into the guestbook's comment box; review it and post to finish. The maintainer will follow up as soon as possible.",
+      songTitleLabel: "Song title (aliases welcome)",
+      songTitlePlaceholder: "e.g. 系ぎて / Tsunagite",
+      sourceLabel: "Chart source / download link",
+      sourcePlaceholder: "e.g. a majdata.net link or a drive link",
+      notesLabel: "Notes (optional)",
+      notesPlaceholder: "e.g. chart designer, difficulty, version",
+      requiredHint: "Please fill in the song title and the chart source first.",
+      submit: "Submit via Guestbook",
+      composedTitle: "[Chart Submission]",
+    },
+    survey: {
+      navLabel: "Survey",
+      title: "Survey",
+      description: "Spare a minute to tell us how the site works for you.",
+      intro:
+        "Your answers shape where this site goes next! After submitting, your responses are prefilled into the guestbook's comment box — review and post to finish.",
+      selectPlaceholder: "Select…",
+      platformLabel: "Which platform do you play AstroDX on?",
+      platformOptions: [
+        { value: "Android", label: "Android" },
+        { value: "iOS", label: "iOS / iPadOS" },
+        { value: "Other", label: "Other / not playing yet" },
+      ],
+      discoverLabel: "How did you find this site?",
+      discoverPlaceholder: "e.g. a friend, a search engine, a QQ group",
+      satisfactionLabel: "Overall, how satisfied are you with the site?",
+      satisfactionOptions: [
+        { value: "5", label: "5 - Very satisfied" },
+        { value: "4", label: "4 - Satisfied" },
+        { value: "3", label: "3 - Neutral" },
+        { value: "2", label: "2 - Dissatisfied" },
+        { value: "1", label: "1 - Very dissatisfied" },
+      ],
+      wishLabel: "What would you most like to see added?",
+      wishPlaceholder: "e.g. more charts, better search, dark-mode polish",
+      otherLabel: "Anything else? (optional)",
+      otherPlaceholder: "Anything you want to tell us",
+      requiredHint: "Please pick a platform and a satisfaction score first.",
+      submit: "Submit via Guestbook",
+      composedTitle: "[Survey Feedback]",
+    },
     notFound: {
       title: "Page not found",
       description:
@@ -1155,8 +1294,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       home: "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download.",
       charts:
         "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download.",
-      status:
-        "Check the live status of this site and its download service — server uptime, response latency, network metrics and key health data from the public monitor page.",
       versions:
         "Browse every AstroDX chart grouped by maimai DX version, from the original maimai to the latest release — jump to any version for its song count, covers and downloads.",
       versionDetail: (label, count) =>
@@ -1167,6 +1304,16 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "Share thoughts, suggestions and feedback, and chat with other maimai and AstroDX players. Comments are powered by Artalk — post anonymously or sign in.",
       links:
         "A curated collection of maimai- and AstroDX-related sites, tools and resources — score trackers, chart utilities, communities and guides for players.",
+      community:
+        "Join the AstroDX player community — our QQ group and Telegram group — to chat about maimai charts, report issues and follow updates to this site and the AstroDX simulator.",
+      donate:
+        "If the ADX chart archive helps you, consider supporting it via Afdian, Patreon or USDT (TRC20) to help cover server and bandwidth costs.",
+      about:
+        "About the ADX chart archive: what this unofficial AstroDX chart site is, how it is maintained, how to reach us, its open-source repository and tech stack, credits and disclaimer.",
+      post:
+        "Submit a chart to the ADX archive: fill in the song title and chart source, review the prefilled guestbook comment and post it — helping more AstroDX players find great charts.",
+      survey:
+        "Take the ADX chart archive survey: tell us your platform and experience — your feedback directly shapes the site's roadmap and content.",
     },
   },
   ja: {
@@ -1174,7 +1321,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     nav: {
       home: "ホーム",
       browse: "曲一覧",
-      community: "Telegram コミュニティ",
       skipToContent: "メインコンテンツへ移動",
       primaryLabel: "メインナビ",
       languageLabel: "言語切り替え",
@@ -1183,6 +1329,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "テーマ切り替え", light: "ライト", dark: "ダーク", system: "システム" },
+    motionToggle: { label: "アニメーションを減らす", enabledHint: "アニメーションを戻す" },
     home: {
       badge: "AstroDX プレイヤーのために",
       title: "AstroDX 譜面アーカイブとダウンロード入口。",
@@ -1191,6 +1338,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       searchCta: "カタログ検索",
       browseCta: "バージョン一覧",
       getAppCta: "AstroDX を入手",
+      videoCta: "デモ動画を見る",
+      randomCta: "ランダムに一曲",
       whatIsAstroDX: "AstroDX とは？",
       quickGenresLabel: "人気ジャンル",
       searchSuggestionsLabel: "検索候補",
@@ -1252,48 +1401,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     },
     statusPage: {
       title: "サーバー状態",
-      description: "公開監視ページの主要なサーバー状態とネットワーク指標を確認します。",
-      sourceLink: "元の監視ページを開く",
       loading: "読み込み中",
-      refreshing: "更新中",
-      lastUpdated: (value) => `最終更新: ${value}`,
-      refreshNow: "今すぐ更新",
-      refreshFailed: "更新に失敗したため、前回の正常なデータを表示しています。",
-      parseFailed: "監視ページの構造が変更されました。",
-      networkUnavailable: "監視ページに一時的にアクセスできません。",
-      overviewTitle: "概要",
-      resourcesTitle: "リソース",
-      networkTitle: "ネットワーク",
-      stateLabel: "状態",
-      regionLabel: "地域",
-      systemLabel: "システム",
-      archLabel: "アーキテクチャ",
-      lastReportLabel: "最終報告時刻",
-      cpuLabel: "CPU",
-      memoryLabel: "メモリ",
-      swapLabel: "スワップ",
-      diskLabel: "ディスク",
-      loadLabel: "負荷",
-      processLabel: "プロセス数",
-      uploadTotalLabel: "総アップロード量",
-      downloadTotalLabel: "総ダウンロード量",
-      uploadSpeedLabel: "アップロード速度",
-      downloadSpeedLabel: "ダウンロード速度",
-      tcpLabel: "TCP",
-      udpLabel: "UDP",
-      resourceChartsTitle: "リソース推移",
-      resourceChartsDescription: "CPU・メモリ・ディスク使用率の推移",
-      networkChartsTitle: "ネットワーク推移",
-      networkChartsDescription: "アップロードとダウンロード速度の推移",
-      waitingForHistory: "より多くのデータを待っています",
-      cpuTrendLabel: "CPU 推移",
-      loadTrendLabel: "負荷推移",
-      uploadSpeedTrendLabel: "アップロード速度",
-      downloadSpeedTrendLabel: "ダウンロード速度",
-      unavailable: "利用不可",
     },
     catalogBrowser: {
       searchPlaceholder: "曲名、別名、アーティスト、バージョンで検索...",
+      randomChart: "ランダム譜面",
       allCategories: "すべての分類",
       allSubcategories: "すべてのバージョン",
       allGenres: "すべてのジャンル",
@@ -1480,7 +1592,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       lastUpdated: (date) => `カタログ更新: ${date}`,
       disclaimer: "非公式のファンメイドアーカイブです。AstroDX および maimai の権利は各所有者に帰属します。",
       sourceLabel: "ソース",
-      communityLabel: "Telegram コミュニティ",
       getAppLabel: "AstroDX を入手",
       navLabel: "フッター",
     },
@@ -1518,6 +1629,86 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "これらのサイト・ツールは当アーカイブとは無関係で、コミュニティ向けに紹介しています。外部リンクのご利用はご自身の判断でお願いします。",
       visit: "アクセス",
     },
+    community: {
+      navLabel: "コミュニティ",
+      title: "コミュニティ",
+      description: "プレイヤーコミュニティに参加して、譜面やゲームについて交流しましょう。",
+      intro: "以下は本サイト関連のプレイヤーグループです。カードをクリックすると参加できます。",
+      join: (name) => `${name}に参加`,
+    },
+    donate: {
+      navLabel: "寄付",
+      title: "寄付・サポート",
+      description: "本サイトがお役に立ちましたら、コーヒー一杯分の応援をお願いします。",
+      intro:
+        "サーバーと帯域のコストは個人で負担しています。皆さまのサポートが継続運営の支えになります。",
+      open: (name) => `${name}を開く`,
+      viewOnExplorer: "Tronscan で確認",
+      addressTitle: "USDT (TRC20)",
+      addressDescription: "TRC20 ネットワーク経由で以下のアドレスに USDT を送金できます。",
+      copyAddress: "アドレスをコピー",
+      copied: "コピーしました",
+      thanks: "すべてのサポーターの皆さまに感謝します！",
+    },
+    resources: {
+      official: "AstroDX",
+      wiki: "Wiki",
+      video: "デモ動画",
+      cloudDrive: "クラウド",
+      netDisk: "オンラインストレージ",
+    },
+    about: {
+      navLabel: "サイトについて",
+      title: "本サイトについて",
+      description: "サイトの紹介、連絡先、オープンソース情報と謝辞。",
+    },
+    post: {
+      navLabel: "投稿",
+      title: "譜面の投稿",
+      description: "収録してほしい譜面があれば、こちらから推薦できます。",
+      intro:
+        "フォームに記入して送信すると、内容がゲストブックのコメント欄に自動で入力されます。確認して投稿すれば完了です。管理人ができるだけ早く対応します。",
+      songTitleLabel: "曲名（別名も可）",
+      songTitlePlaceholder: "例：系ぎて / Tsunagite",
+      sourceLabel: "譜面の入手元 / ダウンロードリンク",
+      sourcePlaceholder: "例：majdata.net のリンク、クラウドのリンクなど",
+      notesLabel: "補足（任意）",
+      notesPlaceholder: "例：譜面作者、難易度、収録バージョンなど",
+      requiredHint: "曲名と入手元を先に入力してください。",
+      submit: "ゲストブックで投稿する",
+      composedTitle: "【譜面投稿】",
+    },
+    survey: {
+      navLabel: "アンケート",
+      title: "アンケート",
+      description: "1 分だけ、使い心地を教えてください。",
+      intro:
+        "皆さまの回答が今後の改善につながります！送信すると回答がゲストブックのコメント欄に自動で入力されるので、確認して投稿してください。",
+      selectPlaceholder: "選択してください…",
+      platformLabel: "AstroDX をどのプラットフォームで遊んでいますか？",
+      platformOptions: [
+        { value: "Android", label: "Android" },
+        { value: "iOS", label: "iOS / iPadOS" },
+        { value: "その他", label: "その他 / まだ遊んでいない" },
+      ],
+      discoverLabel: "本サイトをどこで知りましたか？",
+      discoverPlaceholder: "例：友人の紹介、検索エンジン、コミュニティなど",
+      satisfactionLabel: "本サイトの総合的な満足度は？",
+      satisfactionOptions: [
+        { value: "5", label: "5 - とても満足" },
+        { value: "4", label: "4 - 満足" },
+        { value: "3", label: "3 - ふつう" },
+        { value: "2", label: "2 - 不満" },
+        { value: "1", label: "1 - とても不満" },
+      ],
+      wishLabel: "いちばん追加してほしい機能・コンテンツは？",
+      wishPlaceholder: "例：譜面の追加、検索の改善、ダークモードの調整など",
+      otherLabel: "そのほかのご意見（任意）",
+      otherPlaceholder: "伝えたいことがあれば何でもどうぞ",
+      requiredHint: "プラットフォームと満足度を先に選択してください。",
+      submit: "ゲストブックで送信する",
+      composedTitle: "【アンケート回答】",
+    },
     notFound: {
       title: "ページが見つかりません",
       description:
@@ -1540,8 +1731,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       home: "maimai 系譜面を収録する非公式の AstroDX 譜面アーカイブ。楽曲メタデータ、ジャケット、難易度定数、BPM を掲載し、バージョン別の閲覧、検索、オンラインプレビュー、AstroDX シミュレーターへのダウンロードに対応しています。",
       charts:
         "収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。",
-      status:
-        "本サイトとダウンロードサービスの稼働状況をリアルタイムで確認。サーバーの稼働状態、応答遅延、ネットワーク指標などの主要な健全性データを公開監視ページから取得し、AstroDX 譜面の閲覧・ダウンロードが利用可能か把握できます。",
       versions:
         "すべての AstroDX 譜面を maimai DX のバージョン分類別に閲覧。初代 maimai から最新バージョンまで整理し、各バージョンの収録曲数、ジャケット、難易度を確認しながらオンラインでプレビュー・ダウンロードできます。",
       versionDetail: (label, count) =>
@@ -1550,6 +1739,16 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "ADX 谱面资源のゲストブックで、ご意見・ご提案・ご質問・フィードバックをお気軽にどうぞ。ほかの maimai・AstroDX プレイヤーと交流できます。コメントは Artalk によって提供され、匿名でもサインインしても投稿できます。",
       links:
         "maimai と AstroDX に関連するおすすめのサイト、ツール、リソースをまとめたリンク集。スコア管理ツール、譜面ツール、コミュニティ、ガイドなど、maimai プレイヤーに役立つ情報を見つけやすくまとめています。",
+      community:
+        "AstroDX プレイヤーコミュニティに参加しましょう。QQ グループと Telegram グループで maimai 譜面について交流し、本サイトと AstroDX シミュレーターの最新情報を入手できます。",
+      donate:
+        "ADX 譜面アーカイブがお役に立ちましたら、爱发电・Patreon・USDT (TRC20) での寄付にご協力ください。サーバーと帯域のコスト維持に役立てられます。",
+      about:
+        "ADX 譜面アーカイブについて：非公式 AstroDX 譜面資料サイトの位置づけと運営方針、連絡先、オープンソースリポジトリと技術構成、謝辞、免責事項を掲載しています。",
+      post:
+        "ADX 譜面アーカイブへの譜面投稿：曲名と入手元を記入すると内容がゲストブックのコメント欄に自動入力され、投稿するだけで完了します。",
+      survey:
+        "ADX 譜面アーカイブのアンケートにご協力ください。プレイ環境や使い心地を教えていただくことで、今後の機能とコンテンツの方向性に反映されます。",
     },
   },
 };
@@ -1608,17 +1807,6 @@ export function getStaticPageMetadata(
           : normalizedLocale === "ja"
             ? ["AstroDX", "ADX 谱面资源", "譜面一覧", "分類フィルタ", "表示言語"]
             : ["AstroDX", "ADX 谱面资源", "浏览曲目", "分类筛选", "显示语言"],
-    },
-    status: {
-      pathname: "/status",
-      title: dictionary.statusPage.title,
-      description: dictionary.seo.status,
-      keywords:
-        normalizedLocale === "en"
-          ? ["AstroDX", "ADX 谱面资源", "server status", "monitor page", "network metrics"]
-          : normalizedLocale === "ja"
-            ? ["AstroDX", "ADX 谱面资源", "サーバー状態", "監視ページ", "ネットワーク指標"]
-            : ["AstroDX", "ADX 谱面资源", "服务器状态", "监控页", "网络指标"],
     },
   };
 }

@@ -1,10 +1,10 @@
 "use client";
 
-import { useReducedMotion } from "framer-motion";
+
 import { RotateCwIcon } from "lucide-react";
 import * as React from "react";
 
-import { motion, springSoft } from "@/components/motion";
+import { motion, springSoft, useReducedMotion } from "@/components/motion";
 
 // The offline page's JS chunks are precached with the app shell (see
 // serwist.config.mjs), so this hydrates and works without a network.

@@ -73,23 +73,6 @@ describe("i18n helpers", () => {
     expect(i18n.getDictionary?.("ja").nav.home).toBe("ホーム");
   });
 
-  test("provides localized Nezha chart descriptions for zh en ja", async () => {
-    const i18n = await loadI18nModule();
-
-    expect(typeof i18n.getDictionary).toBe("function");
-
-    const zhStatus = i18n.getDictionary?.("zh").statusPage as Record<string, unknown>;
-    const enStatus = i18n.getDictionary?.("en").statusPage as Record<string, unknown>;
-    const jaStatus = i18n.getDictionary?.("ja").statusPage as Record<string, unknown>;
-
-    expect(zhStatus.resourceChartsDescription).toBe("CPU、内存与磁盘占用趋势");
-    expect(zhStatus.networkChartsDescription).toBe("上传与下载速率趋势");
-    expect(enStatus.resourceChartsDescription).toBe("CPU, memory, and disk usage over time");
-    expect(enStatus.networkChartsDescription).toBe("Upload and download throughput over time");
-    expect(jaStatus.resourceChartsDescription).toBe("CPU・メモリ・ディスク使用率の推移");
-    expect(jaStatus.networkChartsDescription).toBe("アップロードとダウンロード速度の推移");
-  });
-
   test("exposes static page metadata entries for zh en ja", async () => {
     const i18n = (await loadI18nModule()) as Partial<I18nModule> & {
       getStaticPageMetadata?: (
@@ -117,11 +100,12 @@ describe("i18n helpers", () => {
         "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download.",
       keywords: ["AstroDX", "ADX 谱面资源", "browse charts", "category filter", "display language"],
     });
-    expect(jaPages.status).toEqual({
-      pathname: "/status",
-      title: "サーバー状態",
-      description: "本サイトとダウンロードサービスの稼働状況をリアルタイムで確認。サーバーの稼働状態、応答遅延、ネットワーク指標などの主要な健全性データを公開監視ページから取得し、AstroDX 譜面の閲覧・ダウンロードが利用可能か把握できます。",
-      keywords: ["AstroDX", "ADX 谱面资源", "サーバー状態", "監視ページ", "ネットワーク指標"],
+    expect(jaPages.charts).toEqual({
+      pathname: "/charts",
+      title: "譜面一覧",
+      description:
+        "収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。",
+      keywords: ["AstroDX", "ADX 谱面资源", "譜面一覧", "分類フィルタ", "表示言語"],
     });
   });
 
@@ -156,7 +140,7 @@ describe("i18n helpers", () => {
     const pageMetadata = (await loadPageMetadataModule()) as Partial<PageMetadataModule> & {
       buildLocalizedPageMetadata?: (
         locale: "zh" | "en" | "ja",
-        page: "home" | "charts" | "status"
+        page: "home" | "charts"
       ) => {
         title?: string;
         description?: string;
@@ -184,37 +168,37 @@ describe("i18n helpers", () => {
 
     expect(typeof pageMetadata.buildLocalizedPageMetadata).toBe("function");
 
-    const metadata = pageMetadata.buildLocalizedPageMetadata?.("ja", "status");
+    const metadata = pageMetadata.buildLocalizedPageMetadata?.("ja", "charts");
 
-    expect(metadata?.title).toBe("ADX サーバー状態とダウンロード監視 | ADX 谱面资源");
-    expect(metadata?.description).toBe("本サイトとダウンロードサービスの稼働状況をリアルタイムで確認。サーバーの稼働状態、応答遅延、ネットワーク指標などの主要な健全性データを公開監視ページから取得し、AstroDX 譜面の閲覧・ダウンロードが利用可能か把握できます。");
+    expect(metadata?.title).toBe("AstroDX 譜面一覧とダウンロードカタログ | ADX 谱面资源");
+    expect(metadata?.description).toBe("収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。");
     expect(metadata?.keywords).toEqual([
       "AstroDX",
       "ADX 谱面资源",
-      "サーバー状態",
-      "監視ページ",
-      "ネットワーク指標",
+      "譜面一覧",
+      "分類フィルタ",
+      "表示言語",
     ]);
     expect(metadata?.robots).toEqual({
       index: true,
       follow: true,
     });
-    expect(metadata?.alternates?.canonical).toBe("https://adxdls.saop.cc/ja/status");
+    expect(metadata?.alternates?.canonical).toBe("https://adxdls.saop.cc/ja/charts");
     expect(metadata?.alternates?.languages).toEqual({
-      "x-default": "/status",
-      "zh-CN": "/status",
-      en: "/en/status",
-      ja: "/ja/status",
+      "x-default": "/charts",
+      "zh-CN": "/charts",
+      en: "/en/charts",
+      ja: "/ja/charts",
     });
     expect(metadata?.openGraph).toMatchObject({
-      title: "ADX サーバー状態とダウンロード監視 | ADX 谱面资源",
-      description: "本サイトとダウンロードサービスの稼働状況をリアルタイムで確認。サーバーの稼働状態、応答遅延、ネットワーク指標などの主要な健全性データを公開監視ページから取得し、AstroDX 譜面の閲覧・ダウンロードが利用可能か把握できます。",
-      url: "https://adxdls.saop.cc/ja/status",
+      title: "AstroDX 譜面一覧とダウンロードカタログ | ADX 谱面资源",
+      description: "収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。",
+      url: "https://adxdls.saop.cc/ja/charts",
       siteName: "ADX 谱面资源",
     });
     expect(metadata?.twitter).toMatchObject({
-      title: "ADX サーバー状態とダウンロード監視 | ADX 谱面资源",
-      description: "本サイトとダウンロードサービスの稼働状況をリアルタイムで確認。サーバーの稼働状態、応答遅延、ネットワーク指標などの主要な健全性データを公開監視ページから取得し、AstroDX 譜面の閲覧・ダウンロードが利用可能か把握できます。",
+      title: "AstroDX 譜面一覧とダウンロードカタログ | ADX 谱面资源",
+      description: "収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。",
     });
   });
 });

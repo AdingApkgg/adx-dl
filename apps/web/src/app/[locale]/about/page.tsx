@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
-import { ServerStatusClient } from "@/components/site/server-status-client";
-import { buildStatusPageMetadata } from "@/lib/page-metadata";
+import { AboutView } from "@/components/site/about-view";
+import { buildAboutPageMetadata } from "@/lib/page-metadata";
 
 import { generatePrefixedLocaleParams, getPrefixedRouteLocale } from "../route-locale";
 
@@ -15,14 +15,14 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  return buildStatusPageMetadata(getPrefixedRouteLocale(locale));
+  return buildAboutPageMetadata(getPrefixedRouteLocale(locale));
 }
 
-export default async function LocalizedStatusPage({
+export default async function LocalizedAboutPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  return <ServerStatusClient locale={getPrefixedRouteLocale(locale)} />;
+  return <AboutView locale={getPrefixedRouteLocale(locale)} />;
 }

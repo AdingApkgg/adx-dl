@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { useScroll, useTransform } from "framer-motion";
 
-import { EASE_OUT, motion, revealTransition, springSoft } from "@/components/motion";
+import { EASE_OUT, motion, revealTransition, springSoft, useReducedMotion } from "@/components/motion";
 
 /**
  * Parallax shell for the chart detail hero's blurred cover backdrop: as the

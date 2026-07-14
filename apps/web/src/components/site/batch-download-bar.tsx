@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import { ChevronDownIcon, DownloadIcon, PauseIcon, RotateCwIcon, XIcon } from "lucide-react";
-import { useReducedMotion, useSpring } from "framer-motion";
+import { useSpring } from "framer-motion";
 
-import { AnimatePresence, DrawnCheck, EASE_OUT, motion } from "@/components/motion";
+import { AnimatePresence, DrawnCheck, EASE_OUT, motion, useReducedMotion } from "@/components/motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {

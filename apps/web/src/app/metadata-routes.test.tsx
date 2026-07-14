@@ -149,7 +149,6 @@ describe("route metadata", () => {
   test("default zh pages expose static metadata with alternates", async () => {
     const homeModule = await import("./(default)/page");
     const chartsModule = await import("./(default)/charts/page");
-    const statusModule = await import("./(default)/status/page");
 
     expect(homeModule.metadata?.title).toBe("AstroDX 谱面资料站与下载入口 | ADX 谱面资源");
     expect(homeModule.metadata?.description).toBe(
@@ -170,22 +169,11 @@ describe("route metadata", () => {
       description: "浏览本站收录的全部 AstroDX 谱面，可按 maimai DX 版本分支、谱面分类与显示语言筛选，每首曲目均提供封面、难度等级、谱面定数与 BPM 等信息，支持在线预览并下载导入 AstroDX 模拟器。",
       keywords: ["AstroDX", "ADX 谱面资源", "浏览曲目", "分类筛选", "显示语言"],
     });
-
-    expect(statusModule.metadata?.title).toBe("ADX 谱面资源服务器状态监控 | ADX 谱面资源");
-    expect(statusModule.metadata?.description).toBe(
-      "实时查看本站与下载服务的运行状态，包括服务器在线情况、响应延迟、网络指标与关键健康数据，数据来自公开监控页面，便于了解 AstroDX 谱面浏览与下载服务当前是否可用。"
-    );
-    expectLocalizedAlternates(statusModule.metadata ?? {}, "/status", {
-      title: "ADX 谱面资源服务器状态监控",
-      description: "实时查看本站与下载服务的运行状态，包括服务器在线情况、响应延迟、网络指标与关键健康数据，数据来自公开监控页面，便于了解 AstroDX 谱面浏览与下载服务当前是否可用。",
-      keywords: ["AstroDX", "ADX 谱面资源", "服务器状态", "监控页", "网络指标"],
-    });
   });
 
   test("localized en and ja pages generate locale aware metadata with alternates", async () => {
     const homeModule = await import("./[locale]/page");
     const chartsModule = await import("./[locale]/charts/page");
-    const localizedStatusModule = await import("./[locale]/status/page");
 
     const enHomeMetadata = await homeModule.generateMetadata?.({
       params: Promise.resolve({ locale: "en" }),
@@ -217,21 +205,6 @@ describe("route metadata", () => {
       title: "AstroDX Chart Browser and Download Catalog",
       description: "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download.",
       keywords: ["AstroDX", "ADX 谱面资源", "browse charts", "category filter", "display language"],
-    });
-
-    const enStatusMetadata = await localizedStatusModule.generateMetadata?.({
-      params: Promise.resolve({ locale: "en" }),
-    });
-    expect(enStatusMetadata?.title).toBe(
-      "ADX Server Status and Download Service Monitor | ADX 谱面资源"
-    );
-    expect(enStatusMetadata?.description).toBe(
-      "Check the live status of this site and its download service — server uptime, response latency, network metrics and key health data from the public monitor page."
-    );
-    expectLocalizedAlternates(enStatusMetadata ?? {}, "/en/status", {
-      title: "ADX Server Status and Download Service Monitor",
-      description: "Check the live status of this site and its download service — server uptime, response latency, network metrics and key health data from the public monitor page.",
-      keywords: ["AstroDX", "ADX 谱面资源", "server status", "monitor page", "network metrics"],
     });
   });
 

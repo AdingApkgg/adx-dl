@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useReducedMotion } from "framer-motion";
+import { useReducedMotion } from "@/components/motion";
+
 
 // A fixed pool of recycled nodes keeps the cost constant no matter how fast
 // the user taps (round-robin, like maimai's own touch feedback rings).

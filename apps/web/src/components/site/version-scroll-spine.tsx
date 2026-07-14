@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { useReducedMotion, useScroll, useSpring } from "framer-motion";
+import { useScroll, useSpring } from "framer-motion";
 
-import { motion } from "@/components/motion";
+import { motion, useReducedMotion } from "@/components/motion";
 
 /**
  * Decorative scroll-progress spine for the version timeline/grid: a slim track

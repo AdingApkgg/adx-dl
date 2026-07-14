@@ -6,6 +6,7 @@ import {
   DownloadIcon,
   ExternalLinkIcon,
   LayersIcon,
+  PlayCircleIcon,
   SparklesIcon,
 } from "lucide-react";
 
@@ -28,6 +29,7 @@ import { EntryCover } from "@/components/site/entry-cover";
 import { GenreBadge } from "@/components/site/genre-badge";
 import { HeroAurora, HeroStatNumber } from "@/components/site/hero-aurora";
 import { HomeHeroSearch } from "@/components/site/home-hero-search";
+import { RandomChartButton } from "@/components/site/random-chart-button";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { TiltCard } from "@/components/site/tilt-card";
 import { VersionBadge } from "@/components/site/version-badge";
@@ -58,6 +60,7 @@ import {
   versionRouteId,
 } from "@/lib/catalog-shared";
 import { ASTRODX_APP_REPOSITORY } from "@/lib/friend-links";
+import { DEMO_VIDEO_URL } from "@/lib/resource-links";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 import { cn } from "@/lib/utils";
@@ -298,6 +301,13 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
                     {home.browseCta}
                   </Link>
                 </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <a href={DEMO_VIDEO_URL} target="_blank" rel="noreferrer">
+                    <PlayCircleIcon data-icon="inline-start" aria-hidden="true" />
+                    {home.videoCta}
+                  </a>
+                </Button>
+                <RandomChartButton locale={locale} label={home.randomCta} />
                 <a
                   href="#faq"
                   className="text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
