@@ -55,6 +55,7 @@ import {
   GENRES,
   genreLabel,
   getChartDownloadSpec,
+  localChartAssetUrl,
   resolveGenreId,
   sortByReleaseDesc,
   versionRouteId,
@@ -767,7 +768,13 @@ export function ChartDetailPageView({
             <CardContent className="flex min-w-0 flex-col gap-2 text-sm text-muted-foreground">
               <p className="break-all">{entry.source_url}</p>
               <p className="break-all">
-                {entry.files.maidata || entry.files.maidata_dx || entry.remote_dir_name}
+                {/* maidata.txt is mirrored into the site and served same-origin
+                    (the R2 host only carries the media blobs, not maidata), so
+                    surface the same-origin path here rather than the origin URL
+                    stored in files.maidata. */}
+                {entry.files.maidata
+                  ? localChartAssetUrl(entry, "maidata.txt")
+                  : entry.files.maidata_dx || entry.remote_dir_name}
               </p>
               <p className="break-words">{entry.license_note}</p>
             </CardContent>
