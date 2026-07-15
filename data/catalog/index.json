@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-07-13T19:24:38.088701+00:00",
-  "total_entries": 1606,
+  "generated_at": "2026-07-15T17:51:26.400447+00:00",
+  "total_entries": 1610,
   "categories": {
     "Remote": [
       "maimai",
@@ -1370,7 +1370,9 @@
       "genreid": 107,
       "cabinet": "幸",
       "short_id": "100851",
-      "aliases": [],
+      "aliases": [
+        "[幸]犬日和。(はっぴー歌唱ver)"
+      ],
       "offset": 0,
       "bpm": 138,
       "difficulties": [
@@ -4263,21 +4265,7 @@
       "cabinet": "DX",
       "short_id": "10367",
       "aliases": [
-        "龙",
-        "白龙",
-        "龙骨",
-        "龙骑士",
-        "dragoon",
-        "麻辣兔头",
-        "🐲",
-        "龙先生",
-        "绝味鸭头",
-        "奶龙",
-        "多拉贡",
-        "鸭头",
-        "麻辣鸭头",
-        "绝味鸭脖",
-        "🐉"
+        "dragoon"
       ],
       "offset": 0,
       "bpm": 175,
@@ -21579,7 +21567,7 @@
       "cabinet": "協",
       "short_id": "111770",
       "aliases": [
-        "ultimate taste"
+        "[協]ultimate taste"
       ],
       "offset": 0,
       "bpm": 200,
@@ -70335,7 +70323,9 @@
       "genreid": 106,
       "cabinet": "DX",
       "short_id": "11830",
-      "aliases": [],
+      "aliases": [
+        "tidal wave"
+      ],
       "offset": 0,
       "bpm": 175,
       "difficulties": [
@@ -71279,7 +71269,8 @@
         "生椰拿铁",
         "合成法",
         "合成",
-        "合成天下"
+        "合成天下",
+        "感性合成法"
       ],
       "offset": 0,
       "bpm": 180,
@@ -71659,7 +71650,9 @@
       "genreid": 102,
       "cabinet": "DX",
       "short_id": "11847",
-      "aliases": [],
+      "aliases": [
+        "m@gical☆cure! love ♥ shot!"
+      ],
       "offset": 0,
       "bpm": 192,
       "difficulties": [
@@ -71733,7 +71726,9 @@
       "genreid": 104,
       "cabinet": "DX",
       "short_id": "11848",
-      "aliases": [],
+      "aliases": [
+        "overjoy ★ overdose!!"
+      ],
       "offset": 0,
       "bpm": 143,
       "difficulties": [
@@ -71807,7 +71802,9 @@
       "genreid": 104,
       "cabinet": "DX",
       "short_id": "11849",
-      "aliases": [],
+      "aliases": [
+        "dataerr0r"
+      ],
       "offset": 0,
       "bpm": 180,
       "difficulties": [
@@ -71881,7 +71878,9 @@
       "genreid": 102,
       "cabinet": "DX",
       "short_id": "11850",
-      "aliases": [],
+      "aliases": [
+        "あいたい星人"
+      ],
       "offset": 0,
       "bpm": 150,
       "difficulties": [
@@ -71955,7 +71954,9 @@
       "genreid": 102,
       "cabinet": "DX",
       "short_id": "11851",
-      "aliases": [],
+      "aliases": [
+        "ハオ"
+      ],
       "offset": 0,
       "bpm": 176,
       "difficulties": [
@@ -72103,7 +72104,9 @@
       "genreid": 103,
       "cabinet": "DX",
       "short_id": "11853",
-      "aliases": [],
+      "aliases": [
+        "help me, erinnnnnn!!"
+      ],
       "offset": 0,
       "bpm": 185,
       "difficulties": [
@@ -72177,7 +72180,9 @@
       "genreid": 103,
       "cabinet": "DX",
       "short_id": "11854",
-      "aliases": [],
+      "aliases": [
+        "超最終鬼畜妹フランドール・s"
+      ],
       "offset": 0,
       "bpm": 210,
       "difficulties": [
@@ -72251,7 +72256,9 @@
       "genreid": 104,
       "cabinet": "DX",
       "short_id": "11855",
-      "aliases": [],
+      "aliases": [
+        "destined marionette"
+      ],
       "offset": 0,
       "bpm": 186,
       "difficulties": [
@@ -82526,6 +82533,302 @@
       },
       "imported_at": "2026-07-13T19:24:38.088701+00:00",
       "slug": "12002"
+    },
+    {
+      "id": "12003",
+      "remote_dir_name": "純情アルメリア",
+      "title": "純情アルメリア",
+      "title_en": "",
+      "artist": "森羅万象",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX CiRCLE PLUS",
+      "source_archive": "",
+      "source_folder": "26/12003",
+      "version": "maimai DX CiRCLE PLUS",
+      "versionid": 26,
+      "genre": "東方Project",
+      "genreid": 103,
+      "cabinet": "DX",
+      "short_id": "12003",
+      "aliases": [],
+      "offset": 0,
+      "bpm": 172,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Basic",
+          "level": "4.0",
+          "designer": ""
+        },
+        {
+          "slot": 3,
+          "name": "Advanced",
+          "level": "7.5",
+          "designer": ""
+        },
+        {
+          "slot": 4,
+          "name": "Expert",
+          "level": "10.7",
+          "designer": "せめんともり"
+        },
+        {
+          "slot": 5,
+          "name": "Master",
+          "level": "13.3",
+          "designer": "はっぴー"
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/26/12003/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/26/12003/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/26/12003/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/26/12003/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/26/12003/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": true
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/26/12003/",
+        "cover_url": "https://astrodx-charts.saop.cc/26/12003/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/26/12003/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/26/12003/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/26/12003/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/26/12003/pv.mp4"
+      },
+      "imported_at": "2026-07-15T17:51:26.400447+00:00",
+      "slug": "12003"
+    },
+    {
+      "id": "12004",
+      "remote_dir_name": "運命線上のアリア",
+      "title": "運命線上のアリア",
+      "title_en": "",
+      "artist": "森羅万象",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX CiRCLE PLUS",
+      "source_archive": "",
+      "source_folder": "26/12004",
+      "version": "maimai DX CiRCLE PLUS",
+      "versionid": 26,
+      "genre": "東方Project",
+      "genreid": 103,
+      "cabinet": "DX",
+      "short_id": "12004",
+      "aliases": [],
+      "offset": 0,
+      "bpm": 185,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Basic",
+          "level": "4.0",
+          "designer": ""
+        },
+        {
+          "slot": 3,
+          "name": "Advanced",
+          "level": "7.8",
+          "designer": ""
+        },
+        {
+          "slot": 4,
+          "name": "Expert",
+          "level": "10.8",
+          "designer": "Luxizhel"
+        },
+        {
+          "slot": 5,
+          "name": "Master",
+          "level": "13.6",
+          "designer": "じゃこレモン"
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/26/12004/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/26/12004/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/26/12004/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/26/12004/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/26/12004/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": true
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/26/12004/",
+        "cover_url": "https://astrodx-charts.saop.cc/26/12004/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/26/12004/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/26/12004/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/26/12004/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/26/12004/pv.mp4"
+      },
+      "imported_at": "2026-07-15T17:51:26.400447+00:00",
+      "slug": "12004"
+    },
+    {
+      "id": "12005",
+      "remote_dir_name": "デンデラパーティーナイト",
+      "title": "デンデラパーティーナイト",
+      "title_en": "",
+      "artist": "森羅万象",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX CiRCLE PLUS",
+      "source_archive": "",
+      "source_folder": "26/12005",
+      "version": "maimai DX CiRCLE PLUS",
+      "versionid": 26,
+      "genre": "東方Project",
+      "genreid": 103,
+      "cabinet": "DX",
+      "short_id": "12005",
+      "aliases": [],
+      "offset": 0,
+      "bpm": 181,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Basic",
+          "level": "4.0",
+          "designer": ""
+        },
+        {
+          "slot": 3,
+          "name": "Advanced",
+          "level": "7.8",
+          "designer": ""
+        },
+        {
+          "slot": 4,
+          "name": "Expert",
+          "level": "10.7",
+          "designer": "はっぴー"
+        },
+        {
+          "slot": 5,
+          "name": "Master",
+          "level": "13.4",
+          "designer": "サファ太"
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/26/12005/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/26/12005/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/26/12005/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/26/12005/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/26/12005/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": true
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/26/12005/",
+        "cover_url": "https://astrodx-charts.saop.cc/26/12005/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/26/12005/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/26/12005/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/26/12005/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/26/12005/pv.mp4"
+      },
+      "imported_at": "2026-07-15T17:51:26.400447+00:00",
+      "slug": "12005"
+    },
+    {
+      "id": "12006-absolute-queen",
+      "remote_dir_name": "Absolute Queen",
+      "title": "Absolute Queen",
+      "title_en": "",
+      "artist": "Laur",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX CiRCLE PLUS",
+      "source_archive": "",
+      "source_folder": "26/12006",
+      "version": "maimai DX CiRCLE PLUS",
+      "versionid": 26,
+      "genre": "東方Project",
+      "genreid": 103,
+      "cabinet": "DX",
+      "short_id": "12006",
+      "aliases": [],
+      "offset": 0,
+      "bpm": 220,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Basic",
+          "level": "5.0",
+          "designer": ""
+        },
+        {
+          "slot": 3,
+          "name": "Advanced",
+          "level": "8.2",
+          "designer": ""
+        },
+        {
+          "slot": 4,
+          "name": "Expert",
+          "level": "12.8",
+          "designer": "Luxizhel"
+        },
+        {
+          "slot": 5,
+          "name": "Master",
+          "level": "14.2",
+          "designer": "せめんともり"
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/26/12006/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/26/12006/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/26/12006/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/26/12006/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/26/12006/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": true
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/26/12006/",
+        "cover_url": "https://astrodx-charts.saop.cc/26/12006/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/26/12006/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/26/12006/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/26/12006/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/26/12006/pv.mp4"
+      },
+      "imported_at": "2026-07-15T17:51:26.400447+00:00",
+      "slug": "12006"
     },
     {
       "id": "120227-garakuta-doll-play",
@@ -128513,7 +128816,8 @@
         "机器人钓鱼",
         "电线",
         "漏电电线",
-        "天线"
+        "天线",
+        "阿勒泰"
       ],
       "offset": 0,
       "bpm": 90,
