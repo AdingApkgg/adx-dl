@@ -453,6 +453,17 @@ class BuildCatalogTests(unittest.TestCase):
         self.assertEqual(_aliases_for("999", alias_map), [])  # no alias
         self.assertEqual(_aliases_for("", alias_map), [])  # non-numeric short_id
 
+    def test_aliases_union_offset_and_base_ids(self) -> None:
+        # The sources file the same chart under both the offset id and the base
+        # id with different aliases on each; a sparse offset entry must not mask
+        # the base one (the real case: "dragoon" under 10367 vs 15 under 367).
+        alias_map = {10367: ["dragoon"], 367: ["dragoon", "龙", "白龙"]}
+        self.assertEqual(_aliases_for("10367", alias_map), ["dragoon", "龙", "白龙"])
+
+    def test_aliases_union_dedupes_case_insensitively_keeping_first_seen(self) -> None:
+        alias_map = {10008: ["Dragoon", "真爱"], 8: ["DRAGOON", "真爱歌"]}
+        self.assertEqual(_aliases_for("10008", alias_map), ["Dragoon", "真爱", "真爱歌"])
+
     def test_fetch_alias_map_is_non_fatal_on_unexpected_payload(self) -> None:
         # A non-dict payload (e.g. an HTML error page parsed as JSON list) must
         # not break the build — it yields an empty map.

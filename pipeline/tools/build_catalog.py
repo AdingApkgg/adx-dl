@@ -438,11 +438,15 @@ def fetch_alias_map(
 
 
 def _aliases_for(short_id: str, alias_map: dict[int, list[str]]) -> list[str]:
-    """Resolve a chart's aliases from the Lxns map by its maimai song id.
+    """Resolve a chart's aliases from the merged alias map by its maimai song id.
 
     AstroDX short_ids follow the maimai id convention where DX charts carry a
-    +10000 offset and UTAGE charts +100000, while Lxns keys aliases on the base
-    song id. So an exact-id miss falls back to the de-offset base id.
+    +10000 offset and UTAGE charts +100000, while the sources key aliases on the
+    base song id — inconsistently: the same chart can appear under both ids, with
+    different aliases on each. So both keys are unioned rather than stopping at
+    the first hit. Returning early would let a sparse offset-id entry mask a rich
+    base-id one (yuzuchan filing a bare "dragoon" under 10367 hid the 15 aliases
+    under 367).
     """
     if not alias_map or not short_id.isdigit():
         return []
@@ -452,10 +456,16 @@ def _aliases_for(short_id: str, alias_map: dict[int, list[str]]) -> list[str]:
         candidates.append(n - 10000)
     elif n >= 100000:
         candidates.append(n - 100000)
+
+    merged: list[str] = []
+    seen: set[str] = set()
     for key in candidates:
-        if key in alias_map:
-            return alias_map[key]
-    return []
+        for alias in alias_map.get(key, []):
+            folded = alias.casefold()
+            if folded not in seen:
+                seen.add(folded)
+                merged.append(alias)
+    return merged
 
 
 def _attach_aliases(
