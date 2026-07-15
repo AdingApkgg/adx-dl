@@ -6,6 +6,7 @@ import {
   buildIndexNowKeyLocation,
   buildIndexNowPayload,
   buildIndexNowUrlList,
+  diffChangedSlugs,
   normalizeSiteUrl,
   resolveIndexNowKey,
 } from "@/lib/indexnow";
@@ -80,6 +81,69 @@ describe("indexnow helpers", () => {
     expect(urls.indexOf("https://adxdls.saop.cc/ja/links")).toBeLessThan(
       urls.indexOf("https://adxdls.saop.cc/ja/charts/e-1-a")
     );
+  });
+
+  test("diffChangedSlugs reports nothing when the catalog is unchanged", () => {
+    const entries = [
+      { id: "100", slug: "100", imported_at: "2026-07-13T00:00:00Z" },
+      { id: "101", slug: "101", imported_at: "2026-07-13T00:00:00Z" },
+    ];
+
+    expect(diffChangedSlugs(entries, entries)).toEqual([]);
+  });
+
+  test("diffChangedSlugs reports entries whose imported_at was restamped", () => {
+    const previous = [
+      { id: "100", slug: "100", imported_at: "2026-07-13T00:00:00Z" },
+      { id: "101", slug: "101", imported_at: "2026-07-13T00:00:00Z" },
+    ];
+    const current = [
+      { id: "100", slug: "100", imported_at: "2026-07-16T00:00:00Z" },
+      { id: "101", slug: "101", imported_at: "2026-07-13T00:00:00Z" },
+    ];
+
+    expect(diffChangedSlugs(previous, current)).toEqual(["100"]);
+  });
+
+  test("diffChangedSlugs reports newly added entries", () => {
+    const previous = [{ id: "100", slug: "100", imported_at: "2026-07-13T00:00:00Z" }];
+    const current = [
+      { id: "100", slug: "100", imported_at: "2026-07-13T00:00:00Z" },
+      { id: "102", slug: "102", imported_at: "2026-07-16T00:00:00Z" },
+    ];
+
+    expect(diffChangedSlugs(previous, current)).toEqual(["102"]);
+  });
+
+  test("diffChangedSlugs reports an entry whose slug moved even if imported_at held", () => {
+    const previous = [{ id: "100", slug: "100", imported_at: "2026-07-13T00:00:00Z" }];
+    const current = [{ id: "100", slug: "100-renamed", imported_at: "2026-07-13T00:00:00Z" }];
+
+    expect(diffChangedSlugs(previous, current)).toEqual(["100-renamed"]);
+  });
+
+  test("diffChangedSlugs ignores removed entries — their URLs are already gone", () => {
+    const previous = [
+      { id: "100", slug: "100", imported_at: "2026-07-13T00:00:00Z" },
+      { id: "101", slug: "101", imported_at: "2026-07-13T00:00:00Z" },
+    ];
+    const current = [{ id: "100", slug: "100", imported_at: "2026-07-13T00:00:00Z" }];
+
+    expect(diffChangedSlugs(previous, current)).toEqual([]);
+  });
+
+  test("diffChangedSlugs falls back to the entry id when an entry has no slug", () => {
+    const previous = [{ id: "100", imported_at: "2026-07-13T00:00:00Z" }];
+    const current = [{ id: "100", imported_at: "2026-07-16T00:00:00Z" }];
+
+    expect(diffChangedSlugs(previous, current)).toEqual(["100"]);
+  });
+
+  test("diffChangedSlugs treats a first-time imported_at as a change", () => {
+    const previous = [{ id: "100", slug: "100" }];
+    const current = [{ id: "100", slug: "100", imported_at: "2026-07-16T00:00:00Z" }];
+
+    expect(diffChangedSlugs(previous, current)).toEqual(["100"]);
   });
 
   test("buildIndexNowKeyLocation points to the public key file", () => {

@@ -1,10 +1,18 @@
 import { prefixedLocales } from "@/lib/i18n";
+import { entrySlug } from "@/lib/route-slug";
 
 export type IndexNowPayload = {
   host: string;
   key: string;
   keyLocation: string;
   urlList: string[];
+};
+
+// The subset of a catalog entry that decides whether its URLs need re-submitting.
+export type IndexNowCatalogEntry = {
+  id: string;
+  slug?: string | null;
+  imported_at?: string | null;
 };
 
 const staticPaths = [
@@ -61,6 +69,42 @@ export function buildIndexNowUrlList(siteUrl: string, slugs: string[]): string[]
   ]);
 
   return [...defaultUrls, ...localizedUrls];
+}
+
+// Which entries changed between two catalog builds. An entry needs re-submitting
+// when it is new, when its canonical URL moved, or when its imported_at was
+// restamped — which build_catalog only does when the entry's content fingerprint
+// genuinely changed (see pipeline/tools/build_catalog.py:_carry_forward_timestamps).
+// Deletions are skipped: the URL is already gone, so IndexNow has nothing to fetch.
+export function diffChangedSlugs(
+  previousEntries: IndexNowCatalogEntry[],
+  currentEntries: IndexNowCatalogEntry[]
+): string[] {
+  const previousById = new Map(
+    previousEntries.filter((entry) => entry?.id).map((entry) => [entry.id, entry])
+  );
+
+  const changedSlugs: string[] = [];
+
+  for (const entry of currentEntries) {
+    if (!entry?.id) {
+      continue;
+    }
+
+    const slug = entrySlug(entry);
+    const previous = previousById.get(entry.id);
+
+    const isChanged =
+      !previous ||
+      entrySlug(previous) !== slug ||
+      (previous.imported_at ?? null) !== (entry.imported_at ?? null);
+
+    if (isChanged) {
+      changedSlugs.push(slug);
+    }
+  }
+
+  return changedSlugs;
 }
 
 export function assertValidIndexNowConfig(input: { siteUrl: string; key: string }) {

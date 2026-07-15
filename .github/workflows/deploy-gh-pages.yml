@@ -25,8 +25,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      # Full commit history (95 commits, tiny) so the IndexNow step can diff the
+      # catalog against the previously deployed commit. blob:none keeps that cheap:
+      # file contents are fetched on demand rather than pulling ~1.5G of history.
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          filter: blob:none
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -89,4 +95,9 @@ jobs:
         continue-on-error: true
         working-directory: apps/web
         # Key file, site URL, and CNAME all ship in the repo — no Actions secrets or variables needed.
+        # INDEXNOW_BASE_REF is the last deployed commit, so only charts and pages that
+        # actually changed get submitted; unset on workflow_dispatch, which falls back
+        # to a full submission.
+        env:
+          INDEXNOW_BASE_REF: ${{ github.event.before }}
         run: bun run submit:indexnow
