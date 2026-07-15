@@ -189,6 +189,30 @@ class BuildCatalogTests(unittest.TestCase):
         self.assertEqual(entry["version"], "maimai DX PRiSM")
         self.assertFalse(entry["assets"]["has_dx_chart"])
 
+    def test_utage_difficulty_is_named_utage_whatever_slot_it_sits_in(self) -> None:
+        # Upstream packs 宴 charts inconsistently: usually inote_7, but some land in
+        # inote_2 and index.py then names them after that slot ("Basic") — wrong for a
+        # 宴 chart. shortid >= 100000 wins over the slot's name.
+        index = json.loads(UTAGE_INDEX)
+        index[0]["difficulties"] = [
+            {"slot": 2, "name": "Basic", "level": "13.0", "designer": None, "has_notes": True},
+        ]
+        with TemporaryDirectory() as temp_dir:
+            catalog_path = build_catalog(
+                Path(temp_dir),
+                fetch_text=lambda _url: json.dumps(index),
+                download_media=False,
+            )
+            entry = json.loads(catalog_path.read_text(encoding="utf-8"))["entries"][0]
+        self.assertEqual(entry["difficulties"][0]["name"], "Utage")
+        self.assertEqual(entry["difficulties"][0]["slot"], 2)  # slot itself is preserved
+        self.assertEqual(entry["difficulties"][0]["level"], "13.0")
+
+    def test_non_utage_difficulty_keeps_its_upstream_name(self) -> None:
+        entry = self._build()["entries"][1]  # shortid 146 => ST, not UTAGE
+        self.assertTrue(entry["difficulties"])
+        self.assertNotIn("Utage", [d["name"] for d in entry["difficulties"]])
+
     def test_catalog_categories_list_distinct_versions(self) -> None:
         catalog = self._build()
         self.assertEqual(

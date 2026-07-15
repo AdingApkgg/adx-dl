@@ -178,10 +178,16 @@ def _build_entry(item: dict[str, Any], generated_at: str) -> dict[str, Any]:
     version = CANONICAL_VERSIONS.get(version_id, str(item.get("version", "") or "").strip())
     stable_key = f"{short_id}-{name}" if short_id else name
 
+    # UTAGE (宴) charts are packed inconsistently upstream: most carry their notes in
+    # inote_7, but some sit in inote_2 — Basic's slot. index.py names each difficulty
+    # after its slot, so those get labelled "Basic" on a 宴 chart. The shortid
+    # convention (>=100000 = UTAGE, see _resolve_name_cabinet) is the authority here.
+    is_utage = short_id.isdigit() and int(short_id) >= 100000
+
     difficulties = [
         {
             "slot": difficulty.get("slot"),
-            "name": str(difficulty.get("name", "") or ""),
+            "name": "Utage" if is_utage else str(difficulty.get("name", "") or ""),
             "level": str(difficulty.get("level", "") or ""),
             "designer": str(difficulty.get("designer", "") or ""),
         }
