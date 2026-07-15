@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-07-15T19:35:31.320893+00:00",
-  "total_entries": 1795,
+  "generated_at": "2026-07-15T20:02:17.919003+00:00",
+  "total_entries": 1841,
   "categories": {
     "Remote": [
       "maimai",
@@ -33,6 +33,80 @@
     ]
   },
   "entries": [
+    {
+      "id": "10-love-joy",
+      "remote_dir_name": "LOVE ＆ JOY",
+      "title": "LOVE ＆ JOY",
+      "title_en": "",
+      "artist": "木村由姫 [cover]",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai",
+      "source_archive": "",
+      "source_folder": "0/10",
+      "version": "maimai",
+      "versionid": 0,
+      "genre": "POPS＆アニメ",
+      "genreid": 101,
+      "cabinet": "ST",
+      "short_id": "10",
+      "aliases": [],
+      "offset": 0,
+      "bpm": 173,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Basic",
+          "level": "5.0",
+          "designer": "-"
+        },
+        {
+          "slot": 3,
+          "name": "Advanced",
+          "level": "7.1",
+          "designer": "-"
+        },
+        {
+          "slot": 4,
+          "name": "Expert",
+          "level": "8.1",
+          "designer": "-"
+        },
+        {
+          "slot": 5,
+          "name": "Master",
+          "level": "9.9",
+          "designer": "-"
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/0/10/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/0/10/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/0/10/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/0/10/bg.png",
+        "pv": ""
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": false,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/0/10/",
+        "cover_url": "https://astrodx-charts.saop.cc/0/10/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/0/10/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/0/10/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/0/10/track.mp3",
+        "pv_url": ""
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "10"
+    },
     {
       "id": "100-tell-your-world",
       "remote_dir_name": "Tell Your World",
@@ -118,6 +192,68 @@
       "slug": "100"
     },
     {
+      "id": "100017-future",
+      "remote_dir_name": "Future",
+      "title": "[星]Future",
+      "title_en": "",
+      "artist": "★STAR GUiTAR [cover]",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100017",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "星",
+      "short_id": "100017",
+      "aliases": [
+        "未来",
+        "future",
+        "错位歌",
+        "ftr",
+        "蓝的人"
+      ],
+      "offset": 0,
+      "bpm": 130,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "12.0",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100017/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100017/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100017/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100017/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100017/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100017/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100017/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100017/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100017/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100017/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100017/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100017"
+    },
+    {
       "id": "100018-love-you",
       "remote_dir_name": "Love You",
       "title": "[協]Love You",
@@ -187,6 +323,657 @@
       },
       "imported_at": "2026-07-13T19:24:38.088701+00:00",
       "slug": "100018"
+    },
+    {
+      "id": "100042-jelly",
+      "remote_dir_name": "jelly",
+      "title": "[宴]jelly",
+      "title_en": "",
+      "artist": "capsule [cover]",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100042",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "宴",
+      "short_id": "100042",
+      "aliases": [
+        "果冻",
+        "jelly"
+      ],
+      "offset": 0,
+      "bpm": 128.66,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "12.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100042/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100042/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100042/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100042/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100042/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100042/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100042/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100042/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100042/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100042/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100042/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100042"
+    },
+    {
+      "id": "100056",
+      "remote_dir_name": "ウッーウッーウマウマ(ﾟ∀ﾟ)",
+      "title": "[耐]ウッーウッーウマウマ(ﾟ∀ﾟ)",
+      "title_en": "",
+      "artist": "Caramell/Caramelldansen [cover]",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100056",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "耐",
+      "short_id": "100056",
+      "aliases": [
+        "扭腰舞",
+        "扭腰歌",
+        "呜哇呜哇",
+        "ウッーウッーウマウマ(ﾟ∀ﾟ)",
+        "焦糖舞",
+        "跳舞歌",
+        "扭秧歌",
+        "跳的很骚",
+        "扭腰",
+        "(ﾟ∀ﾟ)​"
+      ],
+      "offset": 0,
+      "bpm": 164.73,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "13.9",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100056/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100056/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100056/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100056/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100056/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100056/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100056/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100056/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100056/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100056/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100056/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100056"
+    },
+    {
+      "id": "100070",
+      "remote_dir_name": "ジングルベル",
+      "title": "[即]ジングルベル",
+      "title_en": "",
+      "artist": "SEGA Sound Unit [H.]",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100070",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "即",
+      "short_id": "100070",
+      "aliases": [
+        "圣诞歌",
+        "圣诞",
+        "鸡公煲",
+        "ジングルベル",
+        "铃儿响叮当",
+        "别急15",
+        "标圣诞",
+        "jingle bell",
+        "圣诞树",
+        "🎄",
+        "标准圣诞"
+      ],
+      "offset": 0,
+      "bpm": 100,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.6",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100070/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100070/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100070/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100070/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100070/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100070/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100070/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100070/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100070/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100070/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100070/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100070"
+    },
+    {
+      "id": "100101",
+      "remote_dir_name": "おちゃめ機能",
+      "title": "[逆]おちゃめ機能",
+      "title_en": "",
+      "artist": "ゴジマジP",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100101",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "逆",
+      "short_id": "100101",
+      "aliases": [
+        "天真烂漫机能",
+        "五月病",
+        "おちゃめ機能",
+        "机能",
+        "天真浪漫机能"
+      ],
+      "offset": 0,
+      "bpm": 150,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "13.0",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100101/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100101/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100101/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100101/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100101/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100101/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100101/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100101/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100101/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100101/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100101/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100101"
+    },
+    {
+      "id": "100118",
+      "remote_dir_name": "犬日和。",
+      "title": "[逆]犬日和。",
+      "title_en": "",
+      "artist": "RYOHEI KOHNO/森綾香",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100118",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "逆",
+      "short_id": "100118",
+      "aliases": [
+        "犬日和。",
+        "犬日和",
+        "狗日和",
+        "狗天气",
+        "狗日的",
+        "哈皮",
+        "日和",
+        "狗日子"
+      ],
+      "offset": 0,
+      "bpm": 138,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "12.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100118/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100118/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100118/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100118/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100118/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100118/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100118/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100118/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100118/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100118/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100118/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100118"
+    },
+    {
+      "id": "100121",
+      "remote_dir_name": "スイートマジック",
+      "title": "[撫]スイートマジック",
+      "title_en": "",
+      "artist": "ろん×Junky",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100121",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "撫",
+      "short_id": "100121",
+      "aliases": [
+        "甜蜜魔法",
+        "スイートマジック",
+        "甜甜魔法",
+        "sm",
+        "羽泽鸫",
+        "sweet magic",
+        "sweetmagic",
+        "swmg"
+      ],
+      "offset": 0,
+      "bpm": 123,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "12.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100121/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100121/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100121/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100121/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100121/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100121/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100121/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100121/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100121/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100121/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100121/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100121"
+    },
+    {
+      "id": "100132-turn-around",
+      "remote_dir_name": "Turn around",
+      "title": "[蛸]Turn around",
+      "title_en": "",
+      "artist": "Clean Tears",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100132",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "蛸",
+      "short_id": "100132",
+      "aliases": [
+        "转过来",
+        "转圈",
+        "turn around",
+        "ta",
+        "中国好声音",
+        "转弯",
+        "量子采音",
+        "橘之夏",
+        "转身",
+        "转向"
+      ],
+      "offset": 0,
+      "bpm": 156,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "12.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100132/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100132/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100132/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100132/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100132/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100132/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100132/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100132/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100132/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100132/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100132/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100132"
+    },
+    {
+      "id": "100138-lionheart",
+      "remote_dir_name": "Lionheart",
+      "title": "[蔵]Lionheart",
+      "title_en": "",
+      "artist": "Masayoshi Minoshima",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100138",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "蔵",
+      "short_id": "100138",
+      "aliases": [
+        "狮心",
+        "lionheart",
+        "狮子心",
+        "莱因哈特"
+      ],
+      "offset": 0,
+      "bpm": 132,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.0",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100138/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100138/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100138/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100138/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100138/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100138/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100138/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100138/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100138/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100138/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100138/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100138"
+    },
+    {
+      "id": "100145-starlight-disco",
+      "remote_dir_name": "Starlight Disco",
+      "title": "[宴]Starlight Disco",
+      "title_en": "",
+      "artist": "loos feat. Meramipop",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100145",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "宴",
+      "short_id": "100145",
+      "aliases": [
+        "星光迪斯科",
+        "starlight disco",
+        "标星光",
+        "星光",
+        "绿色圆圈"
+      ],
+      "offset": 0,
+      "bpm": 128,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "12.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100145/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100145/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100145/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100145/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100145/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100145/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100145/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100145/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100145/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100145/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100145/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100145"
+    },
+    {
+      "id": "100191",
+      "remote_dir_name": "脳漿炸裂ガール",
+      "title": "[蔵]脳漿炸裂ガール",
+      "title_en": "",
+      "artist": "れるりり",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100191",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "蔵",
+      "short_id": "100191",
+      "aliases": [
+        "脑浆",
+        "脑浆炸裂少女",
+        "脑浆炸裂女孩",
+        "脑浆炸裂",
+        "脑裂",
+        "brain fluid explosion girl",
+        "脳漿炸裂ガール",
+        "力一儿",
+        "脑浆炸裂谱",
+        "🤯👧",
+        "标🤯",
+        "脑浆炸裂力一儿",
+        "麦当劳1+1",
+        "标脑浆",
+        "吸溜",
+        "标脑",
+        "🤯",
+        "标准脑浆"
+      ],
+      "offset": 0,
+      "bpm": 155,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.5",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100191/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100191/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100191/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100191/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100191/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100191/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100191/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100191/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100191/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100191/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100191/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100191"
     },
     {
       "id": "100199",
@@ -262,6 +1049,76 @@
       },
       "imported_at": "2026-07-13T19:24:38.088701+00:00",
       "slug": "100199"
+    },
+    {
+      "id": "100201",
+      "remote_dir_name": "魔理沙は大変なものを盗んでいきました",
+      "title": "[宴]魔理沙は大変なものを盗んでいきました",
+      "title_en": "",
+      "artist": "ARM＋夕野ヨシミ(IOSYS)feat. 藤咲かりん",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100201",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "宴",
+      "short_id": "100201",
+      "aliases": [
+        "魔理沙大变",
+        "魔理沙大盗",
+        "魔理沙盗大变",
+        "大盗魔理沙",
+        "魔理沙大变盗",
+        "魔理沙は大変なものを盗んでいきました",
+        "魔理沙",
+        "123123",
+        "魔理沙大变态",
+        "魔理沙痴",
+        "魔理沙偷走了重要的东西",
+        "魔理沙偷走重要的东西",
+        "123"
+      ],
+      "offset": 0,
+      "bpm": 170,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "13.5",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100201/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100201/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100201/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100201/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100201/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100201/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100201/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100201/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100201/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100201/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100201/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100201"
     },
     {
       "id": "100206",
@@ -469,6 +1326,75 @@
       "slug": "100220"
     },
     {
+      "id": "100224",
+      "remote_dir_name": "ウサテイ",
+      "title": "[傾]ウサテイ",
+      "title_en": "",
+      "artist": "あまね＋ビートまりお(COOL＆CREATE)",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100224",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "傾",
+      "short_id": "100224",
+      "aliases": [
+        "兔子",
+        "兔子跑",
+        "追逐战",
+        "兔子帝",
+        "ウサテイ",
+        "帝帝跑跑跑",
+        "石门快乐歌",
+        "因幡帝",
+        "🐇",
+        "乌撒",
+        "兔子快跑",
+        "小老帝"
+      ],
+      "offset": 0,
+      "bpm": 190,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "13.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100224/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100224/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100224/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100224/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100224/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100224/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100224/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100224/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100224/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100224/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100224/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100224"
+    },
+    {
       "id": "100227-garakuta-doll-play",
       "remote_dir_name": "Garakuta Doll Play",
       "title": "[は]Garakuta Doll Play",
@@ -629,6 +1555,69 @@
       "slug": "100230"
     },
     {
+      "id": "100282",
+      "remote_dir_name": "からくりピエロ",
+      "title": "[撫]からくりピエロ",
+      "title_en": "",
+      "artist": "40mP",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100282",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "撫",
+      "short_id": "100282",
+      "aliases": [
+        "派对小丑",
+        "活动小丑",
+        "からくりピエロ",
+        "🤡",
+        "活动沙口",
+        "小丑"
+      ],
+      "offset": 0,
+      "bpm": 102,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "12.0",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100282/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100282/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100282/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100282/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100282/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100282/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100282/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100282/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100282/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100282/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100282/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100282"
+    },
+    {
       "id": "10030",
       "remote_dir_name": "ネコ日和。",
       "title": "ネコ日和。",
@@ -709,6 +1698,389 @@
       "slug": "10030"
     },
     {
+      "id": "100305-pop-star",
+      "remote_dir_name": "POP STAR",
+      "title": "[星]POP STAR",
+      "title_en": "",
+      "artist": "平井堅 [cover]",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100305",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "星",
+      "short_id": "100305",
+      "aliases": [
+        "pop star",
+        "匡威",
+        "popstar",
+        "流行星"
+      ],
+      "offset": 0,
+      "bpm": 140.1,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "13.0",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100305/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100305/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100305/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100305/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100305/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100305/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100305/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100305/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100305/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100305/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100305/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100305"
+    },
+    {
+      "id": "100308-back-2-back",
+      "remote_dir_name": "Back 2 Back",
+      "title": "[傾]Back 2 Back",
+      "title_en": "",
+      "artist": "長沼英樹「ソニック ラッシュ」",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100308",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "傾",
+      "short_id": "100308",
+      "aliases": [
+        "b2b",
+        "back to back",
+        "back 2 back",
+        "b歌",
+        "回2回",
+        "一笔画",
+        "2B",
+        "回二回",
+        "背2背"
+      ],
+      "offset": 0,
+      "bpm": 150,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "13.0",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100308/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100308/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100308/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100308/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100308/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100308/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100308/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100308/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100308/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100308/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100308/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100308"
+    },
+    {
+      "id": "100319",
+      "remote_dir_name": "幻想のサテライト",
+      "title": "[藏]幻想のサテライト",
+      "title_en": "",
+      "artist": "豚乙女",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100319",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "藏",
+      "short_id": "100319",
+      "aliases": [
+        "幻想的卫星",
+        "幻想卫星",
+        "幻想のサテライト",
+        "卫星",
+        "标幻想卫星",
+        "homo",
+        "标准幻想卫星"
+      ],
+      "offset": 0,
+      "bpm": 230,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.0",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100319/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100319/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100319/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100319/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100319/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100319/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100319/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100319/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100319/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100319/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100319/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100319"
+    },
+    {
+      "id": "100320",
+      "remote_dir_name": "最速最高シャッターガール",
+      "title": "[即]最速最高シャッターガール",
+      "title_en": "",
+      "artist": "ビートまりお(COOL＆CREATE)",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100320",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "即",
+      "short_id": "100320",
+      "aliases": [
+        "最速最高シャッターガール",
+        "文文",
+        "最速最高"
+      ],
+      "offset": 0,
+      "bpm": 160,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "12.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100320/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100320/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100320/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100320/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100320/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100320/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100320/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100320/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100320/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100320/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100320/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100320"
+    },
+    {
+      "id": "100322",
+      "remote_dir_name": "林檎華憐歌",
+      "title": "[蔵]林檎華憐歌",
+      "title_en": "",
+      "artist": "ビートまりお母(尾崎順子)",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100322",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "蔵",
+      "short_id": "100322",
+      "aliases": [
+        "拜拜",
+        "林檎華憐歌",
+        "大妈唱歌",
+        "马妈歌",
+        "苹果歌",
+        "拜拜拜拜",
+        "林檎",
+        "小苹果",
+        "林檎华怜歌"
+      ],
+      "offset": 0,
+      "bpm": 144,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "13.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100322/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100322/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100322/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100322/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100322/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100322/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100322/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100322/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100322/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100322/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100322/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100322"
+    },
+    {
+      "id": "100326",
+      "remote_dir_name": "コトバ・カラフル",
+      "title": "[宴]コトバ・カラフル",
+      "title_en": "",
+      "artist": "うたよめ575＜正岡小豆(大坪由佳)小林抹茶(大橋彩香)＞",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100326",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "宴",
+      "short_id": "100326",
+      "aliases": [
+        "双押姐妹花",
+        "コトバ・カラフル",
+        "双押妹",
+        "女同",
+        "多彩言语",
+        "575",
+        "女同歌",
+        "歌组575",
+        "女同贴贴"
+      ],
+      "offset": 0,
+      "bpm": 169,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "12.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100326/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100326/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100326/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100326/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100326/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100326/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100326/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100326/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100326/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100326/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100326/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100326"
+    },
+    {
       "id": "100327",
       "remote_dir_name": "タカハせ！名人マン",
       "title": "[狂]タカハせ！名人マン",
@@ -778,6 +2150,74 @@
       },
       "imported_at": "2026-07-13T19:24:38.088701+00:00",
       "slug": "100327"
+    },
+    {
+      "id": "100339-dragonlady",
+      "remote_dir_name": "DRAGONLADY",
+      "title": "[宴]DRAGONLADY",
+      "title_en": "",
+      "artist": "Nankumo/CUBE3",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100339",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "宴",
+      "short_id": "100339",
+      "aliases": [
+        "龙女士",
+        "dragonlady",
+        "喇叭",
+        "ub",
+        "舍得",
+        "纵连女士",
+        "母奶龙",
+        "龙玉涛",
+        "尼美舒利",
+        "龙之梦",
+        "龙女"
+      ],
+      "offset": 0,
+      "bpm": 150,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.6",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100339/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100339/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100339/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100339/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100339/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100339/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100339/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100339/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100339/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100339/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100339/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100339"
     },
     {
       "id": "100363-oshama-scramble",
@@ -865,6 +2305,339 @@
       "slug": "100363"
     },
     {
+      "id": "100364-d-n-t-st-p-r-ckin",
+      "remote_dir_name": "D✪N’T  ST✪P  R✪CKIN’",
+      "title": "[覚]D✪N’T  ST✪P  R✪CKIN’",
+      "title_en": "",
+      "artist": "EB(aka EarBreaker)",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100364",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "覚",
+      "short_id": "100364",
+      "aliases": [
+        "机器人",
+        "年度最佳",
+        "小机器人",
+        "d✪n’t  st✪p  r✪ckin’",
+        "摇滚别停",
+        "dsr",
+        "年度最佳游戏",
+        "秧bot",
+        "⭐⭐⭐",
+        "dont stop rockin",
+        "q群管家",
+        "宇宙机器人",
+        "tga年度最佳",
+        "🤖",
+        "astrobot",
+        "玩机器"
+      ],
+      "offset": 0,
+      "bpm": 140,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "12.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100364/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100364/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100364/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100364/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100364/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100364/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100364/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100364/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100364/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100364/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100364/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100364"
+    },
+    {
+      "id": "100380",
+      "remote_dir_name": "どうしてこうなった",
+      "title": "[蔵]どうしてこうなった",
+      "title_en": "",
+      "artist": "うどんゲルゲ",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100380",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "蔵",
+      "short_id": "100380",
+      "aliases": [
+        "どうしてこうなった",
+        "怎么这样",
+        "为什么会这样呢",
+        "怎会如此",
+        "为什么会变成这样呢",
+        "跳舞狗",
+        "白板",
+        "跳舞洗狗",
+        "为什么会变成这样",
+        "怎么回事呢"
+      ],
+      "offset": 0,
+      "bpm": 180,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100380/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100380/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100380/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100380/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100380/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100380/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100380/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100380/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100380/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100380/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100380/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100380"
+    },
+    {
+      "id": "100385-ignis-danse",
+      "remote_dir_name": "Ignis Danse",
+      "title": "[蔵]Ignis Danse",
+      "title_en": "",
+      "artist": "Yuji Masubuchi「太鼓の達人」より",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100385",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "蔵",
+      "short_id": "100385",
+      "aliases": [
+        "火神",
+        "ignis danse",
+        "卫宫士郎",
+        "史尔特尔",
+        "跳高",
+        "红孩儿",
+        "一个妮子",
+        "一起去吃烤肉吧",
+        "火影忍者"
+      ],
+      "offset": 0,
+      "bpm": 246,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.9",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100385/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100385/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100385/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100385/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100385/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100385/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100385/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100385/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100385/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100385/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100385/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100385"
+    },
+    {
+      "id": "100413",
+      "remote_dir_name": "キャプテン・ムラサのケツアンカー",
+      "title": "[覚]キャプテン・ムラサのケツアンカー",
+      "title_en": "",
+      "artist": "ARM＋夕野ヨシミ(IOSYS)feat.山本椛",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100413",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "覚",
+      "short_id": "100413",
+      "aliases": [
+        "船长",
+        "キャプテン・ムラサのケツアンカー",
+        "村纱水蜜"
+      ],
+      "offset": 0,
+      "bpm": 190,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "12.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100413/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100413/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100413/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100413/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100413/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100413/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100413/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100413/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100413/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100413/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100413/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100413"
+    },
+    {
+      "id": "100422-lance",
+      "remote_dir_name": "LANCE",
+      "title": "[覚]LANCE",
+      "title_en": "",
+      "artist": "Ras",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100422",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "覚",
+      "short_id": "100422",
+      "aliases": [
+        "lance",
+        "懒死",
+        "兰瑟",
+        "烂死",
+        "蓝瑟",
+        "枪",
+        "兰斯",
+        "缆车",
+        "开元",
+        "蓝枪"
+      ],
+      "offset": 0,
+      "bpm": 156,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "13.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100422/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100422/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100422/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100422/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100422/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100422/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100422/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100422/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100422/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100422/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100422/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100422"
+    },
+    {
       "id": "100429-wonderland-wars",
       "remote_dir_name": "Wonderland Wars オープニング",
       "title": "[宴]Wonderland Wars オープニング",
@@ -887,7 +2660,7 @@
       "difficulties": [
         {
           "slot": 2,
-          "name": "Basic",
+          "name": "Utage",
           "level": "13.0",
           "designer": ""
         }
@@ -917,7 +2690,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100429/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100429/pv.mp4"
       },
-      "imported_at": "2026-07-15T19:35:31.320893+00:00",
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
       "slug": "100429"
     },
     {
@@ -1002,6 +2775,70 @@
       "slug": "10044"
     },
     {
+      "id": "100446-gemini-m",
+      "remote_dir_name": "GEMINI -M-",
+      "title": "[宴]GEMINI -M-",
+      "title_en": "",
+      "artist": "Tatsh",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100446",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "宴",
+      "short_id": "100446",
+      "aliases": [
+        "双子星",
+        "gemini -m-",
+        "gemini",
+        "双子座",
+        "戈米尼",
+        "genshin",
+        "googlegemini"
+      ],
+      "offset": 0,
+      "bpm": 180,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100446/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100446/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100446/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100446/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100446/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100446/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100446/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100446/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100446/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100446/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100446/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100446"
+    },
+    {
       "id": "100456-glorious-crown",
       "remote_dir_name": "Glorious Crown",
       "title": "[蔵]Glorious Crown",
@@ -1075,6 +2912,77 @@
       "slug": "100456"
     },
     {
+      "id": "100496-amazing-mightyyyy",
+      "remote_dir_name": "AMAZING MIGHTYYYY!!!!",
+      "title": "[藏]AMAZING MIGHTYYYY!!!!",
+      "title_en": "",
+      "artist": "WAiKURO",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100496",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "藏",
+      "short_id": "100496",
+      "aliases": [
+        "am",
+        "这么强？",
+        "惊人的强大",
+        "太神奇了，太强大了！",
+        "樱羽艾玛",
+        "太神奇了，太强大了!!!!",
+        "amazing mightyyyy!!!!",
+        "！！！！",
+        "不可思议的大概概概概",
+        "恋爱裁判3",
+        "四个感叹号",
+        "惊异全能",
+        "恋爱裁判2",
+        "惊人强大"
+      ],
+      "offset": 0,
+      "bpm": 185,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.8",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100496/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100496/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100496/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100496/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100496/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100496/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100496/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100496/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100496/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100496/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100496/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100496"
+    },
+    {
       "id": "100508",
       "remote_dir_name": "恋愛裁判",
       "title": "[協]恋愛裁判",
@@ -1140,6 +3048,150 @@
       },
       "imported_at": "2026-07-13T19:24:38.088701+00:00",
       "slug": "100508"
+    },
+    {
+      "id": "100513",
+      "remote_dir_name": "だんだん早くなる",
+      "title": "[耐]だんだん早くなる",
+      "title_en": "",
+      "artist": "40mP",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100513",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "耐",
+      "short_id": "100513",
+      "aliases": [
+        "逐渐加快",
+        "早",
+        "越来越快",
+        "一笔画",
+        "渐渐变快",
+        "越走越快",
+        "当当哈压库",
+        "慢慢变快",
+        "だんだん早くなる",
+        "渐渐加速",
+        "末白",
+        "蛋蛋变快",
+        "蛋蛋",
+        "跑男",
+        "蛋蛋加速",
+        "越战越勇",
+        "专注轻机枪",
+        "渐变快",
+        "渐渐加快",
+        "闲鱼客服",
+        "秃老头",
+        "逐渐加速",
+        "当当哈呀库那路",
+        "蛋蛋歌",
+        "渐渐变急",
+        "哈压库",
+        "动力小子",
+        "走路歌",
+        "逐渐变快",
+        "别急8",
+        "走路人"
+      ],
+      "offset": 0,
+      "bpm": 160,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "13.5",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100513/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100513/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100513/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100513/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100513/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100513/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100513/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100513/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100513/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100513/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100513/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100513"
+    },
+    {
+      "id": "100516",
+      "remote_dir_name": "ココロ",
+      "title": "[狂]ココロ",
+      "title_en": "",
+      "artist": "トラボルタ",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100516",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "狂",
+      "short_id": "100516",
+      "aliases": [],
+      "offset": 0,
+      "bpm": 140,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "12.0",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100516/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100516/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100516/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100516/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100516/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100516/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100516/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100516/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100516/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100516/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100516/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100516"
     },
     {
       "id": "100517",
@@ -1357,6 +3409,500 @@
       "slug": "100548"
     },
     {
+      "id": "100571-our-wrenally",
+      "remote_dir_name": "Our Wrenally",
+      "title": "[即]Our Wrenally",
+      "title_en": "",
+      "artist": "t+pazolite",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100571",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "即",
+      "short_id": "100571",
+      "aliases": [
+        "ow",
+        "守望先锋",
+        "魔法阿嫲",
+        "高等数学",
+        "高数",
+        "阿嬷",
+        "ysk对母亲的崇高敬意",
+        "临兵斗者皆阵列在前",
+        "our wrenally",
+        "魔法阿嬷",
+        "魔法阿妈",
+        "白夏祭",
+        "魔法夏祭",
+        "里夏祭",
+        "ena",
+        "别急加强版",
+        "别急9",
+        "夏祭",
+        "夏祭2",
+        "夏祭re:master",
+        "火女孩"
+      ],
+      "offset": 0,
+      "bpm": 105,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.9",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100571/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100571/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100571/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100571/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100571/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100571/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100571/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100571/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100571/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100571/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100571/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100571"
+    },
+    {
+      "id": "100573",
+      "remote_dir_name": "四月の雨",
+      "title": "[宴]四月の雨",
+      "title_en": "",
+      "artist": "cubesato",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100573",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "宴",
+      "short_id": "100573",
+      "aliases": [
+        "四月雨",
+        "四月的雨",
+        "april showers",
+        "你先别急",
+        "bpm79",
+        "四月の雨",
+        "四月的粑粑",
+        "114514月的臭雨",
+        "键盘歌",
+        "四月的星星",
+        "konmai",
+        "雨姐",
+        "别急1",
+        "伞",
+        "我为你撑一把伞",
+        "四月的史",
+        "四月的屎",
+        "四月答辩",
+        "四月的💩",
+        "四月的别急",
+        "☂️",
+        "别急",
+        "下北泽的雨",
+        "四月的粪",
+        "不要急挑战",
+        "四月的急",
+        "四月的shi"
+      ],
+      "offset": 0,
+      "bpm": 79,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.4",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100573/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100573/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100573/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100573/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100573/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100573/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100573/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100573/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100573/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100573/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100573/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100573"
+    },
+    {
+      "id": "100598",
+      "remote_dir_name": "すーぱーぬこになりたい",
+      "title": "[蛸]すーぱーぬこになりたい",
+      "title_en": "",
+      "artist": "まふまふ",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100598",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "蛸",
+      "short_id": "100598",
+      "aliases": [
+        "超猫",
+        "すーぱーぬこになりたい",
+        "nuko",
+        "开水壶成精",
+        "变猫",
+        "想要变成超级猫",
+        "变成猫",
+        "粉猫",
+        "超级猫猫",
+        "我想变成猫咪",
+        "想变猫",
+        "变超猫",
+        "想要成为super nuko",
+        "想要成为超级猫猫",
+        "猫猫",
+        "想变成猫"
+      ],
+      "offset": 0,
+      "bpm": 194,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "12.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100598/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100598/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100598/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100598/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100598/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100598/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100598/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100598/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100598/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100598/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100598/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100598"
+    },
+    {
+      "id": "100603",
+      "remote_dir_name": "その群青が愛しかったようだった",
+      "title": "[星]その群青が愛しかったようだった",
+      "title_en": "",
+      "artist": "n-buna feat.ヤギヌマカナ",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100603",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "星",
+      "short_id": "100603",
+      "aliases": [
+        "群青",
+        "群青爱",
+        "その群青が愛しかったようだった",
+        "那份群青仿佛是很可爱的样子",
+        "那片群青好像很可爱"
+      ],
+      "offset": 0,
+      "bpm": 220,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "13.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100603/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100603/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100603/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100603/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100603/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100603/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100603/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100603/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100603/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100603/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100603/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100603"
+    },
+    {
+      "id": "100614",
+      "remote_dir_name": "夢花火",
+      "title": "[宴]夢花火",
+      "title_en": "",
+      "artist": "豚乙女",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100614",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "宴",
+      "short_id": "100614",
+      "aliases": [
+        "梦花火",
+        "夢花火",
+        "马栏山",
+        "u咩哈那比",
+        "麻辣蒜",
+        "乙姬角色歌"
+      ],
+      "offset": 0,
+      "bpm": 186,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.0",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100614/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100614/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100614/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100614/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100614/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100614/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100614/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100614/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100614/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100614/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100614/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100614"
+    },
+    {
+      "id": "100617",
+      "remote_dir_name": "オトヒメモリー☆ウタゲーション",
+      "title": "[協]オトヒメモリー☆ウタゲーション",
+      "title_en": "",
+      "artist": "Junky",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100617",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "協",
+      "short_id": "100617",
+      "aliases": [
+        "オトヒメモリー☆ウタゲーション",
+        "乙姬",
+        "乙姫"
+      ],
+      "offset": 0,
+      "bpm": 140,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "13.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100617/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100617/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100617/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100617/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100617/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100617/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100617/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100617/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100617/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100617/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100617/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100617"
+    },
+    {
+      "id": "100689-credits",
+      "remote_dir_name": "Credits",
+      "title": "[蔵]Credits",
+      "title_en": "",
+      "artist": "Frums",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100689",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "蔵",
+      "short_id": "100689",
+      "aliases": [
+        "信用",
+        "学分",
+        "18118181181111",
+        "天气预报",
+        "制作组",
+        "末影珍珠",
+        "credits",
+        "信用卡",
+        "点数",
+        "可用点数",
+        "信誉",
+        "corporation",
+        "提供",
+        "🐘",
+        "cooperation",
+        "王一鑫",
+        "安眠曲"
+      ],
+      "offset": 0,
+      "bpm": 179,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.9",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100689/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100689/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100689/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100689/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100689/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100689/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100689/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100689/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100689/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100689/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100689/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100689"
+    },
+    {
       "id": "10070",
       "remote_dir_name": "ジングルベル",
       "title": "ジングルベル",
@@ -1510,6 +4056,72 @@
       "slug": "100700"
     },
     {
+      "id": "100712",
+      "remote_dir_name": "ミラクル・ショッピング",
+      "title": "[蛸]ミラクル・ショッピング",
+      "title_en": "",
+      "artist": "田中マイミ",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100712",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "蛸",
+      "short_id": "100712",
+      "aliases": [
+        "堂吉诃德",
+        "ミラクル・ショッピング",
+        "miracle shopping",
+        "qq",
+        "乱中取胜",
+        "购物",
+        "神奇阿呦",
+        "qq企鹅",
+        "企鹅超市"
+      ],
+      "offset": 0,
+      "bpm": 167,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.4",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100712/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100712/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100712/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100712/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100712/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100712/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100712/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100712/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100712/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100712/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100712/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100712"
+    },
+    {
       "id": "100749-ievan-polkka",
       "remote_dir_name": "Ievan Polkka",
       "title": "[蔵]Ievan Polkka",
@@ -1532,7 +4144,7 @@
       "difficulties": [
         {
           "slot": 2,
-          "name": "Basic",
+          "name": "Utage",
           "level": "12.7",
           "designer": ""
         }
@@ -1562,7 +4174,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100749/track.mp3",
         "pv_url": ""
       },
-      "imported_at": "2026-07-15T19:35:31.320893+00:00",
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
       "slug": "100749"
     },
     {
@@ -1646,6 +4258,144 @@
       "slug": "10077"
     },
     {
+      "id": "100772-freedom-dive-tpz-overcute-remix",
+      "remote_dir_name": "FREEDOM DiVE (tpz Overcute Remix",
+      "title": "[狂]FREEDOM DiVE (tpz Overcute Remix",
+      "title_en": "",
+      "artist": "t+pazolite",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100772",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "狂",
+      "short_id": "100772",
+      "aliases": [
+        "自由落体",
+        "fd",
+        "自由坠机↓↓↓",
+        "2310",
+        "freedom dive (tpz overcute remix)",
+        "大陆首杀",
+        "丛雨",
+        "↓",
+        "牢大坠机",
+        "fdfd",
+        "自由戴夫",
+        "234.56",
+        "科比",
+        "23456",
+        "发癫",
+        "fdmm",
+        "freedom dive",
+        "自由潜水"
+      ],
+      "offset": 0,
+      "bpm": 234,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "15.0",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100772/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100772/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100772/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100772/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100772/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100772/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100772/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100772/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100772/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100772/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100772/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100772"
+    },
+    {
+      "id": "100775",
+      "remote_dir_name": "ジンギスカン",
+      "title": "[宴]ジンギスカン",
+      "title_en": "",
+      "artist": "仁井山征弘 Feat. GREAT G and surprise",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/100775",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "宴",
+      "short_id": "100775",
+      "aliases": [
+        "成吉思汗",
+        "ジンギスカン",
+        "watame",
+        "wtm",
+        "角卷绵芽",
+        "金金金金金"
+      ],
+      "offset": 0,
+      "bpm": 150,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "13.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/100775/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/100775/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/100775/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/100775/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/100775/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/100775/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/100775/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/100775/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/100775/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/100775/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/100775/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "100775"
+    },
+    {
       "id": "100845",
       "remote_dir_name": "怒槌～光吉猛修一部謎～",
       "title": "[宴]怒槌～光吉猛修一部謎～",
@@ -1668,7 +4418,7 @@
       "difficulties": [
         {
           "slot": 2,
-          "name": "Basic",
+          "name": "Utage",
           "level": "13.5",
           "designer": ""
         }
@@ -1698,7 +4448,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100845/track.mp3",
         "pv_url": ""
       },
-      "imported_at": "2026-07-15T19:35:31.320893+00:00",
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
       "slug": "100845"
     },
     {
@@ -8466,6 +11216,62 @@
       },
       "imported_at": "2026-07-13T19:24:38.088701+00:00",
       "slug": "11008"
+    },
+    {
+      "id": "110082-reach-for-the-stars",
+      "remote_dir_name": "Reach For The Stars",
+      "title": "[藏]Reach For The Stars",
+      "title_en": "",
+      "artist": "大谷智哉, Jean Paul Makhlouf of Cash Cash「ソニック カラーズ」",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/110082",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "藏",
+      "short_id": "110082",
+      "aliases": [],
+      "offset": 0,
+      "bpm": 203,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.0",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/110082/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/110082/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/110082/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/110082/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/110082/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/110082/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/110082/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/110082/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/110082/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/110082/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/110082/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "110082"
     },
     {
       "id": "11009-stereoscape",
@@ -15857,7 +18663,7 @@
       "difficulties": [
         {
           "slot": 2,
-          "name": "Basic",
+          "name": "Utage",
           "level": "14.0",
           "designer": ""
         }
@@ -15887,7 +18693,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/26/110997/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/26/110997/pv.mp4"
       },
-      "imported_at": "2026-07-13T19:24:38.088701+00:00",
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
       "slug": "110997"
     },
     {
@@ -17810,6 +20616,70 @@
       "slug": "11119"
     },
     {
+      "id": "111199",
+      "remote_dir_name": "悪戯センセーション",
+      "title": "[奏]悪戯センセーション",
+      "title_en": "",
+      "artist": "森羅万象",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX CiRCLE PLUS",
+      "source_archive": "",
+      "source_folder": "26/111199",
+      "version": "maimai DX CiRCLE PLUS",
+      "versionid": 26,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "奏",
+      "short_id": "111199",
+      "aliases": [
+        "悪戯センセーション",
+        "大小姐",
+        "二小姐",
+        "大妹",
+        "恶戏sensation",
+        "淘气感觉",
+        "恶戏"
+      ],
+      "offset": 0,
+      "bpm": 192,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "13.0",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/26/111199/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/26/111199/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/26/111199/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/26/111199/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/26/111199/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/26/111199/",
+        "cover_url": "https://astrodx-charts.saop.cc/26/111199/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/26/111199/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/26/111199/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/26/111199/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/26/111199/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "111199"
+    },
+    {
       "id": "11120",
       "remote_dir_name": "オトモダチフィルム",
       "title": "オトモダチフィルム",
@@ -18045,6 +20915,95 @@
       },
       "imported_at": "2026-07-13T19:24:38.088701+00:00",
       "slug": "11122"
+    },
+    {
+      "id": "111222-break-break-break",
+      "remote_dir_name": "BREaK! BREaK! BREaK!",
+      "title": "[光]BREaK! BREaK! BREaK!",
+      "title_en": "",
+      "artist": "HiTECH NINJA vs Cranky",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX BUDDiES",
+      "source_archive": "",
+      "source_folder": "21/111222",
+      "version": "maimai DX BUDDiES",
+      "versionid": 21,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "光",
+      "short_id": "111222",
+      "aliases": [
+        "宴绝赞",
+        "[光]break! break! break!",
+        "光bbb",
+        "宴bbb",
+        "break! break! break!",
+        "爆！爆！爆！",
+        "break",
+        "kop2",
+        "崩坏三",
+        "大b歌",
+        "破坏破坏破坏",
+        "绿绿绿",
+        "βββ",
+        "崩三",
+        "绝赞绝赞绝赞",
+        "3b",
+        "哔啵拜",
+        "爆爆爆",
+        "绝赞³",
+        "落落落",
+        "崩坏3",
+        "崩崩崩",
+        "bbb",
+        "break!break!break!",
+        "绝赞！绝赞！绝赞！",
+        "不不不",
+        "苹果苹果派",
+        "三个绝赞",
+        "仨绝赞",
+        "三绝赞",
+        "爆！",
+        "哔波掰哔波掰"
+      ],
+      "offset": 0,
+      "bpm": 165,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/21/111222/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/21/111222/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/21/111222/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/21/111222/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/21/111222/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/21/111222/",
+        "cover_url": "https://astrodx-charts.saop.cc/21/111222/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/21/111222/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/21/111222/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/21/111222/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/21/111222/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "111222"
     },
     {
       "id": "11123",
@@ -23750,6 +26709,72 @@
       "slug": "11172"
     },
     {
+      "id": "111720-re-unknown-x",
+      "remote_dir_name": "Re:Unknown X",
+      "title": "[招]Re:Unknown X",
+      "title_en": "",
+      "artist": "まらしぃ",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX CiRCLE PLUS",
+      "source_archive": "",
+      "source_folder": "26/111720",
+      "version": "maimai DX CiRCLE PLUS",
+      "versionid": 26,
+      "genre": "宴会場",
+      "genreid": 107,
+      "cabinet": "招",
+      "short_id": "111720",
+      "aliases": [
+        "re:unknown x",
+        "rux",
+        "东方ed",
+        "东方et",
+        "rex",
+        "et2",
+        "未知x",
+        "油库里",
+        "endtime2"
+      ],
+      "offset": 0,
+      "bpm": 190,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Utage",
+          "level": "14.7",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/26/111720/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/26/111720/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/26/111720/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/26/111720/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/26/111720/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/26/111720/",
+        "cover_url": "https://astrodx-charts.saop.cc/26/111720/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/26/111720/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/26/111720/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/26/111720/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/26/111720/pv.mp4"
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "111720"
+    },
+    {
       "id": "11173-lovely-fruits",
       "remote_dir_name": "トリドリ⇒モリモリ！Lovely fruits☆",
       "title": "トリドリ⇒モリモリ！Lovely fruits☆",
@@ -25660,7 +28685,7 @@
       "difficulties": [
         {
           "slot": 2,
-          "name": "Basic",
+          "name": "Utage",
           "level": "13.0",
           "designer": ""
         }
@@ -25690,7 +28715,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/26/111914/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/26/111914/pv.mp4"
       },
-      "imported_at": "2026-07-13T19:24:38.088701+00:00",
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
       "slug": "111914"
     },
     {
@@ -26523,7 +29548,7 @@
       "difficulties": [
         {
           "slot": 2,
-          "name": "Basic",
+          "name": "Utage",
           "level": "12.0",
           "designer": ""
         }
@@ -26553,7 +29578,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/26/112002/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/26/112002/pv.mp4"
       },
-      "imported_at": "2026-07-13T19:24:38.088701+00:00",
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
       "slug": "112002"
     },
     {
@@ -79492,6 +82517,80 @@
       },
       "imported_at": "2026-07-13T19:24:38.088701+00:00",
       "slug": "11878"
+    },
+    {
+      "id": "11879-xaleid-scopix-2",
+      "remote_dir_name": "Xaleid◆scopiX (2)",
+      "title": "Xaleid◆scopiX (2)",
+      "title_en": "",
+      "artist": "xi",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX PRiSM PLUS",
+      "source_archive": "",
+      "source_folder": "24/11879",
+      "version": "maimai DX PRiSM PLUS",
+      "versionid": 24,
+      "genre": "maimai",
+      "genreid": 105,
+      "cabinet": "DX",
+      "short_id": "11879",
+      "aliases": [],
+      "offset": 0,
+      "bpm": 180,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Basic",
+          "level": "7.9",
+          "designer": ""
+        },
+        {
+          "slot": 3,
+          "name": "Advanced",
+          "level": "11.0",
+          "designer": ""
+        },
+        {
+          "slot": 4,
+          "name": "Expert",
+          "level": "13.7",
+          "designer": ""
+        },
+        {
+          "slot": 5,
+          "name": "Master",
+          "level": "14.9",
+          "designer": ""
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/24/11879/",
+      "license_note": "Built from astrodx-charts index",
+      "files": {
+        "maidata": "https://adxcs.saop.cc/24/11879/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/24/11879/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/24/11879/bg.png",
+        "pv": ""
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": false,
+        "has_dx_chart": true
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/24/11879/",
+        "cover_url": "https://astrodx-charts.saop.cc/24/11879/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/24/11879/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/24/11879/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/24/11879/track.mp3",
+        "pv_url": ""
+      },
+      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "slug": "11879"
     },
     {
       "id": "11880-circle-campaign",
