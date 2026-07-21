@@ -23,6 +23,8 @@ import {
   StaleWhileRevalidate,
 } from "serwist";
 
+import { CHART_MEDIA_HOST } from "./lib/chart-media";
+
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
     // Matches `injectionPoint` in serwist.config.js.
@@ -33,8 +35,8 @@ declare global {
 declare const self: ServiceWorkerGlobalScope;
 
 // The remote mirror that serves cover art / media when the build runs in
-// `ASTRODX_COVERS=remote` mode (see root-layout-shell COVER_HOST).
-const COVER_HOST = "adxcs.saop.cc";
+// `ASTRODX_COVERS=remote` mode. The shared hostname also drives the root
+// preconnect so the two consumers cannot drift during another media migration.
 // Third-party backends that must always be live (pageview counter, comments).
 const LIVE_HOSTS = ["bsz.saop.cc", "artalk.saop.cc"];
 const ONE_DAY = 60 * 60 * 24;
@@ -56,7 +58,8 @@ const runtimeCaching: RuntimeCaching[] = [
   {
     matcher: ({ url, request, sameOrigin }) =>
       request.destination === "image" &&
-      ((sameOrigin && url.pathname.startsWith("/covers/")) || url.hostname === COVER_HOST),
+      ((sameOrigin && url.pathname.startsWith("/covers/")) ||
+        url.hostname === CHART_MEDIA_HOST),
     handler: new CacheFirst({
       cacheName: "cover-images",
       plugins: [

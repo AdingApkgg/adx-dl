@@ -12,6 +12,7 @@ import { TapRipple } from "@/components/site/tap-ripple";
 import { ThemeProvider } from "@/components/site/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { readCatalog } from "@/lib/catalog";
+import { CHART_MEDIA_ORIGIN } from "@/lib/chart-media";
 import { ASTRODX_APP_REPOSITORY } from "@/lib/friend-links";
 import { ASTRODX_SITE_URL, wikiUrl } from "@/lib/resource-links";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
@@ -22,7 +23,6 @@ type RootLayoutShellProps = Readonly<{
   locale: Locale;
 }>;
 
-const COVER_HOST = "https://adxcs.saop.cc";
 const SOURCE_REPOSITORY = "https://github.com/AdingApkgg/adx-dl";
 // External monitor page; the in-site /status route was removed in favour of a
 // direct link to the public dashboard.
@@ -68,7 +68,7 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
         {/* Resource hints — every cover image is served from this cross-origin
             host; preconnect already implies DNS resolution, so no dns-prefetch
             fallback for it. The dns-prefetch below are for hosts we only warm. */}
-        <link rel="preconnect" href={COVER_HOST} crossOrigin="" />
+        <link rel="preconnect" href={CHART_MEDIA_ORIGIN} crossOrigin="" />
         <link rel="dns-prefetch" href={COUNTER_HOST} />
         <link rel="dns-prefetch" href={COMMENT_HOST} />
         <script dangerouslySetInnerHTML={{ __html: noFlashThemeScript }} />

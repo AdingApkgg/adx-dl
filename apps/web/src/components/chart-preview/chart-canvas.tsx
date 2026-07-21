@@ -23,7 +23,7 @@ export const COPY_FRAME_EVENT = "astrodx-chart-copy-frame";
 export type ChartCanvasProps = {
   /** PV video URL; drawn behind the chart when `showVideo` is on. */
   videoUrl?: string;
-  /** Local bg.png URL; drawn behind the chart as the static background. */
+  /** Background image URL; drawn behind the chart as the static fallback. */
   coverUrl?: string;
   /** Used to name exported PNG files. */
   chartName?: string;
@@ -256,7 +256,9 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
     // 渲染器不再依赖 bpm 构造，创建一次即可（bpm 每帧由 chart 传入）。
   }, [renderFrame]);
 
-  // 背景封面：作为 PV 尚未进入时间窗或未加载时的静态底图。
+  // 背景封面：作为 PV 尚未进入时间窗或未加载时的静态底图。优先用 CORS
+  // 请求以保留导出能力；预览域未被 R2 CORS 允许时退回普通图片请求，至少
+  // 保证画面可见（此时浏览器会按规范禁止导出被污染的 canvas）。
   useEffect(() => {
     const renderer = rendererRef.current;
     if (!coverUrl) {
@@ -266,28 +268,50 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
       return;
     }
 
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.decoding = "async";
-    bgImageRef.current = image;
+    let disposed = false;
+    let activeImage: HTMLImageElement | null = null;
 
-    const refresh = () => {
-      if (bgImageRef.current !== image) return;
+    const refresh = (image: HTMLImageElement) => {
+      if (disposed || activeImage !== image) return;
+      bgImageRef.current = image;
       rendererRef.current?.setBackgroundImage(image);
       if (!useGameStore.getState().isPlaying) {
         renderFrame(playbackTimeRef.current);
       }
     };
 
-    image.addEventListener("load", refresh);
-    image.addEventListener("error", refresh);
-    image.src = coverUrl;
-    if (image.complete) refresh();
+    const loadImage = (cors: boolean) => {
+      const image = new Image();
+      if (cors) image.crossOrigin = "anonymous";
+      image.decoding = "async";
+      activeImage = image;
+      bgImageRef.current = image;
+
+      image.addEventListener("load", () => refresh(image), { once: true });
+      image.addEventListener(
+        "error",
+        () => {
+          if (disposed || activeImage !== image) return;
+          if (cors) {
+            loadImage(false);
+            return;
+          }
+          bgImageRef.current = null;
+          rendererRef.current?.setBackgroundImage(null);
+          if (!useGameStore.getState().isPlaying) {
+            renderFrame(playbackTimeRef.current);
+          }
+        },
+        { once: true },
+      );
+      image.src = coverUrl;
+    };
+
+    loadImage(true);
 
     return () => {
-      image.removeEventListener("load", refresh);
-      image.removeEventListener("error", refresh);
-      if (bgImageRef.current === image) {
+      disposed = true;
+      if (activeImage && bgImageRef.current === activeImage) {
         bgImageRef.current = null;
         rendererRef.current?.setBackgroundImage(null);
       }
@@ -307,14 +331,38 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
   useEffect(() => {
     const video = bgVideoRef.current;
     if (!video) return;
+    let retriedWithoutCors = false;
     const refresh = () => {
       if (!useGameStore.getState().isPlaying) renderFrame(playbackTimeRef.current);
     };
-    if (showVideo && videoUrl) {
+    const handleError = () => {
+      if (
+        retriedWithoutCors ||
+        video.crossOrigin !== "anonymous" ||
+        !showVideo ||
+        !videoUrl
+      ) {
+        return;
+      }
+
+      // Keep the same graceful fallback as the standalone media player: an
+      // alternate/local origin may not be on the R2 CORS allowlist. A plain
+      // request can still be drawn and played, though frame export is then
+      // intentionally blocked by the browser's tainted-canvas protection.
+      retriedWithoutCors = true;
+      video.pause();
+      video.removeAttribute("src");
+      video.removeAttribute("crossorigin");
       video.src = videoUrl;
       video.load();
+    };
+    if (showVideo && videoUrl) {
+      video.crossOrigin = "anonymous";
+      video.src = videoUrl;
       video.addEventListener("loadeddata", refresh);
       video.addEventListener("seeked", refresh);
+      video.addEventListener("error", handleError);
+      video.load();
     } else {
       video.removeAttribute("src");
       video.load();
@@ -323,6 +371,7 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
     return () => {
       video.removeEventListener("loadeddata", refresh);
       video.removeEventListener("seeked", refresh);
+      video.removeEventListener("error", handleError);
     };
   }, [showVideo, videoUrl, chartData, renderFrame]);
 
