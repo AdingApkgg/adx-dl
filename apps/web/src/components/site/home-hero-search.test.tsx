@@ -32,6 +32,11 @@ test("static HTML keeps the real placeholder for crawlers and no-JS readers", ()
   // present and never CSS-hidden in the prerendered markup.
   expect(html).toContain('placeholder="搜索曲名、别名、曲师、版本..."');
   expect(html).not.toContain("placeholder:text-transparent");
+  expect(html).toContain('role="search"');
+  expect(html).toContain('action="/search"');
+  expect(html).toContain('method="get"');
+  expect(html).toContain('name="q"');
+  expect(html).toContain('aria-label="搜索"');
 });
 
 test("genre chips render fully visible in static HTML (transform-only cascade)", () => {
@@ -42,4 +47,20 @@ test("genre chips render fully visible in static HTML (transform-only cascade)",
   // one allowed opacity:0 is the decorative focus-glow layer.
   const opacityZero = html.match(/opacity:\s?0[;"]/g) ?? [];
   expect(opacityZero.length).toBeLessThanOrEqual(1);
+});
+
+test("brand tone uses the AstroDX Start-button frame and keeps its localized label", () => {
+  const html = renderToStaticMarkup(
+    <HomeHeroSearch
+      searchHref="/charts"
+      placeholder="搜索曲名、别名、曲师、版本..."
+      submitLabel="搜索曲库"
+      tone="brand"
+    />
+  );
+
+  expect(html).toContain('data-home-search-submit="astrodx-start"');
+  expect(html).toContain("data-home-search-label");
+  expect(html).toContain(">搜索曲库</span>");
+  expect(html).not.toContain('data-icon="inline-start"');
 });

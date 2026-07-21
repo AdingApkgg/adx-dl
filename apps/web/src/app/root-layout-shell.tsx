@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Script from "next/script";
 
 import { LocaleSuggestionBanner } from "@/app/locale-suggestion-banner";
 import { PageTransition } from "@/app/page-transition";
@@ -13,8 +14,7 @@ import { ThemeProvider } from "@/components/site/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { readCatalog } from "@/lib/catalog";
 import { CHART_MEDIA_ORIGIN } from "@/lib/chart-media";
-import { ASTRODX_APP_REPOSITORY } from "@/lib/friend-links";
-import { ASTRODX_SITE_URL, wikiUrl } from "@/lib/resource-links";
+import { ASTRODX_SITE_URL, astroDxDownloadUrl, wikiUrl } from "@/lib/resource-links";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 
 type RootLayoutShellProps = Readonly<{
@@ -71,8 +71,12 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
         <link rel="preconnect" href={CHART_MEDIA_ORIGIN} crossOrigin="" />
         <link rel="dns-prefetch" href={COUNTER_HOST} />
         <link rel="dns-prefetch" href={COMMENT_HOST} />
-        <script dangerouslySetInnerHTML={{ __html: noFlashThemeScript }} />
-        <script type="speculationrules" dangerouslySetInnerHTML={{ __html: speculationRules }} />
+        <Script id="theme-init" strategy="beforeInteractive">
+          {noFlashThemeScript}
+        </Script>
+        <Script id="speculation-rules" type="speculationrules" strategy="afterInteractive">
+          {speculationRules}
+        </Script>
         <ServiceWorkerRegistrar />
         <a
           href="#main-content"
@@ -158,7 +162,7 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
                       </Link>
                       <a
                         className="text-muted-foreground hover:text-foreground"
-                        href={ASTRODX_APP_REPOSITORY}
+                        href={astroDxDownloadUrl(locale)}
                         target="_blank"
                         rel="noreferrer"
                       >

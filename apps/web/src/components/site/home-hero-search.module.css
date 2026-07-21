@@ -1,0 +1,125 @@
+/* The homepage submit echoes AstroDX's song-select “Start!” control: a dark
+   navy face, luminous double frame, white upper edge and electric-blue sill.
+   It stays CSS-native so the localized label can grow without raster scaling. */
+[data-slot="button"].gameSubmit {
+  position: relative;
+  isolation: isolate;
+  width: clamp(7.4rem, 11vw, 8.75rem);
+  min-width: 0;
+  height: 3rem;
+  overflow: visible;
+  border: 1px solid rgb(144 211 239 / 32%);
+  border-radius: 0.8rem;
+  background: linear-gradient(180deg, rgb(10 20 31 / 94%), rgb(4 14 22 / 98%));
+  padding: 0 0.9rem;
+  color: white;
+  box-shadow:
+    0 0 0 1px rgb(1 8 14 / 76%),
+    0 0 12px rgb(76 188 255 / 22%),
+    inset 0 1px 0 rgb(255 255 255 / 8%);
+  text-shadow: 0 2px 2px rgb(0 0 0 / 64%);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease;
+}
+
+[data-slot="button"].gameSubmit::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0.3rem;
+  border: 2px solid rgb(225 245 255 / 92%);
+  border-bottom-color: rgb(48 171 255 / 96%);
+  border-radius: 0.48rem;
+  background: linear-gradient(
+    180deg,
+    rgb(6 22 37 / 98%) 0%,
+    rgb(7 27 45 / 98%) 63%,
+    rgb(9 42 71 / 98%) 63%,
+    rgb(8 38 65 / 98%) 100%
+  );
+  box-shadow:
+    0 0 8px rgb(100 201 255 / 30%),
+    inset 0 -3px 0 rgb(0 118 221 / 96%),
+    inset 0 1px 0 rgb(255 255 255 / 10%);
+  content: "";
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+[data-slot="button"].gameSubmit::after {
+  position: absolute;
+  z-index: 0;
+  top: 0.46rem;
+  right: 0.72rem;
+  left: 0.72rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 32%), transparent);
+  content: "";
+}
+
+.gameSubmitLabel {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  font-size: clamp(0.75rem, 1.1vw, 0.9rem);
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-slot="button"].gameSubmit:hover {
+  border-color: rgb(151 224 255 / 58%);
+  background: linear-gradient(180deg, rgb(12 25 39 / 96%), rgb(5 17 27 / 99%));
+  color: rgb(255 255 255);
+  box-shadow:
+    0 0 0 1px rgb(1 8 14 / 76%),
+    0 0 17px rgb(66 184 255 / 42%),
+    inset 0 1px 0 rgb(255 255 255 / 12%);
+}
+
+[data-slot="button"].gameSubmit:hover::before {
+  border-color: rgb(241 250 255 / 100%);
+  border-bottom-color: rgb(78 189 255 / 100%);
+  background: linear-gradient(
+    180deg,
+    rgb(8 28 47 / 99%) 0%,
+    rgb(9 35 58 / 99%) 63%,
+    rgb(10 53 89 / 99%) 63%,
+    rgb(8 47 80 / 99%) 100%
+  );
+  box-shadow:
+    0 0 11px rgb(111 210 255 / 44%),
+    inset 0 -3px 0 rgb(0 139 240 / 100%),
+    inset 0 1px 0 rgb(255 255 255 / 14%);
+}
+
+[data-slot="button"].gameSubmit:focus-visible {
+  border-color: rgb(185 235 255 / 76%);
+  outline: 3px solid rgb(96 201 255 / 62%);
+  outline-offset: 3px;
+  box-shadow:
+    0 0 0 1px rgb(1 8 14 / 76%),
+    0 0 18px rgb(66 184 255 / 48%);
+}
+
+@media (max-width: 380px) {
+  [data-slot="button"].gameSubmit {
+    width: 7.4rem;
+    padding-inline: 0.45rem;
+  }
+
+  .gameSubmitLabel {
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+  }
+
+  :global(html:lang(en)) .gameSubmitLabel {
+    font-size: 0.68rem;
+    letter-spacing: 0.01em;
+  }
+}

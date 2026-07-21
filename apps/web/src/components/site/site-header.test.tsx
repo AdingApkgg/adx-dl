@@ -3,12 +3,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 mock.module("next/navigation", () => ({
   usePathname: () => "/",
+  useRouter: () => ({ push() {} }),
 }));
 
 describe("SiteHeader", () => {
   test("renders localized navigation and language switcher for localized detail routes", async () => {
     mock.module("next/navigation", () => ({
       usePathname: () => "/ja/charts/song-3",
+      useRouter: () => ({ push() {} }),
     }));
 
     const { SiteHeader } = await import("./site-header");
@@ -16,6 +18,7 @@ describe("SiteHeader", () => {
 
     expect(html).toContain("ホーム");
     expect(html).toContain("曲一覧");
+    expect(html).toContain("ランダム");
     expect(html).toContain('href="/ja"');
     expect(html).toContain('href="/ja/charts"');
     expect(html).not.toContain('href="/ja/search"');
@@ -29,6 +32,7 @@ describe("SiteHeader", () => {
   test("renders zh navigation and locale roots on the default locale home route", async () => {
     mock.module("next/navigation", () => ({
       usePathname: () => "/",
+      useRouter: () => ({ push() {} }),
     }));
 
     const { SiteHeader } = await import("./site-header");
@@ -36,6 +40,7 @@ describe("SiteHeader", () => {
 
     expect(html).toContain("首页");
     expect(html).toContain("曲库");
+    expect(html).toContain("随机");
     expect(html).toContain('href="/"');
     expect(html).toContain('href="/charts"');
     expect(html).not.toContain('href="/search"');
@@ -46,6 +51,7 @@ describe("SiteHeader", () => {
   test("static HTML is pinned for view transitions and starts expanded", async () => {
     mock.module("next/navigation", () => ({
       usePathname: () => "/",
+      useRouter: () => ({ push() {} }),
     }));
 
     const { SiteHeader } = await import("./site-header");

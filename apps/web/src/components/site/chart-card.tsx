@@ -51,6 +51,8 @@ function toFullEntryStub(entry: CatalogCardEntry): CatalogEntry {
 type ChartCardProps = {
   entry: CatalogCardEntry;
   locale: Locale;
+  /** Homepage/editorial surfaces can preserve the entire cover instead of cropping it. */
+  coverFit?: "cover" | "contain";
   /** Eagerly load above-the-fold covers (LCP). */
   priority?: boolean;
   sizes?: string;
@@ -68,6 +70,7 @@ type ChartCardProps = {
 export function ChartCard({
   entry,
   locale,
+  coverFit = "cover",
   priority = false,
   sizes,
   aliasHit = null,
@@ -107,6 +110,7 @@ export function ChartCard({
       <EntryCover
         entry={fullEntry}
         locale={locale}
+        fit={coverFit}
         priority={priority}
         sizes={sizes}
         className="h-full w-full"

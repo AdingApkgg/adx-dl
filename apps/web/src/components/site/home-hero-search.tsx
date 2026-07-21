@@ -8,6 +8,7 @@ import { SearchIcon } from "lucide-react";
 import { useMotionValue, useSpring, type Variants } from "framer-motion";
 
 import { AnimatePresence, EASE_OUT, motion, springSoft, useReducedMotion } from "@/components/motion";
+import styles from "@/components/site/home-hero-search.module.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -35,6 +36,8 @@ type HomeHeroSearchProps = {
   /** Optional lead-in shown before the genre quick-filter chips. */
   quickLabel?: string;
   genres?: HeroGenreChip[];
+  /** Dark AstroDX homepage treatment; search behavior stays identical. */
+  tone?: "default" | "brand";
 };
 
 // Slim build-time search index (id/slug/titles/artists/aliases) fetched lazily
@@ -99,6 +102,7 @@ export function HomeHeroSearch({
   submitLabel,
   quickLabel,
   genres = [],
+  tone = "default",
 }: HomeHeroSearchProps) {
   const router = useRouter();
   const locale = localeFromHref(searchHref);
@@ -278,6 +282,10 @@ export function HomeHeroSearch({
     <div className="flex w-full max-w-2xl flex-col gap-3">
       <motion.form
         onSubmit={submit}
+        action={searchHref}
+        method="get"
+        role="search"
+        aria-label={submitLabel}
         // z-30 keeps the suggestion dropdown above the genre chips below: the
         // focus scale makes this form a stacking context, so the listbox's
         // z-50 no longer competes globally — the chips' own transforms would
@@ -295,15 +303,24 @@ export function HomeHeroSearch({
           initial={false}
           animate={{ opacity: focused ? 1 : 0 }}
           transition={{ duration: 0.3, ease: EASE_OUT }}
-          className="pointer-events-none absolute -inset-2 -z-10 rounded-2xl bg-gradient-to-r from-primary/30 via-violet-500/20 to-fuchsia-500/30 blur-lg"
+          className={cn(
+            "pointer-events-none absolute -inset-2 -z-10 rounded-2xl blur-lg",
+            tone === "brand"
+              ? "bg-[#5cc8ff]/20"
+              : "bg-gradient-to-r from-primary/30 via-violet-500/20 to-fuchsia-500/30"
+          )}
         />
         <div className="relative flex-1">
           <SearchIcon
-            className="pointer-events-none absolute top-1/2 left-3.5 z-10 size-5 -translate-y-1/2 text-muted-foreground"
+            className={cn(
+              "pointer-events-none absolute top-1/2 left-3.5 z-10 size-5 -translate-y-1/2",
+              tone === "brand" ? "text-slate-500" : "text-muted-foreground"
+            )}
             aria-hidden="true"
           />
           <Input
             type="search"
+            name="q"
             value={query}
             role="combobox"
             aria-expanded={showList}
@@ -338,6 +355,8 @@ export function HomeHeroSearch({
             aria-label={submitLabel}
             className={cn(
               "h-12 rounded-xl border-border/70 bg-background/70 pl-11 text-base shadow-sm backdrop-blur",
+              tone === "brand" &&
+                "border-white/15 bg-white text-slate-950 shadow-[0_14px_38px_rgba(0,0,0,0.22)] focus-visible:border-sky-400 focus-visible:ring-sky-400/30",
               // The real placeholder attribute stays in the HTML for no-JS;
               // hide it via CSS only while the cycling overlay stands in.
               cyclingPlaceholder && "placeholder:text-transparent"
@@ -346,7 +365,10 @@ export function HomeHeroSearch({
           {cyclingPlaceholder ? (
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 right-3 left-11 flex items-center overflow-hidden text-base text-muted-foreground md:text-sm"
+              className={cn(
+                "pointer-events-none absolute inset-y-0 right-3 left-11 flex items-center overflow-hidden text-base md:text-sm",
+                tone === "brand" ? "text-slate-500" : "text-muted-foreground"
+              )}
             >
               <AnimatePresence mode="wait" initial={false}>
                 <motion.span
@@ -432,9 +454,23 @@ export function HomeHeroSearch({
           onPointerLeave={onSubmitPointerLeave}
         >
           <motion.span className="block" style={{ x: submitX, y: submitY }}>
-            <Button type="submit" size="lg" className="h-12 px-5">
-              <SearchIcon data-icon="inline-start" aria-hidden="true" />
-              <span className="hidden sm:inline">{submitLabel}</span>
+            <Button
+              type="submit"
+              size="lg"
+              aria-label={submitLabel}
+              data-home-search-submit={tone === "brand" ? "astrodx-start" : undefined}
+              className={cn(tone === "brand" ? styles.gameSubmit : "h-12 px-5")}
+            >
+              {tone === "brand" ? (
+                <span className={styles.gameSubmitLabel} data-home-search-label>
+                  {submitLabel}
+                </span>
+              ) : (
+                <>
+                  <SearchIcon data-icon="inline-start" aria-hidden="true" />
+                  <span className="sr-only sm:not-sr-only">{submitLabel}</span>
+                </>
+              )}
             </Button>
           </motion.span>
         </span>
@@ -450,7 +486,14 @@ export function HomeHeroSearch({
           variants={{ visible: { transition: { staggerChildren: 0.04 } } }}
         >
           {quickLabel ? (
-            <span className="mr-1 text-xs text-muted-foreground">{quickLabel}</span>
+            <span
+              className={cn(
+                "mr-1 text-xs",
+                tone === "brand" ? "text-white/55" : "text-muted-foreground"
+              )}
+            >
+              {quickLabel}
+            </span>
           ) : null}
           {genres.map((genre) => (
             <MotionLink

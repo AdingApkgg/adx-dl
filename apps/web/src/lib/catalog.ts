@@ -9,12 +9,13 @@ import type {
 } from "@/lib/catalog-shared";
 import {
   getChartDownloadSpec,
+  resolveVersionIndex,
   UNKNOWN_VERSION_ROUTE_ID,
   versionRouteId,
 } from "@/lib/catalog-shared";
 import type { CatalogSearchIndexEntry } from "@/lib/catalog-search";
 import { entrySlug } from "@/lib/route-slug";
-import { MAIMAI_VERSIONS, versionImageIndex } from "@/lib/version-image";
+import { MAIMAI_VERSIONS } from "@/lib/version-image";
 
 export type { Catalog, CatalogDifficulty, CatalogEntry } from "@/lib/catalog-shared";
 
@@ -137,7 +138,7 @@ const readVersionData = cache(async () => {
   const unknown: CatalogEntry[] = [];
 
   for (const entry of entries) {
-    const index = versionImageIndex(entry.version);
+    const index = resolveVersionIndex(entry);
     if (index === null) {
       unknown.push(entry);
       continue;

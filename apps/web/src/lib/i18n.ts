@@ -19,6 +19,7 @@ export type SiteDictionary = {
     languageLabel: string;
     menuLabel: string;
     moreLabel: string;
+    randomLabel: string;
   };
   language: {
     zh: string;
@@ -37,6 +38,11 @@ export type SiteDictionary = {
   };
   home: {
     badge: string;
+    /** Visible homepage hero copy; kept separate from the SEO page title. */
+    heroTitle: string;
+    /** Locale-specific phrase that should stay intact when the hero title wraps. */
+    heroTitleNoBreak?: string;
+    heroDescription: string;
     title: string;
     description: string;
     searchCta: string;
@@ -45,10 +51,18 @@ export type SiteDictionary = {
     videoCta: string;
     randomCta: string;
     whatIsAstroDX: string;
+    heroActionsLabel: string;
     quickGenresLabel: string;
+    genresDescription: string;
     /** Accessible name for the hero search's instant-suggestion listbox. */
     searchSuggestionsLabel: string;
     spotlightLabel: string;
+    spotlightCarouselRole: string;
+    spotlightSlideRole: string;
+    spotlightPrevious: string;
+    spotlightNext: string;
+    spotlightPause: string;
+    spotlightResume: string;
     featuredTitle: string;
     featuredDescription: string;
     viewMore: string;
@@ -446,12 +460,16 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       languageLabel: "语言切换",
       menuLabel: "导航菜单",
       moreLabel: "更多",
+      randomLabel: "随机",
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "切换主题", light: "浅色", dark: "深色", system: "跟随系统" },
     motionToggle: { label: "减弱动画", enabledHint: "恢复动画" },
     home: {
       badge: "为 AstroDX 玩家打造",
+      heroTitle: "为 AstroDX 找到下一首谱面。",
+      heroTitleNoBreak: "找到下一首谱面。",
+      heroDescription: "搜索、试玩并下载社区谱面，按版本与曲风浏览，再一键导入 AstroDX。",
       title: "AstroDX 谱面资料站与下载入口。",
       description:
         "搜索、试玩并下载 maimai 谱面，一键导入 AstroDX 模拟器。可按版本与曲风浏览，也支持整包批量下载。",
@@ -461,9 +479,17 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       videoCta: "观看演示视频",
       randomCta: "随机来一首",
       whatIsAstroDX: "什么是 AstroDX？",
-      quickGenresLabel: "热门分类",
+      heroActionsLabel: "快捷入口",
+      quickGenresLabel: "按曲风浏览",
+      genresDescription: "按曲风快速筛选目录，直接进入对应分类的谱面。",
       searchSuggestionsLabel: "搜索建议",
       spotlightLabel: "今日精选",
+      spotlightCarouselRole: "轮播",
+      spotlightSlideRole: "精选谱面",
+      spotlightPrevious: "上一首精选",
+      spotlightNext: "下一首精选",
+      spotlightPause: "暂停自动轮播",
+      spotlightResume: "继续自动轮播",
       featuredTitle: "随机精选",
       featuredDescription: "随目录更新轮换的随机推荐，发现冷门好谱。",
       viewMore: "查看更多",
@@ -874,12 +900,16 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       languageLabel: "Language",
       menuLabel: "Navigation menu",
       moreLabel: "More",
+      randomLabel: "Random",
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "Toggle theme", light: "Light", dark: "Dark", system: "System" },
     motionToggle: { label: "Reduce motion", enabledHint: "Restore motion" },
     home: {
       badge: "Built for AstroDX players",
+      heroTitle: "Find your next chart for AstroDX.",
+      heroDescription:
+        "Search, preview, and download community charts. Browse by release or genre, then import them into AstroDX.",
       title: "AstroDX chart archive for browsing, indexing, and downloads.",
       description:
         "Search, preview, and download maimai charts, then import them into the AstroDX simulator in one click. Browse by version or genre, or grab whole sets at once.",
@@ -889,9 +919,17 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       videoCta: "Watch the Demo",
       randomCta: "Surprise Me",
       whatIsAstroDX: "What is AstroDX?",
-      quickGenresLabel: "Popular genres",
+      heroActionsLabel: "Quick actions",
+      quickGenresLabel: "Browse by genre",
+      genresDescription: "Filter the catalog by genre and jump straight to matching charts.",
       searchSuggestionsLabel: "Search suggestions",
-      spotlightLabel: "Today's pick",
+      spotlightLabel: "Today's picks",
+      spotlightCarouselRole: "carousel",
+      spotlightSlideRole: "featured chart",
+      spotlightPrevious: "Previous pick",
+      spotlightNext: "Next pick",
+      spotlightPause: "Pause automatic rotation",
+      spotlightResume: "Resume automatic rotation",
       featuredTitle: "Random picks",
       featuredDescription: "A rotating random selection refreshed with each catalog update — discover hidden gems.",
       viewMore: "View more",
@@ -1326,12 +1364,16 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       languageLabel: "言語切り替え",
       menuLabel: "ナビゲーションメニュー",
       moreLabel: "その他",
+      randomLabel: "ランダム",
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "テーマ切り替え", light: "ライト", dark: "ダーク", system: "システム" },
     motionToggle: { label: "アニメーションを減らす", enabledHint: "アニメーションを戻す" },
     home: {
       badge: "AstroDX プレイヤーのために",
+      heroTitle: "AstroDX の次の譜面を見つけよう。",
+      heroDescription:
+        "コミュニティ譜面を検索・プレビュー・ダウンロード。バージョンやジャンルから探して、AstroDX へ導入できます。",
       title: "AstroDX 譜面アーカイブとダウンロード入口。",
       description:
         "maimai 譜面を検索・試遊してダウンロードし、ワンクリックで AstroDX シミュレーターへインポート。バージョンやジャンルから探せて、まとめてダウンロードにも対応しています。",
@@ -1341,9 +1383,17 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       videoCta: "デモ動画を見る",
       randomCta: "ランダムに一曲",
       whatIsAstroDX: "AstroDX とは？",
-      quickGenresLabel: "人気ジャンル",
+      heroActionsLabel: "クイックリンク",
+      quickGenresLabel: "ジャンル別に見る",
+      genresDescription: "ジャンルでカタログを絞り込み、該当する譜面へすぐ移動できます。",
       searchSuggestionsLabel: "検索候補",
       spotlightLabel: "今日のおすすめ",
+      spotlightCarouselRole: "カルーセル",
+      spotlightSlideRole: "おすすめ譜面",
+      spotlightPrevious: "前のおすすめ",
+      spotlightNext: "次のおすすめ",
+      spotlightPause: "自動切り替えを一時停止",
+      spotlightResume: "自動切り替えを再開",
       featuredTitle: "ランダムセレクト",
       featuredDescription: "カタログ更新ごとに入れ替わるランダムなおすすめ。隠れた名曲を見つけよう。",
       viewMore: "もっと見る",

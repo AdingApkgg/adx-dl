@@ -7,6 +7,8 @@ import {
   formatEntrySubcategory,
   getChartAssetFiles,
   getChartDownloadSpec,
+  isKnownVersionIndex,
+  resolveVersionIndex,
   toCatalogCardEntry,
   versionFolderName,
   versionGroupFolderName,
@@ -63,6 +65,14 @@ function buildEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
 }
 
 describe("catalog shared helpers", () => {
+  test("resolves stable version ids with a canonical-name fallback", () => {
+    expect(isKnownVersionIndex(24)).toBe(true);
+    expect(isKnownVersionIndex(27)).toBe(false);
+    expect(resolveVersionIndex(buildEntry({ versionid: 24, version: "stale-name" }))).toBe(24);
+    expect(resolveVersionIndex(buildEntry({ versionid: 999, version: "maimai DX PRiSM" }))).toBe(23);
+    expect(resolveVersionIndex(buildEntry({ versionid: undefined, version: "unmapped" }))).toBeNull();
+  });
+
   test("keeps the original subcategory label for non-remote entries", () => {
     expect(formatEntrySubcategory(buildEntry())).toBe("BUDDiES");
   });

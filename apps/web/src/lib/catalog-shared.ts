@@ -379,17 +379,39 @@ export type VersionGroup = {
   count: number;
 };
 
-/** Route slug for the untagged version bucket (imageIndex === null). */
+/** Stable id for the untagged version bucket. */
 export const UNKNOWN_VERSION_ROUTE_ID = "unknown";
 
+const KNOWN_VERSION_INDEXES = new Set(MAIMAI_VERSIONS.map((version) => version.index));
+
+/** Whether a value is one of the canonical maimai version ids (currently 0–26). */
+export function isKnownVersionIndex(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    KNOWN_VERSION_INDEXES.has(value)
+  );
+}
+
 /**
- * URL path segment for a version's detail route: the maimai versionid (0–26,
- * the same value stored in each chart's maidata `&versionid=`), or "unknown"
- * for the untagged bucket. Stable numeric ids, so the route survives a version
- * being renamed.
+ * Resolve a chart's stable version id. New catalog data uses `versionid`;
+ * older data falls back to the canonical version name.
  */
-export function versionRouteId(imageIndex: number | null): string {
-  return imageIndex === null ? UNKNOWN_VERSION_ROUTE_ID : String(imageIndex);
+export function resolveVersionIndex(
+  entry: Pick<CatalogEntry, "versionid" | "version">
+): number | null {
+  return isKnownVersionIndex(entry.versionid)
+    ? entry.versionid
+    : versionImageIndex(entry.version);
+}
+
+/**
+ * Stable URL value for a version: the maimai versionid (0–26, the same value
+ * stored in each chart's maidata `&versionid=`), or "unknown" for the untagged
+ * bucket. It is shared by legacy route redirects and catalog query parameters.
+ */
+export function versionRouteId(versionIndex: number | null): string {
+  return versionIndex === null ? UNKNOWN_VERSION_ROUTE_ID : String(versionIndex);
 }
 
 // Version/subcategory strings are Latin (maimai version names), so an ASCII slug

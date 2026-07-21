@@ -6,7 +6,12 @@ import {
   type CatalogEntry,
   type ChartDownloadSpec,
 } from "@/lib/catalog-shared";
-import { buildSelectedCatalogCharts, CatalogBrowser } from "./catalog-browser";
+import {
+  buildSelectedCatalogCharts,
+  catalogVersionFilterId,
+  CatalogBrowser,
+  normalizeVersionFilterId,
+} from "./catalog-browser";
 
 function buildEntry(overrides: Partial<CatalogEntry>): CatalogEntry {
   return {
@@ -56,6 +61,20 @@ function buildEntry(overrides: Partial<CatalogEntry>): CatalogEntry {
 }
 
 describe("CatalogBrowser", () => {
+  test("normalizes version entries and legacy query names to stable ids", () => {
+    expect(catalogVersionFilterId({ versionid: 24, version: "stale-name" })).toBe("24");
+    expect(catalogVersionFilterId({ version: "maimai DX PRiSM" })).toBe("23");
+    expect(catalogVersionFilterId({ versionid: 999, version: "maimai DX PRiSM" })).toBe("23");
+    expect(catalogVersionFilterId({ version: "unmapped" })).toBe("unknown");
+
+    expect(normalizeVersionFilterId("24")).toBe("24");
+    expect(normalizeVersionFilterId("024")).toBe("24");
+    expect(normalizeVersionFilterId("Unknown")).toBe("unknown");
+    expect(normalizeVersionFilterId("maimai DX PRiSM PLUS")).toBe("24");
+    expect(normalizeVersionFilterId("999")).toBeNull();
+    expect(normalizeVersionFilterId("not-a-version")).toBeNull();
+  });
+
   test("renders localized search controls with all-category scope", () => {
     const html = renderToStaticMarkup(
       <CatalogBrowser

@@ -17,7 +17,6 @@ import {
   applyCatalogFilters,
   buildCatalogSearchWithMatches,
   getCategoryOptions,
-  getSubcategoryOptions,
 } from "@/lib/catalog-search";
 import type { CatalogCardEntry, ChartDownloadSpec } from "@/lib/catalog-shared";
 import {
@@ -29,17 +28,20 @@ import {
   type DifficultyTone,
   entryHasLevel,
   GENRES,
+  isKnownVersionIndex,
   resolveGenreId,
+  resolveVersionIndex,
   sortByReleaseDesc,
+  versionRouteId,
   versionShortName,
 } from "@/lib/catalog-shared";
 import { getDictionary } from "@/lib/i18n";
 import { jsonFetcher } from "@/lib/swr-fetcher";
 import { cn } from "@/lib/utils";
 import {
+  MAIMAI_VERSIONS,
   VERSION_IMAGE_DIMENSIONS,
-  versionImageIndex,
-  versionImageSources,
+  versionImageSourcesByIndex,
 } from "@/lib/version-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -71,6 +73,28 @@ const CARD_SIZES =
 // Sticky offset for the results toolbar — clears the sticky site header
 // (~65px tall) with a little breathing room. Must match `top-[4.5rem]` below.
 const STICKY_TOOLBAR_TOP_PX = 72;
+const VERSION_NAME_BY_INDEX = new Map(
+  MAIMAI_VERSIONS.map((version) => [version.index, version.name] as const)
+);
+
+type VersionIdentityEntry = Pick<CatalogCardEntry, "versionid" | "version">;
+
+export function catalogVersionFilterId(entry: VersionIdentityEntry): string {
+  return versionRouteId(resolveVersionIndex(entry));
+}
+
+/** Normalize old name-based shared URLs while keeping new URLs id-only. */
+export function normalizeVersionFilterId(value: string): string | null {
+  const normalized = value.trim();
+  if (!normalized) return null;
+  if (normalized.toLowerCase() === "unknown") return versionRouteId(null);
+  if (/^\d+$/.test(normalized)) {
+    const index = Number(normalized);
+    return isKnownVersionIndex(index) ? versionRouteId(index) : null;
+  }
+  const index = resolveVersionIndex({ version: normalized });
+  return index === null ? null : versionRouteId(index);
+}
 
 // Advanced-filter panel: opening staggers the rows in one by one; collapse
 // runs fast and un-staggered so closing feels immediate.
@@ -113,7 +137,9 @@ export function CatalogBrowser({
   locale = "zh",
   collectionName,
 }: CatalogBrowserProps) {
-  const dictionary = getDictionary(locale).catalogBrowser;
+  const siteDictionary = getDictionary(locale);
+  const dictionary = siteDictionary.catalogBrowser;
+  const unknownVersionLabel = siteDictionary.versions.unknownLabel;
   // The input is controlled by `inputValue`; `query` is the committed search
   // term, updated debounced and never mid-IME-composition, so pinyin/kana
   // buffers don't churn the result grid on every keystroke.
@@ -190,8 +216,15 @@ export function CatalogBrowser({
     }
     const genreSet = readSet("genre");
     if (genreSet) setGenreIds(new Set([...genreSet].filter((id) => GENRES[Number(id)])));
-    const version = readSet("version");
-    if (version) setVersionSet(version);
+    const versionParam = readSet("version");
+    const versionIds = versionParam
+      ? new Set(
+          [...versionParam]
+            .map(normalizeVersionFilterId)
+            .filter((id): id is string => id !== null)
+        )
+      : null;
+    if (versionIds && versionIds.size > 0) setVersionSet(versionIds);
     const level = readSet("level");
     if (level) setLevelSet(level);
     const cabinet = readSet("cabinet");
@@ -202,7 +235,7 @@ export function CatalogBrowser({
     if (asset) setAssetSet(asset);
     // Landed with dimension filters already applied → reveal the picker so the
     // user can see and adjust them.
-    if (version || level || genreSet || cabinet || bpm || asset) {
+    if ((versionIds && versionIds.size > 0) || level || genreSet || cabinet || bpm || asset) {
       setFiltersOpen(true);
     }
     if (Number.isInteger(pageParam) && pageParam > 1) {
@@ -264,12 +297,37 @@ export function CatalogBrowser({
   );
   // Dimension chip option lists. Derived from the full catalog (not the current
   // search) so the chip rows stay stable while you type or narrow other filters.
-  const versionOptions = React.useMemo(
-    () =>
-      getSubcategoryOptions(entries, effectiveCategory)
-        .filter((value) => value !== ALL_SUBCATEGORIES)
-        .sort((a, b) => (versionImageIndex(b) ?? -1) - (versionImageIndex(a) ?? -1)),
-    [entries, effectiveCategory]
+  const versionOptions = React.useMemo(() => {
+    const scopedEntries =
+      effectiveCategory === ALL_CATEGORIES
+        ? entries
+        : entries.filter((entry) => entry.category === effectiveCategory);
+    const byId = new Map<
+      string,
+      { id: string; label: string; imageIndex: number | null }
+    >();
+
+    for (const entry of scopedEntries) {
+      const id = catalogVersionFilterId(entry);
+      if (byId.has(id)) continue;
+      const imageIndex = id === "unknown" ? null : Number(id);
+      const label =
+        imageIndex === null
+          ? unknownVersionLabel
+          : VERSION_NAME_BY_INDEX.get(imageIndex) ||
+            entry.subcategory ||
+            entry.version ||
+            unknownVersionLabel;
+      byId.set(id, { id, label, imageIndex });
+    }
+
+    return [...byId.values()].sort(
+      (a, b) => (b.imageIndex ?? -1) - (a.imageIndex ?? -1)
+    );
+  }, [entries, effectiveCategory, unknownVersionLabel]);
+  const versionOptionById = React.useMemo(
+    () => new Map(versionOptions.map((option) => [option.id, option] as const)),
+    [versionOptions]
   );
   // Highest level first (15 → 1) so the hard charts most people filter for sit
   // at the front of the row.
@@ -316,7 +374,7 @@ export function CatalogBrowser({
     let filtered = applyCatalogFilters(baseEntries, effectiveCategory, ALL_SUBCATEGORIES);
     // OR within each dimension, AND across dimensions.
     if (versionSet.size > 0) {
-      filtered = filtered.filter((entry) => versionSet.has(entry.subcategory));
+      filtered = filtered.filter((entry) => versionSet.has(catalogVersionFilterId(entry)));
     }
     if (levelSet.size > 0) {
       filtered = filtered.filter((entry) =>
@@ -628,18 +686,21 @@ export function CatalogBrowser({
             <AllChip active={versionSet.size === 0} onClick={clearSet(setVersionSet)}>
               {dictionary.filterAll}
             </AllChip>
-            {versionOptions.map((value) => {
-              const iconSources = versionImageSources(value);
+            {versionOptions.map((option) => {
+              const iconSources =
+                option.imageIndex !== null
+                  ? versionImageSourcesByIndex(option.imageIndex)
+                  : null;
               // Icon-only: the version logo is the identity; name lives in the
               // aria-label / title for a11y and hover.
               return (
                 <ToggleChip
-                  key={value}
-                  active={versionSet.has(value)}
-                  onClick={() => toggleVersion(value)}
+                  key={option.id}
+                  active={versionSet.has(option.id)}
+                  onClick={() => toggleVersion(option.id)}
                   className="px-2 py-1"
-                  ariaLabel={value}
-                  title={value}
+                  ariaLabel={option.label}
+                  title={option.label}
                 >
                   {iconSources ? (
                     <CompatibleImage
@@ -650,7 +711,7 @@ export function CatalogBrowser({
                       className="h-9 w-auto"
                     />
                   ) : (
-                    versionShortName(value)
+                    versionShortName(option.label)
                   )}
                 </ToggleChip>
               );
@@ -782,26 +843,38 @@ export function CatalogBrowser({
               {query}
             </FilterChip>
           ) : null}
-          {[...versionSet].map((value) => (
-            <FilterChip
-              key={`v-${value}`}
-              onRemove={() => toggleVersion(value)}
-              removeLabel={dictionary.removeFilter(value)}
-              icon={
-                versionImageSources(value) ? (
-                  <CompatibleImage
-                    sources={versionImageSources(value)!}
-                    alt=""
-                    width={VERSION_IMAGE_DIMENSIONS.width}
-                    height={VERSION_IMAGE_DIMENSIONS.height}
-                    className="h-4 w-auto shrink-0"
-                  />
-                ) : undefined
-              }
-            >
-              {versionShortName(value)}
-            </FilterChip>
-          ))}
+          {[...versionSet].map((id) => {
+            const option = versionOptionById.get(id);
+            const numericId = Number(id);
+            const imageIndex =
+              option?.imageIndex ?? (isKnownVersionIndex(numericId) ? numericId : null);
+            const label =
+              option?.label ??
+              (imageIndex !== null ? VERSION_NAME_BY_INDEX.get(imageIndex) : undefined) ??
+              unknownVersionLabel;
+            const iconSources =
+              imageIndex !== null ? versionImageSourcesByIndex(imageIndex) : null;
+            return (
+              <FilterChip
+                key={`v-${id}`}
+                onRemove={() => toggleVersion(id)}
+                removeLabel={dictionary.removeFilter(label)}
+                icon={
+                  iconSources ? (
+                    <CompatibleImage
+                      sources={iconSources}
+                      alt=""
+                      width={VERSION_IMAGE_DIMENSIONS.width}
+                      height={VERSION_IMAGE_DIMENSIONS.height}
+                      className="h-4 w-auto shrink-0"
+                    />
+                  ) : undefined
+                }
+              >
+                {versionShortName(label)}
+              </FilterChip>
+            );
+          })}
           {[...levelSet].map((value) => (
             <FilterChip
               key={`l-${value}`}

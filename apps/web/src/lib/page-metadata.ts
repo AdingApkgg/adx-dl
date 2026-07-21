@@ -21,6 +21,7 @@ import { resolveSiteUrl } from "@/lib/site-url";
 
 const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 const openGraphImageUrl = `${siteUrl}/opengraph-image.png`;
+const homeOpenGraphImageUrl = `${siteUrl}/opengraph-home-v2.png`;
 const siteName = "ADX 谱面资源";
 const robots = {
   index: true,
@@ -205,16 +206,6 @@ function buildVersionsSeoTitle(locale: Locale): string {
   return "maimai DX Version Chart Browser";
 }
 
-function buildVersionDetailSeoTitle(locale: Locale, label: string): string {
-  if (locale === "zh") {
-    return `${label} AstroDX 谱面浏览与下载`;
-  }
-  if (locale === "ja") {
-    return `${label} AstroDX 譜面一覧とダウンロード`;
-  }
-  return `${label} AstroDX Charts and Downloads`;
-}
-
 export function buildPageMetadata({
   locale,
   pathname,
@@ -274,7 +265,16 @@ export function buildLocalizedPageMetadata(
 }
 
 export function buildHomePageMetadata(locale: Locale): Metadata {
-  return buildLocalizedPageMetadata(locale, "home");
+  const pageMetadata = getStaticPageMetadata(locale).home;
+
+  return buildPageMetadata({
+    locale,
+    pathname: pageMetadata.pathname,
+    title: staticSeoTitle(locale, "home"),
+    description: pageMetadata.description,
+    keywords: pageMetadata.keywords,
+    image: homeOpenGraphImageUrl,
+  });
 }
 
 export function buildChartsPageMetadata(locale: Locale): Metadata {
@@ -384,24 +384,6 @@ export function buildVersionsPageMetadata(locale: Locale): Metadata {
     title: buildVersionsSeoTitle(locale),
     description: dictionary.seo.versions,
     keywords: ["AstroDX", siteName, versions.title, "maimai DX"],
-  });
-}
-
-export function buildVersionDetailMetadata(
-  locale: Locale,
-  name: string,
-  slug: string,
-  count: number
-): Metadata {
-  const dictionary = getDictionary(locale);
-  const versions = dictionary.versions;
-  const label = name === "Unknown" ? versions.unknownLabel : name;
-  return buildPageMetadata({
-    locale,
-    pathname: `/versions/${slug}`,
-    title: buildVersionDetailSeoTitle(locale, label),
-    description: dictionary.seo.versionDetail(label, count),
-    keywords: ["AstroDX", siteName, label, "maimai DX"],
   });
 }
 

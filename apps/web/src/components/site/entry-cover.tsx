@@ -64,6 +64,8 @@ type EntryCoverProps = {
   entry: CatalogEntry;
   locale: "zh" | "en" | "ja";
   className?: string;
+  /** Preserve the full artwork when a surface should not crop non-square covers. */
+  fit?: "cover" | "contain";
   /** Eagerly load above-the-fold covers (LCP). Next 16: use loading/fetchPriority, not the deprecated `priority` prop. */
   priority?: boolean;
   sizes?: string;
@@ -73,6 +75,7 @@ export function EntryCover({
   entry,
   locale,
   className,
+  fit = "cover",
   priority = false,
   sizes = "(max-width: 768px) 100vw, 512px",
 }: EntryCoverProps) {
@@ -121,12 +124,21 @@ export function EntryCover({
     const alt = cover.alt(title);
     // Hover zoom rides the site's shared ease-out curve (EASE_OUT in
     // components/motion) — transform-only, pure CSS, no per-card JS.
-    const imgClassName =
-      "absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.06]";
+    const imgClassName = cn(
+      "absolute inset-0 h-full w-full transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
+      fit === "contain" ? "object-contain" : "object-cover group-hover:scale-[1.06]"
+    );
     const loading = priority ? ("eager" as const) : ("lazy" as const);
     const fetchPriority = priority ? ("high" as const) : ("auto" as const);
     return (
-      <div ref={rootRef} className={cn("relative overflow-hidden rounded-xl", className)}>
+      <div
+        ref={rootRef}
+        className={cn(
+          "relative overflow-hidden rounded-xl",
+          fit === "contain" && "bg-muted/45",
+          className
+        )}
+      >
         {stage === "optimized" ? (
           <picture>
             {avif ? <source srcSet={avif} type="image/avif" /> : null}

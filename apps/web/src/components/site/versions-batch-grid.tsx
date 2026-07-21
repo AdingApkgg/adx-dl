@@ -10,11 +10,11 @@ import { VersionTileCard } from "@/components/site/version-tile-card";
 import { Button } from "@/components/ui/button";
 import {
   versionFolderName,
-  versionRouteId,
   type ChartDownloadSpec,
   type VersionGroup,
 } from "@/lib/catalog-shared";
-import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
+import { buildVersionFilterHref } from "@/lib/catalog-links";
+import { getDictionary, type Locale } from "@/lib/i18n";
 import { jsonFetcher } from "@/lib/swr-fetcher";
 import { cn } from "@/lib/utils";
 
@@ -215,7 +215,7 @@ export function VersionsBatchGrid({
               transition={springSoft}
             >
               <Link
-                href={buildLocalePath(`/versions/${versionRouteId(group.imageIndex)}`, locale)}
+                href={buildVersionFilterHref(group.imageIndex, locale)}
                 className="group/version block h-full rounded-xl"
               >
                 {card}

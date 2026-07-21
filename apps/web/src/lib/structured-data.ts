@@ -8,10 +8,10 @@ import {
   genreLabel,
   uniqueChartDesigners,
   type Catalog,
-  versionRouteId,
   type CatalogEntry,
   type VersionGroup,
 } from "@/lib/catalog-shared";
+import { buildVersionFilterHref } from "@/lib/catalog-links";
 import {
   buildLocalePath,
   getDictionary,
@@ -314,7 +314,7 @@ export function buildVersionsIndexStructuredData(
             itemListElement: linkable.map((group, index) => ({
               "@type": "ListItem",
               position: index + 1,
-              url: toAbsoluteUrl(buildLocalePath(`/versions/${versionRouteId(group.imageIndex)}`, locale)),
+              url: toAbsoluteUrl(buildVersionFilterHref(group.imageIndex, locale)),
               name: group.name === "Unknown" ? versions.unknownLabel : group.name,
             })),
           };
@@ -330,64 +330,6 @@ export function buildVersionsIndexStructuredData(
             item: toAbsoluteUrl(buildLocalePath("/", locale)),
           },
           { "@type": "ListItem", position: 2, name: versions.title, item: listUrl },
-        ],
-      },
-    ],
-  };
-}
-
-export function buildVersionDetailStructuredData(
-  locale: Locale,
-  name: string,
-  slug: string,
-  entries: CatalogEntry[]
-): JsonLdValue {
-  const dictionary = getDictionary(locale);
-  const versions = dictionary.versions;
-  const label = name === "Unknown" ? versions.unknownLabel : name;
-  const path = buildLocalePath(`/versions/${slug}`, locale);
-  const url = toAbsoluteUrl(path);
-
-  return {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "CollectionPage",
-        "@id": url,
-        url,
-        name: versions.detailTitle(label),
-        description: dictionary.seo.versionDetail(label, entries.length),
-        inLanguage: getStructuredDataLanguage(locale),
-        isPartOf: { "@id": websiteId },
-        mainEntity: {
-          "@type": "ItemList",
-          numberOfItems: entries.length,
-          itemListElement: entries.slice(0, 100).map((entry, index) => ({
-            "@type": "ListItem",
-            position: index + 1,
-            url: toAbsoluteUrl(
-              buildLocalePath(`/charts/${encodeURIComponent(entrySlug(entry))}`, locale)
-            ),
-            name: formatEntryTitle(entry, locale),
-          })),
-        },
-      },
-      {
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          {
-            "@type": "ListItem",
-            position: 1,
-            name: dictionary.nav.home,
-            item: toAbsoluteUrl(buildLocalePath("/", locale)),
-          },
-          {
-            "@type": "ListItem",
-            position: 2,
-            name: versions.title,
-            item: toAbsoluteUrl(buildLocalePath("/versions", locale)),
-          },
-          { "@type": "ListItem", position: 3, name: label, item: url },
         ],
       },
     ],

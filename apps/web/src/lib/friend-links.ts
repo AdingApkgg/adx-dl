@@ -15,8 +15,8 @@ export function hostnameOf(url: string): string {
   }
 }
 
-// The AstroDX app itself — linked from the home hero, the footer, and /links.
-// Official repo (README: "the ONLY official source"); formerly named MaipadDX.
+// The AstroDX source repository — linked from the about and community-links
+// surfaces. User-facing "Get AstroDX" actions route through the Wiki instead.
 export const ASTRODX_APP_REPOSITORY = "https://github.com/2394425147/astrodx";
 
 // Curated maimai / AstroDX community sites and tools. External and unaffiliated;

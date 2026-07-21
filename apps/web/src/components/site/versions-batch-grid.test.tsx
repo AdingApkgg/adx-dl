@@ -24,11 +24,14 @@ describe("VersionsBatchGrid", () => {
 
   test("links versions with charts and dims empty ones", () => {
     const html = renderToStaticMarkup(<VersionsBatchGrid groups={groups} locale="zh" />);
+    const enHtml = renderToStaticMarkup(<VersionsBatchGrid groups={groups} locale="en" />);
 
-    // The route uses the version id (0–25), not the slug.
-    expect(html).toContain('href="/versions/25"');
+    // Every active tile deep-links the shared catalog with that version selected.
+    expect(html).toContain('href="/charts?version=25"');
+    expect(enHtml).toContain('href="/en/charts?version=25"');
+    expect(html).toContain('href="/charts?version=unknown"');
     // The 0-chart "maimai" tile (id 0) is dimmed, not linked.
-    expect(html).not.toContain('href="/versions/0"');
+    expect(html).not.toContain('href="/charts?version=0"');
     expect(html).toContain('aria-disabled="true"');
   });
 

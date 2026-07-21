@@ -2,6 +2,7 @@ import { describe, expect, mock, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import type { Catalog, CatalogEntry } from "@/lib/catalog-shared";
+import { astroDxDownloadUrl, DEMO_VIDEO_URL } from "@/lib/resource-links";
 
 function buildEntry(index: number): CatalogEntry {
   const entryId = index === 3 ? "song-3◆phase" : `song-${index}`;
@@ -102,18 +103,29 @@ describe("default zh routes", () => {
 
     const html = renderToStaticMarkup(await HomePage());
 
-    expect(html).toContain("AstroDX 谱面资料站与下载入口。");
+    expect(html).toContain("<h1>为 AstroDX <span>找到下一首谱面。</span></h1>");
     expect(html).toContain("搜索曲库");
     expect(html).toContain("浏览版本");
-    // Spotlight + "view more" rails always render when the catalog has covers.
-    expect(html).toContain("今日精选");
+    expect(html).toContain(`href="${astroDxDownloadUrl("zh")}"`);
+    expect(html).toContain("观看演示视频");
+    expect(html).toContain(`href="${DEMO_VIDEO_URL}"`);
+    expect(html).toContain("什么是 AstroDX？");
+    expect(html).toContain('href="#faq"');
+    expect(html).toContain('role="group" aria-label="快捷入口"');
+    // The spotlight remains named for assistive tech without showing a redundant
+    // caption above the enlarged card.
+    expect(html).toContain('aria-label="今日精选"');
+    expect(html).not.toContain(">今日精选<");
     expect(html).toContain("查看更多");
     expect(html).toContain("最新谱面");
-    expect(html).toContain("aspect-square");
+    expect(html).toContain("按曲风浏览");
+    expect(html).toContain("ADX CHARTS");
+    expect(html).toContain('role="search"');
+    expect(html).toContain('action="/charts"');
     expect(html).toContain(`/covers/${slugOf("song-9")}/bg.jpg`);
-    // The 8 newest (song-9 … song-2) lead the latest grid.
+    // The newest entry leads the editorial card; the following six fill the grid.
     expect(html).toContain("曲目 9");
-    expect(html).toContain("曲目 2");
+    expect(html).toContain("曲目 3");
   });
 
   test("charts route renders the zh list view", async () => {

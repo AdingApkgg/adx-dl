@@ -38,17 +38,11 @@ type RandomChartButtonProps = {
   className?: string;
 };
 
-/** Jumps to a random chart detail page (slug list fetched on first click). */
-export function RandomChartButton({
-  locale,
-  label,
-  iconOnly = false,
-  className,
-}: RandomChartButtonProps) {
+export function useRandomChartNavigation(locale: Locale) {
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
 
-  const handleClick = React.useCallback(async () => {
+  const navigateToRandomChart = React.useCallback(async () => {
     setBusy(true);
     try {
       const slugs = await loadSlugs();
@@ -58,11 +52,23 @@ export function RandomChartButton({
       const slug = slugs[Math.floor(Math.random() * slugs.length)];
       router.push(buildLocalePath(`/charts/${encodeURIComponent(slug)}`, locale));
     } catch {
-      // Fetch failed (offline?) — quietly give up; the button stays usable.
+      // Fetch failed (offline?) — quietly give up; the action stays usable.
     } finally {
       setBusy(false);
     }
   }, [locale, router]);
+
+  return { busy, navigateToRandomChart };
+}
+
+/** Jumps to a random chart detail page (slug list fetched on first click). */
+export function RandomChartButton({
+  locale,
+  label,
+  iconOnly = false,
+  className,
+}: RandomChartButtonProps) {
+  const { busy, navigateToRandomChart } = useRandomChartNavigation(locale);
 
   if (iconOnly) {
     return (
@@ -70,7 +76,7 @@ export function RandomChartButton({
         type="button"
         variant="outline"
         size="icon"
-        onClick={handleClick}
+        onClick={navigateToRandomChart}
         disabled={busy}
         aria-label={label}
         title={label}
@@ -86,7 +92,7 @@ export function RandomChartButton({
       type="button"
       variant="outline"
       size="sm"
-      onClick={handleClick}
+      onClick={navigateToRandomChart}
       disabled={busy}
       className={className}
     >

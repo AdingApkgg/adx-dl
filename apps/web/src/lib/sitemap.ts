@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-import { readCatalog, readVersionRouteIds } from "@/lib/catalog";
+import { readCatalog } from "@/lib/catalog";
 import { buildLocalePath, locales, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 import { resolveSiteUrl } from "@/lib/site-url";
@@ -75,8 +75,9 @@ function buildSitemapEntry(
   } satisfies MetadataRoute.Sitemap[number];
 }
 
-// The full, unsharded URL list — static pages, then version pages, then every
-// chart detail page (×3 locales, each with hreflang alternates + cover image).
+// The full, unsharded URL list — static pages, then every chart detail page
+// (×3 locales, each with hreflang alternates + cover image). Per-version views
+// are catalog query states, so only the /versions index belongs in the sitemap.
 export async function buildAllSitemapEntries(): Promise<MetadataRoute.Sitemap> {
   const catalog = await readCatalog();
   const siteLastModified = toIsoDate(catalog.generated_at);
@@ -84,13 +85,6 @@ export async function buildAllSitemapEntries(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes = staticPaths.flatMap((pathname) =>
     locales.map((locale) =>
       buildSitemapEntry(pathname, locale, { lastModified: siteLastModified })
-    )
-  );
-
-  const versionRouteIds = await readVersionRouteIds();
-  const versionRoutes = versionRouteIds.flatMap((id) =>
-    locales.map((locale) =>
-      buildSitemapEntry(`/versions/${id}`, locale, { lastModified: siteLastModified })
     )
   );
 
@@ -104,7 +98,7 @@ export async function buildAllSitemapEntries(): Promise<MetadataRoute.Sitemap> {
     );
   });
 
-  return [...staticRoutes, ...versionRoutes, ...detailRoutes];
+  return [...staticRoutes, ...detailRoutes];
 }
 
 // How many shards the current catalog needs (at least 1).

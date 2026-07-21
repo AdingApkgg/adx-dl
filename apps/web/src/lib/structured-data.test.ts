@@ -147,6 +147,28 @@ describe("structured data builders", () => {
     expect(breadcrumb["@type"]).toBe("BreadcrumbList");
   });
 
+  test("version index items deep-link localized catalog filters", async () => {
+    const { buildVersionsIndexStructuredData } = await import("./structured-data");
+    const data = buildVersionsIndexStructuredData("en", [
+      {
+        slug: "maimai-dx-prism-plus",
+        name: "maimai DX PRiSM PLUS",
+        imageIndex: 24,
+        count: 12,
+      },
+    ]) as {
+      "@graph": Array<{
+        "@type": string;
+        mainEntity?: { itemListElement: Array<{ url: string }> };
+      }>;
+    };
+
+    const collection = data["@graph"].find((node) => node["@type"] === "CollectionPage");
+    expect(collection?.mainEntity?.itemListElement[0]?.url).toBe(
+      "https://adxdls.saop.cc/en/charts?version=24"
+    );
+  });
+
   test("buildChartDetailStructuredData emits a fixed MusicRecording and BreadcrumbList", async () => {
     const { buildChartDetailStructuredData } = await import("./structured-data");
     const { buildChartDescription } = await import("./catalog-shared");

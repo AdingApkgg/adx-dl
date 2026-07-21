@@ -154,11 +154,19 @@ describe("route metadata", () => {
     expect(homeModule.metadata?.description).toBe(
       "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。"
     );
-    expectLocalizedAlternates(homeModule.metadata ?? {}, "/", {
-      title: "AstroDX 谱面资料站与下载入口",
-      description: "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
-      keywords: ["AstroDX", "ADX 谱面资源", "谱面资料站", "下载入口", "目录索引"],
-    });
+    expectLocalizedAlternates(
+      homeModule.metadata ?? {},
+      "/",
+      {
+        title: "AstroDX 谱面资料站与下载入口",
+        description: "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
+        keywords: ["AstroDX", "ADX 谱面资源", "谱面资料站", "下载入口", "目录索引"],
+      },
+      {
+        url: "https://adxdls.saop.cc/opengraph-home-v2.png",
+        alt: "AstroDX 谱面资料站与下载入口 | ADX 谱面资源",
+      }
+    );
 
     expect(chartsModule.metadata?.title).toBe("AstroDX 谱面浏览与下载目录 | ADX 谱面资源");
     expect(chartsModule.metadata?.description).toBe(
@@ -188,12 +196,20 @@ describe("route metadata", () => {
     expect(enHomeMetadata?.description).toBe(
       "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download."
     );
-    expectLocalizedAlternates(enHomeMetadata ?? {}, "/en", {
-      title: "AstroDX Chart Archive, Browser and Download Portal",
-      description:
-        "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download.",
-      keywords: ["AstroDX", "ADX 谱面资源", "chart archive", "downloads", "catalog index"],
-    });
+    expectLocalizedAlternates(
+      enHomeMetadata ?? {},
+      "/en",
+      {
+        title: "AstroDX Chart Archive, Browser and Download Portal",
+        description:
+          "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download.",
+        keywords: ["AstroDX", "ADX 谱面资源", "chart archive", "downloads", "catalog index"],
+      },
+      {
+        url: "https://adxdls.saop.cc/opengraph-home-v2.png",
+        alt: "AstroDX Chart Archive, Browser and Download Portal | ADX 谱面资源",
+      }
+    );
 
     expect(enChartsMetadata?.title).toBe(
       "AstroDX Chart Browser and Download Catalog | ADX 谱面资源"
@@ -305,7 +321,7 @@ describe("metadata files", () => {
   test("sitemap exposes localized static routes and chart detail alternates", async () => {
     const { getSitemapShard } = await import("@/lib/sitemap");
 
-    // Sharded now: shard 0 holds the static/version routes and the first charts;
+    // Sharded now: shard 0 holds the static routes and the first charts;
     // the tiny test catalog fits entirely in one shard.
     const sitemap = await getSitemapShard(0);
 
@@ -346,6 +362,7 @@ describe("metadata files", () => {
         }),
       ])
     );
+    expect(sitemap.some((entry) => /\/versions\/[^/]+$/.test(entry.url))).toBe(false);
   });
 
   test("robots publishes the sitemap URL and allow rules (incl. AI crawlers)", async () => {

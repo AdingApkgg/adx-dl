@@ -2,6 +2,7 @@ import { describe, expect, mock, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import type { Catalog, CatalogEntry } from "@/lib/catalog-shared";
+import { astroDxDownloadUrl } from "@/lib/resource-links";
 
 function buildEntry(index: number): CatalogEntry {
   const entryId = index === 3 ? "song-3◆phase" : `song-${index}`;
@@ -111,8 +112,12 @@ describe("localized routes", () => {
       })
     );
 
-    expect(enHtml).toContain("AstroDX chart archive for browsing, indexing, and downloads.");
-    expect(jaHtml).toContain("AstroDX 譜面アーカイブとダウンロード入口。");
+    expect(enHtml).toContain("Find your next chart for AstroDX.");
+    expect(enHtml).toContain('action="/en/charts"');
+    expect(enHtml).toContain(`href="${astroDxDownloadUrl("en")}"`);
+    expect(jaHtml).toContain("AstroDX の次の譜面を見つけよう。");
+    expect(jaHtml).toContain('action="/ja/charts"');
+    expect(jaHtml).toContain(`href="${astroDxDownloadUrl("ja")}"`);
   });
 
   test("localized charts route renders shared en and ja views", async () => {

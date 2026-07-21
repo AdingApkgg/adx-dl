@@ -145,6 +145,7 @@ describe("page views locale-driven content", () => {
       category: "Remote",
       subcategory: "legacy-remote-subcategory",
       version: "maimai DX PRiSM",
+      genreid: 101,
       cabinet: "DX",
       imported_at: "2026-06-13T12:00:00.000Z",
     });
@@ -161,9 +162,42 @@ describe("page views locale-driven content", () => {
     // tiles and latest-cover cards, not a dedicated "branches" section.
     expect(homeHtml).toContain("maimai DX PRiSM / DX");
     expect(homeHtml).not.toContain("legacy-remote-subcategory");
+    expect(homeHtml).toContain('href="/en/charts?version=23"');
+    expect(homeHtml).toContain('href="/en/charts?genre=101"');
+    expect(homeHtml).toContain("border-sky-500/40");
+    expect(homeHtml).toContain("bg-sky-500/12");
+    expect(homeHtml).toContain("object-contain");
+    expect(homeHtml.match(/<h1/g)?.length).toBe(1);
 
     expect(detailHtml).toContain("maimai DX PRiSM / DX");
+    expect(detailHtml).toContain('href="/en/charts?version=23"');
     expect(detailHtml).not.toContain("legacy-remote-subcategory");
+  });
+
+  test("home spotlight exposes three deterministic carousel picks", () => {
+    const entries = Array.from({ length: 5 }, (_, index) =>
+      buildEntry({
+        id: `carousel-song-${index + 1}`,
+        title: `轮播曲目 ${index + 1}`,
+        media: {
+          entry_base_url: `/covers/carousel-song-${index + 1}`,
+          cover_url: `/covers/carousel-song-${index + 1}/bg.jpg`,
+          audio_url: `/covers/carousel-song-${index + 1}/track.mp3`,
+          pv_url: `/covers/carousel-song-${index + 1}/pv.mp4`,
+        },
+      })
+    );
+    const html = renderToStaticMarkup(
+      <HomePageView catalog={buildCatalog(entries, { Official: ["Ver.1"] })} locale="zh" />
+    );
+
+    expect(html).toContain('role="region"');
+    expect(html).toContain('aria-roledescription="轮播"');
+    expect(html).toContain('aria-label="上一首精选"');
+    expect(html).toContain('aria-label="下一首精选"');
+    expect(html).toContain('aria-label="暂停自动轮播"');
+    expect(html.match(/data-spotlight-picker="true"/g)?.length).toBe(3);
+    expect(html.match(/aria-current="true"/g)?.length).toBe(1);
   });
 
   test("detail view keeps the onsite download action after wiring the client button", () => {

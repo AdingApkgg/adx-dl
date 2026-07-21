@@ -3,12 +3,26 @@
 import * as React from "react";
 import Link from "next/link";
 import {
+  ActivityIcon,
   ArrowUpRightIcon,
+  BookOpenIcon,
+  ClipboardListIcon,
+  CloudIcon,
+  DicesIcon,
   DownloadIcon,
   EllipsisIcon,
+  Gamepad2Icon,
+  HardDriveIcon,
+  HeartHandshakeIcon,
+  InfoIcon,
   LayersIcon,
   LibraryBigIcon,
+  Link2Icon,
   MenuIcon,
+  MessageSquareIcon,
+  PlayCircleIcon,
+  UploadIcon,
+  UsersIcon,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import {
@@ -28,6 +42,7 @@ import {
 import { CompatibleImage, compatibleSourcesFromPng } from "@/components/site/compatible-image";
 import { LanguageSwitcher } from "@/components/site/language-switcher";
 import { MotionToggle } from "@/components/site/motion-toggle";
+import { useRandomChartNavigation } from "@/components/site/random-chart-button";
 import { ThemeToggle } from "@/components/site/theme-toggle";
 import {
   defaultLocale,
@@ -73,6 +88,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
   const locale = getLocaleFromPathname(pathname);
   const dictionary = getDictionary(locale);
   const prefersReducedMotion = useReducedMotion();
+  const { busy: randomBusy, navigateToRandomChart } = useRandomChartNavigation(locale);
 
   // Starts expanded (matching the SSR HTML) and compacts once scrolled.
   const [compact, setCompact] = React.useState(false);
@@ -116,23 +132,81 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
   // separator between groups in both the desktop dropdown and the mobile menu.
   const secondaryNavGroups: NavItem[][] = [
     [
-      { href: ASTRODX_SITE_URL, label: dictionary.resources.official, external: true },
-      { href: wikiUrl(locale), label: dictionary.resources.wiki, external: true },
-      { href: DEMO_VIDEO_URL, label: dictionary.resources.video, external: true },
-      { href: CLOUD_DRIVE_URL, label: dictionary.resources.cloudDrive, external: true },
-      { href: NET_DISK_URL, label: dictionary.resources.netDisk, external: true },
+      {
+        href: ASTRODX_SITE_URL,
+        label: dictionary.resources.official,
+        icon: <Gamepad2Icon />,
+        external: true,
+      },
+      {
+        href: wikiUrl(locale),
+        label: dictionary.resources.wiki,
+        icon: <BookOpenIcon />,
+        external: true,
+      },
+      {
+        href: DEMO_VIDEO_URL,
+        label: dictionary.resources.video,
+        icon: <PlayCircleIcon />,
+        external: true,
+      },
+      {
+        href: CLOUD_DRIVE_URL,
+        label: dictionary.resources.cloudDrive,
+        icon: <CloudIcon />,
+        external: true,
+      },
+      {
+        href: NET_DISK_URL,
+        label: dictionary.resources.netDisk,
+        icon: <HardDriveIcon />,
+        external: true,
+      },
     ],
     [
-      { href: switchLocale("/community", locale), label: dictionary.community.navLabel },
-      { href: switchLocale("/comments", locale), label: dictionary.guestbook.navLabel },
-      { href: switchLocale("/post", locale), label: dictionary.post.navLabel },
-      { href: switchLocale("/survey", locale), label: dictionary.survey.navLabel },
+      {
+        href: switchLocale("/community", locale),
+        label: dictionary.community.navLabel,
+        icon: <UsersIcon />,
+      },
+      {
+        href: switchLocale("/comments", locale),
+        label: dictionary.guestbook.navLabel,
+        icon: <MessageSquareIcon />,
+      },
+      {
+        href: switchLocale("/post", locale),
+        label: dictionary.post.navLabel,
+        icon: <UploadIcon />,
+      },
+      {
+        href: switchLocale("/survey", locale),
+        label: dictionary.survey.navLabel,
+        icon: <ClipboardListIcon />,
+      },
     ],
     [
-      { href: switchLocale("/links", locale), label: dictionary.links.navLabel },
-      { href: switchLocale("/donate", locale), label: dictionary.donate.navLabel },
-      { href: switchLocale("/about", locale), label: dictionary.about.navLabel },
-      { href: SERVER_STATUS_URL, label: dictionary.statusPage.title, external: true },
+      {
+        href: switchLocale("/links", locale),
+        label: dictionary.links.navLabel,
+        icon: <Link2Icon />,
+      },
+      {
+        href: switchLocale("/donate", locale),
+        label: dictionary.donate.navLabel,
+        icon: <HeartHandshakeIcon />,
+      },
+      {
+        href: switchLocale("/about", locale),
+        label: dictionary.about.navLabel,
+        icon: <InfoIcon />,
+      },
+      {
+        href: SERVER_STATUS_URL,
+        label: dictionary.statusPage.title,
+        icon: <ActivityIcon />,
+        external: true,
+      },
     ],
   ];
   const secondaryNav: NavItem[] = secondaryNavGroups.flat();
@@ -221,6 +295,20 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               </Button>
             );
           })}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={navigateToRandomChart}
+            disabled={randomBusy}
+          >
+            <DicesIcon
+              data-icon="inline-start"
+              className={cn(randomBusy && "animate-spin")}
+              aria-hidden="true"
+            />
+            {dictionary.nav.randomLabel}
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -235,27 +323,40 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
                 {dictionary.nav.moreLabel}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {secondaryNavGroups.map((group, groupIndex) => (
-                <React.Fragment key={group[0].href}>
-                  {groupIndex > 0 ? <DropdownMenuSeparator /> : null}
-                  {group.map((item) => (
-                    <DropdownMenuItem key={item.href} asChild>
-                      {item.external ? (
-                        <a href={item.href} target="_blank" rel="noreferrer">
-                          {item.label}
-                          {/* New-tab hint so external items read differently from route links. */}
-                          <ArrowUpRightIcon aria-hidden="true" className="ml-auto text-muted-foreground" />
-                        </a>
-                      ) : (
-                        <Link href={item.href} aria-current={isActive(item) ? "page" : undefined}>
-                          {item.label}
-                        </Link>
-                      )}
-                    </DropdownMenuItem>
-                  ))}
-                </React.Fragment>
-              ))}
+            <DropdownMenuContent
+              align="end"
+              collisionPadding={8}
+              className="w-[min(34rem,calc(100vw-2rem))] p-2"
+            >
+              <div className="grid grid-cols-3 gap-2">
+                {secondaryNavGroups.map((group) => (
+                  <div
+                    key={group[0].href}
+                    className="grid min-w-0 content-start gap-0.5 border-l border-border/70 pl-2 first:border-l-0 first:pl-0"
+                  >
+                    {group.map((item) => (
+                      <DropdownMenuItem
+                        key={item.href}
+                        asChild
+                        className="min-w-0 whitespace-normal py-2 leading-snug"
+                      >
+                        {item.external ? (
+                          <a href={item.href} target="_blank" rel="noreferrer">
+                            <NavItemContent item={item} showExternal />
+                          </a>
+                        ) : (
+                          <Link
+                            href={item.href}
+                            aria-current={isActive(item) ? "page" : undefined}
+                          >
+                            <NavItemContent item={item} />
+                          </Link>
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </div>
+                ))}
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
         </nav>
@@ -277,48 +378,130 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
                 <MenuIcon />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" aria-label={dictionary.nav.primaryLabel}>
-              {primaryNav.map((item) => {
-                const active = isActive(item);
-                return (
-                  <DropdownMenuItem key={item.href} asChild>
-                    <Link
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      data-state={active ? "checked" : undefined}
-                    >
-                      {item.label}
-                    </Link>
-                  </DropdownMenuItem>
-                );
-              })}
-              {secondaryNavGroups.map((group) => (
-                <React.Fragment key={group[0].href}>
-                  <DropdownMenuSeparator />
-                  {group.map((item) => {
-                    const active = isActive(item);
-                    return (
-                      <DropdownMenuItem key={item.href} asChild>
-                        {item.external ? (
-                          <a href={item.href} target="_blank" rel="noreferrer">
-                            {item.label}
-                            {/* New-tab hint so external items read differently from route links. */}
-                            <ArrowUpRightIcon aria-hidden="true" className="ml-auto text-muted-foreground" />
-                          </a>
-                        ) : (
+            <DropdownMenuContent
+              align="end"
+              collisionPadding={8}
+              aria-label={dictionary.nav.primaryLabel}
+              className="max-h-[min(36rem,calc(100dvh-5rem))] w-[min(30rem,calc(100vw-1rem))] overscroll-contain p-2"
+            >
+              <div className="grid grid-cols-2 items-start gap-2">
+                <div className="min-w-0">
+                  <div
+                    role="group"
+                    aria-label={dictionary.nav.primaryLabel}
+                    className="grid gap-0.5"
+                  >
+                    {primaryNav.map((item) => {
+                      const active = isActive(item);
+                      return (
+                        <DropdownMenuItem
+                          key={item.href}
+                          asChild
+                          className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug"
+                        >
                           <Link
                             href={item.href}
                             aria-current={active ? "page" : undefined}
                             data-state={active ? "checked" : undefined}
                           >
-                            {item.label}
+                            <NavItemContent item={item} />
                           </Link>
-                        )}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                    <DropdownMenuItem
+                      disabled={randomBusy}
+                      onSelect={() => void navigateToRandomChart()}
+                      className="min-h-11 min-w-0 px-3 py-2.5 leading-snug"
+                    >
+                      <DicesIcon
+                        data-icon="inline-start"
+                        className={cn(randomBusy && "animate-spin")}
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0 break-words">
+                        {dictionary.nav.randomLabel}
+                      </span>
+                    </DropdownMenuItem>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <div
+                    role="group"
+                    aria-label={dictionary.nav.moreLabel}
+                    className="grid gap-0.5"
+                  >
+                    {secondaryNavGroups[0].map((item) => (
+                      <DropdownMenuItem
+                        key={item.href}
+                        asChild
+                        className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug"
+                      >
+                        <a href={item.href} target="_blank" rel="noreferrer">
+                          <NavItemContent item={item} showExternal />
+                        </a>
                       </DropdownMenuItem>
-                    );
-                  })}
-                </React.Fragment>
-              ))}
+                    ))}
+                  </div>
+                </div>
+
+                <div className="min-w-0">
+                  <div
+                    role="group"
+                    aria-label={dictionary.community.navLabel}
+                    className="grid gap-0.5"
+                  >
+                    {secondaryNavGroups[1].map((item) => {
+                      const active = isActive(item);
+                      return (
+                        <DropdownMenuItem
+                          key={item.href}
+                          asChild
+                          className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug"
+                        >
+                          <Link
+                            href={item.href}
+                            aria-current={active ? "page" : undefined}
+                            data-state={active ? "checked" : undefined}
+                          >
+                            <NavItemContent item={item} />
+                          </Link>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </div>
+                  <DropdownMenuSeparator />
+                  <div
+                    role="group"
+                    aria-label={dictionary.footer.navLabel}
+                    className="grid gap-0.5"
+                  >
+                    {secondaryNavGroups[2].map((item) => {
+                      const active = isActive(item);
+                      return (
+                        <DropdownMenuItem
+                          key={item.href}
+                          asChild
+                          className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug"
+                        >
+                          {item.external ? (
+                            <a href={item.href} target="_blank" rel="noreferrer">
+                              <NavItemContent item={item} showExternal />
+                            </a>
+                          ) : (
+                            <Link
+                              href={item.href}
+                              aria-current={active ? "page" : undefined}
+                              data-state={active ? "checked" : undefined}
+                            >
+                              <NavItemContent item={item} />
+                            </Link>
+                          )}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -333,6 +516,36 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
         />
       )}
     </header>
+  );
+}
+
+function NavItemContent({
+  item,
+  showExternal = false,
+}: {
+  item: NavItem;
+  showExternal?: boolean;
+}) {
+  return (
+    <>
+      {item.icon ? (
+        <span
+          aria-hidden="true"
+          className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&>svg]:size-4"
+        >
+          {item.icon}
+        </span>
+      ) : null}
+      <span className="min-w-0 flex-1 break-words">{item.label}</span>
+      {showExternal ? (
+        // New-tab hint keeps external destinations distinct without making
+        // their semantic icon compete for the trailing position.
+        <ArrowUpRightIcon
+          aria-hidden="true"
+          className="ml-auto size-3.5 text-muted-foreground"
+        />
+      ) : null}
+    </>
   );
 }
 

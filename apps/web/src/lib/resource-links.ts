@@ -21,6 +21,20 @@ export const WIKI_BASE_URL = "https://wiki.astrodx.com";
 
 const WIKI_LANG_SEGMENT: Record<Locale, string> = { zh: "cn", en: "en", ja: "jp" };
 
+// Each locale lands on the most relevant getting-started section exposed by
+// that Wiki translation.
+const WIKI_DOWNLOAD_TARGET: Record<Locale, { segment: string; heading: string }> = {
+  zh: { segment: "cn", heading: "下载游戏" },
+  en: { segment: "en", heading: "get-the-game" },
+  ja: { segment: "jp", heading: "譜面の入れ方" },
+};
+
 export function wikiUrl(locale: Locale): string {
   return `${WIKI_BASE_URL}/${WIKI_LANG_SEGMENT[locale]}`;
+}
+
+/** Locale-aware link to the Wiki's AstroDX download/getting-started section. */
+export function astroDxDownloadUrl(locale: Locale): string {
+  const target = WIKI_DOWNLOAD_TARGET[locale];
+  return `${WIKI_BASE_URL}/${target.segment}#${encodeURIComponent(target.heading)}`;
 }

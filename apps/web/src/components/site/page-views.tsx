@@ -5,9 +5,7 @@ import {
   ChevronRightIcon,
   DownloadIcon,
   ExternalLinkIcon,
-  LayersIcon,
   PlayCircleIcon,
-  SparklesIcon,
 } from "lucide-react";
 
 import { Reveal, RevealGroup, RevealItem } from "@/components/motion";
@@ -16,7 +14,10 @@ import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
 import { ChartCard } from "@/components/site/chart-card";
 import { ChartDetailActions } from "@/components/site/chart-detail-actions";
-import { CompatibleImage } from "@/components/site/compatible-image";
+import {
+  CompatibleImage,
+  compatibleSourcesFromPng,
+} from "@/components/site/compatible-image";
 import {
   DetailHeroBackdrop,
   DetailHeroCover,
@@ -27,14 +28,14 @@ import { DifficultyPill } from "@/components/site/difficulty-pill";
 import { EntryAssetBadges } from "@/components/site/entry-asset-badges";
 import { EntryCover } from "@/components/site/entry-cover";
 import { GenreBadge } from "@/components/site/genre-badge";
-import { HeroAurora, HeroStatNumber } from "@/components/site/hero-aurora";
+import { HeroStatNumber } from "@/components/site/hero-aurora";
 import { HomeHeroSearch } from "@/components/site/home-hero-search";
+import styles from "@/components/site/home-page.module.css";
+import { HomeSpotlightCarousel } from "@/components/site/home-spotlight-carousel";
 import { RandomChartButton } from "@/components/site/random-chart-button";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
-import { TiltCard } from "@/components/site/tilt-card";
 import { VersionBadge } from "@/components/site/version-badge";
 import { VersionTileCard } from "@/components/site/version-tile-card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -58,15 +59,15 @@ import {
   getChartDownloadSpec,
   localChartAssetUrl,
   resolveGenreId,
+  resolveVersionIndex,
   sortByReleaseDesc,
-  versionRouteId,
 } from "@/lib/catalog-shared";
-import { ASTRODX_APP_REPOSITORY } from "@/lib/friend-links";
-import { DEMO_VIDEO_URL } from "@/lib/resource-links";
+import { buildVersionFilterHref } from "@/lib/catalog-links";
+import { astroDxDownloadUrl, DEMO_VIDEO_URL } from "@/lib/resource-links";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 import { cn } from "@/lib/utils";
-import { MAIMAI_VERSIONS, versionImageIndex } from "@/lib/version-image";
+import { MAIMAI_VERSIONS } from "@/lib/version-image";
 import {
   buildCatalogDatasetStructuredData,
   buildChartDetailStructuredData,
@@ -125,63 +126,25 @@ function seededShuffle<T>(items: readonly T[], seed: number): T[] {
   return arr;
 }
 
-// The hero's "today's pick": a larger featured card with a big cover, sitting
-// beside the search column on wide screens.
-function HomeSpotlightCard({
-  entry,
-  locale,
-  label,
-}: {
-  entry: CatalogEntry;
-  locale: Locale;
-  label: string;
-}) {
-  const href = buildLocalePath(`/charts/${entrySlug(entry)}`, locale);
+function HomeHeroTitle({ title, noBreak }: { title: string; noBreak?: string }) {
+  if (!noBreak) return title;
+
+  const phraseStart = title.indexOf(noBreak);
+  if (phraseStart < 0) return title;
+
   return (
-    <Link
-      href={href}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-lg shadow-primary/5 backdrop-blur transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10"
-    >
-      <TiltCard className="aspect-square overflow-hidden border-b border-border/60">
-        <EntryCover
-          entry={entry}
-          locale={locale}
-          priority
-          sizes="(max-width: 1024px) 100vw, 360px"
-          className="h-full w-full transition-transform duration-500 group-hover:scale-105"
-        />
-        <span className="absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-background/85 px-3 py-1 text-xs font-medium text-foreground shadow-sm backdrop-blur">
-          <SparklesIcon className="size-3.5 text-primary" aria-hidden="true" />
-          {label}
-        </span>
-      </TiltCard>
-      <div className="flex flex-col gap-2 p-4">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <VersionBadge version={entry.version} label={formatEntrySubcategory(entry)} />
-          <GenreBadge entry={entry} locale={locale} />
-        </div>
-        <div className="min-w-0">
-          <h3 className="line-clamp-1 text-lg font-semibold">{formatEntryTitle(entry, locale)}</h3>
-          <p className="line-clamp-1 text-sm text-muted-foreground">
-            {formatEntryArtist(entry, locale)}
-          </p>
-        </div>
-        {entry.difficulties.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {entry.difficulties.slice(0, 5).map((difficulty) => (
-              <DifficultyPill key={`${entry.id}-${difficulty.slot}`} difficulty={difficulty} />
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </Link>
+    <>
+      {title.slice(0, phraseStart)}
+      <span className={styles.heroTitleNoBreak}>{noBreak}</span>
+      {title.slice(phraseStart + noBreak.length)}
+    </>
   );
 }
 
 export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
   const dictionary = getDictionary(locale);
   const home = dictionary.home;
-  const latestEntries = sortByReleaseDesc(catalog.entries).slice(0, 12);
+  const latestEntries = sortByReleaseDesc(catalog.entries).slice(0, 6);
   const versionCount = new Set(Object.values(catalog.categories).flat()).size;
   const artistCount = new Set(
     catalog.entries.map((entry) => entry.artist.trim()).filter(Boolean)
@@ -194,7 +157,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
   // "Browse by version" teaser: newest first, only versions that have charts.
   const versionCharts = new Map<number, number>();
   for (const entry of catalog.entries) {
-    const index = versionImageIndex(entry.version);
+    const index = resolveVersionIndex(entry);
     if (index === null) continue;
     versionCharts.set(index, (versionCharts.get(index) ?? 0) + 1);
   }
@@ -202,7 +165,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
     .reverse()
     .map((version) => ({ ...version, count: versionCharts.get(version.index) ?? 0 }))
     .filter((version) => version.count > 0)
-    .slice(0, 12);
+    .slice(0, 6);
 
   // Numeric stats count up after hydration (RollingNumber keeps the real value
   // in the SSR HTML); the updated date stays a static string.
@@ -213,48 +176,59 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
     { label: home.metricsUpdated, value: updatedDate },
   ];
 
-  // Genre quick-filter chips for the hero search: only genres present in the
-  // catalog, ordered by their stable id. Each deep-links to ?genre=.
+  // Genre browse cards: only genres present in the catalog, ordered by their
+  // stable id. Each deep-links to a pre-filtered catalog view.
   const heroGenreIds = new Set<number>();
   for (const entry of catalog.entries) {
     const id = resolveGenreId(entry);
     if (id !== null) heroGenreIds.add(id);
   }
-  const heroGenres = [...heroGenreIds]
+  const genreTiles = [...heroGenreIds]
     .sort((a, b) => a - b)
     .map((id) => ({ id, label: GENRES[id][locale], badge: GENRES[id].badge }));
 
-  // Spotlight + "random picks" rail: a build-stable shuffle seeded by the
+  // Spotlight carousel + "random picks" rail: a build-stable shuffle seeded by the
   // catalog timestamp, so the selection rotates whenever the catalog updates.
-  // Prefer entries that actually have cover art for the big featured card.
+  // Cover-bearing entries lead the sequence so all three carousel frames have
+  // artwork whenever the catalog can provide it.
   const seed = seedFromString(catalog.generated_at);
-  const coveredEntries = catalog.entries.filter((entry) => entry.media.cover_url);
-  const shuffled = seededShuffle(
-    coveredEntries.length >= 9 ? coveredEntries : catalog.entries,
-    seed
+  const coveredEntries = catalog.entries.filter(
+    (entry) => entry.media.cover_avif || entry.media.cover_webp || entry.media.cover_url
   );
-  const spotlight = shuffled[0] ?? null;
+  const uncoveredEntries = catalog.entries.filter(
+    (entry) => !entry.media.cover_avif && !entry.media.cover_webp && !entry.media.cover_url
+  );
+  const shuffled = [
+    ...seededShuffle(coveredEntries, seed),
+    ...seededShuffle(uncoveredEntries, seed ^ 0x9e3779b9),
+  ];
+  const spotlightEntries = shuffled.slice(0, 3);
+  const firstSpotlight = spotlightEntries[0] ?? null;
   // Preload the above-the-fold spotlight cover — the home LCP element. It renders
   // as a raw <img> (static export makes next/image unoptimized), so nothing else
   // emits a head preload. Prefer the optimized AVIF and type-gate it so non-AVIF
   // browsers (which fetch the webp/original instead) don't double-download.
-  if (spotlight?.media.cover_avif || spotlight?.media.cover_url) {
-    const avif = spotlight.media.cover_avif;
-    preload(avif || spotlight.media.cover_url, {
+  if (firstSpotlight?.media.cover_avif || firstSpotlight?.media.cover_url) {
+    const avif = firstSpotlight.media.cover_avif;
+    preload(avif || firstSpotlight.media.cover_url, {
       as: "image",
       fetchPriority: "high",
       ...(avif ? { type: "image/avif" } : {}),
     });
   }
   const latestIds = new Set(latestEntries.map((entry) => entry.id));
+  const spotlightIds = new Set(spotlightEntries.map((entry) => entry.id));
   const featuredEntries = shuffled
-    .filter((entry) => entry.id !== spotlight?.id && !latestIds.has(entry.id))
-    .slice(0, 12);
+    .filter((entry) => !spotlightIds.has(entry.id) && !latestIds.has(entry.id))
+    .slice(0, 6);
 
   return (
     <main
       id="main-content"
-      className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-8 md:px-6 md:py-10"
+      className={cn(
+        "mx-auto flex w-full max-w-[82rem] flex-col gap-12 px-4 py-6 md:gap-16 md:px-6 md:py-10",
+        styles.page
+      )}
     >
       <SeoJsonLd
         data={[
@@ -263,115 +237,193 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
           buildCatalogDatasetStructuredData(locale, catalog.generated_at),
         ]}
       />
-      <section className="relative isolate overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-primary/10 via-card/50 to-fuchsia-500/10 px-6 py-12 md:px-12 md:py-16">
-        <HeroAurora />
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="flex flex-col gap-5">
-            <Badge variant="secondary" className="w-fit">
-              {home.badge}
-            </Badge>
-            <h1 className="bg-gradient-to-r from-primary via-violet-500 to-fuchsia-500 bg-clip-text text-4xl leading-tight font-bold text-transparent md:text-5xl">
-              {home.title}
+      <section className={styles.hero}>
+        <div className={styles.heroGrid}>
+          {/* Copy comes first in the DOM so mobile reading and focus order match the layout. */}
+          <div className={styles.heroContent}>
+            <div className={styles.brandLockup}>
+              <CompatibleImage
+                sources={compatibleSourcesFromPng("/brand-icon.png")}
+                alt=""
+                width={40}
+                height={40}
+                className={styles.brandMark}
+              />
+              <span className={styles.brandCopy}>
+                <span className={styles.brandName}>ADX CHARTS</span>
+                <span className={styles.brandMeta}>ASTRODX COMMUNITY LIBRARY</span>
+              </span>
+            </div>
+            <span className={styles.eyebrow}>{home.badge}</span>
+            <h1 className={styles.heroTitle}>
+              <HomeHeroTitle title={home.heroTitle} noBreak={home.heroTitleNoBreak} />
             </h1>
-            <p className="max-w-2xl text-base text-muted-foreground md:text-lg">
-              {home.description}
-            </p>
-            <HomeHeroSearch
-              searchHref={searchHref}
-              placeholder={dictionary.catalogBrowser.searchPlaceholder}
-              submitLabel={home.searchCta}
-              quickLabel={home.quickGenresLabel}
-              genres={heroGenres}
-            />
-            <div className="mt-1 flex flex-wrap items-center gap-x-5 gap-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" size="sm" asChild>
-                  <a href={ASTRODX_APP_REPOSITORY} target="_blank" rel="noreferrer">
-                    <ExternalLinkIcon data-icon="inline-start" aria-hidden="true" />
-                    {home.getAppCta}
-                  </a>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={versionsHref}>
-                    <LayersIcon data-icon="inline-start" aria-hidden="true" />
-                    {home.browseCta}
-                  </Link>
-                </Button>
-                <Button variant="outline" size="sm" asChild>
-                  <a href={DEMO_VIDEO_URL} target="_blank" rel="noreferrer">
-                    <PlayCircleIcon data-icon="inline-start" aria-hidden="true" />
-                    {home.videoCta}
-                  </a>
-                </Button>
-                <RandomChartButton locale={locale} label={home.randomCta} />
-                <a
-                  href="#faq"
-                  className="text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
-                >
-                  {home.whatIsAstroDX}
-                </a>
-              </div>
-              <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                {stats.map((stat) => (
-                  <div key={stat.label} className="flex items-baseline gap-1.5">
-                    <dt>{stat.label}</dt>
-                    <dd className="font-semibold tabular-nums text-foreground">
-                      {typeof stat.value === "number" ? (
-                        <HeroStatNumber value={stat.value} />
-                      ) : (
-                        stat.value
-                      )}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
+            <p className={styles.heroDescription}>{home.heroDescription}</p>
+            <div className={styles.heroSearch}>
+              <HomeHeroSearch
+                searchHref={searchHref}
+                placeholder={dictionary.catalogBrowser.searchPlaceholder}
+                submitLabel={home.searchCta}
+                tone="brand"
+              />
             </div>
+            <div
+              className={styles.heroActions}
+              role="group"
+              aria-label={home.heroActionsLabel}
+            >
+              <a
+                className={cn(styles.heroAction, styles.heroActionPrimary)}
+                href={astroDxDownloadUrl(locale)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {home.getAppCta}
+                <ExternalLinkIcon className="size-3.5" aria-hidden="true" />
+              </a>
+              <Link className={styles.heroAction} href={versionsHref}>
+                {home.browseCta}
+                <ChevronRightIcon className="size-3.5" aria-hidden="true" />
+              </Link>
+              <a
+                className={styles.heroAction}
+                href={DEMO_VIDEO_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {home.videoCta}
+                <PlayCircleIcon className="size-3.5" aria-hidden="true" />
+              </a>
+              <RandomChartButton
+                locale={locale}
+                label={home.randomCta}
+                className={cn(styles.heroAction, styles.randomButton)}
+              />
+              <a className={styles.heroAction} href="#faq">
+                {home.whatIsAstroDX}
+                <ChevronRightIcon className="size-3.5" aria-hidden="true" />
+              </a>
+            </div>
+            <dl className={styles.heroMetrics}>
+              {stats.map((stat) => (
+                <div key={stat.label} className={styles.heroMetric}>
+                  <dt>{stat.label}</dt>
+                  <dd>
+                    {typeof stat.value === "number" ? (
+                      <HeroStatNumber value={stat.value} />
+                    ) : (
+                      stat.value
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </div>
-          {spotlight ? (
-            <div className="mx-auto w-full max-w-sm lg:mx-0 lg:max-w-none">
-              <HomeSpotlightCard entry={spotlight} locale={locale} label={home.spotlightLabel} />
-            </div>
-          ) : null}
+
+          <div className={styles.spotlightColumn}>
+            {spotlightEntries.length > 0 ? (
+              <HomeSpotlightCarousel entries={spotlightEntries} locale={locale} />
+            ) : (
+              <div className={styles.spotlightFallback} aria-hidden="true">
+                <CompatibleImage
+                  sources={compatibleSourcesFromPng("/brand-icon.png")}
+                  alt=""
+                  width={192}
+                  height={192}
+                  className="h-full w-full object-contain"
+                />
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
-      <section className="flex flex-col gap-5">
-        <Reveal className="flex flex-wrap items-end justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-2xl font-semibold">{home.branchesTitle}</h2>
-            <p className="text-sm text-muted-foreground">{home.branchesDescription}</p>
-          </div>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={versionsHref}>
-              {home.versionsCta}
-              <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
-            </Link>
-          </Button>
-        </Reveal>
-        <RevealGroup as="ul" role="list" className="grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-          {versionTiles.map((version) => (
-            <RevealItem as="li" key={version.index} ssrVisible className="h-full">
-              <Link
-                href={buildLocalePath(`/versions/${versionRouteId(version.index)}`, locale)}
-                className="group/version block h-full rounded-xl transition-transform hover:-translate-y-0.5"
-              >
-                <VersionTileCard
-                  name={version.name}
-                  imageIndex={version.index}
-                  count={version.count}
-                  locale={locale}
-                />
-              </Link>
-            </RevealItem>
-          ))}
-        </RevealGroup>
-      </section>
+      <div className={styles.section}>
+        <div className={styles.browsePanel}>
+          <section className={styles.browseColumn}>
+            <Reveal className={cn(styles.sectionHeader, styles.browseColumnHeader)}>
+              <div className={styles.sectionHeadingGroup}>
+                <span className={styles.sectionIndex}>01</span>
+                <div>
+                  <h2 className={styles.sectionTitle}>{home.branchesTitle}</h2>
+                  <p className={styles.sectionDescription}>{home.branchesDescription}</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href={versionsHref}>
+                  {home.versionsCta}
+                  <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
+                </Link>
+              </Button>
+            </Reveal>
+            <RevealGroup
+              as="ul"
+              role="list"
+              className="grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3"
+            >
+              {versionTiles.map((version) => (
+                <RevealItem as="li" key={version.index} ssrVisible className="h-full">
+                  <Link
+                    href={buildVersionFilterHref(version.index, locale)}
+                    className="group/version block h-full rounded-xl transition-transform hover:-translate-y-0.5"
+                  >
+                    <VersionTileCard
+                      name={version.name}
+                      imageIndex={version.index}
+                      count={version.count}
+                      locale={locale}
+                    />
+                  </Link>
+                </RevealItem>
+              ))}
+            </RevealGroup>
+          </section>
 
-      <section className="flex flex-col gap-5">
-        <Reveal className="flex flex-wrap items-end justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-2xl font-semibold">{home.latestTitle}</h2>
-            <p className="text-sm text-muted-foreground">{home.latestDescription}</p>
+          <section className={styles.browseColumn}>
+            <Reveal className={cn(styles.sectionHeader, styles.browseColumnHeader)}>
+              <div className={styles.sectionHeadingGroup}>
+                <span className={styles.sectionIndex}>02</span>
+                <div>
+                  <h2 className={styles.sectionTitle}>{home.quickGenresLabel}</h2>
+                  <p className={styles.sectionDescription}>{home.genresDescription}</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href={searchHref}>
+                  {home.viewMore}
+                  <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
+                </Link>
+              </Button>
+            </Reveal>
+            <RevealGroup
+              as="ul"
+              role="list"
+              className="grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3"
+            >
+              {genreTiles.map((genre) => (
+                <RevealItem as="li" key={genre.id} ssrVisible className="h-full">
+                  <Link
+                    href={`${searchHref}?genre=${genre.id}`}
+                    className={cn(styles.genreBrowseCard, genre.badge)}
+                  >
+                    <span className={styles.genreBrowseLabel}>{genre.label}</span>
+                    <ArrowRightIcon aria-hidden="true" />
+                  </Link>
+                </RevealItem>
+              ))}
+            </RevealGroup>
+          </section>
+        </div>
+      </div>
+
+      <section className={styles.section}>
+        <Reveal className={styles.sectionHeader}>
+          <div className={styles.sectionHeadingGroup}>
+            <span className={styles.sectionIndex}>03</span>
+            <div>
+              <h2 className={styles.sectionTitle}>{home.latestTitle}</h2>
+              <p className={styles.sectionDescription}>{home.latestDescription}</p>
+            </div>
           </div>
           <Button variant="ghost" size="sm" asChild>
             <Link href={searchHref}>
@@ -380,14 +432,18 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
             </Link>
           </Button>
         </Reveal>
-        <RevealGroup as="ul" role="list" className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-          {latestEntries.map((entry, index) => (
+        <RevealGroup
+          as="ul"
+          role="list"
+          className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 xl:grid-cols-6"
+        >
+          {latestEntries.map((entry) => (
             <RevealItem as="li" key={entry.id} ssrVisible className="h-full">
               <ChartCard
                 entry={entry}
                 locale={locale}
-                priority={index < 6}
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                coverFit="contain"
+                sizes="(max-width: 760px) 50vw, (max-width: 1100px) 33vw, 220px"
               />
             </RevealItem>
           ))}
@@ -395,26 +451,37 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
       </section>
 
       {featuredEntries.length > 0 ? (
-        <section className="flex flex-col gap-5">
-          <Reveal className="flex flex-wrap items-end justify-between gap-3">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-2xl font-semibold">{home.featuredTitle}</h2>
-              <p className="text-sm text-muted-foreground">{home.featuredDescription}</p>
+        <section className={styles.section}>
+          <Reveal className={styles.sectionHeader}>
+            <div className={styles.sectionHeadingGroup}>
+              <span className={styles.sectionIndex}>04</span>
+              <div>
+                <h2 className={styles.sectionTitle}>{home.featuredTitle}</h2>
+                <p className={styles.sectionDescription}>{home.featuredDescription}</p>
+              </div>
             </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href={searchHref}>
-                {home.viewMore}
-                <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
-              </Link>
-            </Button>
+            <div className={styles.discoveryActions}>
+              <RandomChartButton locale={locale} label={home.randomCta} />
+              <Button variant="ghost" size="sm" asChild>
+                <Link href={searchHref}>
+                  {home.viewMore}
+                  <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
+                </Link>
+              </Button>
+            </div>
           </Reveal>
-          <RevealGroup as="ul" role="list" className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+          <RevealGroup
+            as="ul"
+            role="list"
+            className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 xl:grid-cols-6"
+          >
             {featuredEntries.map((entry) => (
               <RevealItem as="li" key={entry.id} ssrVisible className="h-full">
                 <ChartCard
                   entry={entry}
                   locale={locale}
-                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  coverFit="contain"
+                  sizes="(max-width: 760px) 50vw, (max-width: 1100px) 33vw, 220px"
                 />
               </RevealItem>
             ))}
@@ -422,29 +489,28 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
         </section>
       ) : null}
 
-      <section className="flex flex-col gap-4">
-        <Reveal ssrVisible>
-          {/* Anchor target for the hero's "What is AstroDX?" link. */}
-          <h2 id="faq" className="scroll-mt-24 text-2xl font-semibold">
-            {home.faqHeading}
-          </h2>
+      <section className={styles.section}>
+        <Reveal ssrVisible className={styles.sectionHeader}>
+          <div className={styles.sectionHeadingGroup}>
+            <span className={styles.sectionIndex}>05</span>
+            <div>
+              <h2 id="faq" className={cn("scroll-mt-24", styles.sectionTitle)}>
+                {home.faqHeading}
+              </h2>
+            </div>
+          </div>
         </Reveal>
-        <RevealGroup className="grid gap-4 md:grid-cols-2">
+        <div className={styles.faqList}>
           {faqItems.map((item) => (
-            <RevealItem key={item.q} ssrVisible className="h-full">
-              <Card size="sm" className="h-full border border-border/70 bg-card/85">
-                <CardHeader>
-                  <CardTitle asChild>
-                    <h3 className="text-base font-medium">{item.q}</h3>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{item.a}</p>
-                </CardContent>
-              </Card>
-            </RevealItem>
+            <details key={item.q} className={styles.faqItem}>
+              <summary className={styles.faqSummary}>
+                <span>{item.q}</span>
+                <ChevronRightIcon className="size-4" aria-hidden="true" />
+              </summary>
+              <p className={styles.faqAnswer}>{item.a}</p>
+            </details>
           ))}
-        </RevealGroup>
+        </div>
       </section>
     </main>
   );
@@ -527,10 +593,11 @@ export function ChartDetailPageView({
       }
     : null;
 
-  // Deep links out of the metadata table: entries with an unmapped version land
-  // in the "unknown" bucket, so /versions/unknown always exists for them.
-  const versionIndex = versionImageIndex(entry.version);
-  const versionHref = buildLocalePath(`/versions/${versionRouteId(versionIndex)}`, locale);
+  // Metadata links reuse the catalog's stable version-id filter instead of
+  // opening a separate per-version page. Older entries fall back to resolving
+  // the id from their canonical version name.
+  const versionIndex = resolveVersionIndex(entry);
+  const versionHref = buildVersionFilterHref(versionIndex, locale);
   const genreId = resolveGenreId(entry);
   const genreHref = genreId !== null ? `${chartsHref}?genre=${genreId}` : undefined;
 

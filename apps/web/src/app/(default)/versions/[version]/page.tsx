@@ -1,30 +1,13 @@
-import { notFound } from "next/navigation";
-import type { Metadata } from "next";
+import { notFound, permanentRedirect } from "next/navigation";
 
-import { VersionDetailView } from "@/components/site/version-views";
 import { readVersionGroup, readVersionRouteIds } from "@/lib/catalog";
-import { buildVersionDetailMetadata } from "@/lib/page-metadata";
+import { buildVersionFilterHref } from "@/lib/catalog-links";
 
 export const dynamicParams = false;
 
 export async function generateStaticParams() {
   const ids = await readVersionRouteIds();
   return ids.map((version) => ({ version }));
-}
-
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ version: string }>;
-}): Promise<Metadata> {
-  const { version } = await params;
-  const group = await readVersionGroup(version);
-
-  if (!group) {
-    notFound();
-  }
-
-  return buildVersionDetailMetadata("zh", group.name, version, group.entries.length);
 }
 
 export default async function VersionDetailPage({
@@ -39,13 +22,6 @@ export default async function VersionDetailPage({
     notFound();
   }
 
-  return (
-    <VersionDetailView
-      name={group.name}
-      slug={version}
-      imageIndex={group.imageIndex}
-      entries={group.entries}
-      locale="zh"
-    />
-  );
+  // Preserve old bookmarks while removing the dedicated detail-page flow.
+  permanentRedirect(buildVersionFilterHref(group.imageIndex, "zh"));
 }
