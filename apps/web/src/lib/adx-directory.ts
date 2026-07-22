@@ -3,7 +3,7 @@ export type AdxRemoteFile = {
   url: string;
 };
 
-const ADX_SOURCE_ROOT = "https://adxcs.saop.cc/";
+const ADX_SOURCE_ROOT = "https://astrodx-charts-alice.saop.cc/";
 
 export function buildAdxDirectoryUrl(directoryName: string): string {
   const trimmed = directoryName.trim();

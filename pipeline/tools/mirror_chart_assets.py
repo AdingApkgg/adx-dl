@@ -11,9 +11,10 @@ from tools.build_catalog import INDEX_URL, _assign_route_slugs, _build_entry, _m
 from tools.remote_catalog import fetch_bytes as default_fetch_bytes
 from tools.remote_catalog import fetch_text as default_fetch_text
 
-# Only maidata.txt is mirrored locally (served same-origin so the .adx download
-# and chart preview can fetch/parse it without CORS). bg.png / audio / video are
-# served from R2 directly — keeping bg.png out of the Pages build saves ~780 MB.
+# Only maidata.txt is mirrored locally from Alice (served same-origin so the
+# .adx download and chart preview can fetch/parse it without CORS). bg.png /
+# audio / video are served from R2 directly — keeping bg.png out of the Pages
+# build saves ~780 MB.
 LOCAL_ASSET_NAMES = {
     "maidata": "maidata.txt",
 }

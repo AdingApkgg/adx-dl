@@ -9,6 +9,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 
 from tools.build_catalog import (
+    INDEX_URL,
     MAIDATA_BASE,
     MEDIA_BASE,
     _aliases_for,
@@ -108,6 +109,12 @@ UTAGE_INDEX = json.dumps(
 
 
 class BuildCatalogTests(unittest.TestCase):
+    def test_authoritative_catalog_and_maidata_use_alice(self) -> None:
+        self.assertEqual(
+            INDEX_URL, "https://astrodx-charts-alice.saop.cc/index.json"
+        )
+        self.assertEqual(MAIDATA_BASE, "https://astrodx-charts-alice.saop.cc/")
+
     def _build(self) -> dict:
         with TemporaryDirectory() as temp_dir:
             catalog_path = build_catalog(
@@ -241,7 +248,7 @@ class BuildCatalogTests(unittest.TestCase):
             self.assertFalse((root / "apps/web/public/adxcs/10146/bg.png").exists())
             self.assertFalse((root / "apps/web/public/adxcs/146/bg.png").exists())
 
-        # maidata is mirrored from the origin host (not R2, which has no maidata).
+        # maidata is mirrored from Alice rather than the primary R2 media route.
         self.assertIn(_maidata_url("14/10146/maidata.txt"), seen_urls)
         self.assertNotIn(_media_url("14/10146/bg.png"), seen_urls)
         self.assertNotIn(_maidata_url("14/10146/bg.png"), seen_urls)
@@ -419,7 +426,7 @@ class BuildCatalogTests(unittest.TestCase):
             return FakeResponse()
 
         with patch("tools.remote_catalog.urlopen", side_effect=fake_urlopen):
-            self.assertEqual(fetch_text("https://adxcs.saop.cc/"), "ok")
+            self.assertEqual(fetch_text("https://example.test/"), "ok")
 
         self.assertIsNone(calls[0])
         self.assertIsNotNone(calls[1])
@@ -446,7 +453,7 @@ class BuildCatalogTests(unittest.TestCase):
         with patch("tools.remote_catalog.time.sleep") as sleep, patch(
             "tools.remote_catalog.urlopen", side_effect=flaky_urlopen
         ):
-            self.assertEqual(fetch_text("https://adxcs.saop.cc/"), "recovered")
+            self.assertEqual(fetch_text("https://example.test/"), "recovered")
 
         self.assertEqual(attempts["n"], 3)  # failed twice, then succeeded
         self.assertEqual(sleep.call_count, 2)  # backed off between attempts
@@ -456,13 +463,13 @@ class BuildCatalogTests(unittest.TestCase):
 
         def not_found(request, context=None, timeout=0):
             attempts["n"] += 1
-            raise HTTPError("https://adxcs.saop.cc/", 404, "Not Found", {}, None)
+            raise HTTPError("https://example.test/", 404, "Not Found", {}, None)
 
         with patch("tools.remote_catalog.time.sleep") as sleep, patch(
             "tools.remote_catalog.urlopen", side_effect=not_found
         ):
             with self.assertRaises(HTTPError):
-                fetch_text("https://adxcs.saop.cc/")
+                fetch_text("https://example.test/")
 
         self.assertEqual(attempts["n"], 1)  # 404 is permanent — no retry
         sleep.assert_not_called()

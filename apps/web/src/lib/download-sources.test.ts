@@ -55,6 +55,12 @@ describe("download source routing", () => {
     expect(resolveDownloadUrl(spec.files[1].url, "g400s")).toBe(
       "https://astrodx-charts-g400s.saop.cc/25/11951/track.mp3"
     );
+    expect(
+      resolveDownloadUrl(
+        "https://astrodx-charts-alice.saop.cc/25/11951/maidata.txt",
+        "g510"
+      )
+    ).toBe("https://astrodx-charts-g510.saop.cc/25/11951/maidata.txt");
 
     expect(routeChartDownloadSpec(spec, "alice")).toEqual({
       ...spec,
@@ -92,6 +98,12 @@ describe("download source routing", () => {
         "https://astrodx-charts-alice.saop.cc/25/11951/track.mp3?download=1"
       )
     ).toBe("https://astrodx-charts.saop.cc/25/11951/track.mp3?download=1");
+    expect(
+      canonicalDownloadResourceUrl("https://adxcs.saop.cc/25/11951/maidata.txt")
+    ).toBe("https://astrodx-charts.saop.cc/25/11951/maidata.txt");
+    expect(
+      resolveDownloadUrl("https://adxcs.saop.cc/25/11951/maidata.txt", "alice")
+    ).toBe("https://astrodx-charts-alice.saop.cc/25/11951/maidata.txt");
     expect(canonicalDownloadResourceUrl("https://example.test/track.mp3")).toBe(
       "https://example.test/track.mp3"
     );

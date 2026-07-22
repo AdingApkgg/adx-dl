@@ -15,6 +15,8 @@ type DownloadSourceConfig = {
 };
 
 const DOWNLOAD_SOURCE_PROBE_PATH = "/0/10/track.mp3";
+/** Jobs saved before the mirror migration can still contain this dead origin. */
+const LEGACY_DOWNLOAD_SOURCE_ORIGINS = ["https://adxcs.saop.cc"] as const;
 
 /**
  * Download routes are intentionally data-driven. Adding another CDN or mirror
@@ -88,16 +90,22 @@ function hasOrigin(url: string, origin: string): boolean {
   return url === origin || url.startsWith(`${origin}/`);
 }
 
+function downloadSourceOrigin(url: string): string | null {
+  return (
+    DOWNLOAD_SOURCES.find((candidate) => hasOrigin(url, candidate.baseUrl))?.baseUrl ??
+    LEGACY_DOWNLOAD_SOURCE_ORIGINS.find((origin) => hasOrigin(url, origin)) ??
+    null
+  );
+}
+
 /**
  * Collapses every configured mirror host to the catalog origin so a whole file
  * fetched from one route can be recognised as the same logical resource after
  * switching routes. External URLs remain exact and are never conflated.
  */
 export function canonicalDownloadResourceUrl(url: string): string {
-  const source = DOWNLOAD_SOURCES.find((candidate) => hasOrigin(url, candidate.baseUrl));
-  return source
-    ? `${CHART_MEDIA_ORIGIN}${url.slice(source.baseUrl.length)}`
-    : url;
+  const origin = downloadSourceOrigin(url);
+  return origin ? `${CHART_MEDIA_ORIGIN}${url.slice(origin.length)}` : url;
 }
 
 /**
@@ -128,18 +136,8 @@ export function inferDownloadSourceId(
 
 export function resolveDownloadUrl(url: string, sourceId: string): string {
   const source = getDownloadSource(sourceId);
-  if (hasOrigin(url, CHART_MEDIA_ORIGIN)) {
-    return `${source.baseUrl}${url.slice(CHART_MEDIA_ORIGIN.length)}`;
-  }
-  return url;
-}
-
-function canonicalDownloadUrl(url: string, sourceId: string): string {
-  const source = getDownloadSource(sourceId);
-  if (hasOrigin(url, source.baseUrl)) {
-    return `${CHART_MEDIA_ORIGIN}${url.slice(source.baseUrl.length)}`;
-  }
-  return url;
+  const origin = downloadSourceOrigin(url);
+  return origin ? `${source.baseUrl}${url.slice(origin.length)}` : url;
 }
 
 export function getDownloadSourceProbeUrl(sourceId: string): string {
@@ -149,10 +147,10 @@ export function getDownloadSourceProbeUrl(sourceId: string): string {
 /** Move a persisted job from one route to another without stacking rewrites. */
 export function rerouteDownloadUrl(
   url: string,
-  fromSourceId: string,
+  _fromSourceId: string,
   toSourceId: string
 ): string {
-  return resolveDownloadUrl(canonicalDownloadUrl(url, fromSourceId), toSourceId);
+  return resolveDownloadUrl(url, toSourceId);
 }
 
 export function routeChartDownloadSpec(

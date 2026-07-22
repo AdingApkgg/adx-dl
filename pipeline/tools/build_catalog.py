@@ -17,15 +17,15 @@ from urllib.parse import unquote, urlparse
 from tools.remote_catalog import fetch_bytes as default_fetch_bytes
 from tools.remote_catalog import fetch_text as default_fetch_text
 
-# Authoritative, version-complete chart index (replaces the old flat-directory scrape).
-INDEX_URL = "https://adxcs.saop.cc/index.json"
+# Authoritative, version-complete chart index, now served by the Alice mirror.
+INDEX_URL = "https://astrodx-charts-alice.saop.cc/index.json"
 # Chart media (bg.png / track.mp3 / pv.mp4 / bg.avif / bg.webp) is served from the
 # Cloudflare R2 bucket, keyed by <versionid>/<shortid>/<file> — the same layout as
 # the index.json `path`, so URLs are just MEDIA_BASE + that relative path.
 MEDIA_BASE = "https://astrodx-charts.saop.cc/"
-# maidata.txt is NOT on R2 (only the media blobs are) — it stays on the origin
-# host and is mirrored locally by mirror_chart_assets for same-origin fetch.
-MAIDATA_BASE = "https://adxcs.saop.cc/"
+# maidata.txt is also available from Alice and is mirrored locally by
+# mirror_chart_assets for same-origin fetch.
+MAIDATA_BASE = "https://astrodx-charts-alice.saop.cc/"
 
 # Song aliases (别名) — community nicknames used to find a chart by an alternate
 # name, the same idea as nonebot-plugin-maimaidx's alias lookup. Both sources are
@@ -168,7 +168,7 @@ def _build_entry(item: dict[str, Any], generated_at: str) -> dict[str, Any]:
         rel = files.get(key)
         return _media_url(rel) if rel else ""
 
-    # maidata lives on the origin host (not R2); the media blobs are on R2.
+    # maidata comes from Alice; the other media blobs use the primary R2 route.
     maidata_url = _maidata_url(files["maidata"]) if files.get("maidata") else ""
     audio_url = media("audio")
     cover_url = media("bg")
