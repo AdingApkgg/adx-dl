@@ -155,6 +155,35 @@ describe("downloads-store", () => {
     setDownloadsPersistenceAdapterForTests(null);
   });
 
+  test("hydration reroutes a legacy-origin job before resume", async () => {
+    const id = singleJobId("legacy-origin-resume");
+    persistedJobs.set(id, {
+      id,
+      kind: "single",
+      title: "legacy-origin-resume",
+      format: "adx",
+      createdAt: Date.now(),
+      files: [
+        {
+          name: "maidata.txt",
+          url: "https://adxcs.saop.cc/25/11951/maidata.txt",
+        },
+      ],
+    });
+
+    useDownloadsStore.getState().hydrateFromStorage();
+    await waitForJob(id, (job) => job.status === "paused");
+    expect(useDownloadsStore.getState().jobs.find((job) => job.id === id)?.sourceId).toBe(
+      "r2"
+    );
+
+    useDownloadsStore.getState().resume(id);
+    await waitForJob(id, (job) => job.status === "success");
+    expect(fetchedUrls).toEqual([
+      "https://astrodx-charts.saop.cc/25/11951/maidata.txt",
+    ]);
+  });
+
   test("shares the selected source and records it on new jobs", async () => {
     useDownloadsStore.getState().setSelectedSourceId("alice");
     expect(useDownloadsStore.getState().selectedSourceId).toBe("alice");

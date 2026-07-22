@@ -930,10 +930,14 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
             continue;
           }
           const sourceId = inferDownloadSourceId(storedSpec.files, storedSpec.sourceId);
-          const spec: PersistedJob =
-            storedSpec.sourceId === sourceId
-              ? storedSpec
-              : { ...storedSpec, sourceId };
+          // Normalize every configured/legacy mirror URL while hydrating. This
+          // lets jobs saved before the Alice migration resume normally without
+          // requiring the user to manually switch source first.
+          const spec: PersistedJob = {
+            ...storedSpec,
+            sourceId,
+            files: routeDownloadFiles(storedSpec.files, sourceId),
+          };
           jobSpecs.set(spec.id, spec);
           const files = await loadFilesForJob(spec.id);
           // A same-id job may have started while IndexedDB was being read. Its
