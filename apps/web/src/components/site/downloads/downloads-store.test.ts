@@ -1,7 +1,20 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { unzipSync } from "fflate";
 
-import { newBatchJobId, singleJobId, useDownloadsStore } from "./downloads-store";
+import {
+  setDownloadsPersistenceAdapterForTests,
+  type DownloadsPersistenceAdapter,
+  type PersistedFile,
+  type PersistedJob,
+} from "./persistence";
+
+import {
+  createInitialDownloadSourceProbes,
+  newBatchJobId,
+  reusablePersistedFile,
+  singleJobId,
+  useDownloadsStore,
+} from "./downloads-store";
 
 // Minimal browser shims: the store's download pipeline ends in saveBlobAsFile,
 // which touches `document` and `URL.createObjectURL`. We stub just enough so the
@@ -9,15 +22,50 @@ import { newBatchJobId, singleJobId, useDownloadsStore } from "./downloads-store
 // driven purely by the module-level store, with no React component mounted.
 const savedFiles: string[] = [];
 const savedBlobs: Blob[] = [];
+const fetchedUrls: string[] = [];
+const persistedJobs = new Map<string, PersistedJob>();
+const persistedFiles = new Map<string, PersistedFile>();
+
+const memoryPersistence: DownloadsPersistenceAdapter = {
+  persistJob: async (job) => {
+    persistedJobs.set(job.id, structuredClone(job));
+  },
+  persistFile: async (file) => {
+    persistedFiles.set(file.key, file);
+  },
+  loadAllJobs: async () => [...persistedJobs.values()],
+  loadFilesForJob: async (jobId) =>
+    [...persistedFiles.values()].filter((file) => file.jobId === jobId),
+  replaceJobKeepingCompletedFiles: async (job) => {
+    persistedJobs.set(job.id, structuredClone(job));
+    const allowedNames = new Set(job.files.map((file) => file.name));
+    for (const [key, file] of persistedFiles) {
+      if (file.jobId === job.id && (!file.complete || !allowedNames.has(file.name))) {
+        persistedFiles.delete(key);
+      }
+    }
+  },
+  deleteJob: async (jobId) => {
+    persistedJobs.delete(jobId);
+    for (const [key, file] of persistedFiles) {
+      if (file.jobId === jobId) {
+        persistedFiles.delete(key);
+      }
+    }
+  },
+};
 
 function installDomShims() {
   savedFiles.length = 0;
   savedBlobs.length = 0;
-  globalThis.fetch = (async () =>
-    new Response(new Uint8Array([1, 2, 3]), {
+  fetchedUrls.length = 0;
+  globalThis.fetch = (async (input) => {
+    fetchedUrls.push(String(input));
+    return new Response(new Uint8Array([1, 2, 3]), {
       status: 200,
       headers: { "content-length": "3" },
-    })) as typeof fetch;
+    });
+  }) as typeof fetch;
 
   (globalThis as Record<string, unknown>).document = {
     createElement: () => ({
@@ -55,14 +103,380 @@ async function waitForSettled(id: string, timeoutMs = 2000): Promise<void> {
   }
 }
 
+async function waitForJob(
+  id: string,
+  predicate: (job: ReturnType<typeof useDownloadsStore.getState>["jobs"][number]) => boolean,
+  timeoutMs = 2000
+): Promise<void> {
+  const start = Date.now();
+  for (;;) {
+    const job = useDownloadsStore.getState().jobs.find((entry) => entry.id === id);
+    if (job && predicate(job)) {
+      return;
+    }
+    if (Date.now() - start > timeoutMs) {
+      throw new Error(`Job ${id} did not reach the expected state`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+async function waitForCondition(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
+  const start = Date.now();
+  while (!predicate()) {
+    if (Date.now() - start > timeoutMs) {
+      throw new Error("Condition was not met before timeout");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 describe("downloads-store", () => {
   beforeEach(() => {
     installDomShims();
-    useDownloadsStore.setState({ jobs: [], presented: {} });
+    persistedJobs.clear();
+    persistedFiles.clear();
+    setDownloadsPersistenceAdapterForTests(memoryPersistence);
+    useDownloadsStore.setState({
+      jobs: [],
+      presented: {},
+      selectedSourceId: "r2",
+      sourceProbes: createInitialDownloadSourceProbes(),
+    });
   });
 
   afterEach(() => {
-    useDownloadsStore.setState({ jobs: [], presented: {} });
+    useDownloadsStore.setState({
+      jobs: [],
+      presented: {},
+      selectedSourceId: "r2",
+      sourceProbes: createInitialDownloadSourceProbes(),
+    });
+    setDownloadsPersistenceAdapterForTests(null);
+  });
+
+  test("shares the selected source and records it on new jobs", async () => {
+    useDownloadsStore.getState().setSelectedSourceId("alice");
+    expect(useDownloadsStore.getState().selectedSourceId).toBe("alice");
+
+    const id = singleJobId("source-routed");
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "source-routed",
+      files: [
+        {
+          name: "track.mp3",
+          url: "https://astrodx-charts.saop.cc/25/11951/track.mp3",
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+    });
+
+    expect(useDownloadsStore.getState().jobs.find((job) => job.id === id)?.sourceId).toBe(
+      "alice"
+    );
+    await waitForSettled(id);
+    expect(fetchedUrls).toContain(
+      "https://astrodx-charts-alice.saop.cc/25/11951/track.mp3"
+    );
+  });
+
+  test("shares one latency probe round and respects the freshness window", async () => {
+    const refresh = useDownloadsStore.getState().refreshSourceProbes;
+    await Promise.all([refresh(true), refresh(true)]);
+
+    expect(fetchedUrls).toEqual([
+      "https://astrodx-charts.saop.cc/0/10/track.mp3",
+      "https://astrodx-charts-alice.saop.cc/0/10/track.mp3",
+      "https://astrodx-charts-g510.saop.cc/0/10/track.mp3",
+      "https://astrodx-charts-g400s.saop.cc/0/10/track.mp3",
+    ]);
+    expect(
+      Object.values(useDownloadsStore.getState().sourceProbes).every(
+        (probe) => probe.state === "ok" && probe.latencyMs !== null
+      )
+    ).toBe(true);
+
+    await refresh();
+    expect(fetchedUrls).toHaveLength(4);
+  });
+
+  test("reuses only a complete matching resource, including across mirror hosts", () => {
+    const prior: PersistedFile = {
+      key: "job::track.mp3",
+      jobId: "job",
+      name: "track.mp3",
+      url: "https://astrodx-charts.saop.cc/track.mp3",
+      complete: true,
+      size: 3,
+      blob: new Blob([new Uint8Array([1, 2, 3])]),
+    };
+
+    expect(
+      reusablePersistedFile({ url: "https://astrodx-charts.saop.cc/track.mp3" }, prior)
+    ).toBe(prior);
+    expect(
+      reusablePersistedFile(
+        { url: "https://astrodx-charts-alice.saop.cc/track.mp3" },
+        prior
+      )
+    ).toBe(prior);
+    expect(
+      reusablePersistedFile(
+        { url: "https://astrodx-charts-alice.saop.cc/other.mp3" },
+        prior
+      )
+    ).toBeUndefined();
+    expect(
+      reusablePersistedFile({ url: "https://example.test/track.mp3" }, prior)
+    ).toBeUndefined();
+  });
+
+  test("a failed job can switch source and restart cleanly", async () => {
+    const id = singleJobId("switch-source");
+    globalThis.fetch = (async (input) => {
+      fetchedUrls.push(String(input));
+      throw new TypeError("network failed");
+    }) as typeof fetch;
+
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "switch-source",
+      files: [
+        {
+          name: "track.mp3",
+          url: "https://astrodx-charts.saop.cc/25/11951/track.mp3",
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+      sourceId: "r2",
+    });
+    await waitForJob(id, (job) => job.status === "error");
+
+    globalThis.fetch = (async (input) => {
+      fetchedUrls.push(String(input));
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { "content-length": "3" },
+      });
+    }) as typeof fetch;
+    useDownloadsStore.getState().restartWithSource(id, "g510");
+
+    await waitForJob(id, (job) => job.sourceId === "g510" && job.status === "success");
+    expect(fetchedUrls).toContain(
+      "https://astrodx-charts-g510.saop.cc/25/11951/track.mp3"
+    );
+  });
+
+  test("source switching keeps completed files and restarts only unfinished files", async () => {
+    const id = singleJobId("switch-keeps-complete-files");
+    let rejectTrack: ((reason?: unknown) => void) | undefined;
+    const firstRequests: { url: string; headers: Headers }[] = [];
+
+    globalThis.fetch = (async (input, init) => {
+      const url = String(input);
+      firstRequests.push({ url, headers: new Headers(init?.headers) });
+      if (url.endsWith("/maidata.txt")) {
+        return new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: { "content-length": "3" },
+        });
+      }
+      return await new Promise<Response>((_resolve, reject) => {
+        rejectTrack = reject;
+      });
+    }) as typeof fetch;
+
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "switch-keeps-complete-files",
+      files: [
+        {
+          name: "maidata.txt",
+          url: "https://astrodx-charts.saop.cc/25/11951/maidata.txt",
+        },
+        {
+          name: "track.mp3",
+          url: "https://astrodx-charts.saop.cc/25/11951/track.mp3",
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+      sourceId: "r2",
+    });
+
+    await waitForCondition(() => persistedFiles.has(`${id}::maidata.txt`));
+    rejectTrack?.(new TypeError("network failed"));
+    await waitForJob(id, (job) => job.status === "error");
+    const failedJob = useDownloadsStore.getState().jobs.find((job) => job.id === id);
+    expect(failedJob?.completed).toBe(1);
+    expect(failedJob?.totalBytes).toBe(0);
+    expect(failedJob?.fileProgress).toEqual([
+      { name: "maidata.txt", received: 3, total: 3, status: "done" },
+      { name: "track.mp3", received: 0, total: null, status: "pending" },
+    ]);
+
+    const switchedRequests: { url: string; headers: Headers }[] = [];
+    globalThis.fetch = (async (input, init) => {
+      const url = String(input);
+      switchedRequests.push({ url, headers: new Headers(init?.headers) });
+      if (url.endsWith("/maidata.txt")) {
+        throw new Error("completed maidata.txt must not be fetched again");
+      }
+      return new Response(new Uint8Array([4, 5, 6]), {
+        status: 200,
+        headers: { "content-length": "3" },
+      });
+    }) as typeof fetch;
+
+    useDownloadsStore.getState().restartWithSource(id, "alice");
+    await waitForJob(id, (job) => job.sourceId === "alice" && job.status === "success");
+
+    expect(firstRequests.map((request) => request.url).sort()).toEqual([
+      "https://astrodx-charts.saop.cc/25/11951/maidata.txt",
+      "https://astrodx-charts.saop.cc/25/11951/track.mp3",
+    ]);
+    expect(switchedRequests.map((request) => request.url)).toEqual([
+      "https://astrodx-charts-alice.saop.cc/25/11951/track.mp3",
+    ]);
+    expect(switchedRequests[0].headers.has("Range")).toBe(false);
+    expect(switchedRequests[0].headers.has("If-Range")).toBe(false);
+  });
+
+  test("manual pause keeps whole files but discards the current file prefix", async () => {
+    const id = singleJobId("pause-keeps-only-complete-files");
+    globalThis.fetch = (async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/maidata.txt")) {
+        return new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: { "content-length": "3" },
+        });
+      }
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array([4]));
+          init?.signal?.addEventListener("abort", () => {
+            controller.error(new DOMException("Aborted", "AbortError"));
+          });
+        },
+      });
+      return new Response(stream, {
+        status: 200,
+        headers: { "content-length": "3" },
+      });
+    }) as typeof fetch;
+
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "pause-keeps-only-complete-files",
+      files: [
+        {
+          name: "maidata.txt",
+          url: "https://astrodx-charts.saop.cc/25/11951/maidata.txt",
+        },
+        {
+          name: "track.mp3",
+          url: "https://astrodx-charts.saop.cc/25/11951/track.mp3",
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+      sourceId: "r2",
+    });
+
+    await waitForCondition(() => {
+      const job = useDownloadsStore.getState().jobs.find((entry) => entry.id === id);
+      return (
+        persistedFiles.has(`${id}::maidata.txt`) &&
+        (job?.fileProgress.find((file) => file.name === "track.mp3")?.received ?? 0) > 0
+      );
+    });
+    useDownloadsStore.getState().pause(id);
+
+    const paused = useDownloadsStore.getState().jobs.find((job) => job.id === id);
+    expect(paused).toMatchObject({ status: "paused", completed: 1, totalBytes: 0 });
+    expect(paused?.fileProgress).toEqual([
+      { name: "maidata.txt", received: 3, total: 3, status: "done" },
+      { name: "track.mp3", received: 0, total: null, status: "pending" },
+    ]);
+
+    const resumeRequests: { url: string; headers: Headers }[] = [];
+    globalThis.fetch = (async (input, init) => {
+      const url = String(input);
+      resumeRequests.push({ url, headers: new Headers(init?.headers) });
+      if (url.endsWith("/maidata.txt")) {
+        throw new Error("completed maidata.txt must not be fetched after pause");
+      }
+      return new Response(new Uint8Array([4, 5, 6]), {
+        status: 200,
+        headers: { "content-length": "3" },
+      });
+    }) as typeof fetch;
+
+    useDownloadsStore.getState().resume(id);
+    await waitForJob(id, (job) => job.status === "success");
+    expect(resumeRequests.map((request) => request.url)).toEqual([
+      "https://astrodx-charts.saop.cc/25/11951/track.mp3",
+    ]);
+    expect(resumeRequests[0].headers.has("Range")).toBe(false);
+    expect(resumeRequests[0].headers.has("If-Range")).toBe(false);
+  });
+
+  test("pause and source switch supersede a run still loading saved checkpoints", async () => {
+    const id = singleJobId("switch-before-storage-load");
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "switch-before-storage-load",
+      files: [
+        {
+          name: "track.mp3",
+          url: "https://astrodx-charts.saop.cc/25/11951/track.mp3",
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+      sourceId: "r2",
+    });
+
+    // Pausing synchronously must invalidate the queued/current run before the
+    // source-switch replacement starts.
+    useDownloadsStore.getState().pause(id);
+    useDownloadsStore.getState().restartWithSource(id, "alice");
+
+    await waitForJob(id, (job) => job.sourceId === "alice" && job.status === "success");
+    expect(fetchedUrls).toEqual([
+      "https://astrodx-charts-alice.saop.cc/25/11951/track.mp3",
+    ]);
+  });
+
+  test("batch jobs route every chart through the selected source", async () => {
+    const id = newBatchJobId();
+    useDownloadsStore.getState().startBatch({
+      id,
+      title: "G400s batch",
+      charts: [
+        {
+          dir: "Song A",
+          files: [
+            {
+              name: "track.mp3",
+              url: "https://astrodx-charts.saop.cc/25/11951/track.mp3",
+            },
+          ],
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+      sourceId: "g400s",
+    });
+
+    await waitForSettled(id);
+    expect(fetchedUrls).toContain(
+      "https://astrodx-charts-g400s.saop.cc/25/11951/track.mp3"
+    );
   });
 
   test("single download runs to success with no component mounted", async () => {
@@ -227,5 +641,100 @@ describe("downloads-store", () => {
 
     useDownloadsStore.getState().dismiss(id);
     expect(useDownloadsStore.getState().jobs.find((j) => j.id === id)).toBeUndefined();
+  });
+
+  test("dismiss waits for an in-flight whole-file checkpoint before cleanup", async () => {
+    const id = singleJobId("dismiss-checkpoint-race");
+    let signalPersistStarted: (() => void) | undefined;
+    const persistStarted = new Promise<void>((resolve) => {
+      signalPersistStarted = resolve;
+    });
+    let releasePersist: (() => void) | undefined;
+    const persistRelease = new Promise<void>((resolve) => {
+      releasePersist = resolve;
+    });
+    setDownloadsPersistenceAdapterForTests({
+      ...memoryPersistence,
+      persistFile: async (file) => {
+        signalPersistStarted?.();
+        await persistRelease;
+        persistedFiles.set(file.key, file);
+      },
+    });
+
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "dismiss-checkpoint-race",
+      files: [{ name: "maidata.txt", url: "https://example.test/maidata.txt" }],
+      includeVideo: true,
+      format: "adx",
+    });
+    await persistStarted;
+
+    useDownloadsStore.getState().dismiss(id);
+    expect(useDownloadsStore.getState().jobs.find((job) => job.id === id)).toBeUndefined();
+    expect(persistedJobs.has(id)).toBe(true);
+
+    releasePersist?.();
+    await waitForCondition(
+      () =>
+        !persistedJobs.has(id) &&
+        ![...persistedFiles.values()].some((file) => file.jobId === id)
+    );
+  });
+
+  test("dismiss cleanup cannot delete an immediate same-id restart", async () => {
+    const id = singleJobId("dismiss-then-restart");
+    let signalOldPersistStarted: (() => void) | undefined;
+    const oldPersistStarted = new Promise<void>((resolve) => {
+      signalOldPersistStarted = resolve;
+    });
+    let releaseOldPersist: (() => void) | undefined;
+    const oldPersistRelease = new Promise<void>((resolve) => {
+      releaseOldPersist = resolve;
+    });
+    let persistFileCalls = 0;
+    setDownloadsPersistenceAdapterForTests({
+      ...memoryPersistence,
+      persistFile: async (file) => {
+        persistFileCalls += 1;
+        if (persistFileCalls === 1) {
+          signalOldPersistStarted?.();
+          await oldPersistRelease;
+        }
+        persistedFiles.set(file.key, file);
+      },
+    });
+
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "old-generation",
+      files: [{ name: "maidata.txt", url: "https://example.test/old/maidata.txt" }],
+      includeVideo: true,
+      format: "adx",
+    });
+    await oldPersistStarted;
+    useDownloadsStore.getState().dismiss(id);
+
+    globalThis.fetch = (async () => {
+      throw new TypeError("new generation stays recoverable after failure");
+    }) as typeof fetch;
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "new-generation",
+      files: [{ name: "maidata.txt", url: "https://example.test/new/maidata.txt" }],
+      includeVideo: true,
+      format: "adx",
+    });
+    releaseOldPersist?.();
+
+    await waitForJob(
+      id,
+      (job) => job.title === "new-generation" && job.status === "error"
+    );
+    expect(persistedJobs.get(id)?.title).toBe("new-generation");
+    expect(
+      [...persistedFiles.values()].filter((file) => file.jobId === id)
+    ).toHaveLength(0);
   });
 });

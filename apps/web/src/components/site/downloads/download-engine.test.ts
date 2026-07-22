@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { runResumableDownload, type EngineFlush } from "./download-engine";
+import {
+  runMultiFileDownload,
+  type CompletedDownloadFile,
+} from "./download-engine";
 
 const FULL = new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
-type Captured = { url: string; headers: Record<string, string> };
+type Captured = { url: string; headers: Headers };
 
 const realFetch = globalThis.fetch;
 
@@ -12,13 +15,13 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-/** Install a fetch stub and capture each request's url + headers. */
-function stubFetch(handler: (captured: Captured) => Response): Captured[] {
+/** Install a fetch stub and capture each request's URL and headers. */
+function stubFetch(handler: (captured: Captured) => Response | Promise<Response>): Captured[] {
   const calls: Captured[] = [];
-  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
     const captured: Captured = {
       url: String(url),
-      headers: (init?.headers ?? {}) as Record<string, string>,
+      headers: new Headers(init?.headers),
     };
     calls.push(captured);
     return handler(captured);
@@ -30,117 +33,203 @@ async function bytesOf(blob: Blob): Promise<Uint8Array> {
   return new Uint8Array(await blob.arrayBuffer());
 }
 
-describe("runResumableDownload", () => {
-  test("fresh download fetches the whole file with no Range header", async () => {
+describe("runMultiFileDownload", () => {
+  test("fetches every unfinished file from byte zero without Range headers", async () => {
     const calls = stubFetch(
       () => new Response(FULL, { status: 200, headers: { "content-length": "10" } })
     );
 
-    const [result] = await runResumableDownload([
-      { name: "a", url: "https://x/a", etag: null, total: null, blob: new Blob([]) },
+    const [result] = await runMultiFileDownload([
+      { name: "a", url: "https://x/a", completedBlob: null },
     ]);
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].headers.Range).toBeUndefined();
+    expect(calls[0].headers.has("Range")).toBe(false);
+    expect(calls[0].headers.has("If-Range")).toBe(false);
     expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
   });
 
-  test("resumes from offset via Range + If-Range and appends a 206 body", async () => {
-    const prefix = FULL.slice(0, 4); // bytes already on hand
-    const remainder = FULL.slice(4); // what the server should send back
+  test("keeps a completed file and fetches only the unfinished files", async () => {
+    const kept = new Blob([new Uint8Array([7, 8, 9])]);
     const calls = stubFetch(
-      () =>
-        new Response(remainder, {
-          status: 206,
-          headers: { "content-range": "bytes 4-9/10", "content-length": "6" },
-        })
+      () => new Response(FULL, { status: 200, headers: { "content-length": "10" } })
     );
 
-    const [result] = await runResumableDownload([
-      { name: "a", url: "https://x/a", etag: '"v1"', total: 10, blob: new Blob([prefix]) },
+    const result = await runMultiFileDownload([
+      { name: "kept", url: "https://old/kept", completedBlob: kept },
+      { name: "remaining", url: "https://new/remaining", completedBlob: null },
     ]);
 
-    expect(calls[0].headers.Range).toBe("bytes=4-");
-    expect(calls[0].headers["If-Range"]).toBe('"v1"');
-    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+    expect(calls.map((call) => call.url)).toEqual(["https://new/remaining"]);
+    expect([...(await bytesOf(result[0].blob))]).toEqual([7, 8, 9]);
+    expect([...(await bytesOf(result[1].blob))]).toEqual([...FULL]);
   });
 
-  test("a changed file (200 to a Range request) discards the stale prefix", async () => {
-    // Partial prefix (4 of 10) → the engine sends a Range request; the server
-    // answers 200 with a whole, different file → the stale prefix is dropped.
-    const stalePrefix = new Uint8Array([99, 99, 99, 99]);
-    const fresh = new Uint8Array([5, 6, 7, 8, 9, 10]);
-    const calls = stubFetch(
-      () => new Response(fresh, { status: 200, headers: { "content-length": "6" } })
-    );
+  test("recognises an explicitly completed zero-byte file without fetching", async () => {
+    const calls = stubFetch(() => new Response(FULL, { status: 200 }));
 
-    const [result] = await runResumableDownload([
-      { name: "a", url: "https://x/a", etag: '"old"', total: 10, blob: new Blob([stalePrefix]) },
-    ]);
-
-    expect(calls[0].headers.Range).toBe("bytes=4-");
-    expect([...(await bytesOf(result.blob))]).toEqual([...fresh]);
-  });
-
-  test("a 416 (offset past EOF) restarts the file from byte 0", async () => {
-    // Mirrors a CDN-compressed file we fully downloaded but recorded with an
-    // unknown size: resume range-requests past the end and the server says 416.
-    const prefix = FULL; // we already hold all 10 bytes, but total was unknown
-    const calls = stubFetch((captured) =>
-      captured.headers.Range
-        ? new Response(null, { status: 416 })
-        : new Response(FULL, { status: 200 })
-    );
-
-    const [result] = await runResumableDownload([
-      { name: "a", url: "https://x/a", etag: null, total: null, blob: new Blob([prefix]) },
-    ]);
-
-    expect(calls).toHaveLength(2); // ranged attempt → 416 → full re-fetch
-    expect(calls[0].headers.Range).toBe("bytes=10-");
-    expect(calls[1].headers.Range).toBeUndefined();
-    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
-  });
-
-  test("records the size when the server omits Content-Length", async () => {
-    // No content-length header (e.g. a gzip'd response) → the engine should still
-    // persist the finished size so a later resume can skip it.
-    stubFetch(() => new Response(FULL, { status: 200 }));
-    const flushes: EngineFlush[] = [];
-
-    await runResumableDownload(
-      [{ name: "a", url: "https://x/a", etag: null, total: null, blob: new Blob([]) }],
-      { onFlush: (file) => flushes.push(file) }
-    );
-
-    expect(flushes[flushes.length - 1].total).toBe(10);
-  });
-
-  test("an already-complete file is returned without any fetch", async () => {
-    const calls = stubFetch(() => new Response(new Uint8Array(), { status: 200 }));
-
-    const [result] = await runResumableDownload([
-      { name: "a", url: "https://x/a", etag: '"v1"', total: 10, blob: new Blob([FULL]) },
+    const [result] = await runMultiFileDownload([
+      { name: "empty", url: "https://x/empty", completedBlob: new Blob([]) },
     ]);
 
     expect(calls).toHaveLength(0);
-    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+    expect(result.blob.size).toBe(0);
   });
 
-  test("flushes the completed bytes through the persistence hook", async () => {
+  test("emits one whole-file checkpoint and waits for its async write", async () => {
+    stubFetch(() => new Response(FULL, { status: 200 }));
+    let releaseWrite: (() => void) | undefined;
+    let signalStarted: (() => void) | undefined;
+    const writeStarted = new Promise<void>((resolve) => {
+      signalStarted = resolve;
+    });
+    const release = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    const completedFiles: CompletedDownloadFile[] = [];
+    let settled = false;
+
+    const run = runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      {
+        onFileComplete: async (file) => {
+          completedFiles.push(file);
+          signalStarted?.();
+          await release;
+        },
+      }
+    ).then((value) => {
+      settled = true;
+      return value;
+    });
+
+    await writeStarted;
+    expect(settled).toBe(false);
+    expect(completedFiles).toHaveLength(1);
+    expect([...(await bytesOf(completedFiles[0].blob))]).toEqual([...FULL]);
+    releaseWrite?.();
+    await run;
+    expect(settled).toBe(true);
+  });
+
+  test("does not checkpoint an interrupted prefix and retries it from zero", async () => {
+    const abortController = new AbortController();
+    let partialDelivered: (() => void) | undefined;
+    const delivered = new Promise<void>((resolve) => {
+      partialDelivered = resolve;
+    });
+    let completed = 0;
+
+    globalThis.fetch = (async (_url, init) => {
+      const signal = init?.signal;
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(FULL.slice(0, 4));
+          partialDelivered?.();
+          signal?.addEventListener("abort", () => {
+            controller.error(new DOMException("Aborted", "AbortError"));
+          });
+        },
+      });
+      return new Response(stream, { status: 200, headers: { "content-length": "10" } });
+    }) as typeof fetch;
+
+    const interrupted = runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      {
+        signal: abortController.signal,
+        onFileComplete: () => {
+          completed += 1;
+        },
+      }
+    );
+    await delivered;
+    abortController.abort();
+    await expect(interrupted).rejects.toThrow();
+    expect(completed).toBe(0);
+
+    const retryCalls = stubFetch(() => new Response(FULL, { status: 200 }));
+    await runMultiFileDownload([
+      { name: "a", url: "https://x/a", completedBlob: null },
+    ]);
+    expect(retryCalls).toHaveLength(1);
+    expect(retryCalls[0].headers.has("Range")).toBe(false);
+    expect(retryCalls[0].headers.has("If-Range")).toBe(false);
+  });
+
+  test("rejects an unsolicited partial response instead of archiving it", async () => {
     stubFetch(
-      () => new Response(FULL, { status: 200, headers: { "content-length": "10" } })
+      () =>
+        new Response(FULL.slice(4), {
+          status: 206,
+          headers: { "content-range": "bytes 4-9/10" },
+        })
     );
-    const flushes: EngineFlush[] = [];
+    let completed = 0;
 
-    await runResumableDownload(
-      [{ name: "a", url: "https://x/a", etag: null, total: null, blob: new Blob([]) }],
-      { onFlush: (file) => flushes.push(file) }
+    await expect(
+      runMultiFileDownload(
+        [{ name: "a", url: "https://x/a", completedBlob: null }],
+        { onFileComplete: () => void (completed += 1) }
+      )
+    ).rejects.toThrow("File download failed");
+    expect(completed).toBe(0);
+  });
+
+  test("aborts sibling workers and waits for their shutdown before rejecting", async () => {
+    let signalSlowStarted: (() => void) | undefined;
+    const slowStarted = new Promise<void>((resolve) => {
+      signalSlowStarted = resolve;
+    });
+    let signalSlowAborted: (() => void) | undefined;
+    const slowAborted = new Promise<void>((resolve) => {
+      signalSlowAborted = resolve;
+    });
+    let releaseSlow: (() => void) | undefined;
+    const slowRelease = new Promise<void>((resolve) => {
+      releaseSlow = resolve;
+    });
+    let slowSettled = false;
+
+    globalThis.fetch = (async (input, init) => {
+      if (String(input).endsWith("/fail")) {
+        await slowStarted;
+        throw new Error("primary worker failed");
+      }
+      signalSlowStarted?.();
+      return await new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          "abort",
+          () => {
+            signalSlowAborted?.();
+            void slowRelease.then(() => {
+              slowSettled = true;
+              reject(new DOMException("Aborted", "AbortError"));
+            });
+          },
+          { once: true }
+        );
+      });
+    }) as typeof fetch;
+
+    const run = runMultiFileDownload(
+      [
+        { name: "fail", url: "https://x/fail", completedBlob: null },
+        { name: "slow", url: "https://x/slow", completedBlob: null },
+      ],
+      { concurrency: 2 }
+    );
+    let settled = false;
+    void run.then(
+      () => void (settled = true),
+      () => void (settled = true)
     );
 
-    expect(flushes.length).toBeGreaterThan(0);
-    const last = flushes[flushes.length - 1];
-    expect(last.received).toBe(10);
-    expect([...(await bytesOf(last.blob))]).toEqual([...FULL]);
+    await slowAborted;
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    releaseSlow?.();
+    await expect(run).rejects.toThrow("primary worker failed");
+    expect(slowSettled).toBe(true);
   });
 });

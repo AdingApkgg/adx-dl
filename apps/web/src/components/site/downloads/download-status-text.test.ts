@@ -11,6 +11,7 @@ describe("downloadJobStatusText", () => {
       id: "batch:AstroDX Charts",
       kind: "batch",
       title: "AstroDX Charts",
+      sourceId: "r2",
       format: "adx",
       status: "archiving",
       completed: 3,

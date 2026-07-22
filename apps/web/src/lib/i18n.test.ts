@@ -73,6 +73,32 @@ describe("i18n helpers", () => {
     expect(i18n.getDictionary?.("ja").nav.home).toBe("ホーム");
   });
 
+  test("localizes download source names, statuses, and route badges", async () => {
+    const i18n = await loadI18nModule();
+
+    const zh = i18n.getDictionary?.("zh").downloads.sourcePicker;
+    const en = i18n.getDictionary?.("en").downloads.sourcePicker;
+    const ja = i18n.getDictionary?.("ja").downloads.sourcePicker;
+
+    expect(zh).toMatchObject({
+      label: "下载线路",
+      statuses: { available: "可用" },
+      probe: { idle: "-- ms", testing: "测速中…", unavailable: "不可用" },
+      badges: { primary: "推荐", backup: "备用" },
+      switchAndRestart: "换线路继续",
+      restartHint: "切换线路后，已完成文件会保留；未完成文件将通过新线路从头下载。",
+    });
+    expect(Object.values(en?.options ?? {}).map((option) => option.name)).toEqual([
+      "R2",
+      "Alice",
+      "G510",
+      "G400s",
+    ]);
+    expect(ja?.options.r2.name).toBe("R2");
+    expect(en?.restartHint).toContain("Completed files are kept");
+    expect(ja?.restartHint).toContain("完了済みファイルは保持");
+  });
+
   test("exposes static page metadata entries for zh en ja", async () => {
     const i18n = (await loadI18nModule()) as Partial<I18nModule> & {
       getStaticPageMetadata?: (

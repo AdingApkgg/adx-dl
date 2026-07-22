@@ -210,6 +210,32 @@ export type SiteDictionary = {
   };
   /** Floating tray that keeps download progress visible after navigating between pages. */
   downloads: {
+    sourcePicker: {
+      label: string;
+      options: {
+        r2: { name: string; description: string };
+        alice: { name: string; description: string };
+        g510: { name: string; description: string };
+        g400s: { name: string; description: string };
+      };
+      statuses: {
+        available: string;
+        degraded: string;
+        maintenance: string;
+      };
+      probe: {
+        idle: string;
+        testing: string;
+        timeout: string;
+        unavailable: string;
+      };
+      badges: {
+        primary: string;
+        backup: string;
+      };
+      switchAndRestart: string;
+      restartHint: string;
+    };
     trayTitle: string;
     dismiss: string;
     resume: string;
@@ -649,6 +675,32 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       shareCopied: "链接已复制",
     },
     downloads: {
+      sourcePicker: {
+        label: "下载线路",
+        options: {
+          r2: { name: "R2", description: "Cloudflare R2 主线路，默认选择" },
+          alice: { name: "Alice", description: "Alice 下载分流" },
+          g510: { name: "G510", description: "G510 下载分流" },
+          g400s: { name: "G400s", description: "G400s 下载分流" },
+        },
+        statuses: {
+          available: "可用",
+          degraded: "拥挤",
+          maintenance: "维护中",
+        },
+        probe: {
+          idle: "-- ms",
+          testing: "测速中…",
+          timeout: "超时",
+          unavailable: "不可用",
+        },
+        badges: {
+          primary: "推荐",
+          backup: "备用",
+        },
+        switchAndRestart: "换线路继续",
+        restartHint: "切换线路后，已完成文件会保留；未完成文件将通过新线路从头下载。",
+      },
       trayTitle: "下载",
       dismiss: "关闭",
       resume: "继续",
@@ -662,9 +714,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       completed: "打包完成，已保存到浏览器下载",
       importHint: "将文件导入 AstroDX 即可游玩（.adx 可直接导入）。",
       confirmDiscard: "再点一次将放弃已下载的数据",
-      errorOffline: "网络已断开，恢复联网后点「继续」即可续传",
-      errorNetwork: "下载失败，已保留进度，可点「继续」重试",
-      errorGeneric: "下载出错，已保留进度，可点「继续」重试",
+      errorOffline: "网络已断开；已完成文件会保留，联网后点「继续」下载剩余文件",
+      errorNetwork: "下载失败；已完成文件会保留，可点「继续」重试剩余文件",
+      errorGeneric: "下载出错；已完成文件会保留，可点「继续」重试剩余文件",
       batchSummary: (charts, files) => `将打包 ${charts} 首谱面，共 ${files} 个文件`,
       batchSplitSummary: (archives) => `跨版本选择，将按版本分为 ${archives} 个压缩包`,
       batchVideoSummary: (count) => `包含 ${count} 个 BGA 视频文件`,
@@ -1093,6 +1145,32 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       shareCopied: "Link copied",
     },
     downloads: {
+      sourcePicker: {
+        label: "Download source",
+        options: {
+          r2: { name: "R2", description: "Primary Cloudflare R2 route, selected by default" },
+          alice: { name: "Alice", description: "Alice download route" },
+          g510: { name: "G510", description: "G510 download route" },
+          g400s: { name: "G400s", description: "G400s download route" },
+        },
+        statuses: {
+          available: "Available",
+          degraded: "Busy",
+          maintenance: "Maintenance",
+        },
+        probe: {
+          idle: "-- ms",
+          testing: "Testing…",
+          timeout: "Timeout",
+          unavailable: "Unavailable",
+        },
+        badges: {
+          primary: "Recommended",
+          backup: "Backup",
+        },
+        switchAndRestart: "Switch and continue",
+        restartHint: "Completed files are kept; unfinished files restart on the new route.",
+      },
       trayTitle: "Downloads",
       dismiss: "Dismiss",
       resume: "Resume",
@@ -1106,9 +1184,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       completed: "Archive saved — check your browser downloads",
       importHint: "Import the file into AstroDX to play (.adx imports directly).",
       confirmDiscard: "Click again to discard the downloaded data",
-      errorOffline: "You're offline — Resume continues once you're back online",
-      errorNetwork: "Download failed — your progress is kept, hit Resume to retry",
-      errorGeneric: "Download error — your progress is kept, hit Resume to retry",
+      errorOffline: "You're offline — completed files are kept; Resume downloads the rest",
+      errorNetwork: "Download failed — completed files are kept; Resume retries the rest",
+      errorGeneric: "Download error — completed files are kept; Resume retries the rest",
       batchSummary: (charts, files) =>
         charts === 1
           ? `Packing 1 chart, ${files} files total`
@@ -1554,6 +1632,32 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       shareCopied: "リンクをコピーしました",
     },
     downloads: {
+      sourcePicker: {
+        label: "ダウンロード回線",
+        options: {
+          r2: { name: "R2", description: "既定で選択される Cloudflare R2 メイン回線" },
+          alice: { name: "Alice", description: "Alice ダウンロード回線" },
+          g510: { name: "G510", description: "G510 ダウンロード回線" },
+          g400s: { name: "G400s", description: "G400s ダウンロード回線" },
+        },
+        statuses: {
+          available: "利用可能",
+          degraded: "混雑中",
+          maintenance: "メンテナンス中",
+        },
+        probe: {
+          idle: "-- ms",
+          testing: "測定中…",
+          timeout: "タイムアウト",
+          unavailable: "利用不可",
+        },
+        badges: {
+          primary: "おすすめ",
+          backup: "予備",
+        },
+        switchAndRestart: "回線を切り替えて続行",
+        restartHint: "完了済みファイルは保持され、未完了ファイルは新しい回線で最初からダウンロードされます。",
+      },
       trayTitle: "ダウンロード",
       dismiss: "閉じる",
       resume: "再開",
@@ -1567,9 +1671,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       completed: "保存しました — ブラウザのダウンロードをご確認ください",
       importHint: "ファイルを AstroDX にインポートするとプレイできます（.adx はそのままインポート可）。",
       confirmDiscard: "もう一度クリックするとダウンロード済みデータを破棄します",
-      errorOffline: "オフラインです — 接続後に「再開」で続行できます",
-      errorNetwork: "ダウンロードに失敗しました — 進捗は保持されています。「再開」で再試行してください",
-      errorGeneric: "ダウンロードエラー — 進捗は保持されています。「再開」で再試行してください",
+      errorOffline: "オフラインです — 完了済みファイルは保持され、接続後に残りを再開できます",
+      errorNetwork: "ダウンロードに失敗しました — 完了済みファイルを保持して残りを再試行できます",
+      errorGeneric: "ダウンロードエラー — 完了済みファイルを保持して残りを再試行できます",
       batchSummary: (charts, files) => `${charts} 譜面、合計 ${files} ファイルをまとめます`,
       batchSplitSummary: (archives) =>
         `複数バージョンのため、バージョンごとに ${archives} 個のアーカイブに分けて保存します`,

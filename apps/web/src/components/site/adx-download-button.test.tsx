@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { getDownloadSource } from "@/lib/download-sources";
+import { getDictionary } from "@/lib/i18n";
 import { AdxDownloadButton } from "./adx-download-button";
+import {
+  DownloadSourceSummary,
+  downloadSourceStatusClass,
+  downloadSourceStatusText,
+} from "./downloads/download-source-selector";
 
 describe("AdxDownloadButton", () => {
   const files = [{ name: "maidata.txt", url: "https://example.test/maidata.txt" }];
@@ -12,6 +19,10 @@ describe("AdxDownloadButton", () => {
     );
 
     expect(html).toContain("Onsite Download");
+    expect(html).toContain('data-download-source="r2"');
+    expect(html).toContain("R2");
+    expect(html).toContain("Recommended");
+    expect(html).toContain("-- ms");
   });
 
   test("renders pending copy when there are no files", () => {
@@ -19,5 +30,28 @@ describe("AdxDownloadButton", () => {
 
     expect(html).toContain("站内下载待接入");
     expect(html).toContain("disabled");
+  });
+
+  test("renders the shared backup-source status and badge", () => {
+    const html = renderToStaticMarkup(
+      <DownloadSourceSummary
+        sourceId="alice"
+        copy={getDictionary("zh").downloads.sourcePicker}
+      />
+    );
+
+    expect(html).toContain('data-download-source="alice"');
+    expect(html).toContain("Alice");
+    expect(html).toContain("备用");
+    expect(html).toContain("-- ms");
+  });
+
+  test("renders the measured source latency in milliseconds", () => {
+    const source = getDownloadSource("alice");
+    const probe = { state: "ok" as const, latencyMs: 38, measuredAt: Date.now() };
+    const copy = getDictionary("zh").downloads.sourcePicker;
+
+    expect(downloadSourceStatusText(source, probe, copy)).toBe("38 ms");
+    expect(downloadSourceStatusClass(source, probe)).toBe("bg-emerald-500");
   });
 });

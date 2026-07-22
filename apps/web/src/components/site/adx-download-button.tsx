@@ -1,7 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDownIcon, DownloadIcon, PauseIcon, RotateCwIcon, XIcon } from "lucide-react";
+import {
+  ArrowLeftRightIcon,
+  ChevronDownIcon,
+  DownloadIcon,
+  PauseIcon,
+  RotateCwIcon,
+  XIcon,
+} from "lucide-react";
 
 import { AnimatePresence, DrawnCheck, EASE_OUT, motion } from "@/components/motion";
 import { Button } from "@/components/ui/button";
@@ -17,6 +24,10 @@ import {
 import { ARCHIVE_FORMATS, type ArchiveFormat } from "@/lib/adx-archive";
 import { isChartVideoFile, type ChartDownloadSpec } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import {
+  DownloadSourceMenu,
+  DownloadSourceSummary,
+} from "./downloads/download-source-selector";
 import {
   DOWNLOAD_STARTED_EVENT,
   DownloadProgressBar,
@@ -41,6 +52,8 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
   const downloadsDictionary = dictionary.downloads;
   const [includeVideo, setIncludeVideo] = React.useState(true);
   const [confirmDiscard, setConfirmDiscard] = React.useState(false);
+  const selectedSourceId = useDownloadsStore((state) => state.selectedSourceId);
+  const setSelectedSourceId = useDownloadsStore((state) => state.setSelectedSourceId);
   const files = spec?.files ?? [];
   const normalizedFileName = typeof spec?.dir === "string" ? spec.dir.trim() : "";
   const canDownload = files.length > 0 && normalizedFileName.length > 0;
@@ -52,13 +65,14 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
   const job = useDownloadsStore((state) => state.jobs.find((entry) => entry.id === jobId));
   const startSingle = useDownloadsStore((state) => state.startSingle);
   const resume = useDownloadsStore((state) => state.resume);
+  const restartWithSource = useDownloadsStore((state) => state.restartWithSource);
   const pause = useDownloadsStore((state) => state.pause);
   const dismiss = useDownloadsStore((state) => state.dismiss);
 
   const status = job?.status ?? "idle";
   const isBusy = status === "packing" || status === "archiving";
   // After a full reload an interrupted job comes back as `paused`; an in-session
-  // failure is `error`. Both keep their partial bytes and can resume from offset.
+  // failure is `error`. Both keep completed loose files and retry unfinished ones.
   const isResumable = status === "paused" || status === "error";
   const progress = { completed: job?.completed ?? 0, total: job?.total ?? 0 };
   const fileProgress = job?.fileProgress ?? [];
@@ -111,6 +125,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
       groupDir: spec?.groupDir,
       includeVideo,
       format,
+      sourceId: selectedSourceId,
     });
   }
 
@@ -126,12 +141,37 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
   return (
     <div className="flex flex-col gap-2">
       {isResumable ? (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <MotionButton type="button" whileTap={{ scale: 0.97 }} onClick={() => resume(jobId)}>
             <RotateCwIcon data-icon="inline-start" />
             {downloadsDictionary.resume}
             {percent > 0 ? ` · ${percent}%` : null}
           </MotionButton>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-label={downloadsDictionary.sourcePicker.switchAndRestart}
+                title={downloadsDictionary.sourcePicker.restartHint}
+              >
+                <ArrowLeftRightIcon data-icon="inline-start" />
+                {downloadsDictionary.sourcePicker.switchAndRestart}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              collisionPadding={8}
+              className="max-h-[min(28rem,calc(100dvh-5rem))] w-[min(20rem,calc(100vw-2rem))] overscroll-contain"
+            >
+              <DownloadSourceMenu
+                value={job?.sourceId ?? selectedSourceId}
+                onValueChange={(sourceId) => restartWithSource(jobId, sourceId)}
+                copy={downloadsDictionary.sourcePicker}
+                hint={downloadsDictionary.sourcePicker.restartHint}
+              />
+            </DropdownMenuContent>
+          </DropdownMenu>
           <MotionButton
             type="button"
             whileTap={{ scale: 0.92 }}
@@ -204,7 +244,16 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
                 ) : null}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="min-w-(--radix-dropdown-menu-trigger-width)">
+            <DropdownMenuContent
+              collisionPadding={8}
+              className="max-h-[min(28rem,calc(100dvh-5rem))] w-[min(20rem,calc(100vw-2rem))] overscroll-contain"
+            >
+              <DownloadSourceMenu
+                value={selectedSourceId}
+                onValueChange={setSelectedSourceId}
+                copy={downloadsDictionary.sourcePicker}
+              />
+              <DropdownMenuSeparator />
               <DropdownMenuLabel>{detailDictionary.downloadFormatLabel}</DropdownMenuLabel>
               {ARCHIVE_FORMATS.map((format) => (
                 <DropdownMenuItem
@@ -256,6 +305,13 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
           </AnimatePresence>
         </div>
       )}
+      {canDownload || job ? (
+        <DownloadSourceSummary
+          sourceId={job?.sourceId ?? selectedSourceId}
+          copy={downloadsDictionary.sourcePicker}
+          className="w-fit"
+        />
+      ) : null}
       <AnimatePresence>
         {job && (isBusy || status === "paused") ? (
           <motion.p

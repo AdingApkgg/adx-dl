@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { animate, useMotionValue, useSpring } from "framer-motion";
 import {
   AlertCircleIcon,
+  ArrowLeftRightIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   DownloadIcon,
@@ -22,8 +23,14 @@ import {
   springSoft,
   useReducedMotion,
 } from "@/components/motion";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { DownloadSourceMenu, DownloadSourceSummary } from "./download-source-selector";
 import { jobPercent, useDownloadsStore } from "./downloads-store";
 import { downloadJobStatusText } from "./download-status-text";
 
@@ -34,6 +41,8 @@ import { downloadJobStatusText } from "./download-status-text";
 export const DOWNLOAD_STARTED_EVENT = "astrodx:download-started";
 
 export type DownloadStartedDetail = { x: number; y: number };
+
+const SOURCE_PROBE_REFRESH_MS = 5 * 60_000;
 
 /** True while the tab is visible — stops infinite sweep loops in hidden tabs. */
 function usePageVisible(): boolean {
@@ -107,7 +116,7 @@ export function DownloadProgressBar({
 }
 
 /**
- * Dismissing a job that still holds resumable bytes (paused/error) or is
+ * Dismissing a job that still holds completed-file checkpoints (paused/error) or is
  * actively downloading throws that data away, so the X arms a short-lived
  * confirm state and only a second click actually discards.
  */
@@ -189,8 +198,8 @@ type GhostFlight = {
  * A floating tray that keeps download progress visible no matter which page the
  * user is on. It shows jobs whose inline owner (the chart page button or the
  * batch bar) has unmounted — i.e. downloads still running after a navigation —
- * plus any `paused` job rehydrated from storage after a full reload, which the
- * user can resume from its last byte offset.
+ * plus any `paused` job rehydrated from storage after a full reload, which can
+ * skip whole files already downloaded and continue with the remaining files.
  */
 export function DownloadDock({ locale }: { locale: Locale }) {
   const dictionary = getDictionary(locale);
@@ -202,8 +211,10 @@ export function DownloadDock({ locale }: { locale: Locale }) {
   const bottomBars = useDownloadsStore((state) => state.bottomBars);
   const dismiss = useDownloadsStore((state) => state.dismiss);
   const resume = useDownloadsStore((state) => state.resume);
+  const restartWithSource = useDownloadsStore((state) => state.restartWithSource);
   const pause = useDownloadsStore((state) => state.pause);
   const hydrateFromStorage = useDownloadsStore((state) => state.hydrateFromStorage);
+  const refreshSourceProbes = useDownloadsStore((state) => state.refreshSourceProbes);
   const [collapsed, setCollapsed] = React.useState(false);
 
   const reducedMotion = useReducedMotion();
@@ -217,6 +228,28 @@ export function DownloadDock({ locale }: { locale: Locale }) {
   React.useEffect(() => {
     hydrateFromStorage();
   }, [hydrateFromStorage]);
+
+  React.useEffect(() => {
+    void refreshSourceProbes();
+    const onOnline = () => void refreshSourceProbes(true);
+    const onVisible = () => {
+      if (!document.hidden) {
+        void refreshSourceProbes();
+      }
+    };
+    const interval = window.setInterval(() => {
+      if (!document.hidden) {
+        void refreshSourceProbes();
+      }
+    }, SOURCE_PROBE_REFRESH_MS);
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refreshSourceProbes]);
 
   React.useEffect(() => {
     const onStarted = (event: Event) => {
@@ -391,15 +424,44 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                               transition={{ duration: 0.15, ease: EASE_OUT }}
                             >
                               {resumable ? (
-                                <motion.button
-                                  type="button"
-                                  whileTap={{ scale: 0.92 }}
-                                  onClick={() => resume(job.id)}
-                                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
-                                >
-                                  <RotateCwIcon className="size-3" />
-                                  {tray.resume}
-                                </motion.button>
+                                <>
+                                  <motion.button
+                                    type="button"
+                                    whileTap={{ scale: 0.92 }}
+                                    onClick={() => resume(job.id)}
+                                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+                                  >
+                                    <RotateCwIcon className="size-3" />
+                                    {tray.resume}
+                                  </motion.button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <motion.button
+                                        type="button"
+                                        whileTap={{ scale: 0.92 }}
+                                        aria-label={tray.sourcePicker.switchAndRestart}
+                                        title={tray.sourcePicker.restartHint}
+                                        className="-m-0.5 rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+                                      >
+                                        <ArrowLeftRightIcon className="size-3.5" />
+                                      </motion.button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                      align="end"
+                                      collisionPadding={8}
+                                      className="max-h-[min(28rem,calc(100dvh-5rem))] w-[min(20rem,calc(100vw-2rem))] overscroll-contain"
+                                    >
+                                      <DownloadSourceMenu
+                                        value={job.sourceId}
+                                        onValueChange={(sourceId) =>
+                                          restartWithSource(job.id, sourceId)
+                                        }
+                                        copy={tray.sourcePicker}
+                                        hint={tray.sourcePicker.restartHint}
+                                      />
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </>
                               ) : null}
                               {active ? (
                                 <motion.button
@@ -434,6 +496,11 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                             </motion.span>
                           </AnimatePresence>
                         </div>
+                        <DownloadSourceSummary
+                          sourceId={job.sourceId}
+                          copy={tray.sourcePicker}
+                          className="w-fit"
+                        />
                         {/* Live region: progress and failures are otherwise
                             invisible to screen readers. */}
                         <p

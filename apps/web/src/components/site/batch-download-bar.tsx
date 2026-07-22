@@ -1,7 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDownIcon, DownloadIcon, PauseIcon, RotateCwIcon, XIcon } from "lucide-react";
+import {
+  ArrowLeftRightIcon,
+  ChevronDownIcon,
+  DownloadIcon,
+  PauseIcon,
+  RotateCwIcon,
+  XIcon,
+} from "lucide-react";
 import { useSpring } from "framer-motion";
 
 import { AnimatePresence, DrawnCheck, EASE_OUT, motion, useReducedMotion } from "@/components/motion";
@@ -19,6 +26,10 @@ import {
 import { BATCH_FORMATS, type BatchArchiveFormat } from "@/lib/adx-archive";
 import { isChartVideoFile, type ChartDownloadSpec } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import {
+  DownloadSourceMenu,
+  DownloadSourceSummary,
+} from "./downloads/download-source-selector";
 import { downloadJobStatusText } from "./downloads/download-status-text";
 import { jobPercent, newBatchJobId, useDownloadsStore } from "./downloads/downloads-store";
 
@@ -72,6 +83,8 @@ export function BatchDownloadBar({
   // Format chosen from the menu while a large selection awaits confirmation.
   const [pendingFormat, setPendingFormat] = React.useState<BatchArchiveFormat | null>(null);
   const barRef = React.useRef<HTMLDivElement | null>(null);
+  const selectedSourceId = useDownloadsStore((state) => state.selectedSourceId);
+  const setSelectedSourceId = useDownloadsStore((state) => state.setSelectedSourceId);
 
   // The pack+download runs in a module-level store so it keeps going after the
   // user navigates away from this page. The bar only tracks the job it started
@@ -84,6 +97,7 @@ export function BatchDownloadBar({
   );
   const startBatch = useDownloadsStore((state) => state.startBatch);
   const resume = useDownloadsStore((state) => state.resume);
+  const restartWithSource = useDownloadsStore((state) => state.restartWithSource);
   const pause = useDownloadsStore((state) => state.pause);
   const dismiss = useDownloadsStore((state) => state.dismiss);
   const presentInline = useDownloadsStore((state) => state.presentInline);
@@ -173,7 +187,14 @@ export function BatchDownloadBar({
     }
     const id = newBatchJobId();
     setJobId(id);
-    startBatch({ id, title: collectionName, charts, includeVideo, format });
+    startBatch({
+      id,
+      title: collectionName,
+      charts,
+      includeVideo,
+      format,
+      sourceId: selectedSourceId,
+    });
   }
 
   function handleSelect(format: BatchArchiveFormat) {
@@ -227,6 +248,32 @@ export function BatchDownloadBar({
                 {tray.resume}
                 {percent > 0 ? ` · ${percent}%` : null}
               </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-label={tray.sourcePicker.switchAndRestart}
+                    title={tray.sourcePicker.restartHint}
+                  >
+                    <ArrowLeftRightIcon data-icon="inline-start" />
+                    {tray.sourcePicker.switchAndRestart}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  collisionPadding={8}
+                  className="max-h-[min(28rem,calc(100dvh-5rem))] w-[min(20rem,calc(100vw-2rem))] overscroll-contain"
+                >
+                  <DownloadSourceMenu
+                    value={job?.sourceId ?? selectedSourceId}
+                    onValueChange={(sourceId) => job && restartWithSource(job.id, sourceId)}
+                    copy={tray.sourcePicker}
+                    hint={tray.sourcePicker.restartHint}
+                  />
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 type="button"
                 variant={confirmDiscard ? "destructive" : "ghost"}
@@ -262,7 +309,17 @@ export function BatchDownloadBar({
                     ) : null}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent
+                  align="end"
+                  collisionPadding={8}
+                  className="max-h-[min(28rem,calc(100dvh-5rem))] w-[min(20rem,calc(100vw-2rem))] overscroll-contain"
+                >
+                  <DownloadSourceMenu
+                    value={selectedSourceId}
+                    onValueChange={setSelectedSourceId}
+                    copy={tray.sourcePicker}
+                  />
+                  <DropdownMenuSeparator />
                   <DropdownMenuLabel>{detail.downloadFormatLabel}</DropdownMenuLabel>
                   {BATCH_FORMATS.map((format) => (
                     <DropdownMenuItem
@@ -307,6 +364,12 @@ export function BatchDownloadBar({
             </>
           )}
         </div>
+
+        <DownloadSourceSummary
+          sourceId={job?.sourceId ?? selectedSourceId}
+          copy={tray.sourcePicker}
+          className="w-fit"
+        />
 
         {!isBusy && !isResumable && status !== "success" ? (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
