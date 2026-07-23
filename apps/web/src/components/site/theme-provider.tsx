@@ -34,6 +34,11 @@ function applyResolvedTheme(theme: ResolvedTheme) {
     return;
   }
   document.documentElement.classList.toggle("dark", theme === "dark");
+  // The boot script pins an inline color-scheme so the pre-CSS canvas paints
+  // in the persisted mode. Inline beats the stylesheet's `.dark`/`:root`
+  // color-scheme, so runtime switches must keep it in step.
+  document.documentElement.style.colorScheme =
+    theme === "dark" ? "dark" : "light";
 }
 
 function applyAccent(accent: AccentColor) {

@@ -5,6 +5,10 @@ on:
     branches:
       - main
   workflow_dispatch:
+  schedule:
+    # Daily 04:00 Asia/Shanghai (20:00 UTC): rotates the homepage spotlight /
+    # featured picks, whose seed is the build day (see featured-selection.ts).
+    - cron: "0 20 * * *"
 
 # Artifact-based GitHub Pages deploy (no gh-pages branch).
 permissions:

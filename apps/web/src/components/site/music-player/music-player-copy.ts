@@ -20,6 +20,14 @@ export type MusicPlayerCopy = {
   noTracks: string;
   unknownArtist: string;
   pausedByOtherMedia: string;
+  collapse: string;
+  expand: string;
+  settings: {
+    title: string;
+    description: string;
+    enable: string;
+    disable: string;
+  };
   trackCount: (count: number) => string;
   mode: {
     sequence: string;
@@ -54,6 +62,14 @@ const copies: Record<Locale, MusicPlayerCopy> = {
     noTracks: "这个版本暂时没有可播放的曲目。",
     unknownArtist: "未知艺术家",
     pausedByOtherMedia: "已为谱面试听暂停",
+    collapse: "收起播放器",
+    expand: "展开播放器",
+    settings: {
+      title: "音乐播放器",
+      description: "左下角的全局音乐播放器，可按版本连续播放曲目。",
+      enable: "显示",
+      disable: "隐藏",
+    },
     trackCount: (count) => `${count} 首`,
     mode: {
       sequence: "顺序播放",
@@ -86,6 +102,15 @@ const copies: Record<Locale, MusicPlayerCopy> = {
     noTracks: "This version has no playable tracks yet.",
     unknownArtist: "Unknown artist",
     pausedByOtherMedia: "Paused for chart preview",
+    collapse: "Collapse player",
+    expand: "Expand player",
+    settings: {
+      title: "Music player",
+      description:
+        "The global bottom-left music player with per-version playlists.",
+      enable: "Show",
+      disable: "Hide",
+    },
     trackCount: (count) => `${count} tracks`,
     mode: {
       sequence: "Play in order",
@@ -118,6 +143,15 @@ const copies: Record<Locale, MusicPlayerCopy> = {
     noTracks: "このバージョンには再生できる曲がありません。",
     unknownArtist: "アーティスト不明",
     pausedByOtherMedia: "譜面プレビューのため一時停止しました",
+    collapse: "プレイヤーを折りたたむ",
+    expand: "プレイヤーを展開する",
+    settings: {
+      title: "音楽プレイヤー",
+      description:
+        "左下のグローバル音楽プレイヤー。バージョン別プレイリストを連続再生します。",
+      enable: "表示",
+      disable: "非表示",
+    },
     trackCount: (count) => `${count} 曲`,
     mode: {
       sequence: "順番に再生",

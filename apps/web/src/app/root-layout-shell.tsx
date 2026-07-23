@@ -1,3 +1,4 @@
+import type { Viewport } from "next";
 import Link from "next/link";
 
 import { LocaleSuggestionBanner } from "@/app/locale-suggestion-banner";
@@ -8,6 +9,7 @@ import { MusicPlayer } from "@/components/site/music-player/music-player";
 import { PageViewsProvider, SitePageViews } from "@/components/site/page-view-counter";
 import { ServiceWorkerRegistrar } from "@/components/site/service-worker-registrar";
 import { SiteHeader } from "@/components/site/site-header";
+import { SiteUptime } from "@/components/site/site-uptime";
 import { SWRProvider } from "@/components/site/swr-provider";
 import { TapRipple } from "@/components/site/tap-ripple";
 import { ThemeProvider } from "@/components/site/theme-provider";
@@ -23,6 +25,28 @@ type RootLayoutShellProps = Readonly<{
   lang: string;
   locale: Locale;
 }>;
+
+// An explicit light/dark mode wins; otherwise the color mode follows the OS.
+// The inline colorScheme style tells the browser the right canvas color while
+// the render-blocking stylesheet is still loading (the CSS `color-scheme`
+// only kicks in afterwards) — without it a dark-mode reload flashes white.
+// The music-player attribute mirrors music-player-preferences.ts.
+const NO_FLASH_BOOT_SCRIPT = `(function(){var e=document.documentElement;try{var t=localStorage.getItem('theme');var m=window.matchMedia('(prefers-color-scheme: dark)').matches;var d=t==='light'?false:(t==='dark'?true:m);e.classList.toggle('dark',d);e.style.colorScheme=d?'dark':'light';}catch(x){e.classList.add('dark');e.style.colorScheme='dark';}try{var a=localStorage.getItem('astrodx-accent');var c=['blue','violet','teal','orange','rose'];e.dataset.accent=c.indexOf(a)>=0?a:'blue';}catch(x){e.dataset.accent='blue';}try{var p=localStorage.getItem('adx-reduce-motion');p=p==='1'?'off':(p==='0'?'system':p);p=p==='on'||p==='off'?p:'system';e.dataset.motion=p;e.toggleAttribute('data-reduced-motion',p==='off');}catch(x){e.dataset.motion='system';}try{var s=JSON.parse(localStorage.getItem('astrodx-music-player-prefs-v1')||'{}');e.dataset.musicPlayer=s.enabled===false?'off':(s.collapsed===false?'expanded':'collapsed');}catch(x){e.dataset.musicPlayer='collapsed';}})();`;
+
+/**
+ * Shared by both html-owning layouts. The color-scheme meta lands early in
+ * <head>, so the browser paints the pre-CSS blank canvas in the OS color mode
+ * instead of default white — the main source of the dark-mode reload flash.
+ * theme-color matches --background (hex: theme-color meta parsing of oklch is
+ * not universal) for browser UI surfaces around the page.
+ */
+export const rootViewport: Viewport = {
+  colorScheme: "dark light",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0b111f" },
+    { media: "(prefers-color-scheme: light)", color: "#f8fcff" },
+  ],
+};
 
 const SOURCE_REPOSITORY = "https://github.com/AdingApkgg/adx-dl";
 // External monitor page; the in-site /status route was removed in favour of a
@@ -57,6 +81,17 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
   return (
     <html lang={lang} className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full bg-background text-foreground">
+        {/* Runs synchronously during HTML parse — first in <body>, before any
+            visible content — so the persisted color mode, accent, motion and
+            music-player preferences apply without a flash. Must stay inside
+            the <html> tree: React 19 rejects inline scripts in the fragment
+            root, and next/script beforeInteractive triggers the same dev
+            error there. On soft navigations React reuses (does not re-run)
+            the hydrated tag, which is fine — the attributes are already set. */}
+        <script
+          id="theme-init"
+          dangerouslySetInnerHTML={{ __html: NO_FLASH_BOOT_SCRIPT }}
+        />
         {/* Resource hints — every cover image is served from this cross-origin
             host; preconnect already implies DNS resolution, so no dns-prefetch
             fallback for it. The dns-prefetch below are for hosts we only warm. */}
@@ -164,11 +199,25 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
                       </a>
                     </nav>
                     <p className="text-xs text-muted-foreground">{dictionary.footer.lastUpdated(updatedDate)}</p>
+                    <SiteUptime locale={locale} />
                     <SitePageViews
                       siteViewsLabel={dictionary.pageViews.siteViews}
                       siteVisitorsLabel={dictionary.pageViews.siteVisitors}
                     />
                     <p className="text-xs text-muted-foreground">{dictionary.footer.disclaimer}</p>
+                    <p className="text-xs text-muted-foreground">{dictionary.footer.aiNotice}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {dictionary.footer.mitLicense.before}
+                      <a
+                        className="underline underline-offset-2 hover:text-foreground"
+                        href={`${SOURCE_REPOSITORY}/blob/main/LICENSE`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {dictionary.footer.mitLicense.link}
+                      </a>
+                      {dictionary.footer.mitLicense.after}
+                    </p>
                   </div>
                 </footer>
               </div>

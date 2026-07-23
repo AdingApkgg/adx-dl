@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   AlertCircleIcon,
+  ChevronDownIcon,
   ListMusicIcon,
   LoaderCircleIcon,
   Music2Icon,
@@ -46,8 +47,15 @@ import { jsonFetcher } from "@/lib/swr-fetcher";
 import { cn } from "@/lib/utils";
 import { versionImageSourcesByIndex } from "@/lib/version-image";
 
-import { getOrCreateMusicPlayerAudio } from "./music-player-audio";
+import {
+  getOrCreateMusicPlayerAudio,
+  MUSIC_PLAYER_AUDIO_ID,
+} from "./music-player-audio";
 import { getMusicPlayerCopy } from "./music-player-copy";
+import {
+  syncMusicPlayerSurfaceAttribute,
+  useMusicPlayerPreferences,
+} from "./music-player-preferences";
 import {
   readMusicPlayerSnapshot,
   type StoredMusicPlayerSnapshot,
@@ -65,6 +73,12 @@ import {
 } from "./music-player-utils";
 
 const PLAYLIST_MANIFEST_PATH = "/music/playlists.json";
+
+// The player survives client-side route transitions as a session-level
+// surface; its entrance animation belongs to the FIRST appearance only. A
+// module flag (not state) survives the remounts that happen when navigation
+// crosses the (default) ↔ [locale] route groups.
+let playerEnteredOnce = false;
 const CHECKPOINT_INTERVAL_MS = 5_000;
 const MODE_ORDER: MusicPlayerMode[] = [
   "sequence",
@@ -162,13 +176,54 @@ function PlaybackModeIcon({ mode }: { mode: MusicPlayerMode }) {
   return <Repeat2Icon />;
 }
 
-export function MusicPlayer({
+export function MusicPlayer(props: MusicPlayerProps) {
+  const enabled = useMusicPlayerPreferences((state) => state.enabled);
+  const prefsHydrated = useMusicPlayerPreferences((state) => state.hydrated);
+  const hydratePreferences = useMusicPlayerPreferences(
+    (state) => state.hydrate
+  );
+
+  React.useEffect(() => {
+    hydratePreferences();
+    // Remounts after a (default) ↔ [locale] group navigation find the <html>
+    // attributes reset by React — restore the persisted surface state.
+    syncMusicPlayerSurfaceAttribute();
+  }, [hydratePreferences]);
+
+  // The <audio> element is a document-level singleton that survives unmounts
+  // (deliberately, so playback crosses route transitions). Turning the player
+  // off must therefore silence it explicitly.
+  React.useEffect(() => {
+    if (!prefsHydrated || enabled || typeof document === "undefined") {
+      return;
+    }
+    const audio = document.getElementById(MUSIC_PLAYER_AUDIO_ID);
+    if (audio instanceof HTMLAudioElement) {
+      audio.pause();
+    }
+  }, [enabled, prefsHydrated]);
+
+  if (!enabled) {
+    return null;
+  }
+  return <MusicPlayerSurface {...props} />;
+}
+
+function MusicPlayerSurface({
   locale,
   versions,
   initialVersionId,
   initialTracks,
 }: MusicPlayerProps) {
   const copy = getMusicPlayerCopy(locale);
+  const [skipEntrance] = React.useState(() => playerEnteredOnce);
+  React.useEffect(() => {
+    playerEnteredOnce = true;
+  }, []);
+  const collapsed = useMusicPlayerPreferences((state) => state.collapsed);
+  const setCollapsed = useMusicPlayerPreferences(
+    (state) => state.setCollapsed
+  );
   const reducedMotion = useReducedMotion();
   const bottomBars = useDownloadsStore((state) => state.bottomBars);
   const audioRef = React.useRef<HTMLAudioElement>(null);
@@ -969,11 +1024,68 @@ export function MusicPlayer({
     >
       <div
         aria-label={copy.playerLabel}
-        className="pointer-events-none fixed inset-x-3 z-50 md:right-auto md:left-4 md:w-[22rem]"
-        style={{ bottom: playerBottom }}
+        className={cn(
+          "pointer-events-none fixed z-50",
+          collapsed
+            ? "left-3 md:left-4"
+            : "inset-x-3 md:right-auto md:left-4 md:w-[22rem]"
+        )}
+        // Own view-transition-name = pinned during page transitions (see
+        // globals.css) instead of blinking with the root snapshot.
+        style={{ bottom: playerBottom, viewTransitionName: "music-player" }}
       >
+        {collapsed ? (
+          <motion.button
+            type="button"
+            data-music-player-surface="collapsed"
+            initial={reducedMotion || skipEntrance ? false : { scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={() => setCollapsed(false)}
+            aria-label={copy.expand}
+            title={copy.expand}
+            className="pointer-events-auto relative block size-12 rounded-full border border-border/70 bg-popover/95 shadow-xl ring-1 ring-foreground/5 backdrop-blur-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            {/* Vinyl-style disc: the artwork spins while playing so the
+                bubble reads as a music player at a glance. */}
+            <motion.span
+              aria-hidden="true"
+              className="absolute inset-0 overflow-hidden rounded-full"
+              animate={
+                isPlaying && !reducedMotion ? { rotate: 360 } : { rotate: 0 }
+              }
+              transition={
+                isPlaying && !reducedMotion
+                  ? { duration: 10, ease: "linear", repeat: Infinity }
+                  : { duration: 0.3 }
+              }
+            >
+              <PlayerArtwork
+                track={currentTrack}
+                versionId={versionId}
+                alt=""
+                className="size-full"
+              />
+            </motion.span>
+            {isPlaying && !reducedMotion ? (
+              <motion.span
+                aria-hidden="true"
+                className="absolute inset-0 rounded-full ring-2 ring-inset ring-primary/70"
+                animate={{ opacity: [0.25, 0.85, 0.25] }}
+                transition={{ duration: 1.8, repeat: Infinity }}
+              />
+            ) : null}
+            {/* The note badge is what says "music player" even while idle. */}
+            <span
+              aria-hidden="true"
+              className="absolute -bottom-0.5 -right-0.5 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground ring-2 ring-background"
+            >
+              <Music2Icon className="size-3" />
+            </span>
+          </motion.button>
+        ) : (
         <motion.div
-          initial={reducedMotion ? false : { y: 16, opacity: 0 }}
+          data-music-player-surface="expanded"
+          initial={reducedMotion || skipEntrance ? false : { y: 16, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           className="pointer-events-auto relative isolate overflow-hidden rounded-2xl border border-border/70 bg-popover/95 shadow-xl ring-1 ring-foreground/5 backdrop-blur-xl"
         >
@@ -1056,8 +1168,23 @@ export function MusicPlayer({
                 <ListMusicIcon />
               </Button>
             </PopoverPrimitive.Trigger>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-lg"
+              onClick={() => {
+                setOpen(false);
+                setCollapsed(true);
+              }}
+              aria-label={copy.collapse}
+              title={copy.collapse}
+              className="size-10"
+            >
+              <ChevronDownIcon />
+            </Button>
           </div>
         </motion.div>
+        )}
       </div>
 
       <PopoverPrimitive.Portal>

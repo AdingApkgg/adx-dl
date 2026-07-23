@@ -228,7 +228,7 @@ export function formatEntrySubcategory(
 /** The release-ordering slice; both full and card entries satisfy it. */
 type ReleaseOrderable = Pick<CatalogEntry, "versionid" | "cabinet" | "short_id">;
 
-function isUtageEntry(entry: Pick<CatalogEntry, "cabinet">): boolean {
+export function isUtageEntry(entry: Pick<CatalogEntry, "cabinet">): boolean {
   const cabinet = entry.cabinet?.trim();
   return Boolean(cabinet) && cabinet !== "DX" && cabinet !== "ST";
 }

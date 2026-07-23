@@ -6,6 +6,7 @@ import { useGameSettingsStore, FULLSCREEN_QUALITY_MP } from "./store/settings-st
 import { MainRenderer, ANSWER_SOUND_BASE_OFFSET_MS } from "@lxns-network/maimai-chart-engine";
 import { useAudio } from "./hooks/use-audio";
 import { useMusicPlayer } from "./hooks/use-music-player";
+import { useWakeLock } from "./hooks/use-wake-lock";
 import { beatsToMs, msToBeats } from "./lib/time-conversion";
 import { formatChartTimeForFilename } from "./lib/format";
 import { sanitizeFilenameId, downloadBlob } from "./lib/file-download";
@@ -19,6 +20,21 @@ type PreviewDict = SiteDictionary["preview"];
 // frame (kept as events so the controls don't need a ref to the canvas).
 export const EXPORT_FRAME_EVENT = "astrodx-chart-export-frame";
 export const COPY_FRAME_EVENT = "astrodx-chart-copy-frame";
+export const SHARE_FRAME_EVENT = "astrodx-chart-share-frame";
+
+/** Whether the platform can share PNG files (gates the share menu item). */
+export function canShareFrameFiles(): boolean {
+  if (typeof navigator === "undefined" || !navigator.canShare) {
+    return false;
+  }
+  try {
+    return navigator.canShare({
+      files: [new File([""], "frame.png", { type: "image/png" })],
+    });
+  } catch {
+    return false;
+  }
+}
 
 export type ChartCanvasProps = {
   /** PV video URL; drawn behind the chart when `showVideo` is on. */
@@ -74,6 +90,7 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
 
   const isFullscreen = useGameStore((s) => s.isFullscreen);
   const isPlaying = useGameStore((s) => s.isPlaying);
+  useWakeLock(isPlaying);
   const chartData = useGameStore((s) => s.chartData);
   const totalMeasures = useGameStore((s) => s.timeline.totalMeasures);
   const beatsPerMeasure = useGameStore((s) => s.timeline.beatsPerMeasure);
@@ -83,6 +100,7 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
 
   const hiSpeed = useGameSettingsStore((s) => s.hiSpeed);
   const alwaysKeepHiSpeed = useGameSettingsStore((s) => s.alwaysKeepHiSpeed);
+  const viewRotation = useGameSettingsStore((s) => s.viewRotation);
   const slideRotation = useGameSettingsStore((s) => s.slideRotation);
   const mirrorMode = useGameSettingsStore((s) => s.mirrorMode);
   const judgmentLineDesign = useGameSettingsStore((s) => s.judgmentLineDesign);
@@ -391,15 +409,20 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
         ),
       );
 
+    const frameFilename = () => {
+      const chart = useGameStore.getState().chartData;
+      const currentMs = chart ? beatsToMs(playbackTimeRef.current, chart.bpmEvents, chart.bpm) : 0;
+      return `maimai-chart-${sanitizeFilenameId(chartName)}-${formatChartTimeForFilename(
+        currentMs,
+      )}.png`;
+    };
+
+    // Save = plain download. Routing it through navigator.share first (the old
+    // behavior) made every save wait on the OS share sheet — the "why does
+    // save hang" complaint.
     const exportFrame = async () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      const chart = useGameStore.getState().chartData;
-      const currentMs = chart ? beatsToMs(playbackTimeRef.current, chart.bpmEvents, chart.bpm) : 0;
-      const filename = `maimai-chart-${sanitizeFilenameId(chartName)}-${formatChartTimeForFilename(
-        currentMs,
-      )}.png`;
-
       let blob: Blob;
       try {
         blob = await canvasToBlob(canvas);
@@ -407,18 +430,30 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
         notify(t.frameFailedTitle, t.frameFailedBody, "red");
         return;
       }
+      downloadBlob(blob, frameFilename());
+      notify(t.frameSavedTitle, t.frameSavedBody, "green");
+    };
 
-      const file = new File([blob], filename, { type: "image/png" });
+    // Explicit system-share menu entry (upstream parity).
+    const shareFrame = async () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      let blob: Blob;
+      try {
+        blob = await canvasToBlob(canvas);
+      } catch {
+        notify(t.frameFailedTitle, t.frameFailedBody, "red");
+        return;
+      }
+      const file = new File([blob], frameFilename(), { type: "image/png" });
       try {
         if (navigator.canShare?.({ files: [file] })) {
           await navigator.share({ files: [file] });
-          return;
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
+        notify(t.frameFailedTitle, t.frameFailedBody, "red");
       }
-      downloadBlob(blob, filename);
-      notify(t.frameSavedTitle, t.frameSavedBody, "green");
     };
 
     const copyFrame = async () => {
@@ -436,9 +471,11 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
 
     window.addEventListener(EXPORT_FRAME_EVENT, exportFrame);
     window.addEventListener(COPY_FRAME_EVENT, copyFrame);
+    window.addEventListener(SHARE_FRAME_EVENT, shareFrame);
     return () => {
       window.removeEventListener(EXPORT_FRAME_EVENT, exportFrame);
       window.removeEventListener(COPY_FRAME_EVENT, copyFrame);
+      window.removeEventListener(SHARE_FRAME_EVENT, shareFrame);
     };
   }, [chartName, t]);
 
@@ -784,6 +821,13 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
         role="img"
         aria-label={t.canvasLabel(chartName)}
         className={cn(classes.canvas, isFullscreen && classes.fullscreen)}
+        // View rotation happens in CSS so the square canvas (and the
+        // engine-drawn HUD inside it) turns as one — right for a flat tablet
+        // with the player sitting on another side. Exports stay unrotated.
+        style={{
+          transform: viewRotation ? `rotate(${viewRotation}deg)` : undefined,
+          transition: "transform 0.3s ease",
+        }}
       />
     </div>
   );

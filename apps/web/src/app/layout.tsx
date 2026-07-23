@@ -1,11 +1,6 @@
 import "./globals.css";
 import Script from "next/script";
 
-// Runs synchronously during HTML parse (before first paint) so persisted color
-// mode, accent and motion preferences apply without a flash. An explicit
-// light/dark mode wins; otherwise the color mode follows the OS.
-const noFlashThemeScript = `(function(){var e=document.documentElement;try{var t=localStorage.getItem('theme');var m=window.matchMedia('(prefers-color-scheme: dark)').matches;var d=t==='light'?false:(t==='dark'?true:m);e.classList.toggle('dark',d);}catch(x){e.classList.add('dark');}try{var a=localStorage.getItem('astrodx-accent');var c=['blue','violet','teal','orange','rose'];e.dataset.accent=c.indexOf(a)>=0?a:'blue';}catch(x){e.dataset.accent='blue';}try{var p=localStorage.getItem('adx-reduce-motion');p=p==='1'?'off':(p==='0'?'system':p);p=p==='on'||p==='off'?p:'system';e.dataset.motion=p;e.toggleAttribute('data-reduced-motion',p==='off');}catch(x){e.dataset.motion='system';}})();`;
-
 // Prefetch the remaining cross-document navigations without running their page
 // scripts. Unsupported browsers ignore this as progressive enhancement.
 const speculationRules = JSON.stringify({
@@ -28,9 +23,9 @@ export default function RootLayout({
 }>) {
   return (
     <>
-      <Script id="theme-init" strategy="beforeInteractive">
-        {noFlashThemeScript}
-      </Script>
+      {/* The no-flash boot script lives in RootLayoutShell (top of <body>):
+          React 19 rejects inline scripts rendered outside the <html> tree,
+          which this fragment root is. */}
       <Script
         id="speculation-rules"
         type="speculationrules"

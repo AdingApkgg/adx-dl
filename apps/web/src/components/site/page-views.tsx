@@ -62,6 +62,7 @@ import {
   resolveVersionIndex,
   sortByReleaseDesc,
 } from "@/lib/catalog-shared";
+import { seedFromString, selectFeatured } from "@/lib/featured-selection";
 import { buildVersionFilterHref } from "@/lib/catalog-links";
 import { astroDxDownloadUrl, DEMO_VIDEO_URL } from "@/lib/resource-links";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
@@ -97,34 +98,14 @@ type ChartDetailPageViewProps = SharedViewProps & {
   related?: CatalogEntry[];
 };
 
-// FNV-1a hash: turn the catalog timestamp into a stable seed so the spotlight
-// and random picks stay fixed within a build but rotate when the catalog updates.
-function seedFromString(value: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i++) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-// Deterministic Fisher-Yates shuffle driven by a mulberry32 PRNG, so the same
-// seed always yields the same order (required for a stable static export).
-function seededShuffle<T>(items: readonly T[], seed: number): T[] {
-  const arr = items.slice();
-  let state = seed >>> 0;
-  const random = () => {
-    state = (state + 0x6d2b79f5) | 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
+// Build-day seed inputs, evaluated ONCE at module init (= SSG build time; also
+// keeps impure Date calls out of render for react-hooks/purity). The daily
+// scheduled rebuild gives this a fresh value each day; the reference timestamp
+// derives from the same day string so recency weights are day-stable too.
+const BUILD_DAY = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Shanghai",
+}).format(new Date());
+const BUILD_DAY_MS = Date.parse(`${BUILD_DAY}T00:00:00+08:00`);
 
 function HomeHeroTitle({ title, noBreak }: { title: string; noBreak?: string }) {
   if (!noBreak) return title;
@@ -187,22 +168,21 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
     .sort((a, b) => a - b)
     .map((id) => ({ id, label: GENRES[id][locale], badge: GENRES[id].badge }));
 
-  // Spotlight carousel + "random picks" rail: a build-stable shuffle seeded by the
-  // catalog timestamp, so the selection rotates whenever the catalog updates.
-  // Cover-bearing entries lead the sequence so all three carousel frames have
-  // artwork whenever the catalog can provide it.
-  const seed = seedFromString(catalog.generated_at);
-  const coveredEntries = catalog.entries.filter(
-    (entry) => entry.media.cover_avif || entry.media.cover_webp || entry.media.cover_url
+  // Spotlight carousel + "random picks" rail: deterministic weighted picks
+  // seeded by the BUILD DAY (Asia/Shanghai) — the daily scheduled rebuild in
+  // deploy-gh-pages.yml rotates the selection once a day, and any re-deploy
+  // within the same day reproduces it. Weights favor fresh imports, covers,
+  // PVs and the newest version; constraints spread versions and difficulty
+  // bands (see lib/featured-selection.ts).
+  const latestIds = new Set(latestEntries.map((entry) => entry.id));
+  const { spotlight: spotlightEntries, featured: featuredEntries } = selectFeatured(
+    catalog.entries,
+    {
+      seed: seedFromString(BUILD_DAY),
+      referenceMs: BUILD_DAY_MS,
+      excludeFromFeatured: latestIds,
+    }
   );
-  const uncoveredEntries = catalog.entries.filter(
-    (entry) => !entry.media.cover_avif && !entry.media.cover_webp && !entry.media.cover_url
-  );
-  const shuffled = [
-    ...seededShuffle(coveredEntries, seed),
-    ...seededShuffle(uncoveredEntries, seed ^ 0x9e3779b9),
-  ];
-  const spotlightEntries = shuffled.slice(0, 3);
   const firstSpotlight = spotlightEntries[0] ?? null;
   // Preload the above-the-fold spotlight cover — the home LCP element. It renders
   // as a raw <img> (static export makes next/image unoptimized), so nothing else
@@ -216,12 +196,6 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
       ...(avif ? { type: "image/avif" } : {}),
     });
   }
-  const latestIds = new Set(latestEntries.map((entry) => entry.id));
-  const spotlightIds = new Set(spotlightEntries.map((entry) => entry.id));
-  const featuredEntries = shuffled
-    .filter((entry) => !spotlightIds.has(entry.id) && !latestIds.has(entry.id))
-    .slice(0, 6);
-
   return (
     <main
       id="main-content"

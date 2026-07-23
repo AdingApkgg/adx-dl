@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 
 import "../globals.css";
-import { RootLayoutShell } from "@/app/root-layout-shell";
+import { RootLayoutShell, rootViewport } from "@/app/root-layout-shell";
 import { resolveSiteUrl } from "@/lib/site-url";
+
+export const viewport = rootViewport;
 
 const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 const siteDescription =

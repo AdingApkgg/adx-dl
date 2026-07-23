@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LockIcon, LockOpenIcon } from "lucide-react";
 import useSWR from "swr";
 import {
   getAvailableDifficulties,
@@ -14,12 +15,15 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartCanvas } from "./chart-canvas";
-import { ChartControls } from "./chart-controls";
-import { ChartSettings } from "./chart-settings";
+import { ChartControls, ChartDifficultyPicker } from "./chart-controls";
+import { ChartSettingsGroups } from "./chart-settings";
+import { ChartSpeedCard } from "./chart-speed-card";
 import { ChartDensityTimeline, type DensityLegendLabels } from "./chart-density-timeline";
 import { ChartExportRangeOverlay } from "./chart-export-range-overlay";
 import { ChartSimaiStatements } from "./chart-simai-statements";
 import { ChartShortcuts } from "./chart-shortcuts";
+import { useDownloadsStore } from "@/components/site/downloads/downloads-store";
+import { resolveDownloadUrl } from "@/lib/download-sources";
 import { useGameStore, playbackTimeRef } from "./store/game-store";
 import { useGameSettingsStore } from "./store/settings-store";
 import { useLiveBeats } from "./hooks/use-live-beats";
@@ -96,7 +100,7 @@ function DensityWithPlayhead({
 export function ChartPreview({
   maidataUrl,
   audioUrl,
-  videoUrl,
+  videoUrl: rawVideoUrl,
   coverUrl,
   chartName = "chart",
   defaultDifficulty,
@@ -105,12 +109,49 @@ export function ChartPreview({
 }: ChartPreviewProps) {
   const t = getDictionary(locale).preview;
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // The PV can be served from any chart-media mirror (视频设置 → 视频线路);
+  // the catalog URL points at the default source and is rerouted here.
+  const videoSourceId = useGameSettingsStore((s) => s.videoSourceId);
+  const customVideoSources = useDownloadsStore((s) => s.customSources);
+  const videoUrl = useMemo(() => {
+    if (!rawVideoUrl) {
+      return rawVideoUrl;
+    }
+    const custom = customVideoSources.find((c) => c.id === videoSourceId);
+    return resolveDownloadUrl(rawVideoUrl, videoSourceId, custom?.baseUrl);
+  }, [rawVideoUrl, videoSourceId, customVideoSources]);
   const gifAbortRef = useRef<AbortController | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [gifExporting, setGifExporting] = useState(false);
   const [gifProgress, setGifProgress] = useState(0);
   const [toast, setToast] = useState<Toast>(null);
   const [showControls, setShowControls] = useState(true);
+  // ?beat= deep link (written by the copy-time-URL button): read once on
+  // mount, applied as soon as a chart is parsed.
+  const [initialBeat] = useState<number | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+    const raw = new URLSearchParams(window.location.search).get("beat");
+    const value = raw === null ? Number.NaN : Number(raw);
+    return Number.isFinite(value) && value >= 0 ? value : null;
+  });
+  const initialBeatAppliedRef = useRef(false);
+  // Fullscreen UI lock: playing along means tapping the screen constantly, and
+  // every tap used to wake the control overlay (or hit a button). While locked
+  // only the floating unlock button responds; it fades out on its own.
+  const [uiLocked, setUiLocked] = useState(false);
+  const [lockHintVisible, setLockHintVisible] = useState(false);
+  // Portal target for the export menu and tooltips: the preview root itself.
+  // A body portal is unusable here BOTH ways — the hosting overlay dialog is
+  // an opaque z-[60] layer (body-level z-50 poppers render invisibly behind
+  // it), and in fullscreen anything outside the fullscreened element is not
+  // painted at all. Captured via callback ref so it exists from first paint.
+  const [menuContainer, setMenuContainer] = useState<HTMLElement | null>(null);
+  const assignContainer = useCallback((el: HTMLDivElement | null) => {
+    containerRef.current = el;
+    setMenuContainer(el);
+  }, []);
   // The Fullscreen API is a silent no-op on iOS Safari (no requestFullscreen,
   // no webkit fallback on <div>), so the entry points hide there.
   const [fullscreenSupported] = useState(() => {
@@ -132,6 +173,15 @@ export function ChartPreview({
   const totalMs = chartData ? beatsToMs(totalBeats, chartData.bpmEvents, chartData.bpm) : 0;
   const exportRange = useExportRange(totalMs);
   const gifRangeMode = exportRange.range !== null;
+
+  // Apply the ?beat= deep link once the first chart parse lands.
+  useEffect(() => {
+    if (initialBeat === null || initialBeatAppliedRef.current || !chartData) {
+      return;
+    }
+    initialBeatAppliedRef.current = true;
+    setPreciseTime(Math.min(initialBeat, totalBeats), true);
+  }, [chartData, initialBeat, setPreciseTime, totalBeats]);
 
   // The raw simai text is immutable and cached by URL, so revisiting a chart (or
   // remounting the player) reuses the cache with no refetch. One shot per source
@@ -202,10 +252,23 @@ export function ChartPreview({
 
   useEffect(() => {
     const doc = document as FullscreenDocument;
-    const onChange = () =>
-      setIsFullscreen(
-        (doc.fullscreenElement ?? doc.webkitFullscreenElement) === containerRef.current,
-      );
+    const onChange = () => {
+      const fullscreen =
+        (doc.fullscreenElement ?? doc.webkitFullscreenElement) === containerRef.current;
+      setIsFullscreen(fullscreen);
+      // Entering via the ⛶ button leaves focus on that button, which sits
+      // inside the auto-hiding overlay — its focus-within escape would then
+      // pin the overlay visible forever. Moving focus to the container also
+      // arms the keyboard shortcuts immediately.
+      if (fullscreen) {
+        containerRef.current?.focus({ preventScroll: true });
+      }
+      // Leaving fullscreen (Esc / browser chrome) must never strand a locked
+      // inline layout, where the lock button is not rendered.
+      if (!fullscreen) {
+        setUiLocked(false);
+      }
+    };
     document.addEventListener("fullscreenchange", onChange);
     document.addEventListener("webkitfullscreenchange", onChange);
     return () => {
@@ -219,7 +282,7 @@ export function ChartPreview({
   // needed otherwise.) Keydown counts as activity so keyboard users can reach the
   // controls; while hidden they are also `invisible` (out of the tab order).
   useEffect(() => {
-    if (!isFullscreen) return;
+    if (!isFullscreen || uiLocked) return;
     let timer: number | undefined;
     const reveal = () => {
       setShowControls(true);
@@ -236,7 +299,27 @@ export function ChartPreview({
       window.removeEventListener("pointerdown", reveal);
       window.removeEventListener("keydown", reveal);
     };
-  }, [isFullscreen]);
+  }, [isFullscreen, uiLocked]);
+
+  // Locked mode: taps only surface the floating unlock button (2.5s), never the
+  // control overlay. pointermove is deliberately not a trigger — resting a palm
+  // on a tablet mid-play must not keep the button lit.
+  useEffect(() => {
+    if (!isFullscreen || !uiLocked) return;
+    let timer: number | undefined;
+    const reveal = () => {
+      setLockHintVisible(true);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setLockHintVisible(false), 2500);
+    };
+    reveal();
+    window.addEventListener("pointerdown", reveal);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pointerdown", reveal);
+      setLockHintVisible(false);
+    };
+  }, [isFullscreen, uiLocked]);
 
   const toggleFullscreen = useCallback(() => {
     const el = containerRef.current as FullscreenElement | null;
@@ -333,6 +416,9 @@ export function ChartPreview({
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // Locked = every shortcut is an accidental input (Esc still exits
+      // fullscreen at the browser level and the exit auto-unlocks).
+      if (uiLocked) return;
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
       const store = useGameStore.getState();
@@ -347,19 +433,29 @@ export function ChartPreview({
           break;
         case "ArrowLeft":
           e.preventDefault();
-          store.stepPosition(-1);
+          // Shift steps a whole measure (upstream parity); plain arrows step
+          // one position.
+          if (e.shiftKey) {
+            store.stepMeasure(-1);
+          } else {
+            store.stepPosition(-1);
+          }
           break;
         case "ArrowRight":
           e.preventDefault();
-          store.stepPosition(1);
+          if (e.shiftKey) {
+            store.stepMeasure(1);
+          } else {
+            store.stepPosition(1);
+          }
           break;
         case "ArrowUp":
           e.preventDefault();
-          settings.setHiSpeed(settings.hiSpeed + 0.5);
+          settings.setHiSpeed(settings.hiSpeed + 0.25);
           break;
         case "ArrowDown":
           e.preventDefault();
-          settings.setHiSpeed(settings.hiSpeed - 0.5);
+          settings.setHiSpeed(settings.hiSpeed - 0.25);
           break;
         case ",":
           store.stepMeasure(-1);
@@ -377,7 +473,7 @@ export function ChartPreview({
           break;
       }
     },
-    [toggleFullscreen],
+    [toggleFullscreen, uiLocked],
   );
 
   if (simai === undefined) {
@@ -411,8 +507,6 @@ export function ChartPreview({
 
   const controls = (
     <ChartControls
-      settingsOpen={settingsOpen}
-      onToggleSettings={() => setSettingsOpen((v) => !v)}
       isFullscreen={isFullscreen}
       onToggleFullscreen={toggleFullscreen}
       fullscreenSupported={fullscreenSupported}
@@ -421,13 +515,101 @@ export function ChartPreview({
       gifExporting={gifExporting}
       gifProgress={gifProgress}
       levels={levels}
+      menuContainer={menuContainer}
       t={t}
     />
   );
 
+  // Seekable density timeline + the GIF range bar. Shared by both layouts —
+  // the reference shows the timeline in fullscreen too, which is also what
+  // makes the GIF flow usable there. The GIF action bar shares this zero-gap
+  // group so its height collapse doesn't leave a dangling parent `gap`.
+  const timelineBlock =
+    totalMs > 0 ? (
+      <div
+        className={cn(
+          "flex w-full flex-col",
+          !isFullscreen && "lg:[grid-area:timeline]",
+        )}
+      >
+        <DensityWithPlayhead
+          notes={densityNotes}
+          durationMs={totalMs}
+          onSeek={seekToMs}
+          interactive={!gifRangeMode}
+          legendLabels={{
+            label: t.legendLabel,
+            tap: t.noteTap,
+            hold: t.noteHold,
+            slide: t.noteSlide,
+            touch: t.noteTouch,
+            break: t.noteBreak,
+          }}
+        >
+          {exportRange.range ? (
+            <ChartExportRangeOverlay
+              range={exportRange.range}
+              totalDurationMs={totalMs}
+              onChange={exportRange.update}
+              onPreview={seekToMs}
+            />
+          ) : null}
+        </DensityWithPlayhead>
+
+        <AnimatePresence initial={false}>
+          {gifRangeMode && exportRange.range ? (
+            <motion.div
+              key="gif-actions"
+              className="overflow-hidden"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={collapseTransition}
+            >
+              <div className="flex flex-wrap items-center gap-2 pt-3 text-sm">
+                <span className="text-muted-foreground">
+                  {t.gifRangeHint(
+                    formatDuration(exportRange.range.endMs - exportRange.range.startMs),
+                  )}
+                </span>
+                <span className="flex-1" />
+                <Button
+                  type="button"
+                  size="sm"
+                  className="relative overflow-hidden"
+                  onClick={() => exportRange.range && runGifExport(exportRange.range)}
+                  disabled={gifExporting}
+                >
+                  {gifExporting ? (
+                    // Progress fill behind the label — scaleX (not width)
+                    // so it stays a pure transform.
+                    <motion.span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 origin-left bg-primary-foreground/25"
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: gifProgress }}
+                      transition={{ duration: 0.25, ease: EASE_OUT }}
+                    />
+                  ) : null}
+                  <span className="relative">
+                    {gifExporting
+                      ? t.exportingPercent(Math.round(gifProgress * 100))
+                      : t.exportGif}
+                  </span>
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={cancelGif}>
+                  {t.cancel}
+                </Button>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+    ) : null;
+
   return (
     <div
-      ref={containerRef}
+      ref={assignContainer}
       tabIndex={0}
       onKeyDown={onKeyDown}
       className={cn(
@@ -435,158 +617,113 @@ export function ChartPreview({
         isFullscreen
           ? cn(
               // `dark` so the overlay controls resolve dark-theme tokens on the
-              // hardcoded black backdrop even for light-mode users.
-              "dark relative flex h-full w-full items-center justify-center bg-black",
-              !showControls && "cursor-none",
+              // hardcoded black backdrop even for light-mode users. The
+              // explicit text-foreground matters: inherited `color` carries
+              // body's computed (light-theme, near-black) value straight past
+              // the variable flip, turning every icon invisible on black.
+              "dark relative flex h-full w-full items-center justify-center bg-black text-foreground",
+              // While locked the cursor stays visible — hiding it on top of a
+              // non-responsive surface reads as a hang.
+              !showControls && !uiLocked && "cursor-none",
             )
-          : "flex flex-col gap-4",
+          : // Desktop (lxns-style) splits into playfield column + sidebar via
+            // named grid areas; the trailing 1fr row absorbs a sidebar taller
+            // than the playfield so it never stretches gaps into the left rows.
+            "flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(19rem,22rem)] lg:grid-rows-[auto_auto_auto_1fr] lg:items-start lg:gap-x-6 lg:[grid-template-areas:'canvas_side'_'timeline_side'_'controls_side'_'spacer_side']",
       )}
     >
-      <ChartCanvas videoUrl={videoUrl} coverUrl={coverUrl} chartName={chartName} t={t} />
+      {/* `contents` keeps this wrapper out of the fullscreen flex layout; it
+          only exists so the (never remounted) canvas can be grid-placed. */}
+      <div className={cn(isFullscreen ? "contents" : "w-full lg:[grid-area:canvas]")}>
+        <ChartCanvas videoUrl={videoUrl} coverUrl={coverUrl} chartName={chartName} t={t} />
+      </div>
 
       {!isFullscreen ? (
         <>
-          {totalMs > 0 ? (
-            // The GIF action bar shares this zero-gap group with the timeline so
-            // its height collapse doesn't leave a dangling parent `gap` behind.
-            <div className="flex w-full flex-col">
-              <DensityWithPlayhead
-                notes={densityNotes}
-                durationMs={totalMs}
-                onSeek={seekToMs}
-                interactive={!gifRangeMode}
-                legendLabels={{
-                  label: t.legendLabel,
-                  tap: t.noteTap,
-                  hold: t.noteHold,
-                  slide: t.noteSlide,
-                  touch: t.noteTouch,
-                  break: t.noteBreak,
-                }}
-              >
-                {exportRange.range ? (
-                  <ChartExportRangeOverlay
-                    range={exportRange.range}
-                    totalDurationMs={totalMs}
-                    onChange={exportRange.update}
-                    onPreview={seekToMs}
-                  />
-                ) : null}
-              </DensityWithPlayhead>
+          {timelineBlock}
 
-              <AnimatePresence initial={false}>
-                {gifRangeMode && exportRange.range ? (
-                  <motion.div
-                    key="gif-actions"
-                    className="overflow-hidden"
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={collapseTransition}
-                  >
-                    <div className="flex flex-wrap items-center gap-2 pt-3 text-sm">
-                      <span className="text-muted-foreground">
-                        {t.gifRangeHint(
-                          formatDuration(exportRange.range.endMs - exportRange.range.startMs),
-                        )}
-                      </span>
-                      <span className="flex-1" />
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="relative overflow-hidden"
-                        onClick={() => exportRange.range && runGifExport(exportRange.range)}
-                        disabled={gifExporting}
-                      >
-                        {gifExporting ? (
-                          // Progress fill behind the label — scaleX (not width)
-                          // so it stays a pure transform.
-                          <motion.span
-                            aria-hidden="true"
-                            className="pointer-events-none absolute inset-0 origin-left bg-primary-foreground/25"
-                            initial={{ scaleX: 0 }}
-                            animate={{ scaleX: gifProgress }}
-                            transition={{ duration: 0.25, ease: EASE_OUT }}
-                          />
-                        ) : null}
-                        <span className="relative">
-                          {gifExporting
-                            ? t.exportingPercent(Math.round(gifProgress * 100))
-                            : t.exportGif}
-                        </span>
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={cancelGif}>
-                        {t.cancel}
-                      </Button>
-                    </div>
-                  </motion.div>
-                ) : null}
-              </AnimatePresence>
-            </div>
-          ) : null}
+          {/* Desktop: the control block matches the canvas width and centers
+              under it, echoing the reference layout. */}
+          <div className="w-full lg:[grid-area:controls] lg:max-w-[600px] lg:justify-self-center">
+            {controls}
+          </div>
 
-          <div className="w-full">{controls}</div>
+          {/* Sidebar column on desktop, ordered like the reference: simai,
+              speed, difficulty, the three settings groups, shortcuts.
+              `contents` on stacked layouts keeps the children flowing in the
+              same order inline instead. */}
+          <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4 lg:[grid-area:side]">
+            <ChartSimaiStatements
+              simaiText={rawSimaiText}
+              difficulty={selectedDifficulty}
+              title={t.simaiTitle}
+              resumeAutoScrollLabel={t.resumeAutoScroll}
+            />
 
-          <AnimatePresence initial={false}>
-            {settingsOpen ? (
-              <motion.div
-                key="settings"
-                className="w-full overflow-hidden"
-                // marginBottom offsets the parent's gap-4 while collapsed so the
-                // unmount doesn't snap the layout by one leftover gap.
-                initial={{ height: 0, opacity: 0, y: -8, marginBottom: -16 }}
-                animate={{ height: "auto", opacity: 1, y: 0, marginBottom: 0 }}
-                exit={{ height: 0, opacity: 0, y: -8, marginBottom: -16 }}
-                transition={collapseTransition}
-              >
-                <div className="rounded-lg border border-border/60 bg-card/40 p-4">
-                  <ChartSettings locale={locale} />
-                </div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
+            <ChartSpeedCard locale={locale} />
 
-          <ChartSimaiStatements
-            simaiText={rawSimaiText}
-            difficulty={selectedDifficulty}
-            title={t.simaiTitle}
-            resumeAutoScrollLabel={t.resumeAutoScroll}
-          />
-          <ChartShortcuts locale={locale} hint={t.keyboardHint} />
+            <ChartDifficultyPicker
+              levels={levels}
+              className="hidden lg:flex"
+              pillLayoutId="preview-difficulty-pill-side"
+            />
+
+            <ChartSettingsGroups locale={locale} />
+
+            <ChartShortcuts locale={locale} hint={t.keyboardHint} />
+          </div>
         </>
       ) : (
         // Fullscreen: canvas stays flex-centered; controls float as an
         // auto-hiding bottom overlay so they never squeeze the 100vmin canvas.
         // While hidden they turn `invisible` (unfocusable), but keyboard focus
         // landing inside keeps them shown via focus-within.
+        <>
+        <button
+          type="button"
+          onClick={() => {
+            if (uiLocked) {
+              setUiLocked(false);
+            } else {
+              setUiLocked(true);
+              setShowControls(false);
+            }
+          }}
+          aria-pressed={uiLocked}
+          aria-label={uiLocked ? t.unlockUi : t.lockUi}
+          title={uiLocked ? t.unlockUi : t.lockUi}
+          className={cn(
+            "fixed left-3 top-1/2 z-20 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white backdrop-blur transition-opacity duration-300",
+            (uiLocked ? lockHintVisible : showControls)
+              ? "opacity-100"
+              : "pointer-events-none opacity-0",
+          )}
+        >
+          {uiLocked ? (
+            <LockIcon className="size-5" aria-hidden="true" />
+          ) : (
+            <LockOpenIcon className="size-5" aria-hidden="true" />
+          )}
+        </button>
         <div
           className={cn(
             "fixed inset-x-0 bottom-0 z-10 flex flex-col items-center gap-3 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-4 pb-5 pt-16 transition-all duration-300",
             showControls
               ? "translate-y-0 opacity-100"
-              : "invisible pointer-events-none translate-y-full opacity-0 focus-within:visible focus-within:pointer-events-auto focus-within:translate-y-0 focus-within:opacity-100",
+              : uiLocked
+                ? // Locked: no focus-within escape — the overlay stays away
+                  // until the user unlocks.
+                  "invisible pointer-events-none translate-y-full opacity-0"
+                : "invisible pointer-events-none translate-y-full opacity-0 focus-within:visible focus-within:pointer-events-auto focus-within:translate-y-0 focus-within:opacity-100",
           )}
         >
-          <AnimatePresence initial={false}>
-            {settingsOpen ? (
-              <motion.div
-                key="fullscreen-settings"
-                className="w-full max-w-2xl overflow-hidden"
-                // marginBottom offsets the overlay's gap-3 while collapsed (same
-                // trick as the inline panel).
-                initial={{ height: 0, opacity: 0, y: -8, marginBottom: -12 }}
-                animate={{ height: "auto", opacity: 1, y: 0, marginBottom: 0 }}
-                exit={{ height: 0, opacity: 0, y: -8, marginBottom: -12 }}
-                transition={collapseTransition}
-              >
-                <div className="max-h-[55vh] w-full overflow-auto rounded-lg border border-border/60 bg-card/90 p-4 backdrop-blur [color-scheme:dark]">
-                  <ChartSettings locale={locale} />
-                </div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
+          {/* Reference parity: the fullscreen overlay is ONLY the seekable
+              timeline (which also hosts the GIF range selection) plus the
+              transport strip — speed/settings live outside fullscreen. */}
+          <div className="w-full max-w-2xl">{timelineBlock}</div>
           <div className="w-full max-w-2xl">{controls}</div>
         </div>
+        </>
       )}
 
       {/* Keyed by title: a different toast exits down while its successor

@@ -290,7 +290,22 @@ export function ChartDensityTimeline({
       </motion.div>
 
       {playheadPercent !== null ? (
-        <div className={classes.playhead} style={{ left: `${playheadPercent}%` }} />
+        <>
+          <div className={classes.playhead} style={{ left: `${playheadPercent}%` }} />
+          {/* Current-time badge riding the playhead (upstream parity — theirs
+              shows the measure, ours the seconds the user actually asked for).
+              Edge-clamped with the same transform trick as the time labels. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-1 z-10 rounded bg-primary px-1 font-mono text-[0.6rem] leading-4 text-primary-foreground tabular-nums"
+            style={{
+              left: `${playheadPercent}%`,
+              transform: getLabelTransform(playheadPercent),
+            }}
+          >
+            {formatTimeLabel(playheadMs ?? 0)}
+          </div>
+        </>
       ) : null}
 
       {/* Short-lived seek ripples: the static wrapper span owns the centering

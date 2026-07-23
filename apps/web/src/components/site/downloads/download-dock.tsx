@@ -289,6 +289,9 @@ export function DownloadDock({ locale }: { locale: Locale }) {
           bottomBars > 0
             ? "calc(var(--batch-download-bar-height, 5rem) + max(1rem, env(safe-area-inset-bottom)) + var(--music-player-mobile-reserve, 0rem) + 0.75rem)"
             : "calc(max(1rem, env(safe-area-inset-bottom)) + var(--music-player-mobile-reserve, 0rem))",
+        // Own view-transition-name = pinned during page transitions (see
+        // globals.css) instead of blinking with the root snapshot.
+        viewTransitionName: "download-dock",
       }}
     >
       {/* popLayout pops the outgoing pill/panel out of the flex flow, so the

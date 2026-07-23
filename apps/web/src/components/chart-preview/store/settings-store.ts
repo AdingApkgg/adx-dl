@@ -4,6 +4,11 @@ import type { MirrorMode, JudgmentLineDesign } from "@lxns-network/maimai-chart-
 
 export type FullscreenQuality = "smooth" | "balanced" | "high";
 
+/** Whole-surface view rotation (deg) — for tablets laid flat where the player
+ *  sits on another side. The HUD is engine-drawn inside the canvas, so it
+ *  correctly rotates along with the playfield. */
+export type ViewRotation = 0 | 90 | 180 | 270;
+
 export const FULLSCREEN_QUALITY_MP: Record<FullscreenQuality, number> = {
   smooth: 2_000_000,
   balanced: 2_500_000,
@@ -29,6 +34,9 @@ export interface GameSettingsState {
   musicOffset: number;
   fullscreenQuality: FullscreenQuality;
   showVideo: boolean;
+  viewRotation: ViewRotation;
+  /** Chart-media mirror used for the preview background PV (download-source id). */
+  videoSourceId: string;
 }
 
 export interface GameSettingsActions {
@@ -50,6 +58,8 @@ export interface GameSettingsActions {
   setMusicOffset: (offset: number) => void;
   setFullscreenQuality: (quality: FullscreenQuality) => void;
   setShowVideo: (enabled: boolean) => void;
+  cycleViewRotation: () => void;
+  setVideoSourceId: (id: string) => void;
 }
 
 export type GameSettingsStore = GameSettingsState & GameSettingsActions;
@@ -75,6 +85,8 @@ const initialState: GameSettingsState = {
   musicOffset: 0,
   fullscreenQuality: "balanced",
   showVideo: false,
+  viewRotation: 0,
+  videoSourceId: "r2",
 };
 
 export const useGameSettingsStore = create<GameSettingsStore>()(
@@ -99,6 +111,11 @@ export const useGameSettingsStore = create<GameSettingsStore>()(
       setMusicOffset: (offset: number) => set({ musicOffset: offset }),
       setFullscreenQuality: (quality: FullscreenQuality) => set({ fullscreenQuality: quality }),
       setShowVideo: (enabled: boolean) => set({ showVideo: enabled }),
+      cycleViewRotation: () =>
+        set((state) => ({
+          viewRotation: ((state.viewRotation + 90) % 360) as ViewRotation,
+        })),
+      setVideoSourceId: (id: string) => set({ videoSourceId: id }),
     }),
     {
       name: "astrodx_chart_preview_settings",
@@ -126,6 +143,8 @@ export const useGameSettingsStore = create<GameSettingsStore>()(
         musicOffset: state.musicOffset,
         fullscreenQuality: state.fullscreenQuality,
         showVideo: state.showVideo,
+        viewRotation: state.viewRotation,
+        videoSourceId: state.videoSourceId,
       }),
     },
   ),

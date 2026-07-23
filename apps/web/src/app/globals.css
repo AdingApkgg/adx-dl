@@ -61,6 +61,23 @@
   animation: none;
 }
 
+/* The floating bottom surfaces (global music player, download dock) are
+   cross-page chrome exactly like the header: without their own names they get
+   snapshotted with the root/page group and visibly blink on every navigation. */
+::view-transition-group(music-player),
+::view-transition-group(download-dock) {
+  animation: none;
+  z-index: 50;
+}
+::view-transition-old(music-player),
+::view-transition-old(download-dock) {
+  display: none;
+}
+::view-transition-new(music-player),
+::view-transition-new(download-dock) {
+  animation: none;
+}
+
 /* Theme-toggle radial wipe: theme-toggle.tsx wraps setTheme in
    document.startViewTransition, stamps <html data-theme-wipe> and sets
    --theme-wipe-x/y to the toggle's coordinates, so the new palette sweeps out
@@ -361,15 +378,28 @@ html[data-motion="off"] *::after {
 }
 
 /* The fixed download dock shares the lower edge with the global player on
-   phones. Desktop has enough horizontal room for one surface on each side. */
+   phones; only the expanded bar needs the reserve (the default collapsed
+   bubble and a disabled player leave the edge free). Desktop has enough
+   horizontal room for one surface on each side. */
 :root {
-  --music-player-mobile-reserve: 4.75rem;
+  --music-player-mobile-reserve: 0rem;
 }
 
-@media (min-width: 48rem) {
-  :root {
-    --music-player-mobile-reserve: 0rem;
+@media (max-width: 47.9375rem) {
+  :root[data-music-player="expanded"] {
+    --music-player-mobile-reserve: 4.75rem;
   }
+}
+
+/* data-music-player mirrors the persisted player preference (stamped by the
+   boot script in root-layout-shell.tsx before first paint, then kept in sync
+   by the preferences store). The surface rules hide the server-rendered
+   surface (collapsed by default) until React swaps in the visitor's actual
+   variant, avoiding a wrong-shape flash on load. */
+:root[data-music-player="off"] [data-music-player-surface],
+:root[data-music-player="collapsed"] [data-music-player-surface="expanded"],
+:root[data-music-player="expanded"] [data-music-player-surface="collapsed"] {
+  display: none;
 }
 
 @layer base {

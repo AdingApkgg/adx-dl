@@ -48,7 +48,14 @@ export const aboutSections: Record<Locale, ContentSection[]> = {
         },
         {
           type: "links",
-          items: [{ label: "AdingApkgg/adx-dl", url: SOURCE_REPOSITORY, note: "本站源代码仓库" }],
+          items: [
+            { label: "AdingApkgg/adx-dl", url: SOURCE_REPOSITORY, note: "本站源代码仓库" },
+            {
+              label: "MIT License",
+              url: `${SOURCE_REPOSITORY}/blob/main/LICENSE`,
+              note: "本站源代码以 MIT License 开源（© 2026 Asuna）",
+            },
+          ],
         },
       ],
     },
@@ -71,6 +78,10 @@ export const aboutSections: Record<Locale, ContentSection[]> = {
         {
           type: "p",
           text: "同样感谢每一位谱面作者与社区贡献者——没有你们就没有这个目录。",
+        },
+        {
+          type: "p",
+          text: "项目由 Claude 与 GPT 联合开发。所有内容均由人工智能生成。",
         },
       ],
     },
@@ -135,7 +146,14 @@ export const aboutSections: Record<Locale, ContentSection[]> = {
         },
         {
           type: "links",
-          items: [{ label: "AdingApkgg/adx-dl", url: SOURCE_REPOSITORY, note: "this site's source repository" }],
+          items: [
+            { label: "AdingApkgg/adx-dl", url: SOURCE_REPOSITORY, note: "this site's source repository" },
+            {
+              label: "MIT License",
+              url: `${SOURCE_REPOSITORY}/blob/main/LICENSE`,
+              note: "the site's source code is MIT-licensed (© 2026 Asuna)",
+            },
+          ],
         },
       ],
     },
@@ -158,6 +176,10 @@ export const aboutSections: Record<Locale, ContentSection[]> = {
         {
           type: "p",
           text: "And thank you to every chart designer and community contributor — this catalog exists because of you.",
+        },
+        {
+          type: "p",
+          text: "This project is co-developed by Claude & GPT. All contents are AI-generated.",
         },
       ],
     },
@@ -222,7 +244,14 @@ export const aboutSections: Record<Locale, ContentSection[]> = {
         },
         {
           type: "links",
-          items: [{ label: "AdingApkgg/adx-dl", url: SOURCE_REPOSITORY, note: "本サイトのソースリポジトリ" }],
+          items: [
+            { label: "AdingApkgg/adx-dl", url: SOURCE_REPOSITORY, note: "本サイトのソースリポジトリ" },
+            {
+              label: "MIT License",
+              url: `${SOURCE_REPOSITORY}/blob/main/LICENSE`,
+              note: "本サイトのソースコードは MIT License で公開（© 2026 Asuna）",
+            },
+          ],
         },
       ],
     },
@@ -245,6 +274,10 @@ export const aboutSections: Record<Locale, ContentSection[]> = {
         {
           type: "p",
           text: "そして、すべての譜面作者とコミュニティの貢献者に感謝します。このカタログは皆さんのおかげで成り立っています。",
+        },
+        {
+          type: "p",
+          text: "本プロジェクトは Claude と GPT の共同開発です。すべてのコンテンツは AI により生成されています。",
         },
       ],
     },

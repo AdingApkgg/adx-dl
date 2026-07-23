@@ -26,14 +26,23 @@ function DropdownMenuContent({
   sideOffset = 6,
   align = "end",
   children,
+  container,
+  instant = false,
   ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+}: React.ComponentProps<typeof DropdownMenuPrimitive.Content> & {
+  /** Portal target override — required inside a Fullscreen API element, where
+   *  the default body portal would render outside the fullscreened subtree. */
+  container?: HTMLElement | null;
+  /** Skip the per-item entrance cascade — for small action menus that should
+   *  feel instantaneous (the stagger reads as lag next to a running canvas). */
+  instant?: boolean;
+}) {
   // Radix remounts the content on every open, so a plain initial/animate pair
   // replays the cascade each time. ~18ms per row, capped so long menus still
   // settle within ~150ms of stagger; the panel keeps its tw-animate-css
   // enter/exit while items drop in behind it.
   let itemIndex = 0
-  const cascadedChildren = React.Children.map(children, (child) => {
+  const cascadedChildren = instant ? children : React.Children.map(children, (child) => {
     if (!React.isValidElement(child)) return child
     const delay = Math.min(itemIndex++ * 0.018, 0.126)
     return (
@@ -47,7 +56,7 @@ function DropdownMenuContent({
     )
   })
   return (
-    <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.Portal container={container ?? undefined}>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}

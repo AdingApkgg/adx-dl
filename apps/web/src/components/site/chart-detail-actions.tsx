@@ -49,6 +49,7 @@ export function getChartPreviewAssets(entry: CatalogEntry) {
 
 export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
   const [activePanel, setActivePanel] = React.useState<DetailPanel>(null);
+
   const dictionary = getDictionary(locale);
   const detail = dictionary.detail;
   const closeLabel = dictionary.downloads.dismiss;
@@ -60,6 +61,39 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
     (entry.assets.has_audio && Boolean(entry.media.audio_url));
   const hasChartPreview = Boolean(entry.files.maidata);
   const portalRoot = typeof document === "undefined" ? null : document.body;
+
+  // ?preview=1 deep link + URL sync, in ONE effect so ordering stays right.
+  // The deep link applies after hydration — the server always renders the
+  // closed state, and deciding from location during the hydration render
+  // mismatches the trees. On that first pass the URL is left untouched
+  // (?beat= must survive until the preview mounts and consumes it); after
+  // that, replaceState (no history spam) mirrors the toggle so a refresh
+  // restores an open preview, and closing clears the flag plus a stale beat.
+  const previewFlagInitializedRef = React.useRef(false);
+  React.useEffect(() => {
+    const url = new URL(window.location.href);
+    const flagged = url.searchParams.get("preview") === "1";
+    if (!previewFlagInitializedRef.current) {
+      previewFlagInitializedRef.current = true;
+      if (flagged && hasChartPreview) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time URL-derived initial state, applied post-hydration on purpose
+        setActivePanel("preview");
+        return;
+      }
+    }
+    if (activePanel === "preview" && !flagged) {
+      url.searchParams.set("preview", "1");
+    } else if (
+      activePanel !== "preview" &&
+      (flagged || url.searchParams.has("beat"))
+    ) {
+      url.searchParams.delete("preview");
+      url.searchParams.delete("beat");
+    } else {
+      return;
+    }
+    window.history.replaceState(window.history.state, "", url);
+  }, [activePanel, hasChartPreview]);
 
   const [shareCopied, setShareCopied] = React.useState(false);
   const shareResetTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);

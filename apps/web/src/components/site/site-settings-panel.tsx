@@ -11,6 +11,7 @@ import {
   LockKeyholeIcon,
   MonitorIcon,
   MoonStarIcon,
+  Music2Icon,
   PaletteIcon,
   PlusIcon,
   SaveIcon,
@@ -36,6 +37,8 @@ import {
   IDLE_DOWNLOAD_SOURCE_PROBE,
 } from "@/components/site/downloads/download-source-selector";
 import { useDownloadsStore } from "@/components/site/downloads/downloads-store";
+import { getMusicPlayerCopy } from "@/components/site/music-player/music-player-copy";
+import { useMusicPlayerPreferences } from "@/components/site/music-player/music-player-preferences";
 import { useMotionPreference, type MotionMode } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -177,6 +180,21 @@ export function SiteSettingsContent({
   const [newName, setNewName] = React.useState("");
   const [newUrl, setNewUrl] = React.useState("");
   const [newSourceError, setNewSourceError] = React.useState(false);
+
+  const musicPlayerCopy = getMusicPlayerCopy(locale);
+  const musicPlayerEnabled = useMusicPlayerPreferences(
+    (state) => state.enabled
+  );
+  const setMusicPlayerEnabled = useMusicPlayerPreferences(
+    (state) => state.setEnabled
+  );
+  const hydrateMusicPlayerPreferences = useMusicPlayerPreferences(
+    (state) => state.hydrate
+  );
+
+  React.useEffect(() => {
+    hydrateMusicPlayerPreferences();
+  }, [hydrateMusicPlayerPreferences]);
 
   const handleLocaleSelect = (
     event: React.MouseEvent<HTMLAnchorElement>,
@@ -358,6 +376,40 @@ export function SiteSettingsContent({
               })}
             </div>
           </SettingsField>
+        </SettingsSection>
+
+        <SettingsSection
+          icon={<Music2Icon />}
+          title={musicPlayerCopy.settings.title}
+          description={musicPlayerCopy.settings.description}
+        >
+          <div className="grid grid-cols-2 gap-2">
+            {([true, false] as const).map((value) => {
+              const active = musicPlayerEnabled === value;
+              return (
+                <button
+                  key={String(value)}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setMusicPlayerEnabled(value)}
+                  className={choiceClass(active)}
+                >
+                  <Music2Icon
+                    aria-hidden="true"
+                    className={value ? undefined : "opacity-50"}
+                  />
+                  <span>
+                    {value
+                      ? musicPlayerCopy.settings.enable
+                      : musicPlayerCopy.settings.disable}
+                  </span>
+                  {active ? (
+                    <CheckIcon aria-hidden="true" className="ml-auto size-3.5" />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
         </SettingsSection>
 
         <SettingsSection

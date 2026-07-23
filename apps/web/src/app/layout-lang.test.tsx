@@ -43,7 +43,37 @@ describe("root layout language", () => {
         : []
     );
 
-    expect(scriptIds).toEqual(["theme-init", "speculation-rules"]);
+    // The no-flash boot script is NOT here: React 19 rejects inline scripts
+    // rendered outside the <html> tree, so it lives in RootLayoutShell.
+    expect(scriptIds).toEqual(["speculation-rules"]);
+  });
+
+  test("the html-owning shell renders the boot script first in <body>", async () => {
+    const { RootLayoutShell } = await import("./root-layout-shell");
+    const shell = (await RootLayoutShell({
+      children: <div>content</div>,
+      lang: "zh-CN",
+      locale: "zh",
+    })) as ReactElement<{ children: ReactNode }>;
+
+    expect(shell.type).toBe("html");
+    const body = Children.toArray(shell.props.children).find(
+      (child): child is ReactElement<{ children: ReactNode }> =>
+        isValidElement(child) && child.type === "body"
+    );
+    expect(body).toBeDefined();
+
+    // First body child, so it executes before any visible content parses.
+    const [firstChild] = Children.toArray(body!.props.children);
+    expect(isValidElement(firstChild) && firstChild.type).toBe("script");
+    const script = firstChild as ReactElement<{
+      id?: string;
+      dangerouslySetInnerHTML?: { __html: string };
+    }>;
+    expect(script.props.id).toBe("theme-init");
+    expect(script.props.dangerouslySetInnerHTML?.__html).toContain(
+      "astrodx-music-player-prefs-v1"
+    );
   });
 
   test("default and localized root layouts render locale specific html lang", async () => {

@@ -55,6 +55,15 @@ const runtimeCaching: RuntimeCaching[] = [
   // 2. Cover art — the archive's heaviest repeat traffic. Served either locally
   //    (`/covers/...`) or from the remote mirror. Cache aggressively but bound it
   //    so a heavy browsing session can't blow past the storage quota.
+  //
+  //    The same cover URL is consumed in BOTH request modes: plain <img> tags
+  //    and MediaSession artwork fetch in no-cors, the chart-preview canvas and
+  //    GIF export with crossOrigin="anonymous". A cached opaque (no-cors)
+  //    response served to a CORS-mode request is rejected by the browser as a
+  //    CORS failure, so the first no-cors consumer used to poison every later
+  //    canvas load. Always fetching in CORS mode (the mirror sends
+  //    Access-Control-Allow-Origin + Vary: Origin) yields one cached response
+  //    every consumer can use.
   {
     matcher: ({ url, request, sameOrigin }) =>
       request.destination === "image" &&
@@ -63,8 +72,14 @@ const runtimeCaching: RuntimeCaching[] = [
     handler: new CacheFirst({
       cacheName: "cover-images",
       plugins: [
-        // Opaque cross-origin responses report status 0 — allow them through.
-        new CacheableResponsePlugin({ statuses: [0, 200] }),
+        {
+          // A no-cors Request cannot be re-initialized directly (the spec
+          // forbids it), so build a fresh CORS request for the same URL.
+          requestWillFetch: async ({ request }) =>
+            new Request(request.url, { mode: "cors", credentials: "omit" }),
+        },
+        // CORS-mode fetches always expose the real status; never cache errors.
+        new CacheableResponsePlugin({ statuses: [200] }),
         new ExpirationPlugin({
           maxEntries: 600,
           maxAgeSeconds: ONE_DAY * 30,
@@ -116,6 +131,25 @@ const runtimeCaching: RuntimeCaching[] = [
     }),
   },
 ];
+
+// Earlier deployments cached opaque cover responses (see runtime rule 2). They
+// would keep failing CORS-mode consumers for up to 30 days, so drop them once
+// on activation; the CORS-mode strategy refills the cache as covers are viewed.
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open("cover-images");
+      for (const request of await cache.keys()) {
+        const response = await cache.match(request);
+        if (response?.type === "opaque") {
+          await cache.delete(request);
+        }
+      }
+    })().catch(() => {
+      // A failed sweep must never block SW activation.
+    })
+  );
+});
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,

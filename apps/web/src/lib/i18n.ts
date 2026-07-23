@@ -348,7 +348,15 @@ export type SiteDictionary = {
     settings: string;
     fullscreen: string;
     exitFullscreen: string;
+    lockUi: string;
+    unlockUi: string;
+    rotateView: (currentDeg: number) => string;
     copyFrame: string;
+    copyTimeUrl: string;
+    exportMenu: string;
+    shareFrame: string;
+    saveFrame: string;
+    gifCancel: string;
     gifRangeHint: (duration: string) => string;
     exportGif: string;
     exportingPercent: (percent: number) => string;
@@ -388,6 +396,8 @@ export type SiteDictionary = {
     description: string;
     lastUpdated: (date: string) => string;
     disclaimer: string;
+    aiNotice: string;
+    mitLicense: { before: string; link: string; after: string };
     sourceLabel: string;
     getAppLabel: string;
     navLabel: string;
@@ -879,7 +889,15 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       settings: "设置",
       fullscreen: "全屏",
       exitFullscreen: "退出全屏",
+      lockUi: "锁定界面（跟打时防误触）",
+      unlockUi: "解锁界面",
+      rotateView: (currentDeg) => `旋转画面（当前 ${currentDeg}°，点按 +90°）`,
       copyFrame: "复制当前帧",
+      copyTimeUrl: "复制当前时间点链接",
+      exportMenu: "画面导出",
+      shareFrame: "系统分享",
+      saveFrame: "保存当前帧",
+      gifCancel: "取消 GIF 导出",
       gifRangeHint: (duration) => `GIF 区间 ${duration}，拖动时间轴上的手柄调整`,
       exportGif: "导出 GIF",
       exportingPercent: (percent) => `导出中 ${percent}%`,
@@ -914,6 +932,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "ADX 谱面资源，基于远端目录构建的非官方索引。",
       lastUpdated: (date) => `目录更新于 ${date}`,
       disclaimer: "非官方爱好者资料站。AstroDX 与 maimai 的相关权利归各自所有者所有。",
+      aiNotice: "项目由 Claude 与 GPT 联合开发。所有内容均由人工智能生成。",
+      mitLicense: { before: "本站源代码以 ", link: "MIT License", after: " 开源。" },
       sourceLabel: "源代码",
       getAppLabel: "获取 AstroDX",
       navLabel: "页脚导航",
@@ -1429,7 +1449,15 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       settings: "Settings",
       fullscreen: "Fullscreen",
       exitFullscreen: "Exit fullscreen",
+      lockUi: "Lock UI (avoid accidental taps while playing along)",
+      unlockUi: "Unlock UI",
+      rotateView: (currentDeg) => `Rotate view (now ${currentDeg}°, tap for +90°)`,
       copyFrame: "Copy current frame",
+      copyTimeUrl: "Copy link to current time",
+      exportMenu: "Frame export",
+      shareFrame: "System share",
+      saveFrame: "Save current frame",
+      gifCancel: "Cancel GIF export",
       gifRangeHint: (duration) => `GIF range ${duration} — drag the timeline handles to adjust`,
       exportGif: "Export GIF",
       exportingPercent: (percent) => `Exporting ${percent}%`,
@@ -1465,6 +1493,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       lastUpdated: (date) => `Catalog updated ${date}`,
       disclaimer:
         "Unofficial fan-made archive. AstroDX and maimai are the property of their respective owners.",
+      aiNotice:
+        "This project is co-developed by Claude & GPT. All contents are AI-generated.",
+      mitLicense: { before: "Site source code is released under the ", link: "MIT License", after: "." },
       sourceLabel: "Source",
       getAppLabel: "Get AstroDX",
       navLabel: "Footer",
@@ -1978,7 +2009,15 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       settings: "設定",
       fullscreen: "全画面",
       exitFullscreen: "全画面を終了",
+      lockUi: "UI をロック（プレイ中の誤タップ防止）",
+      unlockUi: "UI のロックを解除",
+      rotateView: (currentDeg) => `画面を回転（現在 ${currentDeg}°、タップで +90°）`,
       copyFrame: "現在のフレームをコピー",
+      copyTimeUrl: "現在の時間点リンクをコピー",
+      exportMenu: "画面エクスポート",
+      shareFrame: "システム共有",
+      saveFrame: "現在のフレームを保存",
+      gifCancel: "GIF エクスポートをキャンセル",
       gifRangeHint: (duration) => `GIF 範囲 ${duration}。タイムラインのハンドルをドラッグして調整`,
       exportGif: "GIF を書き出す",
       exportingPercent: (percent) => `書き出し中 ${percent}%`,
@@ -2013,6 +2052,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "ADX 谱面资源 — リモートディレクトリから構築した非公式インデックス。",
       lastUpdated: (date) => `カタログ更新: ${date}`,
       disclaimer: "非公式のファンメイドアーカイブです。AstroDX および maimai の権利は各所有者に帰属します。",
+      aiNotice: "本プロジェクトは Claude と GPT の共同開発です。すべてのコンテンツは AI により生成されています。",
+      mitLicense: { before: "本サイトのソースコードは ", link: "MIT License", after: " の下で公開されています。" },
       sourceLabel: "ソース",
       getAppLabel: "AstroDX を入手",
       navLabel: "フッター",
