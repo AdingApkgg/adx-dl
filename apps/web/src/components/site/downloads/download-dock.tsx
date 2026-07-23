@@ -281,18 +281,15 @@ export function DownloadDock({ locale }: { locale: Locale }) {
       ref={containerRef}
       className={cn(
         // Safe-area aware, and lifted above the batch bar when one is on screen
-        // so the two fixed bottom surfaces never overlap on phones.
-        "pointer-events-none fixed right-4 z-50 flex w-full max-w-xs flex-col items-end gap-2",
-        bottomBars > 0 ? "" : "bottom-[max(1rem,env(safe-area-inset-bottom))]"
+        // so the fixed bottom surfaces never overlap on phones.
+        "pointer-events-none fixed right-4 z-50 flex w-full max-w-xs flex-col items-end gap-2"
       )}
-      style={
-        bottomBars > 0
-          ? {
-              bottom:
-                "calc(var(--batch-download-bar-height, 5rem) + max(1rem, env(safe-area-inset-bottom)) + 0.75rem)",
-            }
-          : undefined
-      }
+      style={{
+        bottom:
+          bottomBars > 0
+            ? "calc(var(--batch-download-bar-height, 5rem) + max(1rem, env(safe-area-inset-bottom)) + var(--music-player-mobile-reserve, 0rem) + 0.75rem)"
+            : "calc(max(1rem, env(safe-area-inset-bottom)) + var(--music-player-mobile-reserve, 0rem))",
+      }}
     >
       {/* popLayout pops the outgoing pill/panel out of the flex flow, so the
           incoming one measures its final box and the shared layoutId can morph

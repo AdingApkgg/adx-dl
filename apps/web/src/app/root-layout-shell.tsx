@@ -4,6 +4,7 @@ import { LocaleSuggestionBanner } from "@/app/locale-suggestion-banner";
 import { PageTransition } from "@/app/page-transition";
 import { MotionProvider } from "@/components/motion";
 import { DownloadDock } from "@/components/site/downloads/download-dock";
+import { MusicPlayer } from "@/components/site/music-player/music-player";
 import { PageViewsProvider, SitePageViews } from "@/components/site/page-view-counter";
 import { ServiceWorkerRegistrar } from "@/components/site/service-worker-registrar";
 import { SiteHeader } from "@/components/site/site-header";
@@ -11,10 +12,11 @@ import { SWRProvider } from "@/components/site/swr-provider";
 import { TapRipple } from "@/components/site/tap-ripple";
 import { ThemeProvider } from "@/components/site/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { readCatalog } from "@/lib/catalog";
+import { readCatalog, readVersionGroups } from "@/lib/catalog";
 import { CHART_MEDIA_ORIGIN } from "@/lib/chart-media";
 import { ASTRODX_SITE_URL, astroDxDownloadUrl, wikiUrl } from "@/lib/resource-links";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
+import { musicTracksForVersion } from "@/lib/music-playlists";
 
 type RootLayoutShellProps = Readonly<{
   children: React.ReactNode;
@@ -38,6 +40,17 @@ const licenseLinkLabel: Record<Locale, string> = {
 
 export async function RootLayoutShell({ children, lang, locale }: RootLayoutShellProps) {
   const catalog = await readCatalog();
+  const musicVersions = (await readVersionGroups()).filter(
+    (version) => version.imageIndex !== null && version.count > 0
+  );
+  const initialMusicVersionId = musicVersions[0]?.imageIndex ?? 0;
+  // One immediately playable track keeps the global layout payload small.
+  // The complete 27-version manifest is fetched only when playback or the
+  // playlist panel is requested.
+  const initialMusicTracks = musicTracksForVersion(
+    catalog,
+    initialMusicVersionId
+  ).slice(0, 1);
   const dictionary = getDictionary(locale);
   const updatedDate = catalog.generated_at.slice(0, 10);
 
@@ -162,6 +175,12 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
               {/* Lives above the page subtree so an in-flight download keeps
                   rendering progress after a client-side navigation. */}
               <DownloadDock locale={locale} />
+              <MusicPlayer
+                locale={locale}
+                versions={musicVersions}
+                initialVersionId={initialMusicVersionId}
+                initialTracks={initialMusicTracks}
+              />
               {/* Global maimai-style tap feedback rings (decorative). */}
               <TapRipple />
             </PageViewsProvider>

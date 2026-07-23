@@ -360,6 +360,18 @@ html[data-motion="off"] *::after {
     linear-gradient(180deg, color-mix(in oklch, var(--primary) 8%, transparent), transparent 30%);
 }
 
+/* The fixed download dock shares the lower edge with the global player on
+   phones. Desktop has enough horizontal room for one surface on each side. */
+:root {
+  --music-player-mobile-reserve: 4.75rem;
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --music-player-mobile-reserve: 0rem;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

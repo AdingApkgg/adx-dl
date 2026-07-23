@@ -8,6 +8,11 @@ import type { BpmEvent } from "@lxns-network/maimai-chart-engine";
 import { beatsToMs } from "../lib/time-conversion";
 import { clamp } from "../lib/math";
 import { registerAudioContextForUnlock } from "../lib/audio-unlock";
+import {
+  announceMediaPlay,
+  MEDIA_PLAY_EVENT,
+  type MediaOwner,
+} from "@/lib/media-coordination";
 
 const LEAD_IN_BEATS = 4;
 const SEEK_THROTTLE_MS = 50;
@@ -79,6 +84,22 @@ export function useMusicPlayer() {
   useEffect(() => {
     playbackSpeedRef.current = playbackSpeed;
   }, [playbackSpeed]);
+
+  useEffect(() => {
+    const handleMediaPlay = (event: Event) => {
+      if ((event as CustomEvent<MediaOwner>).detail !== "global-music") {
+        return;
+      }
+
+      const gameState = useGameStore.getState();
+      if (gameState.isPlaying) {
+        gameState.pause();
+      }
+    };
+
+    window.addEventListener(MEDIA_PLAY_EVENT, handleMediaPlay);
+    return () => window.removeEventListener(MEDIA_PLAY_EVENT, handleMediaPlay);
+  }, []);
 
   // 用 sourceNode.playbackRate 而非 ref：切速度时 React effect 顺序让 ref 早于
   // 音频 rate 更新，错位会让切换瞬间的位置外推错。
@@ -221,6 +242,7 @@ export function useMusicPlayer() {
       state.isSourcePlaying = true;
 
       sourceNode.start(0, clampedPosition);
+      announceMediaPlay("chart-preview");
     },
     [stopSource, ensureAudioContextReady],
   );
