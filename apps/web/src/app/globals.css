@@ -118,17 +118,21 @@ html[data-theme-wipe] ::view-transition-new(root) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
+  html:not([data-motion="on"]) ::view-transition-group(*),
+  html:not([data-motion="on"]) ::view-transition-old(*),
+  html:not([data-motion="on"]) ::view-transition-new(*) {
     animation: none !important;
   }
   /* No auto-scroll for reduced-motion users; the full name stays in the title. */
-  [data-marquee="on"] {
+  html:not([data-motion="on"]) [data-marquee="on"] {
     animation: none !important;
   }
-  .shimmer-sweep {
+  html:not([data-motion="on"]) .shimmer-sweep {
     animation: none !important;
+  }
+  html:not([data-motion="on"]) [data-motion-sensitive] {
+    animation: none !important;
+    transition: none !important;
   }
 }
 
@@ -144,6 +148,14 @@ html[data-reduced-motion] [data-marquee="on"] {
 }
 html[data-reduced-motion] .shimmer-sweep {
   animation: none !important;
+}
+html[data-motion="off"] *,
+html[data-motion="off"] *::before,
+html[data-motion="off"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -233,6 +245,7 @@ html[data-reduced-motion] .shimmer-sweep {
   --sidebar-accent-foreground: oklch(0.26 0.04 264);
   --sidebar-border: oklch(0.89 0.02 255);
   --sidebar-ring: oklch(0.72 0.11 259);
+  color-scheme: light;
 }
 
 /* Japanese tree (html lang="ja"): kana and Han-unified ideographs must render
@@ -275,6 +288,76 @@ html[data-reduced-motion] .shimmer-sweep {
   --sidebar-accent-foreground: oklch(0.97 0.01 260);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.72 0.11 259);
+  color-scheme: dark;
+}
+
+/* User-selectable interface accents. Neutral surfaces remain stable so each
+   preset keeps the same contrast and only the interactive brand color moves. */
+:root[data-accent="violet"] {
+  --primary: oklch(0.57 0.22 294);
+  --primary-foreground: oklch(0.98 0.01 290);
+  --ring: oklch(0.7 0.13 294);
+  --sidebar-primary: oklch(0.57 0.22 294);
+  --sidebar-primary-foreground: oklch(0.98 0.01 290);
+}
+.dark[data-accent="violet"] {
+  --primary: oklch(0.74 0.18 294);
+  --primary-foreground: oklch(0.17 0.03 290);
+  --ring: oklch(0.7 0.13 294);
+  --sidebar-primary: oklch(0.74 0.18 294);
+  --sidebar-primary-foreground: oklch(0.17 0.03 290);
+}
+:root[data-accent="teal"] {
+  --primary: oklch(0.55 0.15 180);
+  --primary-foreground: oklch(0.98 0.01 180);
+  --ring: oklch(0.69 0.11 180);
+  --sidebar-primary: oklch(0.55 0.15 180);
+  --sidebar-primary-foreground: oklch(0.98 0.01 180);
+}
+.dark[data-accent="teal"] {
+  --primary: oklch(0.75 0.14 180);
+  --primary-foreground: oklch(0.16 0.03 180);
+  --ring: oklch(0.7 0.11 180);
+  --sidebar-primary: oklch(0.75 0.14 180);
+  --sidebar-primary-foreground: oklch(0.16 0.03 180);
+}
+:root[data-accent="orange"] {
+  --primary: oklch(0.62 0.18 52);
+  --primary-foreground: oklch(0.99 0.01 70);
+  --ring: oklch(0.72 0.12 58);
+  --sidebar-primary: oklch(0.62 0.18 52);
+  --sidebar-primary-foreground: oklch(0.99 0.01 70);
+}
+.dark[data-accent="orange"] {
+  --primary: oklch(0.76 0.16 62);
+  --primary-foreground: oklch(0.18 0.03 55);
+  --ring: oklch(0.72 0.12 58);
+  --sidebar-primary: oklch(0.76 0.16 62);
+  --sidebar-primary-foreground: oklch(0.18 0.03 55);
+}
+:root[data-accent="rose"] {
+  --primary: oklch(0.58 0.2 15);
+  --primary-foreground: oklch(0.99 0.01 15);
+  --ring: oklch(0.7 0.12 15);
+  --sidebar-primary: oklch(0.58 0.2 15);
+  --sidebar-primary-foreground: oklch(0.99 0.01 15);
+}
+.dark[data-accent="rose"] {
+  --primary: oklch(0.75 0.17 15);
+  --primary-foreground: oklch(0.17 0.03 15);
+  --ring: oklch(0.7 0.12 15);
+  --sidebar-primary: oklch(0.75 0.17 15);
+  --sidebar-primary-foreground: oklch(0.17 0.03 15);
+}
+
+.site-shell-background {
+  background-image:
+    radial-gradient(
+      circle at top,
+      color-mix(in oklch, var(--primary) 22%, transparent),
+      transparent 30%
+    ),
+    linear-gradient(180deg, color-mix(in oklch, var(--primary) 8%, transparent), transparent 30%);
 }
 
 @layer base {

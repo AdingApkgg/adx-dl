@@ -83,20 +83,54 @@ describe("i18n helpers", () => {
     expect(zh).toMatchObject({
       label: "下载线路",
       statuses: { available: "可用" },
-      probe: { idle: "-- ms", testing: "测速中…", unavailable: "不可用" },
-      badges: { primary: "推荐", backup: "备用" },
+      probe: {
+        idle: "-- ms",
+        testing: "测速中…",
+        unavailable: "不可用",
+        unconfigured: "未配置",
+      },
+      badges: { primary: "推荐", backup: "备用", custom: "自定义" },
+      customSaveAndTest: "保存并测速",
+      customReset: "恢复 R2",
+      manageInSettings: "可在右上角设置中添加和管理自定义线路。",
       switchAndRestart: "换线路继续",
       restartHint: "切换线路后，已完成文件会保留；未完成文件将通过新线路从头下载。",
     });
     expect(Object.values(en?.options ?? {}).map((option) => option.name)).toEqual([
       "R2",
       "Alice",
+      "AWMC",
       "G510",
       "G400s",
+      "Custom",
     ]);
     expect(ja?.options.r2.name).toBe("R2");
+    expect(ja?.options.custom.name).toBe("カスタム");
     expect(en?.restartHint).toContain("Completed files are kept");
     expect(ja?.restartHint).toContain("完了済みファイルは保持");
+  });
+
+  test("localizes the unified settings panel", async () => {
+    const i18n = await loadI18nModule();
+    const zh = i18n.getDictionary?.("zh").settings;
+    const en = i18n.getDictionary?.("en").settings;
+    const ja = i18n.getDictionary?.("ja").settings;
+
+    expect(zh).toMatchObject({
+      open: "打开设置",
+      themeLabel: "明暗模式",
+      defaultSourceLabel: "默认下载线路",
+      defaultFormatLabel: "默认下载格式",
+      builtInLocked: "内置线路不可删除",
+    });
+    expect(en?.motion).toEqual({
+      system: "Follow system",
+      on: "Motion on",
+      off: "Reduce motion",
+    });
+    expect(en?.formats.adx).toContain("recommended");
+    expect(ja?.addCustomSource).toBe("回線を追加");
+    expect(ja?.accents.teal).toBe("ティール");
   });
 
   test("exposes static page metadata entries for zh en ja", async () => {

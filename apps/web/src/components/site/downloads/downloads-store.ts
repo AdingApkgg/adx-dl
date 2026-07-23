@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import {
+  ARCHIVE_FORMATS,
   buildArchiveBlob,
   buildNestedArchiveBlob,
   getArchiveDownloadFileName,
@@ -15,18 +16,25 @@ import type { AdxRemoteFile } from "@/lib/adx-directory";
 import { isChartVideoFile, type ChartDownloadSpec } from "@/lib/catalog-shared";
 import {
   DOWNLOAD_SOURCE_PROBE_TTL_MS,
+  probeCustomDownloadSource,
   probeDownloadSource,
   type DownloadSourceProbe,
 } from "@/lib/download-source-probe";
 import {
   canonicalDownloadResourceUrl,
+  CUSTOM_DOWNLOAD_SOURCE_ID,
   DEFAULT_DOWNLOAD_SOURCE_ID,
   DOWNLOAD_SOURCES,
   getSelectableDownloadSource,
   inferDownloadSourceId,
+  isCustomDownloadSourceId,
+  normalizeCustomDownloadSourceName,
+  normalizeCustomDownloadSourceUrl,
   rerouteDownloadFiles,
   routeChartDownloadSpecs,
   routeDownloadFiles,
+  type CustomDownloadSourceConfig,
+  type CustomDownloadSourceId,
   type DownloadSourceId,
 } from "@/lib/download-sources";
 import {
@@ -60,6 +68,10 @@ export type DownloadJob = {
   title: string;
   /** Route chosen when the job started; remains stable across pause/resume. */
   sourceId: DownloadSourceId;
+  /** Exact route root, so an existing custom-source job is independent of later edits. */
+  sourceBaseUrl?: string;
+  /** Custom route label snapshot, retained even if that route is later deleted. */
+  sourceName?: string;
   format: ArchiveFormat;
   /**
    * `packing` = fetching files; `archiving` = all bytes on hand, building the
@@ -93,7 +105,7 @@ type StartSingleParams = {
   files: AdxRemoteFile[];
   groupDir?: string;
   includeVideo: boolean;
-  format: ArchiveFormat;
+  format?: ArchiveFormat;
   sourceId?: DownloadSourceId;
 };
 
@@ -102,7 +114,7 @@ type StartBatchParams = {
   title: string;
   charts: ChartDownloadSpec[];
   includeVideo: boolean;
-  format: BatchArchiveFormat;
+  format?: BatchArchiveFormat;
   sourceId?: DownloadSourceId;
 };
 
@@ -110,6 +122,10 @@ type DownloadsState = {
   jobs: DownloadJob[];
   /** Shared choice so every single and batch download entry stays consistent. */
   selectedSourceId: DownloadSourceId;
+  /** Device-local user routes. Built-in routes live in DOWNLOAD_SOURCES instead. */
+  customSources: CustomDownloadSourceConfig[];
+  /** Global one-click archive format; each running job keeps its own snapshot. */
+  preferredFormat: ArchiveFormat;
   /** One shared latency snapshot prevents every picker from probing independently. */
   sourceProbes: DownloadSourceProbeMap;
   /**
@@ -125,6 +141,17 @@ type DownloadsState = {
   startSingle: (params: StartSingleParams) => void;
   startBatch: (params: StartBatchParams) => void;
   setSelectedSourceId: (sourceId: DownloadSourceId) => void;
+  setPreferredFormat: (format: ArchiveFormat) => void;
+  /** Adds a device-local route and returns its stable id when valid. */
+  addCustomSource: (name: string, url: string) => CustomDownloadSourceId | null;
+  /** Updates a custom route without changing running-job snapshots. */
+  updateCustomSource: (
+    id: CustomDownloadSourceId,
+    name: string,
+    url: string
+  ) => boolean;
+  /** Built-ins are rejected; deleting the selected custom route restores R2. */
+  removeCustomSource: (id: DownloadSourceId) => boolean;
   refreshSourceProbes: (force?: boolean) => Promise<void>;
   /** Keeps completed files and restarts unfinished files on another route. */
   restartWithSource: (id: string, sourceId: DownloadSourceId) => void;
@@ -153,6 +180,8 @@ const restartingJobs = new Set<string>();
 const speedSamples = new Map<string, { time: number; bytes: number; ema: number }>();
 let hydrated = false;
 let sourceProbePromise: Promise<void> | null = null;
+const customSourceProbeVersions = new Map<CustomDownloadSourceId, number>();
+let customSourceIdSequence = 0;
 
 /** Minimum sampling window before updating the rate estimate. */
 const SPEED_SAMPLE_MS = 500;
@@ -160,21 +189,43 @@ const ARCHIVE_PROGRESS_SAMPLE_MS = 100;
 /** Gap between consecutive archive saves in a cross-version batch. */
 const MULTI_SAVE_SPACING_MS = 250;
 const SOURCE_PREFERENCE_KEY = "astrodx-download-source";
+const CUSTOM_SOURCE_URL_KEY = "astrodx-custom-download-source";
+const CUSTOM_SOURCES_KEY = "astrodx-custom-download-sources";
+const FORMAT_PREFERENCE_KEY = "astrodx-download-format";
 
-export type DownloadSourceProbeMap = Record<DownloadSourceId, DownloadSourceProbe>;
+export type DownloadSourceProbeMap = Partial<
+  Record<DownloadSourceId, DownloadSourceProbe>
+>;
 
-export function createInitialDownloadSourceProbes(): DownloadSourceProbeMap {
+export function createInitialDownloadSourceProbes(
+  customSources: readonly CustomDownloadSourceConfig[] = []
+): DownloadSourceProbeMap {
   return Object.fromEntries(
-    DOWNLOAD_SOURCES.map((source) => [
-      source.id,
-      { state: "idle", latencyMs: null, measuredAt: null } satisfies DownloadSourceProbe,
+    [
+      ...DOWNLOAD_SOURCES.map((source) => source.id),
+      ...customSources.map((source) => source.id),
+    ].map((sourceId) => [
+      sourceId,
+      {
+        state: "idle",
+        latencyMs: null,
+        measuredAt: null,
+      } satisfies DownloadSourceProbe,
     ])
   ) as DownloadSourceProbeMap;
 }
 
-function sourceProbesAreFresh(probes: DownloadSourceProbeMap, now: number): boolean {
-  return DOWNLOAD_SOURCES.every((source) => {
-    const measuredAt = probes[source.id].measuredAt;
+function sourceProbesAreFresh(
+  probes: DownloadSourceProbeMap,
+  customSources: readonly CustomDownloadSourceConfig[],
+  now: number
+): boolean {
+  const sourceIds: DownloadSourceId[] = [
+    ...DOWNLOAD_SOURCES.map((source) => source.id),
+    ...customSources.map((source) => source.id),
+  ];
+  return sourceIds.every((sourceId) => {
+    const measuredAt = probes[sourceId]?.measuredAt ?? null;
     return measuredAt !== null && now - measuredAt < DOWNLOAD_SOURCE_PROBE_TTL_MS;
   });
 }
@@ -182,12 +233,15 @@ function sourceProbesAreFresh(probes: DownloadSourceProbeMap, now: number): bool
 /** Reuse only a whole file representing the same logical resource across mirrors. */
 export function reusablePersistedFile(
   file: { url: string },
-  prior: PersistedFile | undefined
+  prior: PersistedFile | undefined,
+  sourceBaseUrl?: string
 ): PersistedFile | undefined {
   if (!prior || prior.complete !== true || prior.size !== prior.blob.size) {
     return undefined;
   }
-  return canonicalDownloadResourceUrl(prior.url) === canonicalDownloadResourceUrl(file.url)
+  const knownSourceBaseUrls = [sourceBaseUrl ?? "", prior.sourceBaseUrl ?? ""];
+  return canonicalDownloadResourceUrl(prior.url, knownSourceBaseUrls) ===
+    canonicalDownloadResourceUrl(file.url, knownSourceBaseUrls)
     ? prior
     : undefined;
 }
@@ -226,15 +280,168 @@ function saveSourcePreference(sourceId: DownloadSourceId): void {
   }
 }
 
-function loadSourcePreference(): DownloadSourceId {
+function saveCustomSources(customSources: readonly CustomDownloadSourceConfig[]): void {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  try {
+    localStorage.setItem(
+      CUSTOM_SOURCES_KEY,
+      JSON.stringify({ version: 1, sources: customSources })
+    );
+    // The versioned collection is authoritative, including when empty. Remove
+    // the legacy singleton so a deleted route cannot reappear on the next load.
+    localStorage.removeItem(CUSTOM_SOURCE_URL_KEY);
+  } catch {
+    // A blocked/private localStorage should not prevent downloads.
+  }
+}
+
+function normalizedCustomSourceRecord(
+  value: unknown
+): CustomDownloadSourceConfig | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const id = typeof record.id === "string" ? record.id : "";
+  const name =
+    typeof record.name === "string"
+      ? normalizeCustomDownloadSourceName(record.name)
+      : null;
+  const baseUrl =
+    typeof record.baseUrl === "string"
+      ? normalizeCustomDownloadSourceUrl(record.baseUrl)
+      : null;
+  if (!isCustomDownloadSourceId(id) || name === null || baseUrl === null) {
+    return null;
+  }
+  return { id, name, baseUrl };
+}
+
+/**
+ * Parses the versioned collection and migrates the former singleton only when
+ * no new payload exists. An explicit empty collection must remain empty.
+ */
+export function parseStoredCustomSources(
+  serialized: string | null,
+  legacyUrl: string | null
+): CustomDownloadSourceConfig[] {
+  if (serialized !== null) {
+    try {
+      const payload = JSON.parse(serialized) as {
+        version?: unknown;
+        sources?: unknown;
+      };
+      if (payload.version !== 1 || !Array.isArray(payload.sources)) {
+        return [];
+      }
+      const seen = new Set<CustomDownloadSourceId>();
+      const sources: CustomDownloadSourceConfig[] = [];
+      for (const value of payload.sources) {
+        const source = normalizedCustomSourceRecord(value);
+        if (source && !seen.has(source.id)) {
+          seen.add(source.id);
+          sources.push(source);
+        }
+      }
+      return sources;
+    } catch {
+      return [];
+    }
+  }
+
+  const baseUrl = normalizeCustomDownloadSourceUrl(legacyUrl ?? "");
+  return baseUrl === null
+    ? []
+    : [
+        {
+          id: CUSTOM_DOWNLOAD_SOURCE_ID,
+          name: "Custom",
+          baseUrl,
+        },
+      ];
+}
+
+function loadCustomSources(): CustomDownloadSourceConfig[] {
+  if (typeof localStorage === "undefined") {
+    return [];
+  }
+  try {
+    return parseStoredCustomSources(
+      localStorage.getItem(CUSTOM_SOURCES_KEY),
+      localStorage.getItem(CUSTOM_SOURCE_URL_KEY)
+    );
+  } catch {
+    return [];
+  }
+}
+
+function configuredDownloadSource(
+  sourceId: string | null | undefined,
+  customSources: readonly CustomDownloadSourceConfig[],
+  fallbackBaseUrl?: string,
+  fallbackName?: string
+) {
+  const normalizedId =
+    sourceId === "custom" ? CUSTOM_DOWNLOAD_SOURCE_ID : sourceId;
+  const configured = customSources.find((source) => source.id === normalizedId);
+  return getSelectableDownloadSource(
+    normalizedId,
+    configured?.baseUrl ?? fallbackBaseUrl,
+    configured?.name ?? fallbackName
+  );
+}
+
+function loadSourcePreference(
+  customSources: readonly CustomDownloadSourceConfig[]
+): DownloadSourceId {
   if (typeof localStorage === "undefined") {
     return DEFAULT_DOWNLOAD_SOURCE_ID;
   }
   try {
-    return getSelectableDownloadSource(localStorage.getItem(SOURCE_PREFERENCE_KEY)).id;
+    return configuredDownloadSource(
+      localStorage.getItem(SOURCE_PREFERENCE_KEY),
+      customSources
+    ).id;
   } catch {
     return DEFAULT_DOWNLOAD_SOURCE_ID;
   }
+}
+
+function isArchiveFormat(value: string | null | undefined): value is ArchiveFormat {
+  return ARCHIVE_FORMATS.some((format) => format === value);
+}
+
+function savePreferredFormat(format: ArchiveFormat): void {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  try {
+    localStorage.setItem(FORMAT_PREFERENCE_KEY, format);
+  } catch {
+    // A blocked/private localStorage should not prevent downloads.
+  }
+}
+
+function loadPreferredFormat(): ArchiveFormat {
+  if (typeof localStorage === "undefined") {
+    return "adx";
+  }
+  try {
+    const stored = localStorage.getItem(FORMAT_PREFERENCE_KEY);
+    return isArchiveFormat(stored) ? stored : "adx";
+  } catch {
+    return "adx";
+  }
+}
+
+function createCustomSourceId(): CustomDownloadSourceId {
+  const randomUuid =
+    typeof globalThis.crypto?.randomUUID === "function"
+      ? globalThis.crypto.randomUUID()
+      : `${Date.now().toString(36)}-${(++customSourceIdSequence).toString(36)}`;
+  return `custom:${randomUuid}`;
 }
 
 /** Fraction 0–100, preferring byte-level totals and falling back to file counts. */
@@ -326,7 +533,11 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         persisted.map((file) => [file.name, file])
       );
       const inputs: DownloadFileInput[] = spec.files.map((file) => {
-        const prior = reusablePersistedFile(file, byName.get(file.name));
+        const prior = reusablePersistedFile(
+          file,
+          byName.get(file.name),
+          spec.sourceBaseUrl
+        );
         return {
           name: file.name,
           url: file.url,
@@ -381,6 +592,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
             jobId: id,
             name: file.name,
             url: file.url,
+            ...(spec.sourceBaseUrl ? { sourceBaseUrl: spec.sourceBaseUrl } : {}),
             complete: true,
             size: file.blob.size,
             blob: file.blob,
@@ -633,9 +845,23 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
     if (existing === "packing" || existing === "archiving") {
       return;
     }
-    const sourceId = inferDownloadSourceId(spec.files, spec.sourceId);
-    const sourcedSpec: PersistedJob =
-      spec.sourceId === sourceId ? spec : { ...spec, sourceId };
+    const inferredSourceId = inferDownloadSourceId(
+      spec.files,
+      spec.sourceId,
+      spec.sourceBaseUrl
+    );
+    const source = getSelectableDownloadSource(
+      inferredSourceId,
+      spec.sourceBaseUrl,
+      spec.sourceName
+    );
+    const sourceId = source.id;
+    const sourcedSpec: PersistedJob = {
+      ...spec,
+      sourceId,
+      sourceBaseUrl: source.baseUrl,
+      sourceName: source.name,
+    };
     jobSpecs.set(sourcedSpec.id, sourcedSpec);
     const startedAt = Date.now();
     upsertJob({
@@ -643,6 +869,8 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       kind: sourcedSpec.kind,
       title: sourcedSpec.title,
       sourceId,
+      sourceBaseUrl: source.baseUrl,
+      sourceName: source.name,
       format: sourcedSpec.format as ArchiveFormat,
       status: "packing",
       completed: 0,
@@ -670,6 +898,8 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
   return {
     jobs: [],
     selectedSourceId: DEFAULT_DOWNLOAD_SOURCE_ID,
+    customSources: [],
+    preferredFormat: "adx",
     sourceProbes: createInitialDownloadSourceProbes(),
     presented: {},
     bottomBars: 0,
@@ -683,10 +913,15 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       format,
       sourceId,
     }) => {
-      const selectedSourceId = getSelectableDownloadSource(
-        sourceId ?? get().selectedSourceId
-      ).id;
-      const routedFiles = routeDownloadFiles(files, selectedSourceId);
+      const selectedSource = configuredDownloadSource(
+        sourceId ?? get().selectedSourceId,
+        get().customSources
+      );
+      const routedFiles = routeDownloadFiles(
+        files,
+        selectedSource.id,
+        selectedSource.baseUrl
+      );
       const selected = includeVideo
         ? routedFiles
         : routedFiles.filter((file) => !isChartVideoFile(file.name));
@@ -697,9 +932,11 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         id,
         kind: "single",
         title,
-        format,
+        format: format ?? get().preferredFormat,
         createdAt: Date.now(),
-        sourceId: selectedSourceId,
+        sourceId: selectedSource.id,
+        sourceBaseUrl: selectedSource.baseUrl,
+        ...(selectedSource.name ? { sourceName: selectedSource.name } : {}),
         files: selected.map((file) => ({ name: file.name, url: file.url })),
         ...(groupDir ? { groupDir } : {}),
       });
@@ -713,16 +950,21 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       format,
       sourceId,
     }) => {
-      const selectedSourceId = getSelectableDownloadSource(
-        sourceId ?? get().selectedSourceId
-      ).id;
+      const selectedSource = configuredDownloadSource(
+        sourceId ?? get().selectedSourceId,
+        get().customSources
+      );
       // Download flat (one fetch per file), tagging each by chart index so results
       // can be regrouped — an opaque numeric prefix avoids clashing with chart
       // names that contain "/".
       const dirByIndex: string[] = [];
       const groupByIndex: string[] = [];
       const files: { name: string; url: string }[] = [];
-      routeChartDownloadSpecs(charts, selectedSourceId).forEach((chart, index) => {
+      routeChartDownloadSpecs(
+        charts,
+        selectedSource.id,
+        selectedSource.baseUrl
+      ).forEach((chart, index) => {
         dirByIndex[index] = chart.dir;
         groupByIndex[index] = chart.groupDir ?? "";
         for (const file of chart.files) {
@@ -738,9 +980,11 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         id,
         kind: "batch",
         title,
-        format,
+        format: format ?? get().preferredFormat,
         createdAt: Date.now(),
-        sourceId: selectedSourceId,
+        sourceId: selectedSource.id,
+        sourceBaseUrl: selectedSource.baseUrl,
+        ...(selectedSource.name ? { sourceName: selectedSource.name } : {}),
         files,
         dirByIndex,
         ...(groupByIndex.some(Boolean) ? { groupByIndex } : {}),
@@ -748,16 +992,154 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
     },
 
     setSelectedSourceId: (sourceId) => {
-      const selectedSourceId = getSelectableDownloadSource(sourceId).id;
+      const selectedSourceId = configuredDownloadSource(
+        sourceId,
+        get().customSources
+      ).id;
       set({ selectedSourceId });
       saveSourcePreference(selectedSourceId);
+    },
+
+    setPreferredFormat: (format) => {
+      if (!isArchiveFormat(format)) {
+        return;
+      }
+      set({ preferredFormat: format });
+      savePreferredFormat(format);
+    },
+
+    addCustomSource: (name, url) => {
+      const normalizedName = normalizeCustomDownloadSourceName(name);
+      const baseUrl = normalizeCustomDownloadSourceUrl(url);
+      if (normalizedName === null || baseUrl === null) {
+        return null;
+      }
+      const id = createCustomSourceId();
+      const source: CustomDownloadSourceConfig = {
+        id,
+        name: normalizedName,
+        baseUrl,
+      };
+      set((state) => ({
+        customSources: [...state.customSources, source],
+        sourceProbes: {
+          ...state.sourceProbes,
+          [id]: { state: "testing", latencyMs: null, measuredAt: null },
+        },
+      }));
+      saveCustomSources(get().customSources);
+      const version = (customSourceProbeVersions.get(id) ?? 0) + 1;
+      customSourceProbeVersions.set(id, version);
+      void probeCustomDownloadSource(baseUrl).then((result) => {
+        const current = get().customSources.find((entry) => entry.id === id);
+        if (
+          customSourceProbeVersions.get(id) !== version ||
+          current?.baseUrl !== baseUrl
+        ) {
+          return;
+        }
+        set((state) => ({
+          sourceProbes: {
+            ...state.sourceProbes,
+            [id]: { ...result, measuredAt: Date.now() },
+          },
+        }));
+      });
+      return id;
+    },
+
+    updateCustomSource: (id, name, url) => {
+      if (!isCustomDownloadSourceId(id)) {
+        return false;
+      }
+      const normalizedName = normalizeCustomDownloadSourceName(name);
+      const baseUrl = normalizeCustomDownloadSourceUrl(url);
+      const current = get().customSources.find((source) => source.id === id);
+      if (!current || normalizedName === null || baseUrl === null) {
+        return false;
+      }
+      const urlChanged = current.baseUrl !== baseUrl;
+      set((state) => ({
+        customSources: state.customSources.map((source) =>
+          source.id === id
+            ? { ...source, name: normalizedName, baseUrl }
+            : source
+        ),
+        sourceProbes: urlChanged
+          ? {
+              ...state.sourceProbes,
+              [id]: { state: "testing", latencyMs: null, measuredAt: null },
+            }
+          : state.sourceProbes,
+      }));
+      saveCustomSources(get().customSources);
+      if (urlChanged) {
+        const version = (customSourceProbeVersions.get(id) ?? 0) + 1;
+        customSourceProbeVersions.set(id, version);
+        void probeCustomDownloadSource(baseUrl).then((result) => {
+          const latest = get().customSources.find((source) => source.id === id);
+          if (
+            customSourceProbeVersions.get(id) !== version ||
+            latest?.baseUrl !== baseUrl
+          ) {
+            return;
+          }
+          set((state) => ({
+            sourceProbes: {
+              ...state.sourceProbes,
+              [id]: { ...result, measuredAt: Date.now() },
+            },
+          }));
+        });
+      }
+      return true;
+    },
+
+    removeCustomSource: (id) => {
+      if (
+        !isCustomDownloadSourceId(id) ||
+        !get().customSources.some((source) => source.id === id)
+      ) {
+        return false;
+      }
+      customSourceProbeVersions.set(
+        id,
+        (customSourceProbeVersions.get(id) ?? 0) + 1
+      );
+      set((state) => {
+        const sourceProbes = { ...state.sourceProbes };
+        delete sourceProbes[id];
+        return {
+          customSources: state.customSources.filter(
+            (source) => source.id !== id
+          ),
+          selectedSourceId:
+            state.selectedSourceId === id
+              ? DEFAULT_DOWNLOAD_SOURCE_ID
+              : state.selectedSourceId,
+          sourceProbes,
+        };
+      });
+      saveCustomSources(get().customSources);
+      if (get().selectedSourceId === DEFAULT_DOWNLOAD_SOURCE_ID) {
+        saveSourcePreference(DEFAULT_DOWNLOAD_SOURCE_ID);
+      }
+      return true;
     },
 
     refreshSourceProbes: async (force = false) => {
       if (sourceProbePromise) {
         return sourceProbePromise;
       }
-      if (!force && sourceProbesAreFresh(get().sourceProbes, Date.now())) {
+      const customSources = get().customSources;
+      if (
+        !force &&
+        sourceProbesAreFresh(
+          get().sourceProbes,
+          customSources,
+          Date.now()
+        )
+      ) {
         return;
       }
 
@@ -765,7 +1147,19 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         const sourceProbes = { ...state.sourceProbes };
         for (const source of DOWNLOAD_SOURCES) {
           sourceProbes[source.id] = {
-            ...sourceProbes[source.id],
+            ...(sourceProbes[source.id] ?? {
+              latencyMs: null,
+              measuredAt: null,
+            }),
+            state: "testing",
+          };
+        }
+        for (const source of customSources) {
+          sourceProbes[source.id] = {
+            ...(sourceProbes[source.id] ?? {
+              latencyMs: null,
+              measuredAt: null,
+            }),
             state: "testing",
           };
         }
@@ -773,18 +1167,45 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       });
 
       const run = (async () => {
-        const results = await Promise.all(
-          DOWNLOAD_SOURCES.map(async (source) => ({
-            sourceId: source.id,
-            result: await probeDownloadSource(source.id),
-          }))
-        );
+        const [builtInResults, customResults] = await Promise.all([
+          Promise.all(
+            DOWNLOAD_SOURCES.map(async (source) => ({
+              sourceId: source.id,
+              result: await probeDownloadSource(source.id),
+            }))
+          ),
+          Promise.all(
+            customSources.map(async (source) => ({
+              sourceId: source.id,
+              baseUrl: source.baseUrl,
+              result: await probeCustomDownloadSource(source.baseUrl),
+            }))
+          ),
+        ]);
         const measuredAt = Date.now();
-        const sourceProbes = createInitialDownloadSourceProbes();
-        for (const { sourceId, result } of results) {
-          sourceProbes[sourceId] = { ...result, measuredAt };
-        }
-        set({ sourceProbes });
+        set((state) => {
+          const sourceProbes = createInitialDownloadSourceProbes(
+            state.customSources
+          );
+          for (const { sourceId, result } of builtInResults) {
+            sourceProbes[sourceId] = { ...result, measuredAt };
+          }
+          for (const source of state.customSources) {
+            const measured = customResults.find(
+              (result) =>
+                result.sourceId === source.id &&
+                result.baseUrl === source.baseUrl
+            );
+            sourceProbes[source.id] = measured
+              ? { ...measured.result, measuredAt }
+              : state.sourceProbes[source.id] ?? {
+                  state: "idle",
+                  latencyMs: null,
+                  measuredAt: null,
+                };
+          }
+          return { sourceProbes };
+        });
       })();
       sourceProbePromise = run;
       try {
@@ -808,18 +1229,33 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         return;
       }
 
-      const nextSourceId = getSelectableDownloadSource(sourceId).id;
-      const previousSourceId = inferDownloadSourceId(spec.files, spec.sourceId);
+      const nextSource = configuredDownloadSource(
+        sourceId,
+        get().customSources
+      );
+      const previousSourceId = inferDownloadSourceId(
+        spec.files,
+        spec.sourceId,
+        spec.sourceBaseUrl
+      );
       const restartedSpec: PersistedJob = {
         ...spec,
-        sourceId: nextSourceId,
+        sourceId: nextSource.id,
+        sourceBaseUrl: nextSource.baseUrl,
+        sourceName: nextSource.name,
         createdAt: Date.now(),
-        files: rerouteDownloadFiles(spec.files, previousSourceId, nextSourceId),
+        files: rerouteDownloadFiles(
+          spec.files,
+          previousSourceId,
+          nextSource.id,
+          spec.sourceBaseUrl,
+          nextSource.baseUrl
+        ),
       };
 
       restartingJobs.add(id);
-      set({ selectedSourceId: nextSourceId });
-      saveSourcePreference(nextSourceId);
+      set({ selectedSourceId: nextSource.id });
+      saveSourcePreference(nextSource.id);
       void (async () => {
         try {
           await enqueueLifecycle(id, async () => {
@@ -922,21 +1358,44 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         return;
       }
       hydrated = true;
-      set({ selectedSourceId: loadSourcePreference() });
+      const customSources = loadCustomSources();
+      set({
+        customSources,
+        preferredFormat: loadPreferredFormat(),
+        selectedSourceId: loadSourcePreference(customSources),
+        sourceProbes: createInitialDownloadSourceProbes(customSources),
+      });
+      saveCustomSources(customSources);
       void (async () => {
         const stored = await loadAllJobs();
         for (const storedSpec of stored) {
           if (get().jobs.some((job) => job.id === storedSpec.id)) {
             continue;
           }
-          const sourceId = inferDownloadSourceId(storedSpec.files, storedSpec.sourceId);
+          const inferredSourceId = inferDownloadSourceId(
+            storedSpec.files,
+            storedSpec.sourceId,
+            storedSpec.sourceBaseUrl
+          );
+          const source = getSelectableDownloadSource(
+            inferredSourceId,
+            storedSpec.sourceBaseUrl,
+            storedSpec.sourceName
+          );
+          const sourceId = source.id;
           // Normalize every configured/legacy mirror URL while hydrating. This
           // lets jobs saved before the Alice migration resume normally without
           // requiring the user to manually switch source first.
           const spec: PersistedJob = {
             ...storedSpec,
             sourceId,
-            files: routeDownloadFiles(storedSpec.files, sourceId),
+            sourceBaseUrl: source.baseUrl,
+            sourceName: source.name,
+            files: routeDownloadFiles(
+              storedSpec.files,
+              sourceId,
+              source.baseUrl
+            ),
           };
           jobSpecs.set(spec.id, spec);
           const files = await loadFilesForJob(spec.id);
@@ -954,7 +1413,11 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
           let totalBytes = 0;
           let totalKnown = true;
           for (const file of spec.files) {
-            const prior = reusablePersistedFile(file, byName.get(file.name));
+            const prior = reusablePersistedFile(
+              file,
+              byName.get(file.name),
+              spec.sourceBaseUrl
+            );
             const received = prior?.blob.size ?? 0;
             receivedBytes += received;
             if (!prior) {
@@ -967,7 +1430,11 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
           const fileProgress =
             spec.kind === "single"
               ? spec.files.map((file) => {
-                  const prior = reusablePersistedFile(file, byName.get(file.name));
+                  const prior = reusablePersistedFile(
+                    file,
+                    byName.get(file.name),
+                    spec.sourceBaseUrl
+                  );
                   const received = prior?.blob.size ?? 0;
                   const total = prior?.size ?? null;
                   const status: AdxFileProgress["status"] = prior ? "done" : "pending";
@@ -985,6 +1452,8 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
             kind: spec.kind,
             title: spec.title,
             sourceId,
+            sourceBaseUrl: source.baseUrl,
+            sourceName: source.name,
             format: spec.format as ArchiveFormat,
             status: "paused",
             completed,

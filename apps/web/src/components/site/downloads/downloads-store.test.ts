@@ -11,10 +11,12 @@ import {
 import {
   createInitialDownloadSourceProbes,
   newBatchJobId,
+  parseStoredCustomSources,
   reusablePersistedFile,
   singleJobId,
   useDownloadsStore,
 } from "./downloads-store";
+import { CUSTOM_DOWNLOAD_SOURCE_ID } from "@/lib/download-sources";
 
 // Minimal browser shims: the store's download pipeline ends in saveBlobAsFile,
 // which touches `document` and `URL.createObjectURL`. We stub just enough so the
@@ -25,6 +27,7 @@ const savedBlobs: Blob[] = [];
 const fetchedUrls: string[] = [];
 const persistedJobs = new Map<string, PersistedJob>();
 const persistedFiles = new Map<string, PersistedFile>();
+const localStorageValues = new Map<string, string>();
 
 const memoryPersistence: DownloadsPersistenceAdapter = {
   persistJob: async (job) => {
@@ -59,6 +62,7 @@ function installDomShims() {
   savedFiles.length = 0;
   savedBlobs.length = 0;
   fetchedUrls.length = 0;
+  localStorageValues.clear();
   globalThis.fetch = (async (input) => {
     fetchedUrls.push(String(input));
     return new Response(new Uint8Array([1, 2, 3]), {
@@ -76,6 +80,20 @@ function installDomShims() {
       click() {},
     }),
   };
+  (globalThis as Record<string, unknown>).localStorage = {
+    get length() {
+      return localStorageValues.size;
+    },
+    clear: () => localStorageValues.clear(),
+    getItem: (key: string) => localStorageValues.get(key) ?? null,
+    key: (index: number) => [...localStorageValues.keys()][index] ?? null,
+    removeItem: (key: string) => {
+      localStorageValues.delete(key);
+    },
+    setItem: (key: string, value: string) => {
+      localStorageValues.set(key, value);
+    },
+  } satisfies Storage;
 
   const url = globalThis.URL as unknown as {
     createObjectURL?: (blob: Blob) => string;
@@ -141,6 +159,8 @@ describe("downloads-store", () => {
       jobs: [],
       presented: {},
       selectedSourceId: "r2",
+      customSources: [],
+      preferredFormat: "adx",
       sourceProbes: createInitialDownloadSourceProbes(),
     });
   });
@@ -150,15 +170,43 @@ describe("downloads-store", () => {
       jobs: [],
       presented: {},
       selectedSourceId: "r2",
+      customSources: [],
+      preferredFormat: "adx",
       sourceProbes: createInitialDownloadSourceProbes(),
     });
     setDownloadsPersistenceAdapterForTests(null);
   });
 
-  test("hydration reroutes a legacy-origin job before resume", async () => {
-    const id = singleJobId("legacy-origin-resume");
-    persistedJobs.set(id, {
-      id,
+  test("migrates the legacy singleton only when the versioned collection is absent", () => {
+    const legacyUrl = "https://legacy.example.com/charts/";
+    expect(parseStoredCustomSources(null, legacyUrl)).toEqual([
+      {
+        id: CUSTOM_DOWNLOAD_SOURCE_ID,
+        name: "Custom",
+        baseUrl: "https://legacy.example.com/charts",
+      },
+    ]);
+    expect(
+      parseStoredCustomSources(
+        JSON.stringify({ version: 1, sources: [] }),
+        legacyUrl
+      )
+    ).toEqual([]);
+    expect(parseStoredCustomSources("{broken", legacyUrl)).toEqual([]);
+  });
+
+  test("hydration reroutes legacy jobs and preserves a custom job URL snapshot", async () => {
+    const legacyId = singleJobId("legacy-origin-resume");
+    const customId = singleJobId("custom-origin-resume");
+    const savedCustomSourceUrl = "https://mirror-a.example.com/charts";
+    const currentCustomSourceUrl = "https://mirror-b.example.com/media";
+    localStorageValues.set("astrodx-download-source", "custom");
+    localStorageValues.set(
+      "astrodx-custom-download-source",
+      currentCustomSourceUrl
+    );
+    persistedJobs.set(legacyId, {
+      id: legacyId,
       kind: "single",
       title: "legacy-origin-resume",
       format: "adx",
@@ -170,16 +218,52 @@ describe("downloads-store", () => {
         },
       ],
     });
+    persistedJobs.set(customId, {
+      id: customId,
+      kind: "single",
+      title: "custom-origin-resume",
+      format: "adx",
+      createdAt: Date.now(),
+      sourceId: "custom",
+      sourceBaseUrl: savedCustomSourceUrl,
+      files: [
+        {
+          name: "track.mp3",
+          url: `${savedCustomSourceUrl}/25/11951/track.mp3`,
+        },
+      ],
+    });
 
     useDownloadsStore.getState().hydrateFromStorage();
-    await waitForJob(id, (job) => job.status === "paused");
-    expect(useDownloadsStore.getState().jobs.find((job) => job.id === id)?.sourceId).toBe(
-      "r2"
-    );
+    await waitForJob(legacyId, (job) => job.status === "paused");
+    await waitForJob(customId, (job) => job.status === "paused");
+    expect(
+      useDownloadsStore.getState().jobs.find((job) => job.id === legacyId)
+        ?.sourceId
+    ).toBe("r2");
+    expect(
+      useDownloadsStore.getState().jobs.find((job) => job.id === customId)
+    ).toMatchObject({
+      sourceId: CUSTOM_DOWNLOAD_SOURCE_ID,
+      sourceBaseUrl: savedCustomSourceUrl,
+    });
+    expect(useDownloadsStore.getState()).toMatchObject({
+      selectedSourceId: CUSTOM_DOWNLOAD_SOURCE_ID,
+      customSources: [
+        {
+          id: CUSTOM_DOWNLOAD_SOURCE_ID,
+          name: "Custom",
+          baseUrl: currentCustomSourceUrl,
+        },
+      ],
+    });
 
-    useDownloadsStore.getState().resume(id);
-    await waitForJob(id, (job) => job.status === "success");
+    useDownloadsStore.getState().resume(customId);
+    await waitForJob(customId, (job) => job.status === "success");
+    useDownloadsStore.getState().resume(legacyId);
+    await waitForJob(legacyId, (job) => job.status === "success");
     expect(fetchedUrls).toEqual([
+      `${savedCustomSourceUrl}/25/11951/track.mp3`,
       "https://astrodx-charts.saop.cc/25/11951/maidata.txt",
     ]);
   });
@@ -211,6 +295,283 @@ describe("downloads-store", () => {
     );
   });
 
+  test("uses and persists the preferred format when a start omits an override", async () => {
+    useDownloadsStore.getState().setPreferredFormat("zip");
+    expect(localStorageValues.get("astrodx-download-format")).toBe("zip");
+
+    const id = singleJobId("preferred-format");
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "preferred-format",
+      files: [{ name: "maidata.txt", url: "https://example.test/maidata.txt" }],
+      includeVideo: true,
+    });
+
+    await waitForSettled(id);
+    expect(
+      useDownloadsStore.getState().jobs.find((job) => job.id === id)?.format
+    ).toBe("zip");
+    expect(savedFiles).toEqual(["preferred-format.zip"]);
+  });
+
+  test("rejects invalid or built-in removal and restores R2 after deleting the selected custom route", () => {
+    expect(
+      useDownloadsStore
+        .getState()
+        .addCustomSource("Unsafe", "javascript:alert(1)")
+    ).toBeNull();
+    useDownloadsStore.getState().setSelectedSourceId(
+      CUSTOM_DOWNLOAD_SOURCE_ID
+    );
+    expect(useDownloadsStore.getState().selectedSourceId).toBe("r2");
+
+    const customId = useDownloadsStore
+      .getState()
+      .addCustomSource("My mirror", "https://mirror.example.com/charts/");
+    expect(customId).not.toBeNull();
+    useDownloadsStore
+      .getState()
+      .setSelectedSourceId(customId ?? CUSTOM_DOWNLOAD_SOURCE_ID);
+    expect(useDownloadsStore.getState().removeCustomSource("r2")).toBe(false);
+    expect(
+      useDownloadsStore
+        .getState()
+        .removeCustomSource(customId ?? CUSTOM_DOWNLOAD_SOURCE_ID)
+    ).toBe(true);
+
+    expect(useDownloadsStore.getState()).toMatchObject({
+      selectedSourceId: "r2",
+      customSources: [],
+    });
+    expect(localStorageValues.get("astrodx-download-source")).toBe("r2");
+    expect(localStorageValues.has("astrodx-custom-download-source")).toBe(false);
+    expect(
+      JSON.parse(
+        localStorageValues.get("astrodx-custom-download-sources") ?? "{}"
+      )
+    ).toEqual({ version: 1, sources: [] });
+  });
+
+  test("keeps multiple custom routes independent across edit and removal", async () => {
+    const first = useDownloadsStore
+      .getState()
+      .addCustomSource("First", "https://first.example.com/charts");
+    const second = useDownloadsStore
+      .getState()
+      .addCustomSource("Second", "https://second.example.com/charts");
+    if (first === null || second === null) {
+      throw new Error("Expected valid custom routes");
+    }
+    await waitForCondition(
+      () =>
+        useDownloadsStore.getState().sourceProbes[first]?.measuredAt !== null &&
+        useDownloadsStore.getState().sourceProbes[second]?.measuredAt !== null
+    );
+
+    useDownloadsStore.getState().setSelectedSourceId(second);
+    expect(
+      useDownloadsStore
+        .getState()
+        .updateCustomSource(first, "First renamed", "https://first.example.com/v2")
+    ).toBe(true);
+    expect(useDownloadsStore.getState().removeCustomSource(first)).toBe(true);
+
+    expect(useDownloadsStore.getState()).toMatchObject({
+      selectedSourceId: second,
+      customSources: [
+        {
+          id: second,
+          name: "Second",
+          baseUrl: "https://second.example.com/charts",
+        },
+      ],
+    });
+    expect(useDownloadsStore.getState().sourceProbes[first]).toBeUndefined();
+  });
+
+  test("saves a custom route and uses it for single and batch jobs", async () => {
+    const customSourceUrl = "https://mirror.example.com/charts";
+    const customId = useDownloadsStore
+      .getState()
+      .addCustomSource("Mirror A", ` ${customSourceUrl}/ `);
+    expect(customId).not.toBeNull();
+    if (customId === null) {
+      throw new Error("Expected a valid custom route");
+    }
+    useDownloadsStore.getState().setSelectedSourceId(customId);
+    await waitForCondition(
+      () =>
+        useDownloadsStore.getState().sourceProbes[customId]?.measuredAt !== null
+    );
+
+    expect(useDownloadsStore.getState()).toMatchObject({
+      selectedSourceId: customId,
+      customSources: [{ id: customId, name: "Mirror A", baseUrl: customSourceUrl }],
+    });
+    expect(localStorageValues.get("astrodx-download-source")).toBe(customId);
+    expect(
+      parseStoredCustomSources(
+        localStorageValues.get("astrodx-custom-download-sources") ?? null,
+        null
+      )
+    ).toEqual([{ id: customId, name: "Mirror A", baseUrl: customSourceUrl }]);
+
+    fetchedUrls.length = 0;
+    await useDownloadsStore.getState().refreshSourceProbes(true);
+    expect(fetchedUrls).toEqual([
+      "https://astrodx-charts.saop.cc/0/10/track.mp3",
+      "https://astrodx-charts-alice.saop.cc/0/10/track.mp3",
+      "https://astrodx-charts-wmc.saop.cc/0/10/track.mp3",
+      "https://astrodx-charts-g510.saop.cc/0/10/track.mp3",
+      "https://astrodx-charts-g400s.saop.cc/0/10/track.mp3",
+      `${customSourceUrl}/0/10/track.mp3`,
+    ]);
+
+    fetchedUrls.length = 0;
+    const singleId = singleJobId("custom-source-single");
+    useDownloadsStore.getState().startSingle({
+      id: singleId,
+      title: "custom-source-single",
+      files: [
+        {
+          name: "track.mp3",
+          url: "https://astrodx-charts.saop.cc/25/11951/track.mp3",
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+    });
+    expect(
+      useDownloadsStore.getState().jobs.find((job) => job.id === singleId)
+    ).toMatchObject({
+      sourceId: customId,
+      sourceBaseUrl: customSourceUrl,
+      sourceName: "Mirror A",
+    });
+    await waitForSettled(singleId);
+
+    const batchId = newBatchJobId();
+    useDownloadsStore.getState().startBatch({
+      id: batchId,
+      title: "custom-source-batch",
+      charts: [
+        {
+          dir: "Song A",
+          files: [
+            {
+              name: "maidata.txt",
+              url: "https://astrodx-charts.saop.cc/25/11951/maidata.txt",
+            },
+          ],
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+      sourceId: customId,
+    });
+    await waitForSettled(batchId);
+
+    expect(fetchedUrls).toContain(
+      `${customSourceUrl}/25/11951/track.mp3`
+    );
+    expect(fetchedUrls).toContain(
+      `${customSourceUrl}/25/11951/maidata.txt`
+    );
+  });
+
+  test("a paused custom job resumes from its saved URL after the preference changes", async () => {
+    const originalSourceUrl = "https://mirror-a.example.com/charts";
+    const replacementSourceUrl = "https://mirror-b.example.com/media";
+    const customId = useDownloadsStore
+      .getState()
+      .addCustomSource("Mirror A", originalSourceUrl);
+    if (customId === null) {
+      throw new Error("Expected a valid custom route");
+    }
+    useDownloadsStore.getState().setSelectedSourceId(customId);
+    await waitForCondition(
+      () =>
+        useDownloadsStore.getState().sourceProbes[customId]?.measuredAt !== null
+    );
+
+    const id = singleJobId("custom-source-snapshot");
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "custom-source-snapshot",
+      files: [
+        {
+          name: "track.mp3",
+          url: "https://astrodx-charts.saop.cc/25/11951/track.mp3",
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+    });
+    useDownloadsStore.getState().pause(id);
+    expect(
+      useDownloadsStore.getState().jobs.find((job) => job.id === id)
+    ).toMatchObject({
+      status: "paused",
+      sourceId: customId,
+      sourceBaseUrl: originalSourceUrl,
+    });
+
+    expect(
+      useDownloadsStore
+        .getState()
+        .updateCustomSource(customId, "Mirror B", replacementSourceUrl)
+    ).toBe(true);
+    await waitForCondition(
+      () =>
+        useDownloadsStore.getState().sourceProbes[customId]?.measuredAt !== null
+    );
+    fetchedUrls.length = 0;
+    useDownloadsStore.getState().resume(id);
+    await waitForJob(id, (job) => job.status === "success");
+
+    expect(fetchedUrls).toContain(
+      `${originalSourceUrl}/25/11951/track.mp3`
+    );
+    expect(fetchedUrls).not.toContain(
+      `${replacementSourceUrl}/25/11951/track.mp3`
+    );
+  });
+
+  test("a deleted custom route does not change an existing paused job snapshot", async () => {
+    const sourceUrl = "https://removed.example.com/charts";
+    const customId = useDownloadsStore
+      .getState()
+      .addCustomSource("Temporary", sourceUrl);
+    if (customId === null) {
+      throw new Error("Expected a valid custom route");
+    }
+    useDownloadsStore.getState().setSelectedSourceId(customId);
+
+    const id = singleJobId("deleted-custom-snapshot");
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "deleted-custom-snapshot",
+      files: [
+        {
+          name: "track.mp3",
+          url: "https://astrodx-charts.saop.cc/25/11951/track.mp3",
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+    });
+    useDownloadsStore.getState().pause(id);
+    expect(useDownloadsStore.getState().removeCustomSource(customId)).toBe(true);
+    expect(useDownloadsStore.getState().selectedSourceId).toBe("r2");
+
+    fetchedUrls.length = 0;
+    useDownloadsStore.getState().resume(id);
+    await waitForJob(id, (job) => job.status === "success");
+    expect(fetchedUrls).toEqual([
+      `${sourceUrl}/25/11951/track.mp3`,
+    ]);
+  });
+
   test("shares one latency probe round and respects the freshness window", async () => {
     const refresh = useDownloadsStore.getState().refreshSourceProbes;
     await Promise.all([refresh(true), refresh(true)]);
@@ -218,17 +579,25 @@ describe("downloads-store", () => {
     expect(fetchedUrls).toEqual([
       "https://astrodx-charts.saop.cc/0/10/track.mp3",
       "https://astrodx-charts-alice.saop.cc/0/10/track.mp3",
+      "https://astrodx-charts-wmc.saop.cc/0/10/track.mp3",
       "https://astrodx-charts-g510.saop.cc/0/10/track.mp3",
       "https://astrodx-charts-g400s.saop.cc/0/10/track.mp3",
     ]);
     expect(
-      Object.values(useDownloadsStore.getState().sourceProbes).every(
-        (probe) => probe.state === "ok" && probe.latencyMs !== null
-      )
+      ["r2", "alice", "awmc", "g510", "g400s"].every((sourceId) => {
+        const probe =
+          useDownloadsStore.getState().sourceProbes[
+            sourceId as "r2" | "alice" | "awmc" | "g510" | "g400s"
+          ];
+        return probe?.state === "ok" && probe.latencyMs !== null;
+      })
     ).toBe(true);
+    expect(
+      Object.keys(useDownloadsStore.getState().sourceProbes).sort()
+    ).toEqual(["alice", "awmc", "g400s", "g510", "r2"]);
 
     await refresh();
-    expect(fetchedUrls).toHaveLength(4);
+    expect(fetchedUrls).toHaveLength(5);
   });
 
   test("reuses only a complete matching resource, including across mirror hosts", () => {
@@ -260,6 +629,19 @@ describe("downloads-store", () => {
     expect(
       reusablePersistedFile({ url: "https://example.test/track.mp3" }, prior)
     ).toBeUndefined();
+
+    const customPrior: PersistedFile = {
+      ...prior,
+      url: "https://mirror-a.example.com/charts/track.mp3",
+      sourceBaseUrl: "https://mirror-a.example.com/charts",
+    };
+    expect(
+      reusablePersistedFile(
+        { url: "https://mirror-b.example.com/media/track.mp3" },
+        customPrior,
+        "https://mirror-b.example.com/media"
+      )
+    ).toBe(customPrior);
   });
 
   test("a failed job can switch source and restart cleanly", async () => {
@@ -301,6 +683,18 @@ describe("downloads-store", () => {
 
   test("source switching keeps completed files and restarts only unfinished files", async () => {
     const id = singleJobId("switch-keeps-complete-files");
+    const customSourceUrl = "https://mirror.example.com/charts";
+    const customId = useDownloadsStore
+      .getState()
+      .addCustomSource("Mirror", customSourceUrl);
+    if (customId === null) {
+      throw new Error("Expected a valid custom route");
+    }
+    await waitForCondition(
+      () =>
+        useDownloadsStore.getState().sourceProbes[customId]?.measuredAt !== null
+    );
+    fetchedUrls.length = 0;
     let rejectTrack: ((reason?: unknown) => void) | undefined;
     const firstRequests: { url: string; headers: Headers }[] = [];
 
@@ -360,15 +754,18 @@ describe("downloads-store", () => {
       });
     }) as typeof fetch;
 
-    useDownloadsStore.getState().restartWithSource(id, "alice");
-    await waitForJob(id, (job) => job.sourceId === "alice" && job.status === "success");
+    useDownloadsStore.getState().restartWithSource(id, customId);
+    await waitForJob(
+      id,
+      (job) => job.sourceId === customId && job.status === "success"
+    );
 
     expect(firstRequests.map((request) => request.url).sort()).toEqual([
       "https://astrodx-charts.saop.cc/25/11951/maidata.txt",
       "https://astrodx-charts.saop.cc/25/11951/track.mp3",
     ]);
     expect(switchedRequests.map((request) => request.url)).toEqual([
-      "https://astrodx-charts-alice.saop.cc/25/11951/track.mp3",
+      `${customSourceUrl}/25/11951/track.mp3`,
     ]);
     expect(switchedRequests[0].headers.has("Range")).toBe(false);
     expect(switchedRequests[0].headers.has("If-Range")).toBe(false);

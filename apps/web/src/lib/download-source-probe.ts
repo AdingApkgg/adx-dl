@@ -1,4 +1,9 @@
-import { getDownloadSourceProbeUrl, type DownloadSourceId } from "@/lib/download-sources";
+import {
+  CUSTOM_DOWNLOAD_SOURCE_ID,
+  getDownloadSourceProbeUrl,
+  normalizeCustomDownloadSourceUrl,
+  type BuiltInDownloadSourceId,
+} from "@/lib/download-sources";
 
 export type DownloadSourceProbeState = "idle" | "testing" | "ok" | "timeout" | "error";
 
@@ -21,9 +26,8 @@ function monotonicNow(): number {
   return typeof performance === "undefined" ? Date.now() : performance.now();
 }
 
-/** Measures time to response headers; HEAD avoids downloading the media body. */
-export async function probeDownloadSource(
-  sourceId: DownloadSourceId,
+async function probeUrl(
+  url: string,
   options: ProbeOptions = {}
 ): Promise<Pick<DownloadSourceProbe, "state" | "latencyMs">> {
   const fetcher = options.fetcher ?? fetch;
@@ -37,7 +41,7 @@ export async function probeDownloadSource(
   const startedAt = now();
 
   try {
-    const response = await fetcher(getDownloadSourceProbeUrl(sourceId), {
+    const response = await fetcher(url, {
       method: "HEAD",
       mode: "cors",
       cache: "no-store",
@@ -61,4 +65,27 @@ export async function probeDownloadSource(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/** Measures time to response headers; HEAD avoids downloading the media body. */
+export function probeDownloadSource(
+  sourceId: BuiltInDownloadSourceId,
+  options: ProbeOptions = {}
+): Promise<Pick<DownloadSourceProbe, "state" | "latencyMs">> {
+  return probeUrl(getDownloadSourceProbeUrl(sourceId), options);
+}
+
+/** Runs the same path-compatible latency check against a user-defined mirror. */
+export function probeCustomDownloadSource(
+  baseUrl: string,
+  options: ProbeOptions = {}
+): Promise<Pick<DownloadSourceProbe, "state" | "latencyMs">> {
+  const normalized = normalizeCustomDownloadSourceUrl(baseUrl);
+  if (normalized === null) {
+    return Promise.resolve({ state: "error", latencyMs: null });
+  }
+  return probeUrl(
+    getDownloadSourceProbeUrl(CUSTOM_DOWNLOAD_SOURCE_ID, normalized),
+    options
+  );
 }

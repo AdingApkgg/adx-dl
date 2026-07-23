@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { XIcon } from "lucide-react";
-
+import Link from "next/link";
 
 import {
   readLocaleBannerDismissed,
@@ -63,14 +63,14 @@ export function LocaleSuggestionBanner() {
           className="overflow-hidden"
         >
           <div className="flex items-center justify-center gap-2 border-b border-border/60 bg-primary/10 px-4 py-1.5 text-sm">
-            <a
+            <Link
               href={href}
               lang={target}
               className="font-medium text-primary underline-offset-4 hover:underline"
               onClick={() => storePreferredLocale(target)}
             >
               {banner.continueIn}
-            </a>
+            </Link>
             <button
               type="button"
               aria-label={banner.dismiss}

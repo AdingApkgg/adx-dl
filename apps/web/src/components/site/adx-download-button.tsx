@@ -54,6 +54,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
   const [confirmDiscard, setConfirmDiscard] = React.useState(false);
   const selectedSourceId = useDownloadsStore((state) => state.selectedSourceId);
   const setSelectedSourceId = useDownloadsStore((state) => state.setSelectedSourceId);
+  const preferredFormat = useDownloadsStore((state) => state.preferredFormat);
   const files = spec?.files ?? [];
   const normalizedFileName = typeof spec?.dir === "string" ? spec.dir.trim() : "";
   const canDownload = files.length > 0 && normalizedFileName.length > 0;
@@ -166,6 +167,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
             >
               <DownloadSourceMenu
                 value={job?.sourceId ?? selectedSourceId}
+                sourceBaseUrl={job?.sourceBaseUrl}
                 onValueChange={(sourceId) => restartWithSource(jobId, sourceId)}
                 copy={downloadsDictionary.sourcePicker}
                 hint={downloadsDictionary.sourcePicker.restartHint}
@@ -224,65 +226,85 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button ref={triggerRef} type="button" disabled={!canDownload || isBusy}>
-                <motion.span
-                  className="inline-flex"
-                  animate={isBusy ? { y: [0, 2, 0] } : { y: 0 }}
-                  transition={
-                    isBusy
-                      ? { duration: 0.9, repeat: Infinity, ease: "easeInOut" }
-                      : { duration: 0.2 }
-                  }
-                >
-                  <DownloadIcon data-icon="inline-start" />
-                </motion.span>
-                {label}
-                {canDownload && !isBusy ? (
-                  <ChevronDownIcon data-icon="inline-end" className="opacity-70" />
-                ) : null}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              collisionPadding={8}
-              className="max-h-[min(28rem,calc(100dvh-5rem))] w-[min(20rem,calc(100vw-2rem))] overscroll-contain"
+          <div data-slot="button-group" className="inline-flex">
+            <Button
+              ref={triggerRef}
+              type="button"
+              disabled={!canDownload || isBusy}
+              onClick={() => handleSelect(preferredFormat)}
+              className="rounded-r-none"
             >
-              <DownloadSourceMenu
-                value={selectedSourceId}
-                onValueChange={setSelectedSourceId}
-                copy={downloadsDictionary.sourcePicker}
-              />
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>{detailDictionary.downloadFormatLabel}</DropdownMenuLabel>
-              {ARCHIVE_FORMATS.map((format) => (
-                <DropdownMenuItem
-                  key={format}
-                  onSelect={() => handleSelect(format)}
-                  className="justify-between gap-4"
-                >
-                  <span className="font-mono">.{format}</span>
-                  {format === "adx" ? (
-                    <span className="text-xs text-muted-foreground">
-                      {detailDictionary.formatHintAdx}
-                    </span>
-                  ) : null}
-                </DropdownMenuItem>
-              ))}
-              {hasVideo ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem
-                    checked={includeVideo}
-                    onCheckedChange={(value) => setIncludeVideo(value === true)}
-                    onSelect={(event) => event.preventDefault()}
-                  >
-                    {detailDictionary.downloadIncludeVideo}
-                  </DropdownMenuCheckboxItem>
-                </>
+              <motion.span
+                className="inline-flex"
+                animate={isBusy ? { y: [0, 2, 0] } : { y: 0 }}
+                transition={
+                  isBusy
+                    ? { duration: 0.9, repeat: Infinity, ease: "easeInOut" }
+                    : { duration: 0.2 }
+                }
+              >
+                <DownloadIcon data-icon="inline-start" />
+              </motion.span>
+              {label}
+              {canDownload && !isBusy ? (
+                <span className="font-mono text-xs opacity-75">
+                  .{preferredFormat}
+                </span>
               ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  disabled={!canDownload || isBusy}
+                  aria-label={detailDictionary.downloadFormatLabel}
+                  title={detailDictionary.downloadFormatLabel}
+                  className="-ml-px rounded-l-none border-l border-primary-foreground/25 px-0"
+                >
+                  <ChevronDownIcon className="opacity-80" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                collisionPadding={8}
+                className="max-h-[min(28rem,calc(100dvh-5rem))] w-[min(20rem,calc(100vw-2rem))] overscroll-contain"
+              >
+                <DownloadSourceMenu
+                  value={selectedSourceId}
+                  onValueChange={setSelectedSourceId}
+                  copy={downloadsDictionary.sourcePicker}
+                />
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>{detailDictionary.downloadFormatLabel}</DropdownMenuLabel>
+                {ARCHIVE_FORMATS.map((format) => (
+                  <DropdownMenuItem
+                    key={format}
+                    onSelect={() => handleSelect(format)}
+                    className="justify-between gap-4"
+                  >
+                    <span className="font-mono">.{format}</span>
+                    {format === "adx" ? (
+                      <span className="text-xs text-muted-foreground">
+                        {detailDictionary.formatHintAdx}
+                      </span>
+                    ) : null}
+                  </DropdownMenuItem>
+                ))}
+                {hasVideo ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem
+                      checked={includeVideo}
+                      onCheckedChange={(value) => setIncludeVideo(value === true)}
+                      onSelect={(event) => event.preventDefault()}
+                    >
+                      {detailDictionary.downloadIncludeVideo}
+                    </DropdownMenuCheckboxItem>
+                  </>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <AnimatePresence initial={false} mode="wait">
             {status === "packing" ? (
               <MotionButton
@@ -308,6 +330,8 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
       {canDownload || job ? (
         <DownloadSourceSummary
           sourceId={job?.sourceId ?? selectedSourceId}
+          sourceBaseUrl={job?.sourceBaseUrl}
+          sourceName={job?.sourceName}
           copy={downloadsDictionary.sourcePicker}
           className="w-fit"
         />

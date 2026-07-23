@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CheckIcon, GlobeIcon } from "lucide-react";
 
 import { storePreferredLocale } from "@/app/locale-preference";
@@ -40,6 +41,7 @@ const globeWobble = {
 };
 
 export function LanguageSwitcher({ locale, pathname }: LanguageSwitcherProps) {
+  const router = useRouter();
   const dictionary = getDictionary(locale);
 
   const handleSelect = (
@@ -65,7 +67,9 @@ export function LanguageSwitcher({ locale, pathname }: LanguageSwitcherProps) {
       return;
     }
     event.preventDefault();
-    window.location.assign(`${switchLocale(pathname, targetLocale)}${search}${hash}`);
+    router.push(`${switchLocale(pathname, targetLocale)}${search}${hash}`, {
+      scroll: false,
+    });
   };
 
   return (

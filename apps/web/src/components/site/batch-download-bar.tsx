@@ -85,6 +85,7 @@ export function BatchDownloadBar({
   const barRef = React.useRef<HTMLDivElement | null>(null);
   const selectedSourceId = useDownloadsStore((state) => state.selectedSourceId);
   const setSelectedSourceId = useDownloadsStore((state) => state.setSelectedSourceId);
+  const preferredFormat = useDownloadsStore((state) => state.preferredFormat);
 
   // The pack+download runs in a module-level store so it keeps going after the
   // user navigates away from this page. The bar only tracks the job it started
@@ -268,6 +269,7 @@ export function BatchDownloadBar({
                 >
                   <DownloadSourceMenu
                     value={job?.sourceId ?? selectedSourceId}
+                    sourceBaseUrl={job?.sourceBaseUrl}
                     onValueChange={(sourceId) => job && restartWithSource(job.id, sourceId)}
                     copy={tray.sourcePicker}
                     hint={tray.sourcePicker.restartHint}
@@ -295,60 +297,80 @@ export function BatchDownloadBar({
             </>
           ) : (
             <>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button type="button" size="sm" disabled={!canDownload || isBusy}>
-                    <DownloadIcon data-icon="inline-start" />
-                    {status === "archiving"
-                      ? `${tray.archiving} · ${percent}%`
-                      : isBusy
-                        ? detail.downloadPacking(progress.completed, progress.total)
-                        : browser.batchDownload}
-                    {canDownload ? (
-                      <ChevronDownIcon data-icon="inline-end" className="opacity-70" />
-                    ) : null}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  collisionPadding={8}
-                  className="max-h-[min(28rem,calc(100dvh-5rem))] w-[min(20rem,calc(100vw-2rem))] overscroll-contain"
+              <div data-slot="button-group" className="inline-flex">
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!canDownload || isBusy}
+                  onClick={() => handleSelect(preferredFormat)}
+                  className="rounded-r-none"
                 >
-                  <DownloadSourceMenu
-                    value={selectedSourceId}
-                    onValueChange={setSelectedSourceId}
-                    copy={tray.sourcePicker}
-                  />
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>{detail.downloadFormatLabel}</DropdownMenuLabel>
-                  {BATCH_FORMATS.map((format) => (
-                    <DropdownMenuItem
-                      key={format}
-                      onSelect={() => handleSelect(format)}
-                      className="justify-between gap-4"
-                    >
-                      <span className="font-mono">.{format}</span>
-                      {format === "adx" ? (
-                        <span className="text-xs text-muted-foreground">
-                          {detail.formatHintAdx}
-                        </span>
-                      ) : null}
-                    </DropdownMenuItem>
-                  ))}
-                  {hasVideoFiles ? (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuCheckboxItem
-                        checked={includeVideo}
-                        onCheckedChange={(value) => setIncludeVideo(value === true)}
-                        onSelect={(event) => event.preventDefault()}
-                      >
-                        {detail.downloadIncludeVideo}
-                      </DropdownMenuCheckboxItem>
-                    </>
+                  <DownloadIcon data-icon="inline-start" />
+                  {status === "archiving"
+                    ? `${tray.archiving} · ${percent}%`
+                    : isBusy
+                      ? detail.downloadPacking(progress.completed, progress.total)
+                      : browser.batchDownload}
+                  {canDownload ? (
+                    <span className="font-mono text-[11px] opacity-75">
+                      .{preferredFormat}
+                    </span>
                   ) : null}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      disabled={!canDownload || isBusy}
+                      aria-label={detail.downloadFormatLabel}
+                      title={detail.downloadFormatLabel}
+                      className="-ml-px rounded-l-none border-l border-primary-foreground/25 px-0"
+                    >
+                      <ChevronDownIcon className="opacity-80" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    collisionPadding={8}
+                    className="max-h-[min(28rem,calc(100dvh-5rem))] w-[min(20rem,calc(100vw-2rem))] overscroll-contain"
+                  >
+                    <DownloadSourceMenu
+                      value={selectedSourceId}
+                      onValueChange={setSelectedSourceId}
+                      copy={tray.sourcePicker}
+                    />
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>{detail.downloadFormatLabel}</DropdownMenuLabel>
+                    {BATCH_FORMATS.map((format) => (
+                      <DropdownMenuItem
+                        key={format}
+                        onSelect={() => handleSelect(format)}
+                        className="justify-between gap-4"
+                      >
+                        <span className="font-mono">.{format}</span>
+                        {format === "adx" ? (
+                          <span className="text-xs text-muted-foreground">
+                            {detail.formatHintAdx}
+                          </span>
+                        ) : null}
+                      </DropdownMenuItem>
+                    ))}
+                    {hasVideoFiles ? (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                          checked={includeVideo}
+                          onCheckedChange={(value) => setIncludeVideo(value === true)}
+                          onSelect={(event) => event.preventDefault()}
+                        >
+                          {detail.downloadIncludeVideo}
+                        </DropdownMenuCheckboxItem>
+                      </>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
               {status === "packing" ? (
                 <Button
                   type="button"
@@ -367,6 +389,8 @@ export function BatchDownloadBar({
 
         <DownloadSourceSummary
           sourceId={job?.sourceId ?? selectedSourceId}
+          sourceBaseUrl={job?.sourceBaseUrl}
+          sourceName={job?.sourceName}
           copy={tray.sourcePicker}
           className="w-fit"
         />

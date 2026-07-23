@@ -40,10 +40,8 @@ import {
   wikiUrl,
 } from "@/lib/resource-links";
 import { CompatibleImage, compatibleSourcesFromPng } from "@/components/site/compatible-image";
-import { LanguageSwitcher } from "@/components/site/language-switcher";
-import { MotionToggle } from "@/components/site/motion-toggle";
 import { useRandomChartNavigation } from "@/components/site/random-chart-button";
-import { ThemeToggle } from "@/components/site/theme-toggle";
+import { SiteSettingsPanel } from "@/components/site/site-settings-panel";
 import {
   defaultLocale,
   getDictionary,
@@ -230,9 +228,10 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
       )}
     >
       <div
+        data-motion-sensitive=""
         className={cn(
           "mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 md:px-6",
-          "transition-[padding] duration-300 motion-reduce:transition-none",
+          "transition-[padding] duration-300",
           compact ? "py-1.5" : "py-3"
         )}
       >
@@ -361,9 +360,11 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
           </DropdownMenu>
         </nav>
         <div className="flex shrink-0 items-center gap-2">
-          <LanguageSwitcher locale={locale} pathname={pathname} />
-          <MotionToggle labels={dictionary.motionToggle} />
-          <ThemeToggle labels={dictionary.theme} />
+          <SiteSettingsPanel
+            locale={locale}
+            pathname={pathname}
+            dictionary={dictionary}
+          />
           {/* Mobile: the primary nav above is hidden below md, so every page must
               stay reachable from this menu. */}
           <DropdownMenu>

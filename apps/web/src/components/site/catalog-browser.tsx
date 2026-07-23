@@ -5,7 +5,14 @@ import useSWR from "swr";
 import { ChevronDownIcon, ListFilterIcon, SearchIcon, XIcon } from "lucide-react";
 import type { Variants } from "framer-motion";
 
-import { AnimatePresence, EASE_OUT, motion, RollingNumber, springSoft } from "@/components/motion";
+import {
+  AnimatePresence,
+  EASE_OUT,
+  motion,
+  RollingNumber,
+  springSoft,
+  useReducedMotion,
+} from "@/components/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { ChartCard } from "@/components/site/chart-card";
@@ -140,6 +147,7 @@ export function CatalogBrowser({
   const siteDictionary = getDictionary(locale);
   const dictionary = siteDictionary.catalogBrowser;
   const unknownVersionLabel = siteDictionary.versions.unknownLabel;
+  const reduceMotion = useReducedMotion();
   // The input is controlled by `inputValue`; `query` is the committed search
   // term, updated debounced and never mid-IME-composition, so pinyin/kana
   // buffers don't churn the result grid on every keystroke.
@@ -516,7 +524,6 @@ export function CatalogBrowser({
     // After the new page renders, bring the list top back into view — otherwise
     // the viewport is left stranded at the pagination card below the grid.
     requestAnimationFrame(() => {
-      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       listTopRef.current?.scrollIntoView({
         behavior: reduceMotion ? "auto" : "smooth",
         block: "start",

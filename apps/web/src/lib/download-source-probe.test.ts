@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { probeDownloadSource } from "@/lib/download-source-probe";
+import {
+  probeCustomDownloadSource,
+  probeDownloadSource,
+} from "@/lib/download-source-probe";
 
 describe("download source latency probe", () => {
   test("measures a successful HEAD request in milliseconds", async () => {
@@ -35,6 +38,27 @@ describe("download source latency probe", () => {
 
     expect(notFound).toEqual({ state: "error", latencyMs: null });
     expect(networkError).toEqual({ state: "error", latencyMs: null });
+  });
+
+  test("probes a normalized custom route without falling back to R2", async () => {
+    const calls: { input: string; init?: RequestInit }[] = [];
+    const times = [10, 47.7];
+    const result = await probeCustomDownloadSource(
+      " https://mirror.example.com/charts/ ",
+      {
+        now: () => times.shift() ?? 47.7,
+        fetcher: (async (input, init) => {
+          calls.push({ input: String(input), init });
+          return new Response(null, { status: 204 });
+        }) as typeof fetch,
+      }
+    );
+
+    expect(result).toEqual({ state: "ok", latencyMs: 38 });
+    expect(calls[0]).toMatchObject({
+      input: "https://mirror.example.com/charts/0/10/track.mp3",
+      init: { method: "HEAD", mode: "cors", cache: "no-store" },
+    });
   });
 
   test("aborts a probe that exceeds its timeout", async () => {

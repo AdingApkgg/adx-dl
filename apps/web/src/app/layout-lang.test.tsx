@@ -1,4 +1,10 @@
 import { describe, expect, mock, test } from "bun:test";
+import {
+  Children,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 
 mock.module("@/lib/catalog", () => {
   const catalog = {
@@ -25,6 +31,21 @@ mock.module("@/lib/catalog", () => {
 });
 
 describe("root layout language", () => {
+  test("the shared app root owns global scripts across locale transitions", async () => {
+    const { default: RootLayout } = await import("./layout");
+    const layout = RootLayout({ children: <div>content</div> });
+    const children = Children.toArray(
+      (layout as ReactElement<{ children: ReactNode }>).props.children
+    );
+    const scriptIds = children.flatMap((child) =>
+      isValidElement<{ id?: string }>(child) && child.props.id
+        ? [child.props.id]
+        : []
+    );
+
+    expect(scriptIds).toEqual(["theme-init", "speculation-rules"]);
+  });
+
   test("default and localized root layouts render locale specific html lang", async () => {
     const { default: DefaultRootLayout } = await import("./(default)/layout");
     const { default: LocalizedRootLayout } = await import("./[locale]/layout");

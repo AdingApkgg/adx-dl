@@ -13,6 +13,10 @@ export type PersistedJob = {
   createdAt: number;
   /** Optional for backward compatibility with jobs saved before source routing. */
   sourceId?: string;
+  /** Exact mirror root used by this job; required to resume a custom route safely. */
+  sourceBaseUrl?: string;
+  /** Custom route label snapshot, retained after the configured route is renamed/deleted. */
+  sourceName?: string;
   /** The flat fetch list. For batch, `name` carries the `${index}/...` prefix. */
   files: { name: string; url: string }[];
   /** Single-chart jobs: optional version folder above the chart folder. */
@@ -30,6 +34,8 @@ export type PersistedFile = {
   name: string;
   /** Route that supplied the whole file; kept for logical-resource validation. */
   url: string;
+  /** Exact mirror root that supplied the file, including a custom path prefix. */
+  sourceBaseUrl?: string;
   /** Explicit marker distinguishes a legitimate zero-byte file from no data. */
   complete: true;
   size: number;
@@ -144,6 +150,9 @@ export function normalizePersistedFile(value: unknown): PersistedFile | null {
     jobId: record.jobId,
     name: record.name,
     url: record.url,
+    ...(typeof record.sourceBaseUrl === "string"
+      ? { sourceBaseUrl: record.sourceBaseUrl }
+      : {}),
     complete: true,
     size: blob.size,
     blob,

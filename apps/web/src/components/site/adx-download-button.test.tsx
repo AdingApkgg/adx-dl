@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { getDownloadSource } from "@/lib/download-sources";
+import {
+  CUSTOM_DOWNLOAD_SOURCE_ID,
+  getDownloadSource,
+} from "@/lib/download-sources";
 import { getDictionary } from "@/lib/i18n";
 import { AdxDownloadButton } from "./adx-download-button";
 import {
@@ -54,4 +57,23 @@ describe("AdxDownloadButton", () => {
     expect(downloadSourceStatusText(source, probe, copy)).toBe("38 ms");
     expect(downloadSourceStatusClass(source, probe)).toBe("bg-emerald-500");
   });
+
+  test("renders a custom job from its saved route snapshot", () => {
+    const html = renderToStaticMarkup(
+      <DownloadSourceSummary
+        sourceId={CUSTOM_DOWNLOAD_SOURCE_ID}
+        sourceBaseUrl="https://mirror.example.com/charts"
+        sourceName="My mirror"
+        copy={getDictionary("en").downloads.sourcePicker}
+      />
+    );
+
+    expect(html).toContain(
+      `data-download-source="${CUSTOM_DOWNLOAD_SOURCE_ID}"`
+    );
+    expect(html).toContain("My mirror");
+    expect(html).toContain("https://mirror.example.com/charts");
+    expect(html).toContain("-- ms");
+  });
+
 });

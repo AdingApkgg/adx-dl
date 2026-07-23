@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Script from "next/script";
 
 import { LocaleSuggestionBanner } from "@/app/locale-suggestion-banner";
 import { PageTransition } from "@/app/page-transition";
@@ -37,26 +36,6 @@ const licenseLinkLabel: Record<Locale, string> = {
   ja: "ライセンスと出典",
 };
 
-// Runs synchronously during HTML parse (before first paint) so the persisted
-// theme is applied with no flash. Mirrors ThemeProvider's logic: an explicit
-// 'light'/'dark' wins, otherwise (unset or 'system') follow the OS preference.
-const noFlashThemeScript = `(function(){try{var t=localStorage.getItem('theme');var m=window.matchMedia('(prefers-color-scheme: dark)').matches;var d=t==='light'?false:(t==='dark'?true:m);document.documentElement.classList.toggle('dark',d);}catch(e){document.documentElement.classList.add('dark');}})();`;
-
-// Speculation Rules: the static export ships full RSC payloads (the CF Pages
-// prune was reverted — see repo history), so in-app links normally client-side
-// navigate and animate via <PageTransition>. This rule covers the remaining
-// cross-document loads (first visit, refresh, middle-click, expired cache):
-// Chromium prefetches same-origin pages on hover/pointerdown so those hard
-// navigations feel near-instant and the @view-transition in globals.css
-// animates them. `prefetch` (not `prerender`) on purpose: it caches
-// the HTML without running page scripts, so the pageview counter / comments
-// backend are NOT triggered for merely-hovered pages. `href_matches: "/*"` only
-// matches same-origin path-absolute URLs, so external links are excluded.
-// Unsupported browsers (Firefox/Safari) ignore it — progressive enhancement.
-const speculationRules = JSON.stringify({
-  prefetch: [{ where: { href_matches: "/*" }, eagerness: "moderate" }],
-});
-
 export async function RootLayoutShell({ children, lang, locale }: RootLayoutShellProps) {
   const catalog = await readCatalog();
   const dictionary = getDictionary(locale);
@@ -71,12 +50,6 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
         <link rel="preconnect" href={CHART_MEDIA_ORIGIN} crossOrigin="" />
         <link rel="dns-prefetch" href={COUNTER_HOST} />
         <link rel="dns-prefetch" href={COMMENT_HOST} />
-        <Script id="theme-init" strategy="beforeInteractive">
-          {noFlashThemeScript}
-        </Script>
-        <Script id="speculation-rules" type="speculationrules" strategy="afterInteractive">
-          {speculationRules}
-        </Script>
         <ServiceWorkerRegistrar />
         <a
           href="#main-content"
@@ -89,7 +62,7 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
           <TooltipProvider>
             <SWRProvider>
             <PageViewsProvider>
-              <div className="flex min-h-screen flex-col bg-[radial-gradient(circle_at_top,rgba(64,123,255,0.18),transparent_30%),linear-gradient(180deg,rgba(6,23,66,0.08),transparent_30%)]">
+              <div className="site-shell-background flex min-h-screen flex-col">
                 {/* Only the zh (default) tree suggests switching: prefixed trees were an explicit choice. */}
                 {locale === "zh" ? <LocaleSuggestionBanner /> : null}
                 <SiteHeader totalEntries={catalog.total_entries} />

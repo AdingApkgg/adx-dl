@@ -798,13 +798,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .heroAction,
-  .spotlightCard,
-  .spotlightControl,
-  .spotlightPlayback,
-  .spotlightDot::before,
-  .genreBrowseCard,
-  .faqSummary svg {
+  :global(html:not([data-motion="on"])) .heroAction,
+  :global(html:not([data-motion="on"])) .spotlightCard,
+  :global(html:not([data-motion="on"])) .spotlightControl,
+  :global(html:not([data-motion="on"])) .spotlightPlayback,
+  :global(html:not([data-motion="on"])) .spotlightDot::before,
+  :global(html:not([data-motion="on"])) .genreBrowseCard,
+  :global(html:not([data-motion="on"])) .faqSummary svg {
     transition: none;
   }
 }

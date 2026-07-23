@@ -3,11 +3,14 @@ import { describe, expect, test } from "bun:test";
 import type { ChartDownloadSpec } from "@/lib/catalog-shared";
 import {
   canonicalDownloadResourceUrl,
+  CUSTOM_DOWNLOAD_SOURCE_ID,
   DEFAULT_DOWNLOAD_SOURCE_ID,
   DOWNLOAD_SOURCES,
   getDownloadSource,
   getDownloadSourceProbeUrl,
+  getSelectableDownloadSource,
   inferDownloadSourceId,
+  normalizeCustomDownloadSourceUrl,
   rerouteDownloadUrl,
   resolveDownloadUrl,
   routeChartDownloadSpec,
@@ -27,7 +30,7 @@ const spec: ChartDownloadSpec = {
 };
 
 describe("download source routing", () => {
-  test("defaults to R2 and keeps the four configured routes in display order", () => {
+  test("defaults to R2 and keeps configured routes in display order", () => {
     expect(DEFAULT_DOWNLOAD_SOURCE_ID).toBe("r2");
     expect(getDownloadSource("missing").id).toBe("r2");
     expect(getDownloadSource("cdn").id).toBe("r2");
@@ -39,6 +42,7 @@ describe("download source routing", () => {
     expect(DOWNLOAD_SOURCES.map((source) => source.id)).toEqual([
       "r2",
       "alice",
+      "awmc",
       "g510",
       "g400s",
     ]);
@@ -51,6 +55,9 @@ describe("download source routing", () => {
     );
     expect(resolveDownloadUrl(spec.files[1].url, "g510")).toBe(
       "https://astrodx-charts-g510.saop.cc/25/11951/track.mp3"
+    );
+    expect(resolveDownloadUrl(spec.files[1].url, "awmc")).toBe(
+      "https://astrodx-charts-wmc.saop.cc/25/11951/track.mp3"
     );
     expect(resolveDownloadUrl(spec.files[1].url, "g400s")).toBe(
       "https://astrodx-charts-g400s.saop.cc/25/11951/track.mp3"
@@ -92,6 +99,58 @@ describe("download source routing", () => {
     ).toBe("https://astrodx-charts.saop.cc/25/11951/track.mp3");
   });
 
+  test("validates and normalizes a custom mirror root", () => {
+    expect(
+      normalizeCustomDownloadSourceUrl(" https://mirror.example.com/charts/ ")
+    ).toBe("https://mirror.example.com/charts");
+    expect(normalizeCustomDownloadSourceUrl("http://localhost:8787/")).toBe(
+      "http://localhost:8787"
+    );
+    expect(
+      normalizeCustomDownloadSourceUrl("http://mirror.example.com")
+    ).toBeNull();
+    expect(normalizeCustomDownloadSourceUrl("/relative")).toBeNull();
+    expect(normalizeCustomDownloadSourceUrl("ftp://mirror.example.com")).toBeNull();
+    expect(
+      normalizeCustomDownloadSourceUrl("https://user:secret@mirror.example.com")
+    ).toBeNull();
+    expect(
+      normalizeCustomDownloadSourceUrl("https://mirror.example.com?token=secret")
+    ).toBeNull();
+    expect(
+      normalizeCustomDownloadSourceUrl("https://mirror.example.com#download")
+    ).toBeNull();
+    expect(getSelectableDownloadSource("custom", "").id).toBe("r2");
+  });
+
+  test("routes through a custom path prefix and can switch away without stacking", () => {
+    const customA = "https://mirror.example.com/charts";
+    const customB = "https://backup.example.com/media";
+    expect(resolveDownloadUrl(spec.files[1].url, "custom", customA)).toBe(
+      "https://mirror.example.com/charts/25/11951/track.mp3"
+    );
+    expect(
+      rerouteDownloadUrl(
+        "https://mirror.example.com/charts/25/11951/track.mp3",
+        "custom",
+        "alice",
+        customA
+      )
+    ).toBe("https://astrodx-charts-alice.saop.cc/25/11951/track.mp3");
+    expect(
+      rerouteDownloadUrl(
+        "https://mirror.example.com/charts/25/11951/track.mp3",
+        "custom",
+        "custom",
+        customA,
+        customB
+      )
+    ).toBe("https://backup.example.com/media/25/11951/track.mp3");
+    expect(resolveDownloadUrl(spec.files[2].url, "custom", customA)).toBe(
+      spec.files[2].url
+    );
+  });
+
   test("normalizes mirror hosts while leaving unrelated resources exact", () => {
     expect(
       canonicalDownloadResourceUrl(
@@ -107,6 +166,12 @@ describe("download source routing", () => {
     expect(canonicalDownloadResourceUrl("https://example.test/track.mp3")).toBe(
       "https://example.test/track.mp3"
     );
+    expect(
+      canonicalDownloadResourceUrl(
+        "https://mirror.example.com/charts/25/11951/track.mp3",
+        ["https://mirror.example.com/charts"]
+      )
+    ).toBe("https://astrodx-charts.saop.cc/25/11951/track.mp3");
   });
 
   test("infers the route for jobs persisted before source ids existed", () => {
@@ -129,6 +194,13 @@ describe("download source routing", () => {
         "cdn"
       )
     ).toBe("r2");
+    expect(
+      inferDownloadSourceId(
+        [{ url: "https://mirror.example.com/charts/25/11951/track.mp3" }],
+        "custom",
+        "https://mirror.example.com/charts"
+      )
+    ).toBe(CUSTOM_DOWNLOAD_SOURCE_ID);
   });
 
   test("builds each latency probe URL from the configured mirror root", () => {
@@ -138,5 +210,14 @@ describe("download source routing", () => {
     expect(getDownloadSourceProbeUrl("g400s")).toBe(
       "https://astrodx-charts-g400s.saop.cc/0/10/track.mp3"
     );
+    expect(getDownloadSourceProbeUrl("awmc")).toBe(
+      "https://astrodx-charts-wmc.saop.cc/0/10/track.mp3"
+    );
+    expect(
+      getDownloadSourceProbeUrl(
+        "custom",
+        "https://mirror.example.com/charts/"
+      )
+    ).toBe("https://mirror.example.com/charts/0/10/track.mp3");
   });
 });

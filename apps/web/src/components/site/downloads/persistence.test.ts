@@ -49,6 +49,27 @@ describe("normalizePersistedFile", () => {
     });
   });
 
+  test("preserves the route snapshot for a custom-source checkpoint", () => {
+    const blob = new Blob([new Uint8Array([1])]);
+    const sourceBaseUrl = "https://mirror.example.com/charts";
+
+    expect(
+      normalizePersistedFile({
+        ...baseRecord(),
+        sourceBaseUrl,
+        complete: true,
+        size: 1,
+        blob,
+      })
+    ).toEqual({
+      ...baseRecord(),
+      sourceBaseUrl,
+      complete: true,
+      size: 1,
+      blob,
+    });
+  });
+
   test("rejects legacy byte prefixes and inconsistent current records", () => {
     expect(
       normalizePersistedFile({

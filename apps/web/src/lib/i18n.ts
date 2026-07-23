@@ -36,6 +36,59 @@ export type SiteDictionary = {
     label: string;
     enabledHint: string;
   };
+  settings: {
+    open: string;
+    title: string;
+    description: string;
+    close: string;
+    appearanceTitle: string;
+    appearanceDescription: string;
+    languageLabel: string;
+    themeLabel: string;
+    accentLabel: string;
+    accents: {
+      blue: string;
+      violet: string;
+      teal: string;
+      orange: string;
+      rose: string;
+    };
+    motionLabel: string;
+    motion: {
+      system: string;
+      on: string;
+      off: string;
+    };
+    motionHints: {
+      system: string;
+      on: string;
+      off: string;
+    };
+    downloadsTitle: string;
+    downloadsDescription: string;
+    defaultSourceLabel: string;
+    refreshLatency: string;
+    builtInLabel: string;
+    builtInLocked: string;
+    customSourcesLabel: string;
+    noCustomSources: string;
+    addCustomSource: string;
+    sourceNameLabel: string;
+    sourceNamePlaceholder: string;
+    sourceUrlLabel: string;
+    sourceUrlPlaceholder: string;
+    saveCustomSource: string;
+    removeCustomSource: (name: string) => string;
+    invalidCustomSource: string;
+    customSourceHint: string;
+    defaultFormatLabel: string;
+    formatHelp: string;
+    formats: {
+      adx: string;
+      zip: string;
+      "tar.gz": string;
+    };
+  };
   home: {
     badge: string;
     /** Visible homepage hero copy; kept separate from the SEO page title. */
@@ -215,8 +268,10 @@ export type SiteDictionary = {
       options: {
         r2: { name: string; description: string };
         alice: { name: string; description: string };
+        awmc: { name: string; description: string };
         g510: { name: string; description: string };
         g400s: { name: string; description: string };
+        custom: { name: string; description: string };
       };
       statuses: {
         available: string;
@@ -228,11 +283,20 @@ export type SiteDictionary = {
         testing: string;
         timeout: string;
         unavailable: string;
+        unconfigured: string;
       };
       badges: {
         primary: string;
         backup: string;
+        custom: string;
       };
+      customUrlLabel: string;
+      customUrlPlaceholder: string;
+      customSaveAndTest: string;
+      customReset: string;
+      customHint: string;
+      customInvalid: string;
+      manageInSettings: string;
       switchAndRestart: string;
       restartHint: string;
     };
@@ -491,6 +555,59 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "切换主题", light: "浅色", dark: "深色", system: "跟随系统" },
     motionToggle: { label: "减弱动画", enabledHint: "恢复动画" },
+    settings: {
+      open: "打开设置",
+      title: "设置",
+      description: "统一管理显示偏好、下载格式和下载线路。设置仅保存在当前设备。",
+      close: "关闭设置",
+      appearanceTitle: "外观与体验",
+      appearanceDescription: "调整语言、明暗模式、界面强调色和动画。",
+      languageLabel: "界面语言",
+      themeLabel: "明暗模式",
+      accentLabel: "主题强调色",
+      accents: {
+        blue: "蓝色",
+        violet: "紫色",
+        teal: "青绿色",
+        orange: "橙色",
+        rose: "玫红色",
+      },
+      motionLabel: "动画",
+      motion: {
+        system: "跟随系统",
+        on: "开启动画",
+        off: "减少动画",
+      },
+      motionHints: {
+        system: "遵循设备的“减少动态效果”设置",
+        on: "始终播放界面动画",
+        off: "关闭非必要动画和过渡",
+      },
+      downloadsTitle: "下载",
+      downloadsDescription: "选择默认格式和线路；下载任务开始后会保留当时的配置。",
+      defaultSourceLabel: "默认下载线路",
+      refreshLatency: "重新测速",
+      builtInLabel: "内置",
+      builtInLocked: "内置线路不可删除",
+      customSourcesLabel: "自定义线路",
+      noCustomSources: "尚未添加自定义线路。",
+      addCustomSource: "添加线路",
+      sourceNameLabel: "线路名称",
+      sourceNamePlaceholder: "例如：我的镜像",
+      sourceUrlLabel: "线路地址",
+      sourceUrlPlaceholder: "https://mirror.example.com",
+      saveCustomSource: "保存并测速",
+      removeCustomSource: (name) => `删除线路“${name}”`,
+      invalidCustomSource: "请填写名称和有效的 HTTPS 地址；本机开发地址可使用 HTTP。",
+      customSourceHint: "镜像需保持与内置线路相同的目录结构，并允许跨域下载。",
+      defaultFormatLabel: "默认下载格式",
+      formatHelp: "下载按钮会直接使用此格式，菜单中仍可仅为本次下载临时选择其他格式。",
+      formats: {
+        adx: "AstroDX 导入格式（推荐）",
+        zip: "通用 ZIP 压缩包",
+        "tar.gz": "TAR.GZ 压缩包",
+      },
+    },
     home: {
       badge: "为 AstroDX 玩家打造",
       heroTitle: "为 AstroDX 找到下一首谱面。",
@@ -680,8 +797,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         options: {
           r2: { name: "R2", description: "Cloudflare R2 主线路，默认选择" },
           alice: { name: "Alice", description: "Alice 下载分流" },
+          awmc: { name: "AWMC", description: "AWMC 下载分流" },
           g510: { name: "G510", description: "G510 下载分流" },
           g400s: { name: "G400s", description: "G400s 下载分流" },
+          custom: { name: "自定义", description: "使用你自己的同结构镜像地址" },
         },
         statuses: {
           available: "可用",
@@ -693,11 +812,20 @@ const dictionaries: Record<Locale, SiteDictionary> = {
           testing: "测速中…",
           timeout: "超时",
           unavailable: "不可用",
+          unconfigured: "未配置",
         },
         badges: {
           primary: "推荐",
           backup: "备用",
+          custom: "自定义",
         },
+        customUrlLabel: "自定义线路地址",
+        customUrlPlaceholder: "https://mirror.example.com",
+        customSaveAndTest: "保存并测速",
+        customReset: "恢复 R2",
+        customHint: "仅保存在本机；镜像需保持相同目录结构并允许跨域下载。",
+        customInvalid: "请输入有效的 HTTPS 地址（本机开发可用 HTTP），且不要包含账号、查询参数或锚点。",
+        manageInSettings: "可在右上角设置中添加和管理自定义线路。",
         switchAndRestart: "换线路继续",
         restartHint: "切换线路后，已完成文件会保留；未完成文件将通过新线路从头下载。",
       },
@@ -957,6 +1085,65 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "Toggle theme", light: "Light", dark: "Dark", system: "System" },
     motionToggle: { label: "Reduce motion", enabledHint: "Restore motion" },
+    settings: {
+      open: "Open settings",
+      title: "Settings",
+      description:
+        "Manage display preferences, download format, and download routes in one place. Settings stay on this device.",
+      close: "Close settings",
+      appearanceTitle: "Appearance & experience",
+      appearanceDescription:
+        "Adjust language, color mode, interface accent, and motion.",
+      languageLabel: "Interface language",
+      themeLabel: "Color mode",
+      accentLabel: "Theme accent",
+      accents: {
+        blue: "Blue",
+        violet: "Violet",
+        teal: "Teal",
+        orange: "Orange",
+        rose: "Rose",
+      },
+      motionLabel: "Motion",
+      motion: {
+        system: "Follow system",
+        on: "Motion on",
+        off: "Reduce motion",
+      },
+      motionHints: {
+        system: "Follow your device’s reduced-motion preference",
+        on: "Always play interface motion",
+        off: "Disable nonessential animation and transitions",
+      },
+      downloadsTitle: "Downloads",
+      downloadsDescription:
+        "Choose the default format and route. Running jobs keep the configuration they started with.",
+      defaultSourceLabel: "Default download route",
+      refreshLatency: "Retest latency",
+      builtInLabel: "Built in",
+      builtInLocked: "Built-in routes cannot be deleted",
+      customSourcesLabel: "Custom routes",
+      noCustomSources: "No custom routes have been added.",
+      addCustomSource: "Add route",
+      sourceNameLabel: "Route name",
+      sourceNamePlaceholder: "For example: My mirror",
+      sourceUrlLabel: "Route URL",
+      sourceUrlPlaceholder: "https://mirror.example.com",
+      saveCustomSource: "Save and test",
+      removeCustomSource: (name) => `Remove route “${name}”`,
+      invalidCustomSource:
+        "Enter a name and valid HTTPS URL. Local development URLs may use HTTP.",
+      customSourceHint:
+        "The mirror must preserve the built-in path structure and allow cross-origin downloads.",
+      defaultFormatLabel: "Default download format",
+      formatHelp:
+        "Download buttons use this format directly; their menus can still override it for one download.",
+      formats: {
+        adx: "AstroDX import format (recommended)",
+        zip: "Standard ZIP archive",
+        "tar.gz": "TAR.GZ archive",
+      },
+    },
     home: {
       badge: "Built for AstroDX players",
       heroTitle: "Find your next chart for AstroDX.",
@@ -1150,8 +1337,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         options: {
           r2: { name: "R2", description: "Primary Cloudflare R2 route, selected by default" },
           alice: { name: "Alice", description: "Alice download route" },
+          awmc: { name: "AWMC", description: "AWMC download route" },
           g510: { name: "G510", description: "G510 download route" },
           g400s: { name: "G400s", description: "G400s download route" },
+          custom: { name: "Custom", description: "Use your own path-compatible mirror" },
         },
         statuses: {
           available: "Available",
@@ -1163,11 +1352,20 @@ const dictionaries: Record<Locale, SiteDictionary> = {
           testing: "Testing…",
           timeout: "Timeout",
           unavailable: "Unavailable",
+          unconfigured: "Not configured",
         },
         badges: {
           primary: "Recommended",
           backup: "Backup",
+          custom: "Custom",
         },
+        customUrlLabel: "Custom route URL",
+        customUrlPlaceholder: "https://mirror.example.com",
+        customSaveAndTest: "Save and test",
+        customReset: "Restore R2",
+        customHint: "Saved on this device only. The mirror must use the same paths and allow cross-origin downloads.",
+        customInvalid: "Enter a valid HTTPS URL (local development may use HTTP) without credentials, query parameters, or a fragment.",
+        manageInSettings: "Add and manage custom routes from Settings in the top-right corner.",
         switchAndRestart: "Switch and continue",
         restartHint: "Completed files are kept; unfinished files restart on the new route.",
       },
@@ -1447,6 +1645,65 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "テーマ切り替え", light: "ライト", dark: "ダーク", system: "システム" },
     motionToggle: { label: "アニメーションを減らす", enabledHint: "アニメーションを戻す" },
+    settings: {
+      open: "設定を開く",
+      title: "設定",
+      description:
+        "表示設定、ダウンロード形式、ダウンロード回線をまとめて管理します。設定はこの端末に保存されます。",
+      close: "設定を閉じる",
+      appearanceTitle: "表示と操作感",
+      appearanceDescription:
+        "言語、カラーモード、アクセントカラー、アニメーションを調整します。",
+      languageLabel: "表示言語",
+      themeLabel: "カラーモード",
+      accentLabel: "テーマカラー",
+      accents: {
+        blue: "ブルー",
+        violet: "バイオレット",
+        teal: "ティール",
+        orange: "オレンジ",
+        rose: "ローズ",
+      },
+      motionLabel: "アニメーション",
+      motion: {
+        system: "システムに従う",
+        on: "オン",
+        off: "減らす",
+      },
+      motionHints: {
+        system: "端末の「視差効果を減らす」設定に従います",
+        on: "常にインターフェースの動きを再生します",
+        off: "不要なアニメーションと切り替えを無効にします",
+      },
+      downloadsTitle: "ダウンロード",
+      downloadsDescription:
+        "既定の形式と回線を選択します。開始済みのタスクは開始時の設定を保持します。",
+      defaultSourceLabel: "既定のダウンロード回線",
+      refreshLatency: "再測定",
+      builtInLabel: "内蔵",
+      builtInLocked: "内蔵回線は削除できません",
+      customSourcesLabel: "カスタム回線",
+      noCustomSources: "カスタム回線はまだ追加されていません。",
+      addCustomSource: "回線を追加",
+      sourceNameLabel: "回線名",
+      sourceNamePlaceholder: "例：マイミラー",
+      sourceUrlLabel: "回線 URL",
+      sourceUrlPlaceholder: "https://mirror.example.com",
+      saveCustomSource: "保存して測定",
+      removeCustomSource: (name) => `回線「${name}」を削除`,
+      invalidCustomSource:
+        "名前と有効な HTTPS URL を入力してください。ローカル開発では HTTP を使用できます。",
+      customSourceHint:
+        "ミラーは内蔵回線と同じパス構成を保ち、クロスオリジンダウンロードを許可する必要があります。",
+      defaultFormatLabel: "既定のダウンロード形式",
+      formatHelp:
+        "ダウンロードボタンはこの形式を使用します。メニューから今回だけ別の形式を選ぶこともできます。",
+      formats: {
+        adx: "AstroDX インポート形式（推奨）",
+        zip: "標準 ZIP アーカイブ",
+        "tar.gz": "TAR.GZ アーカイブ",
+      },
+    },
     home: {
       badge: "AstroDX プレイヤーのために",
       heroTitle: "AstroDX の次の譜面を見つけよう。",
@@ -1637,8 +1894,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         options: {
           r2: { name: "R2", description: "既定で選択される Cloudflare R2 メイン回線" },
           alice: { name: "Alice", description: "Alice ダウンロード回線" },
+          awmc: { name: "AWMC", description: "AWMC ダウンロード回線" },
           g510: { name: "G510", description: "G510 ダウンロード回線" },
           g400s: { name: "G400s", description: "G400s ダウンロード回線" },
+          custom: { name: "カスタム", description: "同じパス構成の独自ミラーを使用" },
         },
         statuses: {
           available: "利用可能",
@@ -1650,11 +1909,20 @@ const dictionaries: Record<Locale, SiteDictionary> = {
           testing: "測定中…",
           timeout: "タイムアウト",
           unavailable: "利用不可",
+          unconfigured: "未設定",
         },
         badges: {
           primary: "おすすめ",
           backup: "予備",
+          custom: "カスタム",
         },
+        customUrlLabel: "カスタム回線 URL",
+        customUrlPlaceholder: "https://mirror.example.com",
+        customSaveAndTest: "保存して測定",
+        customReset: "R2 に戻す",
+        customHint: "この端末にのみ保存されます。ミラーには同じパス構成とクロスオリジンダウンロードの許可が必要です。",
+        customInvalid: "認証情報・クエリ・フラグメントを含まない有効な HTTPS URL を入力してください（ローカル開発では HTTP 可）。",
+        manageInSettings: "右上の設定からカスタム回線を追加・管理できます。",
         switchAndRestart: "回線を切り替えて続行",
         restartHint: "完了済みファイルは保持され、未完了ファイルは新しい回線で最初からダウンロードされます。",
       },

@@ -453,6 +453,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                                     >
                                       <DownloadSourceMenu
                                         value={job.sourceId}
+                                        sourceBaseUrl={job.sourceBaseUrl}
                                         onValueChange={(sourceId) =>
                                           restartWithSource(job.id, sourceId)
                                         }
@@ -498,6 +499,8 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                         </div>
                         <DownloadSourceSummary
                           sourceId={job.sourceId}
+                          sourceBaseUrl={job.sourceBaseUrl}
+                          sourceName={job.sourceName}
                           copy={tray.sourcePicker}
                           className="w-fit"
                         />

@@ -34,17 +34,44 @@ export const springSoft: Transition = {
 
 // localStorage key for the user's explicit site-level preference.
 const REDUCE_MOTION_STORAGE_KEY = "adx-reduce-motion";
+export const MOTION_MODES = ["system", "on", "off"] as const;
+export type MotionMode = (typeof MOTION_MODES)[number];
 
 type MotionPreference = {
-  /** The user's explicit site toggle (independent of the OS setting). */
+  mode: MotionMode;
+  setMode: (mode: MotionMode) => void;
+  /** Compatibility handle for the former binary header toggle. */
   userReduced: boolean;
   setUserReduced: (value: boolean) => void;
 };
 
 const MotionPreferenceContext = React.createContext<MotionPreference>({
+  mode: "system",
+  setMode: () => {},
   userReduced: false,
   setUserReduced: () => {},
 });
+
+export function parseMotionMode(value: string | null | undefined): MotionMode {
+  if (value === "1") {
+    return "off";
+  }
+  if (value === "0") {
+    return "system";
+  }
+  return MOTION_MODES.includes(value as MotionMode)
+    ? (value as MotionMode)
+    : "system";
+}
+
+export function motionConfigPreference(
+  mode: MotionMode
+): "user" | "never" | "always" {
+  if (mode === "on") {
+    return "never";
+  }
+  return mode === "off" ? "always" : "user";
+}
 
 /** The header toggle's read/write handle for the site-level preference. */
 export function useMotionPreference(): MotionPreference {
@@ -58,8 +85,8 @@ export function useMotionPreference(): MotionPreference {
  */
 export function useReducedMotion(): boolean {
   const os = useOsReducedMotion();
-  const { userReduced } = React.useContext(MotionPreferenceContext);
-  return Boolean(os) || userReduced;
+  const { mode } = React.useContext(MotionPreferenceContext);
+  return mode === "off" || (mode === "system" && Boolean(os));
 }
 
 /**
@@ -75,38 +102,59 @@ export function useReducedMotion(): boolean {
  * mismatch-free hydration. Client-side navigations see the settled value.
  */
 export function MotionProvider({ children }: { children: React.ReactNode }) {
-  const [userReduced, setUserReducedState] = React.useState(false);
+  const [mode, setModeState] = React.useState<MotionMode>("system");
+  const [preferenceReady, setPreferenceReady] = React.useState(false);
 
   React.useEffect(() => {
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time localStorage sync after hydration
-      setUserReducedState(window.localStorage.getItem(REDUCE_MOTION_STORAGE_KEY) === "1");
+      setModeState(
+        parseMotionMode(window.localStorage.getItem(REDUCE_MOTION_STORAGE_KEY))
+      );
     } catch {
-      // Storage unavailable (private mode) — keep animations on.
+      // Storage unavailable (private mode) — follow the OS.
+    } finally {
+      setPreferenceReady(true);
     }
   }, []);
 
   React.useEffect(() => {
-    document.documentElement.toggleAttribute("data-reduced-motion", userReduced);
-  }, [userReduced]);
+    if (!preferenceReady) {
+      return;
+    }
+    document.documentElement.dataset.motion = mode;
+    document.documentElement.toggleAttribute("data-reduced-motion", mode === "off");
+  }, [mode, preferenceReady]);
 
-  const setUserReduced = React.useCallback((value: boolean) => {
-    setUserReducedState(value);
+  const setMode = React.useCallback((value: MotionMode) => {
+    const normalized = parseMotionMode(value);
+    setModeState(normalized);
     try {
-      window.localStorage.setItem(REDUCE_MOTION_STORAGE_KEY, value ? "1" : "0");
+      window.localStorage.setItem(REDUCE_MOTION_STORAGE_KEY, normalized);
     } catch {
-      // Storage unavailable — the toggle still works for this session.
+      // Storage unavailable — the preference still works for this session.
     }
   }, []);
+  const setUserReduced = React.useCallback(
+    (value: boolean) => setMode(value ? "off" : "system"),
+    [setMode]
+  );
 
   const preference = React.useMemo(
-    () => ({ userReduced, setUserReduced }),
-    [userReduced, setUserReduced]
+    () => ({
+      mode,
+      setMode,
+      userReduced: mode === "off",
+      setUserReduced,
+    }),
+    [mode, setMode, setUserReduced]
   );
 
   return (
     <MotionPreferenceContext.Provider value={preference}>
-      <MotionConfig reducedMotion={userReduced ? "always" : "user"}>{children}</MotionConfig>
+      <MotionConfig reducedMotion={motionConfigPreference(mode)}>
+        {children}
+      </MotionConfig>
     </MotionPreferenceContext.Provider>
   );
 }
