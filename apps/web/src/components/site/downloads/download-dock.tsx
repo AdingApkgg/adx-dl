@@ -358,7 +358,9 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                   <ChevronDownIcon className="size-3.5" />
                 </motion.button>
               </div>
-              <ul className="relative flex max-h-[50vh] touch-pan-y flex-col gap-2 overflow-y-auto">
+              {/* overscroll-contain keeps a flick at either end inside the tray
+                  instead of scrolling the page underneath it. */}
+              <ul className="relative flex max-h-[50vh] touch-pan-y flex-col gap-2 overflow-y-auto overscroll-contain">
                 <AnimatePresence initial={false} mode="popLayout">
                   {visible.map((job) => {
                     const percent = jobPercent(job);
@@ -390,7 +392,11 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                             dismiss(job.id);
                           }
                         }}
-                        className="relative flex flex-col gap-1.5 overflow-hidden rounded-lg"
+                        // shrink-0 is load-bearing: as flex items these rows
+                        // would otherwise compress to fit max-h instead of
+                        // overflowing, so a long queue squeezed every row into
+                        // a clipped sliver and the list never became scrollable.
+                        className="relative flex shrink-0 flex-col gap-1.5 overflow-hidden rounded-lg"
                       >
                         {job.status === "success" ? (
                           // One-shot emerald wash as the row lands on success.
