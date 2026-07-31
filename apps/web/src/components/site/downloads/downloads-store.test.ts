@@ -12,9 +12,13 @@ import {
   createInitialDownloadSourceProbes,
   newBatchJobId,
   parseStoredCustomSources,
+  resetDownloadQueueForTests,
   reusablePersistedFile,
+  setDownloadRetryBaseDelayForTests,
   singleJobId,
+  summarizeDownloadJobs,
   useDownloadsStore,
+  type DownloadJob,
 } from "./downloads-store";
 import { CUSTOM_DOWNLOAD_SOURCE_ID } from "@/lib/download-sources";
 
@@ -106,12 +110,17 @@ function installDomShims() {
   url.revokeObjectURL = () => {};
 }
 
-/** Spin until the job leaves the active download/archive states (or we time out). */
+/** Spin until the job leaves the queued/download/archive states (or we time out). */
 async function waitForSettled(id: string, timeoutMs = 2000): Promise<void> {
   const start = Date.now();
   for (;;) {
     const job = useDownloadsStore.getState().jobs.find((entry) => entry.id === id);
-    if (job && job.status !== "packing" && job.status !== "archiving") {
+    if (
+      job &&
+      job.status !== "queued" &&
+      job.status !== "packing" &&
+      job.status !== "archiving"
+    ) {
       return;
     }
     if (Date.now() - start > timeoutMs) {
@@ -139,6 +148,17 @@ async function waitForJob(
   }
 }
 
+/** Archive filename → its in-archive paths, so assertions ignore save order. */
+async function savedArchives(): Promise<Record<string, string[]>> {
+  const archives: Record<string, string[]> = {};
+  for (const [index, name] of savedFiles.entries()) {
+    archives[name] = Object.keys(
+      unzipSync(new Uint8Array(await savedBlobs[index].arrayBuffer()))
+    ).sort();
+  }
+  return archives;
+}
+
 async function waitForCondition(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
   const start = Date.now();
   while (!predicate()) {
@@ -155,12 +175,15 @@ describe("downloads-store", () => {
     persistedJobs.clear();
     persistedFiles.clear();
     setDownloadsPersistenceAdapterForTests(memoryPersistence);
+    setDownloadRetryBaseDelayForTests(1);
+    resetDownloadQueueForTests();
     useDownloadsStore.setState({
       jobs: [],
       presented: {},
       selectedSourceId: "r2",
       customSources: [],
       preferredFormat: "adx",
+      preferredBatchGrouping: "version",
       sourceProbes: createInitialDownloadSourceProbes(),
     });
   });
@@ -172,9 +195,64 @@ describe("downloads-store", () => {
       selectedSourceId: "r2",
       customSources: [],
       preferredFormat: "adx",
+      preferredBatchGrouping: "version",
       sourceProbes: createInitialDownloadSourceProbes(),
     });
     setDownloadsPersistenceAdapterForTests(null);
+    setDownloadRetryBaseDelayForTests(undefined);
+    resetDownloadQueueForTests();
+  });
+
+  test("summarizeDownloadJobs rolls a queue up into one headline state", () => {
+    const job = (patch: Partial<DownloadJob>): DownloadJob => ({
+      id: patch.id ?? "j",
+      kind: "batch",
+      title: "t",
+      sourceId: "r2",
+      format: "adx",
+      status: "queued",
+      completed: 0,
+      total: 10,
+      receivedBytes: 0,
+      totalBytes: 0,
+      speedBps: 0,
+      fileProgress: [],
+      archiveCurrentFile: null,
+      error: null,
+      errorKind: null,
+      startedAt: 0,
+      ...patch,
+    });
+
+    expect(summarizeDownloadJobs([])).toMatchObject({ status: "idle", percent: 0 });
+    // A job still moving outranks a sibling that already failed.
+    expect(
+      summarizeDownloadJobs([
+        job({ id: "a", status: "error" }),
+        job({ id: "b", status: "packing" }),
+      ]).status
+    ).toBe("packing");
+    expect(
+      summarizeDownloadJobs([
+        job({ id: "a", status: "success" }),
+        job({ id: "b", status: "error" }),
+      ])
+    ).toMatchObject({ status: "error", done: 1, total: 2 });
+    expect(
+      summarizeDownloadJobs([
+        job({ id: "a", status: "queued" }),
+        job({ id: "b", status: "queued" }),
+      ]).status
+    ).toBe("queued");
+
+    // Percent is weighted by file count: a finished 90-file job plus an
+    // untouched 10-file job is 90%, not the 50% a flat average would report.
+    expect(
+      summarizeDownloadJobs([
+        job({ id: "a", status: "success", total: 90 }),
+        job({ id: "b", status: "queued", total: 10 }),
+      ]).percent
+    ).toBe(90);
   });
 
   test("migrates the legacy singleton only when the versioned collection is absent", () => {
@@ -707,9 +785,14 @@ describe("downloads-store", () => {
           headers: { "content-length": "3" },
         });
       }
-      return await new Promise<Response>((_resolve, reject) => {
-        rejectTrack = reject;
-      });
+      if (rejectTrack === undefined) {
+        return await new Promise<Response>((_resolve, reject) => {
+          rejectTrack = reject;
+        });
+      }
+      // The engine retries transient failures — every retry must fail too for
+      // the job to surface an error.
+      throw new TypeError("network failed");
     }) as typeof fetch;
 
     useDownloadsStore.getState().startSingle({
@@ -760,7 +843,7 @@ describe("downloads-store", () => {
       (job) => job.sourceId === customId && job.status === "success"
     );
 
-    expect(firstRequests.map((request) => request.url).sort()).toEqual([
+    expect([...new Set(firstRequests.map((request) => request.url))].sort()).toEqual([
       "https://astrodx-charts.saop.cc/25/11951/maidata.txt",
       "https://astrodx-charts.saop.cc/25/11951/track.mp3",
     ]);
@@ -944,10 +1027,9 @@ describe("downloads-store", () => {
     expect(savedFiles).toHaveLength(1);
   });
 
-  test("cross-version batch saves one archive per version", async () => {
-    const id = newBatchJobId();
-    useDownloadsStore.getState().startBatch({
-      id,
+  test("cross-version batch queues one job per version", async () => {
+    const ids = useDownloadsStore.getState().startBatch({
+      id: newBatchJobId(),
       title: "AstroDX Charts",
       charts: [
         {
@@ -965,13 +1047,298 @@ describe("downloads-store", () => {
       format: "adx",
     });
 
-    await waitForSettled(id);
+    // Two independent queue entries, each titled by its own version.
+    expect(ids).toHaveLength(2);
+    expect(
+      ids.map((id) => useDownloadsStore.getState().jobs.find((job) => job.id === id)?.title)
+    ).toEqual(["25 CiRCLE", "24 PRiSM PLUS"]);
 
-    expect(savedFiles).toEqual(["25 CiRCLE.adx", "24 PRiSM PLUS.adx"]);
-    const circle = unzipSync(new Uint8Array(await savedBlobs[0].arrayBuffer()));
-    expect(Object.keys(circle)).toEqual(["25 CiRCLE/Same Song/maidata.txt"]);
-    const prism = unzipSync(new Uint8Array(await savedBlobs[1].arrayBuffer()));
-    expect(Object.keys(prism)).toEqual(["24 PRiSM PLUS/Same Song/maidata.txt"]);
+    await Promise.all(ids.map((id) => waitForSettled(id)));
+
+    expect(await savedArchives()).toEqual({
+      "25 CiRCLE.adx": ["25 CiRCLE/Same Song/maidata.txt"],
+      "24 PRiSM PLUS.adx": ["24 PRiSM PLUS/Same Song/maidata.txt"],
+    });
+  });
+
+  test("a failing version does not take the rest of the queue down with it", async () => {
+    globalThis.fetch = (async (input) => {
+      const url = String(input);
+      fetchedUrls.push(url);
+      if (url.includes("/prism/")) {
+        throw new TypeError("network failed");
+      }
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { "content-length": "3" },
+      });
+    }) as typeof fetch;
+
+    const ids = useDownloadsStore.getState().startBatch({
+      id: newBatchJobId(),
+      title: "AstroDX Charts",
+      charts: [
+        {
+          groupDir: "25 CiRCLE",
+          dir: "Song A",
+          files: [{ name: "maidata.txt", url: "https://example.test/circle/maidata.txt" }],
+        },
+        {
+          groupDir: "24 PRiSM PLUS",
+          dir: "Song B",
+          files: [{ name: "maidata.txt", url: "https://example.test/prism/maidata.txt" }],
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+    });
+
+    await Promise.all(ids.map((id) => waitForSettled(id)));
+    const statuses = ids.map(
+      (id) => useDownloadsStore.getState().jobs.find((job) => job.id === id)?.status
+    );
+    // The whole point of splitting: one broken group fails alone.
+    expect(statuses).toEqual(["success", "error"]);
+    expect(savedFiles).toEqual(["25 CiRCLE.adx"]);
+  });
+
+  test("only MAX_ACTIVE_JOBS run at once; the rest wait as queued", async () => {
+    let release: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started: string[] = [];
+    globalThis.fetch = (async (input) => {
+      const url = String(input);
+      started.push(url);
+      fetchedUrls.push(url);
+      await held;
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { "content-length": "3" },
+      });
+    }) as typeof fetch;
+
+    const ids = useDownloadsStore.getState().startBatch({
+      id: newBatchJobId(),
+      title: "AstroDX Charts",
+      charts: ["25 CiRCLE", "24 PRiSM PLUS", "23 PRiSM", "22 BUDDiES PLUS"].map(
+        (groupDir, index) => ({
+          groupDir,
+          dir: `Song ${index}`,
+          files: [
+            { name: "maidata.txt", url: `https://example.test/${index}/maidata.txt` },
+          ],
+        })
+      ),
+      includeVideo: true,
+      format: "adx",
+    });
+    expect(ids).toHaveLength(4);
+
+    const statusesOf = () =>
+      ids.map(
+        (id) => useDownloadsStore.getState().jobs.find((job) => job.id === id)?.status
+      );
+    await waitForCondition(
+      () => statusesOf().filter((status) => status === "queued").length === 2
+    );
+    // Two slots busy, two waiting — and the waiting ones never opened a socket.
+    expect(statusesOf()).toEqual(["packing", "packing", "queued", "queued"]);
+    expect(started).toHaveLength(2);
+
+    release?.();
+    await Promise.all(ids.map((id) => waitForSettled(id)));
+    expect(statusesOf()).toEqual(["success", "success", "success", "success"]);
+    expect(Object.keys(await savedArchives()).sort()).toEqual([
+      "22 BUDDiES PLUS.adx",
+      "23 PRiSM.adx",
+      "24 PRiSM PLUS.adx",
+      "25 CiRCLE.adx",
+    ]);
+  });
+
+  test("pausing a queued job takes it out of the queue without fetching", async () => {
+    let release: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    globalThis.fetch = (async (input) => {
+      fetchedUrls.push(String(input));
+      await held;
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { "content-length": "3" },
+      });
+    }) as typeof fetch;
+
+    const ids = useDownloadsStore.getState().startBatch({
+      id: newBatchJobId(),
+      title: "AstroDX Charts",
+      charts: ["25 CiRCLE", "24 PRiSM PLUS", "23 PRiSM"].map((groupDir, index) => ({
+        groupDir,
+        dir: `Song ${index}`,
+        files: [{ name: "maidata.txt", url: `https://example.test/${index}/maidata.txt` }],
+      })),
+      includeVideo: true,
+      format: "adx",
+    });
+
+    const queuedId = ids[2];
+    await waitForJob(queuedId, (job) => job.status === "queued");
+    useDownloadsStore.getState().pause(queuedId);
+    expect(
+      useDownloadsStore.getState().jobs.find((job) => job.id === queuedId)?.status
+    ).toBe("paused");
+
+    release?.();
+    await Promise.all(ids.slice(0, 2).map((id) => waitForSettled(id)));
+    // Its slot was never used, so its file was never requested.
+    expect(fetchedUrls.some((url) => url.includes("/2/"))).toBe(false);
+
+    // And it can still be resumed later, once the queue has drained.
+    useDownloadsStore.getState().resume(queuedId);
+    await waitForJob(queuedId, (job) => job.status === "success");
+    expect(fetchedUrls.some((url) => url.includes("/2/"))).toBe(true);
+  });
+
+  test("batch grouped by genre queues one job per genre folder", async () => {
+    const ids = useDownloadsStore.getState().startBatch({
+      id: newBatchJobId(),
+      title: "AstroDX Charts",
+      charts: [
+        {
+          groupDir: "25 CiRCLE",
+          genreDir: "東方Project",
+          dir: "Song A",
+          files: [{ name: "maidata.txt", url: "https://example.test/a/maidata.txt" }],
+        },
+        {
+          groupDir: "25 CiRCLE",
+          genreDir: "POPS＆アニメ",
+          dir: "Song B",
+          files: [{ name: "maidata.txt", url: "https://example.test/b/maidata.txt" }],
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+      grouping: "genre",
+    });
+
+    await Promise.all(ids.map((jobId) => waitForSettled(jobId)));
+
+    // Same version, two genres: the genre layout decides the split, not the version.
+    expect(await savedArchives()).toEqual({
+      "東方Project.adx": ["東方Project/Song A/maidata.txt"],
+      "POPS＆アニメ.adx": ["POPS＆アニメ/Song B/maidata.txt"],
+    });
+  });
+
+  test("a genre-grouped job keeps its folder layout across a source switch", async () => {
+    globalThis.fetch = (async (input) => {
+      fetchedUrls.push(String(input));
+      throw new TypeError("network failed");
+    }) as typeof fetch;
+
+    // One genre → one job, so this exercises rerouting rather than the split.
+    const [id] = useDownloadsStore.getState().startBatch({
+      id: newBatchJobId(),
+      title: "AstroDX Charts",
+      charts: ["Song A", "Song B"].map((dir, index) => ({
+        groupDir: "25 CiRCLE",
+        genreDir: "東方Project",
+        dir,
+        files: [
+          {
+            name: "maidata.txt",
+            url: `https://astrodx-charts.saop.cc/25/1195${index}/maidata.txt`,
+          },
+        ],
+      })),
+      includeVideo: true,
+      format: "adx",
+      sourceId: "r2",
+      grouping: "genre",
+    });
+
+    await waitForJob(id, (job) => job.status === "error");
+    // The durable spec is what a resume/restart replays from — the chosen
+    // layout must live there, not only in the component that started the job.
+    expect(persistedJobs.get(id)?.groupByIndex).toEqual([
+      "東方Project",
+      "東方Project",
+    ]);
+
+    globalThis.fetch = (async (input) => {
+      fetchedUrls.push(String(input));
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { "content-length": "3" },
+      });
+    }) as typeof fetch;
+    useDownloadsStore.getState().restartWithSource(id, "g510");
+    await waitForJob(id, (job) => job.sourceId === "g510" && job.status === "success");
+
+    // Still genre folders after rerouting — not the version layout that the
+    // (unchanged) preference would have produced for a fresh start. A
+    // single-group selection stays named by the collection, as before the split.
+    expect(await savedArchives()).toEqual({
+      "AstroDX Charts.adx": [
+        "東方Project/Song A/maidata.txt",
+        "東方Project/Song B/maidata.txt",
+      ],
+    });
+    expect(useDownloadsStore.getState().preferredBatchGrouping).toBe("version");
+  });
+
+  test("setPreferredBatchGrouping persists and becomes the startBatch default", async () => {
+    useDownloadsStore.getState().setPreferredBatchGrouping("genre");
+    expect(localStorageValues.get("astrodx-download-batch-grouping")).toBe("genre");
+
+    const id = newBatchJobId();
+    useDownloadsStore.getState().startBatch({
+      id,
+      title: "Preferred grouping",
+      charts: [
+        {
+          groupDir: "25 CiRCLE",
+          genreDir: "maimai",
+          dir: "Song A",
+          files: [{ name: "maidata.txt", url: "https://example.test/a/maidata.txt" }],
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+    });
+
+    await waitForSettled(id);
+    const entries = unzipSync(new Uint8Array(await savedBlobs[0].arrayBuffer()));
+    expect(Object.keys(entries)).toEqual(["maimai/Song A/maidata.txt"]);
+  });
+
+  test("genre grouping without genreDir data falls back to a flat archive", async () => {
+    const id = newBatchJobId();
+    useDownloadsStore.getState().startBatch({
+      id,
+      title: "Legacy specs",
+      charts: [
+        {
+          groupDir: "25 CiRCLE",
+          dir: "Song A",
+          files: [{ name: "maidata.txt", url: "https://example.test/a/maidata.txt" }],
+        },
+      ],
+      includeVideo: true,
+      format: "adx",
+      grouping: "genre",
+    });
+
+    await waitForSettled(id);
+    // Old cached specs.json has no genreDir — charts pack at the archive root
+    // rather than under a bogus folder.
+    expect(savedFiles).toEqual(["Legacy specs.adx"]);
+    const entries = unzipSync(new Uint8Array(await savedBlobs[0].arrayBuffer()));
+    expect(Object.keys(entries)).toEqual(["Song A/maidata.txt"]);
   });
 
   test("single-version batch stays one combined archive", async () => {

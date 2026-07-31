@@ -181,15 +181,34 @@ export function isChartVideoFile(name: string): boolean {
  * A chart's in-archive folder name plus its packable asset files (full set,
  * incl. video). `groupDir` optionally inserts a grouping folder between the
  * batch root and the chart folder, e.g. a version name in multi-version packs.
+ * `genreDir` is the alternative grouping folder for genre-organized batches.
  */
-export type ChartDownloadSpec = { dir: string; files: ChartAssetFile[]; groupDir?: string };
+export type ChartDownloadSpec = {
+  dir: string;
+  files: ChartAssetFile[];
+  groupDir?: string;
+  genreDir?: string;
+};
 
 export function getChartDownloadSpec(entry: CatalogEntry): ChartDownloadSpec {
   return {
     dir: entry.remote_dir_name,
     files: getChartAssetFiles(entry),
     groupDir: versionGroupFolderName(entry.version),
+    genreDir: genreGroupFolderName(entry),
   };
+}
+
+/**
+ * Genre grouping folder for downloads, using the canonical in-game (JP) genre
+ * name. Slashes are normalized so a raw genre string can never nest folders.
+ */
+export function genreGroupFolderName(
+  entry: { genreid?: number; genre?: string },
+  unknownLabel = "Unknown"
+): string {
+  const name = genreInfo(entry)?.ja ?? entry.genre?.trim() ?? "";
+  return name === "" ? unknownLabel : name.replace(/[\\/]+/g, "／");
 }
 
 export function formatEntryTitle(

@@ -176,6 +176,587 @@ describe("runMultiFileDownload", () => {
     expect(completed).toBe(0);
   });
 
+  test("retries a transient network failure and succeeds", async () => {
+    let attempts = 0;
+    const calls = stubFetch(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new TypeError("Failed to fetch");
+      }
+      return new Response(FULL, { status: 200, headers: { "content-length": "10" } });
+    });
+
+    const [result] = await runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      { retryBaseDelayMs: 1 }
+    );
+
+    expect(calls).toHaveLength(2);
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+  });
+
+  test("retries a 503 response and succeeds on the next attempt", async () => {
+    let attempts = 0;
+    const calls = stubFetch(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        return new Response("busy", { status: 503 });
+      }
+      return new Response(FULL, { status: 200, headers: { "content-length": "10" } });
+    });
+
+    const [result] = await runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      { retryBaseDelayMs: 1 }
+    );
+
+    expect(calls).toHaveLength(2);
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+  });
+
+  test("gives up after consecutive attempts that make no progress", async () => {
+    const calls = stubFetch(() => {
+      throw new TypeError("Failed to fetch");
+    });
+
+    await expect(
+      runMultiFileDownload(
+        [{ name: "a", url: "https://x/a", completedBlob: null }],
+        { retryBaseDelayMs: 1 }
+      )
+    ).rejects.toThrow("File download failed");
+    expect(calls).toHaveLength(4);
+  });
+
+  test("does not retry a definitive HTTP error such as 404", async () => {
+    const calls = stubFetch(() => new Response("missing", { status: 404 }));
+
+    await expect(
+      runMultiFileDownload(
+        [{ name: "a", url: "https://x/a", completedBlob: null }],
+        { retryBaseDelayMs: 1 }
+      )
+    ).rejects.toThrow("File download failed");
+    expect(calls).toHaveLength(1);
+  });
+
+  /** A response whose stream delivers `bytes` and then errors mid-transfer. */
+  function interruptedResponse(bytes: Uint8Array, headers: Record<string, string>, status = 200) {
+    let delivered = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        // Erroring in the same tick as enqueue would discard the queued chunk;
+        // deliver it on the first read and fail on the next one instead.
+        if (!delivered) {
+          delivered = true;
+          controller.enqueue(bytes);
+          return;
+        }
+        controller.error(new TypeError("network error"));
+      },
+    });
+    return new Response(stream, { status, headers });
+  }
+
+  test("resumes an interrupted body with Range/If-Range when a validator exists", async () => {
+    const lastModified = "Wed, 01 Jan 2025 00:00:00 GMT";
+    let attempts = 0;
+    const calls = stubFetch(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        return interruptedResponse(FULL.slice(0, 4), {
+          "content-length": "10",
+          "last-modified": lastModified,
+        });
+      }
+      return new Response(FULL.slice(4), {
+        status: 206,
+        headers: { "content-range": "bytes 4-9/10" },
+      });
+    });
+
+    const [result] = await runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      { retryBaseDelayMs: 1 }
+    );
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0].headers.has("Range")).toBe(false);
+    expect(calls[1].headers.get("Range")).toBe("bytes=4-");
+    expect(calls[1].headers.get("If-Range")).toBe(lastModified);
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+  });
+
+  test("prefers a strong ETag over Last-Modified as the resume validator", async () => {
+    let attempts = 0;
+    const calls = stubFetch(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        return interruptedResponse(FULL.slice(0, 4), {
+          "content-length": "10",
+          etag: '"abc123"',
+          "last-modified": "Wed, 01 Jan 2025 00:00:00 GMT",
+        });
+      }
+      return new Response(FULL.slice(4), {
+        status: 206,
+        headers: { "content-range": "bytes 4-9/10" },
+      });
+    });
+
+    await runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      { retryBaseDelayMs: 1 }
+    );
+
+    expect(calls[1].headers.get("If-Range")).toBe('"abc123"');
+  });
+
+  test("restarts from byte zero without Range when no validator is available", async () => {
+    let attempts = 0;
+    const calls = stubFetch(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        return interruptedResponse(FULL.slice(0, 4), { "content-length": "10" });
+      }
+      return new Response(FULL, { status: 200, headers: { "content-length": "10" } });
+    });
+
+    const [result] = await runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      { retryBaseDelayMs: 1 }
+    );
+
+    expect(calls).toHaveLength(2);
+    expect(calls[1].headers.has("Range")).toBe(false);
+    expect(calls[1].headers.has("If-Range")).toBe(false);
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+  });
+
+  test("discards the buffered prefix when the server ignores the Range request", async () => {
+    let attempts = 0;
+    stubFetch(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        return interruptedResponse(FULL.slice(0, 4), {
+          "content-length": "10",
+          "last-modified": "Wed, 01 Jan 2025 00:00:00 GMT",
+        });
+      }
+      return new Response(FULL, { status: 200, headers: { "content-length": "10" } });
+    });
+
+    const [result] = await runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      { retryBaseDelayMs: 1 }
+    );
+
+    // Not 4 prefix bytes + 10 full bytes — the stale prefix must be dropped.
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+  });
+
+  test("treats a cleanly-closed short 206 as truncated and keeps resuming", async () => {
+    const lastModified = "Wed, 01 Jan 2025 00:00:00 GMT";
+    let attempts = 0;
+    const calls = stubFetch(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        return interruptedResponse(FULL.slice(0, 4), {
+          "content-length": "10",
+          "last-modified": lastModified,
+        });
+      }
+      if (attempts === 2) {
+        // Continuation closes cleanly after 2 of the remaining 6 bytes.
+        return new Response(FULL.slice(4, 6), {
+          status: 206,
+          headers: { "content-range": "bytes 4-9/10" },
+        });
+      }
+      return new Response(FULL.slice(6), {
+        status: 206,
+        headers: { "content-range": "bytes 6-9/10" },
+      });
+    });
+
+    const [result] = await runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      { retryBaseDelayMs: 1 }
+    );
+
+    expect(calls).toHaveLength(3);
+    expect(calls[2].headers.get("Range")).toBe("bytes=6-");
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+  });
+
+  test("keeps retrying while every attempt makes progress, beyond the idle budget", async () => {
+    const lastModified = "Wed, 01 Jan 2025 00:00:00 GMT";
+    let attempts = 0;
+    const calls = stubFetch(() => {
+      attempts += 1;
+      const offset = attempts - 1;
+      if (offset === 0) {
+        return interruptedResponse(FULL.slice(0, 1), {
+          "content-length": "10",
+          "last-modified": lastModified,
+        });
+      }
+      if (offset < 9) {
+        // Each attempt yields exactly one more byte before failing.
+        return interruptedResponse(
+          FULL.slice(offset, offset + 1),
+          { "content-range": `bytes ${offset}-9/10` },
+          206
+        );
+      }
+      return new Response(FULL.slice(9), {
+        status: 206,
+        headers: { "content-range": "bytes 9-9/10" },
+      });
+    });
+
+    const [result] = await runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      { retryBaseDelayMs: 1 }
+    );
+
+    // 10 attempts — far beyond the no-progress budget of 4.
+    expect(calls).toHaveLength(10);
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+  });
+
+  test("resets and recovers when a 206 continues from the wrong offset", async () => {
+    const lastModified = "Wed, 01 Jan 2025 00:00:00 GMT";
+    let attempts = 0;
+    const calls = stubFetch(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        return interruptedResponse(FULL.slice(0, 4), {
+          "content-length": "10",
+          "last-modified": lastModified,
+        });
+      }
+      if (attempts === 2) {
+        return new Response(FULL.slice(2), {
+          status: 206,
+          headers: { "content-range": "bytes 2-9/10" },
+        });
+      }
+      return new Response(FULL, { status: 200, headers: { "content-length": "10" } });
+    });
+
+    const [result] = await runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      { retryBaseDelayMs: 1 }
+    );
+
+    // Wrong-offset continuation is unusable; the third attempt restarts clean.
+    expect(calls).toHaveLength(3);
+    expect(calls[2].headers.has("Range")).toBe(false);
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+  });
+
+  test("checks the delivered size even when the 206 total is '*'", async () => {
+    const lastModified = "Wed, 01 Jan 2025 00:00:00 GMT";
+    let attempts = 0;
+    const calls = stubFetch(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        return interruptedResponse(FULL.slice(0, 4), {
+          "content-length": "10",
+          "last-modified": lastModified,
+        });
+      }
+      if (attempts === 2) {
+        // Unknown complete length; the body stops two bytes short of the
+        // declared end, so it must not be accepted as a finished file.
+        return new Response(FULL.slice(4, 8), {
+          status: 206,
+          headers: { "content-range": "bytes 4-9/*" },
+        });
+      }
+      return new Response(FULL.slice(8), {
+        status: 206,
+        headers: { "content-range": "bytes 8-9/*" },
+      });
+    });
+
+    const [result] = await runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      { retryBaseDelayMs: 1 }
+    );
+
+    expect(calls).toHaveLength(3);
+    expect(calls[2].headers.get("Range")).toBe("bytes=8-");
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+  });
+
+  test("rejects a 206 body that overruns the declared range without retrying", async () => {
+    const lastModified = "Wed, 01 Jan 2025 00:00:00 GMT";
+    let attempts = 0;
+    let completed = 0;
+    const calls = stubFetch(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        return interruptedResponse(FULL.slice(0, 4), {
+          "content-length": "10",
+          "last-modified": lastModified,
+        });
+      }
+      // Claims bytes 4-9 but streams the whole 10-byte body.
+      return new Response(FULL, {
+        status: 206,
+        headers: { "content-range": "bytes 4-9/10" },
+      });
+    });
+
+    await expect(
+      runMultiFileDownload(
+        [{ name: "a", url: "https://x/a", completedBlob: null }],
+        { retryBaseDelayMs: 1, onFileComplete: () => void (completed += 1) }
+      )
+    ).rejects.toThrow("File download failed");
+    // Untrusted bytes end the run immediately — no retry, no checkpoint.
+    expect(calls).toHaveLength(2);
+    expect(completed).toBe(0);
+  });
+
+  test("continues asking for more when the server answers with a partial range", async () => {
+    const lastModified = "Wed, 01 Jan 2025 00:00:00 GMT";
+    let attempts = 0;
+    const calls = stubFetch(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        return interruptedResponse(FULL.slice(0, 4), {
+          "content-length": "10",
+          "last-modified": lastModified,
+        });
+      }
+      if (attempts === 2) {
+        // A complete, honest sub-range: good bytes, file not finished.
+        return new Response(FULL.slice(4, 7), {
+          status: 206,
+          headers: { "content-range": "bytes 4-6/10" },
+        });
+      }
+      return new Response(FULL.slice(7), {
+        status: 206,
+        headers: { "content-range": "bytes 7-9/10" },
+      });
+    });
+
+    const [result] = await runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      { retryBaseDelayMs: 1 }
+    );
+
+    expect(calls).toHaveLength(3);
+    expect(calls[2].headers.get("Range")).toBe("bytes=7-");
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+  });
+
+  test("never resumes on a weak ETag and ignores Last-Modified alongside it", async () => {
+    let attempts = 0;
+    const calls = stubFetch(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        return interruptedResponse(FULL.slice(0, 4), {
+          "content-length": "10",
+          etag: 'W/"weak"',
+          "last-modified": "Wed, 01 Jan 2025 00:00:00 GMT",
+        });
+      }
+      return new Response(FULL, { status: 200, headers: { "content-length": "10" } });
+    });
+
+    const [result] = await runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      { retryBaseDelayMs: 1 }
+    );
+
+    // A weak ETag disclaims byte identity, so the retry restarts from zero
+    // rather than falling back to the Last-Modified date.
+    expect(calls).toHaveLength(2);
+    expect(calls[1].headers.has("Range")).toBe(false);
+    expect(calls[1].headers.has("If-Range")).toBe(false);
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+  });
+
+  test("discards the prefix when a 206 continues a different representation", async () => {
+    let attempts = 0;
+    const calls = stubFetch(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        return interruptedResponse(FULL.slice(0, 4), {
+          "content-length": "10",
+          etag: '"v1"',
+        });
+      }
+      if (attempts === 2) {
+        // Server ignored If-Range and continued a newer entity.
+        return new Response(FULL.slice(4), {
+          status: 206,
+          headers: { "content-range": "bytes 4-9/10", etag: '"v2"' },
+        });
+      }
+      return new Response(FULL, {
+        status: 200,
+        headers: { "content-length": "10", etag: '"v2"' },
+      });
+    });
+
+    const [result] = await runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      { retryBaseDelayMs: 1 }
+    );
+
+    expect(calls).toHaveLength(3);
+    expect(calls[2].headers.has("Range")).toBe(false);
+    // v1's prefix was never spliced onto v2's tail.
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+  });
+
+  test("recovers from 416 by restarting the file instead of failing the job", async () => {
+    let attempts = 0;
+    const calls = stubFetch(() => {
+      attempts += 1;
+      if (attempts === 1) {
+        return interruptedResponse(FULL.slice(0, 4), {
+          "content-length": "10",
+          etag: '"v1"',
+        });
+      }
+      if (attempts === 2) {
+        return new Response(null, {
+          status: 416,
+          headers: { "content-range": "bytes */3" },
+        });
+      }
+      return new Response(FULL, { status: 200, headers: { "content-length": "10" } });
+    });
+
+    const [result] = await runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      { retryBaseDelayMs: 1 }
+    );
+
+    expect(calls).toHaveLength(3);
+    expect(calls[2].headers.has("Range")).toBe(false);
+    expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+  });
+
+  test("a 416 that was not asked for is a hard failure", async () => {
+    const calls = stubFetch(() => new Response(null, { status: 416 }));
+
+    await expect(
+      runMultiFileDownload(
+        [{ name: "a", url: "https://x/a", completedBlob: null }],
+        { retryBaseDelayMs: 1 }
+      )
+    ).rejects.toThrow("File download failed");
+    expect(calls).toHaveLength(1);
+  });
+
+  test("aborting during a retry backoff rejects immediately", async () => {
+    const abortController = new AbortController();
+    let signalFailed: (() => void) | undefined;
+    const firstFailed = new Promise<void>((resolve) => {
+      signalFailed = resolve;
+    });
+    const calls = stubFetch(() => {
+      signalFailed?.();
+      throw new TypeError("Failed to fetch");
+    });
+
+    const run = runMultiFileDownload(
+      [{ name: "a", url: "https://x/a", completedBlob: null }],
+      // A backoff long enough that only an abort — not the timer — can end it.
+      { retryBaseDelayMs: 60_000, signal: abortController.signal }
+    );
+    const settledAt = run.then(
+      () => Date.now(),
+      () => Date.now()
+    );
+
+    await firstFailed;
+    const abortedAt = Date.now();
+    abortController.abort();
+    await expect(run).rejects.toThrow();
+    expect((await settledAt) - abortedAt).toBeLessThan(1000);
+    // The pending retry never fired after the abort.
+    expect(calls).toHaveLength(1);
+  });
+
+  test("waits for connectivity instead of spending retries while offline", async () => {
+    const listeners = new Map<string, Set<() => void>>();
+    const originalWindow = (globalThis as Record<string, unknown>).window;
+    const originalNavigator = globalThis.navigator;
+    let online = false;
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: { get onLine() { return online; } },
+    });
+    (globalThis as Record<string, unknown>).window = {
+      addEventListener: (type: string, listener: () => void) => {
+        const bucket = listeners.get(type) ?? new Set();
+        bucket.add(listener);
+        listeners.set(type, bucket);
+      },
+      removeEventListener: (type: string, listener: () => void) => {
+        listeners.get(type)?.delete(listener);
+      },
+    };
+
+    // Connectivity "returns" repeatedly while the device is in fact still
+    // offline, so each wait ends and the engine attempts another fetch.
+    const flapping = setInterval(() => {
+      for (const listener of [...(listeners.get("online") ?? [])]) {
+        listener();
+      }
+    }, 5);
+
+    try {
+      let attempts = 0;
+      const calls = stubFetch(() => {
+        attempts += 1;
+        if (!online) {
+          throw new TypeError("Failed to fetch");
+        }
+        return new Response(FULL, { status: 200, headers: { "content-length": "10" } });
+      });
+
+      const run = runMultiFileDownload(
+        [{ name: "a", url: "https://x/a", completedBlob: null }],
+        { retryBaseDelayMs: 1 }
+      );
+      let rejected = false;
+      void run.catch(() => void (rejected = true));
+
+      // Six consecutive failures — well past MAX_FAILURES_WITHOUT_PROGRESS (4).
+      // An outage must not spend the retry budget, so the run stays alive.
+      const deadline = Date.now() + 5000;
+      while (attempts < 6 && !rejected && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(rejected).toBe(false);
+      expect(attempts).toBeGreaterThanOrEqual(6);
+
+      online = true;
+      const [result] = await run;
+      expect([...(await bytesOf(result.blob))]).toEqual([...FULL]);
+      expect(calls.length).toBeGreaterThan(6);
+      // Every "online" listener was removed again — no leak across attempts.
+      expect(listeners.get("online")?.size ?? 0).toBe(0);
+    } finally {
+      clearInterval(flapping);
+      (globalThis as Record<string, unknown>).window = originalWindow;
+      Object.defineProperty(globalThis, "navigator", {
+        configurable: true,
+        value: originalNavigator,
+      });
+    }
+  });
+
   test("aborts sibling workers and waits for their shutdown before rejecting", async () => {
     let signalSlowStarted: (() => void) | undefined;
     const slowStarted = new Promise<void>((resolve) => {

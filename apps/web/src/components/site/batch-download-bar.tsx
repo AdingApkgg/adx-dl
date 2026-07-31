@@ -20,6 +20,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -31,7 +33,12 @@ import {
   DownloadSourceSummary,
 } from "./downloads/download-source-selector";
 import { downloadJobStatusText } from "./downloads/download-status-text";
-import { jobPercent, newBatchJobId, useDownloadsStore } from "./downloads/downloads-store";
+import {
+  chartGroupingDir,
+  newBatchJobId,
+  summarizeDownloadJobs,
+  useDownloadsStore,
+} from "./downloads/downloads-store";
 
 /** Above this many charts, one click could start a multi-GB transfer — confirm first. */
 const CONFIRM_THRESHOLD = 50;
@@ -86,15 +93,23 @@ export function BatchDownloadBar({
   const selectedSourceId = useDownloadsStore((state) => state.selectedSourceId);
   const setSelectedSourceId = useDownloadsStore((state) => state.setSelectedSourceId);
   const preferredFormat = useDownloadsStore((state) => state.preferredFormat);
+  const grouping = useDownloadsStore((state) => state.preferredBatchGrouping);
+  const setGrouping = useDownloadsStore((state) => state.setPreferredBatchGrouping);
 
   // The pack+download runs in a module-level store so it keeps going after the
-  // user navigates away from this page. The bar only tracks the job it started
-  // itself (unique id per start) — a batch running from another page stays in
+  // user navigates away from this page. The bar only tracks the jobs it started
+  // itself (unique ids per start) — a batch running from another page stays in
   // the floating tray instead of being adopted by (and conflicting with) this
-  // bar's own selection and controls.
-  const [jobId, setJobId] = React.useState<string | null>(null);
-  const job = useDownloadsStore((state) =>
-    jobId !== null ? state.jobs.find((entry) => entry.id === jobId) : undefined
+  // bar's own selection and controls. A selection spanning several versions or
+  // genres queues one job per group, so this is a set, not a single job.
+  const [jobIds, setJobIds] = React.useState<readonly string[]>([]);
+  const allJobs = useDownloadsStore((state) => state.jobs);
+  const jobs = React.useMemo(
+    () =>
+      jobIds
+        .map((id) => allJobs.find((entry) => entry.id === id))
+        .filter((entry): entry is (typeof allJobs)[number] => entry !== undefined),
+    [allJobs, jobIds]
   );
   const startBatch = useDownloadsStore((state) => state.startBatch);
   const resume = useDownloadsStore((state) => state.resume);
@@ -124,28 +139,54 @@ export function BatchDownloadBar({
     ? fileStats.totalFiles
     : fileStats.totalFiles - fileStats.videoFiles;
   const hasVideoFiles = fileStats.videoFiles > 0;
-  // A selection spanning multiple version folders saves one archive per
-  // version (see splitBatchArchives) — tell the user up front.
-  const versionGroupCount = React.useMemo(
-    () => new Set(charts.map((chart) => chart.groupDir ?? "")).size,
-    [charts]
+  // A selection spanning multiple grouping folders (versions or genres) saves
+  // one archive per folder (see splitBatchArchives) — tell the user up front.
+  const groupCount = React.useMemo(
+    () => new Set(charts.map((chart) => chartGroupingDir(chart, grouping))).size,
+    [charts, grouping]
   );
-  const status = job?.status ?? "idle";
-  const isBusy = status === "packing" || status === "archiving";
+  const summary = React.useMemo(() => summarizeDownloadJobs(jobs), [jobs]);
+  const status = summary.status;
+  const isBusy = status === "packing" || status === "archiving" || status === "queued";
   const isResumable = status === "paused" || status === "error";
-  const progress = { completed: job?.completed ?? 0, total: job?.total ?? 0 };
-  const statusText = job ? downloadJobStatusText(job, detail, tray) : "";
+  const progress = React.useMemo(
+    () =>
+      jobs.reduce(
+        (totals, entry) => ({
+          completed: totals.completed + entry.completed,
+          total: totals.total + entry.total,
+        }),
+        { completed: 0, total: 0 }
+      ),
+    [jobs]
+  );
+  const statusText =
+    jobs.length === 0
+      ? ""
+      : jobs.length === 1
+        ? downloadJobStatusText(jobs[0], detail, tray)
+        : status === "success"
+          ? tray.completed
+          : `${tray.queueSummary(summary.done, summary.total)} · ${summary.percent}%`;
   const canDownload = count > 0 && !isBusy && !isResumable;
 
-  // Hide this job from the floating tray while the bar itself is on screen.
-  const hasJob = job != null;
+  // Hide these jobs from the floating tray while the bar itself is on screen.
+  // Keyed by a joined string so the effect doesn't re-run on array identity.
+  const presentedKey = jobs.map((entry) => entry.id).join("\u0000");
   React.useEffect(() => {
-    if (!hasJob || jobId === null) {
+    if (presentedKey === "") {
       return;
     }
-    presentInline(jobId);
-    return () => unpresentInline(jobId);
-  }, [hasJob, jobId, presentInline, unpresentInline]);
+    const ids = presentedKey.split("\u0000");
+    for (const id of ids) {
+      presentInline(id);
+    }
+    return () => {
+      for (const id of ids) {
+        unpresentInline(id);
+      }
+    };
+  }, [presentedKey, presentInline, unpresentInline]);
 
   // Tell the floating tray a full-width bottom bar is on screen so it lifts
   // itself above instead of overlapping on phones.
@@ -181,21 +222,24 @@ export function BatchDownloadBar({
   }, [confirmDiscard]);
 
   function beginBatch(format: BatchArchiveFormat) {
-    // A finished previous run from this bar is done communicating — clear it
-    // instead of letting it pop into the tray as a stale success row.
-    if (job && job.status === "success") {
-      dismiss(job.id);
+    // Finished runs from this bar are done communicating — clear them instead
+    // of letting them pop into the tray as stale success rows.
+    for (const entry of jobs) {
+      if (entry.status === "success") {
+        dismiss(entry.id);
+      }
     }
-    const id = newBatchJobId();
-    setJobId(id);
-    startBatch({
-      id,
-      title: collectionName,
-      charts,
-      includeVideo,
-      format,
-      sourceId: selectedSourceId,
-    });
+    setJobIds(
+      startBatch({
+        id: newBatchJobId(),
+        title: collectionName,
+        charts,
+        includeVideo,
+        format,
+        sourceId: selectedSourceId,
+        grouping,
+      })
+    );
   }
 
   function handleSelect(format: BatchArchiveFormat) {
@@ -219,7 +263,33 @@ export function BatchDownloadBar({
     setPendingFormat(null);
   }
 
-  const percent = job ? jobPercent(job) : 0;
+  const percent = summary.percent;
+  // Every control acts on the whole set this bar started; per-job controls live
+  // in the floating tray.
+  const resumeAll = (): void => {
+    for (const entry of jobs) {
+      if (entry.status === "paused" || entry.status === "error") {
+        resume(entry.id);
+      }
+    }
+  };
+  const pauseAll = (): void => {
+    for (const entry of jobs) {
+      pause(entry.id);
+    }
+  };
+  const dismissAll = (): void => {
+    for (const entry of jobs) {
+      dismiss(entry.id);
+    }
+  };
+  const restartAllWithSource = (sourceId: Parameters<typeof restartWithSource>[1]): void => {
+    for (const entry of jobs) {
+      if (entry.status === "paused" || entry.status === "error") {
+        restartWithSource(entry.id, sourceId);
+      }
+    }
+  };
 
   return (
     <motion.div
@@ -244,7 +314,7 @@ export function BatchDownloadBar({
           </Button>
           {isResumable ? (
             <>
-              <Button type="button" size="sm" onClick={() => job && resume(job.id)}>
+              <Button type="button" size="sm" onClick={resumeAll}>
                 <RotateCwIcon data-icon="inline-start" />
                 {tray.resume}
                 {percent > 0 ? ` · ${percent}%` : null}
@@ -268,9 +338,9 @@ export function BatchDownloadBar({
                   className="max-h-[min(28rem,calc(100dvh-5rem))] w-[min(20rem,calc(100vw-2rem))] overscroll-contain"
                 >
                   <DownloadSourceMenu
-                    value={job?.sourceId ?? selectedSourceId}
-                    sourceBaseUrl={job?.sourceBaseUrl}
-                    onValueChange={(sourceId) => job && restartWithSource(job.id, sourceId)}
+                    value={jobs[0]?.sourceId ?? selectedSourceId}
+                    sourceBaseUrl={jobs[0]?.sourceBaseUrl}
+                    onValueChange={restartAllWithSource}
                     copy={tray.sourcePicker}
                     hint={tray.sourcePicker.restartHint}
                   />
@@ -284,9 +354,7 @@ export function BatchDownloadBar({
                 title={confirmDiscard ? tray.confirmDiscard : tray.cancel}
                 onClick={() => {
                   if (confirmDiscard) {
-                    if (job) {
-                      dismiss(job.id);
-                    }
+                    dismissAll();
                   } else {
                     setConfirmDiscard(true);
                   }
@@ -356,6 +424,27 @@ export function BatchDownloadBar({
                         ) : null}
                       </DropdownMenuItem>
                     ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>{tray.groupingLabel}</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup
+                      value={grouping}
+                      onValueChange={(value) =>
+                        setGrouping(value === "genre" ? "genre" : "version")
+                      }
+                    >
+                      <DropdownMenuRadioItem
+                        value="version"
+                        onSelect={(event) => event.preventDefault()}
+                      >
+                        {tray.groupingVersion}
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem
+                        value="genre"
+                        onSelect={(event) => event.preventDefault()}
+                      >
+                        {tray.groupingGenre}
+                      </DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
                     {hasVideoFiles ? (
                       <>
                         <DropdownMenuSeparator />
@@ -371,14 +460,14 @@ export function BatchDownloadBar({
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              {status === "packing" ? (
+              {status === "packing" || status === "queued" ? (
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   aria-label={tray.pause}
                   title={tray.pause}
-                  onClick={() => job && pause(job.id)}
+                  onClick={pauseAll}
                 >
                   <PauseIcon />
                 </Button>
@@ -388,9 +477,9 @@ export function BatchDownloadBar({
         </div>
 
         <DownloadSourceSummary
-          sourceId={job?.sourceId ?? selectedSourceId}
-          sourceBaseUrl={job?.sourceBaseUrl}
-          sourceName={job?.sourceName}
+          sourceId={jobs[0]?.sourceId ?? selectedSourceId}
+          sourceBaseUrl={jobs[0]?.sourceBaseUrl}
+          sourceName={jobs[0]?.sourceName}
           copy={tray.sourcePicker}
           className="w-fit"
         />
@@ -404,10 +493,14 @@ export function BatchDownloadBar({
                 ? tray.batchVideoSummary(fileStats.videoFiles)
                 : tray.batchNoVideoSummary}
             </span>
-            {versionGroupCount > 1 ? (
+            {groupCount > 1 ? (
               <>
                 <span aria-hidden="true">·</span>
-                <span>{tray.batchSplitSummary(versionGroupCount)}</span>
+                <span>
+                  {grouping === "genre"
+                    ? tray.batchSplitSummaryGenre(groupCount)
+                    : tray.batchSplitSummary(groupCount)}
+                </span>
               </>
             ) : null}
           </div>
@@ -464,7 +557,7 @@ export function BatchDownloadBar({
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground">{statusText}</p>
             </motion.div>
-          ) : status === "packing" || status === "paused" ? (
+          ) : status === "packing" || status === "paused" || status === "queued" ? (
             <motion.div
               key="progress"
               initial={{ opacity: 0, height: 0 }}
@@ -514,7 +607,7 @@ export function BatchDownloadBar({
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.2, ease: EASE_OUT }}
               className="text-xs text-destructive"
-              title={job?.error ?? undefined}
+              title={jobs.find((entry) => entry.error)?.error ?? undefined}
             >
               {statusText}
             </motion.p>

@@ -13,6 +13,8 @@ export function downloadJobStatusText(
 ): string {
   const percent = jobPercent(job);
   switch (job.status) {
+    case "queued":
+      return tray.queued;
     case "packing": {
       const counts = detail.downloadPacking(job.completed, job.total);
       const bytes =

@@ -13,6 +13,7 @@ afterEach(() => {
     selectedSourceId: "r2",
     customSources: [],
     preferredFormat: "adx",
+    preferredBatchGrouping: "version",
     sourceProbes: createInitialDownloadSourceProbes(),
   });
 });
@@ -39,5 +40,29 @@ describe("SiteSettingsContent", () => {
     expect(html).toContain("添加线路");
     expect(html).toContain("R2");
     expect(html).toContain("AWMC");
+  });
+
+  // The active choice is not asserted here: zustand serves its initial state as
+  // the server snapshot, so a static render always shows the defaults. Which
+  // option wins is covered by the store's own tests.
+  test("offers both batch folder layouts in every locale", () => {
+    const expected = {
+      zh: ["批量下载分类路径", "按版本", "按曲风"],
+      en: ["Batch download folder layout", "By version", "By genre"],
+      ja: ["まとめてダウンロードのフォルダ分け", "バージョン別", "ジャンル別"],
+    } as const;
+
+    for (const locale of ["zh", "en", "ja"] as const) {
+      const html = renderToStaticMarkup(
+        <SiteSettingsContent
+          locale={locale}
+          pathname="/charts"
+          dictionary={getDictionary(locale)}
+        />
+      );
+      for (const text of expected[locale]) {
+        expect(html).toContain(text);
+      }
+    }
   });
 });

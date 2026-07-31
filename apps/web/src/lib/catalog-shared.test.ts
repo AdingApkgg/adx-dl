@@ -5,6 +5,7 @@ import {
   difficultyDisplayLevel,
   entryHasLevel,
   formatEntrySubcategory,
+  genreGroupFolderName,
   getChartAssetFiles,
   getChartDownloadSpec,
   isKnownVersionIndex,
@@ -105,7 +106,7 @@ describe("catalog shared helpers", () => {
     ]);
   });
 
-  test("getChartDownloadSpec carries the global version folder", () => {
+  test("getChartDownloadSpec carries the version and genre grouping folders", () => {
     expect(getChartDownloadSpec(buildEntry({ remote_dir_name: "11951" }))).toEqual({
       dir: "11951",
       files: [
@@ -115,10 +116,23 @@ describe("catalog shared helpers", () => {
         { name: "pv.mp4", url: "/covers/song-1/pv.mp4" },
       ],
       groupDir: "21 BUDDiES",
+      genreDir: "Anime",
     });
 
     expect(versionGroupFolderName("maimai DX CiRCLE")).toBe("25 CiRCLE");
     expect(versionGroupFolderName("unmapped version", "未知版本")).toBe("未知版本");
+  });
+
+  test("genreGroupFolderName uses the canonical JP genre name", () => {
+    // genreid wins and maps to the canonical in-game name.
+    expect(genreGroupFolderName({ genreid: 103, genre: "whatever" })).toBe("東方Project");
+    // The stable JP genre string resolves even without a genreid.
+    expect(genreGroupFolderName({ genre: "POPS＆アニメ" })).toBe("POPS＆アニメ");
+    // Unmapped genres fall back to the raw string with path separators defused.
+    expect(genreGroupFolderName({ genre: "A/B\\C" })).toBe("A／B／C");
+    // Nothing to go on → the unknown bucket.
+    expect(genreGroupFolderName({})).toBe("Unknown");
+    expect(genreGroupFolderName({ genre: "  " }, "未知曲风")).toBe("未知曲风");
   });
 
   test("prefers version and cabinet for remote entries", () => {

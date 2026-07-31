@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   CheckIcon,
   FileArchiveIcon,
+  FolderTreeIcon,
   GaugeIcon,
   Globe2Icon,
   LockKeyholeIcon,
@@ -36,7 +37,10 @@ import {
   downloadSourceStatusText,
   IDLE_DOWNLOAD_SOURCE_PROBE,
 } from "@/components/site/downloads/download-source-selector";
-import { useDownloadsStore } from "@/components/site/downloads/downloads-store";
+import {
+  BATCH_GROUPINGS,
+  useDownloadsStore,
+} from "@/components/site/downloads/downloads-store";
 import { getMusicPlayerCopy } from "@/components/site/music-player/music-player-copy";
 import { useMusicPlayerPreferences } from "@/components/site/music-player/music-player-preferences";
 import { useMotionPreference, type MotionMode } from "@/components/motion";
@@ -159,6 +163,12 @@ export function SiteSettingsContent({
   );
   const setSelectedSourceId = useDownloadsStore(
     (state) => state.setSelectedSourceId
+  );
+  const preferredBatchGrouping = useDownloadsStore(
+    (state) => state.preferredBatchGrouping
+  );
+  const setPreferredBatchGrouping = useDownloadsStore(
+    (state) => state.setPreferredBatchGrouping
   );
   const preferredFormat = useDownloadsStore((state) => state.preferredFormat);
   const setPreferredFormat = useDownloadsStore(
@@ -442,6 +452,42 @@ export function SiteSettingsContent({
             </div>
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
               {copy.formatHelp}
+            </p>
+          </SettingsField>
+
+          <SettingsField label={copy.batchGroupingLabel}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {BATCH_GROUPINGS.map((grouping) => {
+                const active = preferredBatchGrouping === grouping;
+                return (
+                  <button
+                    key={grouping}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setPreferredBatchGrouping(grouping)}
+                    className={cn(
+                      choiceClass(active),
+                      "h-auto items-start py-2.5 text-left"
+                    )}
+                  >
+                    <FolderTreeIcon aria-hidden="true" className="mt-0.5" />
+                    <span className="min-w-0">
+                      <span className="block font-medium">
+                        {copy.batchGroupings[grouping].name}
+                      </span>
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        {copy.batchGroupings[grouping].description}
+                      </span>
+                    </span>
+                    {active ? (
+                      <CheckIcon aria-hidden="true" className="ml-auto mt-0.5 size-3.5" />
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {copy.batchGroupingHelp}
             </p>
           </SettingsField>
 

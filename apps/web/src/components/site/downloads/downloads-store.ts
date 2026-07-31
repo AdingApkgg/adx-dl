@@ -74,12 +74,12 @@ export type DownloadJob = {
   sourceName?: string;
   format: ArchiveFormat;
   /**
-   * `packing` = fetching files; `archiving` = all bytes on hand, building the
-   * archive blob (can take a while for big batches — distinct so the UI doesn't
-   * look frozen at 100%). `paused` = interrupted (reload or manual pause),
-   * awaiting manual resume.
+   * `queued` = accepted but waiting for a download slot; `packing` = fetching
+   * files; `archiving` = all bytes on hand, building the archive blob (can take
+   * a while for big batches — distinct so the UI doesn't look frozen at 100%).
+   * `paused` = interrupted (reload or manual pause), awaiting manual resume.
    */
-  status: "packing" | "archiving" | "success" | "error" | "paused";
+  status: "queued" | "packing" | "archiving" | "success" | "error" | "paused";
   /** Files finished downloading so far / total files to fetch. */
   completed: number;
   total: number;
@@ -109,6 +109,19 @@ type StartSingleParams = {
   sourceId?: DownloadSourceId;
 };
 
+/** Folder layout inside a batch archive: one folder per version or per genre. */
+export type BatchGrouping = "version" | "genre";
+
+export const BATCH_GROUPINGS: readonly BatchGrouping[] = ["version", "genre"];
+
+/** The grouping folder a chart lands in under the given batch layout. */
+export function chartGroupingDir(
+  chart: Pick<ChartDownloadSpec, "groupDir" | "genreDir">,
+  grouping: BatchGrouping
+): string {
+  return (grouping === "genre" ? chart.genreDir : chart.groupDir) ?? "";
+}
+
 type StartBatchParams = {
   id: string;
   title: string;
@@ -116,6 +129,8 @@ type StartBatchParams = {
   includeVideo: boolean;
   format?: BatchArchiveFormat;
   sourceId?: DownloadSourceId;
+  /** Folder grouping inside the archive; defaults to the stored preference. */
+  grouping?: BatchGrouping;
 };
 
 type DownloadsState = {
@@ -126,6 +141,8 @@ type DownloadsState = {
   customSources: CustomDownloadSourceConfig[];
   /** Global one-click archive format; each running job keeps its own snapshot. */
   preferredFormat: ArchiveFormat;
+  /** Batch archive folder layout (per version / per genre); device-local. */
+  preferredBatchGrouping: BatchGrouping;
   /** One shared latency snapshot prevents every picker from probing independently. */
   sourceProbes: DownloadSourceProbeMap;
   /**
@@ -139,9 +156,11 @@ type DownloadsState = {
    */
   bottomBars: number;
   startSingle: (params: StartSingleParams) => void;
-  startBatch: (params: StartBatchParams) => void;
+  /** Returns the queued job ids — one per version/genre group in the selection. */
+  startBatch: (params: StartBatchParams) => string[];
   setSelectedSourceId: (sourceId: DownloadSourceId) => void;
   setPreferredFormat: (format: ArchiveFormat) => void;
+  setPreferredBatchGrouping: (grouping: BatchGrouping) => void;
   /** Adds a device-local route and returns its stable id when valid. */
   addCustomSource: (name: string, url: string) => CustomDownloadSourceId | null;
   /** Updates a custom route without changing running-job snapshots. */
@@ -169,6 +188,74 @@ type DownloadsState = {
 /** How long a finished (success) job lingers before the tray auto-clears it. */
 const AUTO_DISMISS_MS = 30000;
 
+/**
+ * Download slots. A grouped batch enqueues one job per version/genre, so
+ * without a cap "select all" would open dozens of jobs × their own per-file
+ * concurrency at once. Two slots rather than one: a job parked in a retry
+ * backoff or waiting for connectivity would otherwise stall the whole queue.
+ */
+const MAX_ACTIVE_JOBS = 2;
+const activeJobIds = new Set<string>();
+type SlotWaiter = { grant: () => void; cancel: () => void };
+/** FIFO, so jobs start in the order the user added them. */
+const slotWaiters: SlotWaiter[] = [];
+
+function pumpJobQueue(): void {
+  while (activeJobIds.size < MAX_ACTIVE_JOBS && slotWaiters.length > 0) {
+    slotWaiters.shift()?.grant();
+  }
+}
+
+/** Resolves when this job may start; rejects if it is aborted while waiting. */
+function acquireJobSlot(id: string, signal: AbortSignal): Promise<void> {
+  const abortReason = (): unknown =>
+    signal.reason ?? new DOMException("Aborted", "AbortError");
+  if (signal.aborted) {
+    return Promise.reject(abortReason());
+  }
+  if (activeJobIds.size < MAX_ACTIVE_JOBS) {
+    activeJobIds.add(id);
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const cleanup = (): void => {
+      signal.removeEventListener("abort", onAbort);
+      const index = slotWaiters.indexOf(waiter);
+      if (index >= 0) {
+        slotWaiters.splice(index, 1);
+      }
+    };
+    const waiter: SlotWaiter = {
+      grant: () => {
+        cleanup();
+        activeJobIds.add(id);
+        resolve();
+      },
+      cancel: () => {
+        cleanup();
+        reject(abortReason());
+      },
+    };
+    const onAbort = (): void => waiter.cancel();
+    signal.addEventListener("abort", onAbort, { once: true });
+    slotWaiters.push(waiter);
+  });
+}
+
+function releaseJobSlot(id: string): void {
+  activeJobIds.delete(id);
+  pumpJobQueue();
+}
+
+/** Test seam: the queue is module state, so it must reset between test cases. */
+export function resetDownloadQueueForTests(): void {
+  for (const waiter of [...slotWaiters]) {
+    waiter.cancel();
+  }
+  slotWaiters.length = 0;
+  activeJobIds.clear();
+}
+
 // Module-level (outside the store value) so they survive store updates but stay
 // out of React's snapshot: the durable job spec and any in-flight abort handle.
 const jobSpecs = new Map<string, PersistedJob>();
@@ -180,6 +267,12 @@ const restartingJobs = new Set<string>();
 const speedSamples = new Map<string, { time: number; bytes: number; ema: number }>();
 let hydrated = false;
 let sourceProbePromise: Promise<void> | null = null;
+/** Test seam: shrink the engine's retry backoff so failure paths settle fast. */
+let engineRetryBaseDelayMs: number | undefined;
+
+export function setDownloadRetryBaseDelayForTests(ms: number | undefined): void {
+  engineRetryBaseDelayMs = ms;
+}
 const customSourceProbeVersions = new Map<CustomDownloadSourceId, number>();
 let customSourceIdSequence = 0;
 
@@ -192,6 +285,7 @@ const SOURCE_PREFERENCE_KEY = "astrodx-download-source";
 const CUSTOM_SOURCE_URL_KEY = "astrodx-custom-download-source";
 const CUSTOM_SOURCES_KEY = "astrodx-custom-download-sources";
 const FORMAT_PREFERENCE_KEY = "astrodx-download-format";
+const BATCH_GROUPING_PREFERENCE_KEY = "astrodx-download-batch-grouping";
 
 export type DownloadSourceProbeMap = Partial<
   Record<DownloadSourceId, DownloadSourceProbe>
@@ -436,6 +530,33 @@ function loadPreferredFormat(): ArchiveFormat {
   }
 }
 
+function isBatchGrouping(value: string | null | undefined): value is BatchGrouping {
+  return BATCH_GROUPINGS.some((grouping) => grouping === value);
+}
+
+function savePreferredBatchGrouping(grouping: BatchGrouping): void {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  try {
+    localStorage.setItem(BATCH_GROUPING_PREFERENCE_KEY, grouping);
+  } catch {
+    // A blocked/private localStorage should not prevent downloads.
+  }
+}
+
+function loadPreferredBatchGrouping(): BatchGrouping {
+  if (typeof localStorage === "undefined") {
+    return "version";
+  }
+  try {
+    const stored = localStorage.getItem(BATCH_GROUPING_PREFERENCE_KEY);
+    return isBatchGrouping(stored) ? stored : "version";
+  } catch {
+    return "version";
+  }
+}
+
 function createCustomSourceId(): CustomDownloadSourceId {
   const randomUuid =
     typeof globalThis.crypto?.randomUUID === "function"
@@ -453,6 +574,65 @@ export function jobPercent(job: DownloadJob): number {
     return Math.min(100, Math.round((job.completed / job.total) * 100));
   }
   return 0;
+}
+
+/** Roll-up of the jobs one batch surface started, for a single inline summary. */
+export type DownloadJobsSummary = {
+  /** `idle` = nothing started yet; a running job outranks a failed/paused one. */
+  status: DownloadJob["status"] | "idle";
+  percent: number;
+  /** Jobs already finished successfully. */
+  done: number;
+  total: number;
+};
+
+export function summarizeDownloadJobs(
+  jobs: readonly DownloadJob[]
+): DownloadJobsSummary {
+  if (jobs.length === 0) {
+    return { status: "idle", percent: 0, done: 0, total: 0 };
+  }
+  const running = jobs.filter(
+    (job) =>
+      job.status === "queued" ||
+      job.status === "packing" ||
+      job.status === "archiving"
+  );
+  let status: DownloadJobsSummary["status"];
+  if (running.length > 0) {
+    // Anything still moving means the selection as a whole is still in flight,
+    // even when a sibling has already failed.
+    status = running.every((job) => job.status === "queued")
+      ? "queued"
+      : running.every((job) => job.status === "archiving")
+        ? "archiving"
+        : "packing";
+  } else if (jobs.some((job) => job.status === "error")) {
+    status = "error";
+  } else if (jobs.some((job) => job.status === "paused")) {
+    status = "paused";
+  } else {
+    status = "success";
+  }
+
+  // Weight by file count so a 200-chart version doesn't count the same as a
+  // 3-chart one. The count is known upfront and stays stable for the run.
+  let weighted = 0;
+  let weight = 0;
+  for (const job of jobs) {
+    const jobWeight = Math.max(1, job.total);
+    const jobProgress =
+      job.status === "success" ? 100 : job.status === "queued" ? 0 : jobPercent(job);
+    weighted += jobProgress * jobWeight;
+    weight += jobWeight;
+  }
+
+  return {
+    status,
+    percent: weight > 0 ? Math.round(weighted / weight) : 0,
+    done: jobs.filter((job) => job.status === "success").length,
+    total: jobs.length,
+  };
 }
 
 /** Coarse failure classification for a friendly, localized error message. */
@@ -517,14 +697,23 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       }
     };
     patchJob(id, {
-      status: "packing",
+      // Surface the wait as its own state instead of a job that looks started
+      // but never moves.
+      status: activeJobIds.size < MAX_ACTIVE_JOBS ? "packing" : "queued",
       error: null,
       errorKind: null,
       speedBps: 0,
       archiveCurrentFile: null,
     });
 
+    let holdsSlot = false;
     try {
+      await acquireJobSlot(id, controller.signal);
+      holdsSlot = true;
+      if (!isCurrentRun()) {
+        return;
+      }
+      patchCurrentJob({ status: "packing" });
       const persisted = await loadFilesForJob(id);
       if (!isCurrentRun()) {
         return;
@@ -581,6 +770,9 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       const archiveInputs = await runMultiFileDownload(inputs, {
         concurrency: spec.kind === "batch" ? 6 : 4,
         signal: controller.signal,
+        ...(engineRetryBaseDelayMs !== undefined
+          ? { retryBaseDelayMs: engineRetryBaseDelayMs }
+          : {}),
         onFileComplete: async (file, completed, total) => {
           // The engine calls this only after receiving the entire file. Awaiting
           // the write ensures archive cleanup cannot race a late checkpoint.
@@ -772,6 +964,10 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         archiveCurrentFile: null,
       });
     } finally {
+      // Hand the slot to the next queued job before anything else can await.
+      if (holdsSlot) {
+        releaseJobSlot(id);
+      }
       // A stale run must never clear the controller or speed samples belonging
       // to the replacement run that superseded it.
       if (abortControllers.get(id) === controller) {
@@ -842,7 +1038,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
 
   const beginJob = (spec: PersistedJob, persistSpec = true): void => {
     const existing = get().jobs.find((job) => job.id === spec.id)?.status;
-    if (existing === "packing" || existing === "archiving") {
+    if (existing === "queued" || existing === "packing" || existing === "archiving") {
       return;
     }
     const inferredSourceId = inferDownloadSourceId(
@@ -900,6 +1096,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
     selectedSourceId: DEFAULT_DOWNLOAD_SOURCE_ID,
     customSources: [],
     preferredFormat: "adx",
+    preferredBatchGrouping: "version",
     sourceProbes: createInitialDownloadSourceProbes(),
     presented: {},
     bottomBars: 0,
@@ -949,46 +1146,73 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       includeVideo,
       format,
       sourceId,
+      grouping,
     }) => {
       const selectedSource = configuredDownloadSource(
         sourceId ?? get().selectedSourceId,
         get().customSources
       );
-      // Download flat (one fetch per file), tagging each by chart index so results
-      // can be regrouped — an opaque numeric prefix avoids clashing with chart
-      // names that contain "/".
-      const dirByIndex: string[] = [];
-      const groupByIndex: string[] = [];
-      const files: { name: string; url: string }[] = [];
-      routeChartDownloadSpecs(
+      const batchGrouping = grouping ?? get().preferredBatchGrouping;
+
+      // A selection spanning several versions/genres becomes one queued job per
+      // group rather than a single job that only saves anything at the very end.
+      // Each job then pauses, resumes, retries and reroutes on its own, and its
+      // archive lands as soon as that group finishes.
+      const groups = new Map<string, ChartDownloadSpec[]>();
+      for (const chart of routeChartDownloadSpecs(
         charts,
         selectedSource.id,
         selectedSource.baseUrl
-      ).forEach((chart, index) => {
-        dirByIndex[index] = chart.dir;
-        groupByIndex[index] = chart.groupDir ?? "";
-        for (const file of chart.files) {
-          if (includeVideo || !isChartVideoFile(file.name)) {
-            files.push({ name: `${index}/${file.name}`, url: file.url });
-          }
+      )) {
+        const groupDir = chartGroupingDir(chart, batchGrouping);
+        const bucket = groups.get(groupDir);
+        if (bucket) {
+          bucket.push(chart);
+        } else {
+          groups.set(groupDir, [chart]);
         }
-      });
-      if (files.length === 0) {
-        return;
       }
-      beginJob({
-        id,
-        kind: "batch",
-        title,
-        format: format ?? get().preferredFormat,
-        createdAt: Date.now(),
-        sourceId: selectedSource.id,
-        sourceBaseUrl: selectedSource.baseUrl,
-        ...(selectedSource.name ? { sourceName: selectedSource.name } : {}),
-        files,
-        dirByIndex,
-        ...(groupByIndex.some(Boolean) ? { groupByIndex } : {}),
-      });
+
+      const startedIds: string[] = [];
+      for (const [groupDir, groupCharts] of groups) {
+        // Download flat (one fetch per file), tagging each by chart index so
+        // results can be regrouped — an opaque numeric prefix avoids clashing
+        // with chart names that contain "/".
+        const dirByIndex: string[] = [];
+        const groupByIndex: string[] = [];
+        const files: { name: string; url: string }[] = [];
+        groupCharts.forEach((chart, index) => {
+          dirByIndex[index] = chart.dir;
+          groupByIndex[index] = groupDir;
+          for (const file of chart.files) {
+            if (includeVideo || !isChartVideoFile(file.name)) {
+              files.push({ name: `${index}/${file.name}`, url: file.url });
+            }
+          }
+        });
+        if (files.length === 0) {
+          continue;
+        }
+        // A single-group selection keeps the caller's id and collection name, so
+        // its archive is named exactly as before this split existed.
+        const single = groups.size === 1;
+        const jobId = single ? id : `${id}#${startedIds.length}`;
+        beginJob({
+          id: jobId,
+          kind: "batch",
+          title: single ? title : groupDir || title,
+          format: format ?? get().preferredFormat,
+          createdAt: Date.now(),
+          sourceId: selectedSource.id,
+          sourceBaseUrl: selectedSource.baseUrl,
+          ...(selectedSource.name ? { sourceName: selectedSource.name } : {}),
+          files,
+          dirByIndex,
+          ...(groupDir ? { groupByIndex } : {}),
+        });
+        startedIds.push(jobId);
+      }
+      return startedIds;
     },
 
     setSelectedSourceId: (sourceId) => {
@@ -1006,6 +1230,14 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       }
       set({ preferredFormat: format });
       savePreferredFormat(format);
+    },
+
+    setPreferredBatchGrouping: (grouping) => {
+      if (!isBatchGrouping(grouping)) {
+        return;
+      }
+      set({ preferredBatchGrouping: grouping });
+      savePreferredBatchGrouping(grouping);
     },
 
     addCustomSource: (name, url) => {
@@ -1325,7 +1557,9 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
 
     pause: (id) => {
       const job = get().jobs.find((entry) => entry.id === id);
-      if (!job || job.status !== "packing") {
+      // Pausing a still-queued job takes it out of the queue without ever
+      // opening a connection.
+      if (!job || (job.status !== "packing" && job.status !== "queued")) {
         return;
       }
       // Abort current requests. Only whole files are durable; reset every
@@ -1362,6 +1596,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       set({
         customSources,
         preferredFormat: loadPreferredFormat(),
+        preferredBatchGrouping: loadPreferredBatchGrouping(),
         selectedSourceId: loadSourcePreference(customSources),
         sourceProbes: createInitialDownloadSourceProbes(customSources),
       });
@@ -1525,10 +1760,12 @@ function regroupBatch(
 }
 
 /**
- * Splits a regrouped batch into the archives to save: one per version folder
- * when the selection spans multiple versions (each named by that folder, e.g.
- * "25 CiRCLE"), otherwise a single archive named by the collection title.
- * Charts without a version folder fall back to the collection title too.
+ * Splits a regrouped batch into the archives to save: one per grouping folder
+ * (version or genre, whichever layout the job was started with) when the
+ * selection spans multiple folders — each named by that folder, e.g.
+ * "25 CiRCLE" or "東方Project" — otherwise a single archive named by the
+ * collection title. Charts without a grouping folder fall back to the
+ * collection title too.
  */
 export function splitBatchArchives(
   charts: NestedChart[],

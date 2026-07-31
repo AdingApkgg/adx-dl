@@ -269,7 +269,10 @@ export function DownloadDock({ locale }: { locale: Locale }) {
 
   const visible = jobs.filter((job) => !((presented[job.id] ?? 0) > 0));
   const activeCount = visible.filter(
-    (job) => job.status === "packing" || job.status === "archiving"
+    (job) =>
+      job.status === "packing" ||
+      job.status === "archiving" ||
+      job.status === "queued"
   ).length;
   const aggregatePercent =
     visible.length > 0
@@ -360,7 +363,9 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                   {visible.map((job) => {
                     const percent = jobPercent(job);
                     const resumable = job.status === "paused" || job.status === "error";
-                    const active = job.status === "packing";
+                    // A queued job can be pulled out of the queue with the same
+                    // pause control, before it ever opens a connection.
+                    const active = job.status === "packing" || job.status === "queued";
                     const statusText = downloadJobStatusText(job, detail, tray);
 
                     return (

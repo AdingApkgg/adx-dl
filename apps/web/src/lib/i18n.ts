@@ -88,6 +88,12 @@ export type SiteDictionary = {
       zip: string;
       "tar.gz": string;
     };
+    batchGroupingLabel: string;
+    batchGroupingHelp: string;
+    batchGroupings: {
+      version: { name: string; description: string };
+      genre: { name: string; description: string };
+    };
   };
   home: {
     badge: string;
@@ -306,6 +312,10 @@ export type SiteDictionary = {
     cancel: string;
     paused: string;
     pause: string;
+    /** Job accepted but waiting for a download slot. */
+    queued: string;
+    /** Roll-up shown by a batch surface that started several queued jobs. */
+    queueSummary: (done: number, total: number) => string;
     collapse: string;
     expand: string;
     jobsCount: (count: number) => string;
@@ -318,6 +328,10 @@ export type SiteDictionary = {
     errorGeneric: string;
     batchSummary: (charts: number, files: number) => string;
     batchSplitSummary: (archives: number) => string;
+    batchSplitSummaryGenre: (archives: number) => string;
+    groupingLabel: string;
+    groupingVersion: string;
+    groupingGenre: string;
     batchVideoSummary: (count: number) => string;
     batchNoVideoSummary: string;
     batchVideoLargeHint: string;
@@ -617,6 +631,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         zip: "通用 ZIP 压缩包",
         "tar.gz": "TAR.GZ 压缩包",
       },
+      batchGroupingLabel: "批量下载分类路径",
+      batchGroupingHelp:
+        "决定批量下载时谱面在压缩包内的文件夹层级；选择跨越多个分类时，会按该分类拆分为多个压缩包。已开始的任务保持开始时的分类方式。",
+      batchGroupings: {
+        version: { name: "按版本", description: "如「25 CiRCLE」" },
+        genre: { name: "按曲风", description: "如「東方Project」" },
+      },
     },
     home: {
       badge: "为 AstroDX 玩家打造",
@@ -845,6 +866,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       cancel: "取消",
       paused: "已暂停",
       pause: "暂停",
+      queued: "排队中，等待前面的任务",
+      queueSummary: (done, total) => `已完成 ${done} / ${total} 个下载任务`,
       collapse: "收起下载列表",
       expand: "展开下载列表",
       jobsCount: (count) => `${count} 个下载任务`,
@@ -856,7 +879,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       errorNetwork: "下载失败；已完成文件会保留，可点「继续」重试剩余文件",
       errorGeneric: "下载出错；已完成文件会保留，可点「继续」重试剩余文件",
       batchSummary: (charts, files) => `将打包 ${charts} 首谱面，共 ${files} 个文件`,
-      batchSplitSummary: (archives) => `跨版本选择，将按版本分为 ${archives} 个压缩包`,
+      batchSplitSummary: (archives) =>
+        `跨版本选择，将拆成 ${archives} 个下载任务加入队列，每个版本一个压缩包`,
+      batchSplitSummaryGenre: (archives) =>
+        `跨曲风选择，将拆成 ${archives} 个下载任务加入队列，每种曲风一个压缩包`,
+      groupingLabel: "分类路径",
+      groupingVersion: "按版本分文件夹",
+      groupingGenre: "按曲风分文件夹",
       batchVideoSummary: (count) => `包含 ${count} 个 BGA 视频文件`,
       batchNoVideoSummary: "不包含 BGA 视频，下载会更轻",
       batchVideoLargeHint: "包含 BGA 会显著增大体积，网络慢或手机流量下建议关闭。",
@@ -1163,6 +1192,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         zip: "Standard ZIP archive",
         "tar.gz": "TAR.GZ archive",
       },
+      batchGroupingLabel: "Batch download folder layout",
+      batchGroupingHelp:
+        "Sets the folder level charts are packed under in a batch download. A selection spanning several of them is split into one archive each. Running jobs keep the layout they started with.",
+      batchGroupings: {
+        version: { name: "By version", description: "e.g. “25 CiRCLE”" },
+        genre: { name: "By genre", description: "e.g. “東方Project”" },
+      },
     },
     home: {
       badge: "Built for AstroDX players",
@@ -1395,6 +1431,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       cancel: "Cancel",
       paused: "Paused",
       pause: "Pause",
+      queued: "Queued — waiting for earlier downloads",
+      queueSummary: (done, total) => `${done} of ${total} downloads finished`,
       collapse: "Collapse downloads",
       expand: "Expand downloads",
       jobsCount: (count) => (count === 1 ? "1 download" : `${count} downloads`),
@@ -1410,7 +1448,12 @@ const dictionaries: Record<Locale, SiteDictionary> = {
           ? `Packing 1 chart, ${files} files total`
           : `Packing ${charts} charts, ${files} files total`,
       batchSplitSummary: (archives) =>
-        `Spans multiple versions — saved as ${archives} archives, one per version`,
+        `Spans multiple versions — queued as ${archives} downloads, one archive per version`,
+      batchSplitSummaryGenre: (archives) =>
+        `Spans multiple genres — queued as ${archives} downloads, one archive per genre`,
+      groupingLabel: "Folder layout",
+      groupingVersion: "Group by version",
+      groupingGenre: "Group by genre",
       batchVideoSummary: (count) =>
         count === 1 ? "Includes 1 BGA video file" : `Includes ${count} BGA video files`,
       batchNoVideoSummary: "BGA video excluded for a lighter download",
@@ -1734,6 +1777,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         zip: "標準 ZIP アーカイブ",
         "tar.gz": "TAR.GZ アーカイブ",
       },
+      batchGroupingLabel: "まとめてダウンロードのフォルダ分け",
+      batchGroupingHelp:
+        "まとめてダウンロード時に譜面を収めるフォルダ階層です。複数にまたがる選択は、それぞれ別のアーカイブに分けて保存されます。実行中のジョブは開始時の分け方を保ちます。",
+      batchGroupings: {
+        version: { name: "バージョン別", description: "例：「25 CiRCLE」" },
+        genre: { name: "ジャンル別", description: "例：「東方Project」" },
+      },
     },
     home: {
       badge: "AstroDX プレイヤーのために",
@@ -1963,6 +2013,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       cancel: "キャンセル",
       paused: "一時停止中",
       pause: "一時停止",
+      queued: "順番待ち — 先のダウンロードを待機中",
+      queueSummary: (done, total) => `${total} 件中 ${done} 件が完了`,
       collapse: "ダウンロード一覧を折りたたむ",
       expand: "ダウンロード一覧を展開",
       jobsCount: (count) => `${count} 件のダウンロード`,
@@ -1975,7 +2027,12 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       errorGeneric: "ダウンロードエラー — 完了済みファイルを保持して残りを再試行できます",
       batchSummary: (charts, files) => `${charts} 譜面、合計 ${files} ファイルをまとめます`,
       batchSplitSummary: (archives) =>
-        `複数バージョンのため、バージョンごとに ${archives} 個のアーカイブに分けて保存します`,
+        `複数バージョンのため、${archives} 件のダウンロードに分けてキューに追加します（バージョンごとに 1 アーカイブ）`,
+      batchSplitSummaryGenre: (archives) =>
+        `複数ジャンルのため、${archives} 件のダウンロードに分けてキューに追加します（ジャンルごとに 1 アーカイブ）`,
+      groupingLabel: "フォルダ分け",
+      groupingVersion: "バージョン別",
+      groupingGenre: "ジャンル別",
       batchVideoSummary: (count) => `${count} 件の BGA 動画を含みます`,
       batchNoVideoSummary: "BGA 動画なしで軽めにダウンロードします",
       batchVideoLargeHint:
