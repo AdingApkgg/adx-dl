@@ -7,6 +7,7 @@ import {
   ChevronRightIcon,
   PauseIcon,
   PlayIcon,
+  SparklesIcon,
 } from "lucide-react";
 import { useInView } from "framer-motion";
 
@@ -153,6 +154,10 @@ export function HomeSpotlightCarousel({ entries, locale }: HomeSpotlightCarousel
                 sizes="(max-width: 760px) calc(100vw - 5rem), (max-width: 1100px) 384px, 384px"
                 className={styles.spotlightCover}
               />
+              <span className={styles.spotlightBadge}>
+                <SparklesIcon aria-hidden="true" />
+                {home.spotlightLabel}
+              </span>
             </span>
             <span className={styles.spotlightCardBody}>
               <span className={styles.spotlightCardCopy}>

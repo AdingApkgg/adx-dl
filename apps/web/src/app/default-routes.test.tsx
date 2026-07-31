@@ -112,10 +112,10 @@ describe("default zh routes", () => {
     expect(html).toContain("什么是 AstroDX？");
     expect(html).toContain('href="#faq"');
     expect(html).toContain('role="group" aria-label="快捷入口"');
-    // The spotlight remains named for assistive tech without showing a redundant
-    // caption above the enlarged card.
+    // The spotlight is named for assistive tech and also carries the visible
+    // corner badge over the top-left of the cover.
     expect(html).toContain('aria-label="今日精选"');
-    expect(html).not.toContain(">今日精选<");
+    expect(html).toContain("今日精选</span>");
     expect(html).toContain("查看更多");
     expect(html).toContain("最新谱面");
     expect(html).toContain("按曲风浏览");
