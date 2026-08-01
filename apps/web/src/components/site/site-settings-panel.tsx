@@ -41,6 +41,7 @@ import {
   BATCH_GROUPINGS,
   useDownloadsStore,
 } from "@/components/site/downloads/downloads-store";
+import { HEADER_ACTION_CLASS } from "@/components/site/header-actions";
 import { getMusicPlayerCopy } from "@/components/site/music-player/music-player-copy";
 import { useMusicPlayerPreferences } from "@/components/site/music-player/music-player-preferences";
 import { useMotionPreference, type MotionMode } from "@/components/motion";
@@ -124,11 +125,15 @@ export function SiteSettingsPanel({
         <Button
           type="button"
           variant="outline"
-          size="icon-sm"
+          size="sm"
           aria-label={dictionary.settings.open}
           title={dictionary.settings.open}
+          className={HEADER_ACTION_CLASS}
         >
           <Settings2Icon aria-hidden="true" />
+          {/* The aria-label ("打开设置") stays the accessible name and contains
+              this shorter visible one, so Label-in-Name still holds. */}
+          <span className="hidden md:inline">{dictionary.settings.title}</span>
         </Button>
       </SheetTrigger>
       <SheetContent closeLabel={dictionary.settings.close}>

@@ -20,6 +20,7 @@ export type SiteDictionary = {
     menuLabel: string;
     moreLabel: string;
     randomLabel: string;
+    searchLabel: string;
   };
   language: {
     zh: string;
@@ -575,6 +576,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       menuLabel: "导航菜单",
       moreLabel: "更多",
       randomLabel: "随机",
+      searchLabel: "搜索",
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "切换主题", light: "浅色", dark: "深色", system: "跟随系统" },
@@ -1130,6 +1132,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       menuLabel: "Navigation menu",
       moreLabel: "More",
       randomLabel: "Random",
+      searchLabel: "Search",
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "Toggle theme", light: "Light", dark: "Dark", system: "System" },
@@ -1715,6 +1718,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       menuLabel: "ナビゲーションメニュー",
       moreLabel: "その他",
       randomLabel: "ランダム",
+      searchLabel: "検索",
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "テーマ切り替え", light: "ライト", dark: "ダーク", system: "システム" },

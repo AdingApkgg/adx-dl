@@ -249,6 +249,21 @@ export function CatalogBrowser({
     if (Number.isInteger(pageParam) && pageParam > 1) {
       setCurrentPage(pageParam);
     }
+    // The header's search icon links here with ?focus=search. Put the cursor in
+    // the filter box, then strip the param so it never reaches a shared or
+    // restored URL (the sync effect below re-reads location.search after this).
+    if (params.get("focus") === "search") {
+      // preventScroll: the box is already near the top on a fresh navigation,
+      // and jumping the viewport mid-mount reads as a glitch.
+      searchInputRef.current?.focus({ preventScroll: true });
+      params.delete("focus");
+      const rest = params.toString();
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}${rest ? `?${rest}` : ""}${window.location.hash}`
+      );
+    }
     setUrlReady(true);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
@@ -619,6 +634,9 @@ export function CatalogBrowser({
         <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={searchInputRef}
+          // The header's search icon focuses this box directly when the browse
+          // route is already mounted (no navigation to hang the ?focus= param on).
+          data-catalog-search=""
           // Solid card fill + shadow so the box reads clearly against the page's
           // tinted gradient (a transparent input blends into it).
           className={cn("h-10 border-border bg-card pl-9 shadow-sm", inputValue && "pr-9")}

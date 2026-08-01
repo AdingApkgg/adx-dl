@@ -22,6 +22,9 @@ describe("SiteHeader", () => {
     expect(html).toContain('href="/ja"');
     expect(html).toContain('href="/ja/charts"');
     expect(html).not.toContain('href="/ja/search"');
+    // Search is an icon-only deep link into the browse catalog's filter box.
+    expect(html).toContain('href="/ja/charts?focus=search"');
+    expect(html).toContain('aria-label="検索"');
     // Language, theme, motion and download defaults now live behind one panel.
     // Radix mounts only the settings trigger in closed server-rendered markup.
     expect(html).toContain('aria-label="設定を開く"');
@@ -43,6 +46,8 @@ describe("SiteHeader", () => {
     expect(html).toContain('href="/"');
     expect(html).toContain('href="/charts"');
     expect(html).not.toContain('href="/search"');
+    expect(html).toContain('href="/charts?focus=search"');
+    expect(html).toContain('aria-label="搜索"');
     expect(html).toContain('aria-label="打开设置"');
     expect(html).not.toContain('aria-label="切换主题"');
   });

@@ -21,6 +21,7 @@ import {
   MenuIcon,
   MessageSquareIcon,
   PlayCircleIcon,
+  SearchIcon,
   UploadIcon,
   UsersIcon,
 } from "lucide-react";
@@ -40,6 +41,7 @@ import {
   wikiUrl,
 } from "@/lib/resource-links";
 import { CompatibleImage, compatibleSourcesFromPng } from "@/components/site/compatible-image";
+import { HEADER_ACTION_CLASS } from "@/components/site/header-actions";
 import { useRandomChartNavigation } from "@/components/site/random-chart-button";
 import { SiteSettingsPanel } from "@/components/site/site-settings-panel";
 import {
@@ -126,6 +128,27 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
       icon: <LayersIcon data-icon="inline-start" />,
     },
   ];
+  // Search has no page of its own: it deep-links to the browse catalog with
+  // ?focus=search, which CatalogBrowser reads once on mount to put the cursor
+  // in its filter box (and then drops from the URL).
+  const chartsHref = switchLocale("/charts", locale);
+  const searchItem: NavItem = {
+    href: `${chartsHref}?focus=search`,
+    label: dictionary.nav.searchLabel,
+    icon: <SearchIcon data-icon="inline-start" />,
+  };
+  // Clicking it while already on the browse page navigates within the same
+  // route, so nothing remounts: the mount-time handler never runs, focus stays
+  // on the button and ?focus=search sticks to the URL. Focus the box directly
+  // instead. Must sit on the Link — Next.js calls the child's onClick first and
+  // skips navigation if it was prevented.
+  const onSearchClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (trimTrailingSlash(pathname) !== trimTrailingSlash(chartsHref)) return;
+    const input = document.querySelector<HTMLInputElement>("input[data-catalog-search]");
+    if (!input) return;
+    event.preventDefault();
+    input.focus();
+  };
   // The "more" menu, grouped: resources / community / site. Rendered with a
   // separator between groups in both the desktop dropdown and the mobile menu.
   const secondaryNavGroups: NavItem[][] = [
@@ -294,20 +317,6 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               </Button>
             );
           })}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={navigateToRandomChart}
-            disabled={randomBusy}
-          >
-            <DicesIcon
-              data-icon="inline-start"
-              className={cn(randomBusy && "animate-spin")}
-              aria-hidden="true"
-            />
-            {dictionary.nav.randomLabel}
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -360,6 +369,35 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
           </DropdownMenu>
         </nav>
         <div className="flex shrink-0 items-center gap-2">
+          {/* Search and random sit with the trailing controls rather than in the
+              nav, and stay reachable at every width — so neither is repeated in
+              the mobile menu below. */}
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            aria-label={searchItem.label}
+            title={searchItem.label}
+            className={HEADER_ACTION_CLASS}
+          >
+            <Link href={searchItem.href} onClick={onSearchClick}>
+              <SearchIcon aria-hidden="true" />
+              <span className="hidden md:inline">{searchItem.label}</span>
+            </Link>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={navigateToRandomChart}
+            disabled={randomBusy}
+            aria-label={dictionary.nav.randomLabel}
+            title={dictionary.nav.randomLabel}
+            className={HEADER_ACTION_CLASS}
+          >
+            <DicesIcon className={cn(randomBusy && "animate-spin")} aria-hidden="true" />
+            <span className="hidden md:inline">{dictionary.nav.randomLabel}</span>
+          </Button>
           <SiteSettingsPanel
             locale={locale}
             pathname={pathname}
@@ -410,20 +448,6 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
                         </DropdownMenuItem>
                       );
                     })}
-                    <DropdownMenuItem
-                      disabled={randomBusy}
-                      onSelect={() => void navigateToRandomChart()}
-                      className="min-h-11 min-w-0 px-3 py-2.5 leading-snug"
-                    >
-                      <DicesIcon
-                        data-icon="inline-start"
-                        className={cn(randomBusy && "animate-spin")}
-                        aria-hidden="true"
-                      />
-                      <span className="min-w-0 break-words">
-                        {dictionary.nav.randomLabel}
-                      </span>
-                    </DropdownMenuItem>
                   </div>
                   <DropdownMenuSeparator />
                   <div
