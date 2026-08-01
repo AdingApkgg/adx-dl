@@ -47,6 +47,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { type Catalog, type CatalogEntry } from "@/lib/catalog";
 import {
+  bpmBucketId,
+  BPM_TONE,
   buildChartDescription,
   DIFFICULTY_DOT_CLASS,
   difficultySlotLabel,
@@ -55,7 +57,6 @@ import {
   formatEntrySubcategory,
   formatEntryTitle,
   GENRES,
-  genreLabel,
   getChartDownloadSpec,
   localChartAssetUrl,
   resolveGenreId,
@@ -573,7 +574,18 @@ export function ChartDetailPageView({
   const versionIndex = resolveVersionIndex(entry);
   const versionHref = buildVersionFilterHref(versionIndex, locale);
   const genreId = resolveGenreId(entry);
-  const genreHref = genreId !== null ? `${chartsHref}?genre=${genreId}` : undefined;
+  // 宴会場 (107) has no chip in the browse genre row — it lives in the Type row
+  // as the UTAGE cabinet icon, so this readout mirrors that: same image, and a
+  // link to the cabinet filter so the chip it lands on is actually highlighted.
+  const isUtageGenre = genreId === 107;
+  const genreHref = isUtageGenre
+    ? `${chartsHref}?cabinet=UTG`
+    : genreId !== null
+      ? `${chartsHref}?genre=${genreId}`
+      : undefined;
+  // BPM links to its bucket, the same granularity the browse filter offers.
+  const bpmBucket = bpmBucketId(entry.bpm);
+  const bpmHref = bpmBucket !== null ? `${chartsHref}?bpm=${bpmBucket}` : undefined;
 
   // Single downloads use the same global chart spec as every batch entry.
   const downloadSpec = getChartDownloadSpec(entry);
@@ -685,20 +697,49 @@ export function ChartDetailPageView({
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
             <div className="grid gap-4 md:grid-cols-2">
-              <MetadataItem
-                label={detail.versionLabel}
-                value={entry.version || detail.unknownValue}
-                href={versionHref}
-              />
-              <MetadataItem
-                label={detail.genreLabel}
-                value={genreLabel(entry, locale) || detail.unknownValue}
-                href={genreHref}
-              />
-              <MetadataItem
-                label={detail.bpmLabel}
-                value={entry.bpm ? `${entry.bpm}` : detail.unknownValue}
-              />
+              {/* Version, genre and BPM all carry the browse filter row's own
+                  visuals — the version logo, the genre's colour, the BPM
+                  bucket's tint — and link back into that filter. */}
+              <MetadataItem label={detail.versionLabel} href={versionHref}>
+                <VersionBadge
+                  version={entry.version}
+                  label={branchLabel || entry.version || detail.unknownValue}
+                  className="h-9"
+                />
+              </MetadataItem>
+              {/* Rendered from GENRES rather than via GenreBadge: that one
+                  suppresses 宴会場 (107) because the hero's cabinet icon
+                  already says so, but here it's the only genre readout. */}
+              <MetadataItem label={detail.genreLabel} href={genreHref}>
+                {isUtageGenre ? (
+                  <CabinetBadge cabinet="UTG" className="h-9" />
+                ) : genreId !== null && GENRES[genreId] ? (
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium",
+                      GENRES[genreId].badge
+                    )}
+                  >
+                    {GENRES[genreId][locale]}
+                  </span>
+                ) : (
+                  detail.unknownValue
+                )}
+              </MetadataItem>
+              <MetadataItem label={detail.bpmLabel} href={bpmHref}>
+                {entry.bpm && bpmBucket ? (
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium",
+                      BPM_TONE[bpmBucket]
+                    )}
+                  >
+                    {entry.bpm}
+                  </span>
+                ) : (
+                  detail.unknownValue
+                )}
+              </MetadataItem>
               <MetadataItem
                 label={detail.shortIdLabel}
                 value={entry.short_id || detail.notAvailableValue}
@@ -911,26 +952,35 @@ function MetadataItem({
   label,
   value,
   href,
+  children,
 }: {
   label: string;
-  value: string;
+  value?: string;
   href?: string;
+  /** Badge or logo shown instead of `value`; skips the plain-text underline. */
+  children?: React.ReactNode;
 }) {
+  const content = children ?? value;
   return (
     <div className="rounded-xl border border-border/70 bg-background/70 p-4">
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-2 text-base font-medium">
+      {/* A div, not a p: the badge variants render pictures and spans. */}
+      <div className="mt-2 flex min-h-9 items-center text-base font-medium">
         {href ? (
           <Link
             href={href}
-            className="underline decoration-border underline-offset-4 transition-colors hover:text-primary hover:decoration-current"
+            className={
+              children
+                ? "inline-flex max-w-full items-center rounded-lg transition-opacity hover:opacity-80"
+                : "underline decoration-border underline-offset-4 transition-colors hover:text-primary hover:decoration-current"
+            }
           >
-            {value}
+            {content}
           </Link>
         ) : (
-          value
+          content
         )}
-      </p>
+      </div>
     </div>
   );
 }

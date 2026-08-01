@@ -29,6 +29,7 @@ import type { CatalogCardEntry, ChartDownloadSpec } from "@/lib/catalog-shared";
 import {
   BPM_BUCKETS,
   bpmBucketId,
+  BPM_TONE,
   cabinetBucket,
   collectDifficultyLevels,
   DIFFICULTY_TONE_CLASS,
@@ -1273,14 +1274,6 @@ function levelTone(level: string): string {
     n <= 5 ? "basic" : n <= 8 ? "advanced" : n <= 11 ? "expert" : n <= 13 ? "master" : "remaster";
   return DIFFICULTY_TONE_CLASS[tone];
 }
-
-// BPM buckets, slow (cool) → fast (warm), keyed by bucket id.
-const BPM_TONE: Record<string, string> = {
-  "0": "border-sky-500/40 bg-sky-500/12 text-sky-700 dark:text-sky-300",
-  "1": "border-teal-500/40 bg-teal-500/12 text-teal-700 dark:text-teal-300",
-  "2": "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  "3": "border-rose-500/40 bg-rose-500/12 text-rose-700 dark:text-rose-300",
-};
 
 // The localized results summary is a whole sentence ("共 N 首谱面"); split it
 // around the raw count so only the digits roll while the words stay static.

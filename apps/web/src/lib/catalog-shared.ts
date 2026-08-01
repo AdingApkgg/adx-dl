@@ -616,6 +616,18 @@ export function bpmBucketId(bpm: number | null | undefined): string | null {
   return bucket ? bucket.id : null;
 }
 
+/**
+ * Bucket tint, slow (cool) → fast (warm), keyed by bucket id. Shared so a
+ * chart's BPM reads the same colour on its detail page as in the browse filter
+ * row — same idea as GENRES[].badge for genres.
+ */
+export const BPM_TONE: Record<string, string> = {
+  "0": "border-sky-500/40 bg-sky-500/12 text-sky-700 dark:text-sky-300",
+  "1": "border-teal-500/40 bg-teal-500/12 text-teal-700 dark:text-teal-300",
+  "2": "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  "3": "border-rose-500/40 bg-rose-500/12 text-rose-700 dark:text-rose-300",
+};
+
 function compactVersionName(name: string): string {
   const trimmed = name.trim();
   if (/^maimai$/i.test(trimmed)) {
