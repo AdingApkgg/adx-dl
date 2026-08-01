@@ -14,9 +14,9 @@
 &ChartConvertTool=MuConvert
 &ChartConvertToolVersion=0.4.0-rc.7+47834d4
 
-&lv_2=14.0
-&des_2=
-&inote_2=(230){1},
+&lv_7=14?
+&des_7=
+&inote_7=(230){1},
 4h[4:7]/7h[4:7],,
 2h[2:3]/5h[2:3],
 {4},,,5/6,

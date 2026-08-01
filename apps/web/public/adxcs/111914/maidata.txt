@@ -14,9 +14,9 @@
 &ChartConvertTool=MuConvert
 &ChartConvertToolVersion=0.4.0-rc.7+47834d4
 
-&lv_2=13.0
-&des_2=
-&inote_2=(170){1},
+&lv_7=13?
+&des_7=
+&inote_7=(170){1},
 4p5[2:1],
 {16}6,,6,,5/7,,6,5,6,,3,4,3,4,3,,
 2/5,,2/5,,2/5,,3,4,3,4,3,4,3,,6,,

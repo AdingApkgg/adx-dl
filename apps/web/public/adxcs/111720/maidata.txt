@@ -14,9 +14,9 @@
 &ChartConvertTool=MuConvert
 &ChartConvertToolVersion=0.4.0-rc.7+47834d4
 
-&lv_2=14.7
-&des_2=
-&inote_2=(190){1},
+&lv_7=14?
+&des_7=
+&inote_7=(190){1},
 {16},,,,,,,,,,,,,,A5,A4,
 {1}E4h[8:13]/A3h[8:13]/A6h[8:13]/B5h[8:13]/B4h[8:13],
 {16},,,,,,,,,,,,,,5,4,
