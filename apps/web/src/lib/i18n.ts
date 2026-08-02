@@ -275,6 +275,7 @@ export type SiteDictionary = {
       options: {
         r2: { name: string; description: string };
         alice: { name: string; description: string };
+        tsumugi: { name: string; description: string };
         awmc: { name: string; description: string };
         g510: { name: string; description: string };
         g400s: { name: string; description: string };
@@ -830,6 +831,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         options: {
           r2: { name: "R2", description: "Cloudflare R2 主线路，默认选择" },
           alice: { name: "Alice", description: "Alice 下载分流" },
+          tsumugi: { name: "Tsumugi", description: "Tsumugi 下载分流" },
           awmc: { name: "AWMC", description: "AWMC 下载分流" },
           g510: { name: "G510", description: "G510 下载分流" },
           g400s: { name: "G400s", description: "G400s 下载分流" },
@@ -1396,6 +1398,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         options: {
           r2: { name: "R2", description: "Primary Cloudflare R2 route, selected by default" },
           alice: { name: "Alice", description: "Alice download route" },
+          tsumugi: { name: "Tsumugi", description: "Tsumugi download route" },
           awmc: { name: "AWMC", description: "AWMC download route" },
           g510: { name: "G510", description: "G510 download route" },
           g400s: { name: "G400s", description: "G400s download route" },
@@ -1979,6 +1982,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         options: {
           r2: { name: "R2", description: "既定で選択される Cloudflare R2 メイン回線" },
           alice: { name: "Alice", description: "Alice ダウンロード回線" },
+          tsumugi: { name: "Tsumugi", description: "Tsumugi ダウンロード回線" },
           awmc: { name: "AWMC", description: "AWMC ダウンロード回線" },
           g510: { name: "G510", description: "G510 ダウンロード回線" },
           g400s: { name: "G400s", description: "G400s ダウンロード回線" },

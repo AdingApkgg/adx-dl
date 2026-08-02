@@ -42,6 +42,7 @@ describe("download source routing", () => {
     expect(DOWNLOAD_SOURCES.map((source) => source.id)).toEqual([
       "r2",
       "alice",
+      "tsumugi",
       "awmc",
       "g510",
       "g400s",
@@ -55,6 +56,9 @@ describe("download source routing", () => {
     );
     expect(resolveDownloadUrl(spec.files[1].url, "g510")).toBe(
       "https://astrodx-charts-g510.saop.cc/25/11951/track.mp3"
+    );
+    expect(resolveDownloadUrl(spec.files[1].url, "tsumugi")).toBe(
+      "https://astrodx-charts-tsumugi.saop.cc/25/11951/track.mp3"
     );
     expect(resolveDownloadUrl(spec.files[1].url, "awmc")).toBe(
       "https://astrodx-charts-wmc.saop.cc/25/11951/track.mp3"

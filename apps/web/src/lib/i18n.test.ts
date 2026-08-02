@@ -99,6 +99,7 @@ describe("i18n helpers", () => {
     expect(Object.values(en?.options ?? {}).map((option) => option.name)).toEqual([
       "R2",
       "Alice",
+      "Tsumugi",
       "AWMC",
       "G510",
       "G400s",

@@ -6,6 +6,7 @@ export type DownloadSourceRole = "primary" | "backup" | "custom";
 export type BuiltInDownloadSourceId =
   | "r2"
   | "alice"
+  | "tsumugi"
   | "awmc"
   | "g510"
   | "g400s";
@@ -57,6 +58,13 @@ export const DOWNLOAD_SOURCES = [
     role: "backup",
     status: "available" as DownloadSourceStatus,
     baseUrl: "https://astrodx-charts-alice.saop.cc",
+  },
+  {
+    id: "tsumugi",
+    copyKey: "tsumugi",
+    role: "backup",
+    status: "available" as DownloadSourceStatus,
+    baseUrl: "https://astrodx-charts-tsumugi.saop.cc",
   },
   {
     id: "awmc",
