@@ -14,7 +14,7 @@
 
 &lv_7=14+?
 &des_7=and in that light, I found deliverance.
-&inote_7s=(234){1},,
+&inote_7=(234){1},,
 4h[1:6]/5h[1:6],,,,,,,,
 {8}4h[8:7]/C,,,,,5,,,
 5h[8:7]/C,,,,,4,,3,

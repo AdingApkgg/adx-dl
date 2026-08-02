@@ -14,7 +14,7 @@
 &ChartConvertTool=MuConvert
 &ChartConvertToolVersion=0.4.0-rc.7+47834d4
 
-&lv_7=13.7
+&lv_7=13+?
 &des_7=
 &inote_7=(190){1},,
 {8}2,2h[8:3],,,3,3h[8:3],,,
