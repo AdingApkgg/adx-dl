@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-01T00:01:13.983407+00:00",
+  "generated_at": "2026-08-02T13:45:24.315937+00:00",
   "total_entries": 1856,
   "categories": {
     "Remote": [
@@ -219,9 +219,9 @@
       "bpm": 130,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.0",
+          "level": "12?",
           "designer": ""
         }
       ],
@@ -250,7 +250,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100017/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100017/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100017"
     },
     {
@@ -349,9 +349,9 @@
       "bpm": 128.66,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.7",
+          "level": "12+?",
           "designer": ""
         }
       ],
@@ -380,7 +380,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100042/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100042/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100042"
     },
     {
@@ -416,9 +416,9 @@
       "bpm": 164.73,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.9",
+          "level": "13+?",
           "designer": ""
         }
       ],
@@ -447,7 +447,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100056/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100056/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100056"
     },
     {
@@ -484,9 +484,9 @@
       "bpm": 100,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.6",
+          "level": "14?",
           "designer": ""
         }
       ],
@@ -515,7 +515,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100070/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100070/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100070"
     },
     {
@@ -550,9 +550,9 @@
       "bpm": 203,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.7",
+          "level": "13+?",
           "designer": ""
         }
       ],
@@ -581,7 +581,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100082/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100082/pv.mp4"
       },
-      "imported_at": "2026-08-01T00:01:13.983407+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100082"
     },
     {
@@ -612,9 +612,9 @@
       "bpm": 150,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.0",
+          "level": "13?",
           "designer": ""
         }
       ],
@@ -643,7 +643,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100101/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100101/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100101"
     },
     {
@@ -677,9 +677,9 @@
       "bpm": 138,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.7",
+          "level": "12+?",
           "designer": ""
         }
       ],
@@ -708,7 +708,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100118/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100118/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100118"
     },
     {
@@ -742,9 +742,9 @@
       "bpm": 123,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.7",
+          "level": "12+?",
           "designer": ""
         }
       ],
@@ -773,7 +773,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100121/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100121/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100121"
     },
     {
@@ -809,9 +809,9 @@
       "bpm": 156,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.7",
+          "level": "12+?",
           "designer": ""
         }
       ],
@@ -840,7 +840,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100132/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100132/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100132"
     },
     {
@@ -870,9 +870,9 @@
       "bpm": 132,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.0",
+          "level": "14?",
           "designer": ""
         }
       ],
@@ -901,7 +901,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100138/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100138/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100138"
     },
     {
@@ -932,9 +932,9 @@
       "bpm": 128,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.7",
+          "level": "12+?",
           "designer": ""
         }
       ],
@@ -963,7 +963,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100145/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100145/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100145"
     },
     {
@@ -1007,9 +1007,9 @@
       "bpm": 155,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.5",
+          "level": "14?",
           "designer": ""
         }
       ],
@@ -1038,7 +1038,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100191/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100191/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100191"
     },
     {
@@ -1152,9 +1152,9 @@
       "bpm": 170,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.5",
+          "level": "13?",
           "designer": ""
         }
       ],
@@ -1183,7 +1183,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100201/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100201/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100201"
     },
     {
@@ -1426,9 +1426,9 @@
       "bpm": 190,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.7",
+          "level": "13+?",
           "designer": ""
         }
       ],
@@ -1457,7 +1457,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100224/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100224/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100224"
     },
     {
@@ -1649,9 +1649,9 @@
       "bpm": 102,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.0",
+          "level": "12?",
           "designer": ""
         }
       ],
@@ -1680,7 +1680,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100282/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100282/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100282"
     },
     {
@@ -1790,9 +1790,9 @@
       "bpm": 140.1,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.0",
+          "level": "13?",
           "designer": ""
         }
       ],
@@ -1821,7 +1821,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100305/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100305/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100305"
     },
     {
@@ -1856,9 +1856,9 @@
       "bpm": 150,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.0",
+          "level": "13?",
           "designer": ""
         }
       ],
@@ -1887,7 +1887,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100308/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100308/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100308"
     },
     {
@@ -1920,9 +1920,9 @@
       "bpm": 230,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.0",
+          "level": "14?",
           "designer": ""
         }
       ],
@@ -1951,7 +1951,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100319/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100319/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100319"
     },
     {
@@ -1980,9 +1980,9 @@
       "bpm": 160,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.7",
+          "level": "12+?",
           "designer": ""
         }
       ],
@@ -2011,7 +2011,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100320/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100320/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100320"
     },
     {
@@ -2046,9 +2046,9 @@
       "bpm": 144,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.7",
+          "level": "13+?",
           "designer": ""
         }
       ],
@@ -2077,7 +2077,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100322/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100322/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100322"
     },
     {
@@ -2112,9 +2112,9 @@
       "bpm": 169,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.7",
+          "level": "12+?",
           "designer": ""
         }
       ],
@@ -2143,7 +2143,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100326/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100326/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100326"
     },
     {
@@ -2251,9 +2251,9 @@
       "bpm": 150,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.6",
+          "level": "14?",
           "designer": ""
         }
       ],
@@ -2282,7 +2282,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100339/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100339/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100339"
     },
     {
@@ -2409,9 +2409,9 @@
       "bpm": 140,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.7",
+          "level": "12+?",
           "designer": ""
         }
       ],
@@ -2440,7 +2440,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100364/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100364/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100364"
     },
     {
@@ -2476,9 +2476,9 @@
       "bpm": 180,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.7",
+          "level": "14+?",
           "designer": ""
         }
       ],
@@ -2507,7 +2507,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100380/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100380/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100380"
     },
     {
@@ -2542,9 +2542,9 @@
       "bpm": 246,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.9",
+          "level": "14+?",
           "designer": ""
         }
       ],
@@ -2573,7 +2573,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100385/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100385/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100385"
     },
     {
@@ -2602,9 +2602,9 @@
       "bpm": 190,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.7",
+          "level": "12+?",
           "designer": ""
         }
       ],
@@ -2633,7 +2633,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100413/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100413/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100413"
     },
     {
@@ -2669,9 +2669,9 @@
       "bpm": 156,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.7",
+          "level": "13+?",
           "designer": ""
         }
       ],
@@ -2700,7 +2700,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100422/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100422/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100422"
     },
     {
@@ -2725,9 +2725,9 @@
       "bpm": 70,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.0",
+          "level": "13?",
           "designer": ""
         }
       ],
@@ -2756,7 +2756,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100429/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100429/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100429"
     },
     {
@@ -2870,9 +2870,9 @@
       "bpm": 180,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.7",
+          "level": "14+?",
           "designer": ""
         }
       ],
@@ -2901,7 +2901,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100446/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100446/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100446"
     },
     {
@@ -3014,9 +3014,9 @@
       "bpm": 185,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.8",
+          "level": "14+?",
           "designer": ""
         }
       ],
@@ -3045,7 +3045,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100496/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100496/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100496"
     },
     {
@@ -3169,9 +3169,9 @@
       "bpm": 160,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.5",
+          "level": "13?",
           "designer": ""
         }
       ],
@@ -3200,7 +3200,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100513/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100513/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100513"
     },
     {
@@ -3225,9 +3225,9 @@
       "bpm": 140,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.0",
+          "level": "12?",
           "designer": ""
         }
       ],
@@ -3256,7 +3256,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100516/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100516/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100516"
     },
     {
@@ -3518,9 +3518,9 @@
       "bpm": 105,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.9",
+          "level": "14+?",
           "designer": ""
         }
       ],
@@ -3549,7 +3549,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100571/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100571/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100571"
     },
     {
@@ -3602,9 +3602,9 @@
       "bpm": 79,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.4",
+          "level": "14?",
           "designer": ""
         }
       ],
@@ -3633,7 +3633,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100573/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100573/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100573"
     },
     {
@@ -3675,9 +3675,9 @@
       "bpm": 194,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.7",
+          "level": "12+?",
           "designer": ""
         }
       ],
@@ -3706,7 +3706,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100598/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100598/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100598"
     },
     {
@@ -3737,9 +3737,9 @@
       "bpm": 220,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.7",
+          "level": "13+?",
           "designer": ""
         }
       ],
@@ -3768,7 +3768,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100603/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100603/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100603"
     },
     {
@@ -3800,9 +3800,9 @@
       "bpm": 186,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.0",
+          "level": "14?",
           "designer": ""
         }
       ],
@@ -3831,7 +3831,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100614/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100614/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100614"
     },
     {
@@ -3860,9 +3860,9 @@
       "bpm": 140,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.7",
+          "level": "13+?",
           "designer": ""
         }
       ],
@@ -3891,7 +3891,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100617/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100617/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100617"
     },
     {
@@ -3934,9 +3934,9 @@
       "bpm": 179,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.9",
+          "level": "14+?",
           "designer": ""
         }
       ],
@@ -3965,7 +3965,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100689/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100689/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100689"
     },
     {
@@ -4153,9 +4153,9 @@
       "bpm": 167,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.4",
+          "level": "14?",
           "designer": ""
         }
       ],
@@ -4184,7 +4184,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100712/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100712/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100712"
     },
     {
@@ -4209,9 +4209,9 @@
       "bpm": 119,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.7",
+          "level": "12+?",
           "designer": ""
         }
       ],
@@ -4240,7 +4240,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100749/track.mp3",
         "pv_url": ""
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100749"
     },
     {
@@ -4364,9 +4364,9 @@
       "bpm": 234,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "15.0",
+          "level": "15?",
           "designer": ""
         }
       ],
@@ -4395,7 +4395,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100772/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100772/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100772"
     },
     {
@@ -4427,9 +4427,9 @@
       "bpm": 150,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.7",
+          "level": "13+?",
           "designer": ""
         }
       ],
@@ -4458,7 +4458,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100775/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/100775/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100775"
     },
     {
@@ -4483,9 +4483,9 @@
       "bpm": 200,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.5",
+          "level": "13?",
           "designer": ""
         }
       ],
@@ -4514,7 +4514,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/100845/track.mp3",
         "pv_url": ""
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "100845"
     },
     {
@@ -11384,9 +11384,9 @@
       "bpm": 203,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.0",
+          "level": "14?",
           "designer": ""
         }
       ],
@@ -11415,7 +11415,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/110082/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/110082/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "110082"
     },
     {
@@ -18807,9 +18807,9 @@
       "bpm": 205,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.0",
+          "level": "14?",
           "designer": ""
         }
       ],
@@ -18838,7 +18838,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/26/110997/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/26/110997/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "110997"
     },
     {
@@ -20790,9 +20790,9 @@
       "bpm": 192,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.0",
+          "level": "13?",
           "designer": ""
         }
       ],
@@ -20821,7 +20821,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/26/111199/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/26/111199/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "111199"
     },
     {
@@ -21116,9 +21116,9 @@
       "bpm": 165,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.7",
+          "level": "14+?",
           "designer": ""
         }
       ],
@@ -21147,7 +21147,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/111222/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/111222/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "111222"
     },
     {
@@ -24413,9 +24413,9 @@
       "bpm": 234,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.7",
+          "level": "14+?",
           "designer": "and in that light, I found deliverance."
         }
       ],
@@ -24444,7 +24444,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/111516/track.mp3",
         "pv_url": ""
       },
-      "imported_at": "2026-08-01T00:01:13.983407+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "111516"
     },
     {
@@ -25790,9 +25790,9 @@
       "bpm": 190,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.7",
+          "level": "14+?",
           "designer": ""
         }
       ],
@@ -25821,7 +25821,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/21/111634/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/21/111634/pv.mp4"
       },
-      "imported_at": "2026-08-01T00:01:13.983407+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "111634"
     },
     {
@@ -27009,9 +27009,9 @@
       "bpm": 190,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "14.7",
+          "level": "14+?",
           "designer": ""
         }
       ],
@@ -27040,7 +27040,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/26/111720/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/26/111720/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "111720"
     },
     {
@@ -27490,7 +27490,8 @@
       "short_id": "111770",
       "aliases": [
         "[協]ultimate taste",
-        "ultimate taste"
+        "ultimate taste",
+        "ut"
       ],
       "offset": 0,
       "bpm": 200,
@@ -28953,9 +28954,9 @@
       "bpm": 170,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "13.0",
+          "level": "13?",
           "designer": ""
         }
       ],
@@ -28984,7 +28985,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/26/111914/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/26/111914/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "111914"
     },
     {
@@ -29816,9 +29817,9 @@
       "bpm": 130,
       "difficulties": [
         {
-          "slot": 2,
+          "slot": 7,
           "name": "Utage",
-          "level": "12.0",
+          "level": "12?",
           "designer": ""
         }
       ],
@@ -29847,7 +29848,7 @@
         "audio_url": "https://astrodx-charts.saop.cc/26/112002/track.mp3",
         "pv_url": "https://astrodx-charts.saop.cc/26/112002/pv.mp4"
       },
-      "imported_at": "2026-07-15T20:02:17.919003+00:00",
+      "imported_at": "2026-08-02T13:45:24.315937+00:00",
       "slug": "112002"
     },
     {
@@ -74558,6 +74559,7 @@
       "short_id": "11770",
       "aliases": [
         "ultimate taste",
+        "ut",
         "芙兰教你认曲风"
       ],
       "offset": 0,
