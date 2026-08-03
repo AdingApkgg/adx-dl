@@ -10,11 +10,16 @@ from urllib.parse import quote
 
 from tools.build_catalog import (
     INDEX_URL,
+    LXNS_SONG_URL,
     MAIDATA_BASE,
     MEDIA_BASE,
     _aliases_for,
+    _apply_utage_kanji,
+    _is_utage,
+    _report_utage_signal_conflicts,
     build_catalog,
     fetch_alias_map,
+    fetch_utage_kanji_map,
 )
 from tools.mirror_chart_assets import mirror_chart_assets
 from tools.remote_catalog import fetch_text
@@ -219,6 +224,91 @@ class BuildCatalogTests(unittest.TestCase):
         entry = self._build()["entries"][1]  # shortid 146 => ST, not UTAGE
         self.assertTrue(entry["difficulties"])
         self.assertNotIn("Utage", [d["name"] for d in entry["difficulties"]])
+
+    def test_utage_kanji_variants_are_normalized(self) -> None:
+        # Upstream is not glyph-consistent: 3 charts carry the Chinese 藏 where the
+        # rest use the Japanese 蔵, which would split one 宴 type in two.
+        index = json.loads(UTAGE_INDEX)
+        index[0]["title"] = "[藏]幻想のサテライト"
+        with TemporaryDirectory() as temp_dir:
+            catalog_path = build_catalog(
+                Path(temp_dir),
+                fetch_text=lambda _url: json.dumps(index),
+                download_media=False,
+            )
+            entry = json.loads(catalog_path.read_text(encoding="utf-8"))["entries"][0]
+        self.assertEqual(entry["cabinet"], "蔵")
+        self.assertEqual(entry["remote_dir_name"], "幻想のサテライト")
+
+    def test_bracketed_title_on_a_normal_chart_is_not_read_as_utage(self) -> None:
+        # A real DX chart is titled "[X]" (shortid 11455). The prefix is only a 宴
+        # marker once the shortid says the chart is UTAGE — never on its own.
+        index = json.loads(SAMPLE_INDEX)
+        index[0]["title"] = "[X]"
+        with TemporaryDirectory() as temp_dir:
+            catalog_path = build_catalog(
+                Path(temp_dir),
+                fetch_text=lambda _url: json.dumps(index),
+                download_media=False,
+            )
+            entries = json.loads(catalog_path.read_text(encoding="utf-8"))["entries"]
+        entry = next(e for e in entries if e["short_id"] == "10146")
+        self.assertEqual(entry["cabinet"], "DX")
+        self.assertEqual(entry["remote_dir_name"], "[X]")
+
+    def test_utage_signals_flag_upstream_drift(self) -> None:
+        agreeing = {
+            "shortid": "111069",
+            "genreid": 107,
+            "difficulties": [{"slot": 7, "name": "Utage"}],
+        }
+        self.assertEqual(_report_utage_signal_conflicts([agreeing]), [])
+        self.assertTrue(_is_utage(agreeing))
+
+        # A chart whose genre says 宴 but whose id and slot say otherwise: reported,
+        # and the shortid — the signal that survived the old index shape — decides.
+        drifted = {
+            "shortid": "11069",
+            "title": "コネクト",
+            "genreid": 107,
+            "difficulties": [{"slot": 5, "name": "Master"}],
+        }
+        self.assertEqual(len(_report_utage_signal_conflicts([drifted])), 1)
+        self.assertFalse(_is_utage(drifted))
+
+    def test_lxns_kanji_overrides_a_mismatched_title_prefix(self) -> None:
+        payload = json.dumps(
+            {
+                "songs": [
+                    {
+                        "id": 111069,
+                        "difficulties": {"utage": [{"kanji": "協"}], "dx": []},
+                    }
+                ]
+            }
+        )
+        kanji_map = fetch_utage_kanji_map(fetch_text=lambda _url: payload)
+        self.assertEqual(kanji_map, {111069: "協"})
+
+        entries = [
+            {"short_id": "111069", "title": "[叶]太陽系デスコ", "cabinet": "叶"},
+            {"short_id": "111070", "title": "[奏]なにか", "cabinet": "奏"},  # not in lxns
+            {"short_id": "10146", "title": "コネクト", "cabinet": "DX"},  # not utage
+        ]
+        self.assertEqual(_apply_utage_kanji(entries, kanji_map), (1, 1))
+        self.assertEqual([e["cabinet"] for e in entries], ["協", "奏", "DX"])
+
+    def test_lxns_kanji_source_failure_leaves_cabinets_untouched(self) -> None:
+        def boom(_url: str) -> str:
+            raise URLError("offline")
+
+        self.assertEqual(fetch_utage_kanji_map(fetch_text=boom), {})
+        entries = [{"short_id": "111069", "title": "[協]x", "cabinet": "協"}]
+        self.assertEqual(_apply_utage_kanji(entries, {}), (0, 0))
+        self.assertEqual(entries[0]["cabinet"], "協")
+
+    def test_lxns_song_list_is_the_kanji_source(self) -> None:
+        self.assertEqual(LXNS_SONG_URL, "https://maimai.lxns.net/api/v0/maimai/song/list")
 
     def test_catalog_categories_list_distinct_versions(self) -> None:
         catalog = self._build()

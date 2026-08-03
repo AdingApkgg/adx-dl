@@ -52,6 +52,22 @@ LICENSE_NOTE = (
 LXNS_ALIAS_URL = "https://maimai.lxns.net/api/v0/maimai/alias/list"
 YUZUCHAN_ALIAS_URL = "https://www.yuzuchan.moe/api/maimaidx/maimaidxalias"
 
+# UTAGE (宴) chart-type kanji. The upstream index only carries it inside the
+# title's "[X]" prefix, which is not glyph-normalized: 3 charts ship the Chinese
+# 藏 where the other 9 use the Japanese 蔵, splitting one UTAGE type across two
+# cabinet values. Lxns' song list exposes the kanji as its own field, so it is
+# both the variant authority below and the cross-check in fetch_utage_kanji_map.
+LXNS_SONG_URL = "https://maimai.lxns.net/api/v0/maimai/song/list"
+UTAGE_KANJI_VARIANTS = {"藏": "蔵"}
+# A chart is UTAGE when the upstream item says so. Three independent signals
+# agree on all 128 UTAGE charts in the current index (see _utage_signals):
+# genreid 107, a lone slot-7 "Utage" difficulty, and the shortid convention.
+# genreid is preferred — it is a first-party maimai field, unlike the id
+# threshold (an upstream convention) and the slot (a packing detail).
+UTAGE_GENRE_ID = 107
+UTAGE_SHORT_ID_MIN = 100000
+UTAGE_SLOT = 7
+
 # Cover images are mirrored into the web app's public/ during the build so the
 # static site serves small local copies instead of hot-linking the remote host.
 # Two formats are written per cover: AVIF (primary) and WebP (compatibility
@@ -154,14 +170,19 @@ def _resolve_name_cabinet(title: str, short_id: str, path: str) -> tuple[str, st
     # For UTAGE the specific 宴-character survives as the title's "[X]" prefix
     # (e.g. "[協]太陽系デスコ"), which we strip for the display/download name — the
     # same name the old "[協] …" folder prefix produced.
+    #
+    # The prefix is only read once the shortid has already established the chart
+    # IS utage — never the other way round, because a normal chart can be titled
+    # "[X]" (shortid 11455) and would otherwise be misread as a 宴 type.
     sid = int(short_id) if short_id.isdigit() else -1
-    if sid >= 100000:
+    if sid >= UTAGE_SHORT_ID_MIN:
         match = re.match(r"^\[([^\]]*)\]\s*(.*)$", title)
         if match:
             cabinet = match.group(1).strip() or "宴"
             name = match.group(2).strip() or title
         else:
             cabinet, name = "宴", title
+        cabinet = UTAGE_KANJI_VARIANTS.get(cabinet, cabinet)
     elif sid >= 10000:
         cabinet, name = "DX", title
     elif sid >= 0:
@@ -171,6 +192,56 @@ def _resolve_name_cabinet(title: str, short_id: str, path: str) -> tuple[str, st
     if not name:
         name = (path.split("/")[-1] if path else "") or "chart"
     return name, cabinet
+
+
+def _utage_signals(item: dict[str, Any]) -> dict[str, bool]:
+    """The three independent "this is a UTAGE chart" signals in an index item.
+
+    They agree on every chart in the current index. Disagreement means the
+    upstream packing changed (a re-slotted difficulty, a shifted id range, a
+    mislabelled genre), which is worth reporting rather than silently resolving.
+    """
+    short_id = str(item.get("shortid", "") or "").strip()
+    difficulties = item.get("difficulties") or []
+    return {
+        "genre": item.get("genreid") == UTAGE_GENRE_ID,
+        "slot": any(
+            difficulty.get("slot") == UTAGE_SLOT
+            or str(difficulty.get("name", "") or "").strip().casefold() == "utage"
+            for difficulty in difficulties
+        ),
+        "shortid": short_id.isdigit() and int(short_id) >= UTAGE_SHORT_ID_MIN,
+    }
+
+
+def _is_utage(item: dict[str, Any]) -> bool:
+    """Whether an index item is a UTAGE chart.
+
+    The shortid range decides: it is the one signal that held even on the older
+    index shape, where genreid was absent and a 宴 chart's notes could sit in
+    Basic's slot. genreid only covers items whose shortid is unusable, and the
+    slot never decides on its own — it is the signal that historically drifted.
+    """
+    signals = _utage_signals(item)
+    if str(item.get("shortid", "") or "").strip().isdigit():
+        return signals["shortid"]
+    return signals["genre"]
+
+
+def _report_utage_signal_conflicts(items: list[dict[str, Any]]) -> list[str]:
+    """Log items whose UTAGE signals disagree; returns the reported lines."""
+    conflicts = []
+    for item in items:
+        signals = _utage_signals(item)
+        if len(set(signals.values())) == 1:
+            continue
+        agreeing = ", ".join(f"{key}={value}" for key, value in signals.items())
+        conflicts.append(
+            f"{item.get('shortid', '?')} {item.get('title', '?')!r}: {agreeing}"
+        )
+    for line in conflicts:
+        print(f"[catalog] utage signal conflict: {line}")
+    return conflicts
 
 
 def _build_entry(item: dict[str, Any], generated_at: str) -> dict[str, Any]:
@@ -195,11 +266,12 @@ def _build_entry(item: dict[str, Any], generated_at: str) -> dict[str, Any]:
     version = CANONICAL_VERSIONS.get(version_id, str(item.get("version", "") or "").strip())
     stable_key = f"{short_id}-{name}" if short_id else name
 
-    # UTAGE (宴) charts are packed inconsistently upstream: most carry their notes in
-    # inote_7, but some sit in inote_2 — Basic's slot. index.py names each difficulty
-    # after its slot, so those get labelled "Basic" on a 宴 chart. The shortid
-    # convention (>=100000 = UTAGE, see _resolve_name_cabinet) is the authority here.
-    is_utage = short_id.isdigit() and int(short_id) >= 100000
+    # UTAGE (宴) charts used to be packed inconsistently upstream: most carried
+    # their notes in inote_7, but some sat in inote_2 — Basic's slot — and index.py
+    # names each difficulty after its slot, so those came through as "Basic" on a 宴
+    # chart. Upstream now labels all 128 of them "Utage" itself, but the rename is
+    # kept so a regression there cannot put a Basic pill on a 宴 chart again.
+    is_utage = _is_utage(item)
 
     difficulties = [
         {
@@ -463,6 +535,68 @@ def fetch_alias_map(
     return merged
 
 
+def _parse_lxns_utage_kanji(payload: object) -> dict[int, str]:
+    """{song_id: 宴 kanji} from the Lxns song list's difficulties.utage[].kanji."""
+    out: dict[int, str] = {}
+    if not isinstance(payload, dict):
+        return out
+    for song in payload.get("songs", []):
+        song_id = song.get("id")
+        if not isinstance(song_id, int):
+            continue
+        difficulties = song.get("difficulties")
+        utage = difficulties.get("utage", []) if isinstance(difficulties, dict) else []
+        for chart in utage or []:
+            kanji = str(chart.get("kanji", "") or "").strip()
+            if kanji:
+                out[song_id] = kanji
+                break
+    return out
+
+
+def fetch_utage_kanji_map(
+    fetch_text: Callable[[str], str] = default_fetch_text,
+) -> dict[int, str]:
+    """Fetch the Lxns 宴 kanji per song id; best-effort like fetch_alias_map.
+
+    Lxns only lists charts currently in the game, so this covers roughly half the
+    catalog's UTAGE charts — enough to catch glyph drift in the titles we parse,
+    not enough to replace them. A failure here leaves every cabinet as parsed.
+    """
+    try:
+        return _parse_lxns_utage_kanji(json.loads(fetch_text(LXNS_SONG_URL)))
+    except Exception as error:  # noqa: BLE001 — network/JSON/shape are all non-fatal
+        print(f"[catalog] utage kanji source lxns failed ({error}); skipping")
+        return {}
+
+
+def _apply_utage_kanji(
+    entries: list[dict[str, Any]], kanji_map: dict[int, str]
+) -> tuple[int, int]:
+    """Reconcile each UTAGE entry's cabinet against Lxns' kanji.
+
+    Returns (checked, corrected). Lxns wins on a mismatch: the title prefix is
+    free text an upstream packer typed, the kanji is a dedicated field.
+    """
+    checked = corrected = 0
+    for entry in entries:
+        short_id = str(entry.get("short_id", "") or "").strip()
+        if not short_id.isdigit() or int(short_id) < UTAGE_SHORT_ID_MIN:
+            continue
+        kanji = kanji_map.get(int(short_id))
+        if not kanji:
+            continue
+        checked += 1
+        if entry.get("cabinet") != kanji:
+            print(
+                f"[catalog] utage kanji: {short_id} {entry.get('title', '')!r} "
+                f"{entry.get('cabinet')!r} -> {kanji!r}"
+            )
+            entry["cabinet"] = kanji
+            corrected += 1
+    return checked, corrected
+
+
 def _aliases_for(short_id: str, alias_map: dict[int, list[str]]) -> list[str]:
     """Resolve a chart's aliases from the merged alias map by its maimai song id.
 
@@ -617,9 +751,20 @@ def build_catalog(
     generated_at = datetime.now(timezone.utc).isoformat()
     items = json.loads(fetch_text(INDEX_URL))
 
+    # UTAGE detection reads three upstream signals that currently agree on all of
+    # them; report any that drift apart instead of letting one quietly win.
+    conflicts = _report_utage_signal_conflicts(items)
+    if conflicts:
+        print(f"[catalog] utage: {len(conflicts)} item(s) with disagreeing signals")
+
     entries = [_build_entry(item, generated_at) for item in items]
     entries.sort(key=lambda entry: entry["id"])
     _assign_route_slugs(entries)
+
+    # The 宴 kanji is parsed out of the title prefix, which is not glyph-normalized
+    # upstream; reconcile it against Lxns' dedicated field where it reaches.
+    checked, corrected = _apply_utage_kanji(entries, fetch_utage_kanji_map(fetch_text))
+    print(f"[catalog] utage kanji: corrected {corrected}/{checked} cross-checked")
 
     # Community aliases (别名) so a chart is findable by its nicknames; best-effort.
     matched = _attach_aliases(entries, fetch_alias_map(fetch_text))
