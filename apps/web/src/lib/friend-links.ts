@@ -50,6 +50,15 @@ export const friendLinks: FriendLink[] = [
     },
   },
   {
+    name: "SimaiHub",
+    url: "https://simaihub.dev/",
+    description: {
+      zh: "新一代 maimai 谱面下载解决方案。",
+      en: "The next-gen maimai chart downloading solution.",
+      ja: "次世代の maimai 譜面ダウンロードソリューション。",
+    },
+  },
+  {
     name: "AWMC BBS",
     url: "https://awmc.cc/",
     description: {
