@@ -98,6 +98,14 @@ export async function RootLayoutShell({ children, lang, locale }: RootLayoutShel
         <link rel="preconnect" href={CHART_MEDIA_ORIGIN} crossOrigin="" />
         <link rel="dns-prefetch" href={COUNTER_HOST} />
         <link rel="dns-prefetch" href={COMMENT_HOST} />
+        {/* Reuse terms in the two places a scraper is most likely to look at
+            the markup rather than the page text. A static export cannot send a
+            `Link: rel=license` header, so this is the header's stand-in. */}
+        <link
+          rel="license"
+          href="https://creativecommons.org/licenses/by/4.0/"
+        />
+        <meta name="copyright" content="ADX 谱面资源 — https://adxdls.saop.cc" />
         <ServiceWorkerRegistrar />
         <a
           href="#main-content"

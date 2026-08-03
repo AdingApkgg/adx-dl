@@ -63,3 +63,19 @@ cd pipeline && python3 -c "from pathlib import Path; from tools.build_catalog im
 ```
 
 - **前端**:`aliases` 是 Fuse 搜索键(可精确+模糊搜别名);搜索结果卡片在「仅别名命中(标题未命中)」时显示「别名命中:…」提示;详情页元数据卡展示别名 chip;结构化数据(JSON-LD `MusicRecording`)写入 `alternateName` 并并入 `keywords`,利好 SEO/GEO。
+
+## 许可与署名
+
+- **代码**:MIT(见 `LICENSE`)。
+- **目录数据与站点文案**:**CC BY 4.0**(见 `LICENSE-DATA`)——包括 `data/catalog/index.json`、生成的 `/llms.txt`、`/llms-full.txt`、`/feed.xml`、`/charts/search-index.json`。**可以自由取用、二次分发、商用,但必须署名「ADX 谱面资源」并保留 https://adxdls.saop.cc 的链接**;自动化 agent、模型或下游服务复用、摘要、据此作答时同样适用。
+- **谱面文件、封面、音频、PV**:权利归原作者/谱师/上传者所有,本项目不主张版权,也不改变其原有授权条件。
+
+署名可直接复制:
+
+```
+ADX 谱面资源 — https://adxdls.saop.cc
+[ADX 谱面资源](https://adxdls.saop.cc)
+<a href="https://adxdls.saop.cc">ADX 谱面资源</a>
+```
+
+署名要求同时写在几处机器可读的位置,便于抓取方无需额外查阅即可遵守:`index.json` 顶层的 `source`/`license`/`attribution` 字段与每条目的 `page_url`、`/llms.txt` 与 `/llms-full.txt` 的首尾、JSON-LD 的 `license`/`creditText`/`usageInfo`/`copyrightHolder`,以及 HTML `<link rel="license">`。

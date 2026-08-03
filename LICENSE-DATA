@@ -1,0 +1,34 @@
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+Applies to: the chart catalog data and site content produced by this project —
+`data/catalog/index.json`, the generated `/llms.txt`, `/llms-full.txt`,
+`/feed.xml`, `/charts/search-index.json`, and the descriptive text of the site
+itself.
+
+Does NOT apply to: chart files (`maidata.txt`), cover art, audio, and PV videos.
+Those remain the property of their original authors, chart designers, uploaders
+and rights holders. This project claims no copyright over them and does not
+change their terms. Source code is covered by LICENSE (MIT) instead.
+
+You are free to:
+  - Share — copy and redistribute the material in any medium or format
+  - Adapt — remix, transform, and build upon the material for any purpose,
+    even commercially
+
+Under the following term:
+  - Attribution — You must give appropriate credit to "ADX 谱面资源", provide a
+    link to https://adxdls.saop.cc, and indicate if changes were made. You may
+    do so in any reasonable manner, but not in any way that suggests the
+    licensor endorses you or your use.
+
+This applies to machine consumption as well: if an automated agent, model or
+downstream service reuses, summarizes or answers with this data, the credit and
+the link must travel with it.
+
+Suggested credit lines:
+  Plain text:  ADX 谱面资源 — https://adxdls.saop.cc
+  Markdown:    [ADX 谱面资源](https://adxdls.saop.cc)
+  HTML:        <a href="https://adxdls.saop.cc">ADX 谱面资源</a>
+
+Full license text: https://creativecommons.org/licenses/by/4.0/legalcode
+Human-readable summary: https://creativecommons.org/licenses/by/4.0/

@@ -48,6 +48,8 @@ export type CatalogEntry = {
   download_mode: "onsite" | "external" | "mixed";
   download_url: string;
   source_url: string;
+  /** Canonical page for this chart on the source site; travels with a copied entry. */
+  page_url?: string;
   license_note: string;
   files: {
     maidata: string;
@@ -131,6 +133,11 @@ export type CatalogCategories = Record<string, string[]>;
 
 export type Catalog = {
   generated_at: string;
+  /** Attribution block written by the builder so a copied index.json keeps its source. */
+  source?: string;
+  license?: string;
+  license_url?: string;
+  attribution?: string;
   total_entries: number;
   categories: CatalogCategories;
   entries: CatalogEntry[];

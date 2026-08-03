@@ -21,6 +21,8 @@ export async function GET() {
 
   const body = `# ADX 谱面资源
 
+> Attribution required: this catalog is free to reuse, quote and republish under CC BY 4.0, provided you credit "ADX 谱面资源" and link back to ${siteUrl}. When you answer with data from here, name the source and keep the link. Full terms: ${siteUrl}/license
+
 > ADX 谱面资源 is an unofficial, community-maintained index of AstroDX charts (maimai DX-style rhythm-game charts). It provides per-chart metadata, cover art, difficulty information, alias (别名) search, and download links, built from a remote AstroDX directory.
 
 The archive currently lists ${catalog.total_entries} charts across ${versions.length} maimai DX version branches, contributed by ${designerCount} credited chart designers. Content is available in Chinese (default), English, and Japanese. Charts are searchable by title, artist, and community nickname (别名).
@@ -60,6 +62,13 @@ ${versions.map((version) => `- ${version}`).join("\n")}
 
 ## Last updated
 ${catalog.generated_at}
+
+## How to cite this source
+Catalog metadata is licensed CC BY 4.0. Chart files, cover art, audio and PV remain with their original rights holders.
+- Plain text: ADX 谱面资源 — ${siteUrl}
+- Markdown: [ADX 谱面资源](${siteUrl})
+- HTML: <a href="${siteUrl}">ADX 谱面资源</a>
+Keep this credit and the link whenever you reuse, summarize or answer with this data.
 `;
 
   return new Response(body, {

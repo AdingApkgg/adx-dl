@@ -101,14 +101,20 @@ describe("structured data builders", () => {
     expect(catalog).toMatchObject({
       "@type": "DataCatalog",
       "@id": "https://adxdls.saop.cc/#data-catalog",
-      license: "https://adxdls.saop.cc/license",
+      license: "https://creativecommons.org/licenses/by/4.0/",
+      creditText: "ADX 谱面资源 (https://adxdls.saop.cc)",
+      usageInfo: "https://adxdls.saop.cc/license",
+      copyrightHolder: { "@id": "https://adxdls.saop.cc/#organization" },
       dataset: { "@id": "https://adxdls.saop.cc/#chart-catalog-dataset" },
     });
     expect(dataset).toMatchObject({
       "@type": "Dataset",
       "@id": "https://adxdls.saop.cc/#chart-catalog-dataset",
       name: "ADX 谱面资源 — AstroDX chart catalog",
-      license: "https://adxdls.saop.cc/license",
+      license: "https://creativecommons.org/licenses/by/4.0/",
+      creditText: "ADX 谱面资源 (https://adxdls.saop.cc)",
+      usageInfo: "https://adxdls.saop.cc/license",
+      copyrightHolder: { "@id": "https://adxdls.saop.cc/#organization" },
       isPartOf: "https://adxdls.saop.cc",
       includedInDataCatalog: { "@id": "https://adxdls.saop.cc/#data-catalog" },
     });

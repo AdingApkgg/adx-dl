@@ -27,6 +27,23 @@ MEDIA_BASE = "https://astrodx-charts.saop.cc/"
 # mirror_chart_assets for same-origin fetch.
 MAIDATA_BASE = "https://astrodx-charts-alice.saop.cc/"
 
+# Attribution travels inside the payload. Anyone (human or agent) who copies
+# index.json — or a single entry out of it — carries the source link with them,
+# which a link on the website alone would not survive. See ATTRIBUTION_KEYS
+# below: these fields are deliberately excluded from the content fingerprint so
+# rewording them never restamps every entry's imported_at.
+SITE_URL = "https://adxdls.saop.cc"
+DATA_LICENSE = "CC-BY-4.0"
+DATA_LICENSE_URL = f"{SITE_URL}/license"
+ATTRIBUTION = (
+    f"Catalog data from ADX 谱面资源 ({SITE_URL}), licensed CC BY 4.0. "
+    "Reuse freely with attribution and a link back to the source."
+)
+LICENSE_NOTE = (
+    f"Catalog metadata: CC BY 4.0, credit {SITE_URL}. "
+    "Chart files, cover art, audio and PV remain with their original rights holders."
+)
+
 # Song aliases (别名) — community nicknames used to find a chart by an alternate
 # name, the same idea as nonebot-plugin-maimaidx's alias lookup. Both sources are
 # free no-auth JSON keyed by the canonical maimai song id and are unioned per id:
@@ -221,7 +238,10 @@ def _build_entry(item: dict[str, Any], generated_at: str) -> dict[str, Any]:
         "download_mode": "onsite",
         "download_url": "",
         "source_url": _media_url(path) + "/" if path else "",
-        "license_note": "Built from astrodx-charts index",
+        # Canonical page for this chart on the source site: the one field that
+        # makes a copied row traceable back here.
+        "page_url": f"{SITE_URL}/charts/{short_id}" if short_id else SITE_URL,
+        "license_note": LICENSE_NOTE,
         "files": {
             "maidata": maidata_url,
             "maidata_dx": "",
@@ -524,11 +544,20 @@ def enrich_aliases(
 # (mirror vs. remote) rather than with content. aliases and slug come from
 # best-effort/deterministic post-processing — a flaky alias source or a shifted
 # slug tie-break shouldn't restamp <lastmod>.
+# Boilerplate that is identical on every entry and changes only when we reword
+# it. Keeping it out of the fingerprint means an attribution edit never restamps
+# 1800+ imported_at values (which would churn every sitemap lastmod and make
+# IndexNow resubmit the whole catalog).
+ATTRIBUTION_KEYS = ("page_url", "license_note")
+
+
 def _content_fingerprint(entry: dict[str, Any]) -> str:
     clone = copy.deepcopy(entry)
     clone.pop("imported_at", None)
     clone.pop("aliases", None)
     clone.pop("slug", None)
+    for key in ATTRIBUTION_KEYS:
+        clone.pop(key, None)
     media = clone.get("media")
     if isinstance(media, dict):
         media.pop("cover_avif", None)
@@ -633,6 +662,10 @@ def build_catalog(
 
     catalog = {
         "generated_at": generated_at,
+        "source": SITE_URL,
+        "license": DATA_LICENSE,
+        "license_url": DATA_LICENSE_URL,
+        "attribution": ATTRIBUTION,
         "total_entries": len(entries),
         "categories": {"Remote": sorted({entry["subcategory"] for entry in entries})},
         "entries": entries,

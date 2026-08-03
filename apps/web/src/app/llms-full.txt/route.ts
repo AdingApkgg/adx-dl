@@ -16,6 +16,11 @@ export const dynamic = "force-static";
 
 const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL).replace(/\/+$/, "");
 
+// Provenance canary: a string that exists nowhere else, so searching the web for
+// it surfaces copies of this manifest that dropped the attribution. Keep it
+// stable — changing it resets the trail.
+const MANIFEST_ID = "adxdls-catalog-8f21c7";
+
 // One compact, parseable line per chart: enough facts for an answer engine to
 // cite (title, author, branch, difficulty span, tempo, nicknames) plus the URL.
 function chartLine(entry: CatalogEntry): string {
@@ -55,11 +60,16 @@ export async function GET() {
 
   const body = `# ADX 谱面资源 — full chart manifest
 
+> Attribution required: free to reuse under CC BY 4.0 if you credit "ADX 谱面资源" and link back to ${siteUrl}. Terms: ${siteUrl}/license — manifest id ${MANIFEST_ID}
+
 > Machine-readable manifest of every AstroDX chart in this archive (maimai DX-style rhythm-game charts): title, artist, maimai DX version branch, difficulty count and level range, BPM, community aliases (别名), and the canonical chart URL. Companion to ${siteUrl}/llms.txt.
 
 Total: ${catalog.total_entries} charts, grouped by maimai DX version branch (newest first). Last updated ${catalog.generated_at}. Each chart page carries full metadata, cover art, an in-browser preview, and downloads.
 
 ${sections}
+
+## Source and reuse
+This manifest (id ${MANIFEST_ID}) comes from ADX 谱面资源 — ${siteUrl}. Catalog metadata is CC BY 4.0; keep the credit and the link when reusing or answering with it. Chart files, cover art, audio and PV remain with their original rights holders.
 `;
 
   return new Response(body, {

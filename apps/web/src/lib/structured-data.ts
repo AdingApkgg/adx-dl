@@ -27,7 +27,11 @@ const organizationId = `${siteUrl}/#organization`;
 const websiteId = `${siteUrl}/#website`;
 const dataCatalogId = `${siteUrl}/#data-catalog`;
 const datasetId = `${siteUrl}/#chart-catalog-dataset`;
-const licenseUrl = `${siteUrl}/license`;
+// Attribution terms in the fields answer engines actually surface: `license`
+// alone states there are terms, `creditText` + `usageInfo` state what they are.
+const dataLicenseUrl = "https://creativecommons.org/licenses/by/4.0/";
+const creditText = `ADX 谱面资源 (${siteUrl})`;
+const usageInfo = `${siteUrl}/license`;
 const sourceRepository = "https://github.com/AdingApkgg/adx-dl";
 const maintainerProfile = "https://github.com/AdingApkgg";
 const communityUrl = "https://t.me/FullDiveSAO";
@@ -91,7 +95,10 @@ export function buildCatalogDatasetStructuredData(
     isAccessibleForFree: true,
     creator: { "@id": organizationId },
     publisher: { "@id": organizationId },
-    license: licenseUrl,
+    license: dataLicenseUrl,
+    creditText,
+    usageInfo,
+    copyrightHolder: { "@id": organizationId },
     isPartOf: siteUrl,
     includedInDataCatalog: { "@id": dataCatalogId },
     keywords: ["AstroDX", "maimai", "maimai DX", "rhythm game charts", "谱面"],
@@ -125,7 +132,10 @@ function buildChartCatalogStructuredData(
       url: toAbsoluteUrl(chartsPath),
       inLanguage: language,
       publisher: { "@id": organizationId },
-      license: licenseUrl,
+      license: dataLicenseUrl,
+      creditText,
+      usageInfo,
+      copyrightHolder: { "@id": organizationId },
       dataset: { "@id": datasetId },
     },
     {
@@ -138,7 +148,10 @@ function buildChartCatalogStructuredData(
       inLanguage: language,
       creator: { "@id": organizationId },
       publisher: { "@id": organizationId },
-      license: licenseUrl,
+      license: dataLicenseUrl,
+      creditText,
+      usageInfo,
+      copyrightHolder: { "@id": organizationId },
       isAccessibleForFree: true,
       // Google Dataset rich results accept a URL here; an object that only
       // points at WebSite can be reported as "invalid object type".

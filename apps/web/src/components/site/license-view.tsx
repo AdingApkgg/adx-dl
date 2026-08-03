@@ -18,6 +18,28 @@ type LicenseCopy = {
   description: string;
   intro: string;
   sections: LicenseSection[];
+  credit: {
+    title: string;
+    body: string;
+    /** Labels for the copy-paste snippets; the snippets themselves are shared. */
+    labels: { plain: string; markdown: string; html: string };
+  };
+};
+
+const SITE_URL = "https://adxdls.saop.cc";
+const SITE_LABEL = "ADX 谱面资源";
+const CREDIT_SNIPPETS = {
+  plain: `${SITE_LABEL} — ${SITE_URL}`,
+  markdown: `[${SITE_LABEL}](${SITE_URL})`,
+  html: `<a href="${SITE_URL}">${SITE_LABEL}</a>`,
+} as const;
+
+// Creative Commons publishes the deed per language; point each locale at the
+// one its readers can actually read.
+const LICENSE_DEED_URL: Record<Locale, string> = {
+  zh: "https://creativecommons.org/licenses/by/4.0/deed.zh-hans",
+  en: "https://creativecommons.org/licenses/by/4.0/deed.en",
+  ja: "https://creativecommons.org/licenses/by/4.0/deed.ja",
 };
 
 const copy: Record<Locale, LicenseCopy> = {
@@ -27,6 +49,11 @@ const copy: Record<Locale, LicenseCopy> = {
     intro:
       "ADX 谱面资源是非官方 AstroDX 谱面索引与下载入口。本站整理远端目录中的公开元数据、封面、谱面文件与媒体链接，方便玩家搜索、预览和导入 AstroDX。",
     sections: [
+      {
+        title: "数据许可（CC BY 4.0）",
+        body:
+          "本站整理的目录数据与站点文案（曲目元数据、别名、难度、/llms.txt、/llms-full.txt、/feed.xml 等）以 CC BY 4.0 发布：可自由取用、二次分发、修改和商用，唯一条件是署名「ADX 谱面资源」并保留本站链接。自动化程序、AI 模型或下游服务在复用、摘要或据此作答时同样适用——请让署名和链接跟着数据一起走。",
+      },
       {
         title: "目录索引",
         body:
@@ -48,6 +75,12 @@ const copy: Record<Locale, LicenseCopy> = {
           "本站与 SEGA、maimai、AstroDX 官方或相关开发者没有隶属关系。AstroDX、maimai 及相关名称、图像、音乐和游戏内容的权利归各自所有者所有。",
       },
     ],
+    credit: {
+      title: "如何署名",
+      body:
+        "任选一种复制即可。转载、二次分发、做成 API、喂给模型或据此生成回答，都请带上这行。",
+      labels: { plain: "纯文本", markdown: "Markdown", html: "HTML" },
+    },
   },
   en: {
     title: "License, Sources and Usage Notes",
@@ -56,6 +89,11 @@ const copy: Record<Locale, LicenseCopy> = {
     intro:
       "ADX 谱面资源 is an unofficial AstroDX chart index and download portal. It organizes public metadata, cover art, chart files and media links from remote directories so players can search, preview and import charts into AstroDX.",
     sections: [
+      {
+        title: "Data license (CC BY 4.0)",
+        body:
+          "The catalog data and site copy compiled here — song metadata, aliases, difficulties, /llms.txt, /llms-full.txt, /feed.xml and friends — are published under CC BY 4.0. You may reuse, redistribute, modify and commercialize them; the only condition is that you credit \u201cADX \u8c31\u9762\u8d44\u6e90\u201d and keep a link back to this site. This applies to automated agents, AI models and downstream services too: when the data travels, the credit and the link travel with it.",
+      },
       {
         title: "Catalog index",
         body:
@@ -77,6 +115,12 @@ const copy: Record<Locale, LicenseCopy> = {
           "This site is not affiliated with SEGA, maimai, AstroDX official releases or related developers. AstroDX, maimai and related names, images, music and game content belong to their respective owners.",
       },
     ],
+    credit: {
+      title: "How to credit",
+      body:
+        "Copy whichever form fits. Republishing, redistributing, wrapping it in an API, feeding it to a model or answering from it — bring this line along.",
+      labels: { plain: "Plain text", markdown: "Markdown", html: "HTML" },
+    },
   },
   ja: {
     title: "ライセンス、出典、利用案内",
@@ -85,6 +129,11 @@ const copy: Record<Locale, LicenseCopy> = {
     intro:
       "ADX 谱面资源 は非公式の AstroDX 譜面インデックス兼ダウンロード入口です。リモートディレクトリの公開メタデータ、ジャケット、譜面ファイル、メディアリンクを整理し、検索・プレビュー・AstroDX への導入をしやすくしています。",
     sections: [
+      {
+        title: "データライセンス（CC BY 4.0）",
+        body:
+          "本サイトが整理したカタログデータとサイト文面（曲メタデータ、別名、難易度、/llms.txt、/llms-full.txt、/feed.xml など）は CC BY 4.0 で公開しています。再利用・再配布・改変・商用利用は自由で、条件は「ADX 谱面资源」のクレジットと本サイトへのリンクを残すことだけです。自動化エージェント、AI モデル、下流サービスによる再利用・要約・回答にも同様に適用されます。",
+      },
       {
         title: "カタログ索引",
         body:
@@ -106,6 +155,12 @@ const copy: Record<Locale, LicenseCopy> = {
           "本サイトは SEGA、maimai、AstroDX 公式リリース、関連開発者とは無関係です。AstroDX、maimai、および関連する名称、画像、音楽、ゲーム内容の権利は各所有者に帰属します。",
       },
     ],
+    credit: {
+      title: "クレジットの書き方",
+      body:
+        "いずれかをコピーしてお使いください。転載、再配布、API 化、モデルへの投入、それを元にした回答生成のいずれでも、この 1 行を添えてください。",
+      labels: { plain: "プレーンテキスト", markdown: "Markdown", html: "HTML" },
+    },
   },
 };
 
@@ -133,6 +188,41 @@ export function LicenseView({ locale = "zh" }: { locale?: Locale }) {
             </section>
           </RevealItem>
         ))}
+        <RevealItem variants={sectionRiseVariants}>
+          <section className="grid gap-3 border-t border-border/60 pt-5">
+            <h2 className="text-lg font-semibold">{content.credit.title}</h2>
+            <p className="text-sm leading-7 text-muted-foreground">
+              {content.credit.body}
+            </p>
+            <dl className="grid gap-2">
+              {(["plain", "markdown", "html"] as const).map((kind) => (
+                <div key={kind} className="grid gap-1">
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {content.credit.labels[kind]}
+                  </dt>
+                  <dd>
+                    {/* Selectable rather than a copy button: the primary reader
+                        here is a scraper, and plain text in the DOM is what it
+                        can actually pick up. */}
+                    <code className="block overflow-x-auto rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs">
+                      {CREDIT_SNIPPETS[kind]}
+                    </code>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <p className="text-xs text-muted-foreground">
+              <a
+                className="underline underline-offset-4 hover:text-foreground"
+                href={LICENSE_DEED_URL[locale]}
+                rel="license noopener noreferrer"
+                target="_blank"
+              >
+                CC BY 4.0
+              </a>
+            </p>
+          </section>
+        </RevealItem>
       </RevealGroup>
     </main>
   );
