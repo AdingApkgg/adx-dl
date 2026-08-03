@@ -1,16 +1,29 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  buildLevelGradient,
+  cabinetBucket,
+  clampRange,
   collectDifficultyLevels,
+  DIFFICULTY_TONE_COLOR,
   difficultyDisplayLevel,
-  entryHasLevel,
+  entryHasLevelInRange,
+  formatRangeParam,
+  isFullRange,
+  levelDisplayTone,
+  parseBpmParam,
+  parseLevelParam,
+  difficultyDisplayLevels,
   formatEntrySubcategory,
+  genreFilterQuery,
   genreGroupFolderName,
   getChartAssetFiles,
   getChartDownloadSpec,
   isKnownVersionIndex,
+  normalizeCabinetId,
   resolveVersionIndex,
   toCatalogCardEntry,
+  UTAGE_GENRE_ID,
   versionFolderName,
   versionGroupFolderName,
   versionShortName,
@@ -135,6 +148,101 @@ describe("catalog shared helpers", () => {
     expect(genreGroupFolderName({ genre: "  " }, "未知曲风")).toBe("未知曲风");
   });
 
+  test("genreFilterQuery routes 宴会場 to the cabinet filter", () => {
+    // Ordinary genres filter from the genre row.
+    expect(genreFilterQuery(103)).toBe("genre=103");
+    expect(genreFilterQuery(101)).toBe("genre=101");
+    // 宴会場 has no genre chip — the Type row's UTAGE chip is the same filter, so
+    // a genre=107 link would highlight nothing in the panel.
+    expect(genreFilterQuery(UTAGE_GENRE_ID)).toBe("cabinet=UTAGE");
+    expect(genreFilterQuery(107)).toBe("cabinet=UTAGE");
+  });
+
+  test("level ranges match on the sort order, not the string", () => {
+    const entry = buildEntry({
+      difficulties: [
+        { slot: 4, level: "11.2", designer: "" },
+        { slot: 5, level: "12.8", designer: "" },
+      ],
+    });
+    // 11.2 displays as "11", 12.8 as "12+".
+    expect(entryHasLevelInRange(entry, "11", "12+")).toBe(true);
+    expect(entryHasLevelInRange(entry, "12+", "13")).toBe(true);
+    expect(entryHasLevelInRange(entry, "13", "15")).toBe(false);
+    expect(entryHasLevelInRange(entry, "1", "10+")).toBe(false);
+    // "12+" sits between 12 and 13 — a plain string compare would sort it after.
+    expect(entryHasLevelInRange(entry, "12", "12+")).toBe(true);
+    expect(entryHasLevelInRange(entry, "12", "12")).toBe(false);
+  });
+
+  test("level param reads ranges and the chip-list form it replaced", () => {
+    const scale = ["1", "7", "7+", "12", "12+", "13"];
+    expect(parseLevelParam("7-12+", scale)).toEqual([1, 4]);
+    // A legacy list collapses to its span — a range cannot express a gap.
+    expect(parseLevelParam("7,13", scale)).toEqual([1, 5]);
+    expect(parseLevelParam("12+", scale)).toEqual([4, 4]);
+    // Reversed ends are ordered.
+    expect(parseLevelParam("13-7", scale)).toEqual([1, 5]);
+    // A range with an unreadable end is discarded whole rather than half-applied
+    // — "7-99" must not silently become "just level 7", a filter nobody asked for.
+    expect(parseLevelParam("99", scale)).toBeNull();
+    expect(parseLevelParam("7-99", scale)).toBeNull();
+    expect(parseLevelParam("7-12+", [])).toBeNull();
+  });
+
+  test("bpm param reads ranges and the legacy bucket ids", () => {
+    const bounds = [60, 300] as const;
+    expect(parseBpmParam("120-200", bounds)).toEqual([120, 200]);
+    // Detail pages linked ?bpm=<bucket id>; bucket 1 is 121–160.
+    expect(parseBpmParam("1", bounds)).toEqual([121, 160]);
+    expect(parseBpmParam("1,2", bounds)).toEqual([121, 200]);
+    // The top bucket is open-ended and gets capped at the catalog's fastest.
+    expect(parseBpmParam("3", bounds)).toEqual([201, 300]);
+    // Out-of-bounds ends clamp rather than filtering to nothing.
+    expect(parseBpmParam("0-9999", bounds)).toEqual([60, 300]);
+    expect(parseBpmParam("nonsense", bounds)).toBeNull();
+  });
+
+  test("a full-span range counts as no filter", () => {
+    expect(isFullRange([0, 5], [0, 5])).toBe(true);
+    expect(isFullRange([0, 4], [0, 5])).toBe(false);
+    expect(isFullRange([1, 5], [0, 5])).toBe(false);
+    expect(formatRangeParam([120, 200])).toBe("120-200");
+    expect(clampRange([200, 120], [0, 300])).toEqual([120, 200]);
+  });
+
+  test("the level gradient stops on each level's difficulty colour", () => {
+    expect(levelDisplayTone("3")).toBe("basic");
+    expect(levelDisplayTone("7+")).toBe("advanced");
+    expect(levelDisplayTone("11")).toBe("expert");
+    expect(levelDisplayTone("13+")).toBe("master");
+    expect(levelDisplayTone("15")).toBe("remaster");
+
+    const gradient = buildLevelGradient(["1", "8", "15"]);
+    expect(gradient).toContain(DIFFICULTY_TONE_COLOR.basic + " 0.00%");
+    expect(gradient).toContain(DIFFICULTY_TONE_COLOR.advanced + " 50.00%");
+    expect(gradient).toContain(DIFFICULTY_TONE_COLOR.remaster + " 100.00%");
+    // Degenerate scales still yield a usable gradient rather than NaN stops.
+    expect(buildLevelGradient([])).not.toContain("NaN");
+    expect(buildLevelGradient(["12"])).not.toContain("NaN");
+  });
+
+  test("cabinet buckets group the real cabinet strings, legacy ids still resolve", () => {
+    // The catalog stores DX/ST or a 宴 kanji; every kanji is one UTAGE bucket.
+    expect(cabinetBucket("DX")).toBe("DX");
+    expect(cabinetBucket("ST")).toBe("ST");
+    expect(cabinetBucket("協")).toBe("UTAGE");
+    expect(cabinetBucket("蔵")).toBe("UTAGE");
+    expect(cabinetBucket("")).toBe("UTAGE");
+
+    expect(normalizeCabinetId("UTAGE")).toBe("UTAGE");
+    // The bucket was called UTG until it was renamed; shared links still say so.
+    expect(normalizeCabinetId("UTG")).toBe("UTAGE");
+    expect(normalizeCabinetId(" DX ")).toBe("DX");
+    expect(normalizeCabinetId("SD")).toBeNull();
+    expect(normalizeCabinetId("")).toBeNull();
+  });
+
   test("prefers version and cabinet for remote entries", () => {
     expect(
       formatEntrySubcategory(
@@ -248,16 +356,49 @@ describe("catalog shared helpers", () => {
     expect(collectDifficultyLevels(entries)).toEqual(["12", "12+", "13"]);
   });
 
-  test("entryHasLevel matches when any difficulty displays as the level", () => {
-    const entry = buildEntry({
-      difficulties: [
-        { slot: 4, level: "12.7", designer: "" },
-        { slot: 5, level: "13.2", designer: "" },
-      ],
+  test("an unverified UTAGE level covers its whole level, both tiers", () => {
+    // A constant maps to exactly one display level.
+    expect(difficultyDisplayLevels("13.4")).toEqual(["13"]);
+    expect(difficultyDisplayLevels("13.7")).toEqual(["13+"]);
+    // "13?" has no constant behind it — it is somewhere in level 13, so it
+    // occupies the level whole and answers a filter for either tier.
+    expect(difficultyDisplayLevels("13?")).toEqual(["13", "13+"]);
+    // Already committed to the upper tier — stays single.
+    expect(difficultyDisplayLevels("13+?")).toEqual(["13+"]);
+    // No official 15+ / 6+ tier exists, so those span nothing extra.
+    expect(difficultyDisplayLevels("15?")).toEqual(["15"]);
+    expect(difficultyDisplayLevels("6?")).toEqual(["6"]);
+    expect(difficultyDisplayLevels("")).toEqual([]);
+  });
+
+  test("a 13? UTAGE chart is found by both the 13 and the 13+ range", () => {
+    const utage = buildEntry({
+      cabinet: "協",
+      difficulties: [{ slot: 7, level: "13?", designer: "" }],
     });
 
-    expect(entryHasLevel(entry, "13")).toBe(true);
-    expect(entryHasLevel(entry, "12+")).toBe(true);
-    expect(entryHasLevel(entry, "12")).toBe(false);
+    expect(entryHasLevelInRange(utage, "13", "13")).toBe(true);
+    expect(entryHasLevelInRange(utage, "13+", "13+")).toBe(true);
+    expect(entryHasLevelInRange(utage, "12+", "13")).toBe(true);
+    expect(entryHasLevelInRange(utage, "13+", "14")).toBe(true);
+    // But not levels it cannot be: 12 and below, 14 and above.
+    expect(entryHasLevelInRange(utage, "1", "12+")).toBe(false);
+    expect(entryHasLevelInRange(utage, "14", "15")).toBe(false);
+
+    // An exact constant still matches only its own tier.
+    const normal = buildEntry({
+      difficulties: [{ slot: 5, level: "13.4", designer: "" }],
+    });
+    expect(entryHasLevelInRange(normal, "13", "13")).toBe(true);
+    expect(entryHasLevelInRange(normal, "13+", "13+")).toBe(false);
+  });
+
+  test("the level scale includes both tiers an unverified level spans", () => {
+    expect(
+      collectDifficultyLevels([
+        { difficulties: [{ slot: 7, level: "13?", designer: "" }] },
+        { difficulties: [{ slot: 7, level: "15?", designer: "" }] },
+      ])
+    ).toEqual(["13", "13+", "15"]);
   });
 });

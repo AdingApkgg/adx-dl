@@ -210,6 +210,12 @@ export type SiteDictionary = {
     levelFilterLabel: string;
     allLevels: string;
     levelOption: (level: string) => string;
+    /** Thumb labels on the level/BPM range sliders. */
+    rangeMin: string;
+    rangeMax: string;
+    /** Applied-filter chip for a level / BPM span. */
+    levelRangeLabel: (low: string, high: string) => string;
+    bpmRangeLabel: (low: number, high: number) => string;
     /** Shown while the batch download manifest loads after entering select mode. */
     specsLoading: string;
     specsError: string;
@@ -771,6 +777,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       levelFilterLabel: "等级筛选",
       allLevels: "全部等级",
       levelOption: (level) => `等级 ${level}`,
+      rangeMin: "最低",
+      rangeMax: "最高",
+      levelRangeLabel: (low, high) => (low === high ? `等级 ${low}` : `等级 ${low}–${high}`),
+      bpmRangeLabel: (low, high) => (low === high ? `BPM ${low}` : `BPM ${low}–${high}`),
       specsLoading: "正在加载下载清单…",
       specsError: "下载清单加载失败，请稍后重试。",
     },
@@ -1338,6 +1348,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       levelFilterLabel: "Filter by level",
       allLevels: "All Levels",
       levelOption: (level) => `Level ${level}`,
+      rangeMin: "Min",
+      rangeMax: "Max",
+      levelRangeLabel: (low, high) => (low === high ? `Level ${low}` : `Level ${low}–${high}`),
+      bpmRangeLabel: (low, high) => (low === high ? `BPM ${low}` : `BPM ${low}–${high}`),
       specsLoading: "Loading download manifest…",
       specsError: "Couldn't load the download manifest. Please try again later.",
     },
@@ -1922,6 +1936,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       levelFilterLabel: "レベルで絞り込み",
       allLevels: "すべてのレベル",
       levelOption: (level) => `レベル ${level}`,
+      rangeMin: "最小",
+      rangeMax: "最大",
+      levelRangeLabel: (low, high) => (low === high ? `レベル ${low}` : `レベル ${low}〜${high}`),
+      bpmRangeLabel: (low, high) => (low === high ? `BPM ${low}` : `BPM ${low}〜${high}`),
       specsLoading: "ダウンロードリストを読み込み中…",
       specsError: "ダウンロードリストの読み込みに失敗しました。しばらくしてからもう一度お試しください。",
     },

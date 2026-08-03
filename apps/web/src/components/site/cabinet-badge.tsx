@@ -17,8 +17,12 @@ const ST: CabinetIcon = {
   width: 200,
   height: 64,
 };
-const UTG: CabinetIcon = {
-  sources: { avif: "/cabinet/UTG.avif", webp: "/cabinet/UTG.webp", png: "/cabinet/UTG.png" },
+const UTAGE: CabinetIcon = {
+  sources: {
+    avif: "/cabinet/UTAGE.avif",
+    webp: "/cabinet/UTAGE.webp",
+    png: "/cabinet/UTAGE.png",
+  },
   label: "宴 / UTAGE",
   width: 236,
   height: 64,
@@ -29,7 +33,7 @@ function cabinetIcon(cabinet: string): CabinetIcon | null {
   if (!key) return null;
   if (key === "DX") return DX;
   if (key === "ST") return ST;
-  return UTG;
+  return UTAGE;
 }
 
 type CabinetBadgeProps = {

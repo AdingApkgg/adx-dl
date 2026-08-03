@@ -10,6 +10,8 @@ import {
   buildSelectedCatalogCharts,
   catalogVersionFilterId,
   CatalogBrowser,
+  foldUtageGenreIntoCabinet,
+  isCabinetLockedOut,
   normalizeVersionFilterId,
 } from "./catalog-browser";
 
@@ -73,6 +75,91 @@ describe("CatalogBrowser", () => {
     expect(normalizeVersionFilterId("maimai DX PRiSM PLUS")).toBe("24");
     expect(normalizeVersionFilterId("999")).toBeNull();
     expect(normalizeVersionFilterId("not-a-version")).toBeNull();
+  });
+
+  test("folds a genre=107 link onto the Type row's UTAGE chip", () => {
+    // The genre row has no 宴会場 chip, so a raw ?genre=107 link used to filter
+    // the grid while leaving every chip in the panel unlit.
+    expect(foldUtageGenreIntoCabinet(new Set(["107"]), null)).toEqual({
+      genreIds: new Set(),
+      cabinetIds: new Set(["UTAGE"]),
+    });
+
+    // Mixed with a real genre: only the 107 moves across.
+    expect(foldUtageGenreIntoCabinet(new Set(["103", "107"]), null)).toEqual({
+      genreIds: new Set(["103"]),
+      cabinetIds: new Set(["UTAGE"]),
+    });
+
+    // Already-selected cabinets survive, and UTAGE doesn't duplicate.
+    expect(foldUtageGenreIntoCabinet(new Set(["107"]), new Set(["DX", "UTAGE"]))).toEqual({
+      genreIds: new Set(),
+      cabinetIds: new Set(["DX", "UTAGE"]),
+    });
+  });
+
+  test("accepts the bucket's former UTG id from shared links", () => {
+    expect(foldUtageGenreIntoCabinet(null, new Set(["UTG"]))).toEqual({
+      genreIds: null,
+      cabinetIds: new Set(["UTAGE"]),
+    });
+    // Both spellings at once collapse to one chip, not two.
+    expect(foldUtageGenreIntoCabinet(null, new Set(["UTG", "UTAGE"]))).toEqual({
+      genreIds: null,
+      cabinetIds: new Set(["UTAGE"]),
+    });
+    // And the genre=107 route agrees with it.
+    expect(foldUtageGenreIntoCabinet(new Set(["107"]), new Set(["UTG"]))).toEqual({
+      genreIds: new Set(),
+      cabinetIds: new Set(["UTAGE"]),
+    });
+  });
+
+  test("宴会場 locks out the other cabinet chips, DX and ST do not lock each other", () => {
+    const none = new Set<string>();
+    // Nothing picked: every chip is open.
+    expect(isCabinetLockedOut("DX", none)).toBe(false);
+    expect(isCabinetLockedOut("UTAGE", none)).toBe(false);
+
+    // 宴会場 picked: the normal-chart types lock, and it stays clickable to undo.
+    const utage = new Set(["UTAGE"]);
+    expect(isCabinetLockedOut("DX", utage)).toBe(true);
+    expect(isCabinetLockedOut("ST", utage)).toBe(true);
+    expect(isCabinetLockedOut("UTAGE", utage)).toBe(false);
+
+    // A normal type picked: 宴会場 locks, but the other normal type stays open —
+    // "DX or ST" is a real query (everything that isn't 宴会場).
+    const dx = new Set(["DX"]);
+    expect(isCabinetLockedOut("UTAGE", dx)).toBe(true);
+    expect(isCabinetLockedOut("ST", dx)).toBe(false);
+    expect(isCabinetLockedOut("DX", dx)).toBe(false);
+
+    const both = new Set(["DX", "ST"]);
+    expect(isCabinetLockedOut("UTAGE", both)).toBe(true);
+    expect(isCabinetLockedOut("DX", both)).toBe(false);
+  });
+
+  test("leaves untouched dimensions null and drops values naming no chip", () => {
+    // null means "the URL didn't mention this dimension" — the caller then keeps
+    // its default rather than clearing it.
+    expect(foldUtageGenreIntoCabinet(null, null)).toEqual({
+      genreIds: null,
+      cabinetIds: null,
+    });
+    expect(foldUtageGenreIntoCabinet(null, new Set(["ST"]))).toEqual({
+      genreIds: null,
+      cabinetIds: new Set(["ST"]),
+    });
+    expect(foldUtageGenreIntoCabinet(new Set(["999", "abc"]), null)).toEqual({
+      genreIds: new Set(),
+      cabinetIds: null,
+    });
+    // An unknown cabinet would otherwise filter the grid down to nothing with no
+    // chip lit to explain it.
+    expect(foldUtageGenreIntoCabinet(null, new Set(["ST", "nope"]))).toEqual({
+      genreIds: null,
+      cabinetIds: new Set(["ST"]),
+    });
   });
 
   test("renders localized search controls with all-category scope", () => {

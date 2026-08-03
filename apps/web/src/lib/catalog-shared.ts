@@ -534,6 +534,58 @@ export const DIFFICULTY_DOT_CLASS: Record<DifficultyTone, string> = {
   default: "bg-muted-foreground",
 };
 
+// The same difficulty palette as DIFFICULTY_TONE_CLASS, as raw colour values so
+// it can go inside a CSS gradient (a Tailwind class can't). oklch to match what
+// Tailwind emits, which also keeps gradient interpolation smooth.
+export const DIFFICULTY_TONE_COLOR: Record<DifficultyTone, string> = {
+  basic: "oklch(0.696 0.17 162.48)",
+  advanced: "oklch(0.769 0.188 70.08)",
+  expert: "oklch(0.645 0.246 16.439)",
+  master: "oklch(0.606 0.25 292.717)",
+  remaster: "oklch(0.74 0.238 322.16)",
+  utage: "oklch(0.656 0.241 354.308)",
+  default: "oklch(0.554 0.046 257.417)",
+};
+
+/**
+ * The difficulty tone a *display level* reads as ("13+" → master).
+ *
+ * The level a chart sits at tracks its difficulty slot closely enough that low
+ * levels read Basic-green and top levels Re:Master-violet, which is what lets
+ * the level filter's track be a meaningful gradient rather than a decoration.
+ */
+export function levelDisplayTone(level: string): DifficultyTone {
+  const base = Number.parseInt(level, 10);
+  if (!Number.isFinite(base)) return "default";
+  if (base <= 5) return "basic";
+  if (base <= 8) return "advanced";
+  if (base <= 11) return "expert";
+  if (base <= 13) return "master";
+  return "remaster";
+}
+
+/**
+ * A CSS gradient across the given display levels, one colour stop per level.
+ *
+ * Per-level stops (rather than five broad bands) keep each stop at the position
+ * its level actually occupies on the slider, so the colour under a thumb is the
+ * colour of the level it is on.
+ */
+export function buildLevelGradient(levels: readonly string[]): string {
+  if (levels.length === 0) {
+    return `linear-gradient(90deg, ${DIFFICULTY_TONE_COLOR.default}, ${DIFFICULTY_TONE_COLOR.default})`;
+  }
+  if (levels.length === 1) {
+    const only = DIFFICULTY_TONE_COLOR[levelDisplayTone(levels[0])];
+    return `linear-gradient(90deg, ${only}, ${only})`;
+  }
+  const stops = levels.map((level, index) => {
+    const percent = (index / (levels.length - 1)) * 100;
+    return `${DIFFICULTY_TONE_COLOR[levelDisplayTone(level)]} ${percent.toFixed(2)}%`;
+  });
+  return `linear-gradient(90deg, ${stops.join(", ")})`;
+}
+
 // Levels can be plain ("13"), suffixed ("12+"), or decimal ("13.4").
 function levelSortValue(level: string): number {
   const match = level.match(/^(\d+(?:\.\d+)?)(\+)?/);
@@ -571,6 +623,33 @@ export function difficultyDisplayLevel(level: string): string | null {
   return base >= 7 && plus ? `${base}+` : `${base}`;
 }
 
+// The highest base level that has an official "+" tier. maimai runs 7+ … 14+;
+// there is no 15+, so an unverified "15?" spans nothing beyond plain 15.
+const MAX_PLUS_LEVEL = 14;
+
+/**
+ * The display levels a raw level value occupies, low first.
+ *
+ * Normally one: a constant of 13.4 is exactly "13". UTAGE charts are the
+ * exception — they carry unverified levels like "13?", which have no constant
+ * behind them at all, only "somewhere in level 13". Those cover the level whole,
+ * i.e. both "13" and "13+", so filtering for either finds them. An explicit
+ * "13+?" is already committed to the upper tier and stays single.
+ */
+export function difficultyDisplayLevels(level: string): string[] {
+  const display = difficultyDisplayLevel(level);
+  if (!display) {
+    return [];
+  }
+  // "13?" — a bare base with a question mark, as opposed to "13+?" or "13.4".
+  const isUnverifiedWholeLevel = /^\s*\d+\s*\?/.test(level);
+  if (!isUnverifiedWholeLevel) {
+    return [display];
+  }
+  const base = Number.parseInt(level.trim(), 10);
+  return base >= 7 && base <= MAX_PLUS_LEVEL ? [`${base}`, `${base}+`] : [display];
+}
+
 /**
  * Distinct display levels across entries, sorted ascending in play order
  * ("12" < "12+" < "13"). Drives the level filter's option list.
@@ -581,8 +660,7 @@ export function collectDifficultyLevels(
   const levels = new Set<string>();
   for (const entry of entries) {
     for (const difficulty of entry.difficulties) {
-      const level = difficultyDisplayLevel(difficulty.level ?? "");
-      if (level) {
+      for (const level of difficultyDisplayLevels(difficulty.level ?? "")) {
         levels.add(level);
       }
     }
@@ -590,24 +668,76 @@ export function collectDifficultyLevels(
   return [...levels].sort((a, b) => levelSortValue(a) - levelSortValue(b));
 }
 
-/** True when any of the entry's difficulties displays as the given level. */
-export function entryHasLevel(
+/**
+ * True when any difficulty overlaps the display-level range [low, high].
+ *
+ * Compared on the sort value, so "12+" sits between "12" and "13" the way the
+ * filter's slider shows it — a plain string compare would put "12+" after "13".
+ *
+ * Overlap rather than containment because a difficulty can span more than one
+ * display level: an unverified UTAGE "13?" occupies both "13" and "13+" (see
+ * difficultyDisplayLevels), so it answers a filter for either.
+ */
+export function entryHasLevelInRange(
   entry: Pick<CatalogEntry, "difficulties">,
-  level: string
+  low: string,
+  high: string
 ): boolean {
-  return entry.difficulties.some(
-    (difficulty) => difficultyDisplayLevel(difficulty.level ?? "") === level
-  );
+  const lowValue = levelSortValue(low);
+  const highValue = levelSortValue(high);
+  return entry.difficulties.some((difficulty) => {
+    const spanned = difficultyDisplayLevels(difficulty.level ?? "");
+    if (spanned.length === 0) {
+      return false;
+    }
+    const spanLow = levelSortValue(spanned[0]);
+    const spanHigh = levelSortValue(spanned[spanned.length - 1]);
+    return spanHigh >= lowValue && spanLow <= highValue;
+  });
 }
 
 /** Cabinet grouped into the three player-facing buckets used by the filter:
- *  DX (でらっくす), ST (standard), and everything else → UTG (宴 / Utage). */
-export type CabinetBucket = "DX" | "ST" | "UTG";
+ *  DX (でらっくす), ST (standard), and everything else → UTAGE (宴). The catalog
+ *  itself stores the real cabinet string (DX/ST, or a 宴 kanji like 協/奏), so
+ *  these bucket ids exist only in the filter UI and its query params. */
+export type CabinetBucket = "DX" | "ST" | "UTAGE";
 export function cabinetBucket(cabinet: string): CabinetBucket {
   const key = cabinet.trim();
   if (key === "DX") return "DX";
   if (key === "ST") return "ST";
-  return "UTG";
+  return "UTAGE";
+}
+
+const CABINET_BUCKETS: readonly CabinetBucket[] = ["DX", "ST", "UTAGE"];
+/** Bucket ids this filter answered to before; kept so shared links keep working. */
+const LEGACY_CABINET_IDS: Record<string, CabinetBucket> = { UTG: "UTAGE" };
+
+/** Resolve a `?cabinet=` value to a bucket id, or null when it names none. */
+export function normalizeCabinetId(value: string): CabinetBucket | null {
+  const key = value.trim();
+  if ((CABINET_BUCKETS as readonly string[]).includes(key)) {
+    return key as CabinetBucket;
+  }
+  return LEGACY_CABINET_IDS[key] ?? null;
+}
+
+/** The 宴会場 genre. Every chart carrying it is a UTAGE chart and vice versa. */
+export const UTAGE_GENRE_ID = 107;
+/** The Type-row bucket that selects exactly the 宴会場 charts. */
+export const UTAGE_CABINET: CabinetBucket = "UTAGE";
+
+/**
+ * The browse-filter query string that selects one genre.
+ *
+ * 宴会場 (107) is filtered from the Type row, not the genre row — the two select
+ * the same charts and only the Type row has a chip for it — so a genre link for
+ * it has to point at the cabinet filter, or it lands on a page where nothing is
+ * highlighted. Every genre deep link goes through here so the two stay in step.
+ */
+export function genreFilterQuery(genreId: number): string {
+  return genreId === UTAGE_GENRE_ID
+    ? `cabinet=${UTAGE_CABINET}`
+    : `genre=${genreId}`;
 }
 
 /** BPM buckets (ids match the `bpm` URL param values). */
@@ -634,6 +764,112 @@ export const BPM_TONE: Record<string, string> = {
   "2": "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300",
   "3": "border-rose-500/40 bg-rose-500/12 text-rose-700 dark:text-rose-300",
 };
+
+/**
+ * The BPM_TONE ramp as a gradient, in the filter slider's visual order: fast
+ * (warm) on the left down to slow (cool) on the right, matching the level
+ * slider, which also runs hardest-first.
+ */
+export const BPM_GRADIENT =
+  "linear-gradient(90deg, oklch(0.645 0.246 16.439) 0%, oklch(0.769 0.188 70.08) 33%, oklch(0.704 0.14 182.503) 66%, oklch(0.685 0.169 237.323) 100%)";
+
+/** An inclusive [low, high] selection over an ordered scale. */
+export type FilterRange = readonly [number, number];
+
+/** Whether a range covers its whole scale, i.e. filters nothing out. */
+export function isFullRange(range: FilterRange, bounds: FilterRange): boolean {
+  return range[0] <= bounds[0] && range[1] >= bounds[1];
+}
+
+/** Clamp a range into bounds and order its ends. */
+export function clampRange(range: FilterRange, bounds: FilterRange): FilterRange {
+  const low = Math.min(Math.max(range[0], bounds[0]), bounds[1]);
+  const high = Math.min(Math.max(range[1], bounds[0]), bounds[1]);
+  return low <= high ? [low, high] : [high, low];
+}
+
+/** Serialize a range as the `low-high` query value the filters use. */
+export function formatRangeParam(range: FilterRange): string {
+  return `${range[0]}-${range[1]}`;
+}
+
+/**
+ * Read a `low-high` range param.
+ *
+ * Returns null when the value names no usable range, so the caller keeps its
+ * default rather than applying an invisible filter.
+ */
+export function parseRangeParam(raw: string, bounds: FilterRange): FilterRange | null {
+  const match = raw.trim().match(/^(-?\d+)-(-?\d+)$/);
+  if (!match) {
+    return null;
+  }
+  const low = Number(match[1]);
+  const high = Number(match[2]);
+  if (!Number.isFinite(low) || !Number.isFinite(high)) {
+    return null;
+  }
+  return clampRange([low, high], bounds);
+}
+
+/**
+ * Read the `bpm` param, accepting both the range form and the bucket-id list it
+ * replaced (`bpm=1,2`), which detail pages linked and users shared. A bucket
+ * list becomes the span from the lowest bucket's floor to the highest one's
+ * ceiling — contiguous or not, since a range cannot express a gap.
+ */
+export function parseBpmParam(raw: string, bounds: FilterRange): FilterRange | null {
+  const asRange = parseRangeParam(raw, bounds);
+  if (asRange) {
+    return asRange;
+  }
+  const buckets = raw
+    .split(",")
+    .map((id) => BPM_BUCKETS.find((bucket) => bucket.id === id.trim()))
+    .filter((bucket): bucket is (typeof BPM_BUCKETS)[number] => bucket !== undefined);
+  if (buckets.length === 0) {
+    return null;
+  }
+  const low = Math.min(...buckets.map((bucket) => bucket.min));
+  const high = Math.max(...buckets.map((bucket) => bucket.max));
+  // The top bucket is open-ended (max Infinity); cap it at the catalog's fastest.
+  return clampRange([low, Number.isFinite(high) ? high : bounds[1]], bounds);
+}
+
+/**
+ * Read the `level` param as indices into `levels` (ascending display levels),
+ * accepting both the range form (`level=8-14`, by level *label*) and the label
+ * list it replaced (`level=13,14+`). A list becomes the span from its lowest to
+ * its highest label.
+ */
+export function parseLevelParam(
+  raw: string,
+  levels: readonly string[]
+): FilterRange | null {
+  if (levels.length === 0) {
+    return null;
+  }
+  const bounds: FilterRange = [0, levels.length - 1];
+  const indexOf = (label: string) => levels.indexOf(label.trim());
+
+  const rangeMatch = raw.trim().match(/^([^-]+)-([^-]+)$/);
+  if (rangeMatch) {
+    const low = indexOf(rangeMatch[1]);
+    const high = indexOf(rangeMatch[2]);
+    if (low >= 0 && high >= 0) {
+      return clampRange([low, high], bounds);
+    }
+  }
+
+  const picked = raw
+    .split(",")
+    .map((label) => indexOf(label))
+    .filter((index) => index >= 0);
+  if (picked.length === 0) {
+    return null;
+  }
+  return clampRange([Math.min(...picked), Math.max(...picked)], bounds);
+}
 
 function compactVersionName(name: string): string {
   const trimmed = name.trim();

@@ -27,19 +27,26 @@ import {
 } from "@/lib/catalog-search";
 import type { CatalogCardEntry, ChartDownloadSpec } from "@/lib/catalog-shared";
 import {
-  BPM_BUCKETS,
-  bpmBucketId,
-  BPM_TONE,
+  BPM_GRADIENT,
+  buildLevelGradient,
   cabinetBucket,
+  type CabinetBucket,
+  clampRange,
   collectDifficultyLevels,
-  DIFFICULTY_TONE_CLASS,
-  type DifficultyTone,
-  entryHasLevel,
+  entryHasLevelInRange,
+  type FilterRange,
+  formatRangeParam,
   GENRES,
+  isFullRange,
   isKnownVersionIndex,
+  normalizeCabinetId,
+  parseBpmParam,
+  parseLevelParam,
   resolveGenreId,
   resolveVersionIndex,
   sortByReleaseDesc,
+  UTAGE_CABINET,
+  UTAGE_GENRE_ID,
   versionRouteId,
   versionShortName,
 } from "@/lib/catalog-shared";
@@ -55,6 +62,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { RangeSlider } from "@/components/ui/range-slider";
 import { tabsListVariants, tabsTriggerClassName } from "@/components/ui/tabs";
 
 type CatalogBrowserProps = {
@@ -102,6 +110,67 @@ export function normalizeVersionFilterId(value: string): string | null {
   }
   const index = resolveVersionIndex({ version: normalized });
   return index === null ? null : versionRouteId(index);
+}
+
+/**
+ * Resolve the genre + cabinet query params onto the chips that actually exist.
+ *
+ * Two rewrites happen here, both so a link from outside lands on a panel whose
+ * chips match the grid:
+ *  - `genre=107` becomes `cabinet=UTAGE`. They select the identical 128 charts,
+ *    but only the Type row has a chip for it, so a raw genre=107 link filtered
+ *    the grid while leaving every chip in both rows unlit.
+ *  - `cabinet=UTG` becomes `cabinet=UTAGE` — the bucket's former id, still live
+ *    in shared and indexed links.
+ * Values naming no chip at all (unknown genre id, unknown cabinet) are dropped
+ * rather than applied invisibly.
+ *
+ * Returns null for a dimension the URL didn't mention, so the caller can leave
+ * that piece of state at its default.
+ */
+export function foldUtageGenreIntoCabinet(
+  genreParam: ReadonlySet<string> | null,
+  cabinetParam: ReadonlySet<string> | null
+): { genreIds: ReadonlySet<string> | null; cabinetIds: ReadonlySet<string> | null } {
+  const utageId = String(UTAGE_GENRE_ID);
+  const known = genreParam ? [...genreParam].filter((id) => GENRES[Number(id)]) : [];
+  const hasUtage = known.includes(utageId);
+  const cabinets = new Set(
+    [...(cabinetParam ?? [])]
+      .map(normalizeCabinetId)
+      .filter((id): id is CabinetBucket => id !== null)
+  );
+  if (hasUtage) {
+    cabinets.add(UTAGE_CABINET);
+  }
+  return {
+    genreIds: genreParam ? new Set(known.filter((id) => id !== utageId)) : null,
+    cabinetIds: cabinetParam || hasUtage ? cabinets : null,
+  };
+}
+
+/**
+ * Whether a Type-row chip is locked out by what is already picked there.
+ *
+ * The other rows get their greying from plain faceted counts, but the Type row
+ * needs this extra rule: its values are OR-ed like any dimension, so nothing in
+ * the data stops you asking for "宴会場 or DX" — the counts stay non-zero and no
+ * chip would grey out. That query is not one anyone means, though. UTAGE charts
+ * are a different thing from normal ones: their own chart type, their own level
+ * notation ("13?"), their own genre, and a whole separate way of being played.
+ * So 宴会場 is exclusive with the other two.
+ *
+ * DX and ST stay combinable with each other — those are both normal charts, and
+ * "DX or ST" is a real thing to ask for (it is "everything but 宴会場").
+ */
+export function isCabinetLockedOut(
+  value: string,
+  selected: ReadonlySet<string>
+): boolean {
+  if (selected.size === 0) {
+    return false;
+  }
+  return selected.has(UTAGE_CABINET) ? value !== UTAGE_CABINET : value === UTAGE_CABINET;
 }
 
 // Advanced-filter panel: opening staggers the rows in one by one; collapse
@@ -155,14 +224,17 @@ export function CatalogBrowser({
   const [inputValue, setInputValue] = React.useState("");
   const [query, setQuery] = React.useState("");
   const [category, setCategory] = React.useState(initialCategory);
-  // Every dimension is a multi-select chip row: an empty set means "all", and
-  // selections are OR within a dimension, AND across dimensions.
+  // Categorical dimensions are multi-select chip rows: an empty set means "all",
+  // and selections are OR within a dimension, AND across dimensions.
   const [versionSet, setVersionSet] = React.useState<ReadonlySet<string>>(new Set());
-  const [levelSet, setLevelSet] = React.useState<ReadonlySet<string>>(new Set());
   const [genreIds, setGenreIds] = React.useState<ReadonlySet<string>>(new Set());
   const [cabinetSet, setCabinetSet] = React.useState<ReadonlySet<string>>(new Set());
-  const [bpmSet, setBpmSet] = React.useState<ReadonlySet<string>>(new Set());
   const [assetSet, setAssetSet] = React.useState<ReadonlySet<string>>(new Set());
+  // Level and BPM are ordered scales, so they are two-thumb ranges instead: null
+  // means the whole scale (nothing filtered out), which keeps "no filter" a
+  // distinct state from "the range happens to span everything".
+  const [levelRange, setLevelRange] = React.useState<FilterRange | null>(null);
+  const [bpmRange, setBpmRange] = React.useState<FilterRange | null>(null);
   // The filter picker rows are tucked into a collapsible "advanced filters"
   // panel, closed by default (opened automatically when a deep link arrives
   // with filters already applied).
@@ -177,6 +249,33 @@ export function CatalogBrowser({
   // Whether the results toolbar is pinned under the site header (drives the
   // backdrop crossfade — sticky itself is pure CSS).
   const [toolbarStuck, setToolbarStuck] = React.useState(false);
+
+  // The two range scales. Declared up here because the URL reader below resolves
+  // its `level`/`bpm` params against them; both derive from the full catalog, so
+  // the scales stay put while the filters narrow the results.
+  //
+  // Ascending (1 → 15). Both sliders *display* hardest/fastest on the left, but
+  // that is purely a direction flip inside RangeSlider (`reversed`), so every
+  // value here stays in natural order and range[0] is always the low end.
+  const levelScale = React.useMemo(() => collectDifficultyLevels(entries), [entries]);
+  const levelBounds = React.useMemo<FilterRange>(
+    () => [0, Math.max(0, levelScale.length - 1)],
+    [levelScale]
+  );
+  // BPM spans what the catalog actually holds, rounded outwards to a whole 10 so
+  // the ends are round numbers rather than one specific chart's BPM.
+  const bpmBounds = React.useMemo<FilterRange>(() => {
+    const values = entries
+      .map((entry) => entry.bpm)
+      .filter((bpm): bpm is number => typeof bpm === "number" && Number.isFinite(bpm));
+    if (values.length === 0) {
+      return [0, 0];
+    }
+    return [
+      Math.floor(Math.min(...values) / 10) * 10,
+      Math.ceil(Math.max(...values) / 10) * 10,
+    ];
+  }, [entries]);
 
   const isComposingRef = React.useRef(false);
   const debounceRef = React.useRef<number | null>(null);
@@ -223,8 +322,14 @@ export function CatalogBrowser({
       setInputValue(q);
       setQuery(q);
     }
+    // genre=107 (宴会場) has no chip of its own — it resolves to the Type row's
+    // UTAGE chip, so read the two dimensions together.
     const genreSet = readSet("genre");
-    if (genreSet) setGenreIds(new Set([...genreSet].filter((id) => GENRES[Number(id)])));
+    const cabinet = readSet("cabinet");
+    const { genreIds: genreFromUrl, cabinetIds: cabinetFromUrl } =
+      foldUtageGenreIntoCabinet(genreSet, cabinet);
+    if (genreFromUrl) setGenreIds(genreFromUrl);
+    if (cabinetFromUrl) setCabinetSet(cabinetFromUrl);
     const versionParam = readSet("version");
     const versionIds = versionParam
       ? new Set(
@@ -234,12 +339,14 @@ export function CatalogBrowser({
         )
       : null;
     if (versionIds && versionIds.size > 0) setVersionSet(versionIds);
-    const level = readSet("level");
-    if (level) setLevelSet(level);
-    const cabinet = readSet("cabinet");
-    if (cabinet) setCabinetSet(cabinet);
-    const bpm = readSet("bpm");
-    if (bpm) setBpmSet(bpm);
+    // Level and BPM are ranges now; both readers still accept the chip-list form
+    // they replaced (`level=13,14+`, `bpm=1,2`), collapsing a list to its span.
+    const level = params.get("level");
+    const parsedLevel = level ? parseLevelParam(level, levelScale) : null;
+    if (parsedLevel) setLevelRange(isFullRange(parsedLevel, levelBounds) ? null : parsedLevel);
+    const bpm = params.get("bpm");
+    const parsedBpm = bpm ? parseBpmParam(bpm, bpmBounds) : null;
+    if (parsedBpm) setBpmRange(isFullRange(parsedBpm, bpmBounds) ? null : parsedBpm);
     const asset = readSet("asset");
     if (asset) setAssetSet(asset);
     // Landed with dimension filters already applied → reveal the picker so the
@@ -267,6 +374,10 @@ export function CatalogBrowser({
     }
     setUrlReady(true);
     /* eslint-enable react-hooks/set-state-in-effect */
+    // Mount-only by design: this reads the landing URL exactly once, and re-running
+    // it would overwrite whatever the user has since picked. The level/BPM scales it
+    // resolves ranges against are derived from `entries`, fixed for the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   React.useEffect(
@@ -353,35 +464,31 @@ export function CatalogBrowser({
     () => new Map(versionOptions.map((option) => [option.id, option] as const)),
     [versionOptions]
   );
-  // Highest level first (15 → 1) so the hard charts most people filter for sit
-  // at the front of the row.
-  const levelOptions = React.useMemo(
-    () => [...collectDifficultyLevels(entries)].reverse(),
-    [entries]
+  // Built over the reversed scale because the slider is reversed: the gradient is
+  // always given in visual left-to-right order, i.e. Re:Master-violet → Basic-green.
+  const levelGradient = React.useMemo(
+    () => buildLevelGradient([...levelScale].reverse()),
+    [levelScale]
   );
+  // The slider always shows a concrete span; null state means "the whole scale".
+  const levelValue = levelRange ?? levelBounds;
   const genreOptions = React.useMemo(() => {
     const ids = new Set<number>();
     for (const entry of entries) {
       const id = resolveGenreId(entry);
-      // The 宴会场 genre (107) equals the Type row's Utage chip, so it's only
-      // offered there (as the 宴会場 icon) to avoid a duplicate 宴 chip.
-      if (id !== null && id !== 107) ids.add(id);
+      // The 宴会场 genre equals the Type row's Utage chip, so it's only offered
+      // there (as the 宴会場 icon) to avoid a duplicate 宴 chip. Deep links that
+      // name it are folded onto that chip by foldUtageGenreIntoCabinet.
+      if (id !== null && id !== UTAGE_GENRE_ID) ids.add(id);
     }
     return [...ids].sort((a, b) => a - b);
   }, [entries]);
   const cabinetOptions = React.useMemo(() => {
     const present = new Set<string>();
     for (const entry of entries) present.add(cabinetBucket(entry.cabinet));
-    return (["DX", "ST", "UTG"] as const).filter((value) => present.has(value));
+    return (["DX", "ST", "UTAGE"] as const).filter((value) => present.has(value));
   }, [entries]);
-  const bpmOptions = React.useMemo(() => {
-    const present = new Set<string>();
-    for (const entry of entries) {
-      const id = bpmBucketId(entry.bpm);
-      if (id) present.add(id);
-    }
-    return BPM_BUCKETS.filter((bucket) => present.has(bucket.id));
-  }, [entries]);
+  const bpmValue = bpmRange ?? bpmBounds;
   // BGA (background video) presence — a single-select pair: with / without.
   const assetOptions = React.useMemo(() => {
     const options: Array<{ id: "pv" | "nopv"; label: string }> = [];
@@ -394,36 +501,117 @@ export function CatalogBrowser({
     return options;
   }, [entries, dictionary.assetHasPv, dictionary.assetNoPv]);
 
+  // One predicate per dimension, each `null` when that dimension filters nothing.
+  // Keeping them separate is what lets the chip rows below ask "how many results
+  // would survive if this dimension were dropped" without re-deriving the query.
+  const dimensionTests = React.useMemo(() => {
+    const levelSpan =
+      levelRange && levelScale.length > 0 && !isFullRange(levelRange, levelBounds)
+        ? ([levelScale[levelRange[0]], levelScale[levelRange[1]]] as const)
+        : null;
+    return {
+      version:
+        versionSet.size > 0
+          ? (entry: CatalogCardEntry) => versionSet.has(catalogVersionFilterId(entry))
+          : null,
+      level: levelSpan
+        ? (entry: CatalogCardEntry) => entryHasLevelInRange(entry, levelSpan[0], levelSpan[1])
+        : null,
+      genre:
+        genreIds.size > 0
+          ? (entry: CatalogCardEntry) => genreIds.has(String(resolveGenreId(entry)))
+          : null,
+      cabinet:
+        cabinetSet.size > 0
+          ? (entry: CatalogCardEntry) => cabinetSet.has(cabinetBucket(entry.cabinet))
+          : null,
+      bpm:
+        bpmRange && !isFullRange(bpmRange, bpmBounds)
+          ? (entry: CatalogCardEntry) =>
+              typeof entry.bpm === "number" &&
+              entry.bpm >= bpmRange[0] &&
+              entry.bpm <= bpmRange[1]
+          : null,
+      asset: assetSet.has("pv")
+        ? (entry: CatalogCardEntry) => Boolean(entry.assets?.has_pv)
+        : assetSet.has("nopv")
+          ? (entry: CatalogCardEntry) => !entry.assets?.has_pv
+          : null,
+    };
+  }, [
+    versionSet,
+    levelRange,
+    levelScale,
+    levelBounds,
+    genreIds,
+    cabinetSet,
+    bpmRange,
+    bpmBounds,
+    assetSet,
+  ]);
+
+  // Entries passing the search + category scope, before any dimension applies.
+  const scopedEntries = React.useMemo(
+    () => applyCatalogFilters(baseEntries, effectiveCategory, ALL_SUBCATEGORIES),
+    [baseEntries, effectiveCategory]
+  );
+
   const visibleEntries = React.useMemo(() => {
-    let filtered = applyCatalogFilters(baseEntries, effectiveCategory, ALL_SUBCATEGORIES);
-    // OR within each dimension, AND across dimensions.
-    if (versionSet.size > 0) {
-      filtered = filtered.filter((entry) => versionSet.has(catalogVersionFilterId(entry)));
-    }
-    if (levelSet.size > 0) {
-      filtered = filtered.filter((entry) =>
-        [...levelSet].some((level) => entryHasLevel(entry, level))
-      );
-    }
-    if (genreIds.size > 0) {
-      filtered = filtered.filter((entry) => genreIds.has(String(resolveGenreId(entry))));
-    }
-    if (cabinetSet.size > 0) {
-      filtered = filtered.filter((entry) => cabinetSet.has(cabinetBucket(entry.cabinet)));
-    }
-    if (bpmSet.size > 0) {
-      filtered = filtered.filter((entry) => {
-        const id = bpmBucketId(entry.bpm);
-        return id !== null && bpmSet.has(id);
-      });
-    }
-    if (assetSet.has("pv")) {
-      filtered = filtered.filter((entry) => Boolean(entry.assets?.has_pv));
-    } else if (assetSet.has("nopv")) {
-      filtered = filtered.filter((entry) => !entry.assets?.has_pv);
-    }
-    return filtered;
-  }, [baseEntries, effectiveCategory, versionSet, levelSet, genreIds, cabinetSet, bpmSet, assetSet]);
+    const tests = Object.values(dimensionTests).filter((test) => test !== null);
+    // OR within each dimension (inside its own predicate), AND across dimensions.
+    return tests.length === 0
+      ? scopedEntries
+      : scopedEntries.filter((entry) => tests.every((test) => test(entry)));
+  }, [scopedEntries, dimensionTests]);
+
+  /**
+   * How many results each chip would still leave, judged against every *other*
+   * dimension — the standard faceted-search count. A chip at zero is a dead end
+   * and gets disabled, which is what makes the incompatible combinations visible
+   * instead of silently emptying the grid: pick a genre and the 宴会場 type greys
+   * out (UTAGE charts are all genre 宴会場, so no genre can coexist with it), pick
+   * 宴会場 and every genre greys out, pick an early version and it greys out too
+   * (there are no UTAGE charts before BUDDiES).
+   *
+   * Counted against the other dimensions rather than the current results, so a
+   * selected chip never zeroes itself out and stays clickable to undo.
+   */
+  const chipCounts = React.useMemo(() => {
+    const withoutDimension = (skip: keyof typeof dimensionTests) => {
+      const tests = Object.entries(dimensionTests)
+        .filter(([key, test]) => key !== skip && test !== null)
+        .map(([, test]) => test as (entry: CatalogCardEntry) => boolean);
+      return tests.length === 0
+        ? scopedEntries
+        : scopedEntries.filter((entry) => tests.every((test) => test(entry)));
+    };
+    const tally = (list: CatalogCardEntry[], keyOf: (entry: CatalogCardEntry) => string) => {
+      const counts = new Map<string, number>();
+      for (const entry of list) {
+        const key = keyOf(entry);
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+      return counts;
+    };
+    const assetBase = withoutDimension("asset");
+    return {
+      version: tally(withoutDimension("version"), catalogVersionFilterId),
+      genre: tally(withoutDimension("genre"), (entry) => String(resolveGenreId(entry))),
+      cabinet: tally(withoutDimension("cabinet"), (entry) => cabinetBucket(entry.cabinet)),
+      asset: new Map<string, number>([
+        ["pv", assetBase.filter((entry) => entry.assets?.has_pv).length],
+        ["nopv", assetBase.filter((entry) => !entry.assets?.has_pv).length],
+      ]),
+    };
+  }, [scopedEntries, dimensionTests]);
+
+  /** A chip is a dead end when nothing would survive picking it — unless it is
+   *  already picked, in which case it has to stay clickable to be undone. */
+  const isChipDisabled = (
+    dimension: keyof typeof chipCounts,
+    id: string,
+    selected: boolean
+  ) => !selected && (chipCounts[dimension].get(id) ?? 0) === 0;
   // Default browse order is newest-first by release (version era, then song id);
   // a text query keeps the search relevance ranking instead.
   const orderedEntries = React.useMemo(
@@ -440,14 +628,17 @@ export function CatalogBrowser({
     visibleEntries.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(safeCurrentPage * PAGE_SIZE, visibleEntries.length);
 
-  // Number of picked dimension values, shown as a badge on the panel toggle.
+  // Number of applied dimension filters, shown as a badge on the panel toggle.
+  // A narrowed range counts as one filter, however wide it is.
+  const levelFiltered = dimensionTests.level !== null;
+  const bpmFiltered = dimensionTests.bpm !== null;
   const dimensionFilterCount =
     versionSet.size +
-    levelSet.size +
     genreIds.size +
     cabinetSet.size +
-    bpmSet.size +
-    assetSet.size;
+    assetSet.size +
+    (levelFiltered ? 1 : 0) +
+    (bpmFiltered ? 1 : 0);
   const hasActiveFilters =
     hasQuery ||
     dimensionFilterCount > 0 ||
@@ -470,10 +661,20 @@ export function CatalogBrowser({
     setCurrentPage(1);
   };
   const toggleVersion = toggleIn(setVersionSet);
-  const toggleLevel = toggleIn(setLevelSet);
   const toggleGenre = toggleIn(setGenreIds);
   const toggleCabinet = toggleIn(setCabinetSet);
-  const toggleBpm = toggleIn(setBpmSet);
+  // Dragging a range back to its full span is the same as not filtering, so it
+  // stores null — the badge count, the active-filter chip and the URL param all
+  // read off that one state instead of each re-testing the bounds.
+  const commitRange =
+    (setter: React.Dispatch<React.SetStateAction<FilterRange | null>>, bounds: FilterRange) =>
+    (next: number[]) => {
+      const range = clampRange([next[0], next[1]], bounds);
+      setter(isFullRange(range, bounds) ? null : range);
+      setCurrentPage(1);
+    };
+  const commitLevelRange = commitRange(setLevelRange, levelBounds);
+  const commitBpmRange = commitRange(setBpmRange, bpmBounds);
   // BGA is single-select (with / without are mutually exclusive): picking one
   // replaces the set; re-picking it clears back to "all".
   const selectAsset = (id: string) => {
@@ -487,11 +688,11 @@ export function CatalogBrowser({
     setInputValue("");
     setQuery("");
     setVersionSet(new Set());
-    setLevelSet(new Set());
     setGenreIds(new Set());
     setCabinetSet(new Set());
-    setBpmSet(new Set());
     setAssetSet(new Set());
+    setLevelRange(null);
+    setBpmRange(null);
     setCategory(initialCategory);
     setHasUserSelectedCategory(false);
     setCurrentPage(1);
@@ -510,10 +711,17 @@ export function CatalogBrowser({
     const joinSet = (set: ReadonlySet<string>) => (set.size > 0 ? [...set].join(",") : null);
     apply("q", hasQuery ? query : null);
     apply("version", joinSet(versionSet));
-    apply("level", joinSet(levelSet));
+    // Levels go out as labels ("8-13+") rather than indices, so a shared link
+    // survives the scale growing a level.
+    apply(
+      "level",
+      levelRange && levelScale[levelRange[0]] && levelScale[levelRange[1]]
+        ? `${levelScale[levelRange[0]]}-${levelScale[levelRange[1]]}`
+        : null
+    );
     apply("genre", joinSet(genreIds));
     apply("cabinet", joinSet(cabinetSet));
-    apply("bpm", joinSet(bpmSet));
+    apply("bpm", bpmRange ? formatRangeParam(bpmRange) : null);
     apply("asset", joinSet(assetSet));
     apply("page", safeCurrentPage > 1 ? String(safeCurrentPage) : null);
     const queryString = params.toString();
@@ -527,10 +735,11 @@ export function CatalogBrowser({
     hasQuery,
     query,
     versionSet,
-    levelSet,
+    levelRange,
+    levelScale,
     genreIds,
     cabinetSet,
-    bpmSet,
+    bpmRange,
     assetSet,
     safeCurrentPage,
   ]);
@@ -723,6 +932,11 @@ export function CatalogBrowser({
                 <ToggleChip
                   key={option.id}
                   active={versionSet.has(option.id)}
+                  disabled={isChipDisabled(
+                    "version",
+                    option.id,
+                    versionSet.has(option.id)
+                  )}
                   onClick={() => toggleVersion(option.id)}
                   className="px-2 py-1"
                   ariaLabel={option.label}
@@ -745,22 +959,31 @@ export function CatalogBrowser({
           </ChipFilterRow>
         ) : null}
 
-        {levelOptions.length > 0 ? (
-          <ChipFilterRow label={dictionary.filterLevel}>
-            <AllChip active={levelSet.size === 0} onClick={clearSet(setLevelSet)}>
-              {dictionary.filterAll}
-            </AllChip>
-            {levelOptions.map((value) => (
-              <ToggleChip
-                key={value}
-                active={levelSet.has(value)}
-                onClick={() => toggleLevel(value)}
-                tone={levelTone(value)}
-              >
-                {value}
-              </ToggleChip>
-            ))}
-          </ChipFilterRow>
+        {levelScale.length > 1 ? (
+          <RangeFilterRow
+            label={dictionary.filterLevel}
+            active={levelFiltered}
+            onReset={() => {
+              setLevelRange(null);
+              setCurrentPage(1);
+            }}
+            resetLabel={dictionary.filterAll}
+          >
+            <RangeSlider
+              value={[levelValue[0], levelValue[1]]}
+              min={levelBounds[0]}
+              max={levelBounds[1]}
+              step={1}
+              minStepsBetweenThumbs={0}
+              onValueChange={commitLevelRange}
+              gradient={levelGradient}
+              reversed
+              formatValue={(value, index) =>
+                `${index === 0 ? dictionary.rangeMin : dictionary.rangeMax} ${levelScale[value] ?? value}`
+              }
+              renderThumbValue={(value) => levelScale[value] ?? String(value)}
+            />
+          </RangeFilterRow>
         ) : null}
 
         {genreOptions.length > 0 ? (
@@ -772,6 +995,7 @@ export function CatalogBrowser({
               <ToggleChip
                 key={id}
                 active={genreIds.has(String(id))}
+                disabled={isChipDisabled("genre", String(id), genreIds.has(String(id)))}
                 onClick={() => toggleGenre(String(id))}
                 tone={GENRES[id].badge}
               >
@@ -797,6 +1021,10 @@ export function CatalogBrowser({
                 <ToggleChip
                   key={value}
                   active={cabinetSet.has(value)}
+                  disabled={
+                    isChipDisabled("cabinet", value, cabinetSet.has(value)) ||
+                    isCabinetLockedOut(value, cabinetSet)
+                  }
                   onClick={() => toggleCabinet(value)}
                   className="px-2"
                   ariaLabel={label}
@@ -809,22 +1037,31 @@ export function CatalogBrowser({
           </ChipFilterRow>
         ) : null}
 
-        {bpmOptions.length > 0 ? (
-          <ChipFilterRow label={dictionary.filterBpm}>
-            <AllChip active={bpmSet.size === 0} onClick={clearSet(setBpmSet)}>
-              {dictionary.filterAll}
-            </AllChip>
-            {bpmOptions.map((bucket) => (
-              <ToggleChip
-                key={bucket.id}
-                active={bpmSet.has(bucket.id)}
-                onClick={() => toggleBpm(bucket.id)}
-                tone={BPM_TONE[bucket.id]}
-              >
-                {bucket.label}
-              </ToggleChip>
-            ))}
-          </ChipFilterRow>
+        {bpmBounds[1] > bpmBounds[0] ? (
+          <RangeFilterRow
+            label={dictionary.filterBpm}
+            active={bpmFiltered}
+            onReset={() => {
+              setBpmRange(null);
+              setCurrentPage(1);
+            }}
+            resetLabel={dictionary.filterAll}
+          >
+            <RangeSlider
+              value={[bpmValue[0], bpmValue[1]]}
+              min={bpmBounds[0]}
+              max={bpmBounds[1]}
+              step={5}
+              minStepsBetweenThumbs={0}
+              onValueChange={commitBpmRange}
+              gradient={BPM_GRADIENT}
+              reversed
+              formatValue={(value, index) =>
+                `${index === 0 ? dictionary.rangeMin : dictionary.rangeMax} BPM ${value}`
+              }
+              renderThumbValue={(value) => String(value)}
+            />
+          </RangeFilterRow>
         ) : null}
 
         {assetOptions.length > 0 ? (
@@ -836,6 +1073,7 @@ export function CatalogBrowser({
               <ToggleChip
                 key={option.id}
                 active={assetSet.has(option.id)}
+                disabled={isChipDisabled("asset", option.id, assetSet.has(option.id))}
                 onClick={() => selectAsset(option.id)}
               >
                 {option.label}
@@ -901,15 +1139,23 @@ export function CatalogBrowser({
               </FilterChip>
             );
           })}
-          {[...levelSet].map((value) => (
+          {levelFiltered ? (
             <FilterChip
-              key={`l-${value}`}
-              onRemove={() => toggleLevel(value)}
-              removeLabel={dictionary.removeFilter(dictionary.levelOption(value))}
+              key="level"
+              onRemove={() => {
+                setLevelRange(null);
+                setCurrentPage(1);
+              }}
+              removeLabel={dictionary.removeFilter(
+                dictionary.levelRangeLabel(levelScale[levelValue[0]], levelScale[levelValue[1]])
+              )}
             >
-              {dictionary.levelOption(value)}
+              {dictionary.levelRangeLabel(
+                levelScale[levelValue[0]],
+                levelScale[levelValue[1]]
+              )}
             </FilterChip>
-          ))}
+          ) : null}
           {[...genreIds].map((id) => {
             const info = GENRES[Number(id)];
             if (!info) return null;
@@ -941,18 +1187,20 @@ export function CatalogBrowser({
               </FilterChip>
             );
           })}
-          {[...bpmSet].map((value) => {
-            const label = BPM_BUCKETS.find((b) => b.id === value)?.label ?? value;
-            return (
-              <FilterChip
-                key={`b-${value}`}
-                onRemove={() => toggleBpm(value)}
-                removeLabel={dictionary.removeFilter(label)}
-              >
-                {label}
-              </FilterChip>
-            );
-          })}
+          {bpmFiltered ? (
+            <FilterChip
+              key="bpm"
+              onRemove={() => {
+                setBpmRange(null);
+                setCurrentPage(1);
+              }}
+              removeLabel={dictionary.removeFilter(
+                dictionary.bpmRangeLabel(bpmValue[0], bpmValue[1])
+              )}
+            >
+              {dictionary.bpmRangeLabel(bpmValue[0], bpmValue[1])}
+            </FilterChip>
+          ) : null}
           {[...assetSet].map((value) => {
             const label = value === "pv" ? dictionary.assetHasPv : dictionary.assetNoPv;
             return (
@@ -1233,6 +1481,7 @@ function ToggleChip({
   className,
   ariaLabel,
   title,
+  disabled = false,
 }: {
   active: boolean;
   onClick: () => void;
@@ -1241,22 +1490,30 @@ function ToggleChip({
   className?: string;
   ariaLabel?: string;
   title?: string;
+  /** No result would survive picking this — greyed out and inert. */
+  disabled?: boolean;
 }) {
   return (
     <motion.button
       type="button"
-      whileTap={{ scale: 0.93 }}
+      whileTap={disabled ? undefined : { scale: 0.93 }}
       aria-pressed={active}
       aria-label={ariaLabel}
       title={title}
+      disabled={disabled}
       onClick={onClick}
       className={cn(
-        "flex min-h-8 shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-        tone
-          ? cn(tone, active ? "ring-2 ring-current" : "opacity-70 hover:opacity-100")
-          : active
-            ? "border-primary bg-primary/15 text-primary"
-            : "border-border text-muted-foreground hover:bg-muted/60",
+        "flex min-h-8 shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-[color,background-color,border-color,opacity,filter]",
+        // Greyed out: desaturated and faded, whatever tone it would otherwise
+        // carry, so an incompatible option reads as unavailable rather than
+        // merely unselected.
+        disabled
+          ? "cursor-not-allowed border-border opacity-40 grayscale"
+          : tone
+            ? cn(tone, active ? "ring-2 ring-current" : "opacity-70 hover:opacity-100")
+            : active
+              ? "border-primary bg-primary/15 text-primary"
+              : "border-border text-muted-foreground hover:bg-muted/60",
         className
       )}
     >
@@ -1265,14 +1522,35 @@ function ToggleChip({
   );
 }
 
-// Tint a level chip with maimai's real difficulty palette (the same tones the
-// difficulty pills use): the level a chart sits at tracks its difficulty slot,
-// so low levels read Basic-green and top levels Master/Re:Master-violet.
-function levelTone(level: string): string {
-  const n = Number.parseInt(level, 10);
-  const tone: DifficultyTone =
-    n <= 5 ? "basic" : n <= 8 ? "advanced" : n <= 11 ? "expert" : n <= 13 ? "master" : "remaster";
-  return DIFFICULTY_TONE_CLASS[tone];
+// A labeled filter row holding a range slider plus its current readout. Mirrors
+// ChipFilterRow's label column so the rows line up, but the control fills the
+// track instead of scrolling horizontally.
+function RangeFilterRow({
+  label,
+  active,
+  onReset,
+  resetLabel,
+  children,
+}: {
+  label: string;
+  active: boolean;
+  onReset: () => void;
+  resetLabel: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <motion.div variants={filterRowVariants} className="flex items-center gap-x-2">
+      <span className="w-12 shrink-0 text-xs font-medium text-muted-foreground">{label}</span>
+      {/* The current values ride under the thumbs themselves (see RangeSlider),
+          so the row carries only the reset chip and the track. */}
+      <div className="flex min-w-0 flex-1 items-center gap-3 py-1.5 pr-4">
+        <AllChip active={!active} onClick={onReset}>
+          {resetLabel}
+        </AllChip>
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
+    </motion.div>
+  );
 }
 
 // The localized results summary is a whole sentence ("共 N 首谱面"); split it

@@ -57,11 +57,14 @@ import {
   formatEntrySubcategory,
   formatEntryTitle,
   GENRES,
+  genreFilterQuery,
   getChartDownloadSpec,
   localChartAssetUrl,
   resolveGenreId,
   resolveVersionIndex,
   sortByReleaseDesc,
+  UTAGE_CABINET,
+  UTAGE_GENRE_ID,
 } from "@/lib/catalog-shared";
 import { seedFromString, selectFeatured } from "@/lib/featured-selection";
 import { buildVersionFilterHref } from "@/lib/catalog-links";
@@ -165,9 +168,15 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
     const id = resolveGenreId(entry);
     if (id !== null) heroGenreIds.add(id);
   }
-  const genreTiles = [...heroGenreIds]
-    .sort((a, b) => a - b)
-    .map((id) => ({ id, label: GENRES[id][locale], badge: GENRES[id].badge }));
+  const genreTiles = [...heroGenreIds].sort((a, b) => a - b).map((id) => ({
+    id,
+    label: GENRES[id][locale],
+    badge: GENRES[id].badge,
+    // 宴会場 resolves to the Type row's UTAGE chip, not a genre chip — see
+    // genreFilterQuery. Linking it as ?genre=107 lands on a filtered grid with
+    // no chip lit anywhere in the panel.
+    href: `${searchHref}?${genreFilterQuery(id)}`,
+  }));
 
   // Spotlight carousel + "random picks" rail: deterministic weighted picks
   // seeded by the BUILD DAY (Asia/Shanghai) — the daily scheduled rebuild in
@@ -378,7 +387,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
               {genreTiles.map((genre) => (
                 <RevealItem as="li" key={genre.id} ssrVisible className="h-full">
                   <Link
-                    href={`${searchHref}?genre=${genre.id}`}
+                    href={genre.href}
                     className={cn(styles.genreBrowseCard, genre.badge)}
                   >
                     <span className={styles.genreBrowseLabel}>{genre.label}</span>
@@ -574,15 +583,12 @@ export function ChartDetailPageView({
   const versionIndex = resolveVersionIndex(entry);
   const versionHref = buildVersionFilterHref(versionIndex, locale);
   const genreId = resolveGenreId(entry);
-  // 宴会場 (107) has no chip in the browse genre row — it lives in the Type row
-  // as the UTAGE cabinet icon, so this readout mirrors that: same image, and a
-  // link to the cabinet filter so the chip it lands on is actually highlighted.
-  const isUtageGenre = genreId === 107;
-  const genreHref = isUtageGenre
-    ? `${chartsHref}?cabinet=UTG`
-    : genreId !== null
-      ? `${chartsHref}?genre=${genreId}`
-      : undefined;
+  // 宴会場 has no chip in the browse genre row — it lives in the Type row as the
+  // UTAGE cabinet icon, so this readout mirrors that: same image, and (via
+  // genreFilterQuery) a link to the cabinet filter, whose chip does highlight.
+  const isUtageGenre = genreId === UTAGE_GENRE_ID;
+  const genreHref =
+    genreId !== null ? `${chartsHref}?${genreFilterQuery(genreId)}` : undefined;
   // BPM links to its bucket, the same granularity the browse filter offers.
   const bpmBucket = bpmBucketId(entry.bpm);
   const bpmHref = bpmBucket !== null ? `${chartsHref}?bpm=${bpmBucket}` : undefined;
@@ -712,7 +718,7 @@ export function ChartDetailPageView({
                   already says so, but here it's the only genre readout. */}
               <MetadataItem label={detail.genreLabel} href={genreHref}>
                 {isUtageGenre ? (
-                  <CabinetBadge cabinet="UTG" className="h-9" />
+                  <CabinetBadge cabinet={UTAGE_CABINET} className="h-9" />
                 ) : genreId !== null && GENRES[genreId] ? (
                   <span
                     className={cn(
