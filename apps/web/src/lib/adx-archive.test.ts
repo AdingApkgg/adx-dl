@@ -23,6 +23,23 @@ async function bytes(blob: Blob): Promise<Uint8Array> {
   return new Uint8Array(await blob.arrayBuffer());
 }
 
+// Built with the local-time constructor because fflate reads the date back
+// through local getters, so the packed DOS bytes come out the same in every
+// timezone. Any wall-clock-shaped instant works; this one is just readable.
+const STAMP = new Date(2026, 7, 8, 14, 30, 0);
+
+/** The DOS mod time+date field (offset 10) of every zip local file header. */
+function zipEntryStamps(archive: Uint8Array): Uint8Array[] {
+  const stamps: Uint8Array[] = [];
+  const view = new DataView(archive.buffer, archive.byteOffset, archive.byteLength);
+  for (let offset = 0; offset + 14 <= archive.length; offset += 1) {
+    if (view.getUint32(offset, true) === 0x04034b50) {
+      stamps.push(archive.subarray(offset + 10, offset + 14));
+    }
+  }
+  return stamps;
+}
+
 function tarEntries(tar: Uint8Array): Record<string, Uint8Array> {
   const decoder = new TextDecoder();
   const entries: Record<string, Uint8Array> = {};
@@ -68,36 +85,49 @@ describe("adx archive", () => {
   test("adx and zip produce byte-identical archives", async () => {
     const inputs = [entry("maidata.txt", "&title=39"), entry("track.mp3", new Uint8Array([1, 2, 3]))];
 
-    const adx = await bytes(await buildArchiveBlob(inputs, "adx"));
-    const zip = await bytes(await buildArchiveBlob(inputs, "zip"));
+    // Both builds are handed the same stamp. Reading the clock twice instead
+    // would make this assertion a coin flip whenever the two calls straddle a
+    // DOS tick — zip stores mtime at 2-second granularity.
+    const adx = await bytes(await buildArchiveBlob(inputs, "adx", undefined, undefined, STAMP));
+    const zip = await bytes(await buildArchiveBlob(inputs, "zip", undefined, undefined, STAMP));
 
     expect(adx).toEqual(zip);
   });
 
-  test("stamps every zip entry with the fixed DOS epoch timestamp", async () => {
-    // The byte-identical tests above only catch a wall-clock mtime when the two
-    // builds straddle a DOS tick (2-second granularity), so assert the stamp
-    // directly. Local file header: signature at 0, mod time+date at offset 10.
+  test("stamps every zip entry from one clock read", async () => {
+    // Entries are stamped as they stream, so an archive that takes a while to
+    // pack would smear its dates across the run if the clock were read per
+    // entry. Local file header: signature at 0, DOS mod time+date at offset 10.
     const blob = await buildArchiveBlob(
       [entry("maidata.txt", "&title=39"), entry("track.mp3", new Uint8Array([1, 2, 3]))],
-      "adx"
+      "adx",
+      undefined,
+      undefined,
+      STAMP
     );
-    const archive = await bytes(blob);
 
-    const headers: number[] = [];
-    for (let offset = 0; offset + 4 <= archive.length; offset += 1) {
-      const signature = new DataView(archive.buffer, archive.byteOffset + offset).getUint32(0, true);
-      if (signature === 0x04034b50) {
-        headers.push(offset);
-      }
-    }
-    expect(headers).toHaveLength(2); // one local header per entry
+    const stamps = zipEntryStamps(await bytes(blob));
+    expect(stamps).toHaveLength(2); // one local header per entry
+    // 2026-08-08 14:30:00 packed as DOS date+time, little-endian.
+    expect(stamps[0]).toEqual(new Uint8Array([0xc0, 0x73, 0x08, 0x5d]));
+    expect(stamps[1]).toEqual(stamps[0]);
+  });
 
-    // 1980-01-01 12:00:00 packed as DOS date+time, little-endian.
-    const expected = new Uint8Array([0x00, 0x60, 0x21, 0x00]);
-    for (const offset of headers) {
-      expect(archive.subarray(offset + 10, offset + 14)).toEqual(expected);
-    }
+  test("clamps a device clock set before the DOS epoch instead of failing", async () => {
+    // fflate rejects an out-of-range DOS year outright, which would turn a
+    // skewed clock into a failed download rather than an odd file date.
+    const blob = await buildArchiveBlob(
+      [entry("maidata.txt", "&title=39")],
+      "adx",
+      undefined,
+      undefined,
+      new Date(1970, 0, 1, 12)
+    );
+
+    // 1980-01-01 12:00:00, the DOS epoch the clamp falls back to.
+    expect(zipEntryStamps(await bytes(blob))[0]).toEqual(
+      new Uint8Array([0x00, 0x60, 0x21, 0x00])
+    );
   });
 
   test("reports deterministic archive progress while writing entries", async () => {
@@ -175,8 +205,12 @@ describe("adx archive", () => {
       { name: "Song B", files: [entry("maidata.txt", "&title=B")] },
     ];
 
-    const adx = await bytes(await buildNestedArchiveBlob(charts, "adx", "Version 2026"));
-    const zip = await bytes(await buildNestedArchiveBlob(charts, "zip", "Version 2026"));
+    const adx = await bytes(
+      await buildNestedArchiveBlob(charts, "adx", "Version 2026", undefined, STAMP)
+    );
+    const zip = await bytes(
+      await buildNestedArchiveBlob(charts, "zip", "Version 2026", undefined, STAMP)
+    );
 
     expect(adx).toEqual(zip);
   });

@@ -140,16 +140,28 @@ async function streamBlob(blob: Blob, onChunk: (chunk: Uint8Array) => void): Pro
   }
 }
 
-// Zip entries carry a fixed timestamp so archives are reproducible — the same
-// chart packed twice is byte-identical, matching the epoch mtime the tar path
-// already writes. Without it fflate falls back to Date.now(), and DOS time's
-// 2-second granularity makes back-to-back builds differ across a tick boundary.
+// The whole archive shares one timestamp, read off the clock when packing
+// starts. Left to itself fflate re-reads the clock per entry, so a batch that
+// takes minutes to pack would smear its file dates across that entire run.
+// Capturing once also makes the output a pure function of its inputs, which is
+// what lets the tests assert adx and zip are the same archive without racing
+// DOS time's 2-second granularity — they pass an explicit stamp; nothing else does.
 //
-// Built with the local-time constructor on purpose: fflate reads the date via
-// local getters (getFullYear/getHours/...), so a UTC instant would both shift
-// per timezone and, west of UTC, roll 1980-01-01 back to 1979 — below the DOS
-// epoch, which fflate rejects outright. Noon dodges any midnight DST skip.
-const ZIP_ENTRY_MTIME = new Date(1980, 0, 1, 12); // DOS epoch day, local noon
+// Out-of-range dates are clamped rather than passed through: fflate rejects
+// anything outside the DOS range outright (`err(10)`), so a badly skewed device
+// clock would fail the download instead of merely mis-stamping it. It reads the
+// date back through local getters (getFullYear/getHours/...), so the bounds are
+// local-time too, and noon dodges any midnight DST skip.
+const DOS_MIN = new Date(1980, 0, 1, 12);
+const DOS_MAX = new Date(2099, 11, 31, 12);
+
+function archiveTimestamp(mtime?: Date): Date {
+  const value = mtime ?? new Date();
+  if (Number.isNaN(value.getTime()) || value.getFullYear() < 1980) {
+    return DOS_MIN;
+  }
+  return value.getFullYear() > 2099 ? DOS_MAX : value;
+}
 
 /**
  * Streams every entry's bytes into a STORE (uncompressed) zip. The payloads are
@@ -160,6 +172,7 @@ const ZIP_ENTRY_MTIME = new Date(1980, 0, 1, 12); // DOS epoch day, local noon
 async function packZip(
   files: AdxArchiveInput[],
   type: string,
+  mtime: Date,
   onProgress?: ArchiveProgressCallback
 ): Promise<Blob> {
   const sink = createBlobSink();
@@ -179,7 +192,7 @@ async function packZip(
       break;
     }
     const entry = new ZipPassThrough(file.name);
-    entry.mtime = ZIP_ENTRY_MTIME;
+    entry.mtime = mtime;
     zip.add(entry);
     progress.startFile(file.name);
     await streamBlob(file.blob, (chunk) => {
@@ -198,8 +211,8 @@ async function packZip(
   return sink.finish(type);
 }
 
-/** Builds a USTAR tar header block (512 bytes) for one file. Deterministic (no mtime/owner). */
-function tarHeader(name: string, size: number): Uint8Array {
+/** Builds a USTAR tar header block (512 bytes) for one file. No owner recorded. */
+function tarHeader(name: string, size: number, mtime: Date): Uint8Array {
   const encoder = new TextEncoder();
   const octalField = (value: number, length: number): Uint8Array =>
     encoder.encode(value.toString(8).padStart(length - 1, "0") + "\0");
@@ -231,7 +244,9 @@ function tarHeader(name: string, size: number): Uint8Array {
   header.set(octalField(0, 8), 108); // uid
   header.set(octalField(0, 8), 116); // gid
   header.set(octalField(size, 12), 124); // size
-  header.set(octalField(0, 12), 136); // mtime (epoch — deterministic)
+  // tar records mtime as Unix epoch seconds (UTC); zip's DOS field is local
+  // wall time. Same instant, different conventions — that is the formats, not us.
+  header.set(octalField(Math.floor(mtime.getTime() / 1000), 12), 136); // mtime
   header[156] = 0x30; // typeflag '0' (regular file)
   header.set(encoder.encode("ustar\0"), 257); // magic
   header.set(encoder.encode("00"), 263); // version
@@ -251,17 +266,18 @@ function tarHeader(name: string, size: number): Uint8Array {
 async function packTarGz(
   files: AdxArchiveInput[],
   type: string,
+  mtime: Date,
   onProgress?: ArchiveProgressCallback
 ): Promise<Blob> {
   const sink = createBlobSink();
   const progress = createProgressReporter(files, onProgress);
   progress.emit();
-  const gzip = new Gzip({ mtime: 0 }, (data) => sink.push(data));
+  const gzip = new Gzip({ mtime }, (data) => sink.push(data));
 
   for (const file of files) {
     const size = file.blob.size;
     progress.startFile(file.name);
-    gzip.push(tarHeader(file.name, size), false);
+    gzip.push(tarHeader(file.name, size, mtime), false);
     await streamBlob(file.blob, (chunk) => {
       gzip.push(chunk, false);
       progress.addBytes(chunk.length);
@@ -282,7 +298,8 @@ export async function buildArchiveBlob(
   files: AdxArchiveInput[],
   format: ArchiveFormat = "adx",
   directoryName?: string,
-  onProgress?: ArchiveProgressCallback
+  onProgress?: ArchiveProgressCallback,
+  mtime?: Date
 ): Promise<Blob> {
   if (files.length === 0) {
     throw new Error("Directory is empty");
@@ -292,8 +309,11 @@ export async function buildArchiveBlob(
   // browsers "correct" the download name by appending the canonical extension
   // (e.g. "39.adx.zip"); octet-stream keeps the extension we set on the anchor.
   const type = "application/octet-stream";
+  const stamp = archiveTimestamp(mtime);
   const entries = withRootDirectory(files, directoryName);
-  return format === "tar.gz" ? packTarGz(entries, type, onProgress) : packZip(entries, type, onProgress);
+  return format === "tar.gz"
+    ? packTarGz(entries, type, stamp, onProgress)
+    : packZip(entries, type, stamp, onProgress);
 }
 
 /** Combined archive formats for a batch download. `.adx` is zip-compatible. */
@@ -318,7 +338,8 @@ export async function buildNestedArchiveBlob(
   charts: NestedChart[],
   format: BatchArchiveFormat = "adx",
   directoryName?: string,
-  onProgress?: ArchiveProgressCallback
+  onProgress?: ArchiveProgressCallback,
+  mtime?: Date
 ): Promise<Blob> {
   if (charts.length === 0) {
     throw new Error("No charts selected");
@@ -352,10 +373,11 @@ export async function buildNestedArchiveBlob(
   }
 
   const type = "application/octet-stream";
+  const stamp = archiveTimestamp(mtime);
   const rootedEntries = withRootDirectory(entries, directoryName);
   return format === "tar.gz"
-    ? packTarGz(rootedEntries, type, onProgress)
-    : packZip(rootedEntries, type, onProgress);
+    ? packTarGz(rootedEntries, type, stamp, onProgress)
+    : packZip(rootedEntries, type, stamp, onProgress);
 }
 
 export function saveBlobAsFile(blob: Blob, fileName: string): void {
