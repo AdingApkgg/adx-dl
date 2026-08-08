@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-08-03T14:01:06.807229+00:00",
+  "generated_at": "2026-08-08T14:30:37.479615+00:00",
   "source": "https://adxdls.saop.cc",
   "license": "CC-BY-4.0",
   "license_url": "https://adxdls.saop.cc/license",
   "attribution": "Catalog data from ADX 谱面资源 (https://adxdls.saop.cc), licensed CC BY 4.0. Reuse freely with attribution and a link back to the source.",
-  "total_entries": 1871,
+  "total_entries": 1875,
   "categories": {
     "Remote": [
       "maimai",
@@ -6923,7 +6923,8 @@
         "12fanclub",
         "周杰伦",
         "一二粉丝俱乐部",
-        "1 2 fan club"
+        "1 2 fan club",
+        "讲中文才对"
       ],
       "offset": 0,
       "bpm": 145,
@@ -29184,7 +29185,10 @@
       "genreid": 107,
       "cabinet": "好",
       "short_id": "111852",
-      "aliases": [],
+      "aliases": [
+        "[好]好きな惣菜発表ドラゴン",
+        "好きな惣菜発表ドラゴン"
+      ],
       "offset": 0,
       "bpm": 160,
       "difficulties": [
@@ -44774,7 +44778,8 @@
         "银河星",
         "星代主题曲",
         "牛奶4",
-        "流星牛奶"
+        "流星牛奶",
+        "milky star shooting star"
       ],
       "offset": 0,
       "bpm": 184,
@@ -49354,7 +49359,8 @@
         "公主",
         "👸",
         "princess",
-        "😋"
+        "😋",
+        "公♂主"
       ],
       "offset": 0,
       "bpm": 92,
@@ -63859,7 +63865,8 @@
         "两个男人拉小提琴",
         "东北菜市场",
         "我售卖东北竹笋",
-        "奏音快跑"
+        "奏音快跑",
+        "王牌对王牌"
       ],
       "offset": 0,
       "bpm": 201,
@@ -68376,7 +68383,8 @@
         "汪大吼",
         "大调查",
         "wonderhoy",
-        "千客万来"
+        "千客万来",
+        "姆二箱"
       ],
       "offset": 0,
       "bpm": 180,
@@ -73402,7 +73410,8 @@
       "cabinet": "DX",
       "short_id": "11729",
       "aliases": [
-        "オシオキgimmick!!"
+        "オシオキgimmick!!",
+        "gimmick"
       ],
       "offset": 0,
       "bpm": 176,
@@ -75532,7 +75541,8 @@
       "cabinet": "DX",
       "short_id": "11756",
       "aliases": [
-        "resolution"
+        "resolution",
+        "皇城刹那"
       ],
       "offset": 0,
       "bpm": 190,
@@ -75848,7 +75858,8 @@
       "cabinet": "DX",
       "short_id": "11760",
       "aliases": [
-        "勇者"
+        "勇者",
+        "葬送的芙莉莲"
       ],
       "offset": 0,
       "bpm": 104,
@@ -76894,7 +76905,8 @@
       "cabinet": "DX",
       "short_id": "11775",
       "aliases": [
-        "モンスターカミング"
+        "モンスターカミング",
+        "monster coming"
       ],
       "offset": 0,
       "bpm": 210,
@@ -77374,6 +77386,7 @@
       "short_id": "11781",
       "aliases": [
         "無間嫉妬劇場『666』",
+        "666",
         "六百六十六"
       ],
       "offset": 0,
@@ -78978,6 +78991,7 @@
       "aliases": [
         "ピポピポ -people people- feat. ななひら",
         "people",
+        "peoplepeople",
         "人人",
         "pipopipo",
         "人人网"
@@ -79780,7 +79794,9 @@
       "genreid": 105,
       "cabinet": "DX",
       "short_id": "11811",
-      "aliases": [],
+      "aliases": [
+        "概して過誤"
+      ],
       "offset": 0,
       "bpm": 170,
       "difficulties": [
@@ -79855,7 +79871,10 @@
       "genreid": 105,
       "cabinet": "DX",
       "short_id": "11812",
-      "aliases": [],
+      "aliases": [
+        "unfinished epic",
+        "未竟之诗"
+      ],
       "offset": 0,
       "bpm": 185,
       "difficulties": [
@@ -79930,7 +79949,13 @@
       "genreid": 105,
       "cabinet": "DX",
       "short_id": "11813",
-      "aliases": [],
+      "aliases": [
+        "忙シー日",
+        "忙一日",
+        "忙碌的一天",
+        "忙ー日",
+        "忙日"
+      ],
       "offset": 0,
       "bpm": 150,
       "difficulties": [
@@ -80005,7 +80030,16 @@
       "genreid": 105,
       "cabinet": "DX",
       "short_id": "11814",
-      "aliases": [],
+      "aliases": [
+        "flλme/frφst",
+        "冰与火之舞",
+        "flame/frost",
+        "红门",
+        "焰霜",
+        "flamefrost",
+        "🍎",
+        "森林冰火人"
+      ],
       "offset": 0,
       "bpm": 174,
       "difficulties": [
@@ -80537,7 +80571,8 @@
       "cabinet": "DX",
       "short_id": "11822",
       "aliases": [
-        "supersonic generation"
+        "supersonic generation",
+        "超音速世代"
       ],
       "offset": 0,
       "bpm": 155,
@@ -80621,7 +80656,8 @@
         "炫压抑",
         "柑橘花蜜",
         "柠檬水露",
-        "zit"
+        "zit",
+        "摸摸touch"
       ],
       "offset": 0,
       "bpm": 222,
@@ -80697,7 +80733,9 @@
       "genreid": 106,
       "cabinet": "DX",
       "short_id": "11824",
-      "aliases": [],
+      "aliases": [
+        "なんかノイズにきこえる"
+      ],
       "offset": 0,
       "bpm": 160,
       "difficulties": [
@@ -81638,6 +81676,7 @@
         "ビビデバ",
         "星街彗星",
         "星彗闪耀",
+        "比比拉布",
         "bibbideba",
         "匕匕亏八",
         "bbd8",
@@ -82377,7 +82416,9 @@
       "genreid": 101,
       "cabinet": "DX",
       "short_id": "11845",
-      "aliases": [],
+      "aliases": [
+        "マヌルネコのうた"
+      ],
       "offset": 0,
       "bpm": 137,
       "difficulties": [
@@ -82452,7 +82493,10 @@
       "genreid": 101,
       "cabinet": "DX",
       "short_id": "11846",
-      "aliases": [],
+      "aliases": [
+        "スナネコのうた",
+        "沙猫之歌"
+      ],
       "offset": 0,
       "bpm": 92,
       "difficulties": [
@@ -82612,7 +82656,8 @@
       "short_id": "11848",
       "aliases": [
         "overjoy ★ overdose!!",
-        "ojod"
+        "ojod",
+        "红信用pro max"
       ],
       "offset": 0,
       "bpm": 143,
@@ -82930,7 +82975,12 @@
       "genreid": 102,
       "cabinet": "DX",
       "short_id": "11852",
-      "aliases": [],
+      "aliases": [
+        "好きな惣菜発表ドラゴン",
+        "蔬菜龙",
+        "发表自己爱吃的菜的龙",
+        "好谱面发表龙"
+      ],
       "offset": 0,
       "bpm": 160,
       "difficulties": [
@@ -84371,7 +84421,9 @@
       "genreid": 102,
       "cabinet": "DX",
       "short_id": "11871",
-      "aliases": [],
+      "aliases": [
+        "クーネル・エンゲイザー"
+      ],
       "offset": 0,
       "bpm": 170,
       "difficulties": [
@@ -84446,7 +84498,9 @@
       "genreid": 102,
       "cabinet": "DX",
       "short_id": "11872",
-      "aliases": [],
+      "aliases": [
+        "ゼロトーキング"
+      ],
       "offset": 0,
       "bpm": 133,
       "difficulties": [
@@ -84521,7 +84575,12 @@
       "genreid": 102,
       "cabinet": "DX",
       "short_id": "11873",
-      "aliases": [],
+      "aliases": [
+        "抜錨",
+        "拔锚",
+        "启航",
+        "起航"
+      ],
       "offset": 0,
       "bpm": 140,
       "difficulties": [
@@ -88154,6 +88213,7 @@
         "大手",
         "hb",
         "猛冲男孩",
+        "鸟屎",
         "超级大手"
       ],
       "offset": 0,
@@ -91519,6 +91579,234 @@
       },
       "imported_at": "2026-08-01T00:01:13.983407+00:00",
       "slug": "11964"
+    },
+    {
+      "id": "11965-story-continued",
+      "remote_dir_name": "Story Continued",
+      "title": "Story Continued",
+      "title_en": "",
+      "artist": "ユアミトス",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX CiRCLE PLUS",
+      "source_archive": "",
+      "source_folder": "26/11965",
+      "version": "maimai DX CiRCLE PLUS",
+      "versionid": 26,
+      "genre": "maimai",
+      "genreid": 105,
+      "cabinet": "DX",
+      "short_id": "11965",
+      "aliases": [],
+      "offset": 0,
+      "bpm": 170,
+      "difficulties": [
+        {
+          "slot": 5,
+          "name": "Master",
+          "level": "13.2",
+          "designer": "けんけん法師"
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/26/11965/",
+      "page_url": "https://adxdls.saop.cc/charts/11965",
+      "license_note": "Catalog metadata: CC BY 4.0, credit https://adxdls.saop.cc. Chart files, cover art, audio and PV remain with their original rights holders.",
+      "files": {
+        "maidata": "https://astrodx-charts-alice.saop.cc/26/11965/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/26/11965/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/26/11965/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/26/11965/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": true
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/26/11965/",
+        "cover_url": "https://astrodx-charts.saop.cc/26/11965/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/26/11965/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/26/11965/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/26/11965/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/26/11965/pv.mp4"
+      },
+      "imported_at": "2026-08-08T14:30:37.479615+00:00",
+      "slug": "11965"
+    },
+    {
+      "id": "11966-seraphic-syndrome",
+      "remote_dir_name": "SERAPHIC SYNDROME",
+      "title": "SERAPHIC SYNDROME",
+      "title_en": "",
+      "artist": "堀田英邦",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX CiRCLE PLUS",
+      "source_archive": "",
+      "source_folder": "26/11966",
+      "version": "maimai DX CiRCLE PLUS",
+      "versionid": 26,
+      "genre": "maimai",
+      "genreid": 105,
+      "cabinet": "DX",
+      "short_id": "11966",
+      "aliases": [],
+      "offset": 0,
+      "bpm": 216,
+      "difficulties": [
+        {
+          "slot": 5,
+          "name": "Master",
+          "level": "14.2",
+          "designer": "はっぴー"
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/26/11966/",
+      "page_url": "https://adxdls.saop.cc/charts/11966",
+      "license_note": "Catalog metadata: CC BY 4.0, credit https://adxdls.saop.cc. Chart files, cover art, audio and PV remain with their original rights holders.",
+      "files": {
+        "maidata": "https://astrodx-charts-alice.saop.cc/26/11966/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/26/11966/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/26/11966/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/26/11966/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": true
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/26/11966/",
+        "cover_url": "https://astrodx-charts.saop.cc/26/11966/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/26/11966/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/26/11966/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/26/11966/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/26/11966/pv.mp4"
+      },
+      "imported_at": "2026-08-08T14:30:37.479615+00:00",
+      "slug": "11966"
+    },
+    {
+      "id": "11967",
+      "remote_dir_name": "終幕の傀儡",
+      "title": "終幕の傀儡",
+      "title_en": "",
+      "artist": "RB.H × lixound × 薛南",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX CiRCLE PLUS",
+      "source_archive": "",
+      "source_folder": "26/11967",
+      "version": "maimai DX CiRCLE PLUS",
+      "versionid": 26,
+      "genre": "maimai",
+      "genreid": 105,
+      "cabinet": "DX",
+      "short_id": "11967",
+      "aliases": [],
+      "offset": 0,
+      "bpm": 200,
+      "difficulties": [
+        {
+          "slot": 5,
+          "name": "Master",
+          "level": "14.3",
+          "designer": "Luxizhel"
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/26/11967/",
+      "page_url": "https://adxdls.saop.cc/charts/11967",
+      "license_note": "Catalog metadata: CC BY 4.0, credit https://adxdls.saop.cc. Chart files, cover art, audio and PV remain with their original rights holders.",
+      "files": {
+        "maidata": "https://astrodx-charts-alice.saop.cc/26/11967/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/26/11967/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/26/11967/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/26/11967/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": true
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/26/11967/",
+        "cover_url": "https://astrodx-charts.saop.cc/26/11967/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/26/11967/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/26/11967/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/26/11967/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/26/11967/pv.mp4"
+      },
+      "imported_at": "2026-08-08T14:30:37.479615+00:00",
+      "slug": "11967"
+    },
+    {
+      "id": "11968-aegisfortia",
+      "remote_dir_name": "Aegisfortia",
+      "title": "Aegisfortia",
+      "title_en": "",
+      "artist": "お月さま交響曲",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX CiRCLE PLUS",
+      "source_archive": "",
+      "source_folder": "26/11968",
+      "version": "maimai DX CiRCLE PLUS",
+      "versionid": 26,
+      "genre": "maimai",
+      "genreid": 105,
+      "cabinet": "DX",
+      "short_id": "11968",
+      "aliases": [],
+      "offset": 0,
+      "bpm": 238,
+      "difficulties": [
+        {
+          "slot": 5,
+          "name": "Master",
+          "level": "14.8",
+          "designer": "Cement Forest"
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/26/11968/",
+      "page_url": "https://adxdls.saop.cc/charts/11968",
+      "license_note": "Catalog metadata: CC BY 4.0, credit https://adxdls.saop.cc. Chart files, cover art, audio and PV remain with their original rights holders.",
+      "files": {
+        "maidata": "https://astrodx-charts-alice.saop.cc/26/11968/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/26/11968/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/26/11968/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/26/11968/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": true
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/26/11968/",
+        "cover_url": "https://astrodx-charts.saop.cc/26/11968/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/26/11968/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/26/11968/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/26/11968/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/26/11968/pv.mp4"
+      },
+      "imported_at": "2026-08-08T14:30:37.479615+00:00",
+      "slug": "11968"
     },
     {
       "id": "11969-technopolis-2085",
@@ -95082,7 +95370,9 @@
       "genreid": 107,
       "cabinet": "譜",
       "short_id": "121852",
-      "aliases": [],
+      "aliases": [
+        "[譜]好きな惣菜発表ドラゴン"
+      ],
       "offset": 0,
       "bpm": 160,
       "difficulties": [
@@ -95700,7 +95990,8 @@
         "蛋糕店里卖蛋糕",
         "華の集落、秋のお届け",
         "标华集落",
-        "标华集"
+        "标华集",
+        "华集"
       ],
       "offset": 0,
       "bpm": 165,
@@ -95922,7 +96213,9 @@
       "genreid": 107,
       "cabinet": "面",
       "short_id": "131852",
-      "aliases": [],
+      "aliases": [
+        "[面]好きな惣菜発表ドラゴン"
+      ],
       "offset": 0,
       "bpm": 160,
       "difficulties": [
@@ -96327,8 +96620,8 @@
       "cabinet": "ST",
       "short_id": "135",
       "aliases": [
-        "feel my fire",
         "感受我的火",
+        "feel my fire",
         "海绵",
         "感受我的烧",
         "爱如火",
@@ -96961,7 +97254,9 @@
       "genreid": 107,
       "cabinet": "発",
       "short_id": "141852",
-      "aliases": [],
+      "aliases": [
+        "[発]好きな惣菜発表ドラゴン"
+      ],
       "offset": 0,
       "bpm": 160,
       "difficulties": [
@@ -97760,7 +98055,9 @@
       "genreid": 107,
       "cabinet": "表",
       "short_id": "151852",
-      "aliases": [],
+      "aliases": [
+        "[表]好きな惣菜発表ドラゴン"
+      ],
       "offset": 0,
       "bpm": 160,
       "difficulties": [
@@ -98379,7 +98676,9 @@
       "genreid": 107,
       "cabinet": "龍",
       "short_id": "161852",
-      "aliases": [],
+      "aliases": [
+        "[龍]好きな惣菜発表ドラゴン"
+      ],
       "offset": 0,
       "bpm": 160,
       "difficulties": [
@@ -102082,10 +102381,10 @@
       "cabinet": "ST",
       "short_id": "217",
       "aliases": [
+        "光之骑士",
         "riders of the light",
         "坂本",
-        "光骑",
-        "光之骑士"
+        "光骑"
       ],
       "offset": 0,
       "bpm": 143,
@@ -105285,6 +105584,7 @@
       "short_id": "256",
       "aliases": [
         "1 2 fan club",
+        "讲中文才对",
         "いーあるふぁんくらぶ",
         "12",
         "中日友好歌",
@@ -147245,6 +147545,7 @@
       "aliases": [
         "真爱歌",
         "真爱",
+        "真正的爱之歌",
         "true love song",
         "会员制餐厅",
         "真的爱情歌",
@@ -149051,6 +149352,7 @@
       "aliases": [
         "快速傅里叶变换",
         "fast fourier transform",
+        "潘盒唯一14",
         "fft",
         "喜报",
         "傅立叶快速变换",
