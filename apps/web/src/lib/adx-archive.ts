@@ -140,6 +140,17 @@ async function streamBlob(blob: Blob, onChunk: (chunk: Uint8Array) => void): Pro
   }
 }
 
+// Zip entries carry a fixed timestamp so archives are reproducible — the same
+// chart packed twice is byte-identical, matching the epoch mtime the tar path
+// already writes. Without it fflate falls back to Date.now(), and DOS time's
+// 2-second granularity makes back-to-back builds differ across a tick boundary.
+//
+// Built with the local-time constructor on purpose: fflate reads the date via
+// local getters (getFullYear/getHours/...), so a UTC instant would both shift
+// per timezone and, west of UTC, roll 1980-01-01 back to 1979 — below the DOS
+// epoch, which fflate rejects outright. Noon dodges any midnight DST skip.
+const ZIP_ENTRY_MTIME = new Date(1980, 0, 1, 12); // DOS epoch day, local noon
+
 /**
  * Streams every entry's bytes into a STORE (uncompressed) zip. The payloads are
  * already-compressed media (mp3/mp4/png), so deflate would burn CPU for ~0 gain;
@@ -168,6 +179,7 @@ async function packZip(
       break;
     }
     const entry = new ZipPassThrough(file.name);
+    entry.mtime = ZIP_ENTRY_MTIME;
     zip.add(entry);
     progress.startFile(file.name);
     await streamBlob(file.blob, (chunk) => {

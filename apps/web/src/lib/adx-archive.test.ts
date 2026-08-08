@@ -74,6 +74,32 @@ describe("adx archive", () => {
     expect(adx).toEqual(zip);
   });
 
+  test("stamps every zip entry with the fixed DOS epoch timestamp", async () => {
+    // The byte-identical tests above only catch a wall-clock mtime when the two
+    // builds straddle a DOS tick (2-second granularity), so assert the stamp
+    // directly. Local file header: signature at 0, mod time+date at offset 10.
+    const blob = await buildArchiveBlob(
+      [entry("maidata.txt", "&title=39"), entry("track.mp3", new Uint8Array([1, 2, 3]))],
+      "adx"
+    );
+    const archive = await bytes(blob);
+
+    const headers: number[] = [];
+    for (let offset = 0; offset + 4 <= archive.length; offset += 1) {
+      const signature = new DataView(archive.buffer, archive.byteOffset + offset).getUint32(0, true);
+      if (signature === 0x04034b50) {
+        headers.push(offset);
+      }
+    }
+    expect(headers).toHaveLength(2); // one local header per entry
+
+    // 1980-01-01 12:00:00 packed as DOS date+time, little-endian.
+    const expected = new Uint8Array([0x00, 0x60, 0x21, 0x00]);
+    for (const offset of headers) {
+      expect(archive.subarray(offset + 10, offset + 14)).toEqual(expected);
+    }
+  });
+
   test("reports deterministic archive progress while writing entries", async () => {
     const progress: ArchiveProgress[] = [];
     await buildArchiveBlob(
