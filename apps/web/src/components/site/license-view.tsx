@@ -1,4 +1,7 @@
+import { ArrowUpRightIcon } from "lucide-react";
+
 import { Reveal, RevealGroup, RevealItem } from "@/components/motion";
+import { contactChannels } from "@/lib/community-links";
 import { type Locale } from "@/lib/i18n";
 
 // Transform-only cascade: legal text must stay readable pre-hydration, so the
@@ -11,7 +14,17 @@ const sectionRiseVariants = {
 type LicenseSection = {
   title: string;
   body: string;
+  /**
+   * Destinations the section's text tells the reader to use. The usage-boundary
+   * section asks rights holders to "contact the maintainer" — without these it
+   * named no way to actually do that, which is the one thing a takedown or
+   * attribution request needs to be able to find on this page.
+   */
+  links?: { label: string; url: string }[];
 };
+
+const contactLinks = (locale: Locale) =>
+  contactChannels.map((channel) => ({ label: channel.name[locale], url: channel.url }));
 
 type LicenseCopy = {
   title: string;
@@ -67,7 +80,8 @@ const copy: Record<Locale, LicenseCopy> = {
       {
         title: "使用边界",
         body:
-          "本站提供的下载包面向 AstroDX 玩家个人浏览、备份与导入使用。若你是内容权利方并希望更正来源、补充署名或移除条目，请通过项目仓库或社区入口联系维护者。",
+          "本站提供的下载包面向 AstroDX 玩家个人浏览、备份与导入使用。若你是内容权利方并希望更正来源、补充署名或移除条目，请通过以下任一渠道联系维护者。",
+        links: contactLinks("zh"),
       },
       {
         title: "非官方说明",
@@ -107,7 +121,8 @@ const copy: Record<Locale, LicenseCopy> = {
       {
         title: "Usage boundary",
         body:
-          "Downloads are provided for AstroDX players to browse, back up and import for personal use. Rights holders can contact the maintainers through the project repository or community channel for attribution fixes or removals.",
+          "Downloads are provided for AstroDX players to browse, back up and import for personal use. Rights holders can reach the maintainer through any of the channels below for attribution fixes or removals.",
+        links: contactLinks("en"),
       },
       {
         title: "Unofficial archive",
@@ -147,7 +162,8 @@ const copy: Record<Locale, LicenseCopy> = {
       {
         title: "利用範囲",
         body:
-          "ダウンロードは AstroDX プレイヤーが個人的に閲覧、バックアップ、インポートするために提供されています。権利者の方で出典修正、クレジット追加、削除を希望する場合は、プロジェクトリポジトリまたはコミュニティから管理者へご連絡ください。",
+          "ダウンロードは AstroDX プレイヤーが個人的に閲覧、バックアップ、インポートするために提供されています。権利者の方で出典修正、クレジット追加、削除を希望する場合は、以下のいずれかの窓口から管理者へご連絡ください。",
+        links: contactLinks("ja"),
       },
       {
         title: "非公式アーカイブ",
@@ -185,6 +201,23 @@ export function LicenseView({ locale = "zh" }: { locale?: Locale }) {
             <section className="grid gap-2 border-t border-border/60 pt-5">
               <h2 className="text-lg font-semibold">{section.title}</h2>
               <p className="text-sm leading-7 text-muted-foreground">{section.body}</p>
+              {section.links ? (
+                <ul className="flex list-none flex-wrap gap-x-4 gap-y-1.5 p-0 text-sm">
+                  {section.links.map((link) => (
+                    <li key={link.url}>
+                      <a
+                        className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"
+                        href={link.url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {link.label}
+                        <ArrowUpRightIcon aria-hidden="true" className="size-3.5" />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </section>
           </RevealItem>
         ))}

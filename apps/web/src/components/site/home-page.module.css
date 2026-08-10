@@ -685,6 +685,31 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* Landing on a shared question should point at it, not just scroll near it —
+   five near-identical rows otherwise leave the reader hunting. The tint fades
+   out on its own so it never becomes permanent page furniture. */
+.faqItem:target {
+  animation: faqTargetFlash 2.4s ease-out 1;
+  border-radius: 0.5rem;
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+@keyframes faqTargetFlash {
+  from {
+    background: color-mix(in oklab, var(--primary) 14%, transparent);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faqItem:target {
+    animation: none;
+    background: color-mix(in oklab, var(--primary) 8%, transparent);
+  }
+}
+
 .faqSummary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

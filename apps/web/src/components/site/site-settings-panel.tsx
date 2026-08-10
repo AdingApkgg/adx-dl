@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { storePreferredLocale } from "@/app/locale-preference";
+import { DownloadHistoryList } from "@/components/site/downloads/download-history";
 import {
   ACCENT_COLORS,
   useTheme,
@@ -56,7 +57,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { ARCHIVE_FORMATS } from "@/lib/adx-archive";
+import { ARCHIVE_FORMATS } from "@/lib/adx-archive-shared";
 import {
   getDownloadSource,
   type CustomDownloadSourceConfig,
@@ -160,6 +161,7 @@ export function SiteSettingsContent({
   navigateLocale?: (href: string) => void;
 }) {
   const copy = dictionary.settings;
+  const downloadsCopy = dictionary.downloads;
   const { theme, accent, setTheme, setAccent } = useTheme();
   const { mode: motionMode, setMode: setMotionMode } =
     useMotionPreference();
@@ -493,6 +495,16 @@ export function SiteSettingsContent({
             </div>
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
               {copy.batchGroupingHelp}
+            </p>
+          </SettingsField>
+
+          {/* The tray only exists while a job does, so the history needs a home
+              that is reachable at any time — this is where the other download
+              preferences already live. */}
+          <SettingsField label={downloadsCopy.historyTitle}>
+            <DownloadHistoryList locale={locale} />
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {downloadsCopy.historyDescription}
             </p>
           </SettingsField>
 

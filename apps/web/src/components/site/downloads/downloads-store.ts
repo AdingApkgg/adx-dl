@@ -2,8 +2,6 @@ import { create } from "zustand";
 
 import {
   ARCHIVE_FORMATS,
-  buildArchiveBlob,
-  buildNestedArchiveBlob,
   getArchiveDownloadFileName,
   saveBlobAsFile,
   type AdxArchiveInput,
@@ -11,9 +9,13 @@ import {
   type ArchiveFormat,
   type BatchArchiveFormat,
   type NestedChart,
-} from "@/lib/adx-archive";
+} from "@/lib/adx-archive-shared";
 import type { AdxRemoteFile } from "@/lib/adx-directory";
-import { isChartVideoFile, type ChartDownloadSpec } from "@/lib/catalog-shared";
+import {
+  isChartVideoFile,
+  isOptionalChartAssetFile,
+  type ChartDownloadSpec,
+} from "@/lib/catalog-shared";
 import {
   DOWNLOAD_SOURCE_PROBE_TTL_MS,
   probeCustomDownloadSource,
@@ -30,6 +32,7 @@ import {
   isCustomDownloadSourceId,
   normalizeCustomDownloadSourceName,
   normalizeCustomDownloadSourceUrl,
+  pickFailoverDownloadSource,
   rerouteDownloadFiles,
   routeChartDownloadSpecs,
   routeDownloadFiles,
@@ -41,18 +44,26 @@ import {
   runMultiFileDownload,
   type AdxFileProgress,
   type DownloadFileInput,
+  type SkippedDownloadFile,
 } from "./download-engine";
 import {
+  clearHistory,
   deleteJob,
   fileKey,
   loadAllJobs,
   loadFilesForJob,
+  loadHistory,
+  MAX_DOWNLOAD_HISTORY,
   persistFile,
   persistJob,
+  recordHistory,
   replaceJobKeepingCompletedFiles,
+  subscribeToCheckpointFailures,
+  type DownloadHistoryEntry,
   type PersistedFile,
   type PersistedJob,
 } from "./persistence";
+import { requestPersistentStorage } from "./storage-estimate";
 
 /**
  * A download job. The store is a module-level singleton, so a job keeps running
@@ -83,18 +94,32 @@ export type DownloadJob = {
   /** Files finished downloading so far / total files to fetch. */
   completed: number;
   total: number;
-  /** Aggregate byte progress (0 total when any file's size is unknown). */
+  /** Aggregate byte progress (0 total when no file size is known yet). */
   receivedBytes: number;
   totalBytes: number;
+  /** True when `totalBytes` extrapolated files that had not declared a size. */
+  totalBytesEstimated: boolean;
   /** Smoothed transfer rate in bytes/second (0 until measured). */
   speedBps: number;
+  /** Milliseconds left at the current smoothed rate, or null when unknowable. */
+  etaMs: number | null;
   /** Per-file byte progress; only populated for single-chart downloads. */
   fileProgress: AdxFileProgress[];
   /** Current in-archive file while locally writing the final .adx/.zip/.tar.gz. */
   archiveCurrentFile: string | null;
   error: string | null;
-  /** Coarse cause so the UI can show a friendly, localized message. */
-  errorKind: "offline" | "network" | "unknown" | null;
+  /**
+   * Coarse cause so the UI can show a friendly, localized message. `missing`
+   * (a permanent 4xx) and `server` (5xx) used to be bucketed as `network`,
+   * which told the user to "just retry" a file that will never exist.
+   */
+  errorKind: "offline" | "network" | "missing" | "server" | "unknown" | null;
+  /** Verbatim URL + status, for the expandable detail block and its copy button. */
+  errorDetail: string | null;
+  /** Optional assets the mirror did not have; the archive is complete without them. */
+  skippedFiles: SkippedDownloadFile[];
+  /** Route this run moved to by itself after a failure, until the user acts. */
+  autoSwitchedTo: DownloadSourceId | null;
   /** Disambiguates a restart from a stale auto-dismiss timer. */
   startedAt: number;
 };
@@ -155,6 +180,14 @@ type DownloadsState = {
    * the floating tray can lift itself above them instead of overlapping.
    */
   bottomBars: number;
+  /** Newest-first completed downloads that can be started again as-is. */
+  history: DownloadHistoryEntry[];
+  /**
+   * Set once a checkpoint write has failed. Everything still downloads, but the
+   * "已完成文件会保留" promise no longer holds across a reload, and the UI has
+   * to stop making it.
+   */
+  checkpointsUnavailable: boolean;
   startSingle: (params: StartSingleParams) => void;
   /** Returns the queued job ids — one per version/genre group in the selection. */
   startBatch: (params: StartBatchParams) => string[];
@@ -175,9 +208,18 @@ type DownloadsState = {
   /** Keeps completed files and restarts unfinished files on another route. */
   restartWithSource: (id: string, sourceId: DownloadSourceId) => void;
   resume: (id: string) => void;
+  /**
+   * Restarts every job a lost connection left stranded. Called when the tab
+   * comes back to the foreground online — a phone that backgrounded mid-batch
+   * otherwise showed a wall of failures nobody had asked for.
+   */
+  resumeInterrupted: () => number;
   /** Aborts in-flight files but keeps its spec and whole-file checkpoints. */
   pause: (id: string) => void;
   dismiss: (id: string) => void;
+  /** Queues a finished download again under a fresh job id. */
+  rerunHistoryEntry: (key: string) => void;
+  clearDownloadHistory: () => void;
   hydrateFromStorage: () => void;
   presentInline: (id: string) => void;
   unpresentInline: (id: string) => void;
@@ -187,6 +229,20 @@ type DownloadsState = {
 
 /** How long a finished (success) job lingers before the tray auto-clears it. */
 const AUTO_DISMISS_MS = 30000;
+
+/**
+ * Cap on automatic route switches per job. Two is enough to escape one bad
+ * mirror plus one unlucky second pick; beyond that the failure is almost
+ * certainly the user's own connection, and silently churning through all six
+ * routes only delays telling them so.
+ */
+const MAX_AUTO_SOURCE_SWITCHES = 2;
+
+/**
+ * Ignore the first moments of a transfer when quoting a finish time: the EMA
+ * has not converged yet, and a wildly wrong "剩余 47 分钟" is worse than none.
+ */
+const MIN_ETA_SPEED_BPS = 16 * 1024;
 
 /**
  * Download slots. A grouped batch enqueues one job per version/genre, so
@@ -265,6 +321,9 @@ const activeRunPromises = new Map<string, Promise<void>>();
 const restartingJobs = new Set<string>();
 /** Byte samples for the smoothed transfer-rate estimate, keyed by job id. */
 const speedSamples = new Map<string, { time: number; bytes: number; ema: number }>();
+/** Routes this job has already failed on, so failover never retries a dead one. */
+const jobTriedSources = new Map<string, Set<DownloadSourceId>>();
+const jobAutoSwitchCounts = new Map<string, number>();
 let hydrated = false;
 let sourceProbePromise: Promise<void> | null = null;
 /** Test seam: shrink the engine's retry backoff so failure paths settle fast. */
@@ -346,7 +405,9 @@ function completedCheckpointProgress(job: DownloadJob): Pick<
   "completed" | "receivedBytes" | "totalBytes" | "fileProgress"
 > {
   const fileProgress = job.fileProgress.map((file) =>
-    file.status === "done"
+    // "skipped" is as final as "done": the mirror does not have the file, and
+    // a resume must not present it as something still to fetch.
+    file.status === "done" || file.status === "skipped"
       ? file
       : { name: file.name, received: 0, total: null, status: "pending" as const }
   );
@@ -635,16 +696,67 @@ export function summarizeDownloadJobs(
   };
 }
 
+/**
+ * The HTTP status the engine stamped into a failure message, if any. The engine
+ * and the store are separate modules with their own error classes; matching on
+ * the message keeps the two decoupled and survives an error that crossed a
+ * structured-clone boundary.
+ */
+export function downloadFailureStatus(message: string): number | null {
+  const match = /\(HTTP (\d{3})\)/.exec(message);
+  return match ? Number(match[1]) : null;
+}
+
+/** The failed URL, for the expandable detail block. */
+export function downloadFailureUrl(message: string): string | null {
+  const match = /File download failed: (\S+)/.exec(message);
+  return match ? match[1] : null;
+}
+
 /** Coarse failure classification for a friendly, localized error message. */
-function classifyError(error: unknown): DownloadJob["errorKind"] {
+export function classifyDownloadError(error: unknown): DownloadJob["errorKind"] {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     return "offline";
   }
   const message = error instanceof Error ? error.message : "";
+  const status = downloadFailureStatus(message);
+  if (status !== null) {
+    // 408/425/429 exhausted their retries; that is congestion, not a missing
+    // file, so it stays in the "try again" bucket rather than the 4xx one.
+    if (status >= 500) {
+      return "server";
+    }
+    if (status >= 400 && status !== 408 && status !== 425 && status !== 429) {
+      return "missing";
+    }
+    return "network";
+  }
   if (message.includes("download failed") || error instanceof TypeError) {
     return "network";
   }
   return "unknown";
+}
+
+/** A route change can only help when the current route is the thing failing. */
+function isRoutableFailure(errorKind: DownloadJob["errorKind"]): boolean {
+  return errorKind === "network" || errorKind === "server" || errorKind === "missing";
+}
+
+/**
+ * Remaining milliseconds at the smoothed rate. Null whenever the answer would
+ * be a guess: no measured total, no converged rate, or a total that the byte
+ * extrapolation has already overshot.
+ */
+export function estimateDownloadEtaMs(
+  receivedBytes: number,
+  totalBytes: number,
+  speedBps: number
+): number | null {
+  if (totalBytes <= 0 || speedBps < MIN_ETA_SPEED_BPS) {
+    return null;
+  }
+  const remaining = totalBytes - receivedBytes;
+  return remaining <= 0 ? null : Math.round((remaining / speedBps) * 1000);
 }
 
 export const useDownloadsStore = create<DownloadsState>((set, get) => {
@@ -702,9 +814,16 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       status: activeJobIds.size < MAX_ACTIVE_JOBS ? "packing" : "queued",
       error: null,
       errorKind: null,
+      errorDetail: null,
       speedBps: 0,
+      etaMs: null,
       archiveCurrentFile: null,
     });
+    const triedSources = jobTriedSources.get(id) ?? new Set<DownloadSourceId>();
+    triedSources.add(
+      inferDownloadSourceId(spec.files, spec.sourceId, spec.sourceBaseUrl)
+    );
+    jobTriedSources.set(id, triedSources);
 
     let holdsSlot = false;
     try {
@@ -731,6 +850,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
           name: file.name,
           url: file.url,
           completedBlob: prior?.blob ?? null,
+          optional: isOptionalChartAssetFile(file.name),
         };
       });
 
@@ -746,6 +866,9 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         completed: completeByName.size,
         receivedBytes: 0,
         totalBytes: 0,
+        totalBytesEstimated: false,
+        etaMs: null,
+        skippedFiles: [],
         fileProgress:
           spec.kind === "single"
             ? spec.files.map((file) => {
@@ -811,7 +934,16 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
                 : [],
           });
         },
-        onBytes: (receivedBytes, totalBytes) => {
+        onFileSkipped: (skipped) => {
+          if (!isCurrentRun()) {
+            return;
+          }
+          const current = get().jobs.find((job) => job.id === id);
+          patchCurrentJob({
+            skippedFiles: [...(current?.skippedFiles ?? []), skipped],
+          });
+        },
+        onBytes: (receivedBytes, totalBytes, totalBytesEstimated) => {
           if (!isCurrentRun()) {
             return;
           }
@@ -819,7 +951,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
           const sample = speedSamples.get(id);
           if (!sample) {
             speedSamples.set(id, { time: now, bytes: receivedBytes, ema: 0 });
-            patchCurrentJob({ receivedBytes, totalBytes });
+            patchCurrentJob({ receivedBytes, totalBytes, totalBytesEstimated });
             return;
           }
           const elapsed = now - sample.time;
@@ -827,10 +959,19 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
             const instant = ((receivedBytes - sample.bytes) / elapsed) * 1000;
             const ema = sample.ema === 0 ? instant : sample.ema * 0.7 + instant * 0.3;
             speedSamples.set(id, { time: now, bytes: receivedBytes, ema });
-            patchCurrentJob({ receivedBytes, totalBytes, speedBps: Math.max(0, ema) });
+            const speedBps = Math.max(0, ema);
+            patchCurrentJob({
+              receivedBytes,
+              totalBytes,
+              totalBytesEstimated,
+              speedBps,
+              // Recomputed only on a rate sample: an ETA that re-derives on
+              // every chunk jitters by whole seconds and is unreadable.
+              etaMs: estimateDownloadEtaMs(receivedBytes, totalBytes, speedBps),
+            });
             return;
           }
-          patchCurrentJob({ receivedBytes, totalBytes });
+          patchCurrentJob({ receivedBytes, totalBytes, totalBytesEstimated });
         },
         onFileProgress:
           spec.kind === "single"
@@ -850,7 +991,9 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         total: archiveInputs.length,
         receivedBytes: 0,
         totalBytes: archiveTotalBytes,
+        totalBytesEstimated: false,
         speedBps: 0,
+        etaMs: null,
         archiveCurrentFile: null,
       });
 
@@ -878,6 +1021,13 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       };
 
       const format = spec.format as ArchiveFormat;
+      // fflate (~18.5 KB gzip) is only needed once bytes are actually being
+      // packed. Loading it here instead of at module scope keeps it out of the
+      // shared chunk that every page pays for just to render a download button.
+      const { buildArchiveBlob, buildNestedArchiveBlob } = await import("@/lib/adx-archive");
+      if (!isCurrentRun()) {
+        return;
+      }
       if (spec.kind === "batch") {
         // A cross-version selection saves one archive per version instead of
         // merging every version folder into a single giant archive. Archives
@@ -946,7 +1096,13 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       if (!isCurrentRun()) {
         return;
       }
-      patchJob(id, { status: "success" });
+      patchJob(id, { status: "success", etaMs: null });
+      // The job's own record is gone by design (its checkpoints were the only
+      // reason to keep it). The history entry is a separate, blob-free copy so
+      // "download that version again" survives the cleanup.
+      await rememberCompletedJob(spec);
+      jobTriedSources.delete(id);
+      jobAutoSwitchCounts.delete(id);
       scheduleAutoDismiss(id, startedAt);
     } catch (error) {
       // An abort comes from pause() (which already kept whole-file checkpoints),
@@ -955,14 +1111,28 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         return;
       }
       const current = get().jobs.find((job) => job.id === id);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      const errorKind = classifyDownloadError(error);
+      const status = downloadFailureStatus(message);
+      const failedUrl = downloadFailureUrl(message);
       patchJob(id, {
         ...(current ? completedCheckpointProgress(current) : {}),
         status: "error",
-        error: error instanceof Error ? error.message : "Unknown error",
-        errorKind: classifyError(error),
+        error: message,
+        errorKind,
+        errorDetail: failedUrl
+          ? status === null
+            ? failedUrl
+            : `HTTP ${status} · ${failedUrl}`
+          : message,
         speedBps: 0,
+        etaMs: null,
         archiveCurrentFile: null,
       });
+      // Only after the failure is fully visible: if a healthy mirror exists the
+      // job hops onto it by itself, and the user sees the switch rather than a
+      // dead end behind a wordless ⇄ icon.
+      maybeFailOverToAnotherSource(id, errorKind);
     } finally {
       // Hand the slot to the next queued job before anything else can await.
       if (holdsSlot) {
@@ -975,6 +1145,147 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         speedSamples.delete(id);
       }
     }
+  };
+
+  /**
+   * Files are keyed to whichever mirror they were fetched from, so the history
+   * entry stores the spec canonicalized back to the catalog origin: re-running
+   * it months later must honour the route selected *then*, not the dead mirror
+   * the original run happened to use.
+   */
+  const rememberCompletedJob = async (spec: PersistedJob): Promise<void> => {
+    const entry: DownloadHistoryEntry = {
+      key: `${spec.id}@${Date.now().toString(36)}`,
+      job: {
+        ...spec,
+        files: spec.files.map((file) => ({
+          name: file.name,
+          url: canonicalDownloadResourceUrl(file.url, [spec.sourceBaseUrl ?? ""]),
+        })),
+      },
+      finishedAt: Date.now(),
+      fileCount: spec.files.length,
+    };
+    await recordHistory(entry);
+    set((state) => ({
+      history: [entry, ...state.history.filter((old) => old.key !== entry.key)].slice(
+        0,
+        MAX_DOWNLOAD_HISTORY
+      ),
+    }));
+  };
+
+  /**
+   * Moves an interrupted job to another mirror, keeping every whole file it
+   * already holds. `rememberPreference` is what separates a deliberate user
+   * switch (which should become the new default route) from the automatic
+   * failover below (which must not touch the user's setting).
+   */
+  const restartJobWithSource = (
+    id: string,
+    sourceId: DownloadSourceId,
+    rememberPreference: boolean
+  ): void => {
+    const job = get().jobs.find((entry) => entry.id === id);
+    const spec = jobSpecs.get(id);
+    if (
+      !job ||
+      !spec ||
+      (job.status !== "paused" && job.status !== "error") ||
+      restartingJobs.has(id)
+    ) {
+      return;
+    }
+
+    const nextSource = configuredDownloadSource(sourceId, get().customSources);
+    const previousSourceId = inferDownloadSourceId(
+      spec.files,
+      spec.sourceId,
+      spec.sourceBaseUrl
+    );
+    const restartedSpec: PersistedJob = {
+      ...spec,
+      sourceId: nextSource.id,
+      sourceBaseUrl: nextSource.baseUrl,
+      sourceName: nextSource.name,
+      createdAt: Date.now(),
+      files: rerouteDownloadFiles(
+        spec.files,
+        previousSourceId,
+        nextSource.id,
+        spec.sourceBaseUrl,
+        nextSource.baseUrl
+      ),
+    };
+
+    restartingJobs.add(id);
+    if (rememberPreference) {
+      set({ selectedSourceId: nextSource.id });
+      saveSourcePreference(nextSource.id);
+    }
+    void (async () => {
+      try {
+        await enqueueLifecycle(id, async () => {
+          const current = get().jobs.find((entry) => entry.id === id);
+          if (
+            !current ||
+            jobSpecs.get(id) !== spec ||
+            (current.status !== "paused" && current.status !== "error")
+          ) {
+            return;
+          }
+          // Update the routed spec and discard only legacy/incomplete records.
+          // Whole files survive because the mirror path identifies the same
+          // logical archive input regardless of which host supplied it.
+          await replaceJobKeepingCompletedFiles(restartedSpec);
+          // dismiss() can queue while the replacement transaction is open.
+          // Recheck the generation before exposing/starting the routed spec.
+          if (
+            get().jobs.some((entry) => entry.id === id) &&
+            jobSpecs.get(id) === spec
+          ) {
+            beginJob(restartedSpec, false);
+          }
+        });
+      } catch (error) {
+        const current = get().jobs.find((entry) => entry.id === id);
+        if (current && jobSpecs.get(id) === spec) {
+          patchJob(id, {
+            status: "error",
+            error: error instanceof Error ? error.message : "Unknown error",
+            errorKind: classifyDownloadError(error),
+          });
+        }
+      } finally {
+        restartingJobs.delete(id);
+      }
+    })();
+  };
+
+  const maybeFailOverToAnotherSource = (
+    id: string,
+    errorKind: DownloadJob["errorKind"]
+  ): void => {
+    if (!isRoutableFailure(errorKind)) {
+      return;
+    }
+    const switches = jobAutoSwitchCounts.get(id) ?? 0;
+    if (switches >= MAX_AUTO_SOURCE_SWITCHES) {
+      return;
+    }
+    const next = pickFailoverDownloadSource(
+      get().sourceProbes,
+      [...(jobTriedSources.get(id) ?? [])],
+      get().customSources
+    );
+    if (next === null) {
+      return;
+    }
+    jobAutoSwitchCounts.set(id, switches + 1);
+    patchJob(id, { autoSwitchedTo: next });
+    // `false` for the preference: an automatic recovery must not silently
+    // rewrite the default route the user picked in settings.
+    restartJobWithSource(id, next, false);
   };
 
   /** Serialize all persistence/run transitions that target the same stable id. */
@@ -1073,7 +1384,9 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       total: sourcedSpec.files.length,
       receivedBytes: 0,
       totalBytes: 0,
+      totalBytesEstimated: false,
       speedBps: 0,
+      etaMs: null,
       fileProgress:
         sourcedSpec.kind === "single"
           ? sourcedSpec.files.map((file) => ({
@@ -1086,6 +1399,11 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       archiveCurrentFile: null,
       error: null,
       errorKind: null,
+      errorDetail: null,
+      skippedFiles: [],
+      // Preserved across a reroute so the "已自动切换到 X" note survives the
+      // restart that the switch itself performs.
+      autoSwitchedTo: get().jobs.find((job) => job.id === spec.id)?.autoSwitchedTo ?? null,
       startedAt,
     });
     void startRun(sourcedSpec.id, startedAt, sourcedSpec, persistSpec);
@@ -1100,6 +1418,8 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
     sourceProbes: createInitialDownloadSourceProbes(),
     presented: {},
     bottomBars: 0,
+    history: [],
+    checkpointsUnavailable: false,
 
     startSingle: ({
       id,
@@ -1449,83 +1769,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       }
     },
 
-    restartWithSource: (id, sourceId) => {
-      const job = get().jobs.find((entry) => entry.id === id);
-      const spec = jobSpecs.get(id);
-      if (
-        !job ||
-        !spec ||
-        (job.status !== "paused" && job.status !== "error") ||
-        restartingJobs.has(id)
-      ) {
-        return;
-      }
-
-      const nextSource = configuredDownloadSource(
-        sourceId,
-        get().customSources
-      );
-      const previousSourceId = inferDownloadSourceId(
-        spec.files,
-        spec.sourceId,
-        spec.sourceBaseUrl
-      );
-      const restartedSpec: PersistedJob = {
-        ...spec,
-        sourceId: nextSource.id,
-        sourceBaseUrl: nextSource.baseUrl,
-        sourceName: nextSource.name,
-        createdAt: Date.now(),
-        files: rerouteDownloadFiles(
-          spec.files,
-          previousSourceId,
-          nextSource.id,
-          spec.sourceBaseUrl,
-          nextSource.baseUrl
-        ),
-      };
-
-      restartingJobs.add(id);
-      set({ selectedSourceId: nextSource.id });
-      saveSourcePreference(nextSource.id);
-      void (async () => {
-        try {
-          await enqueueLifecycle(id, async () => {
-            const current = get().jobs.find((entry) => entry.id === id);
-            if (
-              !current ||
-              jobSpecs.get(id) !== spec ||
-              (current.status !== "paused" && current.status !== "error")
-            ) {
-              return;
-            }
-            // Update the routed spec and discard only legacy/incomplete records.
-            // Whole files survive because the mirror path identifies the same
-            // logical archive input regardless of which host supplied it.
-            await replaceJobKeepingCompletedFiles(restartedSpec);
-            // dismiss() can queue while the replacement transaction is open.
-            // Recheck the generation before exposing/starting the routed spec.
-            if (
-              get().jobs.some((entry) => entry.id === id) &&
-              jobSpecs.get(id) === spec
-            ) {
-              beginJob(restartedSpec, false);
-            }
-          });
-        } catch (error) {
-          const current = get().jobs.find((entry) => entry.id === id);
-          if (current && jobSpecs.get(id) === spec) {
-            patchJob(id, {
-              status: "error",
-              error: error instanceof Error ? error.message : "Unknown error",
-              errorKind: classifyError(error),
-            });
-          }
-        } finally {
-          restartingJobs.delete(id);
-        }
-      })();
-    },
+    restartWithSource: (id, sourceId) => restartJobWithSource(id, sourceId, true),
 
     resume: (id) => {
       const job = get().jobs.find((entry) => entry.id === id);
@@ -1548,11 +1792,30 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         status: "packing",
         error: null,
         errorKind: null,
+        errorDetail: null,
         speedBps: 0,
+        etaMs: null,
         archiveCurrentFile: null,
         startedAt,
       });
       void startRun(id, startedAt, spec, false);
+    },
+
+    resumeInterrupted: () => {
+      // Only failures a reconnect can plausibly fix. A permanent 404 and a
+      // manual pause both stay put: retrying the first is pointless, and
+      // overriding the second would be the app disobeying the user.
+      const resumable = get().jobs.filter(
+        (job) =>
+          job.status === "error" &&
+          (job.errorKind === "offline" ||
+            job.errorKind === "network" ||
+            job.errorKind === "server")
+      );
+      for (const job of resumable) {
+        get().resume(job.id);
+      }
+      return resumable.length;
     },
 
     pause: (id) => {
@@ -1579,12 +1842,45 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       abortControllers.delete(id);
       speedSamples.delete(id);
       jobSpecs.delete(id);
+      jobTriedSources.delete(id);
+      jobAutoSwitchCounts.delete(id);
       set((state) => ({ jobs: state.jobs.filter((job) => job.id !== id) }));
       void enqueueLifecycle(id, async () => {
         // A checkpoint callback that began just before dismiss must finish
         // before cleanup, otherwise it could recreate an orphaned file record.
         await deleteJob(id);
       });
+    },
+
+    rerunHistoryEntry: (key) => {
+      const entry = get().history.find((candidate) => candidate.key === key);
+      if (!entry) {
+        return;
+      }
+      const source = configuredDownloadSource(
+        get().selectedSourceId,
+        get().customSources
+      );
+      // A brand-new id: the original job id may still be on screen (or have a
+      // live spec), and reusing it would adopt that generation's checkpoints.
+      const id =
+        entry.job.kind === "batch"
+          ? newBatchJobId()
+          : `${entry.job.id}#again:${Date.now().toString(36)}`;
+      beginJob({
+        ...entry.job,
+        id,
+        createdAt: Date.now(),
+        sourceId: source.id,
+        sourceBaseUrl: source.baseUrl,
+        ...(source.name ? { sourceName: source.name } : {}),
+        files: routeDownloadFiles(entry.job.files, source.id, source.baseUrl),
+      });
+    },
+
+    clearDownloadHistory: () => {
+      set({ history: [] });
+      void clearHistory();
     },
 
     hydrateFromStorage: () => {
@@ -1601,6 +1897,16 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         sourceProbes: createInitialDownloadSourceProbes(customSources),
       });
       saveCustomSources(customSources);
+      subscribeToCheckpointFailures(() => {
+        set({ checkpointsUnavailable: true });
+      });
+      // Best-effort: without it, checkpoints for a big batch are the first
+      // thing a browser evicts under storage pressure, silently turning
+      // "resume after a reload" into "start over".
+      void requestPersistentStorage();
+      void loadHistory().then((history) => {
+        set({ history: history.slice(0, MAX_DOWNLOAD_HISTORY) });
+      });
       void (async () => {
         const stored = await loadAllJobs();
         for (const storedSpec of stored) {
@@ -1695,11 +2001,16 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
             total: spec.files.length,
             receivedBytes,
             totalBytes: totalKnown ? totalBytes : 0,
+            totalBytesEstimated: false,
             speedBps: 0,
+            etaMs: null,
             fileProgress,
             archiveCurrentFile: null,
             error: null,
             errorKind: null,
+            errorDetail: null,
+            skippedFiles: [],
+            autoSwitchedTo: null,
             startedAt: Date.now(),
           });
         }

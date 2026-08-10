@@ -110,7 +110,11 @@ describe("default zh routes", () => {
     expect(html).toContain("观看演示视频");
     expect(html).toContain(`href="${DEMO_VIDEO_URL}"`);
     expect(html).toContain("什么是 AstroDX？");
-    expect(html).toContain('href="#faq"');
+    // The shortcut points at the question itself, and that question ships open
+    // — landing on a heading above five collapsed rows answered nothing.
+    expect(html).toContain('href="#what-is-astrodx"');
+    expect(html).toContain('id="what-is-astrodx"');
+    expect(html).toMatch(/id="what-is-astrodx"[^>]*open/);
     expect(html).toContain('role="group" aria-label="快捷入口"');
     // The spotlight is named for assistive tech and also carries the visible
     // corner badge over the top-left of the cover.
@@ -157,7 +161,9 @@ describe("default zh routes", () => {
     expect(html).toContain("曲目 3");
     expect(html).toContain("谱面信息");
     expect(html).toContain("难度列表");
-    expect(html).toContain("资源状态");
+    // The old "资源状态" card repeated the hero's badges verbatim; the slot now
+    // carries the measured numbers instead.
+    expect(html).not.toContain("资源状态");
     expect(html).toContain("来源信息");
     expect(html).toContain(`/covers/${slugOf("song-3◆phase")}/bg.jpg`);
     expect(html).toContain("站内下载");
@@ -203,6 +209,46 @@ describe("default zh routes", () => {
     expect(html).toContain("鸣谢");
     expect(html).toContain("免责声明");
     expect(html).toContain("https://github.com/AdingApkgg/adx-dl");
+  });
+
+  test("guide route renders the zh walkthrough with stable anchors and HowTo/FAQ data", async () => {
+    const { default: GuidePage } = await import("./(default)/guide/page");
+
+    const html = renderToStaticMarkup(<GuidePage />);
+
+    expect(html).toContain("导入谱面");
+    expect(html).toContain('id="install"');
+    expect(html).toContain('id="download"');
+    expect(html).toContain('id="import"');
+    expect(html).toContain('id="troubleshooting"');
+    expect(html).toContain('href="#troubleshooting"');
+    expect(html).toContain('"@type":"HowTo"');
+    expect(html).toContain('"@type":"FAQPage"');
+    // The FAQ answers must be on the page, not only in the JSON-LD.
+    expect(html).toContain("下载卡住不动");
+    expect(html).toContain("https://github.com/AdingApkgg/adx-dl/issues");
+  });
+
+  test("changelog route groups the zh catalog into dated import batches", async () => {
+    const { default: ChangelogPage } = await import("./(default)/changelog/page");
+
+    const html = renderToStaticMarkup(await ChangelogPage());
+
+    expect(html).toContain("更新日志");
+    // Newest import day first; each fixture entry landed on its own day.
+    expect(html.indexOf("2026-06-09 入库")).toBeLessThan(html.indexOf("2026-06-08 入库"));
+    expect(html).toContain("曲目 9");
+    expect(html).toContain("涉及版本");
+  });
+
+  test("music route lists per-version playlists with play controls", async () => {
+    const { default: MusicPage } = await import("./(default)/music/page");
+
+    const html = renderToStaticMarkup(await MusicPage());
+
+    expect(html).toContain("音乐库");
+    expect(html).toContain('aria-label="播放「maimai MURASAKi PLUS」"');
+    expect(html).toContain("1 首");
   });
 
   test("post route renders the zh submission form", async () => {

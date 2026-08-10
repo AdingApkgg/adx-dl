@@ -14,6 +14,7 @@ import {
   type CatalogEntry,
 } from "@/lib/catalog-shared";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
+import { japaneseTextLang } from "@/lib/text-lang";
 import { entrySlug } from "@/lib/route-slug";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +59,14 @@ type ChartCardProps = {
   sizes?: string;
   /** The alias that matched the current search, shown as a hint to explain the hit. */
   aliasHit?: string | null;
+  /**
+   * Marks a chart the archive imported recently. Passed in rather than derived
+   * from `entry.imported_at`, which the card slice does carry: the window has to
+   * be measured against the catalog's `generated_at` (see `isRecentImport`) and
+   * never against a render-time clock, and only the server surfaces holding the
+   * full catalog know that instant.
+   */
+  isNew?: boolean;
   /** In select mode the card toggles selection instead of navigating to the detail page. */
   selectable?: boolean;
   selected?: boolean;
@@ -74,6 +83,7 @@ export function ChartCard({
   priority = false,
   sizes,
   aliasHit = null,
+  isNew = false,
   selectable = false,
   selected = false,
   onToggleSelect,
@@ -83,6 +93,10 @@ export function ChartCard({
   const dictionary = getDictionary(locale);
   const aliasMatchLabel = dictionary.catalogBrowser.aliasMatchLabel;
   const aliasesLabel = dictionary.detail.aliasesLabel;
+
+  // Stable per-card id so the ARIA checkbox below can name itself from the
+  // heading it already renders.
+  const titleId = `chart-card-title-${entry.id}`;
 
   const aliases = entry.aliases ?? [];
   // Float the search-matched alias first so it's always visible within the cap.
@@ -97,7 +111,9 @@ export function ChartCard({
     "group flex h-full flex-col overflow-hidden rounded-xl border bg-card/80 transition-all",
     selectable
       ? cn(
-          "cursor-pointer",
+          // The selectable card is a bare div, so it never picked up the focus
+          // ring the Button/Link primitives carry.
+          "cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
           selected
             ? "border-primary ring-2 ring-primary"
             : "border-border/70 hover:border-primary/40"
@@ -116,22 +132,45 @@ export function ChartCard({
         className="h-full w-full"
       />
       {selectable ? <SelectCheckBadge selected={selected} /> : null}
+      {/* Top-right: the opposite corner from SelectCheckBadge, so a freshly
+          imported chart shown in select mode carries both without overlap. */}
+      {isNew ? (
+        <span
+          title={dictionary.catalogBrowser.newBadgeHint}
+          className="absolute top-2 right-2 rounded-md bg-primary px-1.5 py-0.5 text-[11px] font-semibold uppercase leading-tight tracking-wide text-primary-foreground shadow-sm"
+        >
+          {dictionary.catalogBrowser.newBadge}
+        </span>
+      ) : null}
     </div>
   );
+
+  const title = formatEntryTitle(entry, locale);
+  const artist = formatEntryArtist(entry, locale);
 
   const body = (
     <>
       {cover}
       <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3 sm:p-4">
         <div className="min-w-0">
-          <h3 className="line-clamp-1 font-semibold leading-snug">
-            {formatEntryTitle(entry, locale)}
+          <h3
+            id={titleId}
+            lang={japaneseTextLang(title)}
+            className="line-clamp-1 font-semibold leading-snug"
+          >
+            {title}
           </h3>
-          <p className="line-clamp-1 text-sm text-muted-foreground">
-            {formatEntryArtist(entry, locale)}
+          <p
+            lang={japaneseTextLang(artist)}
+            className="line-clamp-1 text-sm text-muted-foreground"
+          >
+            {artist}
           </p>
           {aliases.length > 0 ? (
+            // Aliases are Chinese community nicknames; tagging them keeps them
+            // in a Simplified-Chinese font (and voice) on the ja tree.
             <ul
+              lang="zh-Hans"
               className="mt-1.5 flex flex-wrap gap-1"
               title={`${aliasesLabel}: ${aliases.join("、")}`}
             >
@@ -178,6 +217,10 @@ export function ChartCard({
     return (
       <div
         role="checkbox"
+        // ARIA checkbox is Name-From-Author: the card's own content does not
+        // reach the accessible name, so without this a screen reader announced
+        // two dozen identical "checkbox, not checked" rows with no song titles.
+        aria-labelledby={titleId}
         aria-checked={selected}
         tabIndex={0}
         onClick={onToggleSelect}

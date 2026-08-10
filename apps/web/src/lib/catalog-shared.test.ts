@@ -3,11 +3,15 @@ import { describe, expect, test } from "bun:test";
 import {
   buildLevelGradient,
   cabinetBucket,
+  chartBpmDisplay,
   clampRange,
+  collectChartDesigners,
   collectDifficultyLevels,
   DIFFICULTY_TONE_COLOR,
   difficultyDisplayLevel,
+  entryHasDesigner,
   entryHasLevelInRange,
+  formatChartDuration,
   formatRangeParam,
   isFullRange,
   levelDisplayTone,
@@ -19,9 +23,15 @@ import {
   genreGroupFolderName,
   getChartAssetFiles,
   getChartDownloadSpec,
+  isOptionalChartAssetFile,
   isKnownVersionIndex,
+  isRecentImport,
   normalizeCabinetId,
+  peakNoteDifficulty,
   resolveVersionIndex,
+  sortByImportedDesc,
+  sortByReleaseDesc,
+  sumChartDownloadBytes,
   toCatalogCardEntry,
   UTAGE_GENRE_ID,
   versionFolderName,
@@ -321,6 +331,51 @@ describe("catalog shared helpers", () => {
     expect("remote_dir_name" in card).toBe(false);
     // Empty optional fields are omitted entirely (payload bytes matter here).
     expect("aliases" in toCatalogCardEntry(buildEntry())).toBe(false);
+    // imported_at rides along so the browse page can offer a "newest" order.
+    expect(card.imported_at).toBe("2026-06-12T12:00:00.000Z");
+    expect("imported_at" in toCatalogCardEntry(buildEntry({ imported_at: undefined }))).toBe(
+      false
+    );
+  });
+
+  test("collectChartDesigners counts charts (not difficulty rows) per charter", () => {
+    const facets = collectChartDesigners([
+      // One person credited on three slots of the same chart is one chart.
+      buildEntry({
+        difficulties: [
+          { slot: 3, level: "9", designer: "はっぴー" },
+          { slot: 4, level: "12", designer: "はっぴー" },
+          { slot: 5, level: "13+", designer: "Techno Kitchen" },
+        ],
+      }),
+      buildEntry({
+        difficulties: [
+          { slot: 5, level: "13", designer: "はっぴー" },
+          // The source writes "-" (or nothing) when the charter is unknown.
+          { slot: 6, level: "14", designer: "-" },
+          { slot: 7, level: "宴", designer: "" },
+        ],
+      }),
+    ]);
+
+    expect(facets).toEqual([
+      { name: "はっぴー", count: 2 },
+      { name: "Techno Kitchen", count: 1 },
+    ]);
+  });
+
+  test("entryHasDesigner matches any difficulty, and an empty set filters nothing", () => {
+    const entry = buildEntry({
+      difficulties: [
+        { slot: 4, level: "12", designer: "Techno Kitchen" },
+        { slot: 5, level: "13+", designer: " はっぴー " },
+      ],
+    });
+
+    expect(entryHasDesigner(entry, new Set(["はっぴー"]))).toBe(true);
+    expect(entryHasDesigner(entry, new Set(["Techno Kitchen"]))).toBe(true);
+    expect(entryHasDesigner(entry, new Set(["someone else"]))).toBe(false);
+    expect(entryHasDesigner(entry, new Set())).toBe(true);
   });
 
   test("difficultyDisplayLevel groups chart constants into player-facing levels", () => {
@@ -401,4 +456,194 @@ describe("catalog shared helpers", () => {
       ])
     ).toEqual(["13", "13+", "15"]);
   });
+
+  test("import order puts the newest arrival first regardless of version era", () => {
+    const oldSongJustImported = buildEntry({
+      id: "old",
+      versionid: 2,
+      imported_at: "2026-08-02T00:00:00.000Z",
+    });
+    const newSongImportedEarlier = buildEntry({
+      id: "new",
+      versionid: 26,
+      imported_at: "2026-07-13T00:00:00.000Z",
+    });
+
+    expect(
+      sortByImportedDesc([newSongImportedEarlier, oldSongJustImported]).map((e) => e.id)
+    ).toEqual(["old", "new"]);
+    // The version-era comparator disagrees — that is exactly the difference.
+    expect(
+      sortByReleaseDesc([oldSongJustImported, newSongImportedEarlier]).map((e) => e.id)
+    ).toEqual(["new", "old"]);
+  });
+
+  test("import order falls back to release order and sinks undated entries", () => {
+    const sameDayLow = buildEntry({ id: "low", versionid: 21, short_id: "100" });
+    const sameDayHigh = buildEntry({ id: "high", versionid: 21, short_id: "200" });
+    const undated = buildEntry({ id: "undated", versionid: 26, imported_at: undefined });
+
+    expect(
+      sortByImportedDesc([undated, sameDayLow, sameDayHigh]).map((e) => e.id)
+    ).toEqual(["high", "low", "undated"]);
+  });
+
+  test("sortByImportedDesc leaves the input array untouched", () => {
+    const entries = [
+      buildEntry({ id: "a", imported_at: "2026-07-13T00:00:00.000Z" }),
+      buildEntry({ id: "b", imported_at: "2026-08-02T00:00:00.000Z" }),
+    ];
+
+    sortByImportedDesc(entries);
+    expect(entries.map((entry) => entry.id)).toEqual(["a", "b"]);
+  });
+
+  test("recency is measured against the build's catalog, not a wall clock", () => {
+    const generatedAt = "2026-08-08T14:30:00.000Z";
+
+    expect(isRecentImport("2026-08-02T00:00:00.000Z", generatedAt)).toBe(true);
+    expect(isRecentImport("2026-07-13T00:00:00.000Z", generatedAt)).toBe(false);
+    // Exactly on the boundary still counts; a day past it does not.
+    expect(isRecentImport("2026-07-25T14:30:00.000Z", generatedAt)).toBe(true);
+    expect(isRecentImport("2026-07-24T14:29:00.000Z", generatedAt)).toBe(false);
+  });
+
+  test("recency tolerates skew ahead of the build and rejects unusable input", () => {
+    const generatedAt = "2026-08-08T14:30:00.000Z";
+
+    expect(isRecentImport("2026-08-09T00:00:00.000Z", generatedAt)).toBe(true);
+    expect(isRecentImport(undefined, generatedAt)).toBe(false);
+    expect(isRecentImport("not a date", generatedAt)).toBe(false);
+    expect(isRecentImport("2026-08-08T00:00:00.000Z", "not a date")).toBe(false);
+  });
 });
+
+describe("measured chart numbers", () => {
+  test("asset files carry the measured size of the file they map to", () => {
+    const entry = buildEntry({
+      file_bytes: { maidata: 12_000, audio: 4_000_000, background: 250_000, pv: 38_000_000 },
+    });
+
+    // file_bytes is keyed by source role, the files by in-archive name — the
+    // pairing is what this asserts.
+    expect(getChartAssetFiles(entry)).toEqual([
+      { name: "maidata.txt", url: "/adxcs/11951/maidata.txt", bytes: 12_000 },
+      { name: "track.mp3", url: "/covers/song-1/track.mp3", bytes: 4_000_000 },
+      { name: "bg.png", url: "/covers/song-1/bg.jpg", bytes: 250_000 },
+      { name: "pv.mp4", url: "/covers/song-1/pv.mp4", bytes: 38_000_000 },
+    ]);
+  });
+
+  test("an unmeasured file simply carries no size", () => {
+    const files = getChartAssetFiles(buildEntry({ file_bytes: { audio: 4_000_000 } }));
+
+    expect(files.find((file) => file.name === "track.mp3")?.bytes).toBe(4_000_000);
+    expect(files.find((file) => file.name === "bg.png")).not.toHaveProperty("bytes");
+  });
+
+  test("download sizes split the video out so a BGA toggle only re-adds a term", () => {
+    const charts = [
+      getChartDownloadSpec(
+        buildEntry({ file_bytes: { maidata: 10_000, audio: 4_000_000, pv: 38_000_000 } })
+      ),
+      getChartDownloadSpec(
+        buildEntry({ id: "song-2", file_bytes: { maidata: 20_000, audio: 6_000_000 } })
+      ),
+    ];
+
+    expect(sumChartDownloadBytes(charts)).toEqual({
+      baseBytes: 10_030_000,
+      videoBytes: 38_000_000,
+      // bg.png on both entries plus the second entry's pv.mp4.
+      unknownFiles: 3,
+    });
+  });
+
+  test("summing charts with nothing measured yields zeroes, never NaN", () => {
+    expect(sumChartDownloadBytes([getChartDownloadSpec(buildEntry())])).toEqual({
+      baseBytes: 0,
+      videoBytes: 0,
+      unknownFiles: 4,
+    });
+    expect(sumChartDownloadBytes([])).toEqual({
+      baseBytes: 0,
+      videoBytes: 0,
+      unknownFiles: 0,
+    });
+  });
+
+  test("duration formats as m:ss and refuses to invent one", () => {
+    expect(formatChartDuration(201_000)).toBe("3:21");
+    expect(formatChartDuration(59_400)).toBe("0:59");
+    expect(formatChartDuration(59_600)).toBe("1:00");
+    expect(formatChartDuration(0)).toBeNull();
+    expect(formatChartDuration(null)).toBeNull();
+    expect(formatChartDuration(undefined)).toBeNull();
+    expect(formatChartDuration(Number.NaN)).toBeNull();
+  });
+
+  test("BPM widens to a range only when the chart really changes tempo", () => {
+    expect(chartBpmDisplay(buildEntry({ bpm: 165, bpm_min: 90, bpm_max: 240 }))).toEqual({
+      text: "90–240",
+      variable: true,
+    });
+    // Equal extremes are a constant-tempo chart, not a range.
+    expect(chartBpmDisplay(buildEntry({ bpm: 165, bpm_min: 165, bpm_max: 165 }))).toEqual({
+      text: "165",
+      variable: false,
+    });
+    expect(chartBpmDisplay(buildEntry({ bpm: 165 }))).toEqual({ text: "165", variable: false });
+    expect(chartBpmDisplay(buildEntry({ bpm: null }))).toBeNull();
+  });
+
+  test("the headline note count is the busiest difficulty, ties going to the higher slot", () => {
+    const counts = (total: number) => ({
+      tap: total,
+      hold: 0,
+      slide: 0,
+      touch: 0,
+      touch_hold: 0,
+      break: 0,
+      total,
+    });
+
+    expect(
+      peakNoteDifficulty({
+        difficulties: [
+          { slot: 3, level: "12", designer: "", notes: counts(700) },
+          { slot: 4, level: "13", designer: "", notes: counts(1200) },
+          { slot: 5, level: "14", designer: "", notes: counts(900) },
+        ],
+      })?.slot
+    ).toBe(4);
+
+    expect(
+      peakNoteDifficulty({
+        difficulties: [
+          { slot: 3, level: "12", designer: "", notes: counts(900) },
+          { slot: 5, level: "14", designer: "", notes: counts(900) },
+        ],
+      })?.slot
+    ).toBe(5);
+
+    expect(peakNoteDifficulty({ difficulties: [{ slot: 3, level: "12", designer: "" }] })).toBeNull();
+  });
+});
+
+describe("isOptionalChartAssetFile", () => {
+  test("treats only maidata and the audio track as required", () => {
+    expect(isOptionalChartAssetFile("maidata.txt")).toBe(false);
+    expect(isOptionalChartAssetFile("track.mp3")).toBe(false);
+    // Cover art and the BGA movie are decoration AstroDX runs without.
+    expect(isOptionalChartAssetFile("bg.png")).toBe(true);
+    expect(isOptionalChartAssetFile("pv.mp4")).toBe(true);
+  });
+
+  test("matches on the basename so batch index prefixes do not fool it", () => {
+    // Batch jobs name every file `${chartIndex}/${name}`.
+    expect(isOptionalChartAssetFile("12/maidata.txt")).toBe(false);
+    expect(isOptionalChartAssetFile("12/pv.mp4")).toBe(true);
+    expect(isOptionalChartAssetFile("12/MAIDATA.TXT")).toBe(false);
+  });
+});
+

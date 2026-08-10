@@ -14,13 +14,17 @@ import {
   Gamepad2Icon,
   HardDriveIcon,
   HeartHandshakeIcon,
+  HistoryIcon,
   InfoIcon,
   LayersIcon,
   LibraryBigIcon,
+  LifeBuoyIcon,
   Link2Icon,
   MenuIcon,
   MessageSquareIcon,
+  Music2Icon,
   PlayCircleIcon,
+  ScaleIcon,
   SearchIcon,
   UploadIcon,
   UsersIcon,
@@ -42,6 +46,7 @@ import {
 } from "@/lib/resource-links";
 import { CompatibleImage, compatibleSourcesFromPng } from "@/components/site/compatible-image";
 import { HEADER_ACTION_CLASS } from "@/components/site/header-actions";
+import { LanguageSwitcher } from "@/components/site/language-switcher";
 import { useRandomChartNavigation } from "@/components/site/random-chart-button";
 import { SiteSettingsPanel } from "@/components/site/site-settings-panel";
 import {
@@ -154,6 +159,11 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
   const secondaryNavGroups: NavItem[][] = [
     [
       {
+        href: switchLocale("/guide", locale),
+        label: dictionary.guide.navLabel,
+        icon: <LifeBuoyIcon />,
+      },
+      {
         href: ASTRODX_SITE_URL,
         label: dictionary.resources.official,
         icon: <Gamepad2Icon />,
@@ -208,6 +218,16 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
     ],
     [
       {
+        href: switchLocale("/changelog", locale),
+        label: dictionary.changelog.navLabel,
+        icon: <HistoryIcon />,
+      },
+      {
+        href: switchLocale("/music", locale),
+        label: dictionary.music.navLabel,
+        icon: <Music2Icon />,
+      },
+      {
         href: switchLocale("/links", locale),
         label: dictionary.links.navLabel,
         icon: <Link2Icon />,
@@ -221,6 +241,11 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
         href: switchLocale("/about", locale),
         label: dictionary.about.navLabel,
         icon: <InfoIcon />,
+      },
+      {
+        href: switchLocale("/license", locale),
+        label: dictionary.license.navLabel,
+        icon: <ScaleIcon />,
       },
       {
         href: SERVER_STATUS_URL,
@@ -278,7 +303,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             </motion.div>
             <div className="flex min-w-0 flex-col">
               <span className="truncate text-sm font-semibold tracking-wide text-primary">
-                ADX 谱面资源
+                {dictionary.siteName}
               </span>
               {/* Wraps mid-word on narrow phones — the badge and menu need the room more. */}
               {/* Decorative tagline collapses when compact; initial={false} keeps the
@@ -398,6 +423,11 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             <DicesIcon className={cn(randomBusy && "animate-spin")} aria-hidden="true" />
             <span className="hidden md:inline">{dictionary.nav.randomLabel}</span>
           </Button>
+          {/* The only visible way to change language used to be a gear icon
+              labelled 设置 in Chinese — unreadable to exactly the visitors who
+              needed it. The switcher shows the current locale's short label so
+              the control announces what it does before it is opened. */}
+          <LanguageSwitcher locale={locale} pathname={pathname} />
           <SiteSettingsPanel
             locale={locale}
             pathname={pathname}
@@ -455,17 +485,33 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
                     aria-label={dictionary.nav.moreLabel}
                     className="grid gap-0.5"
                   >
-                    {secondaryNavGroups[0].map((item) => (
-                      <DropdownMenuItem
-                        key={item.href}
-                        asChild
-                        className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug"
-                      >
-                        <a href={item.href} target="_blank" rel="noreferrer">
-                          <NavItemContent item={item} showExternal />
-                        </a>
-                      </DropdownMenuItem>
-                    ))}
+                    {/* Mixed group: /guide is an in-site page, the rest are
+                        external resources — only the latter get a new tab and
+                        the external arrow. */}
+                    {secondaryNavGroups[0].map((item) => {
+                      const active = isActive(item);
+                      return (
+                        <DropdownMenuItem
+                          key={item.href}
+                          asChild
+                          className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug"
+                        >
+                          {item.external ? (
+                            <a href={item.href} target="_blank" rel="noreferrer">
+                              <NavItemContent item={item} showExternal />
+                            </a>
+                          ) : (
+                            <Link
+                              href={item.href}
+                              aria-current={active ? "page" : undefined}
+                              data-state={active ? "checked" : undefined}
+                            >
+                              <NavItemContent item={item} />
+                            </Link>
+                          )}
+                        </DropdownMenuItem>
+                      );
+                    })}
                   </div>
                 </div>
 

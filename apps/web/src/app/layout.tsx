@@ -3,8 +3,25 @@ import Script from "next/script";
 
 // Prefetch the remaining cross-document navigations without running their page
 // scripts. Unsupported browsers ignore this as progressive enhancement.
+//
+// The catalog page is excluded on purpose. In-site clicks are soft navigations
+// that fetch an RSC payload, so the speculatively prefetched *document* is
+// thrown away — and /charts inlines the whole card catalog, which makes that
+// wasted fetch the single most expensive one on the site (~263 KB gzip) at
+// `moderate` eagerness, i.e. as soon as a finger touches the link.
 const speculationRules = JSON.stringify({
-  prefetch: [{ where: { href_matches: "/*" }, eagerness: "moderate" }],
+  prefetch: [
+    {
+      where: {
+        and: [
+          { href_matches: "/*" },
+          { not: { href_matches: "/charts" } },
+          { not: { href_matches: "/:locale/charts" } },
+        ],
+      },
+      eagerness: "moderate",
+    },
+  ],
 });
 
 /**

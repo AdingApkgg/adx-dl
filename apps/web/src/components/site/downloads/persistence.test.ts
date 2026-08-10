@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { normalizePersistedFile } from "./persistence";
+import { classifyStorageError, normalizePersistedFile } from "./persistence";
 
 function baseRecord() {
   return {
@@ -87,5 +87,23 @@ describe("normalizePersistedFile", () => {
         blob: new Blob([new Uint8Array([1, 2])]),
       })
     ).toBeNull();
+  });
+});
+
+describe("classifyStorageError", () => {
+  test("recognises a quota failure by name or message", () => {
+    // Engines disagree on the shape: some throw a named DOMException, others a
+    // plain Error whose message is the only clue.
+    const named = new Error("write failed");
+    named.name = "QuotaExceededError";
+    expect(classifyStorageError(named)).toBe("quota");
+    expect(classifyStorageError(new Error("The quota has been exceeded."))).toBe(
+      "quota"
+    );
+  });
+
+  test("treats anything else as an unknown storage failure", () => {
+    expect(classifyStorageError(new Error("db closed"))).toBe("unknown");
+    expect(classifyStorageError(null)).toBe("unknown");
   });
 });

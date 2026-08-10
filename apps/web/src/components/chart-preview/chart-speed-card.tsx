@@ -2,8 +2,11 @@
 
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/lib/i18n";
-import { useGameStore } from "./store/game-store";
-import { useGameSettingsStore } from "./store/settings-store";
+import {
+  MAX_PLAYBACK_SPEED,
+  MIN_PLAYBACK_SPEED,
+  useGameSettingsStore,
+} from "./store/settings-store";
 
 type Labels = {
   hiSpeed: string;
@@ -54,8 +57,8 @@ export function ChartSpeedCard({
   const setAlwaysKeepHiSpeed = useGameSettingsStore(
     (s) => s.setAlwaysKeepHiSpeed,
   );
-  const playbackSpeed = useGameStore((s) => s.playbackSpeed);
-  const setPlaybackSpeed = useGameStore((s) => s.setPlaybackSpeed);
+  const playbackSpeed = useGameSettingsStore((s) => s.playbackSpeed);
+  const setPlaybackSpeed = useGameSettingsStore((s) => s.setPlaybackSpeed);
 
   return (
     <div
@@ -90,8 +93,8 @@ export function ChartSpeedCard({
         </span>
         <input
           type="range"
-          min={0.1}
-          max={1}
+          min={MIN_PLAYBACK_SPEED}
+          max={MAX_PLAYBACK_SPEED}
           step={0.05}
           value={playbackSpeed}
           onChange={(e) => setPlaybackSpeed(Number(e.target.value))}

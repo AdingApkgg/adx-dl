@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
   // src/app/page-transition.tsx. Hard loads use @view-transition in globals.css.
   experimental: {
     viewTransition: true,
+    // `radix-ui` is a namespace barrel over ~35 primitives; the app renders 9 of
+    // them, but the whole barrel landed in the shared first-load chunk. Same
+    // story for lucide-react's icon index. Rewriting these to per-primitive
+    // deep imports at build time is compatible with `output: "export"`.
+    optimizePackageImports: ["radix-ui", "lucide-react"],
   },
   images: {
     unoptimized: true,

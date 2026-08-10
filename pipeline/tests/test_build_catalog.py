@@ -15,6 +15,8 @@ from tools.build_catalog import (
     MEDIA_BASE,
     _aliases_for,
     _apply_utage_kanji,
+    _carry_forward_timestamps,
+    _content_fingerprint,
     _is_utage,
     _report_utage_signal_conflicts,
     build_catalog,
@@ -616,6 +618,80 @@ class BuildCatalogTests(unittest.TestCase):
 
         # lxns still contributes even though yuzuchan errored.
         self.assertEqual(fetch_alias_map(fetch), {8: ["真爱"]})
+
+
+class EnrichedFieldFingerprintTests(unittest.TestCase):
+    """The enrichment pass must not make the next build restamp the catalog.
+
+    apps/web/scripts/enrich-chart-details.ts writes note counts, durations, BPM
+    ranges, sizes and romaji into index.json after the build. The next build
+    reads that file back as "previous entries" — so if any enriched field
+    counted towards the content fingerprint, every entry would look changed and
+    all 1800+ `imported_at` values (and therefore every sitemap `lastmod`) would
+    be rewritten on each run.
+    """
+
+    def _base_entry(self) -> dict:
+        return {
+            "id": "chart-1",
+            "title": "シスターに懺悔を",
+            "title_en": "",
+            "artist": "廃原メモリ",
+            "artist_en": "",
+            "bpm": 180,
+            "difficulties": [{"slot": 4, "name": "Expert", "level": "10.6", "designer": "-"}],
+            "media": {"cover_avif": "", "cover_webp": ""},
+            "imported_at": "2026-01-01T00:00:00+00:00",
+        }
+
+    def test_enriched_entry_fields_do_not_change_the_fingerprint(self) -> None:
+        plain = self._base_entry()
+        enriched = self._base_entry()
+        enriched.update(
+            {
+                "title_en": "Confess to the Sister",
+                "artist_en": "Haibara Memory",
+                "title_romaji": "shisutaani懺悔wo",
+                "artist_romaji": "廃原memori",
+                "duration_ms": 118_000,
+                "bpm_min": 90,
+                "bpm_max": 240,
+                "file_bytes": {"maidata": 4957, "audio": 3_437_279},
+            }
+        )
+
+        self.assertEqual(_content_fingerprint(plain), _content_fingerprint(enriched))
+
+    def test_enriched_difficulty_fields_do_not_change_the_fingerprint(self) -> None:
+        plain = self._base_entry()
+        enriched = self._base_entry()
+        enriched["difficulties"][0]["notes"] = {
+            "tap": 296, "hold": 16, "slide": 33,
+            "touch": 0, "touch_hold": 0, "break": 23, "total": 368,
+        }
+        enriched["difficulties"][0]["duration_ms"] = 98_324
+
+        self.assertEqual(_content_fingerprint(plain), _content_fingerprint(enriched))
+
+    def test_real_content_changes_still_change_the_fingerprint(self) -> None:
+        plain = self._base_entry()
+        changed = self._base_entry()
+        changed["difficulties"][0]["level"] = "10.9"
+
+        self.assertNotEqual(_content_fingerprint(plain), _content_fingerprint(changed))
+
+    def test_carry_forward_keeps_timestamps_across_an_enriched_previous_build(self) -> None:
+        previous = self._base_entry()
+        previous["title_en"] = "Confess to the Sister"
+        previous["duration_ms"] = 118_000
+        previous["difficulties"][0]["notes"] = {"total": 368}
+        fresh = self._base_entry()
+        fresh["imported_at"] = "2026-08-10T00:00:00+00:00"
+
+        carried = _carry_forward_timestamps([fresh], [previous])
+
+        self.assertEqual(carried, 1)
+        self.assertEqual(fresh["imported_at"], "2026-01-01T00:00:00+00:00")
 
 
 if __name__ == "__main__":

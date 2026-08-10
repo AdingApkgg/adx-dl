@@ -1,22 +1,24 @@
 "use client";
 
 import * as React from "react";
-import { createPortal } from "react-dom";
-import { CheckIcon, FilmIcon, Maximize2Icon, MessageCircleIcon, Share2Icon, XIcon } from "lucide-react";
+import {
+  CheckIcon,
+  FilmIcon,
+  MessageCircleIcon,
+  PlayCircleIcon,
+  Share2Icon,
+} from "lucide-react";
 
 import { ChartPreviewIsland } from "@/components/chart-preview/chart-preview-island";
-import {
-  AnimatePresence,
-  EASE_OUT,
-  backdropVariants,
-  dialogVariants,
-  motion,
-  sheetVariants,
-  springSoft,
-} from "@/components/motion";
 import { ChartComments } from "@/components/site/chart-comments";
 import { ChartMediaPlayer } from "@/components/site/chart-media-player";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Tooltip,
   TooltipContent,
@@ -26,9 +28,28 @@ import {
 import { formatEntryTitle, localChartAssetUrl, type CatalogEntry } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
-import { cn } from "@/lib/utils";
+import { cn, TAP_TARGET_44 } from "@/lib/utils";
 
 type DetailPanel = "media" | "preview" | "comments" | null;
+
+/**
+ * Asks the (client) actions block to open the preview on a specific difficulty.
+ *
+ * The difficulty table lives in the server-rendered page body, so a shared
+ * window event is what connects the two without pulling the whole table into a
+ * client component or forcing a full page navigation through `?diff=`.
+ */
+export const OPEN_CHART_PREVIEW_EVENT = "astrodx-open-chart-preview";
+
+export type OpenChartPreviewDetail = { slot?: number };
+
+/** Reads `?diff=` — the difficulty half of a shared preview deep link. */
+function readDifficultyParam(params: URLSearchParams): number | null {
+  // Empty (`?diff=`) must stay "unset": Number("") is 0, which is a real slot.
+  const raw = params.get("diff")?.trim();
+  const value = raw ? Number(raw) : Number.NaN;
+  return Number.isInteger(value) && value >= 0 ? value : null;
+}
 
 type ChartDetailActionsProps = {
   entry: CatalogEntry;
@@ -60,11 +81,33 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
     (entry.assets.has_pv && Boolean(entry.media.pv_url)) ||
     (entry.assets.has_audio && Boolean(entry.media.audio_url));
   const hasChartPreview = Boolean(entry.files.maidata);
-  const portalRoot = typeof document === "undefined" ? null : document.body;
 
-  // ?preview=1 deep link + URL sync, in ONE effect so ordering stays right.
-  // The deep link applies after hydration — the server always renders the
-  // closed state, and deciding from location during the hydration render
+  // Which difficulty the preview opens on. Null = the chart's highest, which is
+  // what a bare link means. A `?diff=` link (or a click on a difficulty row)
+  // pins a specific slot: without it, a link copied on EXPERT reopened on
+  // MASTER at the same beat — a completely different chart at that timestamp.
+  const [previewDifficulty, setPreviewDifficulty] = React.useState<number | null>(null);
+  const highestDifficulty =
+    entry.difficulties.length > 0
+      ? Math.max(...entry.difficulties.map((difficulty) => difficulty.slot))
+      : undefined;
+
+  React.useEffect(() => {
+    if (!hasChartPreview) return;
+    const openPreview = (event: Event) => {
+      const detail = (event as CustomEvent<OpenChartPreviewDetail>).detail;
+      if (typeof detail?.slot === "number") {
+        setPreviewDifficulty(detail.slot);
+      }
+      setActivePanel("preview");
+    };
+    window.addEventListener(OPEN_CHART_PREVIEW_EVENT, openPreview);
+    return () => window.removeEventListener(OPEN_CHART_PREVIEW_EVENT, openPreview);
+  }, [hasChartPreview]);
+
+  // ?preview=1&diff= deep link + URL sync, in ONE effect so ordering stays
+  // right. The deep link applies after hydration — the server always renders
+  // the closed state, and deciding from location during the hydration render
   // mismatches the trees. On that first pass the URL is left untouched
   // (?beat= must survive until the preview mounts and consumes it); after
   // that, replaceState (no history spam) mirrors the toggle so a refresh
@@ -76,24 +119,41 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
     if (!previewFlagInitializedRef.current) {
       previewFlagInitializedRef.current = true;
       if (flagged && hasChartPreview) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time URL-derived initial state, applied post-hydration on purpose
+        const requested = readDifficultyParam(url.searchParams);
+        /* eslint-disable react-hooks/set-state-in-effect -- one-time URL-derived initial state, applied post-hydration on purpose */
+        if (requested !== null) {
+          setPreviewDifficulty(requested);
+        }
         setActivePanel("preview");
+        /* eslint-enable react-hooks/set-state-in-effect */
         return;
       }
     }
-    if (activePanel === "preview" && !flagged) {
+    if (activePanel === "preview") {
+      const slot = previewDifficulty;
+      const diffParam = slot === null ? null : String(slot);
+      if (flagged && url.searchParams.get("diff") === diffParam) {
+        return;
+      }
       url.searchParams.set("preview", "1");
+      if (diffParam === null) {
+        url.searchParams.delete("diff");
+      } else {
+        url.searchParams.set("diff", diffParam);
+      }
     } else if (
-      activePanel !== "preview" &&
-      (flagged || url.searchParams.has("beat"))
+      flagged ||
+      url.searchParams.has("beat") ||
+      url.searchParams.has("diff")
     ) {
       url.searchParams.delete("preview");
       url.searchParams.delete("beat");
+      url.searchParams.delete("diff");
     } else {
       return;
     }
     window.history.replaceState(window.history.state, "", url);
-  }, [activePanel, hasChartPreview]);
+  }, [activePanel, hasChartPreview, previewDifficulty]);
 
   const [shareCopied, setShareCopied] = React.useState(false);
   const shareResetTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -136,114 +196,123 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
     }
   }, [title]);
 
-  React.useEffect(() => {
-    if (!activePanel) {
-      return;
-    }
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setActivePanel(null);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [activePanel]);
+  // Radix owns Escape, the scroll lock and the focus lifecycle now; only one
+  // panel is mounted at a time, so `activePanel` alone decides which.
+  const closePanel = React.useCallback(() => setActivePanel(null), []);
 
-  // Each branch carries a stable key so AnimatePresence can play the exit
-  // animation of the outgoing panel after activePanel goes null (or switches).
   const overlay =
     activePanel === "media" ? (
-      <CenteredDialog
-        key="media"
+      <DetailPanel
         title={mediaLabel}
         closeLabel={closeLabel}
-        onClose={() => setActivePanel(null)}
+        variant="centered"
+        onClose={closePanel}
       >
-        <ChartMediaPlayer entry={entry} locale={locale} />
-      </CenteredDialog>
+        <div className="p-4">
+          <ChartMediaPlayer entry={entry} locale={locale} />
+        </div>
+      </DetailPanel>
     ) : activePanel === "comments" ? (
-      <CenteredDialog
-        key="comments"
+      <DetailPanel
         title={detail.comments}
         closeLabel={closeLabel}
+        variant="centered"
         className="max-w-3xl"
-        onClose={() => setActivePanel(null)}
+        onClose={closePanel}
       >
-        <ChartComments
-          pageKey={`/charts/${entrySlug(entry)}`}
-          pageTitle={title}
-          locale={locale}
-        />
-      </CenteredDialog>
+        <div className="p-4">
+          <ChartComments
+            pageKey={`/charts/${entrySlug(entry)}`}
+            pageTitle={title}
+            locale={locale}
+          />
+        </div>
+      </DetailPanel>
     ) : activePanel === "preview" ? (
-      <FullscreenOverlay
-        key="preview"
+      <DetailPanel
         title={detail.chartPreview}
         closeLabel={closeLabel}
-        onClose={() => setActivePanel(null)}
+        variant="fullscreen"
+        onClose={closePanel}
       >
-        <ChartPreviewIsland
-          maidataUrl={previewAssets.maidataUrl}
-          audioUrl={previewAssets.audioUrl}
-          videoUrl={previewAssets.videoUrl}
-          coverUrl={previewAssets.coverUrl}
-          chartName={`${entry.short_id || entry.id}-${title}`}
-          locale={locale}
-          deferUntilNearViewport={false}
-          levels={Object.fromEntries(entry.difficulties.map((d) => [d.slot, d.level]))}
-          defaultDifficulty={
-            entry.difficulties.length > 0
-              ? Math.max(...entry.difficulties.map((d) => d.slot))
-              : undefined
-          }
-        />
-      </FullscreenOverlay>
+        <div className="mx-auto w-full max-w-7xl px-4 pb-6 pt-4 md:px-6">
+          <ChartPreviewIsland
+            maidataUrl={previewAssets.maidataUrl}
+            audioUrl={previewAssets.audioUrl}
+            videoUrl={previewAssets.videoUrl}
+            coverUrl={previewAssets.coverUrl}
+            chartName={`${entry.short_id || entry.id}-${title}`}
+            locale={locale}
+            deferUntilNearViewport={false}
+            levels={Object.fromEntries(entry.difficulties.map((d) => [d.slot, d.level]))}
+            defaultDifficulty={previewDifficulty ?? highestDifficulty}
+          />
+        </div>
+      </DetailPanel>
     ) : null;
 
   return (
     <>
       <TooltipProvider>
-        <div className="flex items-center gap-1.5" aria-label={detail.preview}>
-          {hasMedia ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-3" role="group" aria-label={detail.actionsLabel}>
+            {/* The preview is the one action worth a full-width button: it was
+                a 40px Maximize2 icon, which everyone reads as "enlarge the
+                cover", behind a Radix tooltip that bails out on touch
+                pointers — i.e. an unlabelled square on every phone. */}
+            {hasChartPreview ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setActivePanel("preview")}
+              >
+                <PlayCircleIcon data-icon="inline-start" aria-hidden="true" />
+                {detail.chartPreview}
+              </Button>
+            ) : null}
+            {hasMedia ? (
+              <ActionIconButton
+                label={mediaLabel}
+                onClick={() => setActivePanel("media")}
+              >
+                <FilmIcon aria-hidden="true" />
+              </ActionIconButton>
+            ) : null}
+            <ActionIconButton label={detail.comments} onClick={() => setActivePanel("comments")}>
+              <MessageCircleIcon aria-hidden="true" />
+            </ActionIconButton>
             <ActionIconButton
-              label={mediaLabel}
-              onClick={() => setActivePanel("media")}
+              label={shareCopied ? detail.shareCopied : detail.share}
+              onClick={handleShare}
             >
-              <FilmIcon aria-hidden="true" />
+              {shareCopied ? (
+                <CheckIcon aria-hidden="true" />
+              ) : (
+                <Share2Icon aria-hidden="true" />
+              )}
             </ActionIconButton>
-          ) : null}
+          </div>
           {hasChartPreview ? (
-            <ActionIconButton label={detail.chartPreview} onClick={() => setActivePanel("preview")}>
-              <Maximize2Icon aria-hidden="true" />
-            </ActionIconButton>
+            <p className="max-w-xs text-xs text-muted-foreground">
+              {detail.chartPreviewDescription}
+            </p>
           ) : null}
-          <ActionIconButton label={detail.comments} onClick={() => setActivePanel("comments")}>
-            <MessageCircleIcon aria-hidden="true" />
-          </ActionIconButton>
-          <ActionIconButton
-            label={shareCopied ? detail.shareCopied : detail.share}
-            onClick={handleShare}
-          >
-            {shareCopied ? (
-              <CheckIcon aria-hidden="true" />
-            ) : (
-              <Share2Icon aria-hidden="true" />
-            )}
-          </ActionIconButton>
         </div>
       </TooltipProvider>
-      {/* AnimatePresence stays mounted (overlay open/closed state lives above
-          it) so Escape / backdrop close unmounts through the exit animation. */}
-      {portalRoot ? createPortal(<AnimatePresence>{overlay}</AnimatePresence>, portalRoot) : null}
+      {/* Radix portals the panel itself, so no extra portal here. */}
+      {overlay}
     </>
   );
 }
 
+/**
+ * Icon action that stops being icon-only where a tooltip can never appear.
+ *
+ * Radix Tooltip returns early on touch pointers by design, so on a phone these
+ * were four unlabelled squares. Rather than bolt a tap-to-reveal popover on
+ * top, the label itself becomes visible under `(hover: none)` — no JS, no
+ * hydration branch, and it survives a device that reports both input types.
+ */
 function ActionIconButton({
   label,
   onClick,
@@ -256,8 +325,21 @@ function ActionIconButton({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button type="button" variant="outline" size="icon" aria-label={label} onClick={onClick}>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className={cn(
+            TAP_TARGET_44,
+            "[@media(hover:none)]:size-auto [@media(hover:none)]:h-8 [@media(hover:none)]:gap-1.5 [@media(hover:none)]:px-2.5"
+          )}
+          aria-label={label}
+          onClick={onClick}
+        >
           {children}
+          <span className="sr-only [@media(hover:none)]:not-sr-only" aria-hidden="true">
+            {label}
+          </span>
         </Button>
       </TooltipTrigger>
       <TooltipContent sideOffset={6}>{label}</TooltipContent>
@@ -265,99 +347,93 @@ function ActionIconButton({
   );
 }
 
-function CenteredDialog({
+/**
+ * A difficulty row that opens the preview already switched to that difficulty.
+ * Rendered inside the (server) difficulty table, so it only carries the click →
+ * event hop; all preview state stays in ChartDetailActions.
+ */
+export function PreviewDifficultyTrigger({
+  slot,
+  label,
+  className,
+  children,
+}: {
+  slot: number;
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      className={cn(
+        "rounded-md transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+        className
+      )}
+      onClick={() =>
+        window.dispatchEvent(
+          new CustomEvent<OpenChartPreviewDetail>(OPEN_CHART_PREVIEW_EVENT, {
+            detail: { slot },
+          })
+        )
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Panel shell for the detail overlays.
+ *
+ * These were hand-rolled `motion.div`s with `role="dialog"`, an Esc handler and
+ * a body scroll lock — but no focus trap, no initial focus and no focus
+ * restore, so a keyboard user tabbed straight out of the open panel into the
+ * page behind it and never got their place back on close. Radix Dialog (via
+ * ui/sheet) gives all three, plus the aria-modal wiring, for free; the only
+ * thing left here is the layout choice.
+ */
+function DetailPanel({
   title,
   closeLabel,
+  variant,
   className,
   children,
   onClose,
 }: {
   title: string;
   closeLabel: string;
+  variant: "centered" | "fullscreen";
   className?: string;
   children: React.ReactNode;
   onClose: () => void;
 }) {
   return (
-    <motion.div
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
-      variants={backdropVariants}
-      initial="hidden"
-      animate="visible"
-      exit="hidden"
-      transition={{ duration: 0.2, ease: EASE_OUT }}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
+    <Sheet
+      open
+      onOpenChange={(next) => {
+        if (!next) {
           onClose();
         }
       }}
     >
-      {/* The panel inherits hidden/visible/exit labels from the backdrop and
-          rises on its own spring while the backdrop just fades. */}
-      <motion.div
-        variants={dialogVariants}
-        transition={springSoft}
-        className={cn(
-          "flex max-h-[min(88vh,760px)] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-border/70 bg-popover shadow-2xl",
-          className
-        )}
+      <SheetContent
+        variant={variant}
+        closeLabel={closeLabel}
+        // No prose description exists for any of these panels; telling Radix so
+        // explicitly is what silences its development warning.
+        aria-describedby={undefined}
+        className={cn("overflow-hidden", className)}
       >
-        <DialogHeader title={title} closeLabel={closeLabel} onClose={onClose} />
-        <div className="min-h-0 overflow-y-auto p-4">{children}</div>
-      </motion.div>
-    </motion.div>
-  );
-}
-
-function FullscreenOverlay({
-  title,
-  closeLabel,
-  children,
-  onClose,
-}: {
-  title: string;
-  closeLabel: string;
-  children: React.ReactNode;
-  onClose: () => void;
-}) {
-  return (
-    <motion.div
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      className="fixed inset-0 z-[60] flex min-h-dvh flex-col bg-background"
-      variants={sheetVariants}
-      initial="hidden"
-      animate="visible"
-      exit="hidden"
-      transition={springSoft}
-    >
-      <DialogHeader title={title} closeLabel={closeLabel} onClose={onClose} />
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-4 md:px-6">
-        <div className="mx-auto w-full max-w-7xl">{children}</div>
-      </div>
-    </motion.div>
-  );
-}
-
-function DialogHeader({
-  title,
-  closeLabel,
-  onClose,
-}: {
-  title: string;
-  closeLabel: string;
-  onClose: () => void;
-}) {
-  return (
-    <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border/70 px-4">
-      <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{title}</h2>
-      <Button type="button" variant="ghost" size="icon-sm" aria-label={closeLabel} onClick={onClose}>
-        <XIcon aria-hidden="true" />
-      </Button>
-    </div>
+        <SheetHeader className="flex h-12 shrink-0 flex-row items-center gap-3 space-y-0 border-b border-border/70 pl-4 pr-12">
+          <SheetTitle className="min-w-0 flex-1 truncate text-sm font-medium">
+            {title}
+          </SheetTitle>
+        </SheetHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+      </SheetContent>
+    </Sheet>
   );
 }

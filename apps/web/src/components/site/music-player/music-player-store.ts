@@ -28,6 +28,18 @@ export type MusicPlayerManifestInput =
       playlists: Readonly<Record<string, readonly MusicTrack[]>>;
     };
 
+/**
+ * A "start this version" ask from somewhere outside the player (the /music
+ * page). The player owns the single <audio> element and every autoplay rule
+ * around it, so remote surfaces post an intent here instead of touching
+ * playback; the token makes a repeat click on the same version a new request
+ * rather than a no-op state write.
+ */
+export type MusicPlayRequest = {
+  versionId: string;
+  token: number;
+};
+
 export type MusicPlayerState = {
   tracksByVersion: MusicTracksByVersion;
   versionId: string | null;
@@ -40,6 +52,7 @@ export type MusicPlayerState = {
   error: string | null;
   hydrated: boolean;
   restorePending: boolean;
+  playRequest: MusicPlayRequest | null;
 };
 
 export type MusicPlayerActions = {
@@ -60,6 +73,9 @@ export type MusicPlayerActions = {
   setVolume: (volume: number) => void;
   setMuted: (muted: boolean) => void;
   setError: (error: string | null) => void;
+  /** Ask the mounted player to switch to `versionId` and start playing it. */
+  requestVersionPlayback: (versionId: string | number) => void;
+  clearPlayRequest: () => void;
 };
 
 export type MusicPlayerStore = MusicPlayerState & MusicPlayerActions;
@@ -80,6 +96,7 @@ const INITIAL_STATE: MusicPlayerState = {
   error: null,
   hydrated: false,
   restorePending: false,
+  playRequest: null,
 };
 
 function boundedRandom(random: MusicPlayerRandom): number {
@@ -507,6 +524,25 @@ export function createMusicPlayerStore(
       })),
     setMuted: (muted) => set({ muted }),
     setError: (error) => set({ error }),
+
+    requestVersionPlayback: (requestedVersionId) => {
+      const versionId = normalizeVersionId(requestedVersionId);
+      if (versionId === null) {
+        return;
+      }
+      // A pending bootstrap snapshot would otherwise win once the manifest
+      // lands and drag playback back to the restored version.
+      pendingBootstrapSnapshot = null;
+      set((state) => ({
+        playRequest: {
+          versionId,
+          token: (state.playRequest?.token ?? 0) + 1,
+        },
+        restorePending: false,
+      }));
+    },
+
+    clearPlayRequest: () => set({ playRequest: null }),
   }));
 }
 

@@ -7,6 +7,11 @@ export type ContentBlock =
   | { type: "p"; text: string }
   | { type: "list"; items: string[] }
   | { type: "steps"; items: string[] }
+  // Question/answer pairs. A distinct block (rather than alternating <p>s) so a
+  // page can emit FAQPage JSON-LD from the very data it renders — the schema
+  // requires the answers to be visible on the page, and a second hand-kept copy
+  // of the same text is what makes that requirement quietly fail.
+  | { type: "qa"; items: { q: string; a: string }[] }
   | { type: "links"; items: { label: string; url: string; note?: string }[] };
 
 export type ContentSection = {

@@ -26,6 +26,17 @@ function Block({ block }: { block: ContentBlock }) {
           ))}
         </ol>
       );
+    case "qa":
+      return (
+        <dl className="flex flex-col gap-4">
+          {block.items.map((item) => (
+            <div key={item.q} className="flex flex-col gap-1">
+              <dt className="font-medium text-foreground">{item.q}</dt>
+              <dd className="leading-relaxed text-muted-foreground">{item.a}</dd>
+            </div>
+          ))}
+        </dl>
+      );
     case "links":
       return (
         <ul className="flex list-none flex-col gap-1.5 p-0">

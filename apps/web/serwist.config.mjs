@@ -19,7 +19,10 @@ const config = {
   globPatterns: [
     "_next/static/**/*.{js,css}",
     "offline.html",
+    // One manifest per locale tree: an installed /ja or /en app must find its
+    // own manifest offline, not fall back to the zh one.
     "site.webmanifest",
+    "{en,ja}/site.webmanifest",
     "favicon.ico",
     "favicon-32x32.png",
     "icon-192.png",

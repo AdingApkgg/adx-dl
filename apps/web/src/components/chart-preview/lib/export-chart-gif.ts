@@ -1,5 +1,5 @@
 import { GIFEncoder, applyPalette, quantize } from "gifenc";
-import { MainRenderer, type Chart } from "@lxns-network/maimai-chart-engine";
+import { MainRenderer, type Chart, type HudLabels } from "@lxns-network/maimai-chart-engine";
 import type { GameSettingsState } from "../store/settings-store";
 import { msToBeats } from "./time-conversion";
 
@@ -24,7 +24,11 @@ type ExportChartGifOptions = {
     | "normalColorBreakSlide"
     | "showFireworks"
     | "showHitEffect"
+    | "showNoteTotal"
+    | "showBreakCount"
   >;
+  /** Localized HUD wording — the engine paints it into every exported frame. */
+  hudLabels?: HudLabels;
   size?: number;
   fps?: number;
   onProgress?: (progress: number) => void;
@@ -92,6 +96,7 @@ export async function exportChartGif({
   range,
   beatsPerMeasure,
   settings,
+  hudLabels,
   size = DEFAULT_EXPORT_SIZE,
   fps = DEFAULT_EXPORT_FPS,
   onProgress,
@@ -120,6 +125,11 @@ export async function exportChartGif({
   renderer.setNormalColorBreakSlide(settings.normalColorBreakSlide);
   renderer.setShowFireworks(settings.showFireworks);
   renderer.setShowHitEffect(settings.showHitEffect);
+  renderer.setShowNoteTotal(settings.showNoteTotal);
+  renderer.setShowBreakCount(settings.showBreakCount);
+  if (hudLabels) {
+    renderer.setHudLabels(hudLabels);
+  }
 
   const ctx = canvas.getContext("2d");
   if (!ctx) {

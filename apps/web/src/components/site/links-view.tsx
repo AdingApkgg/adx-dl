@@ -18,7 +18,7 @@ export function LinksView({ locale = "zh" }: { locale?: Locale }) {
           pathname: "/links",
           title: links.title,
           description: seo.links,
-          items: friendLinks.map((link) => ({ name: link.name, url: link.url })),
+          items: friendLinks.map((link) => ({ name: link.name[locale], url: link.url })),
         })}
       />
       <Reveal className="flex flex-col gap-2">
@@ -33,10 +33,10 @@ export function LinksView({ locale = "zh" }: { locale?: Locale }) {
           <li key={link.url}>
             <FriendLinkCard
               href={link.url}
-              name={link.name}
+              name={link.name[locale]}
               description={link.description[locale]}
               hostname={hostnameOf(link.url)}
-              ariaLabel={`${links.visit} ${link.name}`}
+              ariaLabel={links.visitLink(link.name[locale])}
             />
           </li>
         ))}

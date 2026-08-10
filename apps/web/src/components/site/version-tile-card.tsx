@@ -29,6 +29,12 @@ type VersionTileCardProps = {
   imageIndex: number | null;
   count: number;
   locale: Locale;
+  /**
+   * Overrides the corner badge text. /music counts playable tracks rather than
+   * charts, and "N charts" would be a different (smaller) number than the one
+   * its play button actually queues.
+   */
+  countLabel?: string;
   /** Select mode swaps the top-left #index badge for a checkbox (batch download). */
   selectMode?: boolean;
   selected?: boolean;
@@ -46,6 +52,7 @@ export function VersionTileCard({
   imageIndex,
   count,
   locale,
+  countLabel,
   selectMode = false,
   selected = false,
 }: VersionTileCardProps) {
@@ -147,7 +154,7 @@ export function VersionTileCard({
               : "bg-background/70 text-muted-foreground ring-border/50"
           )}
         >
-          {versions.chartCount(count)}
+          {countLabel ?? versions.chartCount(count)}
         </span>
       </div>
       <div className="flex items-center gap-1.5 px-3 pb-1" title={label}>

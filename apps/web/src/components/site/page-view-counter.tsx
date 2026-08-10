@@ -85,6 +85,9 @@ export function PageViewsProvider({ children }: { children: React.ReactNode }) {
     // Keep the previous totals visible while the next page's numbers load to
     // avoid a flash of empty counters in the footer on every navigation.
     keepPreviousData: true,
+    // Opt out of the provider's reconnect revalidation: this fetcher RECORDS a
+    // view, so re-running it after a network blip would inflate the counter.
+    revalidateOnReconnect: false,
   });
 
   return <PageViewsContext.Provider value={data}>{children}</PageViewsContext.Provider>;

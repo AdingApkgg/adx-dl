@@ -13,8 +13,10 @@ import {
   Loader2Icon,
   MaximizeIcon,
   MinimizeIcon,
+  GaugeIcon,
   PauseIcon,
   PlayIcon,
+  RepeatIcon,
   RotateCcwIcon,
   RotateCwSquareIcon,
   Share2Icon,
@@ -37,7 +39,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { cn, TAP_TARGET_44 } from "@/lib/utils";
 import { difficultyTone, DIFFICULTY_TONE_CLASS } from "@/lib/catalog-shared";
 import type { SiteDictionary } from "@/lib/i18n";
 import { useGameStore, playbackTimeRef } from "./store/game-store";
@@ -55,9 +57,18 @@ type PreviewDict = SiteDictionary["preview"];
 // framer-motion 12 removed the motion(Component) call form.
 const MotionButton = motion.create(Button);
 
-/** Transport icon button with a springy press-down. */
-function TapButton(props: ComponentProps<typeof MotionButton>) {
-  return <MotionButton whileTap={{ scale: 0.92 }} transition={springSoft} {...props} />;
+/** Transport icon button with a springy press-down. The 32px visual box is far
+ *  under the 44pt touch minimum, so every one of them carries the invisible
+ *  hit-area expansion (the strip's gap-3 is sized to keep those from colliding). */
+function TapButton({ className, ...props }: ComponentProps<typeof MotionButton>) {
+  return (
+    <MotionButton
+      whileTap={{ scale: 0.92 }}
+      transition={springSoft}
+      className={cn(TAP_TARGET_44, className)}
+      {...props}
+    />
+  );
 }
 
 /** Hover label for the icon-only strip (upstream parity). The container
@@ -82,11 +93,14 @@ function Tip({
 export type ChartControlsProps = {
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
-  /** Hide the fullscreen button where the Fullscreen API is unavailable (iOS Safari). */
-  fullscreenSupported: boolean;
-  /** Toggle the GIF range-selection overlay. */
-  onToggleGifRange: () => void;
-  gifRangeMode: boolean;
+  /** Toggle the A–B range-selection overlay (shared by the loop and GIF export). */
+  onToggleRangeMode: () => void;
+  rangeMode: boolean;
+  loopEnabled: boolean;
+  onToggleLoop: () => void;
+  /** Fullscreen-only speed panel (the sidebar card is not reachable there). */
+  speedPanelOpen: boolean;
+  onToggleSpeedPanel: () => void;
   gifExporting: boolean;
   gifProgress: number;
   /** Difficulty slot (2–6) → level string, from the catalog. */
@@ -100,9 +114,12 @@ export type ChartControlsProps = {
 export function ChartControls({
   isFullscreen,
   onToggleFullscreen,
-  fullscreenSupported,
-  onToggleGifRange,
-  gifRangeMode,
+  onToggleRangeMode,
+  rangeMode,
+  loopEnabled,
+  onToggleLoop,
+  speedPanelOpen,
+  onToggleSpeedPanel,
   gifExporting,
   gifProgress,
   levels,
@@ -140,6 +157,12 @@ export function ChartControls({
       "beat",
       Math.max(0, playbackTimeRef.current).toFixed(2)
     );
+    // The beat alone is not a moment: the same timestamp on EXPERT and on
+    // MASTER is two different charts, so the difficulty travels with it.
+    const currentDifficulty = useGameStore.getState().selectedDifficulty;
+    if (currentDifficulty !== null) {
+      url.searchParams.set("diff", String(currentDifficulty));
+    }
     try {
       await navigator.clipboard.writeText(url.toString());
       setTimeUrlCopied(true);
@@ -180,7 +203,7 @@ export function ChartControls({
       {/* One centered transport strip (upstream parity): steps + play, then
           the utility icons. Seeking lives on the density timeline's playhead
           and the export actions fold into the camera menu. */}
-      <div className="flex flex-wrap items-center justify-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-3">
         <Tip label={t.prevMeasure} container={menuContainer}>
           <TapButton type="button" size="icon" variant="outline" onClick={() => stepMeasure(-1)} disabled={disabled} aria-label={t.prevMeasure}>
             <SkipBackIcon aria-hidden="true" />
@@ -247,11 +270,26 @@ export function ChartControls({
           <Button
             type="button"
             size="icon"
+            className={TAP_TARGET_44}
             variant={soundEnabled ? "default" : "outline"}
             onClick={() => setSoundEnabled(!soundEnabled)}
             aria-label={soundEnabled ? t.soundOff : t.soundOn}
           >
             {soundEnabled ? <Volume2Icon aria-hidden="true" /> : <VolumeXIcon aria-hidden="true" />}
+          </Button>
+        </Tip>
+        <Tip label={loopEnabled ? t.loopRangeOff : t.loopRange} container={menuContainer}>
+          <Button
+            type="button"
+            size="icon"
+            className={TAP_TARGET_44}
+            variant={loopEnabled ? "default" : "outline"}
+            onClick={onToggleLoop}
+            disabled={disabled}
+            aria-pressed={loopEnabled}
+            aria-label={loopEnabled ? t.loopRangeOff : t.loopRange}
+          >
+            <RepeatIcon aria-hidden="true" />
           </Button>
         </Tip>
 
@@ -264,7 +302,8 @@ export function ChartControls({
               <Button
                 type="button"
                 size="icon"
-                variant={gifRangeMode || gifExporting ? "default" : "outline"}
+                className={TAP_TARGET_44}
+                variant={rangeMode || gifExporting ? "default" : "outline"}
                 disabled={disabled}
                 aria-label={t.exportMenu}
               >
@@ -295,13 +334,13 @@ export function ChartControls({
             ) : null}
             <DropdownMenuItem
               disabled={gifExporting}
-              onSelect={onToggleGifRange}
-              className={gifRangeMode ? "text-destructive" : undefined}
+              onSelect={onToggleRangeMode}
+              className={rangeMode ? "text-destructive" : undefined}
             >
               <FilmIcon aria-hidden="true" />
               {gifExporting
                 ? t.exportingPercent(Math.round(gifProgress * 100))
-                : gifRangeMode
+                : rangeMode
                   ? t.gifCancel
                   : t.exportGif}
             </DropdownMenuItem>
@@ -312,6 +351,7 @@ export function ChartControls({
           <Button
             type="button"
             size="icon"
+            className={TAP_TARGET_44}
             variant="outline"
             onClick={() => void copyTimeUrl()}
             disabled={disabled}
@@ -328,6 +368,7 @@ export function ChartControls({
           <Button
             type="button"
             size="icon"
+            className={TAP_TARGET_44}
             variant={viewRotation !== 0 ? "default" : "outline"}
             onClick={cycleViewRotation}
             aria-label={t.rotateView(viewRotation)}
@@ -335,16 +376,37 @@ export function ChartControls({
             <RotateCwSquareIcon aria-hidden="true" />
           </Button>
         </Tip>
-        {fullscreenSupported ? (
-          <Tip
-            label={isFullscreen ? t.exitFullscreen : t.fullscreen}
-            container={menuContainer}
-          >
-            <Button type="button" size="icon" variant="outline" onClick={onToggleFullscreen} aria-label={isFullscreen ? t.exitFullscreen : t.fullscreen}>
-              {isFullscreen ? <MinimizeIcon aria-hidden="true" /> : <MaximizeIcon aria-hidden="true" />}
+        {/* Fullscreen-only: everywhere else the speed card is already on screen
+            in the sidebar (or stacked under the player). */}
+        {isFullscreen ? (
+          <Tip label={t.speedPanel} container={menuContainer}>
+            <Button
+              type="button"
+              size="icon"
+              className={TAP_TARGET_44}
+              variant={speedPanelOpen ? "default" : "outline"}
+              onClick={onToggleSpeedPanel}
+              aria-pressed={speedPanelOpen}
+              aria-label={t.speedPanel}
+            >
+              <GaugeIcon aria-hidden="true" />
             </Button>
           </Tip>
         ) : null}
+        {/* No `fullscreenSupported` gate any more: browsers without the API get
+            the CSS-only pseudo-fullscreen instead of a missing button. */}
+        <Tip label={isFullscreen ? t.exitFullscreen : t.fullscreen} container={menuContainer}>
+          <Button
+            type="button"
+            size="icon"
+            className={TAP_TARGET_44}
+            variant="outline"
+            onClick={onToggleFullscreen}
+            aria-label={isFullscreen ? t.exitFullscreen : t.fullscreen}
+          >
+            {isFullscreen ? <MinimizeIcon aria-hidden="true" /> : <MaximizeIcon aria-hidden="true" />}
+          </Button>
+        </Tip>
       </div>
 
       {musicError ? (

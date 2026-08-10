@@ -1,10 +1,12 @@
-import { QQ_COMMUNITY, TELEGRAM_COMMUNITY } from "@/lib/community-links";
+import {
+  QQ_COMMUNITY,
+  SITE_REPOSITORY as SOURCE_REPOSITORY,
+  TELEGRAM_COMMUNITY,
+} from "@/lib/community-links";
 import type { ContentSection } from "@/lib/content-sections";
 import { ASTRODX_APP_REPOSITORY } from "@/lib/friend-links";
 import type { Locale } from "@/lib/i18n";
 
-// Keep in sync with the footer's source link in root-layout-shell.tsx.
-const SOURCE_REPOSITORY = "https://github.com/AdingApkgg/adx-dl";
 const SISTER_SITE_VNS = "https://gal.saop.cc/";
 
 export const aboutSections: Record<Locale, ContentSection[]> = {

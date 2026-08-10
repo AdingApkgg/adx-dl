@@ -11,6 +11,19 @@ import { motion, springSoft, useReducedMotion } from "@/components/motion";
 export function RetryButton({ label }: { label: string }) {
   const reducedMotion = useReducedMotion();
   const [reloading, setReloading] = React.useState(false);
+
+  // Nobody wants to sit on this page pressing a button. The moment the device
+  // reports a connection again, retry the navigation that failed — the button
+  // stays for the case where `online` fires but the origin is still down.
+  React.useEffect(() => {
+    const onOnline = () => {
+      setReloading(true);
+      window.location.reload();
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, []);
+
   return (
     <motion.button
       type="button"

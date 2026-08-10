@@ -1,7 +1,14 @@
 import type { Locale } from "@/lib/i18n";
 
 export type FriendLink = {
-  name: string;
+  /**
+   * Localized site name. Half of these sites only have a Chinese name in the
+   * wild, but the card's accessible name and the /links ItemList JSON-LD are
+   * both built from this string — leaving it monolingual meant an English or
+   * Japanese reader got a title they could not read, in the markup as well as
+   * on screen. A romanized/translated form is used where no official one exists.
+   */
+  name: Record<Locale, string>;
   url: string;
   description: Record<Locale, string>;
 };
@@ -23,7 +30,7 @@ export const ASTRODX_APP_REPOSITORY = "https://github.com/2394425147/astrodx";
 // rendered on /links and surfaced in the sitemap. Order follows editorial intent.
 export const friendLinks: FriendLink[] = [
   {
-    name: "AstroDX",
+    name: { zh: "AstroDX", en: "AstroDX", ja: "AstroDX" },
     url: ASTRODX_APP_REPOSITORY,
     description: {
       zh: "AstroDX 模拟器本体的开源仓库，可下载最新版应用。",
@@ -32,7 +39,11 @@ export const friendLinks: FriendLink[] = [
     },
   },
   {
-    name: "AWMC 下载站",
+    name: {
+      zh: "AWMC 下载站",
+      en: "AWMC Downloads",
+      ja: "AWMC ダウンロードサイト",
+    },
     url: "https://download.awmc.cc/",
     description: {
       zh: "AWMC 社区的谱面与资源下载站。",
@@ -41,7 +52,11 @@ export const friendLinks: FriendLink[] = [
     },
   },
   {
-    name: "OneCat 下载站",
+    name: {
+      zh: "OneCat 下载站",
+      en: "OneCat Downloads",
+      ja: "OneCat ダウンロードサイト",
+    },
     url: "https://dw.moant.cn:34225/onecat/#/official",
     description: {
       zh: "OneCat 的 ADX 谱面下载站。",
@@ -50,7 +65,7 @@ export const friendLinks: FriendLink[] = [
     },
   },
   {
-    name: "SimaiHub",
+    name: { zh: "SimaiHub", en: "SimaiHub", ja: "SimaiHub" },
     url: "https://simaihub.dev/",
     description: {
       zh: "新一代 maimai 谱面下载解决方案。",
@@ -59,7 +74,7 @@ export const friendLinks: FriendLink[] = [
     },
   },
   {
-    name: "AWMC BBS",
+    name: { zh: "AWMC BBS", en: "AWMC BBS", ja: "AWMC BBS" },
     url: "https://awmc.cc/",
     description: {
       zh: "maimai DX 非官方社区论坛，玩家交流与资源分享。",
@@ -68,16 +83,20 @@ export const friendLinks: FriendLink[] = [
     },
   },
   {
-    name: "哲零网络",
+    name: {
+      zh: "哲零网络",
+      en: "Zheling Network",
+      ja: "哲零ネットワーク",
+    },
     url: "https://yusizhe.top/",
     description: {
       zh: "哲零网络，一个独立小工作室。",
-      en: "Zhel零 Network — an indie micro studio.",
+      en: "Zheling Network — an indie micro studio.",
       ja: "哲零ネットワーク、インディーの小さなスタジオ。",
     },
   },
   {
-    name: "Majdata Net",
+    name: { zh: "Majdata Net", en: "Majdata Net", ja: "Majdata Net" },
     url: "https://majdata.net/",
     description: {
       zh: "maimai 饭制谱面分享平台，支持上传、下载、排行榜与社区互动。",
@@ -86,7 +105,11 @@ export const friendLinks: FriendLink[] = [
     },
   },
   {
-    name: "舞萌 DX 查分器",
+    name: {
+      zh: "舞萌 DX 查分器",
+      en: "Diving-Fish Score Prober",
+      ja: "Diving-Fish 査分器",
+    },
     url: "https://maimai.diving-fish.com/",
     description: {
       zh: "Diving-Fish 的舞萌 DX / 中二节奏查分器，记录并查询成绩。",
@@ -95,7 +118,11 @@ export const friendLinks: FriendLink[] = [
     },
   },
   {
-    name: "落雪查分器",
+    name: {
+      zh: "落雪查分器",
+      en: "Lxns Score Prober",
+      ja: "落雪（Lxns）査分器",
+    },
     url: "https://maimai.lxns.net/",
     description: {
       zh: "落雪 (Lxns) 的舞萌 DX / 中二节奏国服查分器，并提供开放 API。",
@@ -104,7 +131,7 @@ export const friendLinks: FriendLink[] = [
     },
   },
   {
-    name: "MaiViewer",
+    name: { zh: "MaiViewer", en: "MaiViewer", ja: "MaiViewer" },
     url: "https://maiviewer.net/",
     description: {
       zh: "maimai 谱面在线预览器，在浏览器中查看谱面。",

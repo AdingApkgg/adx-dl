@@ -3,13 +3,18 @@ import { unzipSync } from "fflate";
 
 import {
   setDownloadsPersistenceAdapterForTests,
+  type DownloadHistoryEntry,
   type DownloadsPersistenceAdapter,
   type PersistedFile,
   type PersistedJob,
 } from "./persistence";
 
 import {
+  classifyDownloadError,
   createInitialDownloadSourceProbes,
+  downloadFailureStatus,
+  downloadFailureUrl,
+  estimateDownloadEtaMs,
   newBatchJobId,
   parseStoredCustomSources,
   resetDownloadQueueForTests,
@@ -31,6 +36,7 @@ const savedBlobs: Blob[] = [];
 const fetchedUrls: string[] = [];
 const persistedJobs = new Map<string, PersistedJob>();
 const persistedFiles = new Map<string, PersistedFile>();
+const persistedHistory = new Map<string, DownloadHistoryEntry>();
 const localStorageValues = new Map<string, string>();
 
 const memoryPersistence: DownloadsPersistenceAdapter = {
@@ -59,6 +65,13 @@ const memoryPersistence: DownloadsPersistenceAdapter = {
         persistedFiles.delete(key);
       }
     }
+  },
+  loadHistory: async () => [...persistedHistory.values()],
+  recordHistory: async (entry) => {
+    persistedHistory.set(entry.key, structuredClone(entry));
+  },
+  clearHistory: async () => {
+    persistedHistory.clear();
   },
 };
 
@@ -174,6 +187,7 @@ describe("downloads-store", () => {
     installDomShims();
     persistedJobs.clear();
     persistedFiles.clear();
+    persistedHistory.clear();
     setDownloadsPersistenceAdapterForTests(memoryPersistence);
     setDownloadRetryBaseDelayForTests(1);
     resetDownloadQueueForTests();
@@ -215,11 +229,16 @@ describe("downloads-store", () => {
       total: 10,
       receivedBytes: 0,
       totalBytes: 0,
+      totalBytesEstimated: false,
       speedBps: 0,
+      etaMs: null,
       fileProgress: [],
       archiveCurrentFile: null,
       error: null,
       errorKind: null,
+      errorDetail: null,
+      skippedFiles: [],
+      autoSwitchedTo: null,
       startedAt: 0,
       ...patch,
     });
@@ -775,6 +794,14 @@ describe("downloads-store", () => {
         useDownloadsStore.getState().sourceProbes[customId]?.measuredAt !== null
     );
     fetchedUrls.length = 0;
+    // This case is about the *manual* switch. Park every probe back at "idle"
+    // so automatic failover (covered separately below) finds no healthy
+    // candidate and cannot reroute the job before the assertions run.
+    useDownloadsStore.setState({
+      sourceProbes: createInitialDownloadSourceProbes(
+        useDownloadsStore.getState().customSources
+      ),
+    });
     let rejectTrack: ((reason?: unknown) => void) | undefined;
     const firstRequests: { url: string; headers: Headers }[] = [];
 
@@ -1531,5 +1558,229 @@ describe("downloads-store", () => {
     expect(
       [...persistedFiles.values()].filter((file) => file.jobId === id)
     ).toHaveLength(0);
+  });
+
+  test("classifies a permanent 4xx apart from a 5xx and a flaky connection", () => {
+    // "download failed" used to bucket everything as `network`, so a 404 was
+    // reported as "网络问题，重试即可".
+    expect(
+      classifyDownloadError(
+        new Error("File download failed: https://x/pv.mp4 (HTTP 404)")
+      )
+    ).toBe("missing");
+    expect(
+      classifyDownloadError(
+        new Error("File download failed: https://x/track.mp3 (HTTP 503)")
+      )
+    ).toBe("server");
+    // Congestion statuses exhausted their retries; that is not a missing file.
+    expect(
+      classifyDownloadError(
+        new Error("File download failed: https://x/track.mp3 (HTTP 429)")
+      )
+    ).toBe("network");
+    expect(
+      classifyDownloadError(new Error("File download failed: https://x/track.mp3"))
+    ).toBe("network");
+    expect(classifyDownloadError(new Error("boom"))).toBe("unknown");
+  });
+
+  test("extracts the failed URL and status for the copyable detail block", () => {
+    const message = "File download failed: https://mirror/25/1/pv.mp4 (HTTP 404)";
+    expect(downloadFailureUrl(message)).toBe("https://mirror/25/1/pv.mp4");
+    expect(downloadFailureStatus(message)).toBe(404);
+    expect(downloadFailureStatus("boom")).toBeNull();
+    expect(downloadFailureUrl("boom")).toBeNull();
+  });
+
+  test("quotes an ETA only once the rate estimate has converged", () => {
+    expect(estimateDownloadEtaMs(1_000_000, 5_000_000, 1_000_000)).toBe(4000);
+    // No measured total, or a rate too slow to trust, means no promise at all.
+    expect(estimateDownloadEtaMs(1_000_000, 0, 1_000_000)).toBeNull();
+    expect(estimateDownloadEtaMs(1_000_000, 5_000_000, 1024)).toBeNull();
+    // An extrapolated total the transfer has already overshot.
+    expect(estimateDownloadEtaMs(6_000_000, 5_000_000, 1_000_000)).toBeNull();
+  });
+
+  test("a missing optional asset is skipped instead of failing the chart", async () => {
+    const id = singleJobId("optional-asset-404");
+    globalThis.fetch = (async (input) => {
+      const url = String(input);
+      if (url.endsWith("/pv.mp4")) {
+        return new Response("nope", { status: 404 });
+      }
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { "content-length": "3" },
+      });
+    }) as typeof fetch;
+
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "optional-asset-404",
+      files: [
+        { name: "maidata.txt", url: "https://astrodx-charts.saop.cc/25/1/maidata.txt" },
+        { name: "track.mp3", url: "https://astrodx-charts.saop.cc/25/1/track.mp3" },
+        { name: "pv.mp4", url: "https://astrodx-charts.saop.cc/25/1/pv.mp4" },
+      ],
+      includeVideo: true,
+      format: "zip",
+    });
+
+    await waitForSettled(id);
+    const job = useDownloadsStore.getState().jobs.find((entry) => entry.id === id);
+    expect(job?.status).toBe("success");
+    expect(job?.skippedFiles.map((file) => file.name)).toEqual(["pv.mp4"]);
+    expect(job?.skippedFiles[0].status).toBe(404);
+    // The archive is written without it rather than not written at all.
+    expect(await savedArchives()).toEqual({
+      "optional-asset-404.zip": [
+        "optional-asset-404/maidata.txt",
+        "optional-asset-404/track.mp3",
+      ],
+    });
+  });
+
+  test("a missing required asset still fails the chart", async () => {
+    const id = singleJobId("required-asset-404");
+    globalThis.fetch = (async (input) =>
+      String(input).endsWith("/track.mp3")
+        ? new Response("nope", { status: 404 })
+        : new Response(new Uint8Array([1, 2, 3]), {
+            status: 200,
+            headers: { "content-length": "3" },
+          })) as typeof fetch;
+
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "required-asset-404",
+      files: [
+        { name: "maidata.txt", url: "https://astrodx-charts.saop.cc/25/2/maidata.txt" },
+        { name: "track.mp3", url: "https://astrodx-charts.saop.cc/25/2/track.mp3" },
+      ],
+      includeVideo: true,
+      format: "zip",
+    });
+
+    await waitForSettled(id);
+    const job = useDownloadsStore.getState().jobs.find((entry) => entry.id === id);
+    expect(job?.status).toBe("error");
+    expect(job?.errorKind).toBe("missing");
+    expect(job?.errorDetail).toContain("HTTP 404");
+    expect(savedFiles).toHaveLength(0);
+  });
+
+  test("a failed run moves itself to the fastest healthy route", async () => {
+    const id = singleJobId("auto-failover");
+    // Only Alice is healthy, so that is the only route failover may pick.
+    useDownloadsStore.setState({
+      sourceProbes: {
+        ...createInitialDownloadSourceProbes(),
+        alice: { state: "ok", latencyMs: 12, measuredAt: Date.now() },
+      },
+    });
+    globalThis.fetch = (async (input) => {
+      const url = String(input);
+      if (url.startsWith("https://astrodx-charts.saop.cc/")) {
+        throw new TypeError("network failed");
+      }
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { "content-length": "3" },
+      });
+    }) as typeof fetch;
+
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "auto-failover",
+      files: [
+        { name: "maidata.txt", url: "https://astrodx-charts.saop.cc/25/3/maidata.txt" },
+      ],
+      includeVideo: true,
+      format: "zip",
+      sourceId: "r2",
+    });
+
+    await waitForJob(id, (job) => job.status === "success", 5000);
+    const job = useDownloadsStore.getState().jobs.find((entry) => entry.id === id);
+    expect(job?.sourceId).toBe("alice");
+    expect(job?.autoSwitchedTo).toBe("alice");
+    // An automatic recovery must not rewrite the user's default route.
+    expect(useDownloadsStore.getState().selectedSourceId).toBe("r2");
+  });
+
+  test("a completed download is replayable from history under a fresh id", async () => {
+    const id = singleJobId("history-entry");
+    globalThis.fetch = (async () =>
+      new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { "content-length": "3" },
+      })) as typeof fetch;
+
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "history-entry",
+      files: [
+        { name: "maidata.txt", url: "https://astrodx-charts.saop.cc/25/4/maidata.txt" },
+      ],
+      includeVideo: true,
+      format: "zip",
+    });
+    await waitForSettled(id);
+
+    const [entry] = useDownloadsStore.getState().history;
+    expect(entry?.fileCount).toBe(1);
+    // Stored canonicalized (back to the catalog origin), so a replay honours
+    // the route selected *then* rather than the mirror this run happened to use.
+    expect(entry?.job.files[0].url).toBe(
+      "https://astrodx-charts.saop.cc/25/4/maidata.txt"
+    );
+
+    savedFiles.length = 0;
+    savedBlobs.length = 0;
+    useDownloadsStore.getState().rerunHistoryEntry(entry.key);
+    const rerunId = useDownloadsStore
+      .getState()
+      .jobs.map((job) => job.id)
+      .find((jobId) => jobId !== id);
+    expect(rerunId).toBeDefined();
+    expect(rerunId).not.toBe(id);
+    await waitForSettled(rerunId as string);
+    expect(
+      useDownloadsStore.getState().jobs.find((job) => job.id === rerunId)?.status
+    ).toBe("success");
+  });
+
+  test("resumeInterrupted restarts connection failures but leaves 404s and pauses alone", () => {
+    const base = {
+      kind: "single" as const,
+      title: "t",
+      sourceId: "r2" as const,
+      format: "adx" as const,
+      completed: 0,
+      total: 1,
+      receivedBytes: 0,
+      totalBytes: 0,
+      totalBytesEstimated: false,
+      speedBps: 0,
+      etaMs: null,
+      fileProgress: [],
+      archiveCurrentFile: null,
+      error: "boom",
+      errorDetail: null,
+      skippedFiles: [],
+      autoSwitchedTo: null,
+      startedAt: 0,
+    };
+    useDownloadsStore.setState({
+      jobs: [
+        { ...base, id: "a", status: "error", errorKind: "network" },
+        { ...base, id: "b", status: "error", errorKind: "missing" },
+        { ...base, id: "c", status: "paused", errorKind: null, error: null },
+      ],
+    });
+    // No spec is registered, so resume() is a no-op past the guard — the count
+    // is what proves which jobs were considered recoverable.
+    expect(useDownloadsStore.getState().resumeInterrupted()).toBe(1);
   });
 });

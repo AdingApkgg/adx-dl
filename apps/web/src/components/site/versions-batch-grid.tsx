@@ -180,6 +180,12 @@ export function VersionsBatchGrid({
               >
                 <div
                   role="checkbox"
+                  // ARIA checkbox is Name-From-Author, so the tile's own logo
+                  // and label contribute nothing: without this every version
+                  // announced as an anonymous "checkbox, not checked".
+                  aria-label={
+                    group.name === "Unknown" ? versions.unknownLabel : group.name
+                  }
                   aria-checked={selected}
                   tabIndex={0}
                   onClick={() => toggle(group.slug)}
@@ -189,7 +195,7 @@ export function VersionsBatchGrid({
                       toggle(group.slug);
                     }
                   }}
-                  className="group/version block h-full cursor-pointer rounded-xl"
+                  className="group/version block h-full cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   {card}
                 </div>

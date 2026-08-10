@@ -395,12 +395,23 @@ export interface Point2D {
   y: number;
 }
 
+/**
+ * 本地补丁：画面内 HUD 的文案。上游把这两个词写死在 fillText 里，站点有
+ * zh/en/ja 三种界面语言，必须能替换。re-sync 时须重打。
+ */
+export interface HudLabels {
+  /** 连击计数前缀 */
+  combo: string;
+  /** 「不含保护套的绝赞数」这一行的标注 */
+  breakNoEx: string;
+}
+
 export interface RendererConfig {
   /** 谱面流速：3-9 */
   hiSpeed: number;
   /** 保持固定流速 */
   alwaysKeepHiSpeed: boolean;
-  /** 播放速度：0.1-1.0 */
+  /** 播放速度：0.1-2.0（本地补丁把上游的 1.0 上限提到 2.0） */
   playbackSpeed: number;
   /** 镜像模式：上下反、左右反、全反 */
   mirrorMode: MirrorMode;

@@ -68,7 +68,10 @@ describe("structured data builders", () => {
     expect(organization).toMatchObject({
       "@type": "Organization",
       "@id": "https://adxdls.saop.cc/#organization",
-      name: "ADX 谱面资源",
+      // English page → English name, with the other spellings as alternates so
+      // the Chinese name still resolves to this entity.
+      name: "ADX Chart Archive",
+      alternateName: ["ADX 谱面资源", "ADX 譜面アーカイブ"],
       url: "https://adxdls.saop.cc",
       logo: "https://adxdls.saop.cc/opengraph-image.png",
       sameAs: [
@@ -85,7 +88,8 @@ describe("structured data builders", () => {
     expect(website).toMatchObject({
       "@type": "WebSite",
       "@id": "https://adxdls.saop.cc/#website",
-      name: "ADX 谱面资源",
+      name: "ADX Chart Archive",
+      alternateName: ["ADX 谱面资源", "ADX 譜面アーカイブ"],
       url: "https://adxdls.saop.cc/en",
       inLanguage: "en",
       publisher: { "@id": "https://adxdls.saop.cc/#organization" },
@@ -110,7 +114,12 @@ describe("structured data builders", () => {
     expect(dataset).toMatchObject({
       "@type": "Dataset",
       "@id": "https://adxdls.saop.cc/#chart-catalog-dataset",
-      name: "ADX 谱面资源 — AstroDX chart catalog",
+      name: "ADX Chart Archive — AstroDX chart catalog",
+      alternateName: [
+        "ADX 谱面资源 — AstroDX chart catalog",
+        "AstroDX chart catalog",
+        "ADX chart catalog",
+      ],
       license: "https://creativecommons.org/licenses/by/4.0/",
       creditText: "ADX 谱面资源 (https://adxdls.saop.cc)",
       usageInfo: "https://adxdls.saop.cc/license",

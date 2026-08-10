@@ -46,6 +46,7 @@ type Labels = {
   normalBreakSlide: string;
   fireworks: string;
   hitEffect: string;
+  hud: string;
   showVideo: string;
   audio: string;
   musicVolume: string;
@@ -84,6 +85,7 @@ const LABELS: Record<Locale, Labels> = {
     normalBreakSlide: "Break Slide 常规色",
     fireworks: "烟花",
     hitEffect: "打击特效",
+    hud: "画面内计数",
     showVideo: "背景 PV",
     audio: "音频",
     musicVolume: "音乐音量",
@@ -120,6 +122,7 @@ const LABELS: Record<Locale, Labels> = {
     normalBreakSlide: "Normal-color break slide",
     fireworks: "Fireworks",
     hitEffect: "Hit effect",
+    hud: "On-canvas counters",
     showVideo: "Background PV",
     audio: "Audio",
     musicVolume: "Music volume",
@@ -156,6 +159,7 @@ const LABELS: Record<Locale, Labels> = {
     normalBreakSlide: "ブレイクスライド通常色",
     fireworks: "花火",
     hitEffect: "ヒットエフェクト",
+    hud: "画面内カウンター",
     showVideo: "背景 PV",
     audio: "オーディオ",
     musicVolume: "音楽音量",
@@ -245,6 +249,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function ChartSettingsDisplay({ locale = "zh" }: { locale?: Locale }) {
   const s = useGameSettingsStore();
   const t = LABELS[locale];
+  // The two HUD counters are drawn by the engine inside the canvas, so their
+  // wording comes from the shared preview dictionary — the same strings that
+  // end up in an exported PNG or GIF.
+  const preview = getDictionary(locale).preview;
   // One layoutId per segmented group, so each group's active pill glides
   // independently (and two mounted panels never fight over the same id).
   const pillId = useId();
@@ -319,6 +327,20 @@ export function ChartSettingsDisplay({ locale = "zh" }: { locale?: Locale }) {
           </Toggle>
           <Toggle active={s.showHitEffect} onToggle={() => s.setShowHitEffect(!s.showHitEffect)}>
             {t.hitEffect}
+          </Toggle>
+        </div>
+      </Field>
+
+      <Field label={t.hud}>
+        <div className="flex flex-wrap gap-1.5">
+          <Toggle active={s.showNoteTotal} onToggle={() => s.setShowNoteTotal(!s.showNoteTotal)}>
+            {preview.hudNoteTotalToggle}
+          </Toggle>
+          <Toggle
+            active={s.showBreakCount}
+            onToggle={() => s.setShowBreakCount(!s.showBreakCount)}
+          >
+            {preview.hudBreakCountToggle}
           </Toggle>
         </div>
       </Field>

@@ -61,12 +61,11 @@ export function useMusicPlayer() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { musicUrl, isPlaying, playbackSpeed, chartData, preciseTime, pendingPlay, setMusicState } =
+  const { musicUrl, isPlaying, chartData, preciseTime, pendingPlay, setMusicState } =
     useGameStore(
       useShallow((s) => ({
         musicUrl: s.musicUrl,
         isPlaying: s.isPlaying,
-        playbackSpeed: s.playbackSpeed,
         chartData: s.chartData,
         preciseTime: s.timeline.preciseTime,
         pendingPlay: s.pendingPlay,
@@ -74,8 +73,12 @@ export function useMusicPlayer() {
       })),
     );
 
-  const { musicVolume, musicOffset } = useGameSettingsStore(
-    useShallow((s) => ({ musicVolume: s.musicVolume, musicOffset: s.musicOffset })),
+  const { musicVolume, musicOffset, playbackSpeed } = useGameSettingsStore(
+    useShallow((s) => ({
+      musicVolume: s.musicVolume,
+      musicOffset: s.musicOffset,
+      playbackSpeed: s.playbackSpeed,
+    })),
   );
 
   const bpm = chartData?.bpm ?? 120;

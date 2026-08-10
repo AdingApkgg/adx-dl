@@ -11,6 +11,12 @@ export const prefixedLocales = locales.filter(
 
 export type SiteDictionary = {
   localeLabel: string;
+  /**
+   * The archive's name in this locale. Single source of truth for the metadata
+   * title suffix, og:site_name, the header lockup and the manifest — four
+   * places that had each hardcoded a different name.
+   */
+  siteName: string;
   nav: {
     home: string;
     browse: string;
@@ -106,6 +112,8 @@ export type SiteDictionary = {
     title: string;
     description: string;
     searchCta: string;
+    /** Rotating placeholder examples; one per field the fuzzy search matches on. */
+    searchExamples: string[];
     browseCta: string;
     getAppCta: string;
     videoCta: string;
@@ -149,7 +157,17 @@ export type SiteDictionary = {
     downloadsDescription: string;
     downloadsBadge: string;
     faqHeading: string;
-    faq: (total: number, versions: number) => { q: string; a: string }[];
+    /**
+     * `id` is the stable fragment each question answers to. It is part of the
+     * dictionary rather than derived from the question text so a reworded
+     * question (or a locale switch) never breaks a link someone already shared.
+     */
+    faq: (
+      total: number,
+      versions: number
+    ) => { id: string; q: string; a: string }[];
+    /** Fragment the hero's "what is AstroDX?" shortcut jumps to. */
+    faqEntryId: string;
   };
   charts: {
     title: string;
@@ -165,12 +183,17 @@ export type SiteDictionary = {
   };
   catalogBrowser: {
     searchPlaceholder: string;
+    /** Accessible name for the browse search box and its `role="search"` landmark. */
+    searchLabel: string;
     randomChart: string;
     allCategories: string;
     allSubcategories: string;
     allGenres: string;
     /** Prefix shown on a result card when the query matched a song alias (别名), not its title. */
     aliasMatchLabel: string;
+    /** Corner marker on a chart card the archive imported in the last two weeks. */
+    newBadge: string;
+    newBadgeHint: string;
     details: string;
     download: string;
     source: string;
@@ -187,6 +210,30 @@ export type SiteDictionary = {
     filterCabinet: string;
     filterBpm: string;
     filterAssets: string;
+    filterDesigner: string;
+    /** Placeholder inside the charter combobox (hundreds of names, so it is typed into). */
+    designerSearchPlaceholder: string;
+    designerListLabel: string;
+    designerNoMatch: string;
+    /** Accessible name for a filter chip that also shows its facet count. */
+    chipCountLabel: (label: string, count: number) => string;
+    /** Sort picker in the results toolbar. */
+    sortLabel: string;
+    sortOptions: {
+      default: string;
+      imported: string;
+      "level-desc": string;
+      "level-asc": string;
+      "bpm-desc": string;
+      "bpm-asc": string;
+      "title-asc": string;
+    };
+    /** Lead-in above the "drop one filter" buttons in the empty state. */
+    emptySuggestionsTitle: string;
+    /** One such button: dropping this dimension would leave `count` charts. */
+    dropFilterSuggestion: (label: string, count: number) => string;
+    /** Dimension name for the search query itself, used by the suggestions above. */
+    filterSearch: string;
     cabinetStandard: string;
     cabinetUtage: string;
     assetHasPv: string;
@@ -236,8 +283,6 @@ export type SiteDictionary = {
     metadata: string;
     metadataDescription: string;
     difficulties: string;
-    assets: string;
-    assetsDescription: string;
     source: string;
     sourceDescription: string;
     /** Accessible name for the chart-detail breadcrumb nav. */
@@ -245,6 +290,9 @@ export type SiteDictionary = {
     versionLabel: string;
     genreLabel: string;
     bpmLabel: string;
+    /** Wraps a BPM span for the 174 charts that change tempo mid-song. */
+    bpmVariableLabel: (range: string) => string;
+    durationLabel: string;
     shortIdLabel: string;
     aliasesLabel: string;
     unknownValue: string;
@@ -252,10 +300,35 @@ export type SiteDictionary = {
     tableDifficulty: string;
     tableLevel: string;
     tableCharter: string;
+    tableNotes: string;
+    /** Judged-object buckets shown under a difficulty's note total. */
+    noteTypeTap: string;
+    noteTypeHold: string;
+    noteTypeSlide: string;
+    noteTypeTouch: string;
+    noteTypeTouchHold: string;
+    noteTypeBreak: string;
+    /** Sidebar card carrying the measured note / duration / size numbers. */
+    statsTitle: string;
+    statsDescription: string;
+    statsNotesLabel: string;
+    statsDownloadLabel: string;
+    /** Size quoted before a download starts; always an estimate (zip overhead). */
+    sizeEstimate: (size: string) => string;
+    sizeEstimateWithVideo: (total: string, video: string) => string;
+    /** Source card: the maidata path row and the collapsed license note. */
+    sourceMaidataLabel: string;
+    licenseLabel: string;
+    /** Level chip legend on the difficulty table (display level vs 定数). */
+    levelConstantHint: string;
     preview: string;
     previewDescription: string;
+    /** Accessible name for the row of secondary chart actions. */
+    actionsLabel: string;
     chartPreview: string;
     chartPreviewDescription: string;
+    /** Opens the preview already switched to one difficulty (from the table). */
+    chartPreviewAt: (difficulty: string) => string;
     pvLabel: string;
     audioLabel: string;
     mediaUnsupported: string;
@@ -345,6 +418,27 @@ export type SiteDictionary = {
     batchVideoLargeHint: string;
     batchConfirm: (count: number, includeVideo: boolean) => string;
     batchConfirmStart: string;
+    /** Remaining time at the smoothed transfer rate, e.g. "剩余 1:20". */
+    etaRemaining: (clock: string) => string;
+    errorMissing: string;
+    errorServer: string;
+    errorDetailLabel: string;
+    copyDetail: string;
+    copiedDetail: string;
+    skippedTitle: string;
+    skippedSummary: (count: number) => string;
+    autoSwitched: (name: string) => string;
+    autoResumed: (count: number) => string;
+    /** Shown once a checkpoint write failed: resume-after-reload is gone. */
+    checkpointsUnavailable: string;
+    storageTight: (available: string) => string;
+    storageInsufficient: (available: string, required: string) => string;
+    historyTitle: string;
+    historyDescription: string;
+    historyEmpty: string;
+    historyRerun: string;
+    historyClear: string;
+    historyEntrySummary: (files: number) => string;
   };
   /** In-browser playable chart preview player on chart detail pages. */
   preview: {
@@ -380,7 +474,20 @@ export type SiteDictionary = {
     saveFrame: string;
     gifCancel: string;
     gifRangeHint: (duration: string) => string;
+    /** GIF export is capped at 15 s; a loop range may legitimately be longer. */
+    gifRangeTooLong: (max: string) => string;
     exportGif: string;
+    /** A–B repeat over the range the GIF handles already select. */
+    loopRange: string;
+    loopRangeOff: string;
+    loopActiveHint: (duration: string) => string;
+    /** Speed panel toggle, reachable without leaving fullscreen. */
+    speedPanel: string;
+    /** HUD text the engine paints into the canvas (and into exported GIFs). */
+    hudCombo: string;
+    hudBreakNoEx: string;
+    hudNoteTotalToggle: string;
+    hudBreakCountToggle: string;
     exportingPercent: (percent: number) => string;
     cancel: string;
     gifExportedTitle: string;
@@ -448,13 +555,24 @@ export type SiteDictionary = {
     title: string;
     description: string;
     intro: string;
+    /** Hand-off of a /post or /survey draft into the Artalk composer. */
+    prefill: {
+      pending: string;
+      success: string;
+      failedTitle: string;
+      failedBody: string;
+      draftLabel: string;
+      copy: string;
+      copied: string;
+    };
   };
   links: {
     navLabel: string;
     title: string;
     description: string;
     intro: string;
-    visit: string;
+    // Same template rationale as community.join: ja reads 「MaiViewer にアクセス」.
+    visitLink: (name: string) => string;
   };
   community: {
     navLabel: string;
@@ -491,6 +609,46 @@ export type SiteDictionary = {
     title: string;
     description: string;
   };
+  /** Nav/footer label for /license; the page's own long-form copy lives in license-view.tsx. */
+  license: {
+    navLabel: string;
+  };
+  /** Long-form onboarding page (/guide): install, download, import, fix. */
+  guide: {
+    navLabel: string;
+    title: string;
+    description: string;
+    intro: string;
+    /** Accessible name for the in-page section jump list. */
+    tocLabel: string;
+  };
+  /** Browsable entry point for the global music player's per-version playlists. */
+  music: {
+    navLabel: string;
+    title: string;
+    description: string;
+    intro: string;
+    trackCount: (count: number) => string;
+    // Same template rationale as community.join: ja reads 「maimai DX を再生」.
+    playVersion: (name: string) => string;
+    empty: string;
+  };
+  /** Dated import batches (/changelog). */
+  changelog: {
+    navLabel: string;
+    title: string;
+    description: string;
+    intro: string;
+    batchHeading: (date: string) => string;
+    batchCount: (count: number) => string;
+    /** Link that replaces the charts a large batch's preview leaves out. */
+    viewRest: (count: number) => string;
+    versionsLabel: string;
+    versionLink: (name: string, count: number) => string;
+    /** Trailing link when a batch spans more versions than the row lists. */
+    moreVersions: (count: number) => string;
+    empty: string;
+  };
   post: {
     navLabel: string;
     title: string;
@@ -503,7 +661,11 @@ export type SiteDictionary = {
     notesLabel: string;
     notesPlaceholder: string;
     requiredHint: string;
+    /** Per-field message, linked by aria-describedby so the error names its field. */
+    songTitleRequired: string;
+    sourceRequired: string;
     submit: string;
+    submitting: string;
     composedTitle: string;
   };
   survey: {
@@ -523,7 +685,10 @@ export type SiteDictionary = {
     otherLabel: string;
     otherPlaceholder: string;
     requiredHint: string;
+    platformRequired: string;
+    satisfactionRequired: string;
     submit: string;
+    submitting: string;
     composedTitle: string;
   };
   notFound: {
@@ -531,6 +696,29 @@ export type SiteDictionary = {
     description: string;
     backHome: string;
     browseCharts: string;
+    /** A mistyped CJK slug is the likeliest way to land here, so the page searches. */
+    searchLabel: string;
+    searchSubmit: string;
+  };
+  /** Client-side crash screen rendered by the App Router `error.tsx` boundaries. */
+  errorPage: {
+    title: string;
+    description: string;
+    retry: string;
+    backHome: string;
+    browseCharts: string;
+    detailsLabel: string;
+  };
+  /** Toast shown when a new service worker has installed and is waiting to take over. */
+  swUpdate: {
+    message: string;
+    action: string;
+    dismiss: string;
+  };
+  /** Connectivity bar driven by the online/offline events. */
+  connection: {
+    offline: string;
+    restored: string;
   };
   offline: {
     title: string;
@@ -558,6 +746,9 @@ export type SiteDictionary = {
     community: string;
     donate: string;
     about: string;
+    guide: string;
+    music: string;
+    changelog: string;
     post: string;
     survey: string;
   };
@@ -574,6 +765,7 @@ export type StaticPageMetadataEntry = {
 const dictionaries: Record<Locale, SiteDictionary> = {
   zh: {
     localeLabel: "中文",
+    siteName: "ADX 谱面资源",
     nav: {
       home: "首页",
       browse: "曲库",
@@ -657,6 +849,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description:
         "搜索、试玩并下载 maimai 谱面，一键导入 AstroDX 模拟器。可按版本与曲风浏览，也支持整包批量下载。",
       searchCta: "搜索曲库",
+      searchExamples: ["PANDORA PARADOXXX", "潘多拉", "sasakure.UK", "niconico＆VOCALOID", "系ぎて"],
       browseCta: "浏览版本",
       getAppCta: "获取 AstroDX",
       videoCta: "观看演示视频",
@@ -684,7 +877,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       metricsArtists: "曲师数",
       metricsUpdated: "目录更新",
       branchesTitle: "按版本浏览",
-      branchesDescription: "从 maimai 初代到最新版本,挑一个版本开始浏览。",
+      branchesDescription: "从 maimai 初代到最新版本，挑一个版本开始浏览。",
       versionsCta: "查看全部版本",
       latestTitle: "最新谱面",
       latestDescription: "最近索引的远端谱面及其封面。",
@@ -701,26 +894,32 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       faqHeading: "常见问题",
       faq: (total, versions) => [
         {
+          id: "what-is-astrodx",
           q: "AstroDX 是什么？",
           a: "AstroDX 是一款社区开发的 maimai 风格音乐游戏模拟器。本站「ADX 谱面资源」收录 AstroDX 谱面，提供元数据、封面与下载链接，是非官方的资料站。",
         },
         {
+          id: "what-is-maimai-dx",
           q: "maimai DX 是什么？",
           a: "maimai DX 是 SEGA 的街机音乐游戏，AstroDX 谱面还原其玩法。本目录按 FESTiVAL、PRiSM、BUDDiES、UNiVERSE 等 maimai DX 版本归类谱面。",
         },
         {
+          id: "how-to-download",
           q: "如何下载谱面？",
           a: "打开任意谱面的详情页，使用站内下载按钮即可获取从远端 AstroDX 目录构建的谱面文件包。",
         },
         {
+          id: "how-to-import",
           q: "如何将谱面导入 AstroDX？",
-          a: "Android：在 AstroDX 内使用导入功能选择下载的谱面包，或将解压后的谱面文件夹放入 AstroDX 的谱面目录；iOS：通过「文件」应用将谱面放入 AstroDX 的 collections 目录。具体位置可能因应用版本而异，请以应用内说明为准。",
+          a: "本站下载到的 .adx 可以直接导入，无需解压。iOS：在「文件」App 里把 .adx 移动到 AstroDX 文件夹本身（不要放进里面的 levels）。Android：点一下 .adx，用 AstroDX 打开，或长按「分享 → AstroDX」。导入前记得先启动过一次游戏。完整步骤见上手指南。",
         },
         {
+          id: "catalog-size",
           q: "目录收录了多少谱面？",
           a: `目前共收录 ${total} 首谱面，覆盖 ${versions} 个 maimai DX 版本分支，并会随远端目录持续更新。`,
         },
       ],
+      faqEntryId: "what-is-astrodx",
     },
     charts: {
       title: "浏览曲目",
@@ -733,16 +932,19 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       loading: "加载中",
     },
     catalogBrowser: {
-      searchPlaceholder: "搜索曲名、别名、曲师、版本...",
+      searchPlaceholder: "搜索曲名、别名、罗马音、曲师、谱师、版本...",
+      searchLabel: "搜索谱面",
       randomChart: "随机谱面",
       allCategories: "全部分类",
       allSubcategories: "全部版本",
       allGenres: "全部曲风",
       aliasMatchLabel: "别名命中",
+      newBadge: "新",
+      newBadgeHint: "最近两周新收录",
       details: "详情",
       download: "下载",
       source: "来源",
-      emptyState: "没有匹配到曲目，请尝试别名、曲师或英文标题。",
+      emptyState: "没有匹配到曲目，可以试试别名、罗马音或曲师名。",
       clearSearch: "清空搜索",
       clearFilters: "清除全部筛选",
       activeFiltersLabel: "已应用筛选",
@@ -755,6 +957,24 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       filterCabinet: "类型",
       filterBpm: "BPM",
       filterAssets: "资源",
+      filterDesigner: "谱师",
+      designerSearchPlaceholder: "输入谱师名筛选…",
+      designerListLabel: "谱师候选",
+      designerNoMatch: "没有匹配的谱师",
+      chipCountLabel: (label, count) => `${label}（${count} 首）`,
+      sortLabel: "排序",
+      sortOptions: {
+        default: "默认排序",
+        imported: "最新收录",
+        "level-desc": "难度 高→低",
+        "level-asc": "难度 低→高",
+        "bpm-desc": "BPM 高→低",
+        "bpm-asc": "BPM 低→高",
+        "title-asc": "曲名 A→Z",
+      },
+      emptySuggestionsTitle: "去掉一个条件试试：",
+      dropFilterSuggestion: (label, count) => `去掉「${label}」筛选 → ${count} 首`,
+      filterSearch: "搜索词",
       cabinetStandard: "标准",
       cabinetUtage: "宴会场",
       assetHasPv: "包含 BGA 视频",
@@ -799,14 +1019,14 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       metadata: "谱面信息",
       metadataDescription: "直接解析自远端 AstroDX 目录资源。",
       difficulties: "难度列表",
-      assets: "资源状态",
-      assetsDescription: "从远端目录检测到的资源可用性。",
       source: "来源信息",
       sourceDescription: "基于远端 AstroDX 目录索引构建。",
       breadcrumbLabel: "面包屑导航",
       versionLabel: "版本",
       genreLabel: "曲风",
       bpmLabel: "BPM",
+      bpmVariableLabel: (range) => `${range}（变速）`,
+      durationLabel: "时长",
       shortIdLabel: "短 ID",
       aliasesLabel: "别名",
       unknownValue: "未知",
@@ -814,10 +1034,28 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       tableDifficulty: "难度",
       tableLevel: "等级",
       tableCharter: "谱师",
+      tableNotes: "物量",
+      noteTypeTap: "Tap",
+      noteTypeHold: "Hold",
+      noteTypeSlide: "Slide",
+      noteTypeTouch: "Touch",
+      noteTypeTouchHold: "Touch Hold",
+      noteTypeBreak: "Break",
+      statsTitle: "谱面数据",
+      statsDescription: "构建时解析 maidata 得到的物量、时长与文件体积。",
+      statsNotesLabel: "最高物量",
+      statsDownloadLabel: "下载体积",
+      sizeEstimate: (size) => `约 ${size}`,
+      sizeEstimateWithVideo: (total, video) => `约 ${total}（含 BGA ${video}）`,
+      sourceMaidataLabel: "谱面文件",
+      licenseLabel: "授权说明",
+      levelConstantHint: "加粗为显示等级，浅色数字为定数。",
       preview: "预览",
-      previewDescription: "在线观看 PV 或试听音频(资源来自远端目录)。",
+      previewDescription: "在线观看 PV 或试听音频（资源来自远端目录）。",
+      actionsLabel: "谱面操作",
       chartPreview: "谱面预览",
-      chartPreviewDescription: "在浏览器中播放谱面,与音频同步。",
+      chartPreviewDescription: "在浏览器中播放谱面，与音频同步。",
+      chartPreviewAt: (difficulty) => `预览 ${difficulty} 难度`,
       pvLabel: "PV 影像",
       audioLabel: "音频试听",
       mediaUnsupported: "你的浏览器不支持播放该媒体。",
@@ -908,6 +1146,27 @@ const dictionaries: Record<Locale, SiteDictionary> = {
           ? `确认开始下载 ${count} 首谱面？当前包含 BGA 视频。`
           : `确认开始下载 ${count} 首谱面？`,
       batchConfirmStart: "确认开始",
+      etaRemaining: (clock) => `剩余 ${clock}`,
+      errorMissing: "服务器上没有这个文件；换条线路可能就有，重试同一条不会有变化",
+      errorServer: "线路暂时故障；已完成文件会保留，可稍后重试或换线路",
+      errorDetailLabel: "错误详情",
+      copyDetail: "复制详情",
+      copiedDetail: "已复制",
+      skippedTitle: "已跳过的可选文件",
+      skippedSummary: (count) => `跳过了 ${count} 个可选文件（封面或 BGA），谱面本体完整`,
+      autoSwitched: (name) => `已自动切换到 ${name}`,
+      autoResumed: (count) => `网络恢复，已自动继续 ${count} 个下载任务`,
+      checkpointsUnavailable:
+        "浏览器存储写入失败，本次下载不再支持刷新后续传；请保持页面打开直到完成。",
+      storageTight: (available) => `设备可用存储仅剩约 ${available}，大批量下载可能中途失败。`,
+      storageInsufficient: (available, required) =>
+        `设备可用存储约 ${available}，不足以完成约 ${required} 的下载，请先清理空间或减少选择。`,
+      historyTitle: "最近下载",
+      historyDescription: "已完成的下载会保留在本机，可一键重新下载同一批谱面。",
+      historyEmpty: "还没有已完成的下载记录。",
+      historyRerun: "重新下载",
+      historyClear: "清空记录",
+      historyEntrySummary: (files) => `${files} 个文件`,
     },
     preview: {
       loading: "正在加载谱面…",
@@ -941,8 +1200,17 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       shareFrame: "系统分享",
       saveFrame: "保存当前帧",
       gifCancel: "取消 GIF 导出",
-      gifRangeHint: (duration) => `GIF 区间 ${duration}，拖动时间轴上的手柄调整`,
+      gifRangeHint: (duration) => `区间 ${duration}，拖动时间轴上的手柄调整`,
+      gifRangeTooLong: (max) => `GIF 最长 ${max}，请缩短区间后再导出`,
       exportGif: "导出 GIF",
+      loopRange: "A-B 循环",
+      loopRangeOff: "关闭 A-B 循环",
+      loopActiveHint: (duration) => `正在循环 ${duration} 区间`,
+      speedPanel: "速度",
+      hudCombo: "连击",
+      hudBreakNoEx: "无保护",
+      hudNoteTotalToggle: "画面内连击数",
+      hudBreakCountToggle: "画面内绝赞数",
       exportingPercent: (percent) => `导出中 ${percent}%`,
       cancel: "取消",
       gifExportedTitle: "已导出",
@@ -997,7 +1265,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       unknownLabel: "未分类",
       detailTitle: (label) => `${label} 谱面`,
       detailIntro: (label, count) =>
-        `「${label}」版本下的 ${count} 首 AstroDX 谱面,可在线浏览与下载。`,
+        `「${label}」版本下的 ${count} 首 AstroDX 谱面，可在线浏览与下载。`,
       selectedVersionsCount: (count) => `已选 ${count} 个版本`,
     },
     guestbook: {
@@ -1005,6 +1273,16 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       title: "留言板",
       description: "在这里留言、反馈或闲聊。",
       intro: "欢迎留下你的想法、建议或问题。评论由 Artalk 提供支持，可匿名或登录后发表。",
+      prefill: {
+        pending: "正在把你填写的内容送入评论框…",
+        success: "内容已填入下方评论框，检查无误后点击发送即可完成。",
+        failedTitle: "没能自动填入评论框",
+        failedBody:
+          "评论组件可能被网络拦截或加载失败。你填写的内容仍在下面，可复制后手动粘贴，或通过社区渠道发给我们。",
+        draftLabel: "你填写的内容",
+        copy: "复制内容",
+        copied: "已复制",
+      },
     },
     links: {
       navLabel: "友情链接",
@@ -1012,7 +1290,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "一些 maimai / AstroDX 相关的优秀站点与工具。",
       intro:
         "以下站点与工具均与本站无隶属关系，仅作社区分享。外部内容请自行甄别。",
-      visit: "访问",
+      visitLink: (name) => `访问${name}`,
     },
     community: {
       navLabel: "社区",
@@ -1046,6 +1324,39 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       title: "关于本站",
       description: "站点介绍、联系方式、开源信息与鸣谢。",
     },
+    license: { navLabel: "许可与来源" },
+    guide: {
+      navLabel: "上手指南",
+      title: "上手与排障",
+      description: "从安装 AstroDX 到导入第一首谱面，以及卡住时怎么办。",
+      intro:
+        "本站只提供谱面，AstroDX 本体需要另行安装。下面按「装应用 → 找谱下载 → 导入 → 排障」的顺序说明；Android 与 iOS 的步骤并不相同，请对照自己的设备阅读。",
+      tocLabel: "本页目录",
+    },
+    music: {
+      navLabel: "音乐",
+      title: "音乐库",
+      description: "按 maimai 版本连续播放曲库中的音源。",
+      intro:
+        "选一个版本即可开始播放，播放器会停在页面左下角，切换页面也不会中断。曲目清单在首次播放时才会载入。",
+      trackCount: (count) => `${count} 首`,
+      playVersion: (name) => `播放「${name}」`,
+      empty: "目前还没有可播放的曲目。",
+    },
+    changelog: {
+      navLabel: "更新日志",
+      title: "更新日志",
+      description: "按入库日期排列的谱面收录记录。",
+      intro:
+        "每一批都是一次目录同步的结果，最新的排在最前面。批次很大时只展示前几首，其余可以按版本进入曲库查看。",
+      batchHeading: (date) => `${date} 入库`,
+      batchCount: (count) => `${count} 首谱面`,
+      viewRest: (count) => `查看其余 ${count} 首`,
+      versionsLabel: "涉及版本",
+      versionLink: (name, count) => `${name}（${count} 首）`,
+      moreVersions: (count) => `另有 ${count} 个版本`,
+      empty: "还没有带入库时间的谱面记录。",
+    },
     post: {
       navLabel: "投稿",
       title: "谱面投稿",
@@ -1059,7 +1370,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       notesLabel: "补充说明（可选）",
       notesPlaceholder: "例：谱面作者、难度、版本归属等",
       requiredHint: "请先填写曲名与谱面来源。",
+      songTitleRequired: "请填写曲名。",
+      sourceRequired: "请填写谱面来源或下载链接。",
       submit: "前往留言板投稿",
+      submitting: "正在前往留言板…",
       composedTitle: "【谱面投稿】",
     },
     survey: {
@@ -1090,7 +1404,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       otherLabel: "其他建议（可选）",
       otherPlaceholder: "任何想说的话都可以写在这里",
       requiredHint: "请先选择平台并填写满意度。",
+      platformRequired: "请选择你的游玩平台。",
+      satisfactionRequired: "请选择整体满意度。",
       submit: "前往留言板提交",
+      submitting: "正在前往留言板…",
       composedTitle: "【问卷反馈】",
     },
     notFound: {
@@ -1098,6 +1415,25 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "你访问的页面不存在或已被移动，试试从首页或曲库重新出发。",
       backHome: "返回首页",
       browseCharts: "浏览曲库",
+      searchLabel: "搜索曲库",
+      searchSubmit: "搜索",
+    },
+    errorPage: {
+      title: "页面出错了",
+      description: "这一页在你的浏览器里没能正常加载。多数情况下重试一次就好；如果反复出现，请到留言板告诉我们。",
+      retry: "重试",
+      backHome: "返回首页",
+      browseCharts: "浏览曲库",
+      detailsLabel: "错误详情",
+    },
+    swUpdate: {
+      message: "站点已更新到新版本。",
+      action: "刷新",
+      dismiss: "稍后",
+    },
+    connection: {
+      offline: "当前离线，部分内容可能无法加载。",
+      restored: "网络已恢复。",
     },
     offline: {
       title: "当前处于离线状态",
@@ -1127,6 +1463,12 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "如果 ADX 谱面资源对你有帮助，欢迎通过爱发电、Patreon 或 USDT (TRC20) 捐赠支持，帮助本站持续承担服务器与流量成本。",
       about:
         "了解 ADX 谱面资源：非官方 AstroDX 谱面资料站的定位与维护理念、联系方式、开源仓库与技术栈、鸣谢名单及免责声明。",
+      guide:
+        "AstroDX 上手指南：Android 与 iOS 的安装方式、在本站搜索与下载谱面（.adx / .zip / .tar.gz 与 BGA 的区别）、按平台导入谱面的步骤，以及下载卡住、压缩包打不开、谱面不显示、缺音频封面等常见故障的排查方法。",
+      music:
+        "ADX 谱面资源音乐库：按 maimai DX 版本连续播放曲库中的音源，跨页面播放不中断，可随时切换版本、随机播放或单曲循环。",
+      changelog:
+        "ADX 谱面资源更新日志：按入库日期查看每一批新收录的 AstroDX 谱面，了解各批次涉及的 maimai DX 版本与谱面数量，快速找到最近新增的曲目。",
       post:
         "向 ADX 谱面资源投稿谱面：填写曲名与谱面来源，内容会预填到留言板评论框，发布即完成投稿，帮助更多 AstroDX 玩家找到好谱。",
       survey:
@@ -1135,6 +1477,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
   },
   en: {
     localeLabel: "English",
+    siteName: "ADX Chart Archive",
     nav: {
       home: "Home",
       browse: "Browse",
@@ -1224,6 +1567,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description:
         "Search, preview, and download maimai charts, then import them into the AstroDX simulator in one click. Browse by version or genre, or grab whole sets at once.",
       searchCta: "Search Catalog",
+      searchExamples: ["PANDORA PARADOXXX", "pandora", "sasakure.UK", "niconico＆VOCALOID", "tsunagite"],
       browseCta: "Browse Releases",
       getAppCta: "Get AstroDX",
       videoCta: "Watch the Demo",
@@ -1269,26 +1613,32 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       faqHeading: "Frequently Asked Questions",
       faq: (total, versions) => [
         {
+          id: "what-is-astrodx",
           q: "What is AstroDX?",
-          a: "AstroDX is a community-built simulator for maimai-style rhythm-game charts. This site, ADX 谱面资源, is an unofficial index of AstroDX charts with metadata, cover art, and download links.",
+          a: "AstroDX is a community-built simulator for maimai-style rhythm-game charts. This site, the ADX Chart Archive, is an unofficial index of AstroDX charts with metadata, cover art, and download links.",
         },
         {
+          id: "what-is-maimai-dx",
           q: "What is maimai DX?",
           a: "maimai DX is SEGA's arcade rhythm game, and AstroDX charts recreate its play format. The catalog groups charts by maimai DX versions such as FESTiVAL, PRiSM, BUDDiES, and UNiVERSE.",
         },
         {
+          id: "how-to-download",
           q: "How do I download a chart?",
           a: "Open any chart's detail page and use the on-site download button to fetch the chart package built from the remote AstroDX directory.",
         },
         {
+          id: "how-to-import",
           q: "How do I import charts into AstroDX?",
-          a: "On Android, use the import option inside AstroDX to pick the downloaded chart package, or place the extracted chart folder in AstroDX's charts directory. On iOS, use the Files app to put charts into AstroDX's collections folder. Exact locations can vary by app version — follow the in-app instructions.",
+          a: "The .adx you download here imports as-is — no extracting. On iOS, use the Files app to move it into the AstroDX folder itself (not the levels folder inside it). On Android, tap the .adx and open it with AstroDX, or long-press and share it to AstroDX. Launch the game once before your first import. Full walkthrough in the guide.",
         },
         {
+          id: "catalog-size",
           q: "How many charts are in the archive?",
           a: `The archive currently lists ${total} charts across ${versions} maimai DX version branches, and is updated as the remote directory changes.`,
         },
       ],
+      faqEntryId: "what-is-astrodx",
     },
     charts: {
       title: "Browse Charts",
@@ -1302,17 +1652,20 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       loading: "Loading",
     },
     catalogBrowser: {
-      searchPlaceholder: "Search title, alias, artist, version...",
+      searchPlaceholder: "Search title, romaji, alias, artist, charter, version...",
+      searchLabel: "Search charts",
       randomChart: "Random chart",
       allCategories: "All Categories",
       allSubcategories: "All Versions",
       allGenres: "All Genres",
       aliasMatchLabel: "Alias match",
+      newBadge: "New",
+      newBadgeHint: "Added in the last two weeks",
       details: "Details",
       download: "Download",
       source: "Source",
       emptyState:
-        "No matching charts were found. Try an alias, artist, or English title.",
+        "No matching charts were found. Try the romaji reading, an alias, or the artist.",
       clearSearch: "Clear search",
       clearFilters: "Clear all filters",
       activeFiltersLabel: "Active filters",
@@ -1325,6 +1678,28 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       filterCabinet: "Type",
       filterBpm: "BPM",
       filterAssets: "Assets",
+      filterDesigner: "Charter",
+      designerSearchPlaceholder: "Type a charter's name…",
+      designerListLabel: "Charter suggestions",
+      designerNoMatch: "No charter matches that",
+      chipCountLabel: (label, count) =>
+        count === 1 ? `${label} (1 chart)` : `${label} (${count} charts)`,
+      sortLabel: "Sort",
+      sortOptions: {
+        default: "Default order",
+        imported: "Recently added",
+        "level-desc": "Level: high to low",
+        "level-asc": "Level: low to high",
+        "bpm-desc": "BPM: high to low",
+        "bpm-asc": "BPM: low to high",
+        "title-asc": "Title: A to Z",
+      },
+      emptySuggestionsTitle: "Try dropping one condition:",
+      dropFilterSuggestion: (label, count) =>
+        count === 1
+          ? `Without the ${label} filter → 1 chart`
+          : `Without the ${label} filter → ${count} charts`,
+      filterSearch: "Search",
       cabinetStandard: "Standard",
       cabinetUtage: "Utage",
       assetHasPv: "With BGA video",
@@ -1370,14 +1745,14 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       metadata: "Chart Metadata",
       metadataDescription: "Parsed directly from the remote AstroDX directory resources.",
       difficulties: "Difficulties",
-      assets: "Assets",
-      assetsDescription: "Resource availability detected from the remote directory.",
       source: "Source",
       sourceDescription: "Built from the remote AstroDX directory index.",
       breadcrumbLabel: "Breadcrumb",
       versionLabel: "Version",
       genreLabel: "Genre",
       bpmLabel: "BPM",
+      bpmVariableLabel: (range) => `${range} (variable)`,
+      durationLabel: "Length",
       shortIdLabel: "Short ID",
       aliasesLabel: "Aliases",
       unknownValue: "Unknown",
@@ -1385,10 +1760,28 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       tableDifficulty: "Difficulty",
       tableLevel: "Level",
       tableCharter: "Charter",
+      tableNotes: "Notes",
+      noteTypeTap: "Tap",
+      noteTypeHold: "Hold",
+      noteTypeSlide: "Slide",
+      noteTypeTouch: "Touch",
+      noteTypeTouchHold: "Touch Hold",
+      noteTypeBreak: "Break",
+      statsTitle: "Chart numbers",
+      statsDescription: "Note counts, length and file sizes measured from the maidata at build time.",
+      statsNotesLabel: "Most notes",
+      statsDownloadLabel: "Download size",
+      sizeEstimate: (size) => `about ${size}`,
+      sizeEstimateWithVideo: (total, video) => `about ${total} (${video} of it BGA)`,
+      sourceMaidataLabel: "Chart file",
+      licenseLabel: "Licence note",
+      levelConstantHint: "Bold is the display level; the faint number is the chart constant.",
       preview: "Preview",
       previewDescription: "Watch the PV or listen to the audio (served from the remote directory).",
+      actionsLabel: "Chart actions",
       chartPreview: "Chart preview",
       chartPreviewDescription: "Play the chart in your browser, synced to the audio.",
+      chartPreviewAt: (difficulty) => `Preview the ${difficulty} chart`,
       pvLabel: "Promotion Video (PV)",
       audioLabel: "Audio preview",
       mediaUnsupported: "Your browser does not support playing this media.",
@@ -1488,6 +1881,31 @@ const dictionaries: Record<Locale, SiteDictionary> = {
             ? "Start downloading 1 chart?"
             : `Start downloading ${count} charts?`,
       batchConfirmStart: "Start download",
+      etaRemaining: (clock) => `${clock} left`,
+      errorServer: "The mirror is failing right now. Finished files are kept — retry later or switch route.",
+      errorMissing: "The server does not have this file. Another route may; retrying the same one will not help.",
+      errorDetailLabel: "Error details",
+      copyDetail: "Copy details",
+      copiedDetail: "Copied",
+      skippedTitle: "Skipped optional files",
+      skippedSummary: (count) =>
+        `Skipped ${count} optional file${count === 1 ? "" : "s"} (cover art or BGA). The chart itself is complete.`,
+      autoSwitched: (name) => `Switched to ${name} automatically`,
+      autoResumed: (count) =>
+        `Back online — resumed ${count} download${count === 1 ? "" : "s"} automatically`,
+      checkpointsUnavailable:
+        "Browser storage writes are failing, so this download can no longer resume after a reload. Keep the page open until it finishes.",
+      storageTight: (available) =>
+        `Only about ${available} of device storage is free; a large batch may fail partway.`,
+      storageInsufficient: (available, required) =>
+        `About ${available} of device storage is free, which is not enough for roughly ${required}. Free up space or pick fewer charts.`,
+      historyTitle: "Recent downloads",
+      historyDescription:
+        "Completed downloads are remembered on this device so the same set can be fetched again in one click.",
+      historyEmpty: "No completed downloads yet.",
+      historyRerun: "Download again",
+      historyClear: "Clear history",
+      historyEntrySummary: (files) => `${files} file${files === 1 ? "" : "s"}`,
     },
     preview: {
       loading: "Loading chart…",
@@ -1521,8 +1939,17 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       shareFrame: "System share",
       saveFrame: "Save current frame",
       gifCancel: "Cancel GIF export",
-      gifRangeHint: (duration) => `GIF range ${duration} — drag the timeline handles to adjust`,
+      gifRangeHint: (duration) => `Range ${duration} — drag the timeline handles to adjust`,
+      gifRangeTooLong: (max) => `GIF export tops out at ${max}; shorten the range first`,
       exportGif: "Export GIF",
+      loopRange: "A–B repeat",
+      loopRangeOff: "Stop A–B repeat",
+      loopActiveHint: (duration) => `Repeating a ${duration} section`,
+      speedPanel: "Speed",
+      hudCombo: "Combo",
+      hudBreakNoEx: "no EX",
+      hudNoteTotalToggle: "On-canvas combo",
+      hudBreakCountToggle: "On-canvas break count",
       exportingPercent: (percent) => `Exporting ${percent}%`,
       cancel: "Cancel",
       gifExportedTitle: "Exported",
@@ -1591,6 +2018,17 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "Leave a message, feedback, or just say hi.",
       intro:
         "Share your thoughts, suggestions, or questions. Comments are powered by Artalk — post anonymously or sign in.",
+      prefill: {
+        pending: "Moving what you filled in into the comment box…",
+        success:
+          "Your text is in the comment box below. Check it over and hit send to finish.",
+        failedTitle: "Couldn't fill the comment box automatically",
+        failedBody:
+          "The comment widget may have been blocked or failed to load. Your text is still here — copy it and paste it in by hand, or send it to us through one of the community channels.",
+        draftLabel: "What you wrote",
+        copy: "Copy text",
+        copied: "Copied",
+      },
     },
     links: {
       navLabel: "Links",
@@ -1598,7 +2036,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "A handful of great maimai / AstroDX-related sites and tools.",
       intro:
         "These sites and tools are not affiliated with this archive — shared for the community. Use external links at your own discretion.",
-      visit: "Visit",
+      visitLink: (name) => `Visit ${name}`,
     },
     community: {
       navLabel: "Community",
@@ -1633,6 +2071,40 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       title: "About",
       description: "What this site is, how to reach us, open-source info and credits.",
     },
+    license: { navLabel: "License & Sources" },
+    guide: {
+      navLabel: "Guide",
+      title: "Getting Started & Troubleshooting",
+      description:
+        "From installing AstroDX to importing your first chart — and what to do when something goes wrong.",
+      intro:
+        "This archive hosts charts only; AstroDX itself has to be installed separately. The steps below run install → download → import → fix, and Android and iOS differ, so follow the path that matches your device.",
+      tocLabel: "On this page",
+    },
+    music: {
+      navLabel: "Music",
+      title: "Music Library",
+      description: "Play the archive's audio continuously, one maimai version at a time.",
+      intro:
+        "Pick a version to start playing. The player docks in the bottom-left corner and keeps going as you move between pages; the track list is fetched the first time you press play.",
+      trackCount: (count) => (count === 1 ? "1 track" : `${count} tracks`),
+      playVersion: (name) => `Play ${name}`,
+      empty: "No playable tracks yet.",
+    },
+    changelog: {
+      navLabel: "Changelog",
+      title: "Changelog",
+      description: "Every chart this archive added, grouped by the day it landed.",
+      intro:
+        "Each group is one catalog sync, newest first. Large batches show only their first few charts; the rest is one click away, filtered by version.",
+      batchHeading: (date) => `Added ${date}`,
+      batchCount: (count) => (count === 1 ? "1 chart" : `${count} charts`),
+      viewRest: (count) => `See the other ${count}`,
+      versionsLabel: "Versions in this batch",
+      versionLink: (name, count) => `${name} (${count})`,
+      moreVersions: (count) => `and ${count} more versions`,
+      empty: "No dated import records yet.",
+    },
     post: {
       navLabel: "Submit",
       title: "Submit a Chart",
@@ -1646,7 +2118,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       notesLabel: "Notes (optional)",
       notesPlaceholder: "e.g. chart designer, difficulty, version",
       requiredHint: "Please fill in the song title and the chart source first.",
+      songTitleRequired: "Enter the song title.",
+      sourceRequired: "Enter where the chart came from, or a download link.",
       submit: "Submit via Guestbook",
+      submitting: "Opening the guestbook…",
       composedTitle: "[Chart Submission]",
     },
     survey: {
@@ -1677,7 +2152,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       otherLabel: "Anything else? (optional)",
       otherPlaceholder: "Anything you want to tell us",
       requiredHint: "Please pick a platform and a satisfaction score first.",
+      platformRequired: "Pick the platform you play on.",
+      satisfactionRequired: "Pick an overall satisfaction score.",
       submit: "Submit via Guestbook",
+      submitting: "Opening the guestbook…",
       composedTitle: "[Survey Feedback]",
     },
     notFound: {
@@ -1686,6 +2164,26 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "The page you're looking for doesn't exist or has moved. Head back to the home page or browse the chart library.",
       backHome: "Back to home",
       browseCharts: "Browse charts",
+      searchLabel: "Search the catalog",
+      searchSubmit: "Search",
+    },
+    errorPage: {
+      title: "Something went wrong",
+      description:
+        "This page failed to load in your browser. Retrying usually fixes it — if it keeps happening, let us know on the guestbook.",
+      retry: "Try again",
+      backHome: "Back to home",
+      browseCharts: "Browse charts",
+      detailsLabel: "Error details",
+    },
+    swUpdate: {
+      message: "A new version of the site is available.",
+      action: "Reload",
+      dismiss: "Later",
+    },
+    connection: {
+      offline: "You're offline — some content may not load.",
+      restored: "Back online.",
     },
     offline: {
       title: "You're offline",
@@ -1718,6 +2216,12 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "If the ADX chart archive helps you, consider supporting it via Afdian, Patreon or USDT (TRC20) to help cover server and bandwidth costs.",
       about:
         "About the ADX chart archive: what this unofficial AstroDX chart site is, how it is maintained, how to reach us, its open-source repository and tech stack, credits and disclaimer.",
+      guide:
+        "Getting started with AstroDX: installing it on Android and iOS, finding and downloading charts here (.adx vs .zip vs .tar.gz, and what a BGA adds), importing on each platform, and fixing stalled downloads, unopenable archives, missing charts and missing audio.",
+      music:
+        "The ADX chart archive music library: play the catalog's audio continuously by maimai DX version, keep it running across pages, and switch versions, shuffle or repeat at any time.",
+      changelog:
+        "The ADX chart archive changelog: every batch of newly added AstroDX charts by import date, which maimai DX versions each batch touched, and how many charts it brought in.",
       post:
         "Submit a chart to the ADX archive: fill in the song title and chart source, review the prefilled guestbook comment and post it — helping more AstroDX players find great charts.",
       survey:
@@ -1726,6 +2230,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
   },
   ja: {
     localeLabel: "日本語",
+    siteName: "ADX 譜面アーカイブ",
     nav: {
       home: "ホーム",
       browse: "曲一覧",
@@ -1815,6 +2320,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description:
         "maimai 譜面を検索・試遊してダウンロードし、ワンクリックで AstroDX シミュレーターへインポート。バージョンやジャンルから探せて、まとめてダウンロードにも対応しています。",
       searchCta: "カタログ検索",
+      searchExamples: ["PANDORA PARADOXXX", "パンドラ", "sasakure.UK", "niconico＆VOCALOID", "系ぎて"],
       browseCta: "バージョン一覧",
       getAppCta: "AstroDX を入手",
       videoCta: "デモ動画を見る",
@@ -1859,26 +2365,32 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       faqHeading: "よくある質問",
       faq: (total, versions) => [
         {
+          id: "what-is-astrodx",
           q: "AstroDX とは？",
-          a: "AstroDX はコミュニティ製の maimai 風リズムゲームシミュレーターです。本サイト「ADX 谱面资源」は AstroDX 譜面を収録し、メタデータ・ジャケット・ダウンロードリンクを提供する非公式アーカイブです。",
+          a: "AstroDX はコミュニティ製の maimai 風リズムゲームシミュレーターです。本サイト「ADX 譜面アーカイブ」は AstroDX 譜面を収録し、メタデータ・ジャケット・ダウンロードリンクを提供する非公式アーカイブです。",
         },
         {
+          id: "what-is-maimai-dx",
           q: "maimai DX とは？",
           a: "maimai DX は SEGA のアーケードリズムゲームで、AstroDX 譜面はそのプレイ形式を再現します。本カタログは FESTiVAL・PRiSM・BUDDiES・UNiVERSE などの maimai DX バージョンごとに譜面を分類しています。",
         },
         {
+          id: "how-to-download",
           q: "譜面はどうやってダウンロードしますか？",
           a: "各譜面の詳細ページを開き、サイト内ダウンロードボタンを使うと、リモートの AstroDX ディレクトリから構築された譜面パッケージを取得できます。",
         },
         {
+          id: "how-to-import",
           q: "譜面を AstroDX にインポートするには？",
-          a: "Android では AstroDX 内のインポート機能でダウンロードした譜面パッケージを選ぶか、展開した譜面フォルダーを AstroDX の譜面ディレクトリに配置します。iOS では「ファイル」アプリから AstroDX の collections フォルダーに譜面を入れてください。場所はアプリのバージョンによって異なる場合があるため、アプリ内の案内をご確認ください。",
+          a: "本サイトの .adx は展開せずそのまま取り込めます。iOS はファイル App で AstroDX フォルダ自体へ移動（中の levels ではありません）。Android は .adx をタップして AstroDX で開くか、長押しして「共有 → AstroDX」。初回の取り込み前に一度ゲームを起動しておいてください。詳しい手順はガイドを参照。",
         },
         {
+          id: "catalog-size",
           q: "アーカイブには何曲ありますか？",
           a: `現在 ${total} 曲の譜面を ${versions} 個の maimai DX バージョン分類で収録しており、リモートディレクトリの更新に合わせて随時追加されます。`,
         },
       ],
+      faqEntryId: "what-is-astrodx",
     },
     charts: {
       title: "譜面一覧",
@@ -1891,17 +2403,20 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       loading: "読み込み中",
     },
     catalogBrowser: {
-      searchPlaceholder: "曲名、別名、アーティスト、バージョンで検索...",
+      searchPlaceholder: "曲名、ローマ字、別名、アーティスト、譜面制作者、バージョンで検索...",
+      searchLabel: "譜面を検索",
       randomChart: "ランダム譜面",
       allCategories: "すべての分類",
       allSubcategories: "すべてのバージョン",
       allGenres: "すべてのジャンル",
       aliasMatchLabel: "別名一致",
+      newBadge: "NEW",
+      newBadgeHint: "直近 2 週間に追加",
       details: "詳細",
       download: "ダウンロード",
       source: "配布元",
       emptyState:
-        "一致する譜面は見つかりませんでした。別名、アーティスト名、英語タイトルも試してください。",
+        "一致する譜面は見つかりませんでした。ローマ字表記、別名、アーティスト名でもお試しください。",
       clearSearch: "検索をクリア",
       clearFilters: "フィルターをすべて解除",
       activeFiltersLabel: "適用中のフィルター",
@@ -1914,6 +2429,24 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       filterCabinet: "種別",
       filterBpm: "BPM",
       filterAssets: "収録",
+      filterDesigner: "譜面制作者",
+      designerSearchPlaceholder: "譜面制作者名を入力…",
+      designerListLabel: "譜面制作者の候補",
+      designerNoMatch: "該当する譜面制作者はいません",
+      chipCountLabel: (label, count) => `${label}（${count} 譜面）`,
+      sortLabel: "並び替え",
+      sortOptions: {
+        default: "既定の並び",
+        imported: "新着順",
+        "level-desc": "レベルの高い順",
+        "level-asc": "レベルの低い順",
+        "bpm-desc": "BPM の高い順",
+        "bpm-asc": "BPM の低い順",
+        "title-asc": "曲名 A→Z",
+      },
+      emptySuggestionsTitle: "条件をひとつ外してみましょう：",
+      dropFilterSuggestion: (label, count) => `「${label}」を外す → ${count} 件`,
+      filterSearch: "検索語",
       cabinetStandard: "スタンダード",
       cabinetUtage: "宴会場",
       assetHasPv: "BGA 動画あり",
@@ -1958,14 +2491,14 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       metadata: "譜面情報",
       metadataDescription: "リモートの AstroDX ディレクトリのリソースから直接解析しています。",
       difficulties: "難易度",
-      assets: "収録リソース",
-      assetsDescription: "リモートディレクトリから検出されたリソースの有無。",
       source: "出典",
       sourceDescription: "リモートの AstroDX ディレクトリインデックスから構築。",
       breadcrumbLabel: "パンくずリスト",
       versionLabel: "バージョン",
       genreLabel: "ジャンル",
       bpmLabel: "BPM",
+      bpmVariableLabel: (range) => `${range}（変速）`,
+      durationLabel: "長さ",
       shortIdLabel: "短縮 ID",
       aliasesLabel: "別名",
       unknownValue: "不明",
@@ -1973,10 +2506,28 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       tableDifficulty: "難易度",
       tableLevel: "レベル",
       tableCharter: "譜面作者",
+      tableNotes: "ノーツ数",
+      noteTypeTap: "Tap",
+      noteTypeHold: "Hold",
+      noteTypeSlide: "Slide",
+      noteTypeTouch: "Touch",
+      noteTypeTouchHold: "Touch Hold",
+      noteTypeBreak: "Break",
+      statsTitle: "譜面データ",
+      statsDescription: "ビルド時に maidata を解析して得たノーツ数・長さ・ファイルサイズ。",
+      statsNotesLabel: "最多ノーツ数",
+      statsDownloadLabel: "ダウンロード容量",
+      sizeEstimate: (size) => `約 ${size}`,
+      sizeEstimateWithVideo: (total, video) => `約 ${total}（うち BGA ${video}）`,
+      sourceMaidataLabel: "譜面ファイル",
+      licenseLabel: "ライセンス表記",
+      levelConstantHint: "太字が表示レベル、薄い数字が譜面定数です。",
       preview: "プレビュー",
       previewDescription: "PV の視聴や音源の試聴ができます（リモートディレクトリ提供）。",
+      actionsLabel: "譜面の操作",
       chartPreview: "譜面プレビュー",
       chartPreviewDescription: "ブラウザで譜面を音源と同期して再生します。",
+      chartPreviewAt: (difficulty) => `${difficulty} をプレビュー`,
       pvLabel: "PV 映像",
       audioLabel: "音源試聴",
       mediaUnsupported: "お使いのブラウザはこのメディアの再生に対応していません。",
@@ -2068,6 +2619,32 @@ const dictionaries: Record<Locale, SiteDictionary> = {
           ? `${count} 譜面を BGA 動画込みで開始しますか？`
           : `${count} 譜面のダウンロードを開始しますか？`,
       batchConfirmStart: "開始する",
+      etaRemaining: (clock) => `残り ${clock}`,
+      errorMissing:
+        "サーバーにこのファイルがありません。別の配信元なら存在する可能性があります（同じ配信元での再試行は無意味です）。",
+      errorServer:
+        "配信元が一時的に不調です。完了したファイルは保持されるので、時間をおくか配信元を切り替えてください。",
+      errorDetailLabel: "エラーの詳細",
+      copyDetail: "詳細をコピー",
+      copiedDetail: "コピーしました",
+      skippedTitle: "スキップした任意ファイル",
+      skippedSummary: (count) =>
+        `任意ファイル ${count} 件（ジャケットまたは BGA）をスキップしました。譜面本体は揃っています。`,
+      autoSwitched: (name) => `${name} に自動で切り替えました`,
+      autoResumed: (count) => `通信が回復したため、${count} 件のダウンロードを自動で再開しました`,
+      checkpointsUnavailable:
+        "ブラウザーのストレージに書き込めないため、再読み込み後の再開ができません。完了までこのページを開いたままにしてください。",
+      storageTight: (available) =>
+        `端末の空き容量は約 ${available} です。大量のダウンロードは途中で失敗する可能性があります。`,
+      storageInsufficient: (available, required) =>
+        `端末の空き容量は約 ${available} で、約 ${required} のダウンロードには足りません。空き容量を確保するか選択を減らしてください。`,
+      historyTitle: "最近のダウンロード",
+      historyDescription:
+        "完了したダウンロードはこの端末に記録され、同じ内容をワンクリックで再取得できます。",
+      historyEmpty: "完了したダウンロードはまだありません。",
+      historyRerun: "もう一度ダウンロード",
+      historyClear: "履歴を消去",
+      historyEntrySummary: (files) => `${files} ファイル`,
     },
     preview: {
       loading: "譜面を読み込み中…",
@@ -2101,8 +2678,17 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       shareFrame: "システム共有",
       saveFrame: "現在のフレームを保存",
       gifCancel: "GIF エクスポートをキャンセル",
-      gifRangeHint: (duration) => `GIF 範囲 ${duration}。タイムラインのハンドルをドラッグして調整`,
+      gifRangeHint: (duration) => `範囲 ${duration}。タイムラインのハンドルをドラッグして調整`,
+      gifRangeTooLong: (max) => `GIF は最長 ${max} です。範囲を短くしてください`,
       exportGif: "GIF を書き出す",
+      loopRange: "A-B リピート",
+      loopRangeOff: "A-B リピートを解除",
+      loopActiveHint: (duration) => `${duration} の区間をリピート中`,
+      speedPanel: "速度",
+      hudCombo: "コンボ",
+      hudBreakNoEx: "保護なし",
+      hudNoteTotalToggle: "画面内コンボ表示",
+      hudBreakCountToggle: "画面内 BREAK 数表示",
       exportingPercent: (percent) => `書き出し中 ${percent}%`,
       cancel: "キャンセル",
       gifExportedTitle: "書き出し完了",
@@ -2166,6 +2752,17 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "メッセージやフィードバック、雑談などお気軽にどうぞ。",
       intro:
         "ご意見・ご提案・ご質問をお寄せください。コメントは Artalk によって提供され、匿名でもサインインしても投稿できます。",
+      prefill: {
+        pending: "入力内容をコメント欄へ転記しています…",
+        success:
+          "入力内容を下のコメント欄に転記しました。内容を確認して送信すると完了です。",
+        failedTitle: "コメント欄への自動入力に失敗しました",
+        failedBody:
+          "コメント機能が読み込めなかった可能性があります。入力内容は下に残っているので、コピーして手動で貼り付けるか、コミュニティ経由でお知らせください。",
+        draftLabel: "入力した内容",
+        copy: "内容をコピー",
+        copied: "コピーしました",
+      },
     },
     links: {
       navLabel: "リンク",
@@ -2173,7 +2770,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "maimai / AstroDX 関連のおすすめサイト・ツール。",
       intro:
         "これらのサイト・ツールは当アーカイブとは無関係で、コミュニティ向けに紹介しています。外部リンクのご利用はご自身の判断でお願いします。",
-      visit: "アクセス",
+      visitLink: (name) => `${name} にアクセス`,
     },
     community: {
       navLabel: "コミュニティ",
@@ -2208,6 +2805,40 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       title: "本サイトについて",
       description: "サイトの紹介、連絡先、オープンソース情報と謝辞。",
     },
+    license: { navLabel: "ライセンスと出典" },
+    guide: {
+      navLabel: "使い方ガイド",
+      title: "導入とトラブル解決",
+      description:
+        "AstroDX のインストールから最初の 1 曲を取り込むまで、そして詰まったときの対処法。",
+      intro:
+        "本サイトが配布しているのは譜面だけで、AstroDX 本体は別途インストールが必要です。以下は「アプリを入れる → 譜面を探して落とす → 取り込む → トラブル対処」の順で、Android と iOS では手順が異なります。お使いの端末に合わせてお読みください。",
+      tocLabel: "このページの目次",
+    },
+    music: {
+      navLabel: "ミュージック",
+      title: "ミュージックライブラリ",
+      description: "収録楽曲を maimai のバージョンごとに連続再生します。",
+      intro:
+        "バージョンを選ぶと再生が始まります。プレイヤーは画面左下に常駐し、ページを移動しても再生は途切れません。曲リストは最初の再生時に読み込まれます。",
+      trackCount: (count) => `${count} 曲`,
+      playVersion: (name) => `${name} を再生`,
+      empty: "再生できる曲がまだありません。",
+    },
+    changelog: {
+      navLabel: "更新履歴",
+      title: "更新履歴",
+      description: "収録日ごとにまとめた譜面の追加記録。",
+      intro:
+        "各グループがカタログ同期 1 回分で、新しいものが上に並びます。件数の多いバージョンは先頭の数曲だけを表示し、残りはバージョン別のカタログから確認できます。",
+      batchHeading: (date) => `${date} に追加`,
+      batchCount: (count) => `${count} 曲`,
+      viewRest: (count) => `残り ${count} 曲を見る`,
+      versionsLabel: "対象バージョン",
+      versionLink: (name, count) => `${name}（${count} 曲）`,
+      moreVersions: (count) => `ほか ${count} バージョン`,
+      empty: "収録日つきの記録はまだありません。",
+    },
     post: {
       navLabel: "投稿",
       title: "譜面の投稿",
@@ -2221,7 +2852,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       notesLabel: "補足（任意）",
       notesPlaceholder: "例：譜面作者、難易度、収録バージョンなど",
       requiredHint: "曲名と入手元を先に入力してください。",
+      songTitleRequired: "曲名を入力してください。",
+      sourceRequired: "入手元またはダウンロードリンクを入力してください。",
       submit: "ゲストブックで投稿する",
+      submitting: "ゲストブックへ移動しています…",
       composedTitle: "【譜面投稿】",
     },
     survey: {
@@ -2252,7 +2886,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       otherLabel: "そのほかのご意見（任意）",
       otherPlaceholder: "伝えたいことがあれば何でもどうぞ",
       requiredHint: "プラットフォームと満足度を先に選択してください。",
+      platformRequired: "プレイしているプラットフォームを選択してください。",
+      satisfactionRequired: "全体の満足度を選択してください。",
       submit: "ゲストブックで送信する",
+      submitting: "ゲストブックへ移動しています…",
       composedTitle: "【アンケート回答】",
     },
     notFound: {
@@ -2261,6 +2898,26 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "お探しのページは存在しないか、移動しました。ホームまたは譜面一覧からお探しください。",
       backHome: "ホームへ戻る",
       browseCharts: "譜面一覧を見る",
+      searchLabel: "譜面を検索",
+      searchSubmit: "検索",
+    },
+    errorPage: {
+      title: "エラーが発生しました",
+      description:
+        "このページをブラウザで読み込めませんでした。多くの場合は再試行で解決します。繰り返す場合はゲストブックからお知らせください。",
+      retry: "再試行",
+      backHome: "ホームへ戻る",
+      browseCharts: "譜面一覧を見る",
+      detailsLabel: "エラーの詳細",
+    },
+    swUpdate: {
+      message: "サイトの新しいバージョンがあります。",
+      action: "再読み込み",
+      dismiss: "後で",
+    },
+    connection: {
+      offline: "オフラインです。一部のコンテンツを読み込めない場合があります。",
+      restored: "オンラインに復帰しました。",
     },
     offline: {
       title: "オフラインです",
@@ -2291,6 +2948,12 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "ADX 譜面アーカイブがお役に立ちましたら、爱发电・Patreon・USDT (TRC20) での寄付にご協力ください。サーバーと帯域のコスト維持に役立てられます。",
       about:
         "ADX 譜面アーカイブについて：非公式 AstroDX 譜面資料サイトの位置づけと運営方針、連絡先、オープンソースリポジトリと技術構成、謝辞、免責事項を掲載しています。",
+      guide:
+        "AstroDX の導入ガイド：Android と iOS それぞれのインストール方法、本サイトでの譜面の探し方とダウンロード（.adx / .zip / .tar.gz の違いと BGA について）、プラットフォーム別の取り込み手順、ダウンロードが止まる・書庫が開けない・譜面が表示されない・音源やジャケットが無いといったトラブルの対処法。",
+      music:
+        "ADX 譜面アーカイブのミュージックライブラリ：収録楽曲を maimai DX のバージョンごとに連続再生。ページを移動しても途切れず、バージョン切り替え・シャッフル・1 曲リピートにも対応しています。",
+      changelog:
+        "ADX 譜面アーカイブの更新履歴：新しく追加された AstroDX 譜面を収録日ごとに一覧。各バッチが対象とした maimai DX のバージョンと収録曲数を確認できます。",
       post:
         "ADX 譜面アーカイブへの譜面投稿：曲名と入手元を記入すると内容がゲストブックのコメント欄に自動入力され、投稿するだけで完了します。",
       survey:
@@ -2338,10 +3001,10 @@ export function getStaticPageMetadata(
       description: dictionary.seo.home,
       keywords:
         normalizedLocale === "en"
-          ? ["AstroDX", "ADX 谱面资源", "chart archive", "downloads", "catalog index"]
+          ? ["AstroDX", dictionary.siteName, "chart archive", "downloads", "catalog index"]
           : normalizedLocale === "ja"
-            ? ["AstroDX", "ADX 谱面资源", "譜面アーカイブ", "ダウンロード", "統合カタログ"]
-            : ["AstroDX", "ADX 谱面资源", "谱面资料站", "下载入口", "目录索引"],
+            ? ["AstroDX", dictionary.siteName, "譜面アーカイブ", "ダウンロード", "統合カタログ"]
+            : ["AstroDX", dictionary.siteName, "谱面资料站", "下载入口", "目录索引"],
     },
     charts: {
       pathname: "/charts",
@@ -2349,10 +3012,10 @@ export function getStaticPageMetadata(
       description: dictionary.seo.charts,
       keywords:
         normalizedLocale === "en"
-          ? ["AstroDX", "ADX 谱面资源", "browse charts", "category filter", "display language"]
+          ? ["AstroDX", dictionary.siteName, "browse charts", "category filter", "display language"]
           : normalizedLocale === "ja"
-            ? ["AstroDX", "ADX 谱面资源", "譜面一覧", "分類フィルタ", "表示言語"]
-            : ["AstroDX", "ADX 谱面资源", "浏览曲目", "分类筛选", "显示语言"],
+            ? ["AstroDX", dictionary.siteName, "譜面一覧", "分類フィルタ", "表示言語"]
+            : ["AstroDX", dictionary.siteName, "浏览曲目", "分类筛选", "显示语言"],
     },
   };
 }

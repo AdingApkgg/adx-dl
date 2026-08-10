@@ -15,7 +15,11 @@ export const metadata: Metadata = {
 
 export default function GlobalNotFound() {
   return (
-    <RootLayoutShell lang="zh-CN" locale="zh">
+    // The chrome adopts the locale from the address bar after mount: this one
+    // file answers /en/... and /ja/... too, and a Chinese footer under an
+    // English heading (every link pointing back into the Chinese tree) is a
+    // dead end for the visitor who most needs the navigation.
+    <RootLayoutShell lang="zh-CN" locale="zh" deriveLocaleFromPath>
       <NotFoundView />
     </RootLayoutShell>
   );

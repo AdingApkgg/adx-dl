@@ -9,6 +9,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   DownloadIcon,
+  HistoryIcon,
   PauseIcon,
   RotateCwIcon,
   XIcon,
@@ -31,8 +32,10 @@ import {
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { DownloadSourceMenu, DownloadSourceSummary } from "./download-source-selector";
+import { useWakeLock } from "@/components/chart-preview/hooks/use-wake-lock";
 import { jobPercent, useDownloadsStore } from "./downloads-store";
-import { downloadJobStatusText } from "./download-status-text";
+import { DownloadJobNotes, DownloadJobStatusLine } from "./download-job-notes";
+import { DownloadHistoryList } from "./download-history";
 
 /**
  * Fired by a download trigger (with the button's viewport center) so the dock
@@ -43,6 +46,14 @@ export const DOWNLOAD_STARTED_EVENT = "astrodx:download-started";
 export type DownloadStartedDetail = { x: number; y: number };
 
 const SOURCE_PROBE_REFRESH_MS = 5 * 60_000;
+
+/**
+ * The dock's icon buttons render outside the shared Button primitive, so they
+ * inherited only globals.css's faint `*` outline — effectively invisible for
+ * keyboard users. This is the same ring the primitives use.
+ */
+const DOCK_ICON_BUTTON_CLASS =
+  "-m-0.5 rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 /** True while the tab is visible — stops infinite sweep loops in hidden tabs. */
 function usePageVisible(): boolean {
@@ -153,10 +164,9 @@ function ConfirmDismissButton({
       aria-label={armed ? confirmHint : label}
       title={armed ? confirmHint : label}
       className={cn(
-        "relative -m-0.5 rounded-md p-1.5 transition-colors",
-        armed
-          ? "bg-destructive/10 text-destructive"
-          : "text-muted-foreground hover:text-foreground"
+        "relative",
+        DOCK_ICON_BUTTON_CLASS,
+        armed && "bg-destructive/10 text-destructive"
       )}
     >
       {armed ? (
@@ -203,7 +213,6 @@ type GhostFlight = {
  */
 export function DownloadDock({ locale }: { locale: Locale }) {
   const dictionary = getDictionary(locale);
-  const detail = dictionary.detail;
   const tray = dictionary.downloads;
 
   const jobs = useDownloadsStore((state) => state.jobs);
@@ -215,7 +224,13 @@ export function DownloadDock({ locale }: { locale: Locale }) {
   const pause = useDownloadsStore((state) => state.pause);
   const hydrateFromStorage = useDownloadsStore((state) => state.hydrateFromStorage);
   const refreshSourceProbes = useDownloadsStore((state) => state.refreshSourceProbes);
+  const resumeInterrupted = useDownloadsStore((state) => state.resumeInterrupted);
+  const history = useDownloadsStore((state) => state.history);
+  const checkpointsUnavailable = useDownloadsStore(
+    (state) => state.checkpointsUnavailable
+  );
   const [collapsed, setCollapsed] = React.useState(false);
+  const [historyOpen, setHistoryOpen] = React.useState(false);
 
   const reducedMotion = useReducedMotion();
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -251,6 +266,43 @@ export function DownloadDock({ locale }: { locale: Locale }) {
     };
   }, [refreshSourceProbes]);
 
+  // Backgrounding a phone mid-batch kills its connections, so returning to the
+  // tab used to mean a wall of failures. Resume them once — a retry storm on a
+  // genuinely broken network would be worse than the failures themselves, so
+  // the throttle only lifts after the tab has been away again.
+  const [resumedCount, setResumedCount] = React.useState(0);
+  const resumeArmedRef = React.useRef(true);
+  React.useEffect(() => {
+    const attempt = () => {
+      if (document.hidden) {
+        resumeArmedRef.current = true;
+        return;
+      }
+      if (!resumeArmedRef.current || navigator.onLine === false) {
+        return;
+      }
+      resumeArmedRef.current = false;
+      const resumed = resumeInterrupted();
+      if (resumed > 0) {
+        setResumedCount(resumed);
+      }
+    };
+    document.addEventListener("visibilitychange", attempt);
+    window.addEventListener("online", attempt);
+    return () => {
+      document.removeEventListener("visibilitychange", attempt);
+      window.removeEventListener("online", attempt);
+    };
+  }, [resumeInterrupted]);
+
+  React.useEffect(() => {
+    if (resumedCount === 0) {
+      return;
+    }
+    const timer = window.setTimeout(() => setResumedCount(0), 8000);
+    return () => window.clearTimeout(timer);
+  }, [resumedCount]);
+
   React.useEffect(() => {
     const onStarted = (event: Event) => {
       const startDetail = (event as CustomEvent<DownloadStartedDetail>).detail;
@@ -274,6 +326,11 @@ export function DownloadDock({ locale }: { locale: Locale }) {
       job.status === "archiving" ||
       job.status === "queued"
   ).length;
+  // Packing and archiving are both long stretches with no touch input; a phone
+  // that sleeps mid-way loses its connections and the run has to be resumed.
+  useWakeLock(
+    jobs.some((job) => job.status === "packing" || job.status === "archiving")
+  );
   const aggregatePercent =
     visible.length > 0
       ? Math.round(visible.reduce((sum, job) => sum + jobPercent(job), 0) / visible.length)
@@ -353,11 +410,27 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                   onClick={() => setCollapsed(true)}
                   aria-label={tray.collapse}
                   title={tray.collapse}
-                  className="-m-1 rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+                  className={DOCK_ICON_BUTTON_CLASS}
                 >
                   <ChevronDownIcon className="size-3.5" />
                 </motion.button>
               </div>
+              {/* Tray-wide notices. The auto-resume line is in its own live
+                  region because it reports something the app did on its own,
+                  which no per-job status line would ever announce. */}
+              <p role="status" className="sr-only">
+                {resumedCount > 0 ? tray.autoResumed(resumedCount) : ""}
+              </p>
+              {resumedCount > 0 ? (
+                <p aria-hidden="true" className="text-[11px] text-muted-foreground">
+                  {tray.autoResumed(resumedCount)}
+                </p>
+              ) : null}
+              {checkpointsUnavailable ? (
+                <p className="rounded-md bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-800 dark:text-amber-300">
+                  {tray.checkpointsUnavailable}
+                </p>
+              ) : null}
               {/* overscroll-contain keeps a flick at either end inside the tray
                   instead of scrolling the page underneath it. */}
               <ul className="relative flex max-h-[50vh] touch-pan-y flex-col gap-2 overflow-y-auto overscroll-contain">
@@ -368,7 +441,6 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                     // A queued job can be pulled out of the queue with the same
                     // pause control, before it ever opens a connection.
                     const active = job.status === "packing" || job.status === "queued";
-                    const statusText = downloadJobStatusText(job, detail, tray);
 
                     return (
                       <motion.li
@@ -440,7 +512,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                                     type="button"
                                     whileTap={{ scale: 0.92 }}
                                     onClick={() => resume(job.id)}
-                                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+                                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                                   >
                                     <RotateCwIcon className="size-3" />
                                     {tray.resume}
@@ -452,7 +524,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                                         whileTap={{ scale: 0.92 }}
                                         aria-label={tray.sourcePicker.switchAndRestart}
                                         title={tray.sourcePicker.restartHint}
-                                        className="-m-0.5 rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+                                        className={DOCK_ICON_BUTTON_CLASS}
                                       >
                                         <ArrowLeftRightIcon className="size-3.5" />
                                       </motion.button>
@@ -482,7 +554,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                                   onClick={() => pause(job.id)}
                                   aria-label={tray.pause}
                                   title={tray.pause}
-                                  className="-m-0.5 rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+                                  className={DOCK_ICON_BUTTON_CLASS}
                                 >
                                   <PauseIcon className="size-3.5" />
                                 </motion.button>
@@ -494,7 +566,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                                   onClick={() => dismiss(job.id)}
                                   aria-label={tray.dismiss}
                                   title={tray.dismiss}
-                                  className="-m-0.5 rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+                                  className={DOCK_ICON_BUTTON_CLASS}
                                 >
                                   <XIcon className="size-3.5" />
                                 </motion.button>
@@ -515,18 +587,8 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                           copy={tray.sourcePicker}
                           className="w-fit"
                         />
-                        {/* Live region: progress and failures are otherwise
-                            invisible to screen readers. */}
-                        <p
-                          role="status"
-                          className={cn(
-                            "truncate text-xs",
-                            job.status === "error" ? "text-destructive" : "text-muted-foreground"
-                          )}
-                          title={job.error ?? undefined}
-                        >
-                          {statusText}
-                        </p>
+                        <DownloadJobStatusLine job={job} locale={locale} />
+                        <DownloadJobNotes job={job} locale={locale} />
                         {job.status === "packing" ||
                         job.status === "paused" ||
                         job.status === "archiving" ? (
@@ -542,6 +604,29 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                   })}
                 </AnimatePresence>
               </ul>
+              {history.length > 0 ? (
+                <div className="border-t border-border/60 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setHistoryOpen((open) => !open)}
+                    aria-expanded={historyOpen}
+                    className="inline-flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  >
+                    <HistoryIcon className="size-3" aria-hidden="true" />
+                    {tray.historyTitle}
+                    <ChevronDownIcon
+                      aria-hidden="true"
+                      className={cn(
+                        "ml-auto size-3 transition-transform",
+                        historyOpen && "rotate-180"
+                      )}
+                    />
+                  </button>
+                  {historyOpen ? (
+                    <DownloadHistoryList locale={locale} className="mt-1.5" />
+                  ) : null}
+                </div>
+              ) : null}
             </motion.div>
           )
         ) : null}

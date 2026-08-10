@@ -4,6 +4,7 @@ import type { Catalog, CatalogEntry } from "@/lib/catalog-shared";
 import {
   buildMusicPlaylistManifest,
   musicTracksForVersion,
+  musicVersionSummaries,
   projectMusicTrack,
 } from "@/lib/music-playlists";
 
@@ -162,5 +163,31 @@ describe("music playlist projection", () => {
     expect(track).not.toHaveProperty("artistEn");
     expect(track).not.toHaveProperty("coverAvif");
     expect(track).not.toHaveProperty("coverWebp");
+  });
+});
+
+describe("music version summaries", () => {
+  test("counts playable tracks per version, newest version first", () => {
+    const catalog = buildCatalog([
+      buildEntry({ id: "a", versionid: 21, version: "maimai DX BUDDiES" }),
+      buildEntry({ id: "b", versionid: 26, version: "maimai DX CiRCLE PLUS" }),
+      buildEntry({ id: "c", versionid: 21, version: "maimai DX BUDDiES" }),
+    ]);
+
+    expect(musicVersionSummaries(catalog)).toEqual([
+      { versionId: 26, name: "maimai DX CiRCLE PLUS", slug: "maimai-dx-circle-plus", count: 1 },
+      { versionId: 21, name: "maimai DX BUDDiES", slug: "maimai-dx-buddies", count: 2 },
+    ]);
+  });
+
+  test("drops versions with no playable audio — every card is a play button", () => {
+    const silent = buildEntry({
+      id: "silent",
+      versionid: 26,
+      version: "maimai DX CiRCLE PLUS",
+      assets: { ...buildEntry().assets, has_audio: false },
+    });
+
+    expect(musicVersionSummaries(buildCatalog([silent]))).toEqual([]);
   });
 });

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "../globals.css";
 import { RootLayoutShell, rootViewport } from "@/app/root-layout-shell";
 import { resolveSiteUrl } from "@/lib/site-url";
+import { webManifestPath } from "@/lib/web-manifest";
 
 export const viewport = rootViewport;
 
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: "ADX 谱面资源 | AstroDX 谱面资料站",
   description: siteDescription,
-  manifest: "/site.webmanifest",
+  manifest: webManifestPath("zh"),
 };
 
 export default async function DefaultRootLayout({

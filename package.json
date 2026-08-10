@@ -15,6 +15,8 @@
     "test": "bun run --filter web test",
     "submit:indexnow": "bun run --filter web submit:indexnow",
     "build:catalog": "cd pipeline && python3 -c \"from pathlib import Path; from tools.build_catalog import build_catalog; print(build_catalog(Path('..').resolve(), max_workers=16))\"",
+    "enrich:details": "bun run --filter web enrich:details",
+    "catalog": "bun run build:catalog && bun run enrich:details",
     "test:catalog": "cd pipeline && python3 -m unittest tests.test_build_catalog tests.test_parse_maidata"
   },
   "patchedDependencies": {

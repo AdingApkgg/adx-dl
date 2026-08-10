@@ -33,7 +33,7 @@ export function GuestbookView({ locale = "zh" }: { locale?: Locale }) {
       </Reveal>
       {/* Applies ?draft= from /post and /survey into the Artalk editor. */}
       <React.Suspense fallback={null}>
-        <GuestbookPrefill />
+        <GuestbookPrefill locale={locale} />
       </React.Suspense>
       <ChartComments pageKey={GUESTBOOK_PAGE_KEY} pageTitle={guestbook.title} locale={locale} />
     </main>

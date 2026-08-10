@@ -15,8 +15,20 @@ export const FULLSCREEN_QUALITY_MP: Record<FullscreenQuality, number> = {
   high: 3_500_000,
 };
 
+/**
+ * Playback speed lives here rather than in the (non-persisted) game store: it
+ * sits in the same card as hi-speed, and having one of the two survive a reload
+ * while the other silently snapped back to 1.0x read as a bug. The game store
+ * is reset on every source change by design, which is exactly what kept eating
+ * it. 2.0 is the ceiling on the render side (`MainRenderer.setPlaybackSpeed`)
+ * and the audio side (`AudioBufferSourceNode.playbackRate`) alike.
+ */
+export const MIN_PLAYBACK_SPEED = 0.1;
+export const MAX_PLAYBACK_SPEED = 2;
+
 export interface GameSettingsState {
   hiSpeed: number;
+  playbackSpeed: number;
   alwaysKeepHiSpeed: boolean;
   slideRotation: boolean;
   mirrorMode: MirrorMode;
@@ -34,6 +46,9 @@ export interface GameSettingsState {
   musicOffset: number;
   fullscreenQuality: FullscreenQuality;
   showVideo: boolean;
+  /** Engine-drawn HUD counters (combo / BREAK totals) painted into the canvas. */
+  showNoteTotal: boolean;
+  showBreakCount: boolean;
   viewRotation: ViewRotation;
   /** Chart-media mirror used for the preview background PV (download-source id). */
   videoSourceId: string;
@@ -41,6 +56,7 @@ export interface GameSettingsState {
 
 export interface GameSettingsActions {
   setHiSpeed: (speed: number) => void;
+  setPlaybackSpeed: (speed: number) => void;
   setAlwaysKeepHiSpeed: (enabled: boolean) => void;
   setSlideRotation: (enabled: boolean) => void;
   setMirrorMode: (mode: MirrorMode) => void;
@@ -58,6 +74,8 @@ export interface GameSettingsActions {
   setMusicOffset: (offset: number) => void;
   setFullscreenQuality: (quality: FullscreenQuality) => void;
   setShowVideo: (enabled: boolean) => void;
+  setShowNoteTotal: (enabled: boolean) => void;
+  setShowBreakCount: (enabled: boolean) => void;
   cycleViewRotation: () => void;
   setVideoSourceId: (id: string) => void;
 }
@@ -68,6 +86,7 @@ const SETTINGS_STORE_VERSION = 1;
 
 const initialState: GameSettingsState = {
   hiSpeed: 6,
+  playbackSpeed: 1,
   alwaysKeepHiSpeed: false,
   slideRotation: true,
   mirrorMode: "none",
@@ -85,6 +104,8 @@ const initialState: GameSettingsState = {
   musicOffset: 0,
   fullscreenQuality: "balanced",
   showVideo: false,
+  showNoteTotal: true,
+  showBreakCount: true,
   viewRotation: 0,
   videoSourceId: "r2",
 };
@@ -94,6 +115,10 @@ export const useGameSettingsStore = create<GameSettingsStore>()(
     (set) => ({
       ...initialState,
       setHiSpeed: (speed: number) => set({ hiSpeed: Math.max(3, Math.min(9, speed)) }),
+      setPlaybackSpeed: (speed: number) =>
+        set({
+          playbackSpeed: Math.max(MIN_PLAYBACK_SPEED, Math.min(MAX_PLAYBACK_SPEED, speed)),
+        }),
       setAlwaysKeepHiSpeed: (enabled: boolean) => set({ alwaysKeepHiSpeed: enabled }),
       setSlideRotation: (enabled: boolean) => set({ slideRotation: enabled }),
       setMirrorMode: (mode: MirrorMode) => set({ mirrorMode: mode }),
@@ -111,6 +136,8 @@ export const useGameSettingsStore = create<GameSettingsStore>()(
       setMusicOffset: (offset: number) => set({ musicOffset: offset }),
       setFullscreenQuality: (quality: FullscreenQuality) => set({ fullscreenQuality: quality }),
       setShowVideo: (enabled: boolean) => set({ showVideo: enabled }),
+      setShowNoteTotal: (enabled: boolean) => set({ showNoteTotal: enabled }),
+      setShowBreakCount: (enabled: boolean) => set({ showBreakCount: enabled }),
       cycleViewRotation: () =>
         set((state) => ({
           viewRotation: ((state.viewRotation + 90) % 360) as ViewRotation,
@@ -126,6 +153,7 @@ export const useGameSettingsStore = create<GameSettingsStore>()(
       }),
       partialize: (state) => ({
         hiSpeed: state.hiSpeed,
+        playbackSpeed: state.playbackSpeed,
         alwaysKeepHiSpeed: state.alwaysKeepHiSpeed,
         slideRotation: state.slideRotation,
         mirrorMode: state.mirrorMode,
@@ -143,6 +171,8 @@ export const useGameSettingsStore = create<GameSettingsStore>()(
         musicOffset: state.musicOffset,
         fullscreenQuality: state.fullscreenQuality,
         showVideo: state.showVideo,
+        showNoteTotal: state.showNoteTotal,
+        showBreakCount: state.showBreakCount,
         viewRotation: state.viewRotation,
         videoSourceId: state.videoSourceId,
       }),

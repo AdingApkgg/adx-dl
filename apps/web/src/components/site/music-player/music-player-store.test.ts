@@ -303,4 +303,43 @@ describe("music-player store", () => {
     expect(store.getState().volume).toBe(0);
     expect(store.getState().error).toBeNull();
   });
+  test("a remote play request is a token, so a repeat ask replays the version", () => {
+    const store = createMusicPlayerStore();
+    store.getState().bootstrap("1", [track("a", 1)]);
+
+    store.getState().requestVersionPlayback(2);
+    const first = store.getState().playRequest;
+    expect(first).toMatchObject({ versionId: "2" });
+
+    store.getState().requestVersionPlayback(2);
+    expect(store.getState().playRequest?.versionId).toBe("2");
+    expect(store.getState().playRequest?.token).toBe(first!.token + 1);
+
+    store.getState().clearPlayRequest();
+    expect(store.getState().playRequest).toBeNull();
+  });
+
+  test("a play request drops a pending restore so it cannot steal playback back", () => {
+    const store = createMusicPlayerStore();
+    store
+      .getState()
+      .bootstrap("1", [track("a", 1)], { versionId: "9", trackId: "z" });
+    expect(store.getState().restorePending).toBe(true);
+
+    store.getState().requestVersionPlayback(9);
+    store
+      .getState()
+      .loadManifest({ "1": [track("a", 1)], "9": [track("z", 9), track("y", 9)] });
+
+    expect(store.getState().restorePending).toBe(false);
+    expect(store.getState().versionId).toBe("1");
+  });
+
+  test("an unusable version id is not turned into a request", () => {
+    const store = createMusicPlayerStore();
+    store.getState().bootstrap("1", [track("a", 1)]);
+
+    store.getState().requestVersionPlayback("");
+    expect(store.getState().playRequest).toBeNull();
+  });
 });

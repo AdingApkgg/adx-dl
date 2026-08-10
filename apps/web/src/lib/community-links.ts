@@ -11,6 +11,29 @@ export type CommunityChannel = {
 export const QQ_COMMUNITY = "https://qm.qq.com/q/xltNzTdL1u";
 export const TELEGRAM_COMMUNITY = "https://t.me/FullDiveSAO";
 
+// This site's own repository. Its issue tracker is the third contact route
+// beside the two chat groups — and the one a rights holder or a bug reporter
+// can use without joining anything — so it lives with them rather than being
+// re-declared next to every surface that links it.
+export const SITE_REPOSITORY = "https://github.com/AdingApkgg/adx-dl";
+export const SITE_ISSUES_URL = `${SITE_REPOSITORY}/issues`;
+
+/** The three ways to reach the maintainer, in the order every page lists them. */
+export const contactChannels: { name: Record<Locale, string>; url: string }[] = [
+  {
+    name: { zh: "GitHub Issues", en: "GitHub Issues", ja: "GitHub Issues" },
+    url: SITE_ISSUES_URL,
+  },
+  {
+    name: { zh: "QQ 交流群", en: "QQ Group", ja: "QQ グループ" },
+    url: QQ_COMMUNITY,
+  },
+  {
+    name: { zh: "Telegram 群组", en: "Telegram Group", ja: "Telegram グループ" },
+    url: TELEGRAM_COMMUNITY,
+  },
+];
+
 // Rendered on /community. Order follows editorial intent.
 export const communityChannels: CommunityChannel[] = [
   {

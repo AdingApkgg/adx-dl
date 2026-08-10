@@ -11,6 +11,7 @@ import {
   getSelectableDownloadSource,
   inferDownloadSourceId,
   normalizeCustomDownloadSourceUrl,
+  pickFailoverDownloadSource,
   rerouteDownloadUrl,
   resolveDownloadUrl,
   routeChartDownloadSpec,
@@ -223,5 +224,59 @@ describe("download source routing", () => {
         "https://mirror.example.com/charts/"
       )
     ).toBe("https://mirror.example.com/charts/0/10/track.mp3");
+  });
+
+  test("failover picks the fastest healthy route this run has not burned", () => {
+    const probes = {
+      r2: { state: "ok", latencyMs: 40 },
+      alice: { state: "ok", latencyMs: 15 },
+      tsumugi: { state: "timeout", latencyMs: null },
+      awmc: { state: "ok", latencyMs: 90 },
+    };
+
+    expect(pickFailoverDownloadSource(probes, [])).toBe("alice");
+    // The route that just failed must never be re-picked.
+    expect(pickFailoverDownloadSource(probes, ["alice"])).toBe("r2");
+    expect(pickFailoverDownloadSource(probes, ["alice", "r2"])).toBe("awmc");
+  });
+
+  test("failover never lands on an unprobed, failing or unknown route", () => {
+    // Moving a job onto a mirror we know is down is strictly worse than
+    // reporting the failure, so only `ok` probes are candidates.
+    expect(
+      pickFailoverDownloadSource({
+        r2: { state: "error", latencyMs: null },
+        alice: { state: "idle", latencyMs: null },
+        tsumugi: { state: "testing", latencyMs: null },
+      }, [])
+    ).toBeNull();
+    expect(
+      pickFailoverDownloadSource(
+        { "not-a-route": { state: "ok", latencyMs: 5 } },
+        []
+      )
+    ).toBeNull();
+  });
+
+  test("failover uses a custom route only when it is still configured", () => {
+    const probes = { "custom:abc": { state: "ok", latencyMs: 5 } };
+    expect(pickFailoverDownloadSource(probes, [])).toBeNull();
+    expect(
+      pickFailoverDownloadSource(probes, [], [
+        { id: "custom:abc", name: "Mine", baseUrl: "https://mirror.example.com" },
+      ])
+    ).toBe("custom:abc");
+  });
+
+  test("a probe with no latency sorts behind every measured route", () => {
+    expect(
+      pickFailoverDownloadSource(
+        {
+          r2: { state: "ok", latencyMs: null },
+          alice: { state: "ok", latencyMs: 300 },
+        },
+        []
+      )
+    ).toBe("alice");
   });
 });

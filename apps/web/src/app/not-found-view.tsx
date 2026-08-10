@@ -4,14 +4,11 @@ import { useInView } from "framer-motion";
 import Link from "next/link";
 import * as React from "react";
 
+import { usePathLocale } from "@/app/use-path-locale";
 import { RevealItem, motion, useReducedMotion } from "@/components/motion";
+import { HomeHeroSearch } from "@/components/site/home-hero-search";
 import { Button } from "@/components/ui/button";
-import {
-  buildLocalePath,
-  getDictionary,
-  isSupportedLocale,
-  type Locale,
-} from "@/lib/i18n";
+import { buildLocalePath, getDictionary } from "@/lib/i18n";
 
 const GLYPHS = ["4", "0", "4"] as const;
 
@@ -24,7 +21,7 @@ const GLYPHS = ["4", "0", "4"] as const;
  * initial states) carry no SEO cost.
  */
 export function NotFoundView() {
-  const [locale, setLocale] = React.useState<Locale>("zh");
+  const locale = usePathLocale("zh", true);
   const reducedMotion = useReducedMotion();
   const glyphsRef = React.useRef<HTMLDivElement>(null);
   const glyphsInView = useInView(glyphsRef);
@@ -32,18 +29,26 @@ export function NotFoundView() {
   // the idle bob is gated by hand — and paused off-screen / pre-mount.
   const bobbing = !reducedMotion && glyphsInView;
 
+  // A mistyped or truncated CJK slug is by far the likeliest way to reach this
+  // page, and the last path segment is usually most of the song title — so it
+  // seeds the search box rather than being thrown away.
+  const [seedQuery, setSeedQuery] = React.useState("");
   React.useEffect(() => {
-    const [firstSegment] = window.location.pathname.split("/").filter(Boolean);
-    if (firstSegment && isSupportedLocale(firstSegment)) {
-      // Intentional one-time sync from the URL (an external system) after
-      // mount — the static 404.html is one page for all locales, so the SSR
-      // markup must stay zh and re-render only on the client.
-      /* eslint-disable-next-line react-hooks/set-state-in-effect */
-      setLocale(firstSegment);
+    const segments = window.location.pathname.split("/").filter(Boolean);
+    const last = segments.at(-1) ?? "";
+    let decoded = last;
+    try {
+      decoded = decodeURIComponent(last);
+    } catch {
+      // A malformed %-sequence in the URL is exactly the sort of typo that
+      // lands here; fall back to the raw segment.
     }
+    /* eslint-disable-next-line react-hooks/set-state-in-effect -- one-time URL-derived seed, post-hydration on purpose */
+    setSeedQuery(decoded.replace(/[-_]+/g, " ").trim());
   }, []);
 
-  const notFound = getDictionary(locale).notFound;
+  const dictionary = getDictionary(locale);
+  const notFound = dictionary.notFound;
 
   return (
     <main
@@ -103,6 +108,18 @@ export function NotFoundView() {
       </RevealItem>
       <RevealItem delay={0.4}>
         <p className="max-w-md text-sm text-muted-foreground">{notFound.description}</p>
+      </RevealItem>
+      {/* Keyed on the seed so the input adopts it once it has been read from
+          the URL — HomeHeroSearch owns its query state from mount onwards. */}
+      <RevealItem delay={0.45} className="w-full max-w-xl text-left">
+        <h2 className="sr-only">{notFound.searchLabel}</h2>
+        <HomeHeroSearch
+          key={seedQuery}
+          searchHref={buildLocalePath("/charts", locale)}
+          placeholder={dictionary.catalogBrowser.searchPlaceholder}
+          submitLabel={notFound.searchSubmit}
+          initialQuery={seedQuery}
+        />
       </RevealItem>
       <RevealItem
         delay={0.5}

@@ -31,6 +31,9 @@ The archive currently lists ${catalog.total_entries} charts across ${versions.le
 - Home: ${siteUrl}/
 - Browse charts: ${siteUrl}/charts
 - Browse by version: ${siteUrl}/versions
+- Changelog (charts by the date they were added): ${siteUrl}/changelog
+- Setup and troubleshooting guide (install AstroDX, download, import, fix): ${siteUrl}/guide
+- Music library (per-version playlists of the archive's audio): ${siteUrl}/music
 - Player community (QQ / Telegram groups): ${siteUrl}/community
 - Support the site (donations): ${siteUrl}/donate
 - About the site (maintainer, contact, credits): ${siteUrl}/about

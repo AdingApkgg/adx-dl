@@ -684,6 +684,24 @@ def enrich_aliases(
 # IndexNow resubmit the whole catalog).
 ATTRIBUTION_KEYS = ("page_url", "license_note")
 
+# Fields owned by the post-build enrichment pass
+# (apps/web/scripts/enrich-chart-details.ts): note counts, chart duration, BPM
+# range, measured download sizes and romaji. This builder writes none of them —
+# title_en/artist_en are emitted empty here and filled from maidata later — so
+# without this exclusion every rebuild would see "" != "Some Title" on all 1800+
+# entries and restamp the entire catalog's imported_at.
+ENRICHED_KEYS = (
+    "title_en",
+    "artist_en",
+    "title_romaji",
+    "artist_romaji",
+    "duration_ms",
+    "bpm_min",
+    "bpm_max",
+    "file_bytes",
+)
+ENRICHED_DIFFICULTY_KEYS = ("notes", "duration_ms")
+
 
 def _content_fingerprint(entry: dict[str, Any]) -> str:
     clone = copy.deepcopy(entry)
@@ -692,6 +710,12 @@ def _content_fingerprint(entry: dict[str, Any]) -> str:
     clone.pop("slug", None)
     for key in ATTRIBUTION_KEYS:
         clone.pop(key, None)
+    for key in ENRICHED_KEYS:
+        clone.pop(key, None)
+    for difficulty in clone.get("difficulties") or []:
+        if isinstance(difficulty, dict):
+            for key in ENRICHED_DIFFICULTY_KEYS:
+                difficulty.pop(key, None)
     media = clone.get("media")
     if isinstance(media, dict):
         media.pop("cover_avif", None)

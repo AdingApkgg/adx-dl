@@ -166,6 +166,81 @@ describe("catalog-search", () => {
     expect(search("alpha").map((result) => result.entry.slug)).toEqual(["11224"]);
   });
 
+  test("版本名的子串也能命中（Fuse 的加权分数会把低权重字段的精确命中判死）", () => {
+    // "maimai DX BUDDiES" 的 version 权重只有 0.05，Fuse 给 "BUDDiES" 打出的
+    // 分数约 0.88，远超 maxAcceptedScore(0.4)，整条被过滤掉。
+    const search = buildCatalogSearch([
+      buildEntry({ id: "buddies-song", version: "maimai DX BUDDiES" }),
+      buildEntry({ id: "prism-song", title: "Prism Song", version: "maimai DX PRiSM" }),
+    ]);
+
+    expect(search("BUDDiES").map((entry) => entry.id)).toEqual(["buddies-song"]);
+    // 大小写无关：这个版本名本身就是混合大小写的。
+    expect(search("buddies").map((entry) => entry.id)).toEqual(["buddies-song"]);
+  });
+
+  test("谱师名可以直接搜索（难度里的 designer 进了索引）", () => {
+    const search = buildCatalogSearch([
+      buildEntry({
+        id: "happy-song",
+        difficulties: [
+          { slot: 4, level: "12", designer: "はっぴー" },
+          { slot: 5, level: "13+", designer: "はっぴー" },
+        ],
+      }),
+      buildEntry({
+        id: "other-song",
+        title: "Other",
+        difficulties: [{ slot: 5, level: "13", designer: "Techno Kitchen" }],
+      }),
+    ]);
+
+    expect(search("はっぴー").map((entry) => entry.id)).toEqual(["happy-song"]);
+    // 部分匹配同样有效——Fuse 对这种长名字的片段会打到 0.7 左右而被丢弃。
+    expect(search("Techno").map((entry) => entry.id)).toEqual(["other-song"]);
+  });
+
+  test("罗马音让没有任何拉丁写法的假名曲目可被检索", () => {
+    const search = buildCatalogSearch([
+      buildEntry({
+        id: "kana-song",
+        title: "げっこう",
+        title_en: undefined,
+        title_romaji: "gekkou",
+        artist: "夜色",
+        artist_romaji: "yoiro",
+      }),
+      buildEntry({ id: "latin-song", title: "Plain Title" }),
+    ]);
+
+    expect(search("gekkou").map((entry) => entry.id)).toEqual(["kana-song"]);
+    expect(search("yoiro").map((entry) => entry.id)).toEqual(["kana-song"]);
+  });
+
+  test("子串命中排在模糊命中之前，且标题命中优先于其他字段", () => {
+    const search = buildCatalogSearch([
+      buildEntry({ id: "genre-hit", title: "Unrelated", genre: "Echo Genre" }),
+      buildEntry({ id: "title-hit", title: "Echo Chamber" }),
+      buildEntry({ id: "artist-hit", title: "Nothing", artist: "Echo Crew" }),
+    ]);
+
+    expect(search("Echo").map((entry) => entry.id)).toEqual([
+      "title-hit",
+      "artist-hit",
+      "genre-hit",
+    ]);
+  });
+
+  test("不相关的查询依然一条都不返回（子串预检没有放宽模糊阈值）", () => {
+    const search = buildCatalogSearch([
+      buildEntry({}),
+      buildEntry({ id: "community-beta", title: "Midnight Echo" }),
+    ]);
+
+    expect(search("qwerty")).toEqual([]);
+    expect(search("ZZZZZZ")).toEqual([]);
+  });
+
   test("分类和子分类选项包含 all 作用域", () => {
     expect(getCategoryOptions(entries)).toEqual([ALL_CATEGORIES, "Community", "Official"]);
     expect(getSubcategoryOptions(entries, ALL_CATEGORIES)).toEqual([

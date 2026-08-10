@@ -12,6 +12,9 @@ type DragMode = "start" | "end" | "selection";
 type ExportRangeOverlayProps = {
   range: ChartExportRange;
   totalDurationMs: number;
+  /** Widest span the handles may open to — 15 s for a GIF, the whole chart for
+   *  a practice loop (see useExportRange). */
+  maxDurationMs?: number;
   onChange: (range: ChartExportRange) => void;
   /** Seek the canvas to the dragged edge so the user previews that frame. */
   onPreview?: (ms: number) => void;
@@ -22,6 +25,7 @@ type ExportRangeOverlayProps = {
 export function ChartExportRangeOverlay({
   range,
   totalDurationMs,
+  maxDurationMs = MAX_EXPORT_DURATION_MS,
   onChange,
   onPreview,
 }: ExportRangeOverlayProps) {
@@ -32,6 +36,7 @@ export function ChartExportRangeOverlay({
   const selectionDragOffsetMsRef = useRef(0);
   const rangeRef = useRef(range);
   const totalDurationMsRef = useRef(totalDurationMs);
+  const maxDurationMsRef = useRef(maxDurationMs);
   const onChangeRef = useRef(onChange);
   const onPreviewRef = useRef(onPreview);
 
@@ -40,6 +45,7 @@ export function ChartExportRangeOverlay({
   useEffect(() => {
     rangeRef.current = range;
     totalDurationMsRef.current = totalDurationMs;
+    maxDurationMsRef.current = maxDurationMs;
     onChangeRef.current = onChange;
     onPreviewRef.current = onPreview;
   });
@@ -61,6 +67,7 @@ export function ChartExportRangeOverlay({
     if (!mode) return;
 
     const currentRange = rangeRef.current;
+    const maxDuration = maxDurationMsRef.current;
     const targetMs =
       mode === "start" || mode === "end" ? pointerMs - handleDragOffsetMsRef.current : pointerMs;
     let newRange: ChartExportRange;
@@ -68,7 +75,7 @@ export function ChartExportRangeOverlay({
     if (mode === "start") {
       newRange = {
         startMs: Math.max(
-          currentRange.endMs - MAX_EXPORT_DURATION_MS,
+          currentRange.endMs - maxDuration,
           Math.min(targetMs, currentRange.endMs - MIN_EXPORT_DURATION_MS),
         ),
         endMs: currentRange.endMs,
@@ -81,7 +88,7 @@ export function ChartExportRangeOverlay({
       newRange = {
         startMs: currentRange.startMs,
         endMs: Math.min(
-          currentRange.startMs + MAX_EXPORT_DURATION_MS,
+          currentRange.startMs + maxDuration,
           Math.max(targetMs, currentRange.startMs + MIN_EXPORT_DURATION_MS),
         ),
       };

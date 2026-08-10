@@ -24,8 +24,8 @@ interface TimelineState {
 interface GameState {
   /** 是否正在播放 */
   isPlaying: boolean;
-  /** 播放速度 */
-  playbackSpeed: number;
+  // 播放速度不在这里：它跟流速同属「设置」，而本 store 每次换谱面都会 reset，
+  // 于是同一张卡片里流速被记住、速度被清回 1.0x。见 settings-store。
   /** 时间线 */
   timeline: TimelineState;
   /** 谱面数据 */
@@ -83,8 +83,6 @@ interface GameActions {
   setSelectedDifficulty: (difficulty: ChartDifficulty) => void;
   /** 设置可用的难度 */
   setAvailableDifficulties: (difficulties: AvailableDifficulties) => void;
-  /** 设置播放速度 */
-  setPlaybackSpeed: (speed: number) => void;
   /** 设置音乐 URL */
   setMusicUrl: (url: string) => void;
   /** 设置音乐状态 */
@@ -117,7 +115,6 @@ const initialTimeline: TimelineState = {
 
 const initialState: GameState = {
   isPlaying: false,
-  playbackSpeed: 1.0,
   timeline: initialTimeline,
   chartData: null,
   rawSimaiText: "",
@@ -378,24 +375,6 @@ export const useGameStore = create<GameStore>()(
     setSelectedDifficulty: (difficulty: ChartDifficulty) => set({ selectedDifficulty: difficulty }),
     setAvailableDifficulties: (difficulties: AvailableDifficulties) =>
       set({ availableDifficulties: difficulties }),
-
-    setPlaybackSpeed: (speed: number) => {
-      const state = get();
-      set({ playbackSpeed: Math.max(0.1, Math.min(1.0, speed)) });
-
-      if (state.isPlaying) {
-        const currentBeats = playbackTimeRef.current;
-        const currentMs = beatsToMs(
-          currentBeats,
-          state.chartData?.bpmEvents ?? null,
-          state.chartData?.bpm ?? 120,
-        );
-        set({
-          playbackStartTime: performance.now(),
-          playbackStartPositionMs: currentMs,
-        });
-      }
-    },
 
     setMusicUrl: (url: string) => {
       if (!url) {

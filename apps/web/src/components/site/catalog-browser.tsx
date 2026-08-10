@@ -2,7 +2,13 @@
 
 import * as React from "react";
 import useSWR from "swr";
-import { ChevronDownIcon, ListFilterIcon, SearchIcon, XIcon } from "lucide-react";
+import {
+  ArrowDownUpIcon,
+  ChevronDownIcon,
+  ListFilterIcon,
+  SearchIcon,
+  XIcon,
+} from "lucide-react";
 import type { Variants } from "framer-motion";
 
 import {
@@ -31,8 +37,11 @@ import {
   buildLevelGradient,
   cabinetBucket,
   type CabinetBucket,
+  type ChartDesignerFacet,
   clampRange,
+  collectChartDesigners,
   collectDifficultyLevels,
+  entryHasDesigner,
   entryHasLevelInRange,
   type FilterRange,
   formatRangeParam,
@@ -44,13 +53,26 @@ import {
   parseLevelParam,
   resolveGenreId,
   resolveVersionIndex,
-  sortByReleaseDesc,
+  uniqueChartDesigners,
   UTAGE_CABINET,
   UTAGE_GENRE_ID,
   versionRouteId,
   versionShortName,
 } from "@/lib/catalog-shared";
-import { getDictionary } from "@/lib/i18n";
+import {
+  catalogSelectionStorage,
+  readCatalogSelection,
+  writeCatalogSelection,
+} from "@/lib/catalog-selection";
+import {
+  CATALOG_SORT_IDS,
+  type CatalogSortId,
+  DEFAULT_CATALOG_SORT,
+  parseCatalogSortId,
+  sortCatalogEntries,
+} from "@/lib/catalog-sort";
+import { getDictionary, type SiteDictionary } from "@/lib/i18n";
+import { entrySlug } from "@/lib/route-slug";
 import { jsonFetcher } from "@/lib/swr-fetcher";
 import { cn } from "@/lib/utils";
 import {
@@ -63,6 +85,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { RangeSlider } from "@/components/ui/range-slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { tabsListVariants, tabsTriggerClassName } from "@/components/ui/tabs";
 
 type CatalogBrowserProps = {
@@ -230,6 +259,9 @@ export function CatalogBrowser({
   const [genreIds, setGenreIds] = React.useState<ReadonlySet<string>>(new Set());
   const [cabinetSet, setCabinetSet] = React.useState<ReadonlySet<string>>(new Set());
   const [assetSet, setAssetSet] = React.useState<ReadonlySet<string>>(new Set());
+  // Charters are a multi-select set like the chip dimensions, but there are
+  // hundreds of them, so the picker is a typed combobox rather than a chip row.
+  const [designerSet, setDesignerSet] = React.useState<ReadonlySet<string>>(new Set());
   // Level and BPM are ordered scales, so they are two-thumb ranges instead: null
   // means the whole scale (nothing filtered out), which keeps "no filter" a
   // distinct state from "the range happens to span everything".
@@ -240,6 +272,7 @@ export function CatalogBrowser({
   // with filters already applied).
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [hasUserSelectedCategory, setHasUserSelectedCategory] = React.useState(false);
+  const [sort, setSort] = React.useState<CatalogSortId>(DEFAULT_CATALOG_SORT);
   const [currentPage, setCurrentPage] = React.useState(1);
   const [selectMode, setSelectMode] = React.useState(false);
   const [selectedIds, setSelectedIds] = React.useState<ReadonlySet<string>>(new Set());
@@ -276,6 +309,21 @@ export function CatalogBrowser({
       Math.ceil(Math.max(...values) / 10) * 10,
     ];
   }, [entries]);
+
+  // Ids the current build knows about, so a selection restored from an earlier
+  // visit can drop charts the archive has since removed.
+  const knownIds = React.useMemo(
+    () => new Set(entries.map((entry) => entry.id)),
+    [entries]
+  );
+  // Every charter in the catalog with a chart count, most prolific first — the
+  // combobox's option list. Derived from the full catalog (not the current
+  // results) so the list stays stable while the other filters narrow the grid.
+  const designerFacets = React.useMemo(() => collectChartDesigners(entries), [entries]);
+  const knownDesignerNames = React.useMemo(
+    () => new Set(designerFacets.map((facet) => facet.name)),
+    [designerFacets]
+  );
 
   const isComposingRef = React.useRef(false);
   const debounceRef = React.useRef<number | null>(null);
@@ -349,13 +397,43 @@ export function CatalogBrowser({
     if (parsedBpm) setBpmRange(isFullRange(parsedBpm, bpmBounds) ? null : parsedBpm);
     const asset = readSet("asset");
     if (asset) setAssetSet(asset);
+    // Charters are the one dimension that can't use the comma-joined list form:
+    // two of the credited names contain a comma themselves ("and in that light,
+    // I found deliverance."), so the param repeats instead. Only names the
+    // catalog actually credits survive — an unknown one would empty the grid
+    // with nothing in the panel to explain it.
+    const designerParam = params.getAll("designer").filter(Boolean);
+    const designers =
+      designerParam.length > 0
+        ? new Set(designerParam.filter((name) => knownDesignerNames.has(name)))
+        : null;
+    if (designers && designers.size > 0) setDesignerSet(designers);
     // Landed with dimension filters already applied → reveal the picker so the
     // user can see and adjust them.
-    if ((versionIds && versionIds.size > 0) || level || genreSet || cabinet || bpm || asset) {
+    if (
+      (versionIds && versionIds.size > 0) ||
+      level ||
+      genreSet ||
+      cabinet ||
+      bpm ||
+      asset ||
+      (designers && designers.size > 0)
+    ) {
       setFiltersOpen(true);
     }
+    const sortFromUrl = parseCatalogSortId(params.get("sort"));
+    if (sortFromUrl) setSort(sortFromUrl);
     if (Number.isInteger(pageParam) && pageParam > 1) {
       setCurrentPage(pageParam);
+    }
+    // A batch selection survives leaving the page (opening a chart to check a
+    // difficulty is a real navigation, not a tab switch), so restore it — and
+    // with it select mode, or the restored ticks would be invisible.
+    const storage = catalogSelectionStorage();
+    const restoredIds = storage ? readCatalogSelection(storage, knownIds) : [];
+    if (restoredIds.length > 0) {
+      setSelectedIds(new Set(restoredIds));
+      setSelectMode(true);
     }
     // The header's search icon links here with ?focus=search. Put the cursor in
     // the filter box, then strip the param so it never reaches a shared or
@@ -414,13 +492,27 @@ export function CatalogBrowser({
     searchInputRef.current?.focus();
   }, [commitQuery]);
 
+  // Cheap now: buildCatalogSearchWithMatches defers both its Fuse index and its
+  // substring haystack to the first non-empty query, so a browse page whose
+  // search box is never touched pays nothing for it.
   const search = React.useMemo(() => buildCatalogSearchWithMatches(entries), [entries]);
   const hasQuery = query.trim().length > 0;
+  // The grid re-renders off a *deferred* copy of the committed query: matching
+  // and re-rendering 24 cards costs tens of milliseconds on desktop and several
+  // times that on a mid-range phone, and React can interrupt that work to keep
+  // the input painting the next keystroke. Everything the user is looking at
+  // while typing (the box itself, the applied-filter chip, the URL) still reads
+  // the immediate `query`.
+  const deferredQuery = React.useDeferredValue(query);
+  const hasDeferredQuery = deferredQuery.trim().length > 0;
   const categories = React.useMemo(() => getCategoryOptions(entries), [entries]);
   const resolvedCategory = categories.includes(category) ? category : ALL_CATEGORIES;
   const effectiveCategory =
     hasQuery && !hasUserSelectedCategory ? ALL_CATEGORIES : resolvedCategory;
-  const searchResults = React.useMemo(() => search(query), [search, query]);
+  const searchResults = React.useMemo(
+    () => search(deferredQuery),
+    [search, deferredQuery]
+  );
   const baseEntries = React.useMemo(
     () => searchResults.map((result) => result.entry),
     [searchResults]
@@ -537,6 +629,10 @@ export function CatalogBrowser({
         : assetSet.has("nopv")
           ? (entry: CatalogCardEntry) => !entry.assets?.has_pv
           : null,
+      designer:
+        designerSet.size > 0
+          ? (entry: CatalogCardEntry) => entryHasDesigner(entry, designerSet)
+          : null,
     };
   }, [
     versionSet,
@@ -548,6 +644,7 @@ export function CatalogBrowser({
     bpmRange,
     bpmBounds,
     assetSet,
+    designerSet,
   ]);
 
   // Entries passing the search + category scope, before any dimension applies.
@@ -585,38 +682,82 @@ export function CatalogBrowser({
         ? scopedEntries
         : scopedEntries.filter((entry) => tests.every((test) => test(entry)));
     };
-    const tally = (list: CatalogCardEntry[], keyOf: (entry: CatalogCardEntry) => string) => {
+    const tally = (
+      list: CatalogCardEntry[],
+      keysOf: (entry: CatalogCardEntry) => string[]
+    ) => {
       const counts = new Map<string, number>();
       for (const entry of list) {
-        const key = keyOf(entry);
-        counts.set(key, (counts.get(key) ?? 0) + 1);
+        for (const key of keysOf(entry)) {
+          counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
       }
       return counts;
     };
-    const assetBase = withoutDimension("asset");
+    const bases = {
+      version: withoutDimension("version"),
+      genre: withoutDimension("genre"),
+      cabinet: withoutDimension("cabinet"),
+      asset: withoutDimension("asset"),
+      designer: withoutDimension("designer"),
+      level: withoutDimension("level"),
+      bpm: withoutDimension("bpm"),
+    };
     return {
-      version: tally(withoutDimension("version"), catalogVersionFilterId),
-      genre: tally(withoutDimension("genre"), (entry) => String(resolveGenreId(entry))),
-      cabinet: tally(withoutDimension("cabinet"), (entry) => cabinetBucket(entry.cabinet)),
-      asset: new Map<string, number>([
-        ["pv", assetBase.filter((entry) => entry.assets?.has_pv).length],
-        ["nopv", assetBase.filter((entry) => !entry.assets?.has_pv).length],
-      ]),
+      options: {
+        version: tally(bases.version, (entry) => [catalogVersionFilterId(entry)]),
+        genre: tally(bases.genre, (entry) => [String(resolveGenreId(entry))]),
+        cabinet: tally(bases.cabinet, (entry) => [cabinetBucket(entry.cabinet)]),
+        asset: new Map<string, number>([
+          ["pv", bases.asset.filter((entry) => entry.assets?.has_pv).length],
+          ["nopv", bases.asset.filter((entry) => !entry.assets?.has_pv).length],
+        ]),
+        // A chart credits one charter per difficulty, so count it once per
+        // chart however many slots that person did.
+        designer: tally(bases.designer, uniqueChartDesigners),
+      },
+      /**
+       * How many results would be left if a whole dimension were dropped.
+       * Falls out of the same lists the chips are counted from, and turns the
+       * dead-end empty state into "去掉『版本』筛选 → 87 首".
+       */
+      withoutDimension: {
+        version: bases.version.length,
+        genre: bases.genre.length,
+        cabinet: bases.cabinet.length,
+        asset: bases.asset.length,
+        designer: bases.designer.length,
+        level: bases.level.length,
+        bpm: bases.bpm.length,
+      },
     };
   }, [scopedEntries, dimensionTests]);
 
   /** A chip is a dead end when nothing would survive picking it — unless it is
    *  already picked, in which case it has to stay clickable to be undone. */
   const isChipDisabled = (
-    dimension: keyof typeof chipCounts,
+    dimension: keyof typeof chipCounts.options,
     id: string,
     selected: boolean
-  ) => !selected && (chipCounts[dimension].get(id) ?? 0) === 0;
-  // Default browse order is newest-first by release (version era, then song id);
-  // a text query keeps the search relevance ranking instead.
+  ) => !selected && (chipCounts.options[dimension].get(id) ?? 0) === 0;
+  const chipCount = (dimension: keyof typeof chipCounts.options, id: string) =>
+    chipCounts.options[dimension].get(id) ?? 0;
+  // Collation for the title sort. Pinned to the reading locale so zh sorts by
+  // pinyin and ja by kana rather than by code point, and `numeric` keeps
+  // "Alpha 2" ahead of "Alpha 10".
+  const collator = React.useMemo(
+    () => new Intl.Collator(locale, { numeric: true, sensitivity: "base" }),
+    [locale]
+  );
+  // The default order is newest-first by release era; a text query keeps the
+  // search's own relevance ranking, which no comparator can reproduce. Any
+  // explicitly picked ordering overrides both.
   const orderedEntries = React.useMemo(
-    () => (hasQuery ? visibleEntries : sortByReleaseDesc(visibleEntries)),
-    [hasQuery, visibleEntries]
+    () =>
+      sort === DEFAULT_CATALOG_SORT && hasDeferredQuery
+        ? visibleEntries
+        : sortCatalogEntries(visibleEntries, sort, collator),
+    [sort, hasDeferredQuery, visibleEntries, collator]
   );
   const totalPages = Math.max(1, Math.ceil(visibleEntries.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -637,6 +778,7 @@ export function CatalogBrowser({
     genreIds.size +
     cabinetSet.size +
     assetSet.size +
+    designerSet.size +
     (levelFiltered ? 1 : 0) +
     (bpmFiltered ? 1 : 0);
   const hasActiveFilters =
@@ -663,6 +805,7 @@ export function CatalogBrowser({
   const toggleVersion = toggleIn(setVersionSet);
   const toggleGenre = toggleIn(setGenreIds);
   const toggleCabinet = toggleIn(setCabinetSet);
+  const toggleDesigner = toggleIn(setDesignerSet);
   // Dragging a range back to its full span is the same as not filtering, so it
   // stores null — the badge count, the active-filter chip and the URL param all
   // read off that one state instead of each re-testing the bounds.
@@ -691,6 +834,7 @@ export function CatalogBrowser({
     setGenreIds(new Set());
     setCabinetSet(new Set());
     setAssetSet(new Set());
+    setDesignerSet(new Set());
     setLevelRange(null);
     setBpmRange(null);
     setCategory(initialCategory);
@@ -709,6 +853,12 @@ export function CatalogBrowser({
       else params.delete(key);
     };
     const joinSet = (set: ReadonlySet<string>) => (set.size > 0 ? [...set].join(",") : null);
+    // Repeated key rather than a joined list — see the reader above: charter
+    // names are free text and two of them contain a comma.
+    const applyList = (key: string, set: ReadonlySet<string>) => {
+      params.delete(key);
+      for (const value of set) params.append(key, value);
+    };
     apply("q", hasQuery ? query : null);
     apply("version", joinSet(versionSet));
     // Levels go out as labels ("8-13+") rather than indices, so a shared link
@@ -723,6 +873,10 @@ export function CatalogBrowser({
     apply("cabinet", joinSet(cabinetSet));
     apply("bpm", bpmRange ? formatRangeParam(bpmRange) : null);
     apply("asset", joinSet(assetSet));
+    applyList("designer", designerSet);
+    // Absent while the ordering is the page's own default, so a plain browse
+    // URL stays clean and only a deliberate choice is shareable.
+    apply("sort", sort === DEFAULT_CATALOG_SORT ? null : sort);
     apply("page", safeCurrentPage > 1 ? String(safeCurrentPage) : null);
     const queryString = params.toString();
     const next = `${window.location.pathname}${queryString ? `?${queryString}` : ""}${window.location.hash}`;
@@ -741,6 +895,8 @@ export function CatalogBrowser({
     cabinetSet,
     bpmRange,
     assetSet,
+    designerSet,
+    sort,
     safeCurrentPage,
   ]);
 
@@ -768,6 +924,15 @@ export function CatalogBrowser({
   const selectedCharts = React.useMemo(() => {
     return buildSelectedCatalogCharts(entries, chartSpecs, selectedIds);
   }, [chartSpecs, entries, selectedIds]);
+
+  // …and across navigations, by mirroring it into localStorage. Gated on
+  // `urlReady` so the initial empty state can't wipe a stored selection before
+  // the mount effect above has had its chance to restore it.
+  React.useEffect(() => {
+    if (!urlReady) return;
+    const storage = catalogSelectionStorage();
+    if (storage) writeCatalogSelection(storage, [...selectedIds]);
+  }, [urlReady, selectedIds]);
 
   const toggleSelection = (id: string) =>
     setSelectedIds((prev) => {
@@ -797,6 +962,119 @@ export function CatalogBrowser({
   };
 
   const showBatchBar = selectMode && selectedCharts.length > 0;
+
+  // Route slugs of what is currently on screen, handed to the random button so
+  // it draws from the filtered set. Undefined (not an empty array) when nothing
+  // is filtered, which is the button's signal to fall back to the full library.
+  const randomPool = React.useMemo(
+    () => (hasActiveFilters ? visibleEntries.map(entrySlug) : undefined),
+    [hasActiveFilters, visibleEntries]
+  );
+
+  const sortLabelId = React.useId();
+
+  // How many charts the dimension filters alone would leave. Unlike the
+  // `chipCounts` family this has to re-filter from the whole catalog, since the
+  // search is what it is dropping — so it is only computed when the grid is
+  // actually empty and the suggestion might be shown.
+  const withoutQueryCount = React.useMemo(() => {
+    if (visibleEntries.length > 0 || !hasDeferredQuery) {
+      return 0;
+    }
+    const tests = Object.values(dimensionTests).filter((test) => test !== null);
+    const scoped = applyCatalogFilters(entries, effectiveCategory, ALL_SUBCATEGORIES);
+    return tests.length === 0
+      ? scoped.length
+      : scoped.filter((entry) => tests.every((test) => test(entry))).length;
+  }, [visibleEntries.length, hasDeferredQuery, dimensionTests, entries, effectiveCategory]);
+
+  // "去掉『版本』筛选 → 87 首" — one per condition that is both applied and
+  // actually blocking, best payoff first. Plain data (no handlers): the button
+  // dispatches through `dropDimension` below, which keeps this list out of the
+  // render-phase ref-access the lint rule rightly objects to. Computed inline
+  // rather than memoized because the branch that reads it only exists when
+  // there are no results at all.
+  const emptySuggestions =
+    visibleEntries.length === 0
+      ? (
+          [
+            {
+              key: "version",
+              label: dictionary.filterVersion,
+              active: dimensionTests.version !== null,
+              count: chipCounts.withoutDimension.version,
+            },
+            {
+              key: "level",
+              label: dictionary.filterLevel,
+              active: levelFiltered,
+              count: chipCounts.withoutDimension.level,
+            },
+            {
+              key: "genre",
+              label: dictionary.filterGenre,
+              active: dimensionTests.genre !== null,
+              count: chipCounts.withoutDimension.genre,
+            },
+            {
+              key: "cabinet",
+              label: dictionary.filterCabinet,
+              active: dimensionTests.cabinet !== null,
+              count: chipCounts.withoutDimension.cabinet,
+            },
+            {
+              key: "designer",
+              label: dictionary.filterDesigner,
+              active: dimensionTests.designer !== null,
+              count: chipCounts.withoutDimension.designer,
+            },
+            {
+              key: "bpm",
+              label: dictionary.filterBpm,
+              active: bpmFiltered,
+              count: chipCounts.withoutDimension.bpm,
+            },
+            {
+              key: "asset",
+              label: dictionary.filterAssets,
+              active: dimensionTests.asset !== null,
+              count: chipCounts.withoutDimension.asset,
+            },
+            {
+              key: "q",
+              label: dictionary.filterSearch,
+              active: hasDeferredQuery,
+              count: withoutQueryCount,
+            },
+          ] as const
+        )
+          .filter((suggestion) => suggestion.active && suggestion.count > 0)
+          .sort((a, b) => b.count - a.count)
+      : [];
+
+  /** Clear exactly one dimension, from the empty state's suggestion buttons. */
+  const dropDimension = (key: (typeof emptySuggestions)[number]["key"]) => {
+    switch (key) {
+      case "version":
+        return clearSet(setVersionSet)();
+      case "genre":
+        return clearSet(setGenreIds)();
+      case "cabinet":
+        return clearSet(setCabinetSet)();
+      case "asset":
+        return clearSet(setAssetSet)();
+      case "designer":
+        return clearSet(setDesignerSet)();
+      case "level":
+        setLevelRange(null);
+        return setCurrentPage(1);
+      case "bpm":
+        setBpmRange(null);
+        return setCurrentPage(1);
+      case "q":
+        return clearSearch();
+    }
+  };
 
   return (
     <div
@@ -840,10 +1118,18 @@ export function CatalogBrowser({
       ) : null}
 
       <div className="flex items-center gap-2">
-      <div className="relative min-w-0 flex-1">
-        <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+      {/* A real search landmark with an accessible name — a placeholder is not a
+          label, and it disappears the moment anything is typed. */}
+      <div role="search" aria-label={dictionary.searchLabel} className="relative min-w-0 flex-1">
+        <SearchIcon
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+        />
         <Input
           ref={searchInputRef}
+          // Deliberately not type="search": WebKit would draw its own clear
+          // glyph on top of the custom one positioned below.
+          aria-label={dictionary.searchLabel}
           // The header's search icon focuses this box directly when the browse
           // route is already mounted (no navigation to hang the ?focus= param on).
           data-catalog-search=""
@@ -879,7 +1165,15 @@ export function CatalogBrowser({
           </button>
         ) : null}
       </div>
-      <RandomChartButton locale={locale} label={dictionary.randomChart} iconOnly />
+      {/* Draws from what is on screen once anything is filtered — "random" from
+          the whole library is not what someone who just narrowed to 宴会場 13+
+          is asking for. Unfiltered, it keeps the lazy slugs.json path. */}
+      <RandomChartButton
+        locale={locale}
+        label={dictionary.randomChart}
+        iconOnly
+        pool={randomPool}
+      />
       </div>
 
       {/* Advanced filters are tucked into a collapsible panel (closed by
@@ -939,7 +1233,11 @@ export function CatalogBrowser({
                   )}
                   onClick={() => toggleVersion(option.id)}
                   className="px-2 py-1"
-                  ariaLabel={option.label}
+                  count={chipCount("version", option.id)}
+                  ariaLabel={dictionary.chipCountLabel(
+                    option.label,
+                    chipCount("version", option.id)
+                  )}
                   title={option.label}
                 >
                   {iconSources ? (
@@ -998,6 +1296,11 @@ export function CatalogBrowser({
                 disabled={isChipDisabled("genre", String(id), genreIds.has(String(id)))}
                 onClick={() => toggleGenre(String(id))}
                 tone={GENRES[id].badge}
+                count={chipCount("genre", String(id))}
+                ariaLabel={dictionary.chipCountLabel(
+                  GENRES[id][locale],
+                  chipCount("genre", String(id))
+                )}
               >
                 {GENRES[id][locale]}
               </ToggleChip>
@@ -1027,7 +1330,8 @@ export function CatalogBrowser({
                   }
                   onClick={() => toggleCabinet(value)}
                   className="px-2"
-                  ariaLabel={label}
+                  count={chipCount("cabinet", value)}
+                  ariaLabel={dictionary.chipCountLabel(label, chipCount("cabinet", value))}
                   title={label}
                 >
                   <CabinetBadge cabinet={value} className="h-4" />
@@ -1035,6 +1339,18 @@ export function CatalogBrowser({
               );
             })}
           </ChipFilterRow>
+        ) : null}
+
+        {designerFacets.length > 0 ? (
+          <DesignerFilterRow
+            label={dictionary.filterDesigner}
+            dictionary={dictionary}
+            facets={designerFacets}
+            selected={designerSet}
+            countOf={(name) => chipCount("designer", name)}
+            onToggle={toggleDesigner}
+            onClear={clearSet(setDesignerSet)}
+          />
         ) : null}
 
         {bpmBounds[1] > bpmBounds[0] ? (
@@ -1075,6 +1391,11 @@ export function CatalogBrowser({
                 active={assetSet.has(option.id)}
                 disabled={isChipDisabled("asset", option.id, assetSet.has(option.id))}
                 onClick={() => selectAsset(option.id)}
+                count={chipCount("asset", option.id)}
+                ariaLabel={dictionary.chipCountLabel(
+                  option.label,
+                  chipCount("asset", option.id)
+                )}
               >
                 {option.label}
               </ToggleChip>
@@ -1213,6 +1534,15 @@ export function CatalogBrowser({
               </FilterChip>
             );
           })}
+          {[...designerSet].map((name) => (
+            <FilterChip
+              key={`d-${name}`}
+              onRemove={() => toggleDesigner(name)}
+              removeLabel={dictionary.removeFilter(name)}
+            >
+              {name}
+            </FilterChip>
+          ))}
           {hasUserSelectedCategory && effectiveCategory !== ALL_CATEGORIES ? (
             <FilterChip
               key="category"
@@ -1258,6 +1588,37 @@ export function CatalogBrowser({
           className="pointer-events-none absolute -inset-x-3 -inset-y-2 -z-10 rounded-xl border border-border/60 bg-background/95 shadow-md"
         />
         <div className="flex flex-wrap items-center gap-2">
+          {/* Radix's trigger is a <button>, so the label is tied by id rather
+              than wrapped in a <label>. */}
+          <span id={sortLabelId} className="sr-only">
+            {dictionary.sortLabel}
+          </span>
+          <Select
+            value={sort}
+            onValueChange={(value) => {
+              setSort(parseCatalogSortId(value) ?? DEFAULT_CATALOG_SORT);
+              setCurrentPage(1);
+            }}
+          >
+            <SelectTrigger aria-labelledby={sortLabelId} className="h-8 bg-card">
+              <ArrowDownUpIcon
+                aria-hidden="true"
+                className="size-3.5 text-muted-foreground"
+              />
+              {/* Explicit children, not Radix's implicit value text: that text
+                  is portalled out of the selected <SelectItem>, which only
+                  exists while the dropdown is open — so the trigger would render
+                  blank in the static HTML and until the first open. */}
+              <SelectValue>{dictionary.sortOptions[sort]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {CATALOG_SORT_IDS.map((id) => (
+                <SelectItem key={id} value={id}>
+                  {dictionary.sortOptions[id]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             type="button"
             variant={selectMode ? "default" : "outline"}
@@ -1304,8 +1665,30 @@ export function CatalogBrowser({
           <Card size="sm">
             <CardContent className="flex flex-col items-center gap-4 py-10 text-center text-sm text-muted-foreground">
               <p>{dictionary.emptyState}</p>
+              {/* The facet counts already know which single condition is doing
+                  the killing, so offer that instead of only the blunt "clear
+                  everything" — dropping one filter is almost always what the
+                  visitor actually wants. */}
+              {emptySuggestions.length > 0 ? (
+                <div className="flex flex-col items-center gap-2">
+                  <p>{dictionary.emptySuggestionsTitle}</p>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {emptySuggestions.map((suggestion) => (
+                      <Button
+                        key={suggestion.key}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => dropDimension(suggestion.key)}
+                      >
+                        {dictionary.dropFilterSuggestion(suggestion.label, suggestion.count)}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {hasActiveFilters ? (
-                <Button type="button" variant="outline" size="sm" onClick={clearAllFilters}>
+                <Button type="button" variant="ghost" size="sm" onClick={clearAllFilters}>
                   {dictionary.clearFilters}
                 </Button>
               ) : null}
@@ -1313,8 +1696,13 @@ export function CatalogBrowser({
           </Card>
         </motion.div>
       ) : (
+        /* No `layout` on the grid or its cards. Layout animation is measured
+           per element on every commit, and it was the single most expensive
+           thing in a keystroke — while buying nothing here, because a page turn
+           or a filter change replaces the whole batch rather than moving cards
+           around. popLayout still lifts the outgoing cards out of flow so the
+           incoming ones don't wait for them. */
         <motion.ul
-          layout
           role="list"
           data-layout="card-grid"
           className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
@@ -1323,7 +1711,6 @@ export function CatalogBrowser({
             {paginatedEntries.map((entry, index) => (
               <motion.li
                 key={entry.id}
-                layout
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
@@ -1338,7 +1725,9 @@ export function CatalogBrowser({
                   locale={locale}
                   priority={safeCurrentPage === 1 && index < 6}
                   sizes={CARD_SIZES}
-                  aliasHit={hasQuery ? aliasHitById.get(entry.id) ?? null : null}
+                  aliasHit={
+                    hasDeferredQuery ? aliasHitById.get(entry.id) ?? null : null
+                  }
                   selectable={selectMode}
                   selected={selectedIds.has(entry.id)}
                   onToggleSelect={() => toggleSelection(entry.id)}
@@ -1430,9 +1819,23 @@ export function CatalogBrowser({
 // A motion row so the advanced panel's open stagger cascades through it (the
 // variants are inherited from the panel — no own animate prop).
 function ChipFilterRow({ label, children }: { label: string; children: React.ReactNode }) {
+  // Without the group + aria-labelledby tie, a screen reader walking the panel
+  // hears six identical "全部, toggle button" rows with nothing saying which
+  // dimension each belongs to.
+  const labelId = React.useId();
   return (
-    <motion.div variants={filterRowVariants} className="flex items-center gap-x-2">
-      <span className="w-12 shrink-0 text-xs font-medium text-muted-foreground">{label}</span>
+    <motion.div
+      variants={filterRowVariants}
+      role="group"
+      aria-labelledby={labelId}
+      className="flex items-center gap-x-2"
+    >
+      <span
+        id={labelId}
+        className="w-12 shrink-0 text-xs font-medium text-muted-foreground"
+      >
+        {label}
+      </span>
       {/* overflow-x also clips overflow-y, so pad vertically (and a touch right)
           to give the selected chip's ring room instead of shearing its edge. */}
       <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto py-1.5 pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1443,6 +1846,14 @@ function ChipFilterRow({ label, children }: { label: string; children: React.Rea
 }
 
 // The "all" chip that clears a whole dimension (active when nothing is picked).
+/**
+ * The filter chips are bare motion.buttons, so they only ever showed the faint
+ * `*` outline from globals.css. This is the same ring the shared primitives
+ * use, and it has to survive the tone classes the chips layer on top.
+ */
+const CHIP_FOCUS_CLASS =
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+
 function AllChip({
   active,
   onClick,
@@ -1459,6 +1870,7 @@ function AllChip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
+        CHIP_FOCUS_CLASS,
         "min-h-8 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
         active
           ? "border-primary bg-primary/15 text-primary"
@@ -1478,6 +1890,7 @@ function ToggleChip({
   onClick,
   children,
   tone,
+  count,
   className,
   ariaLabel,
   title,
@@ -1487,6 +1900,13 @@ function ToggleChip({
   onClick: () => void;
   children: React.ReactNode;
   tone?: string;
+  /**
+   * Faceted count: how many results picking this chip would leave, given
+   * everything already selected in the *other* dimensions. Rendered as a muted
+   * number so a dead end is visible before it is clicked; the callers fold the
+   * same number into `ariaLabel`, hence aria-hidden here.
+   */
+  count?: number;
   className?: string;
   ariaLabel?: string;
   title?: string;
@@ -1503,6 +1923,7 @@ function ToggleChip({
       disabled={disabled}
       onClick={onClick}
       className={cn(
+        CHIP_FOCUS_CLASS,
         "flex min-h-8 shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-[color,background-color,border-color,opacity,filter]",
         // Greyed out: desaturated and faded, whatever tone it would otherwise
         // carry, so an incompatible option reads as unavailable rather than
@@ -1518,6 +1939,11 @@ function ToggleChip({
       )}
     >
       {children}
+      {typeof count === "number" ? (
+        <span aria-hidden="true" className="text-[0.625rem] tabular-nums opacity-60">
+          {count}
+        </span>
+      ) : null}
     </motion.button>
   );
 }
@@ -1538,9 +1964,20 @@ function RangeFilterRow({
   resetLabel: string;
   children: React.ReactNode;
 }) {
+  const labelId = React.useId();
   return (
-    <motion.div variants={filterRowVariants} className="flex items-center gap-x-2">
-      <span className="w-12 shrink-0 text-xs font-medium text-muted-foreground">{label}</span>
+    <motion.div
+      variants={filterRowVariants}
+      role="group"
+      aria-labelledby={labelId}
+      className="flex items-center gap-x-2"
+    >
+      <span
+        id={labelId}
+        className="w-12 shrink-0 text-xs font-medium text-muted-foreground"
+      >
+        {label}
+      </span>
       {/* The current values ride under the thumbs themselves (see RangeSlider),
           so the row carries only the reset chip and the track. */}
       <div className="flex min-w-0 flex-1 items-center gap-3 py-1.5 pr-4">
@@ -1548,6 +1985,213 @@ function RangeFilterRow({
           {resetLabel}
         </AllChip>
         <div className="min-w-0 flex-1">{children}</div>
+      </div>
+    </motion.div>
+  );
+}
+
+/** How many charter options the combobox offers at once. The full list runs to
+ *  several hundred names; anything past a screenful is reached by typing. */
+const DESIGNER_OPTION_LIMIT = 40;
+
+/**
+ * The charter (谱师) filter.
+ *
+ * A chip row like the other dimensions is impossible here — the catalog credits
+ * hundreds of charters, and the prolific ones (はっぴー alone has 645 charts) are
+ * indistinguishable from the one-offs in a horizontally scrolling strip. So this
+ * is a combobox: type to narrow, Enter or click to toggle, picked names sit in
+ * front of the box as removable chips.
+ *
+ * The option list renders *in flow* rather than as an absolutely positioned
+ * popover: the advanced-filter panel animates its height and is therefore
+ * `overflow: hidden`, which would clip a floating list. In flow it simply
+ * expands the panel.
+ */
+function DesignerFilterRow({
+  label,
+  dictionary,
+  facets,
+  selected,
+  countOf,
+  onToggle,
+  onClear,
+}: {
+  label: string;
+  dictionary: SiteDictionary["catalogBrowser"];
+  facets: readonly ChartDesignerFacet[];
+  selected: ReadonlySet<string>;
+  /** Faceted count for a name, given the other dimensions. */
+  countOf: (name: string) => number;
+  onToggle: (name: string) => void;
+  onClear: () => void;
+}) {
+  const [inputValue, setInputValue] = React.useState("");
+  const [open, setOpen] = React.useState(false);
+  const [activeIndex, setActiveIndex] = React.useState(-1);
+  const labelId = React.useId();
+  const listboxId = React.useId();
+  const isComposingRef = React.useRef(false);
+
+  const needle = inputValue.trim().toLowerCase();
+  const options = React.useMemo(() => {
+    const matching = needle
+      ? facets.filter((facet) => facet.name.toLowerCase().includes(needle))
+      : facets;
+    return matching.slice(0, DESIGNER_OPTION_LIMIT);
+  }, [facets, needle]);
+
+  const showList = open && (options.length > 0 || needle.length > 0);
+  const optionId = (index: number) => `${listboxId}-option-${index}`;
+
+  const commit = (name: string) => {
+    onToggle(name);
+    setInputValue("");
+    setActiveIndex(-1);
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    // Mid-composition keys belong to the IME (Enter confirms the kana buffer).
+    if (event.nativeEvent.isComposing || isComposingRef.current) return;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (options.length === 0) return;
+      event.preventDefault();
+      setOpen(true);
+      const delta = event.key === "ArrowDown" ? 1 : -1;
+      setActiveIndex((previous) => {
+        const cycle = options.length + 1;
+        return ((previous + 1 + delta + cycle) % cycle) - 1;
+      });
+      return;
+    }
+    if (event.key === "Escape" && showList) {
+      event.preventDefault();
+      setOpen(false);
+      setActiveIndex(-1);
+      return;
+    }
+    if (event.key === "Enter") {
+      // Nothing highlighted but exactly one match left is still an unambiguous
+      // pick — typing "はっぴ" and hitting Enter should just work.
+      const target = options[activeIndex] ?? (options.length === 1 ? options[0] : null);
+      if (target) {
+        event.preventDefault();
+        commit(target.name);
+      }
+    }
+  };
+
+  return (
+    <motion.div
+      variants={filterRowVariants}
+      role="group"
+      aria-labelledby={labelId}
+      className="flex items-start gap-x-2"
+    >
+      <span
+        id={labelId}
+        className="w-12 shrink-0 pt-3 text-xs font-medium text-muted-foreground"
+      >
+        {label}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-2 py-1.5 pr-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <AllChip active={selected.size === 0} onClick={onClear}>
+            {dictionary.filterAll}
+          </AllChip>
+          {[...selected].map((name) => (
+            <ToggleChip key={name} active onClick={() => onToggle(name)}>
+              {name}
+            </ToggleChip>
+          ))}
+          <Input
+            value={inputValue}
+            role="combobox"
+            aria-expanded={showList}
+            aria-controls={showList ? listboxId : undefined}
+            aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
+            aria-autocomplete="list"
+            aria-label={label}
+            placeholder={dictionary.designerSearchPlaceholder}
+            className="h-8 w-44 text-xs"
+            onChange={(event) => {
+              setInputValue(event.target.value);
+              setActiveIndex(-1);
+              setOpen(true);
+            }}
+            onCompositionStart={() => {
+              isComposingRef.current = true;
+            }}
+            onCompositionEnd={() => {
+              isComposingRef.current = false;
+            }}
+            onFocus={() => setOpen(true)}
+            // The options preventDefault on mousedown, so focus never leaves the
+            // box while picking — a blur here really does mean "done".
+            onBlur={() => {
+              setOpen(false);
+              setActiveIndex(-1);
+            }}
+            onKeyDown={onKeyDown}
+          />
+        </div>
+        {showList ? (
+          <ul
+            id={listboxId}
+            role="listbox"
+            aria-label={dictionary.designerListLabel}
+            className="max-h-48 list-none overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground"
+          >
+            {options.length === 0 ? (
+              <li className="px-2 py-1.5 text-xs text-muted-foreground">
+                {dictionary.designerNoMatch}
+              </li>
+            ) : (
+              options.map((facet, index) => {
+                const picked = selected.has(facet.name);
+                const count = countOf(facet.name);
+                // Same rule as the chip rows: a charter who has nothing left
+                // under the other filters is a dead end, greyed out rather than
+                // silently emptying the grid. A picked one stays clickable to
+                // be undone.
+                const deadEnd = count === 0 && !picked;
+                return (
+                  <li
+                    key={facet.name}
+                    id={optionId(index)}
+                    role="option"
+                    // The name and the count are two separate spans inside;
+                    // spell the option out so it isn't read as "はっぴー 645".
+                    aria-label={dictionary.chipCountLabel(facet.name, count)}
+                    aria-selected={picked}
+                    aria-disabled={deadEnd || undefined}
+                  >
+                    <button
+                      type="button"
+                      disabled={deadEnd}
+                      // Keep focus in the input so the list doesn't close before
+                      // the click lands.
+                      onMouseDown={(event) => event.preventDefault()}
+                      onMouseEnter={() => setActiveIndex(index)}
+                      onClick={() => commit(facet.name)}
+                      className={cn(
+                        "flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-xs transition-colors",
+                        index === activeIndex && !deadEnd && "bg-accent text-accent-foreground",
+                        picked && "font-medium text-primary",
+                        deadEnd && "cursor-not-allowed opacity-40"
+                      )}
+                    >
+                      <span className="truncate">{facet.name}</span>
+                      <span className="shrink-0 tabular-nums text-muted-foreground">
+                        {count}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        ) : null}
       </div>
     </motion.div>
   );

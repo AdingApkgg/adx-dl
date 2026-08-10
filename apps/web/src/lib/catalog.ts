@@ -116,10 +116,16 @@ export const readSearchIndex = cache(async (): Promise<CatalogSearchIndexEntry[]
     slug: entrySlug(entry),
     title: entry.title,
     ...(entry.title_en && entry.title_en !== entry.title ? { title_en: entry.title_en } : {}),
+    // The Latin entry point for a kana title, which for roughly a third of the
+    // catalog is the *only* one — title_en is empty upstream for every entry.
+    // Without it the hero suggestions answer "gekkou" with nothing while the
+    // browse page finds the song, which reads as the site being broken.
+    ...(entry.title_romaji ? { title_romaji: entry.title_romaji } : {}),
     artist: entry.artist,
     ...(entry.artist_en && entry.artist_en !== entry.artist
       ? { artist_en: entry.artist_en }
       : {}),
+    ...(entry.artist_romaji ? { artist_romaji: entry.artist_romaji } : {}),
     ...(entry.aliases?.length ? { aliases: entry.aliases } : {}),
   }));
 });

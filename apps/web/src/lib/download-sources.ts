@@ -348,6 +348,46 @@ export function rerouteDownloadFiles<T extends { url: string }>(
   }));
 }
 
+/**
+ * The route a failed job should retry on: the fastest mirror the live probe
+ * currently calls healthy that this run has not already burned.
+ *
+ * Six routes were measured every five minutes and the result only ever painted
+ * a coloured dot — a failing job stayed on the same dead host until the user
+ * found the wordless ⇄ icon. Latency alone decides between healthy candidates
+ * (a probe with no latency sorts last); an unprobed or failing route is never
+ * chosen, because moving a job onto a mirror we know is down is strictly worse
+ * than telling the user it failed.
+ *
+ * Custom routes are eligible too, so `probes` is a plain lookup rather than a
+ * walk of the built-in list.
+ */
+export function pickFailoverDownloadSource(
+  probes: Partial<Record<string, { state: string; latencyMs: number | null }>>,
+  triedSourceIds: readonly string[],
+  customSources: readonly CustomDownloadSourceConfig[] = []
+): DownloadSourceId | null {
+  const tried = new Set(triedSourceIds);
+  const configuredCustomIds = new Set(customSources.map((source) => source.id));
+  const isEligible = (sourceId: string): boolean =>
+    isCustomDownloadSourceId(sourceId)
+      ? configuredCustomIds.has(sourceId)
+      : DOWNLOAD_SOURCES.some(
+          (source) => source.id === sourceId && source.status !== "maintenance"
+        );
+  const candidates = Object.entries(probes)
+    .filter(
+      ([sourceId, probe]) =>
+        probe?.state === "ok" && !tried.has(sourceId) && isEligible(sourceId)
+    )
+    .map(([sourceId, probe]) => ({
+      sourceId: sourceId as DownloadSourceId,
+      latencyMs: probe?.latencyMs ?? Number.POSITIVE_INFINITY,
+    }))
+    .sort((left, right) => left.latencyMs - right.latencyMs);
+  return candidates[0]?.sourceId ?? null;
+}
+
 export function routeChartDownloadSpecs(
   specs: ChartDownloadSpec[],
   sourceId: string,

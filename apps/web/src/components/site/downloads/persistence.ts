@@ -42,6 +42,19 @@ export type PersistedFile = {
   blob: Blob;
 };
 
+/**
+ * A finished job kept so the same selection can be downloaded again without
+ * rebuilding it by hand. Only the spec is retained — never the blobs, which are
+ * deleted the moment the archive is saved.
+ */
+export type DownloadHistoryEntry = {
+  /** Unique per completion; a job id repeats every time the same chart is fetched. */
+  key: string;
+  job: PersistedJob;
+  finishedAt: number;
+  fileCount: number;
+};
+
 export type DownloadsPersistenceAdapter = {
   persistJob: (job: PersistedJob) => Promise<void>;
   persistFile: (file: PersistedFile) => Promise<void>;
@@ -50,12 +63,56 @@ export type DownloadsPersistenceAdapter = {
   /** Atomically updates the route spec while retaining only whole relevant files. */
   replaceJobKeepingCompletedFiles: (job: PersistedJob) => Promise<void>;
   deleteJob: (jobId: string) => Promise<void>;
+  loadHistory: () => Promise<DownloadHistoryEntry[]>;
+  /** Appends one completion and trims the store back to MAX_DOWNLOAD_HISTORY. */
+  recordHistory: (entry: DownloadHistoryEntry) => Promise<void>;
+  clearHistory: () => Promise<void>;
 };
 
 const DB_NAME = "astrodx-downloads";
-const DB_VERSION = 1;
+// v2 adds the completed-download history store.
+const DB_VERSION = 2;
 const JOBS = "jobs";
 const FILES = "files";
+const HISTORY = "history";
+
+/**
+ * Newest-first cap. The list exists to repeat "the batch I just did", not to be
+ * an archive of everything ever fetched — and a batch spec is a few hundred
+ * file URLs, so an unbounded list would quietly grow into megabytes.
+ */
+export const MAX_DOWNLOAD_HISTORY = 8;
+
+type CheckpointFailureListener = (kind: "quota" | "unknown") => void;
+const checkpointFailureListeners = new Set<CheckpointFailureListener>();
+
+/**
+ * Checkpoint writes used to fail completely silently, so a device that had run
+ * out of quota kept promising "已完成文件会保留" for files that were never
+ * durable. Subscribers surface that instead.
+ */
+export function subscribeToCheckpointFailures(
+  listener: CheckpointFailureListener
+): () => void {
+  checkpointFailureListeners.add(listener);
+  return () => {
+    checkpointFailureListeners.delete(listener);
+  };
+}
+
+/** QuotaExceededError arrives as a DOMException on some engines, an Error on others. */
+export function classifyStorageError(error: unknown): "quota" | "unknown" {
+  const name = error instanceof Error ? error.name : "";
+  const message = error instanceof Error ? error.message : "";
+  return name === "QuotaExceededError" || /quota/i.test(message) ? "quota" : "unknown";
+}
+
+function reportCheckpointFailure(error: unknown): void {
+  const kind = classifyStorageError(error);
+  for (const listener of [...checkpointFailureListeners]) {
+    listener(kind);
+  }
+}
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 
@@ -82,6 +139,9 @@ function openDb(): Promise<IDBDatabase | null> {
       if (!db.objectStoreNames.contains(FILES)) {
         const store = db.createObjectStore(FILES, { keyPath: "key" });
         store.createIndex("jobId", "jobId", { unique: false });
+      }
+      if (!db.objectStoreNames.contains(HISTORY)) {
+        db.createObjectStore(HISTORY, { keyPath: "key" });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -182,8 +242,68 @@ async function indexedDbPersistFile(file: PersistedFile): Promise<void> {
     const tx = db.transaction(FILES, "readwrite");
     tx.objectStore(FILES).put(file);
     await promisifyTx(tx);
+  } catch (error) {
+    // The in-memory run continues (the bytes are already on hand), but the
+    // promise that a reload can resume from here no longer holds — say so.
+    reportCheckpointFailure(error);
+  }
+}
+
+async function indexedDbLoadHistory(): Promise<DownloadHistoryEntry[]> {
+  const db = await openDb();
+  if (!db) {
+    return [];
+  }
+  try {
+    const tx = db.transaction(HISTORY, "readonly");
+    const stored = (await promisifyRequest(
+      tx.objectStore(HISTORY).getAll()
+    )) as DownloadHistoryEntry[];
+    return stored
+      .filter((entry) => entry && typeof entry.key === "string" && entry.job)
+      .sort((left, right) => right.finishedAt - left.finishedAt);
   } catch {
-    // Ignore — the complete file can be fetched again if this checkpoint fails.
+    return [];
+  }
+}
+
+async function indexedDbRecordHistory(entry: DownloadHistoryEntry): Promise<void> {
+  const db = await openDb();
+  if (!db) {
+    return;
+  }
+  try {
+    const tx = db.transaction(HISTORY, "readwrite");
+    const store = tx.objectStore(HISTORY);
+    store.put(entry);
+    // Trim inside the same transaction: two round-trips would let a burst of
+    // finishing batch jobs each read a pre-trim snapshot and keep everything.
+    const allRequest = store.getAll();
+    allRequest.onsuccess = () => {
+      const stored = (allRequest.result as DownloadHistoryEntry[])
+        .filter((candidate) => candidate && typeof candidate.key === "string")
+        .sort((left, right) => right.finishedAt - left.finishedAt);
+      for (const stale of stored.slice(MAX_DOWNLOAD_HISTORY)) {
+        store.delete(stale.key);
+      }
+    };
+    await promisifyTx(tx);
+  } catch {
+    // History is a convenience; losing an entry must never fail a download.
+  }
+}
+
+async function indexedDbClearHistory(): Promise<void> {
+  const db = await openDb();
+  if (!db) {
+    return;
+  }
+  try {
+    const tx = db.transaction(HISTORY, "readwrite");
+    tx.objectStore(HISTORY).clear();
+    await promisifyTx(tx);
+  } catch {
+    // Nothing to recover: the list is rebuilt by the next completed download.
   }
 }
 
@@ -279,6 +399,9 @@ const indexedDbAdapter: DownloadsPersistenceAdapter = {
   loadFilesForJob: indexedDbLoadFilesForJob,
   replaceJobKeepingCompletedFiles: indexedDbReplaceJobKeepingCompletedFiles,
   deleteJob: indexedDbDeleteJob,
+  loadHistory: indexedDbLoadHistory,
+  recordHistory: indexedDbRecordHistory,
+  clearHistory: indexedDbClearHistory,
 };
 
 let activeAdapter = indexedDbAdapter;
@@ -312,6 +435,18 @@ export function replaceJobKeepingCompletedFiles(job: PersistedJob): Promise<void
 
 export function deleteJob(jobId: string): Promise<void> {
   return activeAdapter.deleteJob(jobId);
+}
+
+export function loadHistory(): Promise<DownloadHistoryEntry[]> {
+  return activeAdapter.loadHistory();
+}
+
+export function recordHistory(entry: DownloadHistoryEntry): Promise<void> {
+  return activeAdapter.recordHistory(entry);
+}
+
+export function clearHistory(): Promise<void> {
+  return activeAdapter.clearHistory();
 }
 
 export function fileKey(jobId: string, name: string): string {

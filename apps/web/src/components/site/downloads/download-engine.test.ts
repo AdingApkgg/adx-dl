@@ -813,4 +813,118 @@ describe("runMultiFileDownload", () => {
     await expect(run).rejects.toThrow("primary worker failed");
     expect(slowSettled).toBe(true);
   });
+
+  test("skips an optional file the mirror does not have, keeping the rest", async () => {
+    stubFetch(({ url }) =>
+      url.endsWith("/pv.mp4")
+        ? new Response("nope", { status: 404 })
+        : new Response(FULL, { status: 200, headers: { "content-length": "10" } })
+    );
+    const skipped: { name: string; status: number | null }[] = [];
+
+    const archive = await runMultiFileDownload(
+      [
+        { name: "maidata.txt", url: "https://cdn.test/maidata.txt", completedBlob: null },
+        { name: "track.mp3", url: "https://cdn.test/track.mp3", completedBlob: null },
+        {
+          name: "pv.mp4",
+          url: "https://cdn.test/pv.mp4",
+          completedBlob: null,
+          optional: true,
+        },
+      ],
+      {
+        concurrency: 1,
+        retryBaseDelayMs: 1,
+        onFileSkipped: (file) => skipped.push({ name: file.name, status: file.status }),
+      }
+    );
+
+    // The archive input list must not carry an empty placeholder for it.
+    expect(archive.map((input) => input.name)).toEqual(["maidata.txt", "track.mp3"]);
+    expect(skipped).toEqual([{ name: "pv.mp4", status: 404 }]);
+  });
+
+  test("a required file's 404 still fails the run, with its status in the message", async () => {
+    stubFetch(({ url }) =>
+      url.endsWith("/track.mp3")
+        ? new Response("nope", { status: 404 })
+        : new Response(FULL, { status: 200, headers: { "content-length": "10" } })
+    );
+
+    await expect(
+      runMultiFileDownload(
+        [
+          { name: "maidata.txt", url: "https://cdn.test/maidata.txt", completedBlob: null },
+          { name: "track.mp3", url: "https://cdn.test/track.mp3", completedBlob: null },
+        ],
+        { concurrency: 1, retryBaseDelayMs: 1 }
+      )
+    ).rejects.toThrow("(HTTP 404)");
+  });
+
+  test("a skipped optional file never reaches the durable checkpoint callback", async () => {
+    stubFetch(({ url }) =>
+      url.endsWith("/bg.png")
+        ? new Response("nope", { status: 403 })
+        : new Response(FULL, { status: 200, headers: { "content-length": "10" } })
+    );
+    const checkpointed: string[] = [];
+
+    await runMultiFileDownload(
+      [
+        { name: "track.mp3", url: "https://cdn.test/track.mp3", completedBlob: null },
+        {
+          name: "bg.png",
+          url: "https://cdn.test/bg.png",
+          completedBlob: null,
+          optional: true,
+        },
+      ],
+      {
+        concurrency: 1,
+        retryBaseDelayMs: 1,
+        onFileComplete: (file: CompletedDownloadFile) => {
+          checkpointed.push(file.name);
+        },
+      }
+    );
+
+    expect(checkpointed).toEqual(["track.mp3"]);
+  });
+
+  test("extrapolates a total from the files that have declared a size", async () => {
+    // Sizes only arrive as each response's headers land, so waiting for all of
+    // them pinned the denominator at 0 for most of a run.
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    stubFetch(async ({ url }) => {
+      if (url.endsWith("/b.bin")) {
+        await gate;
+      }
+      return new Response(FULL, { status: 200, headers: { "content-length": "10" } });
+    });
+    const totals: { total: number; estimated: boolean }[] = [];
+
+    const run = runMultiFileDownload(
+      [
+        { name: "a.bin", url: "https://cdn.test/a.bin", completedBlob: null },
+        { name: "b.bin", url: "https://cdn.test/b.bin", completedBlob: null },
+      ],
+      {
+        concurrency: 1,
+        onBytes: (_received, total, estimated) => totals.push({ total, estimated }),
+      }
+    );
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    release?.();
+    await run;
+
+    // One measured 10-byte file and one unknown extrapolates to 20, flagged.
+    expect(totals).toContainEqual({ total: 20, estimated: true });
+    // Once every size is known the flag drops and the number is exact.
+    expect(totals.at(-1)).toEqual({ total: 20, estimated: false });
+  });
 });

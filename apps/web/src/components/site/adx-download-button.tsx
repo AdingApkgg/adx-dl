@@ -21,8 +21,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ARCHIVE_FORMATS, type ArchiveFormat } from "@/lib/adx-archive";
-import { isChartVideoFile, type ChartDownloadSpec } from "@/lib/catalog-shared";
+import { ARCHIVE_FORMATS, type ArchiveFormat } from "@/lib/adx-archive-shared";
+import {
+  isChartVideoFile,
+  sumChartDownloadBytes,
+  type ChartDownloadSpec,
+} from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import {
   DownloadSourceMenu,
@@ -33,7 +37,10 @@ import {
   DownloadProgressBar,
   type DownloadStartedDetail,
 } from "./downloads/download-dock";
-import { downloadJobStatusText } from "./downloads/download-status-text";
+import {
+  DownloadJobNotes,
+  DownloadJobStatusLine,
+} from "./downloads/download-job-notes";
 import { formatBytes } from "./downloads/format-bytes";
 import { jobPercent, singleJobId, useDownloadsStore } from "./downloads/downloads-store";
 
@@ -78,9 +85,27 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
   const progress = { completed: job?.completed ?? 0, total: job?.total ?? 0 };
   const fileProgress = job?.fileProgress ?? [];
   const percent = job ? jobPercent(job) : 0;
-  const statusText = job ? downloadJobStatusText(job, detailDictionary, downloadsDictionary) : "";
 
   const hasVideo = files.some((file) => isChartVideoFile(file.name));
+
+  // Quote the transfer BEFORE it starts: a chart with a BGA is routinely 40 MB
+  // against 6 MB without one, and on mobile data that difference decides the
+  // click. Recomputed from the (measured) per-file sizes as the BGA box flips.
+  const downloadBytes = React.useMemo(
+    () => sumChartDownloadBytes(spec ? [spec] : []),
+    [spec]
+  );
+  const quotedBytes =
+    downloadBytes.baseBytes + (includeVideo && hasVideo ? downloadBytes.videoBytes : 0);
+  const sizeHint =
+    quotedBytes > 0
+      ? includeVideo && hasVideo && downloadBytes.videoBytes > 0
+        ? detailDictionary.sizeEstimateWithVideo(
+            formatBytes(quotedBytes),
+            formatBytes(downloadBytes.videoBytes)
+          )
+        : detailDictionary.sizeEstimate(formatBytes(quotedBytes))
+      : null;
 
   // While this job is shown inline, claim it so the floating tray doesn't also
   // render it; once we unmount (navigation) the tray takes over its progress.
@@ -305,6 +330,9 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          {sizeHint && !isBusy ? (
+            <span className="text-xs tabular-nums text-muted-foreground">{sizeHint}</span>
+          ) : null}
           <AnimatePresence initial={false} mode="wait">
             {status === "packing" ? (
               <MotionButton
@@ -336,21 +364,15 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
           className="w-fit"
         />
       ) : null}
-      <AnimatePresence>
-        {job && (isBusy || status === "paused") ? (
-          <motion.p
-            key="job-status"
-            role="status"
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.2, ease: EASE_OUT }}
-            className="text-xs text-muted-foreground"
-          >
-            {statusText}
-          </motion.p>
-        ) : null}
-      </AnimatePresence>
+      {/* One always-mounted status line for the whole job lifecycle: the
+          success and error blocks below are decoration, and a conditionally
+          mounted live region is exactly what screen readers do not announce. */}
+      {job ? (
+        <>
+          <DownloadJobStatusLine job={job} locale={locale} />
+          <DownloadJobNotes job={job} locale={locale} />
+        </>
+      ) : null}
       <AnimatePresence>
         {status === "archiving" ? (
           <motion.div
@@ -380,6 +402,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
                     ? Math.min(100, Math.round((file.received / file.total) * 100))
                     : null;
               const isIndeterminate = percent === null;
+              const skipped = file.status === "skipped";
 
               return (
                 <li key={file.name} className="flex flex-col gap-1">
@@ -387,8 +410,15 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
                     <span className="truncate font-mono text-muted-foreground">
                       {file.name}
                     </span>
-                    <span className="shrink-0 tabular-nums text-muted-foreground">
-                      {isIndeterminate ? formatBytes(file.received) : `${percent}%`}
+                    <span
+                      aria-hidden="true"
+                      className="shrink-0 tabular-nums text-muted-foreground"
+                    >
+                      {skipped
+                        ? "—"
+                        : isIndeterminate
+                          ? formatBytes(file.received)
+                          : `${percent}%`}
                     </span>
                   </div>
                   <DownloadProgressBar
@@ -415,14 +445,15 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
         {status === "success" ? (
           <motion.div
             key="success"
-            role="status"
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.2, ease: EASE_OUT }}
             className="flex flex-col gap-1 text-sm text-muted-foreground"
           >
-            <p className="flex items-center gap-1.5">
+            {/* The status line above already announces completion; this row is
+                the visual celebration, so it must not say it a second time. */}
+            <p aria-hidden="true" className="flex items-center gap-1.5">
               <span className="shrink-0 text-emerald-500">
                 <DrawnCheck size={16} />
               </span>
@@ -430,19 +461,6 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
             </p>
             <p className="text-xs">{downloadsDictionary.importHint}</p>
           </motion.div>
-        ) : status === "error" ? (
-          <motion.p
-            key="error"
-            role="status"
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.2, ease: EASE_OUT }}
-            className="text-sm text-destructive"
-            title={job?.error ?? undefined}
-          >
-            {statusText}
-          </motion.p>
         ) : null}
       </AnimatePresence>
     </div>

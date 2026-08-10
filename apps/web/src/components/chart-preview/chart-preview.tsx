@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LockIcon, LockOpenIcon } from "lucide-react";
+import { LockIcon, LockOpenIcon, RepeatIcon } from "lucide-react";
 import useSWR from "swr";
 import {
   getAvailableDifficulties,
@@ -30,7 +30,8 @@ import { useLiveBeats } from "./hooks/use-live-beats";
 import { applyDifficulty } from "./apply-difficulty";
 import { beatsToMs, msToBeats } from "./lib/time-conversion";
 import { exportChartGif, type ChartExportRange } from "./lib/export-chart-gif";
-import { useExportRange } from "./lib/use-export-range";
+import { playbackLoopRef } from "./lib/playback-loop";
+import { MAX_EXPORT_DURATION_MS, useExportRange } from "./lib/use-export-range";
 import { formatDuration } from "./lib/format";
 import { downloadBlob, sanitizeFilenameId } from "./lib/file-download";
 
@@ -153,12 +154,18 @@ export function ChartPreview({
     setMenuContainer(el);
   }, []);
   // The Fullscreen API is a silent no-op on iOS Safari (no requestFullscreen,
-  // no webkit fallback on <div>), so the entry points hide there.
-  const [fullscreenSupported] = useState(() => {
+  // no webkit fallback on <div>). The fullscreen LAYOUT, however, is pure CSS —
+  // so instead of hiding the button there we fall back to pinning the player
+  // over the page ourselves.
+  const [nativeFullscreenSupported] = useState(() => {
     if (typeof document === "undefined") return false;
     const el = document.documentElement as FullscreenElement;
     return Boolean(document.fullscreenEnabled || typeof el.webkitRequestFullscreen === "function");
   });
+  const [pseudoFullscreen, setPseudoFullscreen] = useState(false);
+  // Speed lives in the sidebar, which fullscreen hides — practicing a passage
+  // slowed down otherwise meant leaving fullscreen for every adjustment.
+  const [speedPanelOpen, setSpeedPanelOpen] = useState(false);
 
   const isFullscreen = useGameStore((s) => s.isFullscreen);
   const setIsFullscreen = useGameStore((s) => s.setIsFullscreen);
@@ -171,8 +178,30 @@ export function ChartPreview({
 
   const totalBeats = totalMeasures * beatsPerMeasure;
   const totalMs = chartData ? beatsToMs(totalBeats, chartData.bpmEvents, chartData.bpm) : 0;
-  const exportRange = useExportRange(totalMs);
-  const gifRangeMode = exportRange.range !== null;
+  // One selection, two consumers. A GIF has to stay short; an A–B practice loop
+  // has no such reason, so turning the loop on lifts the cap to the whole chart
+  // (and turning it off re-clamps the selection — see useExportRange).
+  const [loopEnabled, setLoopEnabled] = useState(false);
+  const exportRange = useExportRange(
+    totalMs,
+    loopEnabled ? Math.max(totalMs, MAX_EXPORT_DURATION_MS) : MAX_EXPORT_DURATION_MS,
+  );
+  const rangeMode = exportRange.range !== null;
+  const selectedRangeMs = exportRange.range
+    ? exportRange.range.endMs - exportRange.range.startMs
+    : 0;
+  const gifRangeTooLong = selectedRangeMs > MAX_EXPORT_DURATION_MS;
+
+  // Publish the loop to the render loop's module-level ref (a store field would
+  // re-render the whole player on every toggle) and always retract it on unmount
+  // — a stale loop would hijack the next chart mounted into the same page.
+  const loopRange = loopEnabled ? exportRange.range : null;
+  useEffect(() => {
+    playbackLoopRef.current = loopRange;
+    return () => {
+      playbackLoopRef.current = null;
+    };
+  }, [loopRange]);
 
   // Apply the ?beat= deep link once the first chart parse lands.
   useEffect(() => {
@@ -277,6 +306,17 @@ export function ChartPreview({
     };
   }, [setIsFullscreen]);
 
+  // Pseudo fullscreen has no browser-level scroll lock behind it, so the page
+  // underneath would still scroll (and rubber-band on iOS) under the player.
+  useEffect(() => {
+    if (!pseudoFullscreen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [pseudoFullscreen]);
+
   // Auto-hide the fullscreen control overlay: show on pointer/keyboard activity,
   // fade after 3s. (showControls is only read while fullscreen, so no reset is
   // needed otherwise.) Keydown counts as activity so keyboard users can reach the
@@ -322,8 +362,22 @@ export function ChartPreview({
   }, [isFullscreen, uiLocked]);
 
   const toggleFullscreen = useCallback(() => {
+    // No Fullscreen API: drive the same `isFullscreen` layout ourselves. The
+    // store flag is what every consumer (canvas sizing, control overlay,
+    // renderer resize) already keys off, so nothing else changes.
+    if (!nativeFullscreenSupported) {
+      const next = !useGameStore.getState().isFullscreen;
+      setPseudoFullscreen(next);
+      setIsFullscreen(next);
+      if (next) {
+        containerRef.current?.focus({ preventScroll: true });
+      } else {
+        setUiLocked(false);
+      }
+      return;
+    }
     const el = containerRef.current as FullscreenElement | null;
-    if (!el || !fullscreenSupported) return;
+    if (!el) return;
     const doc = document as FullscreenDocument;
     if (doc.fullscreenElement ?? doc.webkitFullscreenElement) {
       if (doc.exitFullscreen) {
@@ -336,7 +390,7 @@ export function ChartPreview({
     } else {
       void el.webkitRequestFullscreen?.();
     }
-  }, [fullscreenSupported]);
+  }, [nativeFullscreenSupported, setIsFullscreen]);
 
   const seekToMs = useCallback(
     (ms: number) => {
@@ -349,16 +403,34 @@ export function ChartPreview({
     [setPreciseTime],
   );
 
-  const toggleGifRange = useCallback(() => {
+  const startRangeAtPlayhead = useCallback(() => {
+    const chart = useGameStore.getState().chartData;
+    const currentMs = chart ? beatsToMs(playbackTimeRef.current, chart.bpmEvents, chart.bpm) : 0;
+    exportRange.start(currentMs);
+  }, [exportRange]);
+
+  const toggleRangeMode = useCallback(() => {
     if (gifExporting) return;
     if (exportRange.range) {
       exportRange.clear();
+      setLoopEnabled(false);
     } else {
-      const chart = useGameStore.getState().chartData;
-      const currentMs = chart ? beatsToMs(playbackTimeRef.current, chart.bpmEvents, chart.bpm) : 0;
-      exportRange.start(currentMs);
+      startRangeAtPlayhead();
     }
-  }, [gifExporting, exportRange]);
+  }, [gifExporting, exportRange, startRangeAtPlayhead]);
+
+  // The loop button doubles as the range's discoverable entry point: with no
+  // section selected yet it opens one at the playhead instead of doing nothing.
+  const toggleLoop = useCallback(() => {
+    if (loopEnabled) {
+      setLoopEnabled(false);
+      return;
+    }
+    if (!exportRange.range) {
+      startRangeAtPlayhead();
+    }
+    setLoopEnabled(true);
+  }, [loopEnabled, exportRange.range, startRangeAtPlayhead]);
 
   const runGifExport = useCallback(
     async (range: ChartExportRange) => {
@@ -377,6 +449,7 @@ export function ChartPreview({
           range,
           beatsPerMeasure: state.timeline.beatsPerMeasure,
           settings,
+          hudLabels: { combo: t.hudCombo, breakNoEx: t.hudBreakNoEx },
           onProgress: setGifProgress,
           signal: abortController.signal,
           video:
@@ -390,7 +463,10 @@ export function ChartPreview({
         });
         downloadBlob(blob, `maimai-chart-${sanitizeFilenameId(chartName)}.gif`);
         showToast({ title: t.gifExportedTitle, message: t.gifExportedBody, color: "green" });
+        // The selection goes away with the export, so the loop that shared it
+        // has to stand down too — otherwise the button stays lit over nothing.
         exportRange.clear();
+        setLoopEnabled(false);
       } catch (error) {
         // User cancel: keep the selected range so the export can be retried.
         if (!(error instanceof DOMException && error.name === "AbortError")) {
@@ -411,6 +487,7 @@ export function ChartPreview({
       gifAbortRef.current?.abort();
     } else {
       exportRange.clear();
+      setLoopEnabled(false);
     }
   }, [gifExporting, exportRange]);
 
@@ -509,9 +586,12 @@ export function ChartPreview({
     <ChartControls
       isFullscreen={isFullscreen}
       onToggleFullscreen={toggleFullscreen}
-      fullscreenSupported={fullscreenSupported}
-      onToggleGifRange={toggleGifRange}
-      gifRangeMode={gifRangeMode}
+      onToggleRangeMode={toggleRangeMode}
+      rangeMode={rangeMode}
+      loopEnabled={loopEnabled}
+      onToggleLoop={toggleLoop}
+      speedPanelOpen={speedPanelOpen}
+      onToggleSpeedPanel={() => setSpeedPanelOpen((open) => !open)}
       gifExporting={gifExporting}
       gifProgress={gifProgress}
       levels={levels}
@@ -520,9 +600,9 @@ export function ChartPreview({
     />
   );
 
-  // Seekable density timeline + the GIF range bar. Shared by both layouts —
+  // Seekable density timeline + the range action bar. Shared by both layouts —
   // the reference shows the timeline in fullscreen too, which is also what
-  // makes the GIF flow usable there. The GIF action bar shares this zero-gap
+  // makes the GIF flow usable there. The action bar shares this zero-gap
   // group so its height collapse doesn't leave a dangling parent `gap`.
   const timelineBlock =
     totalMs > 0 ? (
@@ -536,7 +616,7 @@ export function ChartPreview({
           notes={densityNotes}
           durationMs={totalMs}
           onSeek={seekToMs}
-          interactive={!gifRangeMode}
+          interactive={!rangeMode}
           legendLabels={{
             label: t.legendLabel,
             tap: t.noteTap,
@@ -550,6 +630,9 @@ export function ChartPreview({
             <ChartExportRangeOverlay
               range={exportRange.range}
               totalDurationMs={totalMs}
+              maxDurationMs={
+                loopEnabled ? Math.max(totalMs, MAX_EXPORT_DURATION_MS) : MAX_EXPORT_DURATION_MS
+              }
               onChange={exportRange.update}
               onPreview={seekToMs}
             />
@@ -557,9 +640,9 @@ export function ChartPreview({
         </DensityWithPlayhead>
 
         <AnimatePresence initial={false}>
-          {gifRangeMode && exportRange.range ? (
+          {rangeMode && exportRange.range ? (
             <motion.div
-              key="gif-actions"
+              key="range-actions"
               className="overflow-hidden"
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
@@ -568,17 +651,35 @@ export function ChartPreview({
             >
               <div className="flex flex-wrap items-center gap-2 pt-3 text-sm">
                 <span className="text-muted-foreground">
-                  {t.gifRangeHint(
-                    formatDuration(exportRange.range.endMs - exportRange.range.startMs),
-                  )}
+                  {loopEnabled
+                    ? t.loopActiveHint(formatDuration(selectedRangeMs))
+                    : t.gifRangeHint(formatDuration(selectedRangeMs))}
                 </span>
                 <span className="flex-1" />
                 <Button
                   type="button"
                   size="sm"
+                  variant={loopEnabled ? "default" : "outline"}
+                  aria-pressed={loopEnabled}
+                  onClick={toggleLoop}
+                >
+                  <RepeatIcon data-icon="inline-start" aria-hidden="true" />
+                  {loopEnabled ? t.loopRangeOff : t.loopRange}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
                   className="relative overflow-hidden"
                   onClick={() => exportRange.range && runGifExport(exportRange.range)}
-                  disabled={gifExporting}
+                  // A loop may legitimately span minutes; a GIF that long would
+                  // be hundreds of megabytes, so the export waits for a shorter
+                  // selection rather than silently truncating it.
+                  disabled={gifExporting || gifRangeTooLong}
+                  title={
+                    gifRangeTooLong
+                      ? t.gifRangeTooLong(formatDuration(MAX_EXPORT_DURATION_MS))
+                      : undefined
+                  }
                 >
                   {gifExporting ? (
                     // Progress fill behind the label — scaleX (not width)
@@ -622,6 +723,9 @@ export function ChartPreview({
               // body's computed (light-theme, near-black) value straight past
               // the variable flip, turning every icon invisible on black.
               "dark relative flex h-full w-full items-center justify-center bg-black text-foreground",
+              // Without the Fullscreen API nothing pins the element for us, so
+              // the root does it: dvh/dvw, above the host dialog's z-[60].
+              pseudoFullscreen && "fixed inset-0 z-[70] h-dvh w-dvw",
               // While locked the cursor stays visible — hiding it on top of a
               // non-responsive surface reads as a hang.
               !showControls && !uiLocked && "cursor-none",
@@ -633,9 +737,28 @@ export function ChartPreview({
       )}
     >
       {/* `contents` keeps this wrapper out of the fullscreen flex layout; it
-          only exists so the (never remounted) canvas can be grid-placed. */}
-      <div className={cn(isFullscreen ? "contents" : "w-full lg:[grid-area:canvas]")}>
-        <ChartCanvas videoUrl={videoUrl} coverUrl={coverUrl} chartName={chartName} t={t} />
+          only exists so the (never remounted) canvas can be grid-placed.
+          The canvas used to be `pointer-events: none`, so tapping the chart —
+          the obvious thing to do — did nothing. The handler sits on this
+          wrapper, not on the canvas, because this is the level that knows the
+          fullscreen state: in fullscreen a tap already means "wake the
+          auto-hidden controls", and stacking play/pause on the same tap would
+          pause the chart every time you went looking for a button. Keyboard
+          users get the same action from Space (see onKeyDown). */}
+      <div
+        className={cn(isFullscreen ? "contents" : "w-full lg:[grid-area:canvas]")}
+        onClick={() => {
+          if (isFullscreen || uiLocked) return;
+          useGameStore.getState().togglePlayback();
+        }}
+      >
+        <ChartCanvas
+          pseudoFullscreen={pseudoFullscreen}
+          videoUrl={videoUrl}
+          coverUrl={coverUrl}
+          chartName={chartName}
+          t={t}
+        />
       </div>
 
       {!isFullscreen ? (
@@ -717,9 +840,24 @@ export function ChartPreview({
                 : "invisible pointer-events-none translate-y-full opacity-0 focus-within:visible focus-within:pointer-events-auto focus-within:translate-y-0 focus-within:opacity-100",
           )}
         >
-          {/* Reference parity: the fullscreen overlay is ONLY the seekable
-              timeline (which also hosts the GIF range selection) plus the
-              transport strip — speed/settings live outside fullscreen. */}
+          {/* The overlay is the seekable timeline (which also hosts the range
+              selection) plus the transport strip. Speed is opt-in on top of
+              that: it is the one setting you actually change mid-practice, and
+              leaving fullscreen for every 0.05x was the whole complaint. */}
+          <AnimatePresence initial={false}>
+            {speedPanelOpen ? (
+              <motion.div
+                key="fullscreen-speed"
+                className="w-full max-w-2xl overflow-hidden"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={collapseTransition}
+              >
+                <ChartSpeedCard locale={locale} className="bg-black/50 backdrop-blur" />
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
           <div className="w-full max-w-2xl">{timelineBlock}</div>
           <div className="w-full max-w-2xl">{controls}</div>
         </div>

@@ -25,14 +25,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { BATCH_FORMATS, type BatchArchiveFormat } from "@/lib/adx-archive";
-import { isChartVideoFile, type ChartDownloadSpec } from "@/lib/catalog-shared";
+import { BATCH_FORMATS, type BatchArchiveFormat } from "@/lib/adx-archive-shared";
+import {
+  isChartVideoFile,
+  sumChartDownloadBytes,
+  type ChartDownloadSpec,
+} from "@/lib/catalog-shared";
+import { formatBytes } from "./downloads/format-bytes";
+import {
+  readStorageEstimate,
+  storageHeadroom,
+  type StorageEstimateSnapshot,
+} from "./downloads/storage-estimate";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import {
   DownloadSourceMenu,
   DownloadSourceSummary,
 } from "./downloads/download-source-selector";
-import { downloadJobStatusText } from "./downloads/download-status-text";
+import {
+  downloadJobMetricsText,
+  downloadJobStateText,
+} from "./downloads/download-status-text";
+import { DownloadJobNotes } from "./downloads/download-job-notes";
 import {
   chartGroupingDir,
   newBatchJobId,
@@ -139,6 +153,38 @@ export function BatchDownloadBar({
     ? fileStats.totalFiles
     : fileStats.totalFiles - fileStats.videoFiles;
   const hasVideoFiles = fileStats.videoFiles > 0;
+  // Selecting the whole library is 8.9 GB without BGA and 35.6 GB with — a
+  // number the user has to see before committing, not after. The sum is over
+  // the selection (not the toggle), so flipping BGA only re-adds a term.
+  const selectionBytes = React.useMemo(() => sumChartDownloadBytes(charts), [charts]);
+  const quotedBytes =
+    selectionBytes.baseBytes + (includeVideo ? selectionBytes.videoBytes : 0);
+  const sizeHint =
+    quotedBytes > 0
+      ? includeVideo && selectionBytes.videoBytes > 0
+        ? detail.sizeEstimateWithVideo(
+            formatBytes(quotedBytes),
+            formatBytes(selectionBytes.videoBytes)
+          )
+        : detail.sizeEstimate(formatBytes(quotedBytes))
+      : null;
+  // Free space is checked at the confirmation step (see handleSelect): the
+  // bytes are held twice at peak — as resumable checkpoints and again as the
+  // archive Blob — and an over-quota write surfaces as a job that fails near
+  // the end for no stated reason.
+  const [storageEstimate, setStorageEstimate] =
+    React.useState<StorageEstimateSnapshot | null>(null);
+  const headroom = storageHeadroom(storageEstimate, quotedBytes);
+  const storageWarning =
+    headroom.availableBytes === null || headroom.level === "ok"
+      ? null
+      : headroom.level === "insufficient"
+        ? tray.storageInsufficient(
+            formatBytes(headroom.availableBytes),
+            formatBytes(quotedBytes)
+          )
+        : tray.storageTight(formatBytes(headroom.availableBytes));
+
   // A selection spanning multiple grouping folders (versions or genres) saves
   // one archive per folder (see splitBatchArchives) — tell the user up front.
   const groupCount = React.useMemo(
@@ -160,14 +206,25 @@ export function BatchDownloadBar({
       ),
     [jobs]
   );
-  const statusText =
+  // Split for the live region below: the coarse phase is what assistive tech
+  // should hear, and the byte/rate/ETA numbers change too often to belong in a
+  // region that re-reads its whole contents on every patch.
+  const stateText =
     jobs.length === 0
       ? ""
       : jobs.length === 1
-        ? downloadJobStatusText(jobs[0], detail, tray)
+        ? downloadJobStateText(jobs[0], detail, tray)
         : status === "success"
           ? tray.completed
-          : `${tray.queueSummary(summary.done, summary.total)} · ${summary.percent}%`;
+          : tray.queueSummary(summary.done, summary.total);
+  const metricsText =
+    jobs.length === 1
+      ? downloadJobMetricsText(jobs[0], tray)
+      : jobs.length > 1 && status !== "success"
+        ? `${summary.percent}%`
+        : "";
+  const statusText = metricsText ? `${stateText} · ${metricsText}` : stateText;
+  const failedJob = jobs.find((entry) => entry.status === "error");
   const canDownload = count > 0 && !isBusy && !isResumable;
 
   // Hide these jobs from the floating tray while the bar itself is on screen.
@@ -250,6 +307,10 @@ export function BatchDownloadBar({
     // threshold, ask once before committing.
     if (count > CONFIRM_THRESHOLD) {
       setPendingFormat(format);
+      // The estimate is only read when a confirmation is actually shown:
+      // navigator.storage.estimate() is not free, and quoting free space next
+      // to a three-chart download would be noise.
+      void readStorageEstimate().then(setStorageEstimate);
       return;
     }
     beginBatch(format);
@@ -487,6 +548,12 @@ export function BatchDownloadBar({
         {!isBusy && !isResumable && status !== "success" ? (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             <span>{tray.batchSummary(count, selectedFileCount)}</span>
+            {sizeHint ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="tabular-nums">{sizeHint}</span>
+              </>
+            ) : null}
             <span aria-hidden="true">·</span>
             <span>
               {includeVideo && hasVideoFiles
@@ -517,9 +584,24 @@ export function BatchDownloadBar({
               className="flex flex-wrap items-center justify-between gap-2"
             >
               <div className="min-w-0 flex-1 text-xs text-muted-foreground">
-                <p>{tray.batchConfirm(count, includeVideo)}</p>
+                <p>
+                  {tray.batchConfirm(count, includeVideo)}
+                  {sizeHint ? <span className="ml-1 tabular-nums">{sizeHint}</span> : null}
+                </p>
                 {includeVideo && hasVideoFiles ? (
                   <p className="mt-0.5">{tray.batchVideoLargeHint}</p>
+                ) : null}
+                {storageWarning ? (
+                  <p
+                    className={cn(
+                      "mt-0.5",
+                      headroom.level === "insufficient"
+                        ? "text-destructive"
+                        : "text-amber-800 dark:text-amber-300"
+                    )}
+                  >
+                    {storageWarning}
+                  </p>
                 ) : null}
               </div>
               <div className="flex items-center gap-2">
@@ -555,7 +637,9 @@ export function BatchDownloadBar({
               >
                 <ProgressFill percent={percent} className="bg-primary" />
               </div>
-              <p className="mt-1.5 text-xs text-muted-foreground">{statusText}</p>
+              <p aria-hidden="true" className="mt-1.5 text-xs text-muted-foreground">
+                {statusText}
+              </p>
             </motion.div>
           ) : status === "packing" || status === "paused" || status === "queued" ? (
             <motion.div
@@ -582,12 +666,14 @@ export function BatchDownloadBar({
                   )}
                 />
               </div>
-              <p className="mt-1.5 text-xs text-muted-foreground">{statusText}</p>
+              <p aria-hidden="true" className="mt-1.5 text-xs text-muted-foreground">
+                {statusText}
+              </p>
             </motion.div>
           ) : status === "success" ? (
             <motion.div
               key="success"
-              role="status"
+              aria-hidden="true"
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
@@ -601,18 +687,26 @@ export function BatchDownloadBar({
           ) : status === "error" ? (
             <motion.p
               key="error"
-              role="status"
+              aria-hidden="true"
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.2, ease: EASE_OUT }}
               className="text-xs text-destructive"
-              title={jobs.find((entry) => entry.error)?.error ?? undefined}
             >
               {statusText}
             </motion.p>
           ) : null}
         </AnimatePresence>
+        {/* Always mounted: a live region that appears together with its text is
+            what most screen readers fail to announce, which is exactly how the
+            terminal states used to go unreported. */}
+        <p role="status" className="sr-only">
+          {stateText}
+        </p>
+        {failedJob ? (
+          <DownloadJobNotes job={failedJob} locale={locale} />
+        ) : null}
       </div>
     </motion.div>
   );

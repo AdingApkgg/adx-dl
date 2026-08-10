@@ -16,13 +16,30 @@ import {
   buildLocalePath,
   getDictionary,
   getStaticPageMetadata,
+  locales,
   type Locale,
 } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 import { resolveSiteUrl } from "@/lib/site-url";
 
 const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
-const siteName = "ADX 谱面资源";
+/**
+ * The name in the page's own locale, plus the Chinese name as an alternate on
+ * every locale: it is the form most people search for and the one the archive
+ * has been credited under, so dropping it from the graph would lose the link
+ * between an English page and its Chinese reputation.
+ */
+function siteName(locale: Locale): string {
+  return getDictionary(locale).siteName;
+}
+
+const canonicalSiteName = getDictionary("zh").siteName;
+
+function siteNameAlternates(locale: Locale): string[] {
+  return locales
+    .filter((candidate) => candidate !== locale)
+    .map((candidate) => getDictionary(candidate).siteName);
+}
 const organizationId = `${siteUrl}/#organization`;
 const websiteId = `${siteUrl}/#website`;
 const dataCatalogId = `${siteUrl}/#data-catalog`;
@@ -58,11 +75,12 @@ function toAbsoluteUrl(pathname: string) {
   return `${siteUrl}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
 }
 
-function buildOrganization(): JsonLdValue {
+function buildOrganization(locale: Locale): JsonLdValue {
   return {
     "@type": "Organization",
     "@id": organizationId,
-    name: siteName,
+    name: siteName(locale),
+    alternateName: siteNameAlternates(locale),
     url: siteUrl,
     logo: `${siteUrl}/opengraph-image.png`,
     // Profiles that represent this archive's operator — the source repo, the
@@ -88,7 +106,8 @@ export function buildCatalogDatasetStructuredData(
     "@context": "https://schema.org",
     "@type": "Dataset",
     "@id": datasetId,
-    name: `${siteName} — AstroDX chart catalog`,
+    name: `${siteName(locale)} — AstroDX chart catalog`,
+    alternateName: `${canonicalSiteName} — AstroDX chart catalog`,
     description: getStaticPageMetadata(locale).home.description,
     url: chartsUrl,
     inLanguage: getStructuredDataLanguage(locale),
@@ -127,7 +146,8 @@ function buildChartCatalogStructuredData(
     {
       "@type": "DataCatalog",
       "@id": dataCatalogId,
-      name: siteName,
+      name: siteName(locale),
+      alternateName: siteNameAlternates(locale),
       description: pageMetadata.description,
       url: toAbsoluteUrl(chartsPath),
       inLanguage: language,
@@ -141,8 +161,12 @@ function buildChartCatalogStructuredData(
     {
       "@type": "Dataset",
       "@id": datasetId,
-      name: "ADX 谱面资源 — AstroDX chart catalog",
-      alternateName: ["AstroDX chart catalog", "ADX chart catalog"],
+      name: `${siteName(locale)} — AstroDX chart catalog`,
+      alternateName: [
+        `${canonicalSiteName} — AstroDX chart catalog`,
+        "AstroDX chart catalog",
+        "ADX chart catalog",
+      ],
       description: pageMetadata.description,
       url: toAbsoluteUrl(homePath),
       inLanguage: language,
@@ -200,11 +224,12 @@ export function buildHomeStructuredData(
   return {
     "@context": "https://schema.org",
     "@graph": [
-      buildOrganization(),
+      buildOrganization(locale),
       {
         "@type": "WebSite",
         "@id": websiteId,
-        name: siteName,
+        name: siteName(locale),
+        alternateName: siteNameAlternates(locale),
         description: pageMetadata.description,
         url: toAbsoluteUrl(homePath),
         inLanguage: getStructuredDataLanguage(locale),
@@ -223,13 +248,12 @@ export function buildHomeStructuredData(
   };
 }
 
-export function buildHomeFaqStructuredData(
+// A FAQPage node. Callers must pass the very Q&A pairs the page renders —
+// Google drops a FAQPage whose answers are not visible on the page.
+export function buildFaqStructuredData(
   locale: Locale,
-  totalEntries: number,
-  versionCount: number
+  items: { q: string; a: string }[]
 ): JsonLdValue {
-  const items = getDictionary(locale).home.faq(totalEntries, versionCount);
-
   return {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -241,6 +265,50 @@ export function buildHomeFaqStructuredData(
         "@type": "Answer",
         text: item.a,
       },
+    })),
+  };
+}
+
+export function buildHomeFaqStructuredData(
+  locale: Locale,
+  totalEntries: number,
+  versionCount: number
+): JsonLdValue {
+  return buildFaqStructuredData(
+    locale,
+    getDictionary(locale).home.faq(totalEntries, versionCount)
+  );
+}
+
+// A HowTo node for a walkthrough page (/guide). Each step's `url` anchors at the
+// section it came from, which is what lets an answer engine deep-link the one
+// step it quoted instead of the whole page.
+export function buildHowToStructuredData(
+  locale: Locale,
+  args: {
+    pathname: string;
+    name: string;
+    description: string;
+    steps: { name: string; text: string; anchor?: string }[];
+  }
+): JsonLdValue {
+  const url = toAbsoluteUrl(buildLocalePath(args.pathname, locale));
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "@id": `${url}#howto`,
+    name: args.name,
+    description: args.description,
+    url,
+    inLanguage: getStructuredDataLanguage(locale),
+    publisher: { "@id": organizationId },
+    step: args.steps.map((step, index) => ({
+      "@type": "HowToStep",
+      position: index + 1,
+      name: step.name,
+      text: step.text,
+      ...(step.anchor ? { url: `${url}#${step.anchor}` } : {}),
     })),
   };
 }

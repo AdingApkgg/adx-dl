@@ -38,6 +38,8 @@ type HomeHeroSearchProps = {
   genres?: HeroGenreChip[];
   /** Dark AstroDX homepage treatment; search behavior stays identical. */
   tone?: "default" | "brand";
+  /** Seed text, e.g. the mistyped slug that landed the visitor on the 404 page. */
+  initialQuery?: string;
 };
 
 // Slim build-time search index (id/slug/titles/artists/aliases) fetched lazily
@@ -49,16 +51,10 @@ const SUGGEST_DEBOUNCE_MS = 150;
 
 const MotionLink = motion.create(Link);
 
-// Rotating example queries for the idle placeholder — one per field the fuzzy
-// search matches on (title, 别名/alias, artist, genre). The search index only
-// loads on first focus, so these are hardcoded rather than sourced from data.
-const PLACEHOLDER_EXAMPLES = [
-  "PANDORA PARADOXXX",
-  "潘多拉",
-  "sasakure.UK",
-  "niconico＆VOCALOID",
-  "系ぎて",
-];
+// Rotating example queries live in the dictionary: the alias example only
+// means anything to a reader of that language, so 「潘多拉」 was advertising a
+// Chinese query to English visitors. The search index only loads on first
+// focus, so the examples stay copy rather than data.
 const PLACEHOLDER_CYCLE_MS = 3200;
 
 // Hydration + hover-capability detection without setState-in-effect: both are
@@ -103,12 +99,13 @@ export function HomeHeroSearch({
   quickLabel,
   genres = [],
   tone = "default",
+  initialQuery = "",
 }: HomeHeroSearchProps) {
   const router = useRouter();
   const locale = localeFromHref(searchHref);
   const dictionary = getDictionary(locale);
   const reduced = useReducedMotion();
-  const [query, setQuery] = React.useState("");
+  const [query, setQuery] = React.useState(initialQuery);
   // The committed suggestion query: debounced, never set mid-IME-composition.
   const [suggestQuery, setSuggestQuery] = React.useState("");
   const [open, setOpen] = React.useState(false);
@@ -143,10 +140,10 @@ export function HomeHeroSearch({
 
   // Lead with the real placeholder so the hydration handoff to the overlay is
   // invisible, then rotate through the example queries.
-  const placeholderPhrases = React.useMemo(
-    () => [placeholder, ...PLACEHOLDER_EXAMPLES],
-    [placeholder]
-  );
+  // Not memoized: the only consumers read `.length` and index into it, so a
+  // fresh array per render costs nothing — and React Compiler refuses to
+  // preserve a useMemo whose dependency is a shared dictionary array.
+  const placeholderPhrases = [placeholder, ...dictionary.home.searchExamples];
   const cyclingPlaceholder = mounted && !reduced && !focused && query === "";
 
   React.useEffect(() => {

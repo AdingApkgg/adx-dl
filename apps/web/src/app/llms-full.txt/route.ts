@@ -66,6 +66,8 @@ export async function GET() {
 
 Total: ${catalog.total_entries} charts, grouped by maimai DX version branch (newest first). Last updated ${catalog.generated_at}. Each chart page carries full metadata, cover art, an in-browser preview, and downloads.
 
+For "what was added recently", use ${siteUrl}/changelog (charts grouped by import date) or ${siteUrl}/feed.xml. For "how do I install AstroDX / import a chart / fix a failed download", use ${siteUrl}/guide.
+
 ${sections}
 
 ## Source and reuse

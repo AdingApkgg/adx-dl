@@ -52,7 +52,49 @@ const runtimeCaching: RuntimeCaching[] = [
       ],
     }),
   },
-  // 2. Cover art — the archive's heaviest repeat traffic. Served either locally
+  // 2. RSC flight payloads. Every in-site navigation is a client-side one, so
+  //    the page a user actually reads arrives as `.../__next.*.txt?_rsc=...` —
+  //    a plain `fetch` whose `destination` is "" and whose mode is "cors", not
+  //    "navigate". None of the other rules can see it, which used to mean the
+  //    offline page's promise that "cached pages are still available" was false
+  //    for everything except full hard loads. SWR keeps navigation instant on a
+  //    repeat visit and still refreshes in the background.
+  {
+    matcher: ({ url, sameOrigin }) =>
+      sameOrigin && (url.pathname.includes("__next.") || url.searchParams.has("_rsc")),
+    handler: new StaleWhileRevalidate({
+      cacheName: "rsc-payloads",
+      plugins: [
+        new CacheableResponsePlugin({ statuses: [200] }),
+        new ExpirationPlugin({
+          maxEntries: 400,
+          maxAgeSeconds: ONE_DAY * 30,
+          maxAgeFrom: "last-used",
+          purgeOnQuotaError: true,
+        }),
+      ],
+    }),
+  },
+  // 3. Build-time JSON manifests (`/charts/search-index.json`, `specs.json`,
+  //    `slugs.json`, `/music/playlists.json`). Same blind spot as the RSC
+  //    payloads: no `destination`, not under `/_next/static/`, and served with
+  //    `max-age=600`, so they were re-downloaded every ten minutes.
+  {
+    matcher: ({ url, sameOrigin }) => sameOrigin && url.pathname.endsWith(".json"),
+    handler: new StaleWhileRevalidate({
+      cacheName: "catalog-manifests",
+      plugins: [
+        new CacheableResponsePlugin({ statuses: [200] }),
+        new ExpirationPlugin({
+          maxEntries: 32,
+          maxAgeSeconds: ONE_DAY * 7,
+          maxAgeFrom: "last-used",
+          purgeOnQuotaError: true,
+        }),
+      ],
+    }),
+  },
+  // 4. Cover art — the archive's heaviest repeat traffic. Served either locally
   //    (`/covers/...`) or from the remote mirror. Cache aggressively but bound it
   //    so a heavy browsing session can't blow past the storage quota.
   //
@@ -89,7 +131,7 @@ const runtimeCaching: RuntimeCaching[] = [
       ],
     }),
   },
-  // 3. Other same-origin images (favicons, brand icons, OG image, inline SVGs).
+  // 5. Other same-origin images (favicons, brand icons, OG image, inline SVGs).
   {
     matcher: ({ request, sameOrigin }) => sameOrigin && request.destination === "image",
     handler: new StaleWhileRevalidate({
@@ -100,7 +142,7 @@ const runtimeCaching: RuntimeCaching[] = [
       ],
     }),
   },
-  // 4. Fonts. @fontsource ships them under /_next/static/media (rule 1 already
+  // 6. Fonts. @fontsource ships them under /_next/static/media (rule 1 already
   //    covers those); this catches any other font request.
   {
     matcher: ({ request }) => request.destination === "font",
@@ -112,21 +154,29 @@ const runtimeCaching: RuntimeCaching[] = [
       ],
     }),
   },
-  // 5. Live third-party data (pageview counter, comments) — never cache.
+  // 7. Live third-party data (pageview counter, comments) — never cache.
   {
     matcher: ({ url }) => LIVE_HOSTS.includes(url.hostname),
     handler: new NetworkOnly(),
   },
-  // 6. HTML navigations — fresh content when online, fall back to cache, then to
-  //    the precached offline page (configured via `fallbacks` below).
+  // 8. HTML navigations — fresh content when online, fall back to cache, then to
+  //    the precached offline page (configured via `fallbacks` below). The entry
+  //    budget is sized for a real browsing session (a visitor easily opens more
+  //    than 64 charts), and eviction is by last use so the pages someone keeps
+  //    coming back to are the ones that survive.
   {
     matcher: ({ request }) => request.mode === "navigate",
     handler: new NetworkFirst({
       cacheName: "pages",
-      networkTimeoutSeconds: 5,
+      networkTimeoutSeconds: 3,
       plugins: [
         new CacheableResponsePlugin({ statuses: [0, 200] }),
-        new ExpirationPlugin({ maxEntries: 64, maxAgeSeconds: ONE_DAY * 7 }),
+        new ExpirationPlugin({
+          maxEntries: 200,
+          maxAgeSeconds: ONE_DAY * 30,
+          maxAgeFrom: "last-used",
+          purgeOnQuotaError: true,
+        }),
       ],
     }),
   },
@@ -153,7 +203,13 @@ self.addEventListener("activate", (event) => {
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
-  skipWaiting: true,
+  // Deliberately NOT skipWaiting. Activating immediately sweeps the previous
+  // build's precached `_next/static` chunks out from under every open tab, so a
+  // long-lived tab that lazy-loads anything afterwards throws ChunkLoadError.
+  // The new worker now waits; ServiceWorkerRegistrar surfaces a "reload to
+  // update" prompt and posts SKIP_WAITING when the user accepts (Serwist
+  // installs that message handler for us whenever skipWaiting is false).
+  skipWaiting: false,
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching,

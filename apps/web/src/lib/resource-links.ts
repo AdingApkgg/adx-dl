@@ -15,11 +15,31 @@ export const NET_DISK_URL = "https://drive.saop.cc/";
 // GitHub repo linked as "Get AstroDX").
 export const ASTRODX_SITE_URL = "https://astrodx.com/";
 
+/**
+ * Where AstroDX itself is distributed, per the wiki's "Get the Game" section.
+ *
+ * iOS moved from a TestFlight beta to a public App Store listing (the wiki's
+ * `content/index.mdx` commit "feat: Change TestFlight link to App Store",
+ * 2026-05-16). The per-platform install pages on that same wiki still describe
+ * the TestFlight flow and were last touched in April — the homepage is the
+ * current one. Anything on this site that talks about installing the app must
+ * follow the homepage, not those pages.
+ */
+export const ASTRODX_APP_STORE_URL = "https://apps.apple.com/app/astrodx/id6754203760";
+export const ASTRODX_RELEASES_URL = "https://github.com/2394425147/astrodx/releases";
+/** Bug reports about the APP (ours live in SITE_ISSUES_URL). */
+export const ASTRODX_APP_ISSUES_URL = "https://github.com/2394425147/astrodx/issues/new/choose";
+
 // The official AstroDX wiki. Its language segments differ from our locale codes
 // (zh → "cn", ja → "jp"); only en matches.
 export const WIKI_BASE_URL = "https://wiki.astrodx.com";
 
 const WIKI_LANG_SEGMENT: Record<Locale, string> = { zh: "cn", en: "en", ja: "jp" };
+
+/** The wiki's per-platform chart-install walkthrough, in the reader's language. */
+export function wikiInstallUrl(locale: Locale, platform: "android" | "ios"): string {
+  return `${WIKI_BASE_URL}/${WIKI_LANG_SEGMENT[locale]}/install/${platform}`;
+}
 
 // Each locale lands on the most relevant getting-started section exposed by
 // that Wiki translation.

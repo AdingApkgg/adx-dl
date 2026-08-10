@@ -1,4 +1,4 @@
-import type { AdxArchiveInput } from "@/lib/adx-archive";
+import type { AdxArchiveInput } from "@/lib/adx-archive-shared";
 
 /** Per-file download state, surfaced so the UI can render a progress bar per file. */
 export type AdxFileProgress = {
@@ -7,7 +7,8 @@ export type AdxFileProgress = {
   received: number;
   /** Total bytes when known, or null until the response finishes. */
   total: number | null;
-  status: "pending" | "downloading" | "done";
+  /** `skipped` = an optional asset the mirror does not have; not in the archive. */
+  status: "pending" | "downloading" | "done" | "skipped";
 };
 
 /**
@@ -20,6 +21,20 @@ export type DownloadFileInput = {
   url: string;
   /** null = fetch the whole file; Blob (including an empty Blob) = already complete. */
   completedBlob: Blob | null;
+  /**
+   * Decoration (cover art, BGA movie) the archive is still usable without. A
+   * deterministic 4xx on one of these drops the file from the archive instead
+   * of failing the job — one missing pv.mp4 used to waste a 40-chart batch.
+   */
+  optional?: boolean;
+};
+
+/** An optional file the run gave up on; reported so the UI can list it. */
+export type SkippedDownloadFile = {
+  name: string;
+  url: string;
+  /** HTTP status that made the file unrecoverable, when the server gave one. */
+  status: number | null;
 };
 
 export type CompletedDownloadFile = {
@@ -36,8 +51,14 @@ export type EngineCallbacks = {
     completed: number,
     total: number
   ) => void | Promise<void>;
-  /** Throttled byte totals across all files (for an aggregate %). */
-  onBytes?: (receivedBytes: number, totalBytes: number) => void;
+  /**
+   * Throttled byte totals across all files (for an aggregate %). `estimated`
+   * marks a total that extrapolated the still-unmeasured files, so the UI can
+   * render it with a "~".
+   */
+  onBytes?: (receivedBytes: number, totalBytes: number, estimated: boolean) => void;
+  /** Fires once per optional file dropped from the archive. */
+  onFileSkipped?: (file: SkippedDownloadFile) => void;
   /** Throttled per-file snapshot (drives the single-download per-file bars). */
   onFileProgress?: (progress: AdxFileProgress[]) => void;
   signal?: AbortSignal;
@@ -67,6 +88,20 @@ class RetryableDownloadError extends Error {
     super(message);
     this.name = "RetryableDownloadError";
     this.cause = cause;
+  }
+}
+
+/**
+ * A response the server will keep giving (404/403/410…). Retrying is pointless,
+ * so the only choice is between skipping the file and failing the chart — which
+ * `DownloadFileInput.optional` decides.
+ */
+class MissingDownloadFileError extends Error {
+  readonly status: number;
+  constructor(url: string, status: number) {
+    super(`File download failed: ${url} (HTTP ${status})`);
+    this.name = "MissingDownloadFileError";
+    this.status = status;
   }
 }
 
@@ -191,6 +226,9 @@ type LiveFile = {
   pending: Uint8Array[];
   pendingBytes: number;
   complete: boolean;
+  optional: boolean;
+  /** Set once an optional file is given up on; it leaves the archive entirely. */
+  skipped: boolean;
   status: AdxFileProgress["status"];
   /**
    * Resume validator from the first response. Bytes received in this run are
@@ -236,6 +274,11 @@ function resetLiveFile(file: LiveFile): void {
  *
  * A file only ever completes after its entire body has been read; a 206 is
  * accepted solely as the exact continuation this run asked for.
+ *
+ * A third outcome exists for files marked `optional`: a deterministic 4xx drops
+ * them from the archive (reported via `onFileSkipped`) rather than failing the
+ * run, because one mirror missing a BGA movie should not waste the other 159
+ * files of a batch.
  */
 export async function runMultiFileDownload(
   inputs: DownloadFileInput[],
@@ -269,6 +312,8 @@ export async function runMultiFileDownload(
     pending: [],
     pendingBytes: 0,
     complete: input.completedBlob !== null,
+    optional: input.optional === true,
+    skipped: false,
     status: input.completedBlob === null ? "pending" : "done",
     validator: null,
   }));
@@ -288,18 +333,35 @@ export async function runMultiFileDownload(
       }))
     );
     if (callbacks.onBytes) {
+      // Waiting for every file to declare a Content-Length pinned the
+      // denominator at 0 for the whole run: with six-way concurrency over ~160
+      // files most sizes are still unknown at any instant, so the bar fell back
+      // to a file count that does not move while a large pv.mp4 streams.
+      // Extrapolating the unknowns from the mean measured size keeps the
+      // percentage roughly honest; `estimated` tells the UI to say "~".
       let received = 0;
-      let totalBytes = 0;
-      let totalKnown = true;
+      let knownBytes = 0;
+      let knownFiles = 0;
+      let unknownFiles = 0;
       for (const file of files) {
+        if (file.skipped) {
+          continue;
+        }
         received += liveReceived(file);
         if (file.total === null) {
-          totalKnown = false;
+          unknownFiles += 1;
         } else {
-          totalBytes += file.total;
+          knownBytes += file.total;
+          knownFiles += 1;
         }
       }
-      callbacks.onBytes(received, totalKnown ? totalBytes : 0);
+      const estimated = unknownFiles > 0 && knownFiles > 0;
+      const totalBytes = estimated
+        ? Math.round(knownBytes + (knownBytes / knownFiles) * unknownFiles)
+        : unknownFiles > 0
+          ? 0
+          : knownBytes;
+      callbacks.onBytes(received, totalBytes, estimated);
     }
   };
   const scheduleEmit = (): void => {
@@ -422,7 +484,10 @@ export async function runMultiFileDownload(
         `File download failed: ${file.url} (HTTP ${response.status})`
       );
     } else {
-      throw new Error(`File download failed: ${file.url}`);
+      // Deterministic (the mirror simply does not have this byte range/file).
+      // The status travels in the message so the store can tell a permanent
+      // 404 apart from a flaky connection when it words the failure.
+      throw new MissingDownloadFileError(file.url, response.status);
     }
 
     try {
@@ -482,7 +547,18 @@ export async function runMultiFileDownload(
     file.status = "done";
   }
 
-  async function downloadOne(file: LiveFile): Promise<CompletedDownloadFile> {
+  /** Drops an optional file from the archive and reports it exactly once. */
+  function skipFile(file: LiveFile, status: number | null): void {
+    file.skipped = true;
+    file.complete = false;
+    file.status = "skipped";
+    resetLiveFile(file);
+    scheduleEmit();
+    callbacks.onFileSkipped?.({ name: file.name, url: file.url, status });
+  }
+
+  /** Resolves to null when an optional file was skipped rather than fetched. */
+  async function downloadOne(file: LiveFile): Promise<CompletedDownloadFile | null> {
     if (!file.complete) {
       file.status = "downloading";
       scheduleEmit();
@@ -502,6 +578,10 @@ export async function runMultiFileDownload(
             throw error;
           }
           if (!(error instanceof RetryableDownloadError)) {
+            if (error instanceof MissingDownloadFileError && file.optional) {
+              skipFile(file, error.status);
+              return null;
+            }
             throw error;
           }
           if (isOffline()) {
@@ -544,7 +624,11 @@ export async function runMultiFileDownload(
         throw abortReason(runSignal);
       }
       completed += 1;
-      await callbacks.onFileComplete?.(completedFile, completed, total);
+      // A skipped file still advances the counter (the job really is that much
+      // closer to done) but has no bytes to checkpoint.
+      if (completedFile !== null) {
+        await callbacks.onFileComplete?.(completedFile, completed, total);
+      }
       if (runSignal.aborted) {
         throw abortReason(runSignal);
       }
@@ -586,5 +670,7 @@ export async function runMultiFileDownload(
     }
   }
 
-  return files.map((file): AdxArchiveInput => ({ name: file.name, blob: file.blob }));
+  return files
+    .filter((file) => !file.skipped)
+    .map((file): AdxArchiveInput => ({ name: file.name, blob: file.blob }));
 }

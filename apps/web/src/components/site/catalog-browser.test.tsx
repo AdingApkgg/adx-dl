@@ -184,7 +184,22 @@ describe("CatalogBrowser", () => {
     expect(html).toContain("All Categories");
     // Dimension chip rows live inside the collapsed-by-default advanced panel.
     expect(html).toContain("Advanced filters");
-    expect(html).toContain("Search title, alias, artist, version...");
+    expect(html).toContain("Search title, romaji, alias, artist, charter, version...");
+    // The search box is a named landmark, not a bare placeholder.
+    expect(html).toContain('role="search"');
+    expect(html).toContain('aria-label="Search charts"');
+  });
+
+  test("renders the sort picker with its current option spelled out in the static HTML", () => {
+    const html = renderToStaticMarkup(
+      <CatalogBrowser entries={[buildEntry({})]} locale="en" detailPathPrefix="/charts" />
+    );
+
+    // Radix portals the selected item's text out of the (closed) dropdown, so
+    // the trigger has to carry the label itself or it renders blank before the
+    // first open.
+    expect(html).toContain("Default order");
+    expect(html).toContain("Sort");
   });
 
   test("renders slim card entries without the download payload (payload-slimming contract)", () => {

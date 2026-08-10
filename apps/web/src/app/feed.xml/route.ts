@@ -4,6 +4,7 @@ import {
   formatEntrySubcategory,
   formatEntryTitle,
   genreLabel,
+  sortByImportedDesc,
   type CatalogEntry,
 } from "@/lib/catalog-shared";
 import { entrySlug } from "@/lib/route-slug";
@@ -46,10 +47,9 @@ ${categories}
 
 export async function GET() {
   const catalog = await readCatalog();
-  // ISO-8601 strings sort lexicographically as chronologically; copy before sort.
-  const recent = [...catalog.entries]
-    .sort((a, b) => (b.imported_at ?? "").localeCompare(a.imported_at ?? ""))
-    .slice(0, FEED_SIZE);
+  // Shared with the homepage's "latest charts" rail so both agree on what
+  // "newest" means; sortByImportedDesc copies before sorting.
+  const recent = sortByImportedDesc(catalog.entries).slice(0, FEED_SIZE);
   const updated = recent[0]?.imported_at ?? catalog.generated_at;
 
   const body = `<?xml version="1.0" encoding="utf-8"?>

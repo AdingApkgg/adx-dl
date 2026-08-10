@@ -112,7 +112,13 @@ function expectLocalizedAlternates(
 ) {
   const basePath = canonical.replace(/^\/(en|ja)(?=\/|$)/, "") || "/";
   const absoluteCanonical = `https://adxdls.saop.cc${canonical === "/" ? "" : canonical}`;
-  const fullTitle = `${expected.title} | ADX 谱面资源`;
+  // The title suffix and og:site_name now follow the page's own locale.
+  const expectedSiteName = canonical.startsWith("/en")
+    ? "ADX Chart Archive"
+    : canonical.startsWith("/ja")
+      ? "ADX 譜面アーカイブ"
+      : "ADX 谱面资源";
+  const fullTitle = `${expected.title} | ${expectedSiteName}`;
   const expectedImage = image ?? {
     url: "https://adxdls.saop.cc/opengraph-image.png",
     alt: fullTitle,
@@ -135,7 +141,7 @@ function expectLocalizedAlternates(
     title: fullTitle,
     description: expected.description,
     url: absoluteCanonical,
-    siteName: "ADX 谱面资源",
+    siteName: expectedSiteName,
   });
   expect(metadata.openGraph?.images).toEqual([expectedImage]);
   expect(metadata.twitter).toMatchObject({
@@ -191,7 +197,7 @@ describe("route metadata", () => {
     });
 
     expect(enHomeMetadata?.title).toBe(
-      "AstroDX Chart Archive, Browser and Download Portal | ADX 谱面资源"
+      "AstroDX Chart Archive, Browser and Download Portal | ADX Chart Archive"
     );
     expect(enHomeMetadata?.description).toBe(
       "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download."
@@ -203,16 +209,16 @@ describe("route metadata", () => {
         title: "AstroDX Chart Archive, Browser and Download Portal",
         description:
           "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download.",
-        keywords: ["AstroDX", "ADX 谱面资源", "chart archive", "downloads", "catalog index"],
+        keywords: ["AstroDX", "ADX Chart Archive", "chart archive", "downloads", "catalog index"],
       },
       {
         url: "https://adxdls.saop.cc/opengraph-home-v2.png",
-        alt: "AstroDX Chart Archive, Browser and Download Portal | ADX 谱面资源",
+        alt: "AstroDX Chart Archive, Browser and Download Portal | ADX Chart Archive",
       }
     );
 
     expect(enChartsMetadata?.title).toBe(
-      "AstroDX Chart Browser and Download Catalog | ADX 谱面资源"
+      "AstroDX Chart Browser and Download Catalog | ADX Chart Archive"
     );
     expect(enChartsMetadata?.description).toBe(
       "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download."
@@ -220,7 +226,7 @@ describe("route metadata", () => {
     expectLocalizedAlternates(enChartsMetadata ?? {}, "/en/charts", {
       title: "AstroDX Chart Browser and Download Catalog",
       description: "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download.",
-      keywords: ["AstroDX", "ADX 谱面资源", "browse charts", "category filter", "display language"],
+      keywords: ["AstroDX", "ADX Chart Archive", "browse charts", "category filter", "display language"],
     });
   });
 
@@ -255,7 +261,7 @@ describe("route metadata", () => {
     );
 
     expect(enMetadata?.title).toBe(
-      "Song 3 AstroDX Chart Preview and Download | ADX 谱面资源"
+      "Song 3 AstroDX Chart Preview and Download | ADX Chart Archive"
     );
     expect(enMetadata?.description).toBe(enDescription);
     expectLocalizedAlternates(
@@ -264,7 +270,7 @@ describe("route metadata", () => {
       {
         title: "Song 3 AstroDX Chart Preview and Download",
         description: enDescription,
-        keywords: ["AstroDX", "ADX 谱面资源", "Song 3", "Artist 3", "舞萌DX 2025", "Anime", "maimai"],
+        keywords: ["AstroDX", "ADX Chart Archive", "Song 3", "Artist 3", "舞萌DX 2025", "Anime", "maimai"],
       },
       { url: song3Cover, alt: "Song 3" }
     );
@@ -301,7 +307,7 @@ describe("route metadata", () => {
     expect(zhMetadata?.description).toBe(zhDescription);
     expect(zhDescription).toContain("maimai DX PRiSM / DX");
     expect(enMetadata?.title).toBe(
-      "Remote Song 5 AstroDX Chart Preview and Download | ADX 谱面资源"
+      "Remote Song 5 AstroDX Chart Preview and Download | ADX Chart Archive"
     );
     expect(enMetadata?.description).toBe(enDescription);
     expect(zhMetadata?.openGraph).toMatchObject({
@@ -311,7 +317,7 @@ describe("route metadata", () => {
       siteName: "ADX 谱面资源",
     });
     expect(enMetadata?.twitter).toMatchObject({
-      title: "Remote Song 5 AstroDX Chart Preview and Download | ADX 谱面资源",
+      title: "Remote Song 5 AstroDX Chart Preview and Download | ADX Chart Archive",
       description: enDescription,
     });
   });

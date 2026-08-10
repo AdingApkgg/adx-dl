@@ -286,4 +286,94 @@ describe("page views locale-driven content", () => {
     expect(html).not.toContain(detail.previewDescription);
     expect(html).toContain(detail.chartPreview);
   });
+  test("detail view quotes the measured numbers the catalog now carries", () => {
+    const entry = buildEntry({
+      bpm: 165,
+      bpm_min: 90,
+      bpm_max: 240,
+      duration_ms: 201_000,
+      file_bytes: { maidata: 12_000, audio: 4_000_000, background: 250_000, pv: 38_000_000 },
+      difficulties: [
+        {
+          slot: 4,
+          level: "13.7",
+          designer: "谱师甲",
+          notes: { tap: 700, hold: 40, slide: 60, touch: 12, touch_hold: 2, break: 14, total: 828 },
+          duration_ms: 198_000,
+        },
+      ],
+    });
+
+    const html = renderToStaticMarkup(<ChartDetailPageView entry={entry} locale="zh" />);
+
+    // Variable tempo reads as a span, not as a single number that looks wrong.
+    expect(html).toContain("90–240（变速）");
+    expect(html).toContain("3:21");
+    expect(html).toContain("物量");
+    expect(html).toContain(">828<");
+    expect(html).toContain("Break 14");
+    // Display level leads, chart constant follows.
+    expect(html).toContain(">13+<");
+    expect(html).toContain(">13.7<");
+    // Size is quoted before the download, with the BGA share broken out.
+    expect(html).toContain("含 BGA");
+  });
+
+  test("detail view renders nothing rather than zeroes when the numbers are absent", () => {
+    const html = renderToStaticMarkup(<ChartDetailPageView entry={buildEntry()} locale="zh" />);
+    const detail = getDictionary("zh").detail;
+
+    expect(html).not.toContain("undefined");
+    expect(html).not.toContain("（变速）");
+    expect(html).not.toContain(detail.durationLabel);
+    expect(html).not.toContain(detail.statsTitle);
+  });
+
+  test("detail view links the artist and the charter into the catalog", () => {
+    const html = renderToStaticMarkup(
+      <ChartDetailPageView
+        entry={buildEntry({
+          artist: "歌手 1",
+          difficulties: [{ slot: 4, level: "13.7", designer: "谱师甲" }],
+        })}
+        locale="zh"
+      />
+    );
+
+    expect(html).toContain(`href="/charts?q=${encodeURIComponent("歌手 1")}"`);
+    expect(html).toContain(`href="/charts?designer=${encodeURIComponent("谱师甲")}"`);
+  });
+
+  test("detail view leaves an unattributed charter unlinked", () => {
+    // "-" is the source's placeholder, and the designer facet drops it — a link
+    // would filter to nothing.
+    const html = renderToStaticMarkup(
+      <ChartDetailPageView
+        entry={buildEntry({ difficulties: [{ slot: 4, level: "13", designer: "-" }] })}
+        locale="zh"
+      />
+    );
+
+    expect(html).not.toContain("designer=-");
+  });
+
+  test("detail source card links the host and folds the licence away", () => {
+    const html = renderToStaticMarkup(<ChartDetailPageView entry={buildEntry()} locale="zh" />);
+    const detail = getDictionary("zh").detail;
+
+    expect(html).toContain('href="https://source.example.com/song-1"');
+    expect(html).toContain(">source.example.com<");
+    expect(html).toContain("<details");
+    expect(html).toContain(detail.licenseLabel);
+  });
+
+  test("detail view labels the preview action and explains it", () => {
+    const html = renderToStaticMarkup(<ChartDetailPageView entry={buildEntry()} locale="zh" />);
+    const detail = getDictionary("zh").detail;
+
+    // The preview used to be an unlabelled 40px Maximize2 icon behind a tooltip
+    // that never fires on touch.
+    expect(html).toContain(detail.chartPreview);
+    expect(html).toContain(detail.chartPreviewDescription);
+  });
 });

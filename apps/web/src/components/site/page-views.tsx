@@ -13,7 +13,10 @@ import { AdxDownloadButton } from "@/components/site/adx-download-button";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
 import { ChartCard } from "@/components/site/chart-card";
-import { ChartDetailActions } from "@/components/site/chart-detail-actions";
+import {
+  ChartDetailActions,
+  PreviewDifficultyTrigger,
+} from "@/components/site/chart-detail-actions";
 import {
   CompatibleImage,
   compatibleSourcesFromPng,
@@ -29,6 +32,7 @@ import { EntryAssetBadges } from "@/components/site/entry-asset-badges";
 import { EntryCover } from "@/components/site/entry-cover";
 import { GenreBadge } from "@/components/site/genre-badge";
 import { HeroStatNumber } from "@/components/site/hero-aurora";
+import { HomeFaq } from "@/components/site/home-faq";
 import { HomeHeroSearch } from "@/components/site/home-hero-search";
 import styles from "@/components/site/home-page.module.css";
 import { HomeSpotlightCarousel } from "@/components/site/home-spotlight-carousel";
@@ -50,9 +54,11 @@ import {
   bpmBucketId,
   BPM_TONE,
   buildChartDescription,
+  chartBpmDisplay,
   DIFFICULTY_DOT_CLASS,
   difficultySlotLabel,
   difficultyTone,
+  formatChartDuration,
   formatEntryArtist,
   formatEntrySubcategory,
   formatEntryTitle,
@@ -60,17 +66,23 @@ import {
   genreFilterQuery,
   getChartDownloadSpec,
   localChartAssetUrl,
+  isRecentImport,
+  peakNoteDifficulty,
   resolveGenreId,
   resolveVersionIndex,
-  sortByReleaseDesc,
+  sortByImportedDesc,
+  sumChartDownloadBytes,
   UTAGE_CABINET,
   UTAGE_GENRE_ID,
+  type CatalogNoteCounts,
 } from "@/lib/catalog-shared";
+import { formatBytes } from "@/components/site/downloads/format-bytes";
 import { seedFromString, selectFeatured } from "@/lib/featured-selection";
 import { buildVersionFilterHref } from "@/lib/catalog-links";
 import { astroDxDownloadUrl, DEMO_VIDEO_URL } from "@/lib/resource-links";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
+import { japaneseTextLang } from "@/lib/text-lang";
 import { cn } from "@/lib/utils";
 import { MAIMAI_VERSIONS } from "@/lib/version-image";
 import {
@@ -129,7 +141,10 @@ function HomeHeroTitle({ title, noBreak }: { title: string; noBreak?: string }) 
 export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
   const dictionary = getDictionary(locale);
   const home = dictionary.home;
-  const latestEntries = sortByReleaseDesc(catalog.entries).slice(0, 6);
+  // "Latest" means what this archive added last, not which maimai era a song
+  // shipped in — sortByReleaseDesc answers the second question and left the
+  // rail static between imports of older-version charts.
+  const latestEntries = sortByImportedDesc(catalog.entries).slice(0, 6);
   const versionCount = new Set(Object.values(catalog.categories).flat()).size;
   const artistCount = new Set(
     catalog.entries.map((entry) => entry.artist.trim()).filter(Boolean)
@@ -138,6 +153,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
   const faqItems = home.faq(catalog.total_entries, versionCount);
   const searchHref = buildLocalePath("/charts", locale);
   const versionsHref = buildLocalePath("/versions", locale);
+  const changelogHref = buildLocalePath("/changelog", locale);
 
   // "Browse by version" teaser: newest first, only versions that have charts.
   const versionCharts = new Map<number, number>();
@@ -283,7 +299,9 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
                 label={home.randomCta}
                 className={cn(styles.heroAction, styles.randomButton)}
               />
-              <a className={styles.heroAction} href="#faq">
+              {/* Points at the question itself, not at the section: `#faq`
+                  scrolled to a heading with five collapsed rows under it. */}
+              <a className={styles.heroAction} href={`#${home.faqEntryId}`}>
                 {home.whatIsAstroDX}
                 <ChevronRightIcon className="size-3.5" aria-hidden="true" />
               </a>
@@ -409,8 +427,10 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
               <p className={styles.sectionDescription}>{home.latestDescription}</p>
             </div>
           </div>
+          {/* The rail shows six charts out of one import batch; /changelog is
+              where the rest of that batch — and every earlier one — lives. */}
           <Button variant="ghost" size="sm" asChild>
-            <Link href={searchHref}>
+            <Link href={changelogHref}>
               {home.viewMore}
               <ArrowRightIcon data-icon="inline-end" aria-hidden="true" />
             </Link>
@@ -427,6 +447,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
                 entry={entry}
                 locale={locale}
                 coverFit="contain"
+                isNew={isRecentImport(entry.imported_at, catalog.generated_at)}
                 sizes="(max-width: 760px) 50vw, (max-width: 1100px) 33vw, 220px"
               />
             </RevealItem>
@@ -484,17 +505,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
             </div>
           </div>
         </Reveal>
-        <div className={styles.faqList}>
-          {faqItems.map((item) => (
-            <details key={item.q} className={styles.faqItem}>
-              <summary className={styles.faqSummary}>
-                <span>{item.q}</span>
-                <ChevronRightIcon className="size-4" aria-hidden="true" />
-              </summary>
-              <p className={styles.faqAnswer}>{item.a}</p>
-            </details>
-          ))}
-        </div>
+        <HomeFaq items={faqItems} />
       </section>
     </main>
   );
@@ -592,9 +603,24 @@ export function ChartDetailPageView({
   // BPM links to its bucket, the same granularity the browse filter offers.
   const bpmBucket = bpmBucketId(entry.bpm);
   const bpmHref = bpmBucket !== null ? `${chartsHref}?bpm=${bpmBucket}` : undefined;
+  const bpmDisplay = chartBpmDisplay(entry);
+  const durationText = formatChartDuration(entry.duration_ms);
+
+  // The artist was dead text next to three linked filter chips. `?q=` is the
+  // only param that can carry a free-form name (there is no artist facet), and
+  // the search index weights the artist field, so it lands on that artist's
+  // charts. The charter row uses the real `?designer=` facet added with it.
+  const artistName = formatEntryArtist(entry, locale).trim();
+  const artistHref = artistName
+    ? `${chartsHref}?q=${encodeURIComponent(artistName)}`
+    : undefined;
 
   // Single downloads use the same global chart spec as every batch entry.
   const downloadSpec = getChartDownloadSpec(entry);
+  const downloadBytes = sumChartDownloadBytes([downloadSpec]);
+  const hasChartPreview = Boolean(entry.files.maidata);
+  const peakDifficulty = peakNoteDifficulty(entry);
+  const sourceHost = hostnameOf(entry.source_url);
 
   return (
     <main
@@ -654,15 +680,45 @@ export function ChartDetailPageView({
               <GenreBadge entry={entry} locale={locale} />
             </div>
             <div className="flex flex-col gap-2">
-              <h1 className="text-3xl font-bold md:text-5xl">{formatEntryTitle(entry, locale)}</h1>
-              <p className="text-lg text-muted-foreground">{formatEntryArtist(entry, locale)}</p>
+              <h1
+                lang={japaneseTextLang(title)}
+                className="text-3xl font-bold md:text-5xl"
+              >
+                {title}
+              </h1>
+              <p lang={japaneseTextLang(artistName)} className="text-lg text-muted-foreground">
+                {artistHref ? (
+                  <Link
+                    href={artistHref}
+                    className="underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-current"
+                  >
+                    {artistName}
+                  </Link>
+                ) : (
+                  artistName
+                )}
+              </p>
               <ChartPageViews label={dictionary.pageViews.pageViews} />
             </div>
             {entry.difficulties.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
-                {entry.difficulties.map((difficulty) => (
-                  <DifficultyPill key={`${entry.id}-${difficulty.slot}`} difficulty={difficulty} />
-                ))}
+                {entry.difficulties.map((difficulty) =>
+                  hasChartPreview ? (
+                    <PreviewDifficultyTrigger
+                      key={`${entry.id}-${difficulty.slot}`}
+                      slot={difficulty.slot}
+                      label={detail.chartPreviewAt(difficultySlotLabel(difficulty))}
+                    >
+                      <DifficultyPill difficulty={difficulty} showConstant />
+                    </PreviewDifficultyTrigger>
+                  ) : (
+                    <DifficultyPill
+                      key={`${entry.id}-${difficulty.slot}`}
+                      difficulty={difficulty}
+                      showConstant
+                    />
+                  )
+                )}
               </div>
             ) : null}
             <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
@@ -732,20 +788,27 @@ export function ChartDetailPageView({
                   detail.unknownValue
                 )}
               </MetadataItem>
+              {/* The bucket link still keys off the nominal BPM; the label may
+                  widen to the measured span on a variable-tempo chart. */}
               <MetadataItem label={detail.bpmLabel} href={bpmHref}>
-                {entry.bpm && bpmBucket ? (
+                {bpmDisplay && bpmBucket ? (
                   <span
                     className={cn(
                       "inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium",
                       BPM_TONE[bpmBucket]
                     )}
                   >
-                    {entry.bpm}
+                    {bpmDisplay.variable
+                      ? detail.bpmVariableLabel(bpmDisplay.text)
+                      : bpmDisplay.text}
                   </span>
                 ) : (
                   detail.unknownValue
                 )}
               </MetadataItem>
+              {durationText ? (
+                <MetadataItem label={detail.durationLabel} value={durationText} />
+              ) : null}
               <MetadataItem
                 label={detail.shortIdLabel}
                 value={entry.short_id || detail.notAvailableValue}
@@ -754,11 +817,18 @@ export function ChartDetailPageView({
             {entry.aliases && entry.aliases.length > 0 ? (
               <>
                 <Separator />
-                <div className="flex flex-col gap-2">
-                  <h2 className="text-sm font-medium text-muted-foreground">
+                {/* Entries average 6.5 aliases and one has 41 — all Chinese
+                    community nicknames. On the zh tree that wall is the point;
+                    on en/ja it was untranslatable filler sitting in the middle
+                    of the page, so there it starts collapsed. `details` keeps
+                    every alias in the served HTML either way (they are a real
+                    search entry point), and needs no JavaScript. */}
+                <details open={locale === "zh"} className="flex flex-col gap-2">
+                  <summary className="cursor-pointer rounded-sm text-sm font-medium text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                     {detail.aliasesLabel}
-                  </h2>
-                  <ul className="flex flex-wrap gap-1.5">
+                    <span className="ml-1 tabular-nums">({entry.aliases.length})</span>
+                  </summary>
+                  <ul lang="zh-Hans" className="mt-2 flex flex-wrap gap-1.5">
                     {entry.aliases.map((alias) => (
                       <li
                         key={alias}
@@ -768,12 +838,14 @@ export function ChartDetailPageView({
                       </li>
                     ))}
                   </ul>
-                </div>
+                </details>
               </>
             ) : null}
             <Separator />
             <div className="flex flex-col gap-3">
               <h2 className="text-lg font-medium">{detail.difficulties}</h2>
+              {/* The table can outgrow a 390px viewport once the note column is
+                  in; the scroller (not a reflow) keeps the columns aligned. */}
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-sm">
                   <caption className="sr-only">
@@ -787,54 +859,121 @@ export function ChartDetailPageView({
                       <th scope="col" className="py-2 pr-4 font-medium">
                         {detail.tableLevel}
                       </th>
+                      <th scope="col" className="py-2 pr-4 text-right font-medium">
+                        {detail.tableNotes}
+                      </th>
                       <th scope="col" className="py-2 font-medium">
                         {detail.tableCharter}
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {entry.difficulties.map((difficulty) => (
-                      <tr
-                        key={`${entry.id}-${difficulty.slot}`}
-                        className="border-b border-border/40 last:border-0"
-                      >
-                        <th scope="row" className="py-2 pr-4 text-left font-medium">
-                          <span className="inline-flex items-center gap-2">
-                            <span
-                              aria-hidden="true"
-                              className={cn(
-                                "size-2.5 rounded-full",
-                                DIFFICULTY_DOT_CLASS[difficultyTone(difficulty)]
-                              )}
-                            />
-                            {difficultySlotLabel(difficulty)}
-                          </span>
-                        </th>
-                        <td className="py-2 pr-4">
-                          <DifficultyPill difficulty={difficulty} />
-                        </td>
-                        <td className="py-2 text-muted-foreground">
-                          {difficulty.designer || detail.unknownValue}
-                        </td>
-                      </tr>
-                    ))}
+                    {entry.difficulties.map((difficulty) => {
+                      // "-" is the source's own placeholder for "unattributed"
+                      // (which is why the designer facet drops it too) — it
+                      // must not become a filter link that matches nothing.
+                      const designer = difficulty.designer.trim();
+                      const designerHref =
+                        designer && designer !== "-"
+                          ? `${chartsHref}?designer=${encodeURIComponent(designer)}`
+                          : undefined;
+                      return (
+                        <tr
+                          key={`${entry.id}-${difficulty.slot}`}
+                          className="border-b border-border/40 last:border-0"
+                        >
+                          <th scope="row" className="py-2 pr-4 text-left font-medium">
+                            <span className="inline-flex items-center gap-2">
+                              <span
+                                aria-hidden="true"
+                                className={cn(
+                                  "size-2.5 rounded-full",
+                                  DIFFICULTY_DOT_CLASS[difficultyTone(difficulty)]
+                                )}
+                              />
+                              {difficultySlotLabel(difficulty)}
+                            </span>
+                          </th>
+                          <td className="py-2 pr-4">
+                            {hasChartPreview ? (
+                              <PreviewDifficultyTrigger
+                                slot={difficulty.slot}
+                                label={detail.chartPreviewAt(difficultySlotLabel(difficulty))}
+                              >
+                                <DifficultyPill difficulty={difficulty} showConstant />
+                              </PreviewDifficultyTrigger>
+                            ) : (
+                              <DifficultyPill difficulty={difficulty} showConstant />
+                            )}
+                          </td>
+                          <td className="py-2 pr-4 align-top text-right">
+                            <NoteCountCell counts={difficulty.notes} detail={detail} />
+                          </td>
+                          <td className="py-2 text-muted-foreground">
+                            {designerHref ? (
+                              <Link
+                                href={designerHref}
+                                className="underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-current"
+                              >
+                                {designer}
+                              </Link>
+                            ) : (
+                              detail.unknownValue
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
+              <p className="text-xs text-muted-foreground">{detail.levelConstantHint}</p>
             </div>
           </CardContent>
         </Card>
 
         <div className="flex flex-col gap-6">
-          <Card size="sm">
-            <CardHeader>
-              <CardTitle>{detail.assets}</CardTitle>
-              <CardDescription>{detail.assetsDescription}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              <EntryAssetBadges entry={entry} locale={locale} />
-            </CardContent>
-          </Card>
+          {/* This slot used to repeat the hero's asset badges verbatim. The
+              measured numbers are what the hero cannot show. */}
+          {peakDifficulty || durationText || downloadBytes.baseBytes > 0 ? (
+            <Card size="sm">
+              <CardHeader>
+                <CardTitle>{detail.statsTitle}</CardTitle>
+                <CardDescription>{detail.statsDescription}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <dl className="flex flex-col gap-3 text-sm">
+                  {peakDifficulty?.notes ? (
+                    <StatRow label={detail.statsNotesLabel}>
+                      <span className="tabular-nums">{peakDifficulty.notes.total}</span>
+                      <span className="text-muted-foreground">
+                        {difficultySlotLabel(peakDifficulty)}
+                      </span>
+                    </StatRow>
+                  ) : null}
+                  {durationText ? (
+                    <StatRow label={detail.durationLabel}>
+                      <span className="tabular-nums">{durationText}</span>
+                    </StatRow>
+                  ) : null}
+                  {downloadBytes.baseBytes > 0 ? (
+                    <StatRow label={detail.statsDownloadLabel}>
+                      <span className="tabular-nums">
+                        {downloadBytes.videoBytes > 0
+                          ? detail.sizeEstimateWithVideo(
+                              formatBytes(
+                                downloadBytes.baseBytes + downloadBytes.videoBytes
+                              ),
+                              formatBytes(downloadBytes.videoBytes)
+                            )
+                          : detail.sizeEstimate(formatBytes(downloadBytes.baseBytes))}
+                      </span>
+                    </StatRow>
+                  ) : null}
+                </dl>
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card size="sm">
             <CardHeader>
@@ -842,8 +981,22 @@ export function ChartDetailPageView({
               <CardDescription>{detail.sourceDescription}</CardDescription>
             </CardHeader>
             <CardContent className="flex min-w-0 flex-col gap-2 text-sm text-muted-foreground">
-              <p className="break-all">{entry.source_url}</p>
+              {/* The full URL was three lines of break-all text nobody could
+                  read; the hostname is the part that answers "where is this
+                  from", and the link answers the rest. */}
+              {entry.source_url ? (
+                <a
+                  href={entry.source_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex w-fit items-center gap-1.5 underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-current"
+                >
+                  {sourceHost ?? entry.source_url}
+                  <ExternalLinkIcon className="size-3.5 shrink-0" aria-hidden="true" />
+                </a>
+              ) : null}
               <p className="break-all">
+                <span className="mr-1.5 text-foreground/80">{detail.sourceMaidataLabel}</span>
                 {/* maidata.txt is mirrored into the site and served same-origin
                     (the R2 host only carries the media blobs, not maidata), so
                     surface the same-origin path here rather than the origin URL
@@ -852,7 +1005,16 @@ export function ChartDetailPageView({
                   ? localChartAssetUrl(entry, "maidata.txt")
                   : entry.files.maidata_dx || entry.remote_dir_name}
               </p>
-              <p className="break-words">{entry.license_note}</p>
+              {entry.license_note ? (
+                <details className="group">
+                  <summary className="w-fit cursor-pointer text-foreground/80 transition-colors hover:text-foreground">
+                    {detail.licenseLabel}
+                  </summary>
+                  <p className="mt-1.5 break-words text-xs leading-relaxed">
+                    {entry.license_note}
+                  </p>
+                </details>
+              ) : null}
             </CardContent>
           </Card>
         </div>
@@ -951,6 +1113,67 @@ function CatalogPageView({
         detailPathPrefix={buildLocalePath("/charts", locale)}
       />
     </main>
+  );
+}
+
+/** Hostname of an absolute URL, or null when the value is not one. */
+function hostnameOf(url: string): string | null {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A difficulty's note total with its bucket breakdown underneath.
+ *
+ * The breakdown is text rather than a nested table so it can wrap inside the
+ * cell on a phone; the buckets are disjoint, so the parts really do sum to the
+ * total shown above them.
+ */
+function NoteCountCell({
+  counts,
+  detail,
+}: {
+  counts: CatalogNoteCounts | undefined;
+  detail: ReturnType<typeof getDictionary>["detail"];
+}) {
+  if (!counts || counts.total <= 0) {
+    return <span className="text-muted-foreground">{detail.unknownValue}</span>;
+  }
+  const parts: [string, number][] = [
+    [detail.noteTypeTap, counts.tap],
+    [detail.noteTypeHold, counts.hold],
+    [detail.noteTypeSlide, counts.slide],
+    [detail.noteTypeTouch, counts.touch],
+    [detail.noteTypeTouchHold, counts.touch_hold],
+    [detail.noteTypeBreak, counts.break],
+  ];
+  return (
+    <span className="inline-flex flex-col items-end gap-0.5">
+      <span className="font-medium tabular-nums">{counts.total}</span>
+      {/* The cap is what makes the breakdown wrap instead of stretching the
+          table past a 390px viewport — a table cell is max-content otherwise. */}
+      <span className="flex max-w-[8.5rem] flex-wrap justify-end gap-x-1.5 text-[11px] leading-tight text-muted-foreground">
+        {parts
+          .filter(([, value]) => value > 0)
+          .map(([label, value]) => (
+            <span key={label} className="whitespace-nowrap tabular-nums">
+              {label} {value}
+            </span>
+          ))}
+      </span>
+    </span>
+  );
+}
+
+function StatRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="flex items-baseline gap-1.5 text-right font-medium">{children}</dd>
+    </div>
   );
 }
 

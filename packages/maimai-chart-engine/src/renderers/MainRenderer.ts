@@ -7,6 +7,7 @@ import { TimingTimeline } from "../core/timing/TimingTimeline";
 import {
   Note,
   Chart,
+  HudLabels,
   RendererConfig,
   SlideNote,
   HoldStartNote,
@@ -212,6 +213,9 @@ export class MainRenderer {
     showHitEffect: true,
   };
 
+  // 本地补丁：见 setHudLabels。默认保留上游写死的中文。re-sync 时须重打。
+  private hudLabels: HudLabels = { combo: "连击", breakNoEx: "无保护" };
+
   private fps: number = 0;
   private prevBpm: number = 120;
   private bpmChangeTime: number = 0;
@@ -402,8 +406,11 @@ export class MainRenderer {
     this.updateRenderersContext();
   }
 
+  // 本地补丁：上游上限 1.0（只做减速练习），我们也允许 2.0 倍速跟打；
+  // alwaysKeepHiSpeed 的补偿式 (base / (hi / speed)) 在 >1 时同样成立。
+  // re-sync 时须重打。
   setPlaybackSpeed(playbackSpeed: number): void {
-    if (playbackSpeed >= 0.1 && playbackSpeed <= 1.0) {
+    if (playbackSpeed >= 0.1 && playbackSpeed <= 2.0) {
       this.config.playbackSpeed = playbackSpeed;
       this.updateRenderersContext();
     }
@@ -453,6 +460,25 @@ export class MainRenderer {
 
   setShowFireworks(enabled: boolean): void {
     this.config.showFireworks = enabled;
+  }
+
+  // 本地补丁：HUD 的两个计数上游只有默认开启、没有 setter，站点要把它们做成
+  // 可关的设置项。re-sync 时须重打。
+  setShowNoteTotal(enabled: boolean): void {
+    this.config.showNoteTotal = enabled;
+  }
+
+  setShowBreakCount(enabled: boolean): void {
+    this.config.showBreakCount = enabled;
+  }
+
+  /**
+   * 本地补丁：HUD 文案本地化。上游把「连击」「无保护」直接写死在 fillText 里，
+   * en/ja 用户会看到中文被烧进画面，连导出的 PNG/GIF 也一样。只覆盖传入的键，
+   * 未传的沿用默认中文。re-sync 时须重打。
+   */
+  setHudLabels(labels: Partial<HudLabels>): void {
+    this.hudLabels = { ...this.hudLabels, ...labels };
   }
 
   setShowHitEffect(enabled: boolean): void {
@@ -1596,7 +1622,7 @@ export class MainRenderer {
       this.ctx.textBaseline = "top";
       this.ctx.fillStyle = COLORS.WHITE;
       this.ctx.fillText(
-        `连击: ${completedNotes} / ${totalNotes}`,
+        `${this.hudLabels.combo}: ${completedNotes} / ${totalNotes}`,
         this.logicalSize - padding,
         padding,
       );
@@ -1623,7 +1649,11 @@ export class MainRenderer {
         bottomY,
       );
       this.ctx.font = `bold ${smallFontSize}px sans-serif`;
-      this.ctx.fillText("无保护", this.logicalSize - padding, bottomY - fontSize - lineGap);
+      this.ctx.fillText(
+        this.hudLabels.breakNoEx,
+        this.logicalSize - padding,
+        bottomY - fontSize - lineGap,
+      );
     }
 
     this.ctx.restore();

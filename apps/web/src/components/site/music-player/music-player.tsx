@@ -258,6 +258,7 @@ function MusicPlayerSurface({
     error,
     hydrated,
     restorePending,
+    playRequest,
     bootstrap,
     loadManifest,
     selectVersion,
@@ -268,6 +269,7 @@ function MusicPlayerSurface({
     setVolume,
     setMuted,
     setError,
+    clearPlayRequest,
   } = useMusicPlayerStore(
     useShallow((state) => ({
       tracksByVersion: state.tracksByVersion,
@@ -281,6 +283,7 @@ function MusicPlayerSurface({
       error: state.error,
       hydrated: state.hydrated,
       restorePending: state.restorePending,
+      playRequest: state.playRequest,
       bootstrap: state.bootstrap,
       loadManifest: state.loadManifest,
       selectVersion: state.selectVersion,
@@ -291,12 +294,13 @@ function MusicPlayerSurface({
       setVolume: state.setVolume,
       setMuted: state.setMuted,
       setError: state.setError,
+      clearPlayRequest: state.clearPlayRequest,
     }))
   );
 
   const needsPersistedManifest = hydrated && restorePending;
   const manifestKey =
-    manifestRequested || open || needsPersistedManifest
+    manifestRequested || open || needsPersistedManifest || playRequest !== null
       ? PLAYLIST_MANIFEST_PATH
       : null;
   const {
@@ -724,6 +728,35 @@ function MusicPlayerSurface({
     },
     [playTrack, selectVersion]
   );
+
+  // A "play this version" ask posted by /music. It carries only a version id,
+  // and that version's tracks live in the lazily fetched manifest — so the
+  // request usually has to survive a render or two until the SWR key above
+  // (which the request itself switches on) delivers them. Clicking the same
+  // version again arrives as a new token, which is what re-triggers this.
+  React.useEffect(() => {
+    if (!playRequest || !hydrated) {
+      return;
+    }
+    const tracks = tracksByVersion[playRequest.versionId];
+    if (!tracks || tracks.length === 0) {
+      return;
+    }
+    clearPlayRequest();
+    selectVersion(playRequest.versionId);
+    const { trackId: selectedTrackId } = useMusicPlayerStore.getState();
+    const track =
+      tracks.find((candidate) => candidate.id === selectedTrackId) ?? tracks[0];
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- driving the <audio> singleton from a one-shot cross-page intent; the state it touches mirrors that element
+    playTrack(track, 0, true);
+  }, [
+    clearPlayRequest,
+    hydrated,
+    playRequest,
+    playTrack,
+    selectVersion,
+    tracksByVersion,
+  ]);
 
   const cycleMode = React.useCallback(() => {
     const currentIndex = MODE_ORDER.indexOf(mode);

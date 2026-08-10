@@ -8,6 +8,7 @@ import { useAudio } from "./hooks/use-audio";
 import { useMusicPlayer } from "./hooks/use-music-player";
 import { useWakeLock } from "./hooks/use-wake-lock";
 import { beatsToMs, msToBeats } from "./lib/time-conversion";
+import { playbackLoopRef } from "./lib/playback-loop";
 import { formatChartTimeForFilename } from "./lib/format";
 import { sanitizeFilenameId, downloadBlob } from "./lib/file-download";
 import classes from "./chart-canvas.module.css";
@@ -37,6 +38,8 @@ export function canShareFrameFiles(): boolean {
 }
 
 export type ChartCanvasProps = {
+  /** Fullscreen without the Fullscreen API — the CSS-only path for iOS Safari. */
+  pseudoFullscreen?: boolean;
   /** PV video URL; drawn behind the chart when `showVideo` is on. */
   videoUrl?: string;
   /** Background image URL; drawn behind the chart as the static fallback. */
@@ -47,7 +50,13 @@ export type ChartCanvasProps = {
   t: PreviewDict;
 };
 
-export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: ChartCanvasProps) {
+export function ChartCanvas({
+  pseudoFullscreen = false,
+  videoUrl,
+  coverUrl,
+  chartName = "chart",
+  t,
+}: ChartCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<MainRenderer | null>(null);
@@ -94,11 +103,11 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
   const chartData = useGameStore((s) => s.chartData);
   const totalMeasures = useGameStore((s) => s.timeline.totalMeasures);
   const beatsPerMeasure = useGameStore((s) => s.timeline.beatsPerMeasure);
-  const playbackSpeed = useGameStore((s) => s.playbackSpeed);
   const setPreciseTime = useGameStore((s) => s.setPreciseTime);
   const pause = useGameStore((s) => s.pause);
 
   const hiSpeed = useGameSettingsStore((s) => s.hiSpeed);
+  const playbackSpeed = useGameSettingsStore((s) => s.playbackSpeed);
   const alwaysKeepHiSpeed = useGameSettingsStore((s) => s.alwaysKeepHiSpeed);
   const viewRotation = useGameSettingsStore((s) => s.viewRotation);
   const slideRotation = useGameSettingsStore((s) => s.slideRotation);
@@ -110,6 +119,8 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
   const showFireworks = useGameSettingsStore((s) => s.showFireworks);
   const showHitEffect = useGameSettingsStore((s) => s.showHitEffect);
   const showVideo = useGameSettingsStore((s) => s.showVideo);
+  const showNoteTotal = useGameSettingsStore((s) => s.showNoteTotal);
+  const showBreakCount = useGameSettingsStore((s) => s.showBreakCount);
   const soundEnabled = useGameSettingsStore((s) => s.soundEnabled);
   const soundVolume = useGameSettingsStore((s) => s.soundVolume);
   const soundOffset = useGameSettingsStore((s) => s.soundOffset);
@@ -197,7 +208,7 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
         if (!bgVideo.paused) bgVideo.pause();
         if (target <= 0 && bgVideo.currentTime > 0) bgVideo.currentTime = 0;
       } else if (playing) {
-        const speed = useGameStore.getState().playbackSpeed;
+        const speed = useGameSettingsStore.getState().playbackSpeed;
         const drift = bgVideo.currentTime - target;
         if (Math.abs(drift) > 0.3) {
           bgVideo.currentTime = target;
@@ -247,7 +258,9 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
     renderer.setShowFireworks(settingsState.showFireworks);
     renderer.setShowHitEffect(settingsState.showHitEffect);
     renderer.setFullscreenMaxPixels(FULLSCREEN_QUALITY_MP[settingsState.fullscreenQuality]);
-    renderer.setPlaybackSpeed(useGameStore.getState().playbackSpeed);
+    renderer.setPlaybackSpeed(settingsState.playbackSpeed);
+    renderer.setShowNoteTotal(settingsState.showNoteTotal);
+    renderer.setShowBreakCount(settingsState.showBreakCount);
 
     const handleResize = () => {
       renderer.resize(useGameStore.getState().isFullscreen);
@@ -602,6 +615,24 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
     }
   }, [showHitEffect, renderFrame]);
 
+  // The two HUD counters are painted by the engine INSIDE the canvas, so their
+  // wording travels into every exported PNG/GIF too — hence localized labels
+  // rather than the vendored engine's hardcoded Chinese.
+  useEffect(() => {
+    if (rendererRef.current) {
+      rendererRef.current.setHudLabels({ combo: t.hudCombo, breakNoEx: t.hudBreakNoEx });
+      renderFrame(playbackTimeRef.current);
+    }
+  }, [t.hudCombo, t.hudBreakNoEx, renderFrame]);
+
+  useEffect(() => {
+    if (rendererRef.current) {
+      rendererRef.current.setShowNoteTotal(showNoteTotal);
+      rendererRef.current.setShowBreakCount(showBreakCount);
+      renderFrame(playbackTimeRef.current);
+    }
+  }, [showNoteTotal, showBreakCount, renderFrame]);
+
   useEffect(() => {
     answerSoundRefs.current.setEnabled(soundEnabled);
     if (!chartData || !isPlaying) return;
@@ -727,6 +758,18 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
         currentMs = getPlaybackMs(timestamp);
       }
 
+      // A–B repeat, checked before the end-of-chart stop so a loop whose tail
+      // sits on the last measure still wraps instead of pausing. Going through
+      // setPreciseTime(_, true) bumps seekVersion, which is the same path the
+      // timeline scrubber uses — the audio layer re-seeks on its own and needs
+      // no loop awareness at all.
+      const loop = playbackLoopRef.current;
+      if (loop && currentMs >= loop.endMs) {
+        setPreciseTime(msToBeats(loop.startMs, chartData.bpmEvents, chartData.bpm), true);
+        animationFrameRef.current = requestAnimationFrame(animate);
+        return;
+      }
+
       if (currentMs >= totalDurationMs + 500) {
         setPreciseTime(totalBeats);
         pause();
@@ -799,7 +842,13 @@ export function ChartCanvas({ videoUrl, coverUrl, chartName = "chart", t }: Char
   }, [isPlaying, inView, renderFrame]);
 
   return (
-    <div ref={containerRef} className={cn(classes.container, isFullscreen && classes.fullscreen)}>
+    <div
+      ref={containerRef}
+      className={cn(
+        classes.container,
+        isFullscreen && (pseudoFullscreen ? classes.pseudoFullscreen : classes.fullscreen),
+      )}
+    >
       <video
         ref={bgVideoRef}
         muted

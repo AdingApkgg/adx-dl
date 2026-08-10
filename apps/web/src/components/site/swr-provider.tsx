@@ -10,9 +10,16 @@ import { jsonFetcher } from "@/lib/swr-fetcher";
  * functions, which are not serializable as RSC props).
  *
  * Conservative defaults for a mostly-static catalog site: no focus revalidation
- * by default (page-view POSTs must not double-count, chart text never changes),
- * a couple of retries on transient errors. Hooks that genuinely want live data
- * (server status) opt back into focus/interval revalidation locally.
+ * by default (chart text never changes), a couple of retries on transient
+ * errors. Hooks that genuinely want live data (server status) opt back into
+ * focus/interval revalidation locally.
+ *
+ * Reconnect revalidation IS on: every fetch behind these defaults is a static
+ * per-deploy JSON manifest, and after three failed retries offline the data
+ * would otherwise stay missing until a full reload — the search index, the
+ * playlist manifest and the chart preview all silently stop working. The one
+ * hook that must not re-run on reconnect is the pageview recorder (its fetcher
+ * increments a counter); it opts out at its own call site.
  */
 export function SWRProvider({ children }: { children: React.ReactNode }) {
   return (
@@ -20,7 +27,7 @@ export function SWRProvider({ children }: { children: React.ReactNode }) {
       value={{
         fetcher: jsonFetcher,
         revalidateOnFocus: false,
-        revalidateOnReconnect: false,
+        revalidateOnReconnect: true,
         errorRetryCount: 3,
       }}
     >

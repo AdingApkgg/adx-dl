@@ -1,11 +1,34 @@
 import { MAIMAI_VERSIONS, versionImageIndex } from "@/lib/version-image";
 
+/**
+ * Judged-object counts for one difficulty, produced by the enrichment pass
+ * (apps/web/scripts/enrich-chart-details.ts) from the same simai parser the
+ * in-browser preview uses — so these numbers and the preview always agree.
+ *
+ * The buckets are disjoint, so `total` is exactly their sum. Notably `break`
+ * counts BREAK taps, which the parser types separately from ordinary taps
+ * rather than as a flag on them.
+ */
+export type CatalogNoteCounts = {
+  tap: number;
+  hold: number;
+  slide: number;
+  touch: number;
+  touch_hold: number;
+  break: number;
+  total: number;
+};
+
 export type CatalogDifficulty = {
   slot: number;
   /** Official difficulty name from the source (Basic/Advanced/Expert/Master/Re:Master/Utage). */
   name?: string;
   level: string;
   designer: string;
+  /** Absent when the maidata could not be fetched or parsed at build time. */
+  notes?: CatalogNoteCounts;
+  /** Playable span of this difficulty in milliseconds. */
+  duration_ms?: number;
 };
 
 export type CatalogEntryMedia = {
@@ -43,7 +66,27 @@ export type CatalogEntry = {
   short_id: string;
   /** Community nicknames (别名) for the song; used to find a chart by an alternate name. */
   aliases?: string[];
+  /**
+   * Hepburn transliteration of a kana title/artist, added by the enrichment
+   * pass so songs with no Latin form at all are still reachable from a Latin
+   * keyboard. Absent when the source is already Latin or is pure kanji.
+   */
+  title_romaji?: string;
+  artist_romaji?: string;
   bpm: number | null;
+  /**
+   * BPM extremes across every difficulty, including inline `(bpm)` changes.
+   * Equal to `bpm` on a constant-tempo chart; both absent when unmeasured.
+   */
+  bpm_min?: number | null;
+  bpm_max?: number | null;
+  /** Longest difficulty's playable span in milliseconds. */
+  duration_ms?: number | null;
+  /**
+   * Measured download sizes in bytes, keyed like `files`. Lets the UI quote a
+   * size before the user commits to a download (and show what the PV adds).
+   */
+  file_bytes?: Partial<Record<"maidata" | "audio" | "background" | "pv", number>>;
   offset: number | null;
   download_mode: "onsite" | "external" | "mixed";
   download_url: string;
@@ -81,8 +124,10 @@ export type CatalogCardEntry = Pick<
   | "slug"
   | "title"
   | "title_en"
+  | "title_romaji"
   | "artist"
   | "artist_en"
+  | "artist_romaji"
   | "category"
   | "subcategory"
   | "version"
@@ -94,10 +139,26 @@ export type CatalogCardEntry = Pick<
   | "aliases"
   | "bpm"
   | "assets"
-  | "difficulties"
+  // Carried so the browse page can offer a "newest imported" sort order. It is
+  // the one thing the release comparator cannot answer, and at ~24 bytes of
+  // highly repetitive ISO text per entry it is the cheapest field in the slice.
+  | "imported_at"
 > & {
   media: Pick<CatalogEntryMedia, "cover_url" | "cover_avif" | "cover_webp">;
+  /**
+   * Note counts and per-difficulty durations are deliberately dropped here: the
+   * grid never renders them, and carrying seven extra numbers per difficulty
+   * across 1800+ entries is pure weight in the page payload. The detail page
+   * reads them from the full entry.
+   */
+  difficulties: CatalogCardDifficulty[];
 };
+
+/** The difficulty fields the browse grid and the client search index need. */
+export type CatalogCardDifficulty = Pick<
+  CatalogDifficulty,
+  "slot" | "name" | "level" | "designer"
+>;
 
 /** Project a full entry down to the card slice (optional keys omitted when empty
  * so they don't cost bytes in the serialized page payload). */
@@ -107,8 +168,10 @@ export function toCatalogCardEntry(entry: CatalogEntry): CatalogCardEntry {
     ...(entry.slug ? { slug: entry.slug } : {}),
     title: entry.title,
     ...(entry.title_en ? { title_en: entry.title_en } : {}),
+    ...(entry.title_romaji ? { title_romaji: entry.title_romaji } : {}),
     artist: entry.artist,
     ...(entry.artist_en ? { artist_en: entry.artist_en } : {}),
+    ...(entry.artist_romaji ? { artist_romaji: entry.artist_romaji } : {}),
     category: entry.category,
     subcategory: entry.subcategory,
     version: entry.version,
@@ -119,8 +182,14 @@ export function toCatalogCardEntry(entry: CatalogEntry): CatalogCardEntry {
     short_id: entry.short_id,
     ...(entry.aliases?.length ? { aliases: entry.aliases } : {}),
     bpm: entry.bpm,
+    ...(entry.imported_at ? { imported_at: entry.imported_at } : {}),
     assets: entry.assets,
-    difficulties: entry.difficulties,
+    difficulties: entry.difficulties.map((difficulty) => ({
+      slot: difficulty.slot,
+      ...(difficulty.name ? { name: difficulty.name } : {}),
+      level: difficulty.level,
+      designer: difficulty.designer,
+    })),
     media: {
       cover_url: entry.media.cover_url,
       ...(entry.media.cover_avif ? { cover_avif: entry.media.cover_avif } : {}),
@@ -143,7 +212,16 @@ export type Catalog = {
   entries: CatalogEntry[];
 };
 
-export type ChartAssetFile = { name: string; url: string };
+export type ChartAssetFile = {
+  name: string;
+  url: string;
+  /**
+   * Measured size of the source file, carried so a download surface can quote
+   * a size before the transfer starts. Absent when the enrichment pass could
+   * not reach the file — the UI then says "about", never "0 B".
+   */
+  bytes?: number;
+};
 
 function chartRouteId(entry: Pick<CatalogEntry, "id" | "slug" | "short_id">): string {
   return entry.slug?.trim() || entry.short_id?.trim() || entry.id;
@@ -165,15 +243,119 @@ export function getChartAssetFiles(
   options: { includeVideo?: boolean } = {}
 ): ChartAssetFile[] {
   const includeVideo = options.includeVideo ?? true;
+  // file_bytes is keyed by the SOURCE file role, not by the in-archive name the
+  // AstroDX app expects — hence the explicit pairing here.
+  const sizes = entry.file_bytes;
   const candidates: (ChartAssetFile | null)[] = [
     entry.files.maidata
-      ? { name: "maidata.txt", url: localChartAssetUrl(entry, "maidata.txt") }
+      ? {
+          name: "maidata.txt",
+          url: localChartAssetUrl(entry, "maidata.txt"),
+          ...(sizes?.maidata ? { bytes: sizes.maidata } : {}),
+        }
       : null,
-    { name: "track.mp3", url: entry.media.audio_url },
-    entry.media.cover_url ? { name: "bg.png", url: entry.media.cover_url } : null,
-    includeVideo ? { name: "pv.mp4", url: entry.media.pv_url } : null,
+    {
+      name: "track.mp3",
+      url: entry.media.audio_url,
+      ...(sizes?.audio ? { bytes: sizes.audio } : {}),
+    },
+    entry.media.cover_url
+      ? {
+          name: "bg.png",
+          url: entry.media.cover_url,
+          ...(sizes?.background ? { bytes: sizes.background } : {}),
+        }
+      : null,
+    includeVideo
+      ? { name: "pv.mp4", url: entry.media.pv_url, ...(sizes?.pv ? { bytes: sizes.pv } : {}) }
+      : null,
   ];
   return candidates.filter((file): file is ChartAssetFile => Boolean(file && file.url));
+}
+
+/**
+ * Byte totals for a set of charts, split so a surface can re-quote the number
+ * live as the BGA checkbox flips without walking the file list again.
+ *
+ * `unknownFiles` counts files with no measured size: everything the UI shows is
+ * an estimate anyway (the archive adds zip overhead), but a large unknown count
+ * is the difference between "close enough" and "meaningless".
+ */
+export type ChartDownloadBytes = {
+  baseBytes: number;
+  videoBytes: number;
+  unknownFiles: number;
+};
+
+export function sumChartDownloadBytes(
+  charts: ReadonlyArray<{ files: ReadonlyArray<ChartAssetFile> }>
+): ChartDownloadBytes {
+  let baseBytes = 0;
+  let videoBytes = 0;
+  let unknownFiles = 0;
+  for (const chart of charts) {
+    for (const file of chart.files) {
+      if (!file.bytes || file.bytes <= 0) {
+        unknownFiles += 1;
+        continue;
+      }
+      if (isChartVideoFile(file.name)) {
+        videoBytes += file.bytes;
+      } else {
+        baseBytes += file.bytes;
+      }
+    }
+  }
+  return { baseBytes, videoBytes, unknownFiles };
+}
+
+/** Playable span as `m:ss`; null when the enrichment pass never measured it. */
+export function formatChartDuration(durationMs: number | null | undefined): string | null {
+  if (typeof durationMs !== "number" || !Number.isFinite(durationMs) || durationMs <= 0) {
+    return null;
+  }
+  const totalSeconds = Math.round(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+/**
+ * The BPM readout: a single tempo, or the span for the 174 charts that change
+ * tempo mid-song. `variable` lets the caller append a localized "(variable)"
+ * note — the number alone reads like a typo.
+ */
+export function chartBpmDisplay(
+  entry: Pick<CatalogEntry, "bpm" | "bpm_min" | "bpm_max">
+): { text: string; variable: boolean } | null {
+  const min = entry.bpm_min ?? null;
+  const max = entry.bpm_max ?? null;
+  if (min !== null && max !== null && min > 0 && max > min) {
+    // En dash, not a hyphen: this is a numeric range, not a compound word.
+    return { text: `${min}–${max}`, variable: true };
+  }
+  const single = entry.bpm ?? min ?? max;
+  return single !== null && single > 0 ? { text: String(single), variable: false } : null;
+}
+
+/**
+ * The difficulty carrying the most judged objects — the number players mean by
+ * "how many notes does this song have". Ties break toward the higher slot, the
+ * same way the rest of the UI treats the highest difficulty as the headline.
+ */
+export function peakNoteDifficulty(
+  entry: Pick<CatalogEntry, "difficulties">
+): CatalogDifficulty | null {
+  let best: CatalogDifficulty | null = null;
+  for (const difficulty of entry.difficulties) {
+    const total = difficulty.notes?.total ?? 0;
+    if (total <= 0) continue;
+    const bestTotal = best?.notes?.total ?? 0;
+    if (!best || total > bestTotal || (total === bestTotal && difficulty.slot > best.slot)) {
+      best = difficulty;
+    }
+  }
+  return best;
 }
 
 /** Background-animation (BGA) movie extensions; offered as an optional batch exclusion. */
@@ -182,6 +364,23 @@ export const CHART_VIDEO_EXTENSIONS = [".mp4", ".mov", ".webm", ".mkv", ".avi", 
 export function isChartVideoFile(name: string): boolean {
   const lower = name.toLowerCase();
   return CHART_VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
+/**
+ * The two files AstroDX cannot open a chart without. Everything else in the
+ * archive (cover art, BGA movie) is decoration the app happily runs without,
+ * which is what lets a 404 on one of them be skipped instead of failing the
+ * whole download.
+ *
+ * Batch jobs prefix each entry with an opaque `${index}/`, so the comparison is
+ * on the basename rather than the whole path.
+ */
+const REQUIRED_CHART_ASSET_NAMES = new Set(["maidata.txt", "track.mp3"]);
+
+export function isOptionalChartAssetFile(name: string): boolean {
+  const slash = name.lastIndexOf("/");
+  const baseName = (slash >= 0 ? name.slice(slash + 1) : name).toLowerCase();
+  return !REQUIRED_CHART_ASSET_NAMES.has(baseName);
 }
 
 /**
@@ -283,6 +482,60 @@ export function sortByReleaseDesc<T extends ReleaseOrderable>(entries: T[]): T[]
   return [...entries].sort(compareByReleaseDesc);
 }
 
+/** The import-ordering slice: when the archive got the chart, plus the fallback. */
+type ImportOrderable = ReleaseOrderable & Pick<CatalogEntry, "imported_at">;
+
+// Newest-*import*-first comparator — "what did this archive add recently",
+// which is what a visitor means by "latest" and what compareByReleaseDesc
+// cannot answer (it only knows the maimai version era). imported_at is clean
+// ISO-8601, so a string compare is already chronological. Entries that never
+// got a timestamp fall back to the version-era order rather than clumping at
+// one end of the list.
+export function compareByImportedDesc(a: ImportOrderable, b: ImportOrderable): number {
+  const importedA = a.imported_at ?? "";
+  const importedB = b.imported_at ?? "";
+  if (importedA !== importedB) {
+    return importedB.localeCompare(importedA);
+  }
+  return compareByReleaseDesc(a, b);
+}
+
+export function sortByImportedDesc<T extends ImportOrderable>(entries: T[]): T[] {
+  return [...entries].sort(compareByImportedDesc);
+}
+
+/** How long a freshly imported chart keeps its "new" marker. */
+export const NEW_CHART_WINDOW_DAYS = 14;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Whether a chart landed within `windowDays` of the reference instant.
+ *
+ * The reference must be the catalog's own `generated_at`, never `Date.now()`:
+ * every page here is prerendered once per build, so a render-time clock would
+ * bake in whatever the build machine saw and then keep claiming "new" for as
+ * long as that HTML is served. Deriving it from the catalog ties the badge to
+ * the same data the page was built from, and the daily rebuild retires it.
+ */
+export function isRecentImport(
+  importedAt: string | undefined,
+  referenceIso: string,
+  windowDays: number = NEW_CHART_WINDOW_DAYS
+): boolean {
+  if (!importedAt) {
+    return false;
+  }
+  const imported = Date.parse(importedAt);
+  const reference = Date.parse(referenceIso);
+  if (Number.isNaN(imported) || Number.isNaN(reference)) {
+    return false;
+  }
+  // A negative age (import stamped after the build, i.e. clock skew) still
+  // counts as new — it can only mean the entry is at most brand new.
+  return reference - imported <= windowDays * DAY_MS;
+}
+
 // maimai genres, keyed by genreid (101–107). Localized names + a colored chip
 // (literal class strings so Tailwind's scanner emits them). 107 (宴会場) is the
 // UTAGE genre — already conveyed by the cabinet icon, so its chip is suppressed.
@@ -321,7 +574,7 @@ export const GENRES: Record<number, GenreInfo> = {
     ja: "東方Project",
     zh: "东方Project",
     en: "Touhou Project",
-    badge: "border-red-500/40 bg-red-500/12 text-red-600 dark:text-red-300",
+    badge: "border-red-500/40 bg-red-500/12 text-red-700 dark:text-red-300",
     dot: "bg-red-500",
   },
   104: {
@@ -339,7 +592,7 @@ export const GENRES: Record<number, GenreInfo> = {
     ja: "maimai",
     zh: "maimai",
     en: "maimai",
-    badge: "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    badge: "border-amber-500/40 bg-amber-500/15 text-amber-800 dark:text-amber-300",
     dot: "bg-amber-500",
   },
   106: {
@@ -513,10 +766,16 @@ export function difficultyTone(difficulty: { slot: number; name?: string }): Dif
 
 // Literal class strings (kept whole so Tailwind's scanner emits them). Tuned to
 // read clearly on both the light and dark surfaces.
+//
+// The light-mode text shades are pinned by contrast, not taste: these pills are
+// 12px/600, which is below the WCAG large-text threshold, so every one has to
+// clear 4.5:1 over its own tinted background (see lib/color-contrast.test.ts).
+// Expert was rose-600 (3.75:1) and Advanced amber-700 (4.46:1). Dark mode
+// already sits at 7.8–11.7:1 and is left alone.
 export const DIFFICULTY_TONE_CLASS: Record<DifficultyTone, string> = {
   basic: "border-emerald-500/40 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
-  advanced: "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  expert: "border-rose-500/40 bg-rose-500/12 text-rose-600 dark:text-rose-300",
+  advanced: "border-amber-500/40 bg-amber-500/15 text-amber-800 dark:text-amber-300",
+  expert: "border-rose-500/40 bg-rose-500/12 text-rose-700 dark:text-rose-300",
   master: "border-violet-500/45 bg-violet-500/15 text-violet-700 dark:text-violet-300",
   remaster: "border-fuchsia-400/45 bg-fuchsia-400/12 text-fuchsia-700 dark:text-fuchsia-200",
   utage: "border-pink-500/45 bg-pink-500/15 text-pink-700 dark:text-pink-300",
@@ -587,7 +846,7 @@ export function buildLevelGradient(levels: readonly string[]): string {
 }
 
 // Levels can be plain ("13"), suffixed ("12+"), or decimal ("13.4").
-function levelSortValue(level: string): number {
+export function levelSortValue(level: string): number {
   const match = level.match(/^(\d+(?:\.\d+)?)(\+)?/);
   if (!match) {
     return -1;
@@ -761,7 +1020,7 @@ export function bpmBucketId(bpm: number | null | undefined): string | null {
 export const BPM_TONE: Record<string, string> = {
   "0": "border-sky-500/40 bg-sky-500/12 text-sky-700 dark:text-sky-300",
   "1": "border-teal-500/40 bg-teal-500/12 text-teal-700 dark:text-teal-300",
-  "2": "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  "2": "border-amber-500/40 bg-amber-500/15 text-amber-800 dark:text-amber-300",
   "3": "border-rose-500/40 bg-rose-500/12 text-rose-700 dark:text-rose-300",
 };
 
@@ -987,7 +1246,7 @@ export function buildChartDescription(entry: CatalogEntry, locale: EntryLocale):
 // unknown and dedupes names shared across difficulty slots — so JSON-LD credits
 // each author once and never emits a bogus "-" Person.
 export function uniqueChartDesigners(entry: {
-  difficulties: { designer?: string }[];
+  difficulties: readonly { designer?: string }[];
 }): string[] {
   const seen = new Set<string>();
   const names: string[] = [];
@@ -1000,4 +1259,41 @@ export function uniqueChartDesigners(entry: {
     names.push(name);
   }
   return names;
+}
+
+/** One charter and how many charts in the current scope they worked on. */
+export type ChartDesignerFacet = { name: string; count: number };
+
+/**
+ * Every charter across `entries`, most prolific first (ties alphabetical).
+ *
+ * A chart credits one designer per difficulty and the same person usually did
+ * all five, so the count is per *chart*, not per difficulty — "はっぴー · 645"
+ * has to mean 645 songs, not 3000 difficulty rows.
+ */
+export function collectChartDesigners(
+  entries: ReadonlyArray<{ difficulties: readonly { designer?: string }[] }>
+): ChartDesignerFacet[] {
+  const counts = new Map<string, number>();
+  for (const entry of entries) {
+    for (const name of uniqueChartDesigners(entry)) {
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
+/** Whether any of an entry's difficulties was charted by one of `designers`. */
+export function entryHasDesigner(
+  entry: { difficulties: readonly { designer?: string }[] },
+  designers: ReadonlySet<string>
+): boolean {
+  if (designers.size === 0) {
+    return true;
+  }
+  return entry.difficulties.some((difficulty) =>
+    designers.has((difficulty.designer ?? "").trim())
+  );
 }

@@ -65,6 +65,18 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # build_catalog above rewrites index.json from upstream and knows nothing
+      # about note counts, chart duration, BPM ranges, measured download sizes or
+      # romaji — those come from parsing every maidata with the SAME simai parser
+      # the in-browser preview uses, which is TypeScript and lives in the web
+      # workspace. So it has to run after `bun install`, and it has to run on
+      # every deploy: skip it and the detail pages silently lose every number
+      # they quote. ~75s for 1875 charts. Per-chart failures are logged and
+      # skipped, so only something systemic fails the job.
+      - name: Enrich chart details
+        working-directory: apps/web
+        run: bun run enrich:details
+
       # Next.js build cache (module graph, compiled pages) across runs.
       - name: Cache Next.js build
         uses: actions/cache@v6

@@ -246,6 +246,50 @@ describe("localized routes", () => {
     expect(jaSurveyHtml).toContain("ゲストブックで送信する");
   });
 
+  test("localized guide, music and changelog routes render en and ja views", async () => {
+    const { default: LocalizedGuidePage, generateStaticParams } = await import(
+      "./[locale]/guide/page"
+    );
+    const { default: LocalizedMusicPage } = await import("./[locale]/music/page");
+    const { default: LocalizedChangelogPage } = await import("./[locale]/changelog/page");
+
+    expect(await generateStaticParams()).toEqual([{ locale: "en" }, { locale: "ja" }]);
+
+    const enGuideHtml = renderToStaticMarkup(
+      await LocalizedGuidePage({ params: Promise.resolve({ locale: "en" }) })
+    );
+    const jaGuideHtml = renderToStaticMarkup(
+      await LocalizedGuidePage({ params: Promise.resolve({ locale: "ja" }) })
+    );
+    expect(enGuideHtml).toContain("Importing charts");
+    expect(enGuideHtml).toContain('id="troubleshooting"');
+    expect(jaGuideHtml).toContain("譜面を取り込む");
+    expect(jaGuideHtml).toContain('"@type":"HowTo"');
+
+    const enMusicHtml = renderToStaticMarkup(
+      await LocalizedMusicPage({ params: Promise.resolve({ locale: "en" }) })
+    );
+    const jaMusicHtml = renderToStaticMarkup(
+      await LocalizedMusicPage({ params: Promise.resolve({ locale: "ja" }) })
+    );
+    expect(enMusicHtml).toContain("Music Library");
+    expect(jaMusicHtml).toContain("ミュージックライブラリ");
+    // These fixtures carry no resolvable version, so every track is unplaceable
+    // — the page must say so rather than render an empty grid.
+    expect(enMusicHtml).toContain("No playable tracks yet.");
+    expect(jaMusicHtml).toContain("再生できる曲がまだありません。");
+
+    const enChangelogHtml = renderToStaticMarkup(
+      await LocalizedChangelogPage({ params: Promise.resolve({ locale: "en" }) })
+    );
+    const jaChangelogHtml = renderToStaticMarkup(
+      await LocalizedChangelogPage({ params: Promise.resolve({ locale: "ja" }) })
+    );
+    expect(enChangelogHtml).toContain("Added 2026-06-04");
+    expect(enChangelogHtml).toContain('href="/en/charts/song-4"');
+    expect(jaChangelogHtml).toContain("2026-06-04 に追加");
+  });
+
   test("zh and invalid locale routes throw notFound", async () => {
     notFound.mockClear();
 

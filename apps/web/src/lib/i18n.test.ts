@@ -159,14 +159,14 @@ describe("i18n helpers", () => {
       title: "Browse Charts",
       description:
         "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download.",
-      keywords: ["AstroDX", "ADX 谱面资源", "browse charts", "category filter", "display language"],
+      keywords: ["AstroDX", "ADX Chart Archive", "browse charts", "category filter", "display language"],
     });
     expect(jaPages.charts).toEqual({
       pathname: "/charts",
       title: "譜面一覧",
       description:
         "収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。",
-      keywords: ["AstroDX", "ADX 谱面资源", "譜面一覧", "分類フィルタ", "表示言語"],
+      keywords: ["AstroDX", "ADX 譜面アーカイブ", "譜面一覧", "分類フィルタ", "表示言語"],
     });
   });
 
@@ -184,7 +184,7 @@ describe("i18n helpers", () => {
       keywords: [],
     });
 
-    expect(metadata?.title).toBe("Search | ADX 谱面资源");
+    expect(metadata?.title).toBe("Search | ADX Chart Archive");
     expect(metadata?.description).toBe(
       "Built from remote AstroDX directory scans, with per-song metadata, chart parsing, and a unified catalog for static deployment."
     );
@@ -231,11 +231,11 @@ describe("i18n helpers", () => {
 
     const metadata = pageMetadata.buildLocalizedPageMetadata?.("ja", "charts");
 
-    expect(metadata?.title).toBe("AstroDX 譜面一覧とダウンロードカタログ | ADX 谱面资源");
+    expect(metadata?.title).toBe("AstroDX 譜面一覧とダウンロードカタログ | ADX 譜面アーカイブ");
     expect(metadata?.description).toBe("収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。");
     expect(metadata?.keywords).toEqual([
       "AstroDX",
-      "ADX 谱面资源",
+      "ADX 譜面アーカイブ",
       "譜面一覧",
       "分類フィルタ",
       "表示言語",
@@ -252,13 +252,13 @@ describe("i18n helpers", () => {
       ja: "/ja/charts",
     });
     expect(metadata?.openGraph).toMatchObject({
-      title: "AstroDX 譜面一覧とダウンロードカタログ | ADX 谱面资源",
+      title: "AstroDX 譜面一覧とダウンロードカタログ | ADX 譜面アーカイブ",
       description: "収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。",
       url: "https://adxdls.saop.cc/ja/charts",
-      siteName: "ADX 谱面资源",
+      siteName: "ADX 譜面アーカイブ",
     });
     expect(metadata?.twitter).toMatchObject({
-      title: "AstroDX 譜面一覧とダウンロードカタログ | ADX 谱面资源",
+      title: "AstroDX 譜面一覧とダウンロードカタログ | ADX 譜面アーカイブ",
       description: "収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。",
     });
   });
