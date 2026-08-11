@@ -432,7 +432,15 @@ function DetailPanel({
             {title}
           </SheetTitle>
         </SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+        {/* `flex-auto`, not `flex-1`. The centered variant sizes itself with
+            `h-fit`, and a `flex: 1 1 0%` child has no basis to contribute to a
+            fit-content parent — WebKit resolves that to zero, which collapsed
+            the audio and comment panels on iOS to just their title bar. With
+            `flex: 1 1 auto` the body's own content is the basis, so the panel
+            grows to fit, and `min-h-0` still lets it shrink and scroll once the
+            container hits its max height. The fullscreen variant has a definite
+            height, so it is unaffected either way. */}
+        <div className="min-h-0 flex-auto overflow-y-auto">{children}</div>
       </SheetContent>
     </Sheet>
   );

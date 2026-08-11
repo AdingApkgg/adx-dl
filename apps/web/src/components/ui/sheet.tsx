@@ -41,8 +41,14 @@ const sheetVariantClass: Record<SheetVariant, string> = {
   // would be overwritten mid-animation: tw-animate-css's enter/exit keyframes
   // set `transform` wholesale, so the panel would snap to the top-left corner
   // for the duration of the fade.
+  //
+  // `h-fit` means the panel is only as tall as its content, so whatever this
+  // wraps must contribute an intrinsic height — a `flex: 1 1 0%` child does not,
+  // and WebKit collapses it (see the note in chart-detail-actions.tsx). The cap
+  // is in `dvh` so a mobile browser's retractable chrome shrinks the panel
+  // instead of pushing its bottom off-screen.
   centered: cn(
-    "inset-0 m-auto h-fit max-h-[min(88vh,760px)] w-[calc(100vw-2rem)] max-w-4xl rounded-xl border border-border/70",
+    "inset-0 m-auto h-fit max-h-[min(88dvh,760px)] w-[calc(100vw-2rem)] max-w-4xl rounded-xl border border-border/70",
     "data-closed:zoom-out-95 data-open:zoom-in-95"
   ),
   fullscreen: cn(
