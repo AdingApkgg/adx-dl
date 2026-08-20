@@ -10,7 +10,13 @@ Vendored from **Lxns-Network/maimai-prober-frontend** (`packages/maimai-chart-en
 MIT licensed — see `LICENSE`. Copy taken verbatim; keep changes minimal so it can
 be re-synced from upstream. If you patch it, note the change here.
 
-**Last synced:** upstream commit `b3ec6089b2834f4074ef590a39b1b137b2904609` (2026-07-24).
+**Last synced:** upstream commit `8ef0d710e` (2026-08-21, cherry-picked by hand —
+the only engine change since the previous full sync). Pulled PR #82: simai `@`
+slide-head modifier (`hasTapHead` on `SlideNote` — head renders as a plain TAP
+in `TAP_PINK` instead of a star) and order-free TAP modifiers (`1$b` ≡ `1b$`,
+spinning star by `$` count).
+
+Previous full sync: upstream commit `b3ec6089b2834f4074ef590a39b1b137b2904609` (2026-07-24).
 That sync pulled the extreme-density render optimizations (time-window binary
 culling in the render loop, offline mixing of dense hit SFX), simai parser fixes
 and extensions (`<HS*x>` visual hi-speed markers, `&first` audio offset, inline
