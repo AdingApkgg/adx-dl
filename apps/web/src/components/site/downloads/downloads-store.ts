@@ -40,7 +40,7 @@ import {
   type CustomDownloadSourceId,
   type DownloadSourceId,
 } from "@/lib/download-sources";
-import { tagMaidataInputs } from "@/lib/maidata-title";
+import { chartDirWithMaidataId, tagMaidataInputs } from "@/lib/maidata-title";
 import {
   runMultiFileDownload,
   type AdxFileProgress,
@@ -1038,11 +1038,24 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       if (!isCurrentRun()) {
         return;
       }
+      // Chart dirs may predate the id-prefix naming (stale cached specs,
+      // persisted jobs, history reruns); heal them from each chart's own
+      // maidata so replays cannot reintroduce the same-name overwrite bug.
+      const healDir = async (dir: string, maidataName: string): Promise<string> => {
+        const maidata = packedInputs.find((input) => input.name === maidataName);
+        return maidata ? chartDirWithMaidataId(dir, await maidata.blob.text()) : dir;
+      };
       if (spec.kind === "batch") {
+        const dirByIndex = await Promise.all(
+          (spec.dirByIndex ?? []).map((dir, index) => healDir(dir, `${index}/maidata.txt`))
+        );
+        if (!isCurrentRun()) {
+          return;
+        }
         // A cross-version selection saves one archive per version instead of
         // merging every version folder into a single giant archive. Archives
         // build sequentially with cumulative progress across the whole set.
-        const charts = regroupBatch(packedInputs, spec.dirByIndex ?? [], spec.groupByIndex ?? []);
+        const charts = regroupBatch(packedInputs, dirByIndex, spec.groupByIndex ?? []);
         const groups = splitBatchArchives(charts, spec.title);
         let fileOffset = 0;
         let byteOffset = 0;
@@ -1081,18 +1094,22 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
           }
         }
       } else {
+        const dirName = await healDir(spec.title, "maidata.txt");
+        if (!isCurrentRun()) {
+          return;
+        }
         const archiveBlob = spec.groupDir
           ? await buildNestedArchiveBlob(
-              [{ name: spec.title, groupDir: spec.groupDir, files: packedInputs }],
+              [{ name: dirName, groupDir: spec.groupDir, files: packedInputs }],
               format,
               undefined,
               onArchiveProgress
             )
-          : await buildArchiveBlob(packedInputs, format, spec.title, onArchiveProgress);
+          : await buildArchiveBlob(packedInputs, format, dirName, onArchiveProgress);
         if (!isCurrentRun()) {
           return;
         }
-        saveBlobAsFile(archiveBlob, getArchiveDownloadFileName(spec.title, format));
+        saveBlobAsFile(archiveBlob, getArchiveDownloadFileName(dirName, format));
       }
 
       if (!isCurrentRun()) {

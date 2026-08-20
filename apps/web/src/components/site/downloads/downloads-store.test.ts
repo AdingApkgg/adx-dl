@@ -392,7 +392,7 @@ describe("downloads-store", () => {
     );
   });
 
-  test("tags a standard chart's maidata title with [SD] in the packed archive only", async () => {
+  test("tags [SD] titles and heals old-style dirs in the packed archive only", async () => {
     const stMaidata = "&title=ジングルベル\r\n&artist=SEGA\r\n&shortid=70\r\n&inote_2=(100)E\r\n";
     const dxMaidata = "&title=ジングルベル\r\n&artist=SEGA\r\n&shortid=10070\r\n&inote_2=(100)E\r\n";
     const encoder = new TextEncoder();
@@ -435,12 +435,14 @@ describe("downloads-store", () => {
         })
       )
     );
-    // The standard chart is tagged; the DX chart is untouched byte for byte.
-    // (Pack-time-only is covered by maidata-title.test.ts's blob-identity
-    // cases; a successful job deletes its checkpoints, so there is nothing
-    // persisted left to compare here.)
-    expect(unpacked["st-jingle.adx"]).toContain("&title=ジングルベル [SD]\r\n");
-    expect(unpacked["dx-jingle.adx"]).toBe(dxMaidata);
+    // The standard chart is tagged; the DX chart's maidata is untouched byte
+    // for byte. The old-style dirs the job was started with ("st-jingle",
+    // "dx-jingle") are healed from each maidata's &shortid into the id-prefixed
+    // archive names. (Pack-time-only is covered by maidata-title.test.ts's
+    // blob-identity cases; a successful job deletes its checkpoints, so there
+    // is nothing persisted left to compare here.)
+    expect(unpacked["000070 st-jingle.adx"]).toContain("&title=ジングルベル [SD]\r\n");
+    expect(unpacked["010070 dx-jingle.adx"]).toBe(dxMaidata);
   });
 
   test("uses and persists the preferred format when a start omits an override", async () => {

@@ -21,6 +21,7 @@
  * shortid, no change.
  */
 import type { AdxArchiveInput } from "./adx-archive-shared";
+import { chartDownloadDirName } from "./catalog-shared";
 
 const STANDARD_SHORT_ID_MAX = 10000;
 const UTAGE_SHORT_ID_MIN = 100000;
@@ -33,13 +34,16 @@ const MAIDATA_NAME = /(?:^|\/)maidata\.txt$/;
  * (`===`) when there is nothing to do — callers use the identity to skip
  * rebuilding the Blob.
  */
+/** The numeric `&shortid` inside a maidata, or null when absent/non-numeric. */
+function maidataShortid(text: string): string | null {
+  const match = /^﻿?&shortid=([^\r\n]*)/m.exec(text);
+  const shortid = match?.[1]?.trim() ?? "";
+  return /^\d+$/.test(shortid) ? shortid : null;
+}
+
 export function tagMaidataTitle(text: string): string {
-  const shortidMatch = /^﻿?&shortid=([^\r\n]*)/m.exec(text);
-  if (!shortidMatch) {
-    return text;
-  }
-  const shortid = shortidMatch[1]!.trim();
-  if (!/^\d+$/.test(shortid)) {
+  const shortid = maidataShortid(text);
+  if (shortid === null) {
     return text;
   }
   const id = Number(shortid);
@@ -90,4 +94,26 @@ export async function tagMaidataInputs(inputs: AdxArchiveInput[]): Promise<AdxAr
       return { ...input, blob: new Blob([tagged]) };
     })
   );
+}
+
+/**
+ * Heals a chart folder name that predates the id-prefix naming: specs served
+ * from a stale SW cache, persisted jobs and download-history reruns replay
+ * their stored `dir` verbatim, which would quietly reintroduce the same-name
+ * overwrite bug the prefix exists to fix. The shortid comes out of the chart's
+ * own maidata at pack time, and `chartDownloadDirName` reapplies the exact
+ * naming rules (zero-padding, byte budget). A dir that already carries a
+ * 6-digit prefix — or a maidata without a usable shortid — passes through
+ * unchanged.
+ */
+export function chartDirWithMaidataId(dir: string, maidataText: string): string {
+  const trimmed = dir.trim();
+  if (/^\d{6} /.test(trimmed)) {
+    return dir;
+  }
+  const shortid = maidataShortid(maidataText);
+  if (shortid === null) {
+    return dir;
+  }
+  return chartDownloadDirName({ short_id: shortid, remote_dir_name: trimmed });
 }

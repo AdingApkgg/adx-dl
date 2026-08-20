@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { tagMaidataInputs, tagMaidataTitle } from "./maidata-title";
+import { chartDirWithMaidataId, tagMaidataInputs, tagMaidataTitle } from "./maidata-title";
 
 /** A miniature but shape-accurate maidata: CRLF line endings, real field order. */
 function maidata(shortid: string, title = "ジングルベル"): string {
@@ -146,5 +146,35 @@ describe("tagMaidataInputs", () => {
     const result = await tagMaidataInputs(inputs);
 
     expect(result[0]?.blob).toBe(inputs[0]!.blob);
+  });
+});
+
+describe("chartDirWithMaidataId", () => {
+  test("prefixes an old-style dir with the zero-padded shortid", () => {
+    expect(chartDirWithMaidataId("ジングルベル", maidata("70"))).toBe("000070 ジングルベル");
+    expect(chartDirWithMaidataId("ジングルベル", maidata("10070"))).toBe(
+      "010070 ジングルベル"
+    );
+  });
+
+  test("leaves an already-prefixed dir alone", () => {
+    expect(chartDirWithMaidataId("000070 ジングルベル", maidata("70"))).toBe(
+      "000070 ジングルベル"
+    );
+  });
+
+  test("leaves the dir alone without a usable shortid", () => {
+    expect(chartDirWithMaidataId("ジングルベル", "&title=x\r\n&inote_2=E\r\n")).toBe(
+      "ジングルベル"
+    );
+    expect(chartDirWithMaidataId("ジングルベル", maidata("n/a"))).toBe("ジングルベル");
+  });
+
+  test("applies the byte budget when prefixing", () => {
+    const long = "ア".repeat(45); // 135 bytes; prefixed it must shrink to <= 125
+    const dir = chartDirWithMaidataId(long, maidata("547"));
+
+    expect(dir.startsWith("000547 ")).toBe(true);
+    expect(new TextEncoder().encode(dir).length).toBeLessThanOrEqual(125);
   });
 });
