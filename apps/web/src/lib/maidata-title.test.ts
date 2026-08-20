@@ -34,10 +34,24 @@ describe("tagMaidataTitle", () => {
     expect(tagged.replace("ジングルベル [DX]", "ジングルベル")).toBe(maidata("10070"));
   });
 
-  test("returns the input string itself for an UTAGE chart", () => {
-    const text = maidata("100070", "[即]ジングルベル");
+  test("appends the shortid to an UTAGE chart's title", () => {
+    // The [X] kanji prefix identifies the kind but not the chart: a song can
+    // have two utage charts with the SAME kanji (111634/121634 are both
+    // [協]青春コンプレックス), so only the id makes the title unique.
+    const tagged = tagMaidataTitle(maidata("100070", "[即]ジングルベル"));
 
-    expect(tagMaidataTitle(text)).toBe(text);
+    expect(tagged).toContain("&title=[即]ジングルベル [100070]\r\n");
+    expect(tagged.replace("ジングルベル [100070]", "ジングルベル")).toBe(
+      maidata("100070", "[即]ジングルベル")
+    );
+  });
+
+  test("same-kanji utage charts of one song get distinct titles", () => {
+    const a = tagMaidataTitle(maidata("111634", "[協]青春コンプレックス"));
+    const b = tagMaidataTitle(maidata("121634", "[協]青春コンプレックス"));
+
+    expect(a).toContain("&title=[協]青春コンプレックス [111634]\r\n");
+    expect(b).toContain("&title=[協]青春コンプレックス [121634]\r\n");
   });
 
   test("leaves a file without &shortid alone", () => {
@@ -52,12 +66,14 @@ describe("tagMaidataTitle", () => {
     expect(tagMaidataTitle(text)).toBe(text);
   });
 
-  test("is idempotent for both kinds", () => {
+  test("is idempotent for every kind", () => {
     const sd = tagMaidataTitle(maidata("70"));
     const dx = tagMaidataTitle(maidata("10070"));
+    const utage = tagMaidataTitle(maidata("100070", "[即]ジングルベル"));
 
     expect(tagMaidataTitle(sd)).toBe(sd);
     expect(tagMaidataTitle(dx)).toBe(dx);
+    expect(tagMaidataTitle(utage)).toBe(utage);
   });
 
   test("leaves an empty title alone", () => {
@@ -113,7 +129,7 @@ describe("tagMaidataInputs", () => {
 
   test("keeps blob identity when nothing needs tagging", async () => {
     const inputs = [
-      input("maidata.txt", maidata("100070", "[即]ジングルベル")),
+      input("maidata.txt", maidata("not-a-number")),
       input("bg.png", "not really an image"),
     ];
     const result = await tagMaidataInputs(inputs);
