@@ -709,12 +709,6 @@ export type SiteDictionary = {
     browseCharts: string;
     detailsLabel: string;
   };
-  /** Toast shown when a new service worker has installed and is waiting to take over. */
-  swUpdate: {
-    message: string;
-    action: string;
-    dismiss: string;
-  };
   /** Connectivity bar driven by the online/offline events. */
   connection: {
     offline: string;
@@ -1425,11 +1419,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       backHome: "返回首页",
       browseCharts: "浏览曲库",
       detailsLabel: "错误详情",
-    },
-    swUpdate: {
-      message: "站点已更新到新版本。",
-      action: "刷新",
-      dismiss: "稍后",
     },
     connection: {
       offline: "当前离线，部分内容可能无法加载。",
@@ -2176,11 +2165,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       browseCharts: "Browse charts",
       detailsLabel: "Error details",
     },
-    swUpdate: {
-      message: "A new version of the site is available.",
-      action: "Reload",
-      dismiss: "Later",
-    },
     connection: {
       offline: "You're offline — some content may not load.",
       restored: "Back online.",
@@ -2909,11 +2893,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       backHome: "ホームへ戻る",
       browseCharts: "譜面一覧を見る",
       detailsLabel: "エラーの詳細",
-    },
-    swUpdate: {
-      message: "サイトの新しいバージョンがあります。",
-      action: "再読み込み",
-      dismiss: "後で",
     },
     connection: {
       offline: "オフラインです。一部のコンテンツを読み込めない場合があります。",

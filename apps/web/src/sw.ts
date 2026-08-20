@@ -24,6 +24,13 @@ import {
 } from "serwist";
 
 import { CHART_MEDIA_HOST } from "./lib/chart-media";
+import {
+  hasStaleShellAssets,
+  shellAssetKeys,
+  SHELL_STATE_CACHE,
+  SHELL_STATE_KEY,
+  SHELL_UPDATED_MESSAGE,
+} from "./lib/sw-shell";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -182,6 +189,50 @@ const runtimeCaching: RuntimeCaching[] = [
   },
 ];
 
+/**
+ * Records this build's app-shell assets and, when the previous build's are no
+ * longer all there, tells every open tab to reload itself.
+ *
+ * This is the other half of `skipWaiting` below. Activating immediately sweeps
+ * precache entries this build no longer lists, so a tab still running the old
+ * build would lazy-load a chunk that is gone from the cache AND from the origin
+ * (GitHub Pages replaces the whole tree on deploy). Reloading is the fix — but
+ * only when something was actually swept: CI redeploys the site every day just
+ * to rotate the homepage spotlight, and those builds ship byte-identical chunks.
+ */
+async function reloadClientsIfShellChanged(): Promise<void> {
+  const next = shellAssetKeys(self.__SW_MANIFEST ?? []);
+  const cache = await caches.open(SHELL_STATE_CACHE);
+  const stored = await cache.match(SHELL_STATE_KEY);
+  const parsed: unknown = stored ? await stored.json() : null;
+  const previous = Array.isArray(parsed) ? (parsed as string[]) : null;
+
+  // Written before anything can throw, so a failure below cannot leave this
+  // build asking every tab to reload again on the next activation.
+  await cache.put(SHELL_STATE_KEY, new Response(JSON.stringify(next)));
+
+  // No record means this is the first worker on the origin: there is no older
+  // build for an open tab to be stranded on.
+  if (previous === null || !hasStaleShellAssets(previous, next)) {
+    return;
+  }
+
+  const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  for (const client of clients) {
+    client.postMessage({ type: SHELL_UPDATED_MESSAGE });
+  }
+}
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    reloadClientsIfShellChanged().catch(() => {
+      // Never block activation on the reload check. The stored list is only
+      // rewritten on success, so the next activation compares against the last
+      // list we know landed — erring towards a reload, not towards silence.
+    })
+  );
+});
+
 // Earlier deployments cached opaque cover responses (see runtime rule 2). They
 // would keep failing CORS-mode consumers for up to 30 days, so drop them once
 // on activation; the CORS-mode strategy refills the cache as covers are viewed.
@@ -203,13 +254,16 @@ self.addEventListener("activate", (event) => {
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
-  // Deliberately NOT skipWaiting. Activating immediately sweeps the previous
-  // build's precached `_next/static` chunks out from under every open tab, so a
-  // long-lived tab that lazy-loads anything afterwards throws ChunkLoadError.
-  // The new worker now waits; ServiceWorkerRegistrar surfaces a "reload to
-  // update" prompt and posts SKIP_WAITING when the user accepts (Serwist
-  // installs that message handler for us whenever skipWaiting is false).
-  skipWaiting: false,
+  // Updates apply silently: the new worker takes over as soon as it installs,
+  // with no "reload to update" prompt anywhere.
+  //
+  // This is only safe because it is paired with `reloadClientsIfShellChanged()`
+  // above. Activating sweeps the previous build's precached `_next/static`
+  // chunks out from under every open tab, and the deleted hashes are gone from
+  // the origin too, so a long-lived tab that lazy-loads anything afterwards
+  // throws ChunkLoadError — unless it reloads. Do not remove one without the
+  // other.
+  skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching,

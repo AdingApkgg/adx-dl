@@ -36,6 +36,13 @@ const config = {
     "**/charts/**",
     "**/_next/data/**",
     "**/*.map",
+    // The only precache candidates whose URL is not content-hashed: their
+    // directory is the buildId, which `next build` regenerates every run. The
+    // App Router export never requests them (checked against a real `out/`), so
+    // in they would only churn the manifest — and src/sw.ts decides whether to
+    // reload open tabs by asking whether any precached URL disappeared.
+    "**/_next/static/*/_buildManifest.js",
+    "**/_next/static/*/_ssgManifest.js",
   ],
   // A few first-load JS chunks can exceed the 2 MiB default.
   maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
