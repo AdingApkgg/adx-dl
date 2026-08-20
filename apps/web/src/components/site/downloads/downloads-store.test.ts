@@ -392,6 +392,57 @@ describe("downloads-store", () => {
     );
   });
 
+  test("tags a standard chart's maidata title with [SD] in the packed archive only", async () => {
+    const stMaidata = "&title=ジングルベル\r\n&artist=SEGA\r\n&shortid=70\r\n&inote_2=(100)E\r\n";
+    const dxMaidata = "&title=ジングルベル\r\n&artist=SEGA\r\n&shortid=10070\r\n&inote_2=(100)E\r\n";
+    const encoder = new TextEncoder();
+    globalThis.fetch = (async (input) => {
+      const url = String(input);
+      fetchedUrls.push(url);
+      const body = url.includes("/0/70/")
+        ? encoder.encode(stMaidata)
+        : url.includes("/19/10070/")
+          ? encoder.encode(dxMaidata)
+          : new Uint8Array([1, 2, 3]);
+      return new Response(body, {
+        status: 200,
+        headers: { "content-length": String(body.length) },
+      });
+    }) as typeof fetch;
+
+    for (const [dir, url] of [
+      ["st-jingle", "https://astrodx-charts.saop.cc/0/70/maidata.txt"],
+      ["dx-jingle", "https://astrodx-charts.saop.cc/19/10070/maidata.txt"],
+    ] as const) {
+      const id = singleJobId(dir);
+      useDownloadsStore.getState().startSingle({
+        id,
+        title: dir,
+        files: [{ name: "maidata.txt", url }],
+        includeVideo: true,
+        format: "adx",
+      });
+      await waitForSettled(id);
+    }
+
+    const decoder = new TextDecoder();
+    const unpacked = Object.fromEntries(
+      await Promise.all(
+        savedFiles.map(async (name, index) => {
+          const entries = unzipSync(new Uint8Array(await savedBlobs[index]!.arrayBuffer()));
+          const maidata = Object.entries(entries).find(([path]) => path.endsWith("maidata.txt"));
+          return [name, decoder.decode(maidata![1])] as const;
+        })
+      )
+    );
+    // The standard chart is tagged; the DX chart is untouched byte for byte.
+    // (Pack-time-only is covered by maidata-title.test.ts's blob-identity
+    // cases; a successful job deletes its checkpoints, so there is nothing
+    // persisted left to compare here.)
+    expect(unpacked["st-jingle.adx"]).toContain("&title=ジングルベル [SD]\r\n");
+    expect(unpacked["dx-jingle.adx"]).toBe(dxMaidata);
+  });
+
   test("uses and persists the preferred format when a start omits an override", async () => {
     useDownloadsStore.getState().setPreferredFormat("zip");
     expect(localStorageValues.get("astrodx-download-format")).toBe("zip");

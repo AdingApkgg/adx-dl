@@ -40,6 +40,7 @@ import {
   type CustomDownloadSourceId,
   type DownloadSourceId,
 } from "@/lib/download-sources";
+import { tagStandardMaidataInputs } from "@/lib/maidata-title";
 import {
   runMultiFileDownload,
   type AdxFileProgress,
@@ -982,9 +983,17 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         return;
       }
 
+      // Tag standard charts' `&title` with " [SD]" so the two same-named charts
+      // of a song stay tellable apart in AstroDX's level list. Pack-time only:
+      // the checkpoints persisted above and the served files keep the original.
+      const packedInputs = await tagStandardMaidataInputs(archiveInputs);
+      if (!isCurrentRun()) {
+        return;
+      }
+
       // All bytes are on hand; building the archive can take a while for big
       // batches, so surface it as its own phase instead of a full, frozen bar.
-      const archiveTotalBytes = archiveInputs.reduce((sum, input) => sum + input.blob.size, 0);
+      const archiveTotalBytes = packedInputs.reduce((sum, input) => sum + input.blob.size, 0);
       patchCurrentJob({
         status: "archiving",
         completed: 0,
@@ -1032,7 +1041,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         // A cross-version selection saves one archive per version instead of
         // merging every version folder into a single giant archive. Archives
         // build sequentially with cumulative progress across the whole set.
-        const charts = regroupBatch(archiveInputs, spec.dirByIndex ?? [], spec.groupByIndex ?? []);
+        const charts = regroupBatch(packedInputs, spec.dirByIndex ?? [], spec.groupByIndex ?? []);
         const groups = splitBatchArchives(charts, spec.title);
         let fileOffset = 0;
         let byteOffset = 0;
@@ -1049,7 +1058,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
             (progress) =>
               onArchiveProgress({
                 completedFiles: fileOffset + progress.completedFiles,
-                totalFiles: archiveInputs.length,
+                totalFiles: packedInputs.length,
                 writtenBytes: byteOffset + progress.writtenBytes,
                 totalBytes: archiveTotalBytes,
                 currentFile: progress.currentFile,
@@ -1073,12 +1082,12 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       } else {
         const archiveBlob = spec.groupDir
           ? await buildNestedArchiveBlob(
-              [{ name: spec.title, groupDir: spec.groupDir, files: archiveInputs }],
+              [{ name: spec.title, groupDir: spec.groupDir, files: packedInputs }],
               format,
               undefined,
               onArchiveProgress
             )
-          : await buildArchiveBlob(archiveInputs, format, spec.title, onArchiveProgress);
+          : await buildArchiveBlob(packedInputs, format, spec.title, onArchiveProgress);
         if (!isCurrentRun()) {
           return;
         }
