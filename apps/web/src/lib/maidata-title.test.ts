@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { tagStandardMaidataInputs, tagStandardMaidataTitle } from "./maidata-title";
+import { tagMaidataInputs, tagMaidataTitle } from "./maidata-title";
 
 /** A miniature but shape-accurate maidata: CRLF line endings, real field order. */
 function maidata(shortid: string, title = "ジングルベル"): string {
@@ -18,9 +18,9 @@ function maidata(shortid: string, title = "ジングルベル"): string {
   ].join("\r\n");
 }
 
-describe("tagStandardMaidataTitle", () => {
+describe("tagMaidataTitle", () => {
   test("appends [SD] to a standard chart's title", () => {
-    const tagged = tagStandardMaidataTitle(maidata("70"));
+    const tagged = tagMaidataTitle(maidata("70"));
 
     expect(tagged).toContain("&title=ジングルベル [SD]\r\n");
     // Only the title line changes; everything else must be byte-identical.
@@ -30,48 +30,60 @@ describe("tagStandardMaidataTitle", () => {
   test("returns the input string itself for a DX chart", () => {
     const text = maidata("10070");
 
-    expect(tagStandardMaidataTitle(text)).toBe(text);
+    expect(tagMaidataTitle(text)).toBe(text);
   });
 
-  test("returns the input string itself for an UTAGE chart", () => {
-    const text = maidata("100070", "[即]ジングルベル");
+  test("moves an UTAGE chart's kanji prefix to a spaced suffix", () => {
+    const tagged = tagMaidataTitle(maidata("100070", "[即]ジングルベル"));
 
-    expect(tagStandardMaidataTitle(text)).toBe(text);
+    expect(tagged).toContain("&title=ジングルベル [即]\r\n");
+    // Only the title line changes; everything else must be byte-identical.
+    expect(tagged.replace("ジングルベル [即]", "[即]ジングルベル")).toBe(
+      maidata("100070", "[即]ジングルベル")
+    );
+  });
+
+  test("leaves an UTAGE title without a bracket prefix alone", () => {
+    const text = maidata("100999", "素のタイトル");
+
+    expect(tagMaidataTitle(text)).toBe(text);
   });
 
   test("leaves a file without &shortid alone", () => {
     const text = "&title=Custom Song\r\n&artist=someone\r\n&inote_5=(120)E\r\n";
 
-    expect(tagStandardMaidataTitle(text)).toBe(text);
+    expect(tagMaidataTitle(text)).toBe(text);
   });
 
   test("leaves a non-numeric &shortid alone", () => {
     const text = maidata("abc");
 
-    expect(tagStandardMaidataTitle(text)).toBe(text);
+    expect(tagMaidataTitle(text)).toBe(text);
   });
 
   test("is idempotent", () => {
-    const tagged = tagStandardMaidataTitle(maidata("70"));
+    const sd = tagMaidataTitle(maidata("70"));
+    const utage = tagMaidataTitle(maidata("100070", "[即]ジングルベル"));
 
-    expect(tagStandardMaidataTitle(tagged)).toBe(tagged);
+    expect(tagMaidataTitle(sd)).toBe(sd);
+    expect(tagMaidataTitle(utage)).toBe(utage);
   });
 
   test("leaves an empty title alone", () => {
     const text = maidata("70", "");
 
-    expect(tagStandardMaidataTitle(text)).toBe(text);
+    expect(tagMaidataTitle(text)).toBe(text);
   });
 
   test("tolerates and preserves a UTF-8 BOM", () => {
     const text = `﻿${maidata("70")}`;
-    const tagged = tagStandardMaidataTitle(text);
+    const tagged = tagMaidataTitle(text);
 
     expect(tagged.startsWith("﻿&title=ジングルベル [SD]")).toBe(true);
   });
 
   test("works with LF line endings too", () => {
-    const tagged = tagStandardMaidataTitle("&title=Song\n&shortid=70\n&inote_2=E\n");
+    const tagged = tagMaidataTitle("&title=Song\n&shortid=70\n&inote_2=E\n");
 
     expect(tagged).toBe("&title=Song [SD]\n&shortid=70\n&inote_2=E\n");
   });
@@ -79,13 +91,13 @@ describe("tagStandardMaidataTitle", () => {
   test("only rewrites the first &title line", () => {
     const text = "&title=Song\r\n&shortid=70\r\n&inote_2=E\r\n&title=Song\r\n";
 
-    expect(tagStandardMaidataTitle(text)).toBe(
+    expect(tagMaidataTitle(text)).toBe(
       "&title=Song [SD]\r\n&shortid=70\r\n&inote_2=E\r\n&title=Song\r\n"
     );
   });
 });
 
-describe("tagStandardMaidataInputs", () => {
+describe("tagMaidataInputs", () => {
   const encoder = new TextEncoder();
   const input = (name: string, content: string | Uint8Array) => ({
     name,
@@ -100,7 +112,7 @@ describe("tagStandardMaidataInputs", () => {
       input("3/maidata.txt", maidata("131", "Link")),
       input("track.mp3", "not really audio"),
     ];
-    const result = await tagStandardMaidataInputs(inputs);
+    const result = await tagMaidataInputs(inputs);
 
     expect(await result[0]?.blob.text()).toContain("&title=ジングルベル [SD]\r\n");
     expect(await result[1]?.blob.text()).toContain("&title=Link [SD]\r\n");
@@ -113,7 +125,7 @@ describe("tagStandardMaidataInputs", () => {
       input("maidata.txt", maidata("10070")),
       input("bg.png", "not really an image"),
     ];
-    const result = await tagStandardMaidataInputs(inputs);
+    const result = await tagMaidataInputs(inputs);
 
     expect(result[0]?.blob).toBe(inputs[0]!.blob);
     expect(result[1]?.blob).toBe(inputs[1]!.blob);
@@ -124,14 +136,14 @@ describe("tagStandardMaidataInputs", () => {
     // and re-encoding that would corrupt the file. It must pass through as-is.
     const gbkish = new Uint8Array([...encoder.encode("&title="), 0xd6, 0xd0, ...encoder.encode("\r\n&shortid=70\r\n")]);
     const inputs = [input("maidata.txt", gbkish)];
-    const result = await tagStandardMaidataInputs(inputs);
+    const result = await tagMaidataInputs(inputs);
 
     expect(result[0]?.blob).toBe(inputs[0]!.blob);
   });
 
   test("does not touch files merely named like maidata", async () => {
     const inputs = [input("maidata.txt.bak", maidata("70"))];
-    const result = await tagStandardMaidataInputs(inputs);
+    const result = await tagMaidataInputs(inputs);
 
     expect(result[0]?.blob).toBe(inputs[0]!.blob);
   });
