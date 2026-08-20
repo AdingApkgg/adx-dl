@@ -40,7 +40,7 @@ import {
   type CustomDownloadSourceId,
   type DownloadSourceId,
 } from "@/lib/download-sources";
-import { tagMaidataInputs } from "@/lib/maidata-title";
+import { tagStandardMaidataInputs } from "@/lib/maidata-title";
 import {
   runMultiFileDownload,
   type AdxFileProgress,
@@ -983,11 +983,10 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         return;
       }
 
-      // Tag `&title` with the chart kind (" [SD]" / " [DX]") so same-named
-      // charts of a song stay tellable apart in AstroDX's level list. Pack-time
-      // only: the checkpoints persisted above and the served files keep the
-      // original.
-      const packedInputs = await tagMaidataInputs(archiveInputs);
+      // Tag standard charts' `&title` with " [SD]" so the two same-named charts
+      // of a song stay tellable apart in AstroDX's level list. Pack-time only:
+      // the checkpoints persisted above and the served files keep the original.
+      const packedInputs = await tagStandardMaidataInputs(archiveInputs);
       if (!isCurrentRun()) {
         return;
       }
