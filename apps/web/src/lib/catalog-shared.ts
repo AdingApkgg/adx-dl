@@ -396,9 +396,58 @@ export type ChartDownloadSpec = {
   genreDir?: string;
 };
 
+/**
+ * Longest chart folder name (in UTF-8 bytes) a download may use. tar's USTAR
+ * `prefix` field caps a file's directory path at 155 bytes, and a nested
+ * archive puts one grouping folder above the chart: the longest one is the
+ * genre 'niconico＆ボーカロイド' (29 bytes), so 125 + "/" + 29 = 155 exactly.
+ * Zip has no such limit — the budget exists so every offered format can pack
+ * every chart.
+ */
+const CHART_DIR_MAX_BYTES = 125;
+
+/**
+ * The download folder name for a chart: `<shortid, zero-padded to 6> <name>`.
+ *
+ * AstroDX flattens every archive into `levels/` keyed by this folder name and
+ * silently overwrites an existing folder with the same name, so the name must
+ * be unique per chart — 183 titles in the catalog are shared between two or
+ * more charts (a song's SD/DX/宴 versions), and without the id prefix those
+ * overwrite each other on import. The shortid is the only globally unique key
+ * (it also encodes the kind: <10000 SD, 1xxxx DX, 1xxxxx 宴), and zero-padding
+ * makes name-sorted file listings follow that same order. Re-downloading the
+ * same chart still lands on the same folder — an in-place update, as intended.
+ *
+ * Truncation to the byte budget always keeps the id prefix (uniqueness) and
+ * never splits a code point.
+ */
+export function chartDownloadDirName(
+  entry: Pick<CatalogEntry, "short_id" | "remote_dir_name">
+): string {
+  const id = entry.short_id.trim();
+  const prefix = /^\d+$/.test(id) ? `${id.padStart(6, "0")} ` : "";
+  const full = `${prefix}${entry.remote_dir_name.trim()}`;
+
+  const encoder = new TextEncoder();
+  if (encoder.encode(full).length <= CHART_DIR_MAX_BYTES) {
+    return full;
+  }
+  let result = "";
+  let bytes = 0;
+  for (const char of full) {
+    const width = encoder.encode(char).length;
+    if (bytes + width > CHART_DIR_MAX_BYTES) {
+      break;
+    }
+    result += char;
+    bytes += width;
+  }
+  return result.trimEnd();
+}
+
 export function getChartDownloadSpec(entry: CatalogEntry): ChartDownloadSpec {
   return {
-    dir: entry.remote_dir_name,
+    dir: chartDownloadDirName(entry),
     files: getChartAssetFiles(entry),
     groupDir: versionGroupFolderName(entry.version),
     genreDir: genreGroupFolderName(entry),

@@ -328,8 +328,12 @@ export async function buildNestedArchiveBlob(
     const used = usedByGroup.get(usedKey) ?? new Set<string>();
     usedByGroup.set(usedKey, used);
 
-    // Disambiguate the case where two selected charts share a directory name in
-    // the same group; identical names in different version folders can stay as-is.
+    // Fallback disambiguation for two charts sharing a directory name in the
+    // same group. Catalog specs prefix every dir with the unique shortid, so
+    // this only fires for stale cached specs or custom sources — and it CANNOT
+    // help across separate downloads: AstroDX flattens all archives into one
+    // levels/ folder, where same-named folders overwrite each other. Uniqueness
+    // has to come from the name itself (see chartDownloadDirName).
     const safeChartName = archivePathSegment(chart.name);
     let directoryName = safeChartName;
     for (let copy = 2; used.has(directoryName); copy += 1) {

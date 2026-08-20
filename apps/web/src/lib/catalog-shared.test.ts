@@ -20,6 +20,7 @@ import {
   difficultyDisplayLevels,
   formatEntrySubcategory,
   genreFilterQuery,
+  chartDownloadDirName,
   genreGroupFolderName,
   getChartAssetFiles,
   getChartDownloadSpec,
@@ -129,9 +130,56 @@ describe("catalog shared helpers", () => {
     ]);
   });
 
+  test("chartDownloadDirName prefixes the zero-padded shortid", () => {
+    expect(chartDownloadDirName({ short_id: "70", remote_dir_name: "ジングルベル" })).toBe(
+      "000070 ジングルベル"
+    );
+    expect(chartDownloadDirName({ short_id: "10070", remote_dir_name: "ジングルベル" })).toBe(
+      "010070 ジングルベル"
+    );
+    expect(chartDownloadDirName({ short_id: "100070", remote_dir_name: "ジングルベル" })).toBe(
+      "100070 ジングルベル"
+    );
+  });
+
+  test("chartDownloadDirName falls back to the bare name without a numeric id", () => {
+    expect(chartDownloadDirName({ short_id: "", remote_dir_name: "ジングルベル" })).toBe(
+      "ジングルベル"
+    );
+    expect(chartDownloadDirName({ short_id: "n/a", remote_dir_name: "ジングルベル" })).toBe(
+      "ジングルベル"
+    );
+  });
+
+  test("chartDownloadDirName keeps the folder inside the USTAR path budget", () => {
+    // The longest real chart name (149 bytes) — with the id prefix it would
+    // blow the 155-byte tar `prefix` field once a grouping folder is added.
+    const falseAmber =
+      "False Amber (from the Black Bazaar, Or by A Kervan Trader from the Lands Afar, " +
+      "Or Buried Beneath the Shifting Sands That Lead Everywhere but Nowhere)";
+    const dir = chartDownloadDirName({ short_id: "11885", remote_dir_name: falseAmber });
+    const encoder = new TextEncoder();
+
+    expect(encoder.encode(dir).length).toBeLessThanOrEqual(125);
+    expect(dir.startsWith("011885 False Amber")).toBe(true);
+    // 125 + "/" + the longest grouping folder (niconico＆ボーカロイド, 29 bytes)
+    // still fits tar's 155-byte prefix field.
+    expect(encoder.encode(`niconico＆ボーカロイド/${dir}`).length).toBeLessThanOrEqual(155);
+  });
+
+  test("chartDownloadDirName truncates at a character boundary", () => {
+    // 41 × 3-byte kana = 123 bytes; with the 7-byte prefix the 125-byte budget
+    // lands mid-character and must round down, not split a code point.
+    const longKana = "ア".repeat(41);
+    const dir = chartDownloadDirName({ short_id: "547", remote_dir_name: longKana });
+
+    expect(dir).toBe(`000547 ${"ア".repeat(39)}`);
+    expect(new TextEncoder().encode(dir).length).toBeLessThanOrEqual(125);
+  });
+
   test("getChartDownloadSpec carries the version and genre grouping folders", () => {
     expect(getChartDownloadSpec(buildEntry({ remote_dir_name: "11951" }))).toEqual({
-      dir: "11951",
+      dir: "011951 11951",
       files: [
         { name: "maidata.txt", url: "/adxcs/11951/maidata.txt" },
         { name: "track.mp3", url: "/covers/song-1/track.mp3" },

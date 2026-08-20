@@ -300,6 +300,30 @@ describe("adx archive", () => {
     ]);
   });
 
+  test("packs the worst-case folder budget into tar.gz", async () => {
+    // chartDownloadDirName caps chart dirs at 125 bytes precisely so that the
+    // longest grouping folder (niconico＆ボーカロイド, 29 bytes) still fits
+    // tar's 155-byte USTAR prefix field: 125 + "/" + 29 = 155.
+    const chartDir = `011885 ${"x".repeat(118)}`; // 125 bytes
+    const groupDir = "niconico＆ボーカロイド"; // 29 bytes
+    const blob = await buildNestedArchiveBlob(
+      [
+        {
+          name: chartDir,
+          groupDir,
+          files: [{ name: "maidata.txt", blob: new Blob([new Uint8Array([1])]) }],
+        },
+      ],
+      "tar.gz",
+      undefined,
+      undefined,
+      STAMP
+    );
+    const entries = tarEntries(gunzipSync(new Uint8Array(await blob.arrayBuffer())));
+
+    expect(Object.keys(entries)).toEqual([`${groupDir}/${chartDir}/maidata.txt`]);
+  });
+
   test("sanitizes path separators in archive directory names", async () => {
     const blob = await buildArchiveBlob(
       [entry("maidata.txt", "&title=Unsafe")],
