@@ -124,17 +124,17 @@ describe("CatalogBrowser", () => {
     // 宴会場 picked: the normal-chart types lock, and it stays clickable to undo.
     const utage = new Set(["UTAGE"]);
     expect(isCabinetLockedOut("DX", utage)).toBe(true);
-    expect(isCabinetLockedOut("ST", utage)).toBe(true);
+    expect(isCabinetLockedOut("SD", utage)).toBe(true);
     expect(isCabinetLockedOut("UTAGE", utage)).toBe(false);
 
     // A normal type picked: 宴会場 locks, but the other normal type stays open —
     // "DX or ST" is a real query (everything that isn't 宴会場).
     const dx = new Set(["DX"]);
     expect(isCabinetLockedOut("UTAGE", dx)).toBe(true);
-    expect(isCabinetLockedOut("ST", dx)).toBe(false);
+    expect(isCabinetLockedOut("SD", dx)).toBe(false);
     expect(isCabinetLockedOut("DX", dx)).toBe(false);
 
-    const both = new Set(["DX", "ST"]);
+    const both = new Set(["DX", "SD"]);
     expect(isCabinetLockedOut("UTAGE", both)).toBe(true);
     expect(isCabinetLockedOut("DX", both)).toBe(false);
   });
@@ -146,9 +146,9 @@ describe("CatalogBrowser", () => {
       genreIds: null,
       cabinetIds: null,
     });
-    expect(foldUtageGenreIntoCabinet(null, new Set(["ST"]))).toEqual({
+    expect(foldUtageGenreIntoCabinet(null, new Set(["SD"]))).toEqual({
       genreIds: null,
-      cabinetIds: new Set(["ST"]),
+      cabinetIds: new Set(["SD"]),
     });
     expect(foldUtageGenreIntoCabinet(new Set(["999", "abc"]), null)).toEqual({
       genreIds: new Set(),
@@ -156,9 +156,9 @@ describe("CatalogBrowser", () => {
     });
     // An unknown cabinet would otherwise filter the grid down to nothing with no
     // chip lit to explain it.
-    expect(foldUtageGenreIntoCabinet(null, new Set(["ST", "nope"]))).toEqual({
+    expect(foldUtageGenreIntoCabinet(null, new Set(["SD", "nope"]))).toEqual({
       genreIds: null,
-      cabinetIds: new Set(["ST"]),
+      cabinetIds: new Set(["SD"]),
     });
   });
 

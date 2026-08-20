@@ -166,7 +166,9 @@ def _maidata_url(relative_path: str) -> str:
 def _resolve_name_cabinet(title: str, short_id: str, path: str) -> tuple[str, str]:
     # The chart folders are named by shortid (e.g. "111069"), so cabinet can no
     # longer be read off a "[DX]"/"[奏]" folder prefix. Derive it from the stable
-    # maimai shortid convention instead: <10000 ST, 10000–99999 DX, >=100000 UTAGE.
+    # maimai shortid convention instead: <10000 SD, 10000–99999 DX, >=100000 UTAGE.
+    # "SD" (not "ST") is the ecosystem's standard-chart abbreviation — diving-fish's
+    # `type` field, the prober bots, SimaiHub — so that is what the catalog stores.
     # For UTAGE the specific 宴-character survives as the title's "[X]" prefix
     # (e.g. "[協]太陽系デスコ"), which we strip for the display/download name — the
     # same name the old "[協] …" folder prefix produced.
@@ -186,7 +188,7 @@ def _resolve_name_cabinet(title: str, short_id: str, path: str) -> tuple[str, st
     elif sid >= 10000:
         cabinet, name = "DX", title
     elif sid >= 0:
-        cabinet, name = "ST", title
+        cabinet, name = "SD", title
     else:
         cabinet, name = "", title
     if not name:

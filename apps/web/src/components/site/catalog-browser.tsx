@@ -578,7 +578,7 @@ export function CatalogBrowser({
   const cabinetOptions = React.useMemo(() => {
     const present = new Set<string>();
     for (const entry of entries) present.add(cabinetBucket(entry.cabinet));
-    return (["DX", "ST", "UTAGE"] as const).filter((value) => present.has(value));
+    return (["DX", "SD", "UTAGE"] as const).filter((value) => present.has(value));
   }, [entries]);
   const bpmValue = bpmRange ?? bpmBounds;
   // BGA (background video) presence — a single-select pair: with / without.
@@ -1317,7 +1317,7 @@ export function CatalogBrowser({
               const label =
                 value === "DX"
                   ? "DX"
-                  : value === "ST"
+                  : value === "SD"
                     ? dictionary.cabinetStandard
                     : dictionary.cabinetUtage;
               return (
@@ -1495,7 +1495,7 @@ export function CatalogBrowser({
             const label =
               value === "DX"
                 ? "DX"
-                : value === "ST"
+                : value === "SD"
                   ? dictionary.cabinetStandard
                   : dictionary.cabinetUtage;
             return (

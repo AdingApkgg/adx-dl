@@ -15,12 +15,12 @@ import { cn } from "@/lib/utils";
 // versionid 13 = "maimai DX" (first DX-era version); 0–12 are classic maimai.
 const DX_ERA_MIN_INDEX = 13;
 
-/** Which cabinet badge marks a version's era: DX (でらっくす) or ST (スタンダード). */
-export function versionEraCabinet(imageIndex: number | null): "DX" | "ST" | null {
+/** Which cabinet badge marks a version's era: DX (でらっくす) or SD (スタンダード). */
+export function versionEraCabinet(imageIndex: number | null): "DX" | "SD" | null {
   if (imageIndex === null) {
     return null;
   }
-  return imageIndex >= DX_ERA_MIN_INDEX ? "DX" : "ST";
+  return imageIndex >= DX_ERA_MIN_INDEX ? "DX" : "SD";
 }
 
 type VersionTileCardProps = {

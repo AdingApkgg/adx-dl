@@ -1,7 +1,7 @@
 import { CompatibleImage, type CompatibleImageSources } from "@/components/site/compatible-image";
 import { cn } from "@/lib/utils";
 
-// Cabinet/chart-type icon. DX and ST are the standard cabinets; every other
+// Cabinet/chart-type icon. DX and SD are the regular cabinets; every other
 // prefix (宴/協/奏/… and other single-char markers) is a UTAGE (宴) chart type.
 type CabinetIcon = { sources: CompatibleImageSources; label: string; width: number; height: number };
 
@@ -11,8 +11,8 @@ const DX: CabinetIcon = {
   width: 200,
   height: 64,
 };
-const ST: CabinetIcon = {
-  sources: { avif: "/cabinet/ST.avif", webp: "/cabinet/ST.webp", png: "/cabinet/ST.png" },
+const SD: CabinetIcon = {
+  sources: { avif: "/cabinet/SD.avif", webp: "/cabinet/SD.webp", png: "/cabinet/SD.png" },
   label: "Standard",
   width: 200,
   height: 64,
@@ -32,7 +32,8 @@ function cabinetIcon(cabinet: string): CabinetIcon | null {
   const key = cabinet.trim();
   if (!key) return null;
   if (key === "DX") return DX;
-  if (key === "ST") return ST;
+  // "ST": pre-2026-08 catalog spelling, still possible in SW-cached payloads.
+  if (key === "SD" || key === "ST") return SD;
   return UTAGE;
 }
 

@@ -238,9 +238,11 @@ describe("catalog shared helpers", () => {
   });
 
   test("cabinet buckets group the real cabinet strings, legacy ids still resolve", () => {
-    // The catalog stores DX/ST or a 宴 kanji; every kanji is one UTAGE bucket.
+    // The catalog stores DX/SD or a 宴 kanji; every kanji is one UTAGE bucket.
     expect(cabinetBucket("DX")).toBe("DX");
-    expect(cabinetBucket("ST")).toBe("ST");
+    expect(cabinetBucket("SD")).toBe("SD");
+    // Legacy spelling from pre-2026-08 catalogs and SW-cached payloads.
+    expect(cabinetBucket("ST")).toBe("SD");
     expect(cabinetBucket("協")).toBe("UTAGE");
     expect(cabinetBucket("蔵")).toBe("UTAGE");
     expect(cabinetBucket("")).toBe("UTAGE");
@@ -249,7 +251,9 @@ describe("catalog shared helpers", () => {
     // The bucket was called UTG until it was renamed; shared links still say so.
     expect(normalizeCabinetId("UTG")).toBe("UTAGE");
     expect(normalizeCabinetId(" DX ")).toBe("DX");
-    expect(normalizeCabinetId("SD")).toBeNull();
+    // ?cabinet=ST deep links from before the SD rename keep selecting standard.
+    expect(normalizeCabinetId("ST")).toBe("SD");
+    expect(normalizeCabinetId("nope")).toBeNull();
     expect(normalizeCabinetId("")).toBeNull();
   });
 

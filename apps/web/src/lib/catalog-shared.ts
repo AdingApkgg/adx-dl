@@ -455,7 +455,9 @@ type ReleaseOrderable = Pick<CatalogEntry, "versionid" | "cabinet" | "short_id">
 
 export function isUtageEntry(entry: Pick<CatalogEntry, "cabinet">): boolean {
   const cabinet = entry.cabinet?.trim();
-  return Boolean(cabinet) && cabinet !== "DX" && cabinet !== "ST";
+  // "ST" is the pre-2026-08 spelling of the standard cabinet; data cached by the
+  // service worker (RSC payloads live up to 30 days) can still carry it.
+  return Boolean(cabinet) && cabinet !== "DX" && cabinet !== "SD" && cabinet !== "ST";
 }
 
 // Newest-first comparator. There is no per-song release date, so order by the
@@ -956,20 +958,21 @@ export function entryHasLevelInRange(
 }
 
 /** Cabinet grouped into the three player-facing buckets used by the filter:
- *  DX (でらっくす), ST (standard), and everything else → UTAGE (宴). The catalog
- *  itself stores the real cabinet string (DX/ST, or a 宴 kanji like 協/奏), so
+ *  DX (でらっくす), SD (standard), and everything else → UTAGE (宴). The catalog
+ *  itself stores the real cabinet string (DX/SD, or a 宴 kanji like 協/奏), so
  *  these bucket ids exist only in the filter UI and its query params. */
-export type CabinetBucket = "DX" | "ST" | "UTAGE";
+export type CabinetBucket = "DX" | "SD" | "UTAGE";
 export function cabinetBucket(cabinet: string): CabinetBucket {
   const key = cabinet.trim();
   if (key === "DX") return "DX";
-  if (key === "ST") return "ST";
+  // "ST": pre-2026-08 catalog spelling, still possible in SW-cached payloads.
+  if (key === "SD" || key === "ST") return "SD";
   return "UTAGE";
 }
 
-const CABINET_BUCKETS: readonly CabinetBucket[] = ["DX", "ST", "UTAGE"];
+const CABINET_BUCKETS: readonly CabinetBucket[] = ["DX", "SD", "UTAGE"];
 /** Bucket ids this filter answered to before; kept so shared links keep working. */
-const LEGACY_CABINET_IDS: Record<string, CabinetBucket> = { UTG: "UTAGE" };
+const LEGACY_CABINET_IDS: Record<string, CabinetBucket> = { UTG: "UTAGE", ST: "SD" };
 
 /** Resolve a `?cabinet=` value to a bucket id, or null when it names none. */
 export function normalizeCabinetId(value: string): CabinetBucket | null {

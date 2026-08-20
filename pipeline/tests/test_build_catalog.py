@@ -178,7 +178,7 @@ class BuildCatalogTests(unittest.TestCase):
         bare = self._build()["entries"][1]
         self.assertEqual(bare["version"], "maimai FiNALE")
         # shortid 146 (< 10000) => Standard cabinet.
-        self.assertEqual(bare["cabinet"], "ST")
+        self.assertEqual(bare["cabinet"], "SD")
         self.assertEqual(bare["short_id"], "146")
         self.assertEqual(bare["files"]["pv"], "")
         self.assertEqual(bare["media"]["pv_url"], "")
