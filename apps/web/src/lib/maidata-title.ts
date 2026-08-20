@@ -1,6 +1,5 @@
 /**
- * Pack-time `&title` tagging with the chart kind: ` [SD]` / ` [DX]`, and the
- * shortid for UTAGE charts.
+ * Pack-time `&title` tagging with the chart kind: ` [SD]` / ` [DX]`.
  *
  * AstroDX's level list shows nothing but `&title`, so a song's standard and DX
  * charts — whose titles are identical upstream — are indistinguishable in-game
@@ -9,9 +8,7 @@
  * diving-fish's `type` field, the prober bots, SimaiHub — which marks SD the
  * same way but leaves DX bare; marking both was a deliberate choice here, an
  * unmarked row shouldn't need outside knowledge to read). UTAGE titles already
- * carry their `[X]` kanji prefix, but that names the kind, not the chart — a
- * song can have two utage charts with the SAME kanji (111634/121634 are both
- * [協]青春コンプレックス) — so they get their shortid appended instead.
+ * carry their `[X]` kanji prefix and stay untouched.
  *
  * This runs on the bytes being packed into an archive, never on the stored
  * files: the served maidata, the chart preview, fingerprints and enrichment all
@@ -41,18 +38,14 @@ export function tagMaidataTitle(text: string): string {
     return text;
   }
   const shortid = shortidMatch[1]!.trim();
-  if (!/^\d+$/.test(shortid)) {
+  if (!/^\d+$/.test(shortid) || Number(shortid) >= UTAGE_SHORT_ID_MIN) {
     return text;
   }
-  const id = Number(shortid);
-  const tag =
-    id >= UTAGE_SHORT_ID_MIN ? `[${shortid}]` : id >= DX_SHORT_ID_MIN ? "[DX]" : "[SD]";
+  const tag = Number(shortid) >= DX_SHORT_ID_MIN ? "[DX]" : "[SD]";
 
   return text.replace(/^(﻿?&title=)([^\r\n]*)/m, (line, prefix: string, value: string) => {
     const title = value.trimEnd();
-    // No natural title ends in a bracketed number (checked against the whole
-    // catalog), so these suffixes can only be a previous run's tag.
-    if (title === "" || /\[(?:SD|DX|\d+)\]$/.test(title)) {
+    if (title === "" || title.endsWith("[SD]") || title.endsWith("[DX]")) {
       return line;
     }
     return `${prefix}${title} ${tag}`;
