@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
+import { useInView } from "framer-motion";
 import useSWR from "swr";
 import { EyeIcon } from "lucide-react";
 
@@ -28,6 +29,29 @@ type BszResponse = {
 // `undefined` = no response yet (loading), `null` = the backend answered with a
 // failure (recordView swallows errors), a value = live totals.
 const PageViewsContext = React.createContext<PageViews | null | undefined>(undefined);
+
+// Read-only lookup against the same backend: `GET /api` returns the totals
+// without incrementing anything, so browse surfaces can show a page's count
+// without registering a visit. No credentials — reads don't touch UV identity.
+async function queryViews(referer: string): Promise<PageViews | null> {
+  try {
+    const res = await fetch(BSZ_ENDPOINT, {
+      method: "GET",
+      headers: { "x-bsz-referer": referer },
+    });
+    if (!res.ok) {
+      return null;
+    }
+    const body = (await res.json()) as BszResponse;
+    if (!body.success || !body.data) {
+      return null;
+    }
+    const { site_pv = 0, site_uv = 0, page_pv = 0 } = body.data;
+    return { sitePv: site_pv, siteUv: site_uv, pagePv: page_pv };
+  } catch {
+    return null;
+  }
+}
 
 async function recordView(referer: string): Promise<PageViews | null> {
   try {
@@ -174,6 +198,47 @@ export function SitePageViews({
       {siteVisitorsLabel}{" "}
       <CountValue views={views} field="siteUv" unavailableLabel={unavailable} />
     </p>
+  );
+}
+
+/**
+ * Read-only view-count chip for browse cards, overlaid on the cover corner.
+ *
+ * Fetches lazily — only once the card scrolls near the viewport — through the
+ * backend's query-only GET endpoint, so rendering a grid of cards never
+ * inflates any counter. The chip stays empty (an invisible marker span, no
+ * reserved box) until a count actually arrives, and hides for good when the
+ * backend is unreachable; the detail page is the only surface that records.
+ *
+ * The SWR key is namespaced apart from PageViewsProvider's plain-string
+ * referer key: on a chart's own detail page both would otherwise share one
+ * cache entry with different fetchers (one records, one reads).
+ */
+export function CardPageViews({ slug, label }: { slug: string; label: string }) {
+  const ref = React.useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: "200px 0px 200px 0px" });
+  // Locale-independent canonical detail path, matching what canonicalReferer
+  // records when someone actually opens the page.
+  const key = inView ? (["bsz-page-views", `${window.location.origin}/charts/${slug}`] as const) : null;
+  const { data } = useSWR(key, ([, referer]) => queryViews(referer), {
+    // Paging back and forth through the browse grid remounts cards; one lookup
+    // per chart per minute is plenty for a slow-moving counter.
+    dedupingInterval: 60_000,
+  });
+
+  return (
+    <span ref={ref} className="absolute right-2 bottom-2">
+      {data ? (
+        <span
+          title={label}
+          className="flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[11px] font-medium leading-tight text-white backdrop-blur-sm"
+        >
+          <EyeIcon className="size-3" aria-hidden="true" />
+          <span className="sr-only">{label} </span>
+          <span className="tabular-nums">{formatCount(data.pagePv)}</span>
+        </span>
+      ) : null}
+    </span>
   );
 }
 

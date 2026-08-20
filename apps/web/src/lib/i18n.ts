@@ -535,6 +535,8 @@ export type SiteDictionary = {
     siteViews: string;
     siteVisitors: string;
     pageViews: string;
+    /** Compact label for the read-only count chip on browse cards. */
+    views: string;
     /** Screen-reader fallback announced when the counter backend is unreachable. */
     unavailable: string;
   };
@@ -1247,6 +1249,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       siteViews: "本站总访问量",
       siteVisitors: "访客数",
       pageViews: "本页浏览量",
+      views: "浏览量",
       unavailable: "暂无数据",
     },
     versions: {
@@ -1983,6 +1986,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       siteViews: "Site views",
       siteVisitors: "Visitors",
       pageViews: "Page views",
+      views: "Views",
       unavailable: "Unavailable",
     },
     versions: {
@@ -2715,6 +2719,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       siteViews: "総アクセス数",
       siteVisitors: "訪問者数",
       pageViews: "ページ閲覧数",
+      views: "閲覧数",
       unavailable: "取得できません",
     },
     versions: {

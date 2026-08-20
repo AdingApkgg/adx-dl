@@ -4,6 +4,7 @@ import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { DifficultyPill } from "@/components/site/difficulty-pill";
 import { EntryCover } from "@/components/site/entry-cover";
 import { GenreBadge } from "@/components/site/genre-badge";
+import { CardPageViews } from "@/components/site/page-view-counter";
 import { SelectCheckBadge } from "@/components/site/select-check-badge";
 import { VersionBadge } from "@/components/site/version-badge";
 import {
@@ -142,6 +143,9 @@ export function ChartCard({
           {dictionary.catalogBrowser.newBadge}
         </span>
       ) : null}
+      {/* Bottom-right, clear of the two top-corner badges. Read-only lookup —
+          browsing a grid of cards must never tick any chart's counter. */}
+      <CardPageViews slug={entrySlug(entry)} label={dictionary.pageViews.views} />
     </div>
   );
 
