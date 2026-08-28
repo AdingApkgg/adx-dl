@@ -2,7 +2,11 @@ import { describe, expect, mock, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import type { Catalog, CatalogEntry } from "@/lib/catalog-shared";
-import { astroDxDownloadUrl, DEMO_VIDEO_URL } from "@/lib/resource-links";
+import {
+  astroDxDownloadUrl,
+  CHART_IMPORT_VIDEO_URL,
+  DEMO_VIDEO_URL,
+} from "@/lib/resource-links";
 
 function buildEntry(index: number): CatalogEntry {
   const entryId = index === 3 ? "song-3◆phase" : `song-${index}`;
@@ -107,6 +111,10 @@ describe("default zh routes", () => {
     expect(html).toContain("搜索曲库");
     expect(html).toContain("浏览版本");
     expect(html).toContain(`href="${astroDxDownloadUrl("zh")}"`);
+    expect(html).toContain("上手指南");
+    expect(html).toContain('href="/guide"');
+    expect(html).toContain("谱面导入教程");
+    expect(html).toContain(`href="${CHART_IMPORT_VIDEO_URL}"`);
     expect(html).toContain("观看演示视频");
     expect(html).toContain(`href="${DEMO_VIDEO_URL}"`);
     expect(html).toContain("什么是 AstroDX？");

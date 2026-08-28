@@ -19,6 +19,19 @@ import { japaneseTextLang } from "@/lib/text-lang";
 import { entrySlug } from "@/lib/route-slug";
 import { cn } from "@/lib/utils";
 
+// The site-wide ramp for a grid of these cards: 2 columns on phones, 3 from md,
+// 4 from lg, 6 from xl. It lives here, next to the card, because the ramp and
+// CHART_CARD_SIZES below have to move together — a copy of one that drifts from
+// the other silently ships wrong-resolution covers, and copies of the class
+// string alone had already drifted (the home rails and /changelog were stuck at
+// 3-wide where /charts showed 4).
+export const CHART_GRID_CLASS =
+  "grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6";
+// Matches that ramp. Page content is capped around max-w-7xl, so an xl card is
+// roughly 200px wide.
+export const CHART_CARD_SIZES =
+  "(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 200px";
+
 // Keep compact cards tidy: show a few alias chips inline, the rest as a "+N"
 // overflow. The full list is still on the detail page and in the title tooltip.
 const MAX_VISIBLE_ALIASES = 3;

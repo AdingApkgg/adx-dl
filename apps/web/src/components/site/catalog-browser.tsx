@@ -21,7 +21,11 @@ import {
 } from "@/components/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
-import { ChartCard } from "@/components/site/chart-card";
+import {
+  ChartCard,
+  CHART_CARD_SIZES,
+  CHART_GRID_CLASS,
+} from "@/components/site/chart-card";
 import { CompatibleImage } from "@/components/site/compatible-image";
 import { RandomChartButton } from "@/components/site/random-chart-button";
 import {
@@ -111,10 +115,6 @@ const SEARCH_DEBOUNCE_MS = 200;
 // Fetched only when the user enters select mode — card entries deliberately do
 // not carry the file URLs a batch download needs.
 const CHART_SPECS_PATH = "/charts/specs.json";
-// Matches the browse grid: 2 columns on phones, 3 from md, 4 from lg, 6 from
-// xl (content is capped at max-w-7xl, so xl cards are ~200px wide).
-const CARD_SIZES =
-  "(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 200px";
 // Sticky offset for the results toolbar — clears the sticky site header
 // (~65px tall) with a little breathing room. Must match `top-[4.5rem]` below.
 const STICKY_TOOLBAR_TOP_PX = 72;
@@ -1705,7 +1705,7 @@ export function CatalogBrowser({
         <motion.ul
           role="list"
           data-layout="card-grid"
-          className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
+          className={CHART_GRID_CLASS}
         >
           <AnimatePresence mode="popLayout" initial={false}>
             {paginatedEntries.map((entry, index) => (
@@ -1724,7 +1724,7 @@ export function CatalogBrowser({
                   entry={entry}
                   locale={locale}
                   priority={safeCurrentPage === 1 && index < 6}
-                  sizes={CARD_SIZES}
+                  sizes={CHART_CARD_SIZES}
                   aliasHit={
                     hasDeferredQuery ? aliasHitById.get(entry.id) ?? null : null
                   }

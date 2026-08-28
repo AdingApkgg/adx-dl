@@ -9,6 +9,7 @@ import {
   ASTRODX_APP_ISSUES_URL,
   ASTRODX_APP_STORE_URL,
   ASTRODX_RELEASES_URL,
+  CHART_IMPORT_VIDEO_URL,
   wikiInstallUrl,
   wikiUrl,
 } from "@/lib/resource-links";
@@ -136,6 +137,11 @@ export const guideSections: Record<Locale, ContentSection[]> = {
         {
           type: "links",
           items: [
+            {
+              label: "视频教程 · 谱面导入",
+              url: CHART_IMPORT_VIDEO_URL,
+              note: "B 站实录，跟着做一遍最快",
+            },
             { label: "Wiki · iOS / iPadOS 导入教程", url: wikiInstallUrl("zh", "ios"), note: "官方分步说明" },
             { label: "Wiki · Android 导入教程", url: wikiInstallUrl("zh", "android"), note: "含视频演示" },
           ],
@@ -286,6 +292,11 @@ export const guideSections: Record<Locale, ContentSection[]> = {
         {
           type: "links",
           items: [
+            {
+              label: "Video walkthrough · importing charts",
+              url: CHART_IMPORT_VIDEO_URL,
+              note: "screen recording on Bilibili, narrated in Chinese",
+            },
             { label: "Wiki · iOS / iPadOS import guide", url: wikiInstallUrl("en", "ios"), note: "the official step-by-step" },
             { label: "Wiki · Android import guide", url: wikiInstallUrl("en", "android"), note: "includes a video walkthrough" },
           ],
@@ -436,6 +447,11 @@ export const guideSections: Record<Locale, ContentSection[]> = {
         {
           type: "links",
           items: [
+            {
+              label: "動画で見る譜面の入れ方",
+              url: CHART_IMPORT_VIDEO_URL,
+              note: "bilibili の実演動画（中国語）",
+            },
             { label: "Wiki · iOS / iPadOS の導入手順", url: wikiInstallUrl("ja", "ios"), note: "公式のステップ解説" },
             { label: "Wiki · Android の導入手順", url: wikiInstallUrl("ja", "android"), note: "動画つき" },
           ],

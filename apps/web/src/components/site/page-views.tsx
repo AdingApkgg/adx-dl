@@ -5,6 +5,7 @@ import {
   ChevronRightIcon,
   DownloadIcon,
   ExternalLinkIcon,
+  LifeBuoyIcon,
   PlayCircleIcon,
 } from "lucide-react";
 
@@ -12,7 +13,11 @@ import { Reveal, RevealGroup, RevealItem } from "@/components/motion";
 import { AdxDownloadButton } from "@/components/site/adx-download-button";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
-import { ChartCard } from "@/components/site/chart-card";
+import {
+  ChartCard,
+  CHART_CARD_SIZES,
+  CHART_GRID_CLASS,
+} from "@/components/site/chart-card";
 import {
   ChartDetailActions,
   PreviewDifficultyTrigger,
@@ -79,7 +84,11 @@ import {
 import { formatBytes } from "@/components/site/downloads/format-bytes";
 import { seedFromString, selectFeatured } from "@/lib/featured-selection";
 import { buildVersionFilterHref } from "@/lib/catalog-links";
-import { astroDxDownloadUrl, DEMO_VIDEO_URL } from "@/lib/resource-links";
+import {
+  astroDxDownloadUrl,
+  CHART_IMPORT_VIDEO_URL,
+  DEMO_VIDEO_URL,
+} from "@/lib/resource-links";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 import { japaneseTextLang } from "@/lib/text-lang";
@@ -123,6 +132,12 @@ const BUILD_DAY = new Intl.DateTimeFormat("en-CA", {
 }).format(new Date());
 const BUILD_DAY_MS = Date.parse(`${BUILD_DAY}T00:00:00+08:00`);
 
+// Cards per home rail ("latest" and "random picks"). 12 is the one size that
+// fills whole rows at every step of CHART_GRID_CLASS (2 / 3 / 4 / 6 columns),
+// and it matches CHANGELOG_PREVIEW_SIZE, which the "latest" rail is a preview
+// of. Anything not divisible by 4 leaves a ragged row on lg screens.
+const HOME_RAIL_SIZE = 12;
+
 function HomeHeroTitle({ title, noBreak }: { title: string; noBreak?: string }) {
   if (!noBreak) return title;
 
@@ -144,7 +159,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
   // "Latest" means what this archive added last, not which maimai era a song
   // shipped in — sortByReleaseDesc answers the second question and left the
   // rail static between imports of older-version charts.
-  const latestEntries = sortByImportedDesc(catalog.entries).slice(0, 6);
+  const latestEntries = sortByImportedDesc(catalog.entries).slice(0, HOME_RAIL_SIZE);
   const versionCount = new Set(Object.values(catalog.categories).flat()).size;
   const artistCount = new Set(
     catalog.entries.map((entry) => entry.artist.trim()).filter(Boolean)
@@ -154,6 +169,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
   const searchHref = buildLocalePath("/charts", locale);
   const versionsHref = buildLocalePath("/versions", locale);
   const changelogHref = buildLocalePath("/changelog", locale);
+  const guideHref = buildLocalePath("/guide", locale);
 
   // "Browse by version" teaser: newest first, only versions that have charts.
   const versionCharts = new Map<number, number>();
@@ -206,6 +222,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
     {
       seed: seedFromString(BUILD_DAY),
       referenceMs: BUILD_DAY_MS,
+      featuredCount: HOME_RAIL_SIZE,
       excludeFromFeatured: latestIds,
     }
   );
@@ -280,6 +297,19 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
               >
                 {home.getAppCta}
                 <ExternalLinkIcon className="size-3.5" aria-hidden="true" />
+              </a>
+              <Link className={styles.heroAction} href={guideHref}>
+                {home.guideCta}
+                <LifeBuoyIcon className="size-3.5" aria-hidden="true" />
+              </Link>
+              <a
+                className={styles.heroAction}
+                href={CHART_IMPORT_VIDEO_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {home.importVideoCta}
+                <PlayCircleIcon className="size-3.5" aria-hidden="true" />
               </a>
               <Link className={styles.heroAction} href={versionsHref}>
                 {home.browseCta}
@@ -427,8 +457,8 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
               <p className={styles.sectionDescription}>{home.latestDescription}</p>
             </div>
           </div>
-          {/* The rail shows six charts out of one import batch; /changelog is
-              where the rest of that batch — and every earlier one — lives. */}
+          {/* The rail shows one page of an import batch; /changelog is where
+              the rest of that batch — and every earlier one — lives. */}
           <Button variant="ghost" size="sm" asChild>
             <Link href={changelogHref}>
               {home.viewMore}
@@ -439,7 +469,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
         <RevealGroup
           as="ul"
           role="list"
-          className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 xl:grid-cols-6"
+          className={CHART_GRID_CLASS}
         >
           {latestEntries.map((entry) => (
             <RevealItem as="li" key={entry.id} ssrVisible className="h-full">
@@ -448,7 +478,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
                 locale={locale}
                 coverFit="contain"
                 isNew={isRecentImport(entry.imported_at, catalog.generated_at)}
-                sizes="(max-width: 760px) 50vw, (max-width: 1100px) 33vw, 220px"
+                sizes={CHART_CARD_SIZES}
               />
             </RevealItem>
           ))}
@@ -478,7 +508,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
           <RevealGroup
             as="ul"
             role="list"
-            className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 xl:grid-cols-6"
+            className={CHART_GRID_CLASS}
           >
             {featuredEntries.map((entry) => (
               <RevealItem as="li" key={entry.id} ssrVisible className="h-full">
@@ -486,7 +516,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
                   entry={entry}
                   locale={locale}
                   coverFit="contain"
-                  sizes="(max-width: 760px) 50vw, (max-width: 1100px) 33vw, 220px"
+                  sizes={CHART_CARD_SIZES}
                 />
               </RevealItem>
             ))}

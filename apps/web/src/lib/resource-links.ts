@@ -7,6 +7,10 @@ import type { Locale } from "@/lib/i18n";
 // AstroDX.
 export const DEMO_VIDEO_URL = "https://www.bilibili.com/video/BV17FNV6EE19";
 
+// Bilibili walkthrough dedicated to importing a downloaded .adx into AstroDX —
+// narrower than DEMO_VIDEO_URL, which tours the whole browse → import flow.
+export const CHART_IMPORT_VIDEO_URL = "https://www.bilibili.com/video/BV1sPtF6mE24";
+
 // Self-hosted storage mirrors maintained by the site owner.
 export const CLOUD_DRIVE_URL = "https://cloud.saop.cc/";
 export const NET_DISK_URL = "https://drive.saop.cc/";

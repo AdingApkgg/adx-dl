@@ -116,6 +116,10 @@ export type SiteDictionary = {
     searchExamples: string[];
     browseCta: string;
     getAppCta: string;
+    /** Onboarding page (/guide) shortcut. */
+    guideCta: string;
+    /** Bilibili walkthrough of importing a downloaded .adx. */
+    importVideoCta: string;
     videoCta: string;
     randomCta: string;
     whatIsAstroDX: string;
@@ -848,6 +852,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       searchExamples: ["PANDORA PARADOXXX", "潘多拉", "sasakure.UK", "niconico＆VOCALOID", "系ぎて"],
       browseCta: "浏览版本",
       getAppCta: "获取 AstroDX",
+      guideCta: "上手指南",
+      importVideoCta: "谱面导入教程",
       videoCta: "观看演示视频",
       randomCta: "随机来一首",
       whatIsAstroDX: "什么是 AstroDX？",
@@ -1562,6 +1568,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       searchExamples: ["PANDORA PARADOXXX", "pandora", "sasakure.UK", "niconico＆VOCALOID", "tsunagite"],
       browseCta: "Browse Releases",
       getAppCta: "Get AstroDX",
+      guideCta: "Getting Started",
+      importVideoCta: "Chart Import Tutorial",
       videoCta: "Watch the Demo",
       randomCta: "Surprise Me",
       whatIsAstroDX: "What is AstroDX?",
@@ -2311,6 +2319,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       searchExamples: ["PANDORA PARADOXXX", "パンドラ", "sasakure.UK", "niconico＆VOCALOID", "系ぎて"],
       browseCta: "バージョン一覧",
       getAppCta: "AstroDX を入手",
+      guideCta: "使い方ガイド",
+      importVideoCta: "譜面の入れ方動画",
       videoCta: "デモ動画を見る",
       randomCta: "ランダムに一曲",
       whatIsAstroDX: "AstroDX とは？",

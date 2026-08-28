@@ -2,7 +2,11 @@ import Link from "next/link";
 import { ArrowRightIcon } from "lucide-react";
 
 import { Reveal } from "@/components/motion";
-import { ChartCard } from "@/components/site/chart-card";
+import {
+  ChartCard,
+  CHART_CARD_SIZES,
+  CHART_GRID_CLASS,
+} from "@/components/site/chart-card";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { buildVersionFilterHref } from "@/lib/catalog-links";
 import {
@@ -89,7 +93,7 @@ export function ChangelogView({ catalog, locale = "zh" }: ChangelogViewProps) {
               </div>
             ) : null}
 
-            <ul className="grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 xl:grid-cols-6">
+            <ul className={CHART_GRID_CLASS}>
               {batch.preview.map((entry) => (
                 <li key={entry.id} className="h-full">
                   <ChartCard
@@ -97,7 +101,7 @@ export function ChangelogView({ catalog, locale = "zh" }: ChangelogViewProps) {
                     locale={locale}
                     coverFit="contain"
                     isNew={isRecentImport(entry.imported_at, catalog.generated_at)}
-                    sizes="(max-width: 760px) 50vw, (max-width: 1100px) 33vw, 220px"
+                    sizes={CHART_CARD_SIZES}
                   />
                 </li>
               ))}
