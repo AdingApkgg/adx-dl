@@ -14,6 +14,7 @@ import {
   versionRouteId,
 } from "@/lib/catalog-shared";
 import type { CatalogSearchIndexEntry } from "@/lib/catalog-search";
+import { buildPackableAliasIndex, type PackableAliasIndex } from "@/lib/maidata-aliases";
 import { entrySlug } from "@/lib/route-slug";
 import { MAIMAI_VERSIONS } from "@/lib/version-image";
 
@@ -105,6 +106,14 @@ export const readChartSpecsById = cache(
     return Object.fromEntries(entries.map((entry) => [entry.id, getChartDownloadSpec(entry)]));
   }
 );
+
+// Community aliases worth appending to a packed maidata's title, keyed by
+// shortid. Served as a static JSON endpoint (/charts/aliases.json) and fetched
+// by the download store only when the "append aliases" setting is on.
+export const readPackableAliasIndex = cache(async (): Promise<PackableAliasIndex> => {
+  const entries = await readCatalogEntries();
+  return buildPackableAliasIndex(entries);
+});
 
 // Minimal client search index (id/slug/titles/artists/aliases) for the home
 // hero's instant suggestions, served as a static JSON endpoint. English fields

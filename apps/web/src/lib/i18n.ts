@@ -101,6 +101,12 @@ export type SiteDictionary = {
       version: { name: string; description: string };
       genre: { name: string; description: string };
     };
+    maidataLabel: string;
+    maidataHelp: string;
+    maidataOptions: {
+      aliases: { name: string; description: string };
+      preciseLevels: { name: string; description: string };
+    };
   };
   home: {
     badge: string;
@@ -839,6 +845,18 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         version: { name: "按版本", description: "如「25 CiRCLE」" },
         genre: { name: "按曲风", description: "如「東方Project」" },
       },
+      maidataLabel: "谱面文件（maidata.txt）写入",
+      maidataHelp: "仅影响打包进压缩包的 maidata.txt，网站展示与试玩不受影响。示例：",
+      maidataOptions: {
+        aliases: {
+          name: "标题后附带别名",
+          description: "把社区别名接在标题末尾，方便在 AstroDX 内按别名搜索；最多 5 个。",
+        },
+        preciseLevels: {
+          name: "定数保留小数",
+          description: "保留 13.7 这样的精确定数；关闭后写成 13+ / 13。",
+        },
+      },
     },
     home: {
       badge: "为 AstroDX 玩家打造",
@@ -1554,6 +1572,21 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       batchGroupings: {
         version: { name: "By version", description: "e.g. “25 CiRCLE”" },
         genre: { name: "By genre", description: "e.g. “東方Project”" },
+      },
+      maidataLabel: "Chart file (maidata.txt) output",
+      maidataHelp:
+        "Only affects the maidata.txt packed into downloads; the site and the preview are unchanged. Example:",
+      maidataOptions: {
+        aliases: {
+          name: "Append aliases to the title",
+          description:
+            "Adds community nicknames after the title so charts can be found by alias inside AstroDX; up to 5.",
+        },
+        preciseLevels: {
+          name: "Keep decimal constants",
+          description:
+            "Keeps exact chart constants such as 13.7; when off they are written as 13+ / 13.",
+        },
       },
     },
     home: {
@@ -2305,6 +2338,21 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       batchGroupings: {
         version: { name: "バージョン別", description: "例：「25 CiRCLE」" },
         genre: { name: "ジャンル別", description: "例：「東方Project」" },
+      },
+      maidataLabel: "譜面ファイル（maidata.txt）の書き出し",
+      maidataHelp:
+        "ダウンロードに同梱する maidata.txt にのみ影響し、サイトの表示やプレビューは変わりません。例：",
+      maidataOptions: {
+        aliases: {
+          name: "タイトルに別名を付ける",
+          description:
+            "タイトルの後ろにコミュニティの別名を追加し、AstroDX 内で別名から探せるようにします（最大 5 件）。",
+        },
+        preciseLevels: {
+          name: "定数の小数を保持",
+          description:
+            "13.7 のような正確な譜面定数を保持します。オフにすると 13+ / 13 と書き出します。",
+        },
       },
     },
     home: {

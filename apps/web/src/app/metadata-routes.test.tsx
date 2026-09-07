@@ -98,6 +98,7 @@ mock.module("@/lib/catalog", () => ({
       ? { name: "maimai DX PRiSM", slug: "maimai-dx-prism", imageIndex: 23, entries }
       : undefined,
   readVersionRouteIds: async () => ["23"],
+  readPackableAliasIndex: async () => ({}),
 }));
 
 function expectLocalizedAlternates(

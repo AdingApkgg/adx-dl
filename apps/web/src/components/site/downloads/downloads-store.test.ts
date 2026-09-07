@@ -26,6 +26,7 @@ import {
   type DownloadJob,
 } from "./downloads-store";
 import { CUSTOM_DOWNLOAD_SOURCE_ID } from "@/lib/download-sources";
+import { resetPackableAliasIndexForTests } from "@/lib/maidata-aliases";
 
 // Minimal browser shims: the store's download pipeline ends in saveBlobAsFile,
 // which touches `document` and `URL.createObjectURL`. We stub just enough so the
@@ -81,7 +82,13 @@ function installDomShims() {
   fetchedUrls.length = 0;
   localStorageValues.clear();
   globalThis.fetch = (async (input) => {
-    fetchedUrls.push(String(input));
+    const url = String(input);
+    fetchedUrls.push(url);
+    // The alias manifest is a valid, empty index by default: jobs that pack
+    // with aliases on then simply find none, instead of tripping over bytes.
+    if (url.endsWith("/charts/aliases.json")) {
+      return Response.json({});
+    }
     return new Response(new Uint8Array([1, 2, 3]), {
       status: 200,
       headers: { "content-length": "3" },
@@ -191,6 +198,7 @@ describe("downloads-store", () => {
     setDownloadsPersistenceAdapterForTests(memoryPersistence);
     setDownloadRetryBaseDelayForTests(1);
     resetDownloadQueueForTests();
+    resetPackableAliasIndexForTests();
     useDownloadsStore.setState({
       jobs: [],
       presented: {},
@@ -198,6 +206,8 @@ describe("downloads-store", () => {
       customSources: [],
       preferredFormat: "adx",
       preferredBatchGrouping: "version",
+      maidataAliases: false,
+      maidataPreciseLevels: true,
       sourceProbes: createInitialDownloadSourceProbes(),
     });
   });
@@ -210,6 +220,8 @@ describe("downloads-store", () => {
       customSources: [],
       preferredFormat: "adx",
       preferredBatchGrouping: "version",
+      maidataAliases: false,
+      maidataPreciseLevels: true,
       sourceProbes: createInitialDownloadSourceProbes(),
     });
     setDownloadsPersistenceAdapterForTests(null);
@@ -331,7 +343,11 @@ describe("downloads-store", () => {
       ],
     });
 
+    localStorageValues.set("astrodx-maidata-aliases", "1");
+    localStorageValues.set("astrodx-maidata-precise-levels", "0");
     useDownloadsStore.getState().hydrateFromStorage();
+    expect(useDownloadsStore.getState().maidataAliases).toBe(true);
+    expect(useDownloadsStore.getState().maidataPreciseLevels).toBe(false);
     await waitForJob(legacyId, (job) => job.status === "paused");
     await waitForJob(customId, (job) => job.status === "paused");
     expect(
@@ -359,7 +375,9 @@ describe("downloads-store", () => {
     await waitForJob(customId, (job) => job.status === "success");
     useDownloadsStore.getState().resume(legacyId);
     await waitForJob(legacyId, (job) => job.status === "success");
-    expect(fetchedUrls).toEqual([
+    // The alias setting hydrated above makes each resumed job also fetch the
+    // manifest; the routes the chart files themselves took are what matter here.
+    expect(fetchedUrls.filter((url) => !url.endsWith("/charts/aliases.json"))).toEqual([
       `${savedCustomSourceUrl}/25/11951/track.mp3`,
       "https://astrodx-charts.saop.cc/25/11951/maidata.txt",
     ]);
@@ -443,6 +461,100 @@ describe("downloads-store", () => {
     // is nothing persisted left to compare here.)
     expect(unpacked["000070 st-jingle.adx"]).toContain("&title=ジングルベル [SD]\r\n");
     expect(unpacked["010070 dx-jingle.adx"]).toBe(dxMaidata);
+    // With aliases off (the default) the manifest is never even requested.
+    expect(fetchedUrls).not.toContain("/charts/aliases.json");
+  });
+
+  test("appends aliases and collapses levels in the packed maidata when the options say so", async () => {
+    const sdMaidata =
+      "&title=ジングルベル\r\n&artist=SEGA\r\n&shortid=70\r\n&lv_5=14.6\r\n&inote_5=(100)E\r\n";
+    const encoder = new TextEncoder();
+    globalThis.fetch = (async (input) => {
+      const url = String(input);
+      fetchedUrls.push(url);
+      if (url.endsWith("/charts/aliases.json")) {
+        return Response.json({ "70": ["圣诞歌", "铃儿响叮当"], "10070": ["dx圣诞"] });
+      }
+      const body = url.includes("/0/70/") ? encoder.encode(sdMaidata) : new Uint8Array([1, 2, 3]);
+      return new Response(body, {
+        status: 200,
+        headers: { "content-length": String(body.length) },
+      });
+    }) as typeof fetch;
+
+    useDownloadsStore.getState().setMaidataAliases(true);
+    useDownloadsStore.getState().setMaidataPreciseLevels(false);
+    expect(localStorageValues.get("astrodx-maidata-aliases")).toBe("1");
+    expect(localStorageValues.get("astrodx-maidata-precise-levels")).toBe("0");
+
+    const id = singleJobId("alias-jingle");
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "alias-jingle",
+      files: [
+        { name: "maidata.txt", url: "https://astrodx-charts.saop.cc/0/70/maidata.txt" },
+      ],
+      includeVideo: true,
+      format: "adx",
+    });
+    await waitForSettled(id);
+
+    expect(useDownloadsStore.getState().jobs.find((job) => job.id === id)?.status).toBe(
+      "success"
+    );
+    const entries = unzipSync(new Uint8Array(await savedBlobs[0]!.arrayBuffer()));
+    const maidata = Object.entries(entries).find(([path]) => path.endsWith("maidata.txt"));
+    const packed = new TextDecoder().decode(maidata![1]);
+    expect(packed).toContain("&title=ジングルベル [SD] (圣诞歌/铃儿响叮当)\r\n");
+    expect(packed).toContain("&lv_5=14+\r\n");
+    expect(fetchedUrls).toContain("/charts/aliases.json");
+  });
+
+  test("still packs, without aliases, when the alias manifest cannot be fetched", async () => {
+    const sdMaidata = "&title=ジングルベル\r\n&shortid=70\r\n&lv_5=14.4\r\n&inote_5=(100)E\r\n";
+    const encoder = new TextEncoder();
+    globalThis.fetch = (async (input) => {
+      const url = String(input);
+      fetchedUrls.push(url);
+      if (url.endsWith("/charts/aliases.json")) {
+        return new Response("nope", { status: 500 });
+      }
+      const body = encoder.encode(sdMaidata);
+      return new Response(body, {
+        status: 200,
+        headers: { "content-length": String(body.length) },
+      });
+    }) as typeof fetch;
+
+    useDownloadsStore.getState().setMaidataAliases(true);
+    // The store reports the (expected) miss on the console; keep the run quiet.
+    const warn = console.warn;
+    console.warn = () => {};
+    const id = singleJobId("alias-offline");
+    useDownloadsStore.getState().startSingle({
+      id,
+      title: "alias-offline",
+      files: [
+        { name: "maidata.txt", url: "https://astrodx-charts.saop.cc/0/70/maidata.txt" },
+      ],
+      includeVideo: true,
+      format: "adx",
+    });
+    try {
+      await waitForSettled(id);
+    } finally {
+      console.warn = warn;
+    }
+
+    expect(useDownloadsStore.getState().jobs.find((job) => job.id === id)?.status).toBe(
+      "success"
+    );
+    const entries = unzipSync(new Uint8Array(await savedBlobs[0]!.arrayBuffer()));
+    const maidata = Object.entries(entries).find(([path]) => path.endsWith("maidata.txt"));
+    const packed = new TextDecoder().decode(maidata![1]);
+    expect(packed).toContain("&title=ジングルベル [SD]\r\n");
+    // Constants stay precise by default even though the alias switch is on.
+    expect(packed).toContain("&lv_5=14.4\r\n");
   });
 
   test("uses and persists the preferred format when a start omits an override", async () => {

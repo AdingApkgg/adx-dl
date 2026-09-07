@@ -132,6 +132,22 @@ describe("i18n helpers", () => {
     expect(en?.formats.adx).toContain("recommended");
     expect(ja?.addCustomSource).toBe("回線を追加");
     expect(ja?.accents.teal).toBe("ティール");
+    expect(zh?.maidataLabel).toBe("谱面文件（maidata.txt）写入");
+    expect(zh?.maidataOptions).toEqual({
+      aliases: {
+        name: "标题后附带别名",
+        description: expect.stringContaining("别名"),
+      },
+      preciseLevels: {
+        name: "定数保留小数",
+        description: expect.stringContaining("13+"),
+      },
+    });
+    expect(en?.maidataOptions.aliases.name).toBe("Append aliases to the title");
+    expect(en?.maidataOptions.preciseLevels.name).toBe("Keep decimal constants");
+    expect(ja?.maidataOptions.aliases.name).toBe("タイトルに別名を付ける");
+    expect(ja?.maidataOptions.preciseLevels.name).toBe("定数の小数を保持");
+    expect(zh?.maidataHelp).toContain("maidata.txt");
   });
 
   test("exposes static page metadata entries for zh en ja", async () => {

@@ -40,7 +40,8 @@ import {
   type CustomDownloadSourceId,
   type DownloadSourceId,
 } from "@/lib/download-sources";
-import { chartDirWithMaidataId, tagMaidataInputs } from "@/lib/maidata-title";
+import { loadPackableAliasIndex, type PackableAliasIndex } from "@/lib/maidata-aliases";
+import { chartDirWithMaidataId, packMaidataInputs } from "@/lib/maidata-title";
 import {
   runMultiFileDownload,
   type AdxFileProgress,
@@ -169,6 +170,10 @@ type DownloadsState = {
   preferredFormat: ArchiveFormat;
   /** Batch archive folder layout (per version / per genre); device-local. */
   preferredBatchGrouping: BatchGrouping;
+  /** Append community aliases to `&title` when packing a maidata; device-local. */
+  maidataAliases: boolean;
+  /** Keep decimal chart constants in `&lv_N=` when packing a maidata; device-local. */
+  maidataPreciseLevels: boolean;
   /** One shared latency snapshot prevents every picker from probing independently. */
   sourceProbes: DownloadSourceProbeMap;
   /**
@@ -195,6 +200,8 @@ type DownloadsState = {
   setSelectedSourceId: (sourceId: DownloadSourceId) => void;
   setPreferredFormat: (format: ArchiveFormat) => void;
   setPreferredBatchGrouping: (grouping: BatchGrouping) => void;
+  setMaidataAliases: (enabled: boolean) => void;
+  setMaidataPreciseLevels: (enabled: boolean) => void;
   /** Adds a device-local route and returns its stable id when valid. */
   addCustomSource: (name: string, url: string) => CustomDownloadSourceId | null;
   /** Updates a custom route without changing running-job snapshots. */
@@ -346,6 +353,8 @@ const CUSTOM_SOURCE_URL_KEY = "astrodx-custom-download-source";
 const CUSTOM_SOURCES_KEY = "astrodx-custom-download-sources";
 const FORMAT_PREFERENCE_KEY = "astrodx-download-format";
 const BATCH_GROUPING_PREFERENCE_KEY = "astrodx-download-batch-grouping";
+const MAIDATA_ALIASES_PREFERENCE_KEY = "astrodx-maidata-aliases";
+const MAIDATA_PRECISE_LEVELS_PREFERENCE_KEY = "astrodx-maidata-precise-levels";
 
 export type DownloadSourceProbeMap = Partial<
   Record<DownloadSourceId, DownloadSourceProbe>
@@ -616,6 +625,29 @@ function loadPreferredBatchGrouping(): BatchGrouping {
     return isBatchGrouping(stored) ? stored : "version";
   } catch {
     return "version";
+  }
+}
+
+function saveBooleanPreference(key: string, value: boolean): void {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  try {
+    localStorage.setItem(key, value ? "1" : "0");
+  } catch {
+    // A blocked/private localStorage should not prevent downloads.
+  }
+}
+
+function loadBooleanPreference(key: string, fallback: boolean): boolean {
+  if (typeof localStorage === "undefined") {
+    return fallback;
+  }
+  try {
+    const stored = localStorage.getItem(key);
+    return stored === "1" ? true : stored === "0" ? false : fallback;
+  } catch {
+    return fallback;
   }
 }
 
@@ -985,9 +1017,31 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
 
       // Normalize `&title` kind markers into spaced suffixes (" [SD]", utage
       // "[即]…" → "… [即]") so same-named charts stay tellable apart in
-      // AstroDX's level list. Pack-time only: the checkpoints persisted above
-      // and the served files keep the original.
-      const packedInputs = await tagMaidataInputs(archiveInputs);
+      // AstroDX's level list, and apply the device-local maidata options (alias
+      // tail, display-level constants). Pack-time only: the checkpoints
+      // persisted above and the served files keep the original.
+      //
+      // The options are read here, not at job start: they shape the written
+      // file rather than the transfer, so a setting flipped while a batch is
+      // still queued is the one the user expects to see applied. The alias
+      // manifest is best effort — a download that took minutes must not fail
+      // over a cosmetic fetch, so a miss packs without aliases.
+      const { maidataAliases, maidataPreciseLevels } = get();
+      let aliasesByShortId: PackableAliasIndex | null = null;
+      if (maidataAliases) {
+        try {
+          aliasesByShortId = await loadPackableAliasIndex();
+        } catch (error) {
+          console.warn("Alias manifest unavailable; packing without aliases.", error);
+        }
+        if (!isCurrentRun()) {
+          return;
+        }
+      }
+      const packedInputs = await packMaidataInputs(archiveInputs, {
+        aliasesByShortId,
+        preciseLevels: maidataPreciseLevels,
+      });
       if (!isCurrentRun()) {
         return;
       }
@@ -1442,6 +1496,8 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
     customSources: [],
     preferredFormat: "adx",
     preferredBatchGrouping: "version",
+    maidataAliases: false,
+    maidataPreciseLevels: true,
     sourceProbes: createInitialDownloadSourceProbes(),
     presented: {},
     bottomBars: 0,
@@ -1585,6 +1641,16 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       }
       set({ preferredBatchGrouping: grouping });
       savePreferredBatchGrouping(grouping);
+    },
+
+    setMaidataAliases: (enabled) => {
+      set({ maidataAliases: enabled });
+      saveBooleanPreference(MAIDATA_ALIASES_PREFERENCE_KEY, enabled);
+    },
+
+    setMaidataPreciseLevels: (enabled) => {
+      set({ maidataPreciseLevels: enabled });
+      saveBooleanPreference(MAIDATA_PRECISE_LEVELS_PREFERENCE_KEY, enabled);
     },
 
     addCustomSource: (name, url) => {
@@ -1920,6 +1986,11 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         customSources,
         preferredFormat: loadPreferredFormat(),
         preferredBatchGrouping: loadPreferredBatchGrouping(),
+        maidataAliases: loadBooleanPreference(MAIDATA_ALIASES_PREFERENCE_KEY, false),
+        maidataPreciseLevels: loadBooleanPreference(
+          MAIDATA_PRECISE_LEVELS_PREFERENCE_KEY,
+          true
+        ),
         selectedSourceId: loadSourcePreference(customSources),
         sourceProbes: createInitialDownloadSourceProbes(customSources),
       });

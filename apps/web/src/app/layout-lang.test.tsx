@@ -27,6 +27,7 @@ mock.module("@/lib/catalog", () => {
     readVersionGroups: async () => [],
     readVersionGroup: async () => undefined,
     readVersionRouteIds: async () => [],
+    readPackableAliasIndex: async () => ({}),
   };
 });
 

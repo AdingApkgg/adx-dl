@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   CheckIcon,
+  DecimalsArrowRightIcon,
   FileArchiveIcon,
   FolderTreeIcon,
   GaugeIcon,
@@ -19,6 +20,7 @@ import {
   Settings2Icon,
   SparklesIcon,
   SunMediumIcon,
+  TagsIcon,
   Trash2Icon,
 } from "lucide-react";
 
@@ -71,6 +73,7 @@ import {
   type Locale,
   type SiteDictionary,
 } from "@/lib/i18n";
+import { packMaidata } from "@/lib/maidata-title";
 import { cn } from "@/lib/utils";
 
 const accentSwatches: Record<AccentColor, string> = {
@@ -86,6 +89,25 @@ const themeIcons: Record<ThemePreference, React.ReactNode> = {
   light: <SunMediumIcon aria-hidden="true" />,
   dark: <MoonStarIcon aria-hidden="true" />,
 };
+
+/**
+ * The example under the maidata toggles is a real excerpt run through the real
+ * packer, so it shows exactly what a download will contain and can never drift
+ * from behaviour. "Turn around" (shortid 132) is a standard chart — hence the
+ * [SD] marker — whose 13.7 Master constant collapses to 13+.
+ */
+const MAIDATA_EXAMPLE_SOURCE = "&title=Turn around\n&shortid=132\n&lv_5=13.7";
+const MAIDATA_EXAMPLE_ALIASES = { "132": ["转过来", "转圈"] };
+
+function maidataExample(aliases: boolean, preciseLevels: boolean): string {
+  return packMaidata(MAIDATA_EXAMPLE_SOURCE, {
+    aliasesByShortId: aliases ? MAIDATA_EXAMPLE_ALIASES : null,
+    preciseLevels,
+  })
+    .split("\n")
+    .filter((line) => !line.startsWith("&shortid="))
+    .join("\n");
+}
 
 const motionIcons: Record<MotionMode, React.ReactNode> = {
   system: <MonitorIcon aria-hidden="true" />,
@@ -180,6 +202,14 @@ export function SiteSettingsContent({
   const preferredFormat = useDownloadsStore((state) => state.preferredFormat);
   const setPreferredFormat = useDownloadsStore(
     (state) => state.setPreferredFormat
+  );
+  const maidataAliases = useDownloadsStore((state) => state.maidataAliases);
+  const setMaidataAliases = useDownloadsStore((state) => state.setMaidataAliases);
+  const maidataPreciseLevels = useDownloadsStore(
+    (state) => state.maidataPreciseLevels
+  );
+  const setMaidataPreciseLevels = useDownloadsStore(
+    (state) => state.setMaidataPreciseLevels
   );
   const customSources = useDownloadsStore((state) => state.customSources);
   const addCustomSource = useDownloadsStore(
@@ -496,6 +526,31 @@ export function SiteSettingsContent({
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
               {copy.batchGroupingHelp}
             </p>
+          </SettingsField>
+
+          <SettingsField label={copy.maidataLabel}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <MaidataOptionToggle
+                icon={<TagsIcon aria-hidden="true" />}
+                name={copy.maidataOptions.aliases.name}
+                description={copy.maidataOptions.aliases.description}
+                checked={maidataAliases}
+                onChange={setMaidataAliases}
+              />
+              <MaidataOptionToggle
+                icon={<DecimalsArrowRightIcon aria-hidden="true" />}
+                name={copy.maidataOptions.preciseLevels.name}
+                description={copy.maidataOptions.preciseLevels.description}
+                checked={maidataPreciseLevels}
+                onChange={setMaidataPreciseLevels}
+              />
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {copy.maidataHelp}
+            </p>
+            <pre className="mt-1.5 overflow-x-auto rounded-lg border border-border bg-muted/30 px-3 py-2 font-mono text-xs leading-relaxed text-foreground/80">
+              {maidataExample(maidataAliases, maidataPreciseLevels)}
+            </pre>
           </SettingsField>
 
           {/* The tray only exists while a job does, so the history needs a home
@@ -823,6 +878,59 @@ function SourceChoice({
           <LockKeyholeIcon className="size-3" aria-hidden="true" />
           {lockedLabel}
         </span>
+      </span>
+    </button>
+  );
+}
+
+/**
+ * An on/off card in the style of the other choice cards, with switch semantics:
+ * `role="switch"` + `aria-checked` tells assistive tech this is an independent
+ * toggle, not one option of a group like the format or layout cards.
+ */
+function MaidataOptionToggle({
+  icon,
+  name,
+  description,
+  checked,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  name: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={cn(choiceClass(checked), "h-auto items-start py-2.5 text-left")}
+    >
+      <span className="mt-0.5 [&>svg]:size-4">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium">{name}</span>
+        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+          {description}
+        </span>
+      </span>
+      <span
+        aria-hidden="true"
+        className={cn(
+          "mt-1 inline-flex h-4 w-7 shrink-0 items-center rounded-full border p-0.5 transition-colors",
+          checked
+            ? "justify-end border-primary bg-primary"
+            : "justify-start border-muted-foreground/40 bg-muted"
+        )}
+      >
+        <span
+          className={cn(
+            "size-2.5 rounded-full",
+            checked ? "bg-primary-foreground" : "bg-muted-foreground/60"
+          )}
+        />
       </span>
     </button>
   );

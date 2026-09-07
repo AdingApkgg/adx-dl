@@ -83,7 +83,7 @@ const runtimeCaching: RuntimeCaching[] = [
     }),
   },
   // 3. Build-time JSON manifests (`/charts/search-index.json`, `specs.json`,
-  //    `slugs.json`, `/music/playlists.json`). Same blind spot as the RSC
+  //    `slugs.json`, `aliases.json`, `/music/playlists.json`). Same blind spot as the RSC
   //    payloads: no `destination`, not under `/_next/static/`, and served with
   //    `max-age=600`, so they were re-downloaded every ten minutes.
   {
