@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { unzipSync } from "fflate";
 
 import {
@@ -75,6 +75,40 @@ const memoryPersistence: DownloadsPersistenceAdapter = {
     persistedHistory.clear();
   },
 };
+
+// What these globals were before this file touched them. bun has no `document`
+// or `localStorage`, so restoring those means deleting them again: every test
+// file runs in the same process, and a leftover `document` stub with nothing
+// but `createElement` on it made music-player-preferences.test.ts blow up on
+// `document.documentElement` whenever the runner happened to order this file
+// first (it did on CI from 2026-09-04, once a runner image update changed the
+// file order — while macOS ran the files the other way round and passed).
+const globalsBefore = {
+  fetch: globalThis.fetch,
+  document: (globalThis as Record<string, unknown>).document,
+  localStorage: (globalThis as Record<string, unknown>).localStorage,
+  createObjectURL: URL.createObjectURL,
+  revokeObjectURL: URL.revokeObjectURL,
+};
+
+function restoreGlobals() {
+  globalThis.fetch = globalsBefore.fetch;
+  for (const key of ["document", "localStorage"] as const) {
+    if (globalsBefore[key] === undefined) {
+      delete (globalThis as Record<string, unknown>)[key];
+    } else {
+      (globalThis as Record<string, unknown>)[key] = globalsBefore[key];
+    }
+  }
+  URL.createObjectURL = globalsBefore.createObjectURL;
+  URL.revokeObjectURL = globalsBefore.revokeObjectURL;
+}
+
+afterAll(() => {
+  restoreGlobals();
+  // The point of the restore: nothing DOM-shaped may outlive this file.
+  expect(typeof document).toBe("undefined");
+});
 
 function installDomShims() {
   savedFiles.length = 0;
@@ -227,6 +261,9 @@ describe("downloads-store", () => {
     setDownloadsPersistenceAdapterForTests(null);
     setDownloadRetryBaseDelayForTests(undefined);
     resetDownloadQueueForTests();
+    // After every test, not just at the end of the file: the next test's
+    // beforeEach reinstalls the shims, and no test here may leak them out.
+    restoreGlobals();
   });
 
   test("summarizeDownloadJobs rolls a queue up into one headline state", () => {
