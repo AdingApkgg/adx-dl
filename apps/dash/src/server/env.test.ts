@@ -64,4 +64,53 @@ describe("parseEnv", () => {
       /GITHUB_APP_INSTALLATION_ID/
     );
   });
+
+  // Fix round 1: Finding 1 — CF_ACCESS_TEAM_DOMAIN scheme validation
+  test("团队域名不带 scheme 时报错", () => {
+    expect(() => parseEnv({ ...complete, CF_ACCESS_TEAM_DOMAIN: "example.cloudflareaccess.com" })).toThrow(
+      /CF_ACCESS_TEAM_DOMAIN/
+    );
+  });
+
+  test("团队域名带 http:// 也接受", () => {
+    const env = parseEnv({ ...complete, CF_ACCESS_TEAM_DOMAIN: "http://example.cloudflareaccess.com" });
+    expect(env.accessTeamDomain).toBe("http://example.cloudflareaccess.com");
+  });
+
+  test("scheme 校验错误与其他错误一起报告", () => {
+    try {
+      parseEnv({
+        ...complete,
+        CF_ACCESS_TEAM_DOMAIN: "no-scheme.cloudflareaccess.com",
+        CF_ACCESS_AUD: "", // Empty to trigger missing error
+      });
+      throw new Error("应当抛错");
+    } catch (error) {
+      const message = (error as Error).message;
+      expect(message).toContain("CF_ACCESS_TEAM_DOMAIN"); // scheme error
+      expect(message).toContain("CF_ACCESS_AUD"); // missing error
+    }
+  });
+
+  // Fix round 1: Finding 2 — Quote handling and newline idempotence
+  test("双引号包裹的私钥带转义 newline", () => {
+    const quotedKey = '"-----BEGIN RSA PRIVATE KEY-----\\nline1\\nline2\\n-----END RSA PRIVATE KEY-----"';
+    const env = parseEnv({ ...complete, GITHUB_APP_PRIVATE_KEY: quotedKey });
+
+    expect(env.githubPrivateKey).toBe("-----BEGIN RSA PRIVATE KEY-----\nline1\nline2\n-----END RSA PRIVATE KEY-----");
+    expect(env.githubPrivateKey.split("\n")).toHaveLength(4);
+  });
+
+  test("单引号包裹的普通值去掉引号", () => {
+    const env = parseEnv({ ...complete, GITHUB_REPO_NAME: "'adx-dl'" });
+    expect(env.repoName).toBe("adx-dl");
+  });
+
+  test("私钥已有真实 newline，幂等处理", () => {
+    const keyWithRealNewlines = "-----BEGIN RSA PRIVATE KEY-----\nline1\nline2\n-----END RSA PRIVATE KEY-----";
+    const env = parseEnv({ ...complete, GITHUB_APP_PRIVATE_KEY: keyWithRealNewlines });
+
+    expect(env.githubPrivateKey).toBe(keyWithRealNewlines);
+    expect(env.githubPrivateKey.split("\n")).toHaveLength(4);
+  });
 });
