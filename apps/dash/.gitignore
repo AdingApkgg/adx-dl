@@ -1,0 +1,18 @@
+# dependencies (bun workspaces hoist to the root; this is per-workspace symlinks/bins)
+/node_modules
+
+# react-router build output (client SPA bundle + the prerender-only server build)
+/build
+
+# bun build:server output
+/dist
+
+# react-router typegen (./+types/*, rootDirs target in tsconfig.json)
+/.react-router
+
+# misc
+.DS_Store
+*.tsbuildinfo
+
+# env files (can opt-in for committing if needed)
+.env*

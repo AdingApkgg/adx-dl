@@ -1,0 +1,30 @@
+{
+  "name": "dash",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "react-router dev",
+    "build": "react-router build",
+    "build:server": "bun build src/server/main.ts --target=bun --outfile=dist/server.js",
+    "start": "bun run src/server/main.ts",
+    "test": "bun test",
+    "check": "tsc --noEmit && bun test"
+  },
+  "dependencies": {
+    "@react-router/node": "8.4.0",
+    "hono": "^4.13.8",
+    "jose": "^6.2.12",
+    "octokit": "^5.0.5",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "react-router": "8.4.0",
+    "isbot": "^5"
+  },
+  "devDependencies": {
+    "@react-router/dev": "8.4.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^6",
+    "vite": "^8.3.0"
+  }
+}
