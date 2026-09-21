@@ -1,4 +1,10 @@
-import type { RepoInfo, RunDetail, RunSummary, WorkflowSummary } from "@/shared/dto";
+import type {
+  FailedStepLog,
+  RepoInfo,
+  RunDetail,
+  RunSummary,
+  WorkflowSummary,
+} from "@/shared/dto";
 
 /**
  * 后端用到的 GitHub 能力的窄接口。
@@ -11,6 +17,10 @@ export interface GitHubClient {
   listWorkflows(): Promise<WorkflowSummary[]>;
   listRuns(opts?: { perPage?: number }): Promise<RunSummary[]>;
   getRun(runId: number): Promise<RunDetail>;
+  dispatchWorkflow(workflowId: number, ref: string): Promise<void>;
+  rerunRun(runId: number): Promise<void>;
+  cancelRun(runId: number): Promise<void>;
+  getFailedStepLog(runId: number): Promise<FailedStepLog | null>;
 }
 
 /** 真实实现向上抛的错误，路由据此回一个能看懂的消息。 */

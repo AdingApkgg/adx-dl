@@ -88,3 +88,83 @@ describe("GET /api/runs/:runId", () => {
     expect(called).toBe(false);
   });
 });
+
+describe("POST /api/workflows/:workflowId/dispatch", () => {
+  test("触发工作流，默认用仓库默认分支", async () => {
+    const github = createFakeGitHubClient();
+    const res = await makeApp(github).request("/api/workflows/1/dispatch", { method: "POST" });
+
+    expect(res.status).toBe(202);
+    expect(github.seed.dispatched).toEqual([{ workflowId: 1, ref: "main" }]);
+  });
+
+  test("可以指定 ref", async () => {
+    const github = createFakeGitHubClient();
+    await makeApp(github).request("/api/workflows/1/dispatch", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ref: "some-branch" }),
+    });
+
+    expect(github.seed.dispatched).toEqual([{ workflowId: 1, ref: "some-branch" }]);
+  });
+
+  test("GET 不能触发", async () => {
+    // 触发部署是有副作用的操作，绝不能被一个 GET 触发 —— 预加载、
+    // 爬虫、甚至浏览器的地址栏补全都会发 GET。
+    const github = createFakeGitHubClient();
+    const res = await makeApp(github).request("/api/workflows/1/dispatch");
+
+    expect(res.status).not.toBe(202);
+    expect(github.seed.dispatched).toEqual([]);
+  });
+});
+
+describe("POST /api/runs/:runId/rerun 与 /cancel", () => {
+  test("重跑", async () => {
+    const github = createFakeGitHubClient();
+    const res = await makeApp(github).request("/api/runs/1001/rerun", { method: "POST" });
+
+    expect(res.status).toBe(202);
+    expect(github.seed.rerun).toEqual([1001]);
+  });
+
+  test("取消", async () => {
+    const github = createFakeGitHubClient();
+    const res = await makeApp(github).request("/api/runs/1002/cancel", { method: "POST" });
+
+    expect(res.status).toBe(202);
+    expect(github.seed.cancelled).toEqual([1002]);
+  });
+
+  test("runId 非数字：400", async () => {
+    const res = await makeApp().request("/api/runs/abc/rerun", { method: "POST" });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /api/runs/:runId/failure-log", () => {
+  test("返回失败步骤的日志尾部", async () => {
+    const github = createFakeGitHubClient({
+      failureLogs: {
+        1003: { jobName: "deploy", stepName: "Typecheck and test", lines: ["error TS2345", "1 error"] },
+      },
+    });
+
+    const res = await makeApp(github).request("/api/runs/1003/failure-log");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      jobName: "deploy",
+      stepName: "Typecheck and test",
+      lines: ["error TS2345", "1 error"],
+    });
+  });
+
+  test("没有失败步骤时返回 204", async () => {
+    const res = await makeApp().request("/api/runs/1001/failure-log");
+
+    expect(res.status).toBe(204);
+  });
+});

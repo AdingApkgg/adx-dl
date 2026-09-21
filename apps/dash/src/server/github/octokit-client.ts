@@ -1,6 +1,12 @@
 import { App, Octokit as OctokitCtor } from "octokit";
 
-import type { RepoInfo, RunDetail, RunSummary, WorkflowSummary } from "@/shared/dto";
+import type {
+  FailedStepLog,
+  RepoInfo,
+  RunDetail,
+  RunSummary,
+  WorkflowSummary,
+} from "@/shared/dto";
 
 import { GitHubRequestError, type GitHubClient } from "./client";
 
@@ -178,6 +184,74 @@ export function createOctokitGitHubClient(
               completedAt: step.completed_at ?? null,
             })),
           })),
+        };
+      });
+    },
+
+    async dispatchWorkflow(workflowId: number, ref: string): Promise<void> {
+      return withOctokit(async (kit) => {
+        await kit.rest.actions.createWorkflowDispatch({
+          owner: config.owner,
+          repo: config.repo,
+          workflow_id: workflowId,
+          ref,
+        });
+      });
+    },
+
+    async rerunRun(runId: number): Promise<void> {
+      return withOctokit(async (kit) => {
+        await kit.rest.actions.reRunWorkflow({
+          owner: config.owner,
+          repo: config.repo,
+          run_id: runId,
+        });
+      });
+    },
+
+    async cancelRun(runId: number): Promise<void> {
+      return withOctokit(async (kit) => {
+        await kit.rest.actions.cancelWorkflowRun({
+          owner: config.owner,
+          repo: config.repo,
+          run_id: runId,
+        });
+      });
+    },
+
+    async getFailedStepLog(runId: number): Promise<FailedStepLog | null> {
+      return withOctokit(async (kit) => {
+        const { data } = await kit.rest.actions.listJobsForWorkflowRun({
+          owner: config.owner,
+          repo: config.repo,
+          run_id: runId,
+          per_page: 100,
+        });
+
+        const failedJob = data.jobs.find((job) => job.conclusion === "failure");
+        if (!failedJob) return null;
+        const failedStep = (failedJob.steps ?? []).find((step) => step.conclusion === "failure");
+
+        // 单个 job 的日志是纯文本（整个 run 的日志是 zip，不要用那个）。
+        const log = await kit.rest.actions.downloadJobLogsForWorkflowRun({
+          owner: config.owner,
+          repo: config.repo,
+          job_id: failedJob.id,
+        });
+
+        const text = typeof log.data === "string" ? log.data : String(log.data ?? "");
+        // 先按空行过滤，再取尾部：过滤要在切片之前做，否则最后 200 行里可能
+        // 混进一堆空行，把真正有信息量的日志行挤出这个窗口。构建日志动辄
+        // 上万行，全量传到浏览器没有意义，失败原因也几乎总在末尾。
+        const lines = text
+          .split("\n")
+          .filter((line) => line.trim())
+          .slice(-200);
+
+        return {
+          jobName: failedJob.name,
+          stepName: failedStep?.name ?? "(未知步骤)",
+          lines,
         };
       });
     },

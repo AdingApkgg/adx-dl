@@ -58,4 +58,64 @@ export function registerActionsRoutes(
       return c.json({ error: String(error) }, statusFor(error));
     }
   });
+
+  app.post("/api/workflows/:workflowId/dispatch", async (c) => {
+    const workflowId = Number(c.req.param("workflowId"));
+    if (!Number.isInteger(workflowId)) {
+      return c.json({ error: "workflowId 必须是整数" }, 400);
+    }
+
+    // 请求体可有可无：没有就用仓库默认分支。
+    let ref: string | undefined;
+    try {
+      const body = (await c.req.json()) as { ref?: unknown };
+      if (typeof body.ref === "string" && body.ref.trim()) ref = body.ref.trim();
+    } catch {
+      // 空 body 或非 JSON —— 用默认分支，不是错误。
+    }
+
+    try {
+      const target = ref ?? (await deps.github.getRepoInfo()).defaultBranch;
+      await deps.github.dispatchWorkflow(workflowId, target);
+      // 202：GitHub 收下了，但 run 还没出现在列表里，前端要靠轮询等它。
+      return c.json({ accepted: true, ref: target }, 202);
+    } catch (error) {
+      return c.json({ error: String(error) }, statusFor(error));
+    }
+  });
+
+  const runAction = (path: string, perform: (runId: number) => Promise<void>) => {
+    app.post(path, async (c) => {
+      const runId = Number(c.req.param("runId"));
+      if (!Number.isInteger(runId)) {
+        return c.json({ error: "runId 必须是整数" }, 400);
+      }
+      try {
+        await perform(runId);
+        return c.json({ accepted: true }, 202);
+      } catch (error) {
+        return c.json({ error: String(error) }, statusFor(error));
+      }
+    });
+  };
+
+  runAction("/api/runs/:runId/rerun", (runId) => deps.github.rerunRun(runId));
+  runAction("/api/runs/:runId/cancel", (runId) => deps.github.cancelRun(runId));
+
+  app.get("/api/runs/:runId/failure-log", async (c) => {
+    const runId = Number(c.req.param("runId"));
+    if (!Number.isInteger(runId)) {
+      return c.json({ error: "runId 必须是整数" }, 400);
+    }
+
+    try {
+      const log = await deps.github.getFailedStepLog(runId);
+      // 没有失败步骤是正常结果，不是错误 —— 204 让前端不必去分辨
+      // 「空数组」和「查不到」。
+      if (!log) return c.body(null, 204);
+      return c.json(log);
+    } catch (error) {
+      return c.json({ error: String(error) }, statusFor(error));
+    }
+  });
 }

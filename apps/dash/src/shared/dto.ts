@@ -79,3 +79,10 @@ export type RunDetail = {
   run: RunSummary;
   jobs: RunJob[];
 };
+
+export type FailedStepLog = {
+  jobName: string;
+  stepName: string;
+  /** 日志尾部，最多 200 行。 */
+  lines: string[];
+};
