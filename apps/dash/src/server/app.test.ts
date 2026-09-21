@@ -29,12 +29,16 @@ async function makeAccess() {
   };
 }
 
+// 不带定时器的最小假货：这些测试只关心路由挂没挂上，不关心推送。
+const stubPoller = { subscribe: () => () => {}, snapshot: () => [] };
+
 async function makeApp(overrides: Partial<AppDeps> = {}) {
   const access = await makeAccess();
   const deps: AppDeps = {
     clientRoot: "./build/client",
     github: createFakeGitHubClient(),
     accessConfig: access.config,
+    poller: stubPoller,
     ...overrides,
   };
   return { app: createApp(deps), assertion: access.assertion };
