@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+    # dash 是独立部署的管理后台（apps/dash），它的改动产不出主站内容，
+    # 所以不该触发一轮 catalog→build→deploy。它有自己的 CI：dash-check.yml。
+    # 注意 paths-ignore 只作用于 push —— workflow_dispatch 与 schedule 不受影响，
+    # 这正是我们要的：手动触发和每日轮换仍然照常跑。
+    paths-ignore:
+      - "apps/dash/**"
   workflow_dispatch:
   schedule:
     # Daily 04:00 Asia/Shanghai (20:00 UTC): rotates the homepage spotlight /
