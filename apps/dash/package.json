@@ -8,7 +8,8 @@
     "build:server": "bun build src/server/main.ts --target=bun --outfile=dist/server.js",
     "start": "bun run src/server/main.ts",
     "test": "bun test",
-    "check": "tsc --noEmit && bun test"
+    "typegen": "react-router typegen",
+    "check": "bun run typegen && tsc --noEmit && bun test"
   },
   "dependencies": {
     "@react-router/node": "8.4.0",

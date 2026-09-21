@@ -20,6 +20,11 @@ on:
       - "apps/dash/**"
       - "bun.lock"
       - ".github/workflows/dash-check.yml"
+  # Lets the dashboard's Actions panel dispatch this workflow on demand: it's
+  # the cheap one (~20s) to verify the dispatch path against, versus the site
+  # deploy's 7+ minutes. Not subject to the `paths` filters above — a manual
+  # run always runs, which is what "on demand" should mean.
+  workflow_dispatch:
 
 permissions:
   contents: read
