@@ -36,6 +36,19 @@ export function parseEnv(source: Source): DashEnv {
     return value;
   };
 
+  // Optional values that may be unset or quoted. Strips quotes (if present) and returns
+  // the provided defaultValue if unset or empty. Ensures all optional variables undergo
+  // the same quote-stripping path, preventing future optional fields from accidentally
+  // skipping this processing.
+  const optional = (key: string, defaultValue: string): string => {
+    let value = source[key]?.trim() ?? "";
+    if (!value) {
+      return defaultValue;
+    }
+    value = stripQuotes(value);
+    return value;
+  };
+
   const accessTeamDomain = required("CF_ACCESS_TEAM_DOMAIN").replace(/\/+$/, "");
   const accessAud = required("CF_ACCESS_AUD");
   const githubAppId = required("GITHUB_APP_ID");
@@ -59,11 +72,13 @@ export function parseEnv(source: Source): DashEnv {
     problems.push(`GITHUB_APP_INSTALLATION_ID 必须是整数，收到 ${rawInstallationId}`);
   }
 
-  const rawPort = source.PORT?.trim();
+  const rawPort = optional("PORT", "");
   const port = rawPort ? Number(rawPort) : 3000;
   if (rawPort && !Number.isInteger(port)) {
     problems.push(`PORT 必须是整数，收到 ${rawPort}`);
   }
+
+  const clientRoot = optional("DASH_CLIENT_ROOT", "./build/client");
 
   if (problems.length > 0) {
     // 一次列全。容器起不来时只看得到一行日志，逐个报错等于逐个重启。
@@ -79,6 +94,6 @@ export function parseEnv(source: Source): DashEnv {
     githubInstallationId,
     repoOwner,
     repoName,
-    clientRoot: stripQuotes(source.DASH_CLIENT_ROOT?.trim() || "./build/client"),
+    clientRoot,
   };
 }

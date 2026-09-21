@@ -113,4 +113,33 @@ describe("parseEnv", () => {
     expect(env.githubPrivateKey).toBe(keyWithRealNewlines);
     expect(env.githubPrivateKey.split("\n")).toHaveLength(4);
   });
+
+  // Fix round 2: Optional variables quote handling
+  test("引号包裹的 PORT 被去掉后解析为数字", () => {
+    const env = parseEnv({ ...complete, PORT: '"8080"' });
+    expect(env.port).toBe(8080);
+  });
+
+  test("引号包裹的 DASH_CLIENT_ROOT 被去掉", () => {
+    const env = parseEnv({ ...complete, DASH_CLIENT_ROOT: "'/custom/path'" });
+    expect(env.clientRoot).toBe("/custom/path");
+  });
+
+  test("PORT 未设置时仍然默认为 3000", () => {
+    const env = parseEnv({ ...complete, PORT: "" });
+    expect(env.port).toBe(3000);
+  });
+
+  test("PORT 非数字时报错（包含引号去掉后的值）", () => {
+    expect(() => parseEnv({ ...complete, PORT: "notaport" })).toThrow(/PORT/);
+
+    try {
+      parseEnv({ ...complete, PORT: '"notaport"' });
+      throw new Error("应当抛错");
+    } catch (error) {
+      const message = (error as Error).message;
+      expect(message).toContain("PORT");
+      expect(message).toContain("notaport"); // 应显示去掉引号后的值
+    }
+  });
 });
