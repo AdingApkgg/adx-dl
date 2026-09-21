@@ -20,6 +20,7 @@
       },
       "devDependencies": {
         "@react-router/dev": "8.4.0",
+        "@types/node": "^24",
         "@types/react": "^19",
         "@types/react-dom": "^19",
         "typescript": "^6",
