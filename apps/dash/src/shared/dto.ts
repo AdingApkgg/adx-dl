@@ -14,3 +14,68 @@ export type MeResponse = {
   /** 连不通时的原因，供界面直接显示。连得通是 null。 */
   repoError: string | null;
 };
+
+export type RunStatus =
+  | "queued"
+  | "in_progress"
+  | "completed"
+  | "waiting"
+  | "requested"
+  | "pending";
+
+export type RunConclusion =
+  | "success"
+  | "failure"
+  | "cancelled"
+  | "skipped"
+  | "timed_out"
+  | "action_required"
+  | "neutral"
+  | "stale"
+  | null;
+
+export type WorkflowSummary = {
+  id: number;
+  name: string;
+  path: string;
+  state: string;
+};
+
+export type RunSummary = {
+  id: number;
+  name: string;
+  status: RunStatus;
+  conclusion: RunConclusion;
+  /** 触发源：push / workflow_dispatch / schedule / pull_request … */
+  event: string;
+  branch: string;
+  sha: string;
+  createdAt: string;
+  updatedAt: string;
+  runNumber: number;
+  htmlUrl: string;
+};
+
+export type JobStep = {
+  name: string;
+  status: string;
+  conclusion: string | null;
+  number: number;
+  startedAt: string | null;
+  completedAt: string | null;
+};
+
+export type RunJob = {
+  id: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  steps: JobStep[];
+};
+
+export type RunDetail = {
+  run: RunSummary;
+  jobs: RunJob[];
+};

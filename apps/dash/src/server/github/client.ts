@@ -1,4 +1,4 @@
-import type { RepoInfo } from "@/shared/dto";
+import type { RepoInfo, RunDetail, RunSummary, WorkflowSummary } from "@/shared/dto";
 
 /**
  * 后端用到的 GitHub 能力的窄接口。
@@ -8,6 +8,9 @@ import type { RepoInfo } from "@/shared/dto";
  */
 export interface GitHubClient {
   getRepoInfo(): Promise<RepoInfo>;
+  listWorkflows(): Promise<WorkflowSummary[]>;
+  listRuns(opts?: { perPage?: number }): Promise<RunSummary[]>;
+  getRun(runId: number): Promise<RunDetail>;
 }
 
 /** 真实实现向上抛的错误，路由据此回一个能看懂的消息。 */

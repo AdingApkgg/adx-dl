@@ -1,6 +1,6 @@
 import { App, Octokit as OctokitCtor } from "octokit";
 
-import type { RepoInfo } from "@/shared/dto";
+import type { RepoInfo, RunDetail, RunSummary, WorkflowSummary } from "@/shared/dto";
 
 import { GitHubRequestError, type GitHubClient } from "./client";
 
@@ -30,6 +30,37 @@ function toRequestError(error: unknown): GitHubRequestError {
   return new GitHubRequestError(error instanceof Error ? error.message : String(error), null);
 }
 
+type RawRun = {
+  id: number;
+  name?: string | null;
+  status?: string | null;
+  conclusion?: string | null;
+  event: string;
+  head_branch?: string | null;
+  head_sha: string;
+  created_at: string;
+  updated_at: string;
+  run_number: number;
+  html_url: string;
+};
+
+/** GitHub 的 snake_case 到我们 DTO 的 camelCase 的唯一转换点。 */
+function toRunSummary(raw: RawRun): RunSummary {
+  return {
+    id: raw.id,
+    name: raw.name ?? "(unnamed)",
+    status: (raw.status ?? "queued") as RunSummary["status"],
+    conclusion: (raw.conclusion ?? null) as RunSummary["conclusion"],
+    event: raw.event,
+    branch: raw.head_branch ?? "",
+    sha: raw.head_sha,
+    createdAt: raw.created_at,
+    updatedAt: raw.updated_at,
+    runNumber: raw.run_number,
+    htmlUrl: raw.html_url,
+  };
+}
+
 export function createOctokitGitHubClient(config: OctokitClientConfig): GitHubClient {
   const app = new App({ appId: config.appId, privateKey: config.privateKey });
 
@@ -41,10 +72,23 @@ export function createOctokitGitHubClient(config: OctokitClientConfig): GitHubCl
     return cached;
   };
 
+  // 每个方法都要「拿实例 → 调用 → 失败时清缓存并抛出统一错误」，七个方法
+  // 手抄七遍这段样板迟早漏掉一次 `cached = null`，那个方法就悄悄退出了
+  // 缓存恢复机制——认证失败一次，就把进程钉在坏实例上直到重启。
+  // 这里收成一个包装：调用方只管拿到 kit 之后要做什么。
+  async function withOctokit<T>(fn: (kit: Octokit) => Promise<T>): Promise<T> {
+    try {
+      const kit = await octokit();
+      return await fn(kit);
+    } catch (error) {
+      cached = null;
+      throw toRequestError(error);
+    }
+  }
+
   return {
     async getRepoInfo(): Promise<RepoInfo> {
-      try {
-        const kit = await octokit();
+      return withOctokit(async (kit) => {
         const { data } = await kit.rest.repos.get({
           owner: config.owner,
           repo: config.repo,
@@ -54,12 +98,72 @@ export function createOctokitGitHubClient(config: OctokitClientConfig): GitHubCl
           repo: data.name,
           defaultBranch: data.default_branch,
         };
-      } catch (error) {
-        // 认证失败时把缓存清掉，下次请求重新建实例——否则一次凭据问题
-        // 会把这个进程钉死在坏实例上，直到重启。
-        cached = null;
-        throw toRequestError(error);
-      }
+      });
+    },
+
+    async listWorkflows(): Promise<WorkflowSummary[]> {
+      return withOctokit(async (kit) => {
+        const { data } = await kit.rest.actions.listRepoWorkflows({
+          owner: config.owner,
+          repo: config.repo,
+          per_page: 100,
+        });
+        return data.workflows.map((w) => ({
+          id: w.id,
+          name: w.name,
+          path: w.path,
+          state: w.state,
+        }));
+      });
+    },
+
+    async listRuns(opts?: { perPage?: number }): Promise<RunSummary[]> {
+      return withOctokit(async (kit) => {
+        const { data } = await kit.rest.actions.listWorkflowRunsForRepo({
+          owner: config.owner,
+          repo: config.repo,
+          per_page: opts?.perPage ?? 30,
+        });
+        return data.workflow_runs.map(toRunSummary);
+      });
+    },
+
+    async getRun(runId: number): Promise<RunDetail> {
+      return withOctokit(async (kit) => {
+        const [run, jobs] = await Promise.all([
+          kit.rest.actions.getWorkflowRun({
+            owner: config.owner,
+            repo: config.repo,
+            run_id: runId,
+          }),
+          kit.rest.actions.listJobsForWorkflowRun({
+            owner: config.owner,
+            repo: config.repo,
+            run_id: runId,
+            per_page: 100,
+          }),
+        ]);
+
+        return {
+          run: toRunSummary(run.data),
+          jobs: jobs.data.jobs.map((job) => ({
+            id: job.id,
+            name: job.name,
+            status: job.status,
+            conclusion: job.conclusion ?? null,
+            startedAt: job.started_at ?? null,
+            completedAt: job.completed_at ?? null,
+            steps: (job.steps ?? []).map((step) => ({
+              name: step.name,
+              status: step.status,
+              conclusion: step.conclusion ?? null,
+              number: step.number,
+              startedAt: step.started_at ?? null,
+              completedAt: step.completed_at ?? null,
+            })),
+          })),
+        };
+      });
     },
   };
 }
