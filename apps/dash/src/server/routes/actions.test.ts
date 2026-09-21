@@ -3,6 +3,7 @@ import { Hono } from "hono";
 
 import type { RunDetail, RunSummary, WorkflowSummary } from "@/shared/dto";
 
+import { GitHubRequestError } from "../github/client";
 import { createFakeGitHubClient } from "../github/fake-client";
 import type { AccessVariables } from "../middleware/access-jwt";
 import { registerActionsRoutes } from "./actions";
@@ -166,5 +167,66 @@ describe("GET /api/runs/:runId/failure-log", () => {
     const res = await makeApp().request("/api/runs/1001/failure-log");
 
     expect(res.status).toBe(204);
+  });
+});
+
+describe("statusFor 的状态码映射", () => {
+  test("上游 409（例如取消一个已经跑完的 run）：原样传给客户端", async () => {
+    const github = createFakeGitHubClient();
+    github.cancelRun = async () => {
+      throw new GitHubRequestError("run already completed", 409);
+    };
+
+    const res = await makeApp(github).request("/api/runs/1001/cancel", { method: "POST" });
+
+    expect(res.status).toBe(409);
+  });
+
+  test("上游 422（例如 workflow 没有 workflow_dispatch 触发器）：原样传给客户端", async () => {
+    const github = createFakeGitHubClient();
+    github.dispatchWorkflow = async () => {
+      throw new GitHubRequestError("no workflow_dispatch trigger configured", 422);
+    };
+
+    const res = await makeApp(github).request("/api/workflows/1/dispatch", { method: "POST" });
+
+    expect(res.status).toBe(422);
+  });
+
+  test("上游 403 不原样传——会跟 Access 中间件自己的 403 撞车，统一按 502 处理，body 也不冒充 Access 的拒绝", async () => {
+    const github = createFakeGitHubClient();
+    github.rerunRun = async () => {
+      throw new GitHubRequestError("installation token revoked", 403);
+    };
+
+    const res = await makeApp(github).request("/api/runs/1001/rerun", { method: "POST" });
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { error: string };
+    // 不能是 accessJwt 中间件用的那句话——那样客户端就分不清是
+    // 「Access 会话过期」还是「GitHub 这边的凭证出问题了」。
+    expect(body.error).not.toBe("Access 断言无效");
+  });
+
+  test("上游 500：按 502 处理", async () => {
+    const github = createFakeGitHubClient();
+    github.cancelRun = async () => {
+      throw new GitHubRequestError("internal server error", 500);
+    };
+
+    const res = await makeApp(github).request("/api/runs/1001/cancel", { method: "POST" });
+
+    expect(res.status).toBe(502);
+  });
+
+  test("上游 404：保留既有行为，原样传给客户端", async () => {
+    const github = createFakeGitHubClient();
+    github.getFailedStepLog = async () => {
+      throw new GitHubRequestError("run not found", 404);
+    };
+
+    const res = await makeApp(github).request("/api/runs/999999/failure-log");
+
+    expect(res.status).toBe(404);
   });
 });
