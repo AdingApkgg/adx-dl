@@ -10,6 +10,7 @@ const complete = {
   GITHUB_APP_INSTALLATION_ID: "7890",
   GITHUB_REPO_OWNER: "AdingApkgg",
   GITHUB_REPO_NAME: "adx-dl",
+  DASH_PUBLIC_ORIGIN: "https://adxdls-dash.saop.cc",
 };
 
 describe("parseEnv", () => {
@@ -22,6 +23,7 @@ describe("parseEnv", () => {
     expect(env.githubInstallationId).toBe(7890);
     expect(env.repoOwner).toBe("AdingApkgg");
     expect(env.repoName).toBe("adx-dl");
+    expect(env.dashPublicOrigin).toBe("https://adxdls-dash.saop.cc");
   });
 
   test("把私钥里的字面 \\n 还原成真换行", () => {
@@ -63,6 +65,25 @@ describe("parseEnv", () => {
     expect(() => parseEnv({ ...complete, GITHUB_APP_INSTALLATION_ID: "abc" })).toThrow(
       /GITHUB_APP_INSTALLATION_ID/
     );
+  });
+
+  // Finding I-2 — DASH_PUBLIC_ORIGIN 是必填项，故意 fail-fast：一个悄悄
+  // 不做 CSRF 校验但看起来健康的容器，比一个直接起不来的容器更危险。
+  test("DASH_PUBLIC_ORIGIN 未设置时报错", () => {
+    const { DASH_PUBLIC_ORIGIN, ...withoutOrigin } = complete;
+    expect(() => parseEnv(withoutOrigin)).toThrow(/DASH_PUBLIC_ORIGIN/);
+  });
+
+  test("DASH_PUBLIC_ORIGIN 不带 scheme 时报错", () => {
+    expect(() => parseEnv({ ...complete, DASH_PUBLIC_ORIGIN: "adxdls-dash.saop.cc" })).toThrow(
+      /DASH_PUBLIC_ORIGIN/
+    );
+  });
+
+  test("DASH_PUBLIC_ORIGIN 末尾的斜杠会被去掉", () => {
+    // Origin 请求头永远不带尾部斜杠；留着它，字符串相等比较永远不会命中。
+    const env = parseEnv({ ...complete, DASH_PUBLIC_ORIGIN: "https://adxdls-dash.saop.cc/" });
+    expect(env.dashPublicOrigin).toBe("https://adxdls-dash.saop.cc");
   });
 
   // Fix round 1: Finding 1 — CF_ACCESS_TEAM_DOMAIN scheme validation

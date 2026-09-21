@@ -2,10 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 
 import { createApp, type AppDeps } from "./app";
+import { GitHubRequestError } from "./github/client";
 import { createFakeGitHubClient } from "./github/fake-client";
 
 const TEAM = "https://example.cloudflareaccess.com";
 const AUD = "aud-tag-abc";
+const PUBLIC_ORIGIN = "https://dash.example.com";
 
 /** 造一组测试密钥，返回可注入的 accessConfig 与一个合法断言。 */
 async function makeAccess() {
@@ -39,6 +41,7 @@ async function makeApp(overrides: Partial<AppDeps> = {}) {
     github: createFakeGitHubClient(),
     accessConfig: access.config,
     poller: stubPoller,
+    dashPublicOrigin: PUBLIC_ORIGIN,
     ...overrides,
   };
   return { app: createApp(deps), assertion: access.assertion };
@@ -132,5 +135,108 @@ describe("createApp", () => {
       // 挂起——但也没必要为了这条断言去 await 一个可能是流的 body。
       expect(res.status).toBe(403);
     }
+  });
+});
+
+describe("Finding I-2 — 写端点的同源保护（csrf）", () => {
+  // 复现方式：apps/dash/src/client/lib/api.ts 里 rerun/cancel 发的正是这种
+  // 「没有自定义 header、没有 body」的 POST——CORS 里的 simple request，浏览器
+  // 不会先发 OPTIONS 预检就直接把请求送出去。第三方页面用
+  // `fetch(url, {method:"POST", credentials:"include"})` 打这个端点时读不到
+  // 响应，但副作用已经发生——这里验证 csrf() 真的挡住了它，而不只是让
+  // 状态码变难看。
+
+  test("Origin 与 DASH_PUBLIC_ORIGIN 匹配：放行，副作用真的发生", async () => {
+    const { app, assertion } = await makeApp();
+
+    const res = await app.request("/api/runs/1001/rerun", {
+      method: "POST",
+      headers: {
+        "Cf-Access-Jwt-Assertion": assertion,
+        Origin: PUBLIC_ORIGIN,
+      },
+    });
+
+    expect(res.status).toBe(202);
+  });
+
+  test("Origin 是第三方站点：拒绝，且副作用没有发生", async () => {
+    const github = createFakeGitHubClient();
+    const { app, assertion } = await makeApp({ github });
+
+    const res = await app.request("/api/runs/1001/rerun", {
+      method: "POST",
+      headers: {
+        "Cf-Access-Jwt-Assertion": assertion,
+        Origin: "https://evil.example.com",
+      },
+    });
+
+    expect(res.status).toBe(403);
+    // 光看状态码不够——它证明不了 handler 真的没跑。断言 fake 客户端的
+    // rerun 数组仍是空的，才是证明副作用真的没发生。
+    expect(github.seed.rerun).toEqual([]);
+  });
+
+  test("完全没有 Origin 头（比如 curl/脚本）：也被拒绝，副作用没有发生", async () => {
+    // 这是刻意的选择，不是意外：hono/csrf 对「不安全方法 + 没有 Origin +
+    // 没有 Sec-Fetch-Site」的请求默认拒绝（两项白名单检查都在没有值的情况下
+    // 直接判 false）。目前这个 API 唯一的调用方是浏览器里的 SPA（见
+    // client/lib/api.ts），它发出的每一个 POST 浏览器都会带上 Origin 头
+    // （现代浏览器对非安全方法一律带，不分同源跨源）；不带 Origin 的写请求
+    // 只可能来自 curl 之类的脚本，而这个服务眼下没有任何这样的合法调用方，
+    // 默认拒绝是「安全优先」而不是误伤——真要支持某个自动化脚本，到时候
+    // 应该给它一个明确的例外（比如校验一个专用 header），而不是放宽这里。
+    const github = createFakeGitHubClient();
+    const { app, assertion } = await makeApp({ github });
+
+    const res = await app.request("/api/runs/1001/rerun", {
+      method: "POST",
+      headers: { "Cf-Access-Jwt-Assertion": assertion },
+    });
+
+    expect(res.status).toBe(403);
+    expect(github.seed.rerun).toEqual([]);
+  });
+
+  test("GET /api/ping 没有 Origin 头也照样 200——csrf 不该拖累健康检查", async () => {
+    const { app } = await makeApp();
+
+    const res = await app.request("/api/ping");
+
+    expect(res.status).toBe(200);
+  });
+
+  test("GET /api/runs 没有 Origin 头也照样通——csrf 只挡不安全方法", async () => {
+    const { app, assertion } = await makeApp();
+
+    const res = await app.request("/api/runs", {
+      headers: { "Cf-Access-Jwt-Assertion": assertion },
+    });
+
+    expect(res.status).toBe(200);
+  });
+});
+
+describe("Finding I-5 — app.onError 集中记录、集中拼 body", () => {
+  test("GitHub 错误：状态码来自 statusFor，body 不带异常类名前缀", async () => {
+    const github = createFakeGitHubClient();
+    github.rerunRun = async () => {
+      throw new GitHubRequestError("installation token revoked", 403);
+    };
+    const { app, assertion } = await makeApp({ github });
+
+    const res = await app.request("/api/runs/1001/rerun", {
+      method: "POST",
+      headers: {
+        "Cf-Access-Jwt-Assertion": assertion,
+        Origin: PUBLIC_ORIGIN,
+      },
+    });
+
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { error: string };
+    // Finding M-1：不能是 "GitHubRequestError: installation token revoked"。
+    expect(body.error).toBe("installation token revoked");
   });
 });

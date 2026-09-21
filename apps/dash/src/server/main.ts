@@ -26,6 +26,7 @@ const app = createApp({
     teamDomain: env.accessTeamDomain,
     aud: env.accessAud,
   },
+  dashPublicOrigin: env.dashPublicOrigin,
 });
 
 console.log(`dash listening on :${env.port} (repo ${env.repoOwner}/${env.repoName})`);

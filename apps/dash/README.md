@@ -24,6 +24,7 @@ Copy `.env.example` to `.env` and fill in:
 | --- | --- |
 | `CF_ACCESS_TEAM_DOMAIN` | **Confirmed:** `https://saop-pages.cloudflareaccess.com`. This is the real team domain — verified against this Mac's local Access cache (`~/.cloudflared/saop-pages.cloudflareaccess.com-jwks`), not a placeholder. No trailing slash. Used to build the JWKS URL and validate the JWT `iss` claim. |
 | `CF_ACCESS_AUD` | **Confirmed, deployed.** The Access application's Application Audience (AUD) Tag, generated when the Access application was created in the Zero Trust dashboard. It is now set in `apps/dash/.env` on g510 — verified by observing the JWKS `kid` in the login redirect from an unauthenticated request, which matches this value exactly. |
+| `DASH_PUBLIC_ORIGIN` | **Required, no default.** The origin the browser actually sends (`https://adxdls-dash.saop.cc` for this deployment, no trailing slash). Passed to `hono/csrf`'s `origin` option to reject cross-origin writes (see Finding I-2). Must be set explicitly: this process sits behind `cloudflared`, so the origin Hono would otherwise derive from the incoming request is the tunnel's local address (`http://localhost:12702`), not the public domain the browser sends — the two never match, so there is no safe default to fall back to. `parseEnv` throws if it's unset, the same fail-fast treatment as the other required variables: a container that starts up looking healthy with this protection silently disabled is worse than one that refuses to start. **This means an existing deployment's `.env` on g510 must be updated with this variable before/when this change ships, or the container will fail to start.** |
 | `GITHUB_APP_ID` | `5020220` — the AstroDX dash GitHub App. |
 | `GITHUB_APP_PRIVATE_KEY` | The App's private key (PEM). Write it as a single line with literal `\n` in place of newlines; `env.ts` unescapes them. |
 | `GITHUB_APP_INSTALLATION_ID` | `163475623` — the installation on `AdingApkgg/adx-dl`. |
@@ -105,6 +106,13 @@ docker compose logs --tail=50
 
 Expect the container to reach `running (healthy)` and the log line
 `dash listening on :3000 (repo AdingApkgg/adx-dl)`.
+
+**Before pulling the commit that introduces `DASH_PUBLIC_ORIGIN`** (Finding
+I-2's csrf protection), add it to `apps/dash/.env` on g510 —
+`DASH_PUBLIC_ORIGIN=https://adxdls-dash.saop.cc` — first. It's a required
+variable with no default; `docker compose up -d --build` will build fine
+but the container will exit immediately (`环境变量有问题：- DASH_PUBLIC_ORIGIN
+未设置`) without it.
 
 **The clone on g510 is a sparse, partial checkout, not a full clone.** It
 was created with `--filter=blob:none --sparse`, limited to the paths the
@@ -211,6 +219,19 @@ always targets the repository's default branch; the UI has no ref
 picker even though `POST /api/workflows/:workflowId/dispatch` accepts
 one — a real gap now that the repo uses a `dev` → `pre` → `main` model,
 but not a checklist failure.
+
+**Known unverified item:** `DASH_PUBLIC_ORIGIN` and the `hono/csrf` check it
+feeds (Finding I-2) have only been verified with `bun test`'s in-process
+`app.request()`, never against the real tunnel. The risk this test suite
+cannot rule out: if `cloudflared`, Cloudflare Access, or some proxy in
+between rewrites or strips the `Origin` header before it reaches the
+container, every real POST from the deployed UI (触发/重跑/取消) would
+start failing with 403 even though `DASH_PUBLIC_ORIGIN` is configured
+correctly. After the next deploy, click "触发" once and confirm it still
+works (202, run appears) before trusting this is fully verified — if it
+403s instead, check `docker logs` for a `[api] POST ... -> 403: (no error
+message)` line, which confirms it's this check (not accessJwt, which logs
+its own distinct `[access-jwt] rejected: ...` line) rejecting the request.
 
 **Known unverified item:** the `paths-ignore: ['apps/dash/**']` rule on
 `deploy-gh-pages.yml` has never actually been demonstrated. The merge to

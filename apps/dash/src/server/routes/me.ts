@@ -24,6 +24,10 @@ export function registerMeRoute(
       repo = await deps.github.getRepoInfo();
     } catch (error) {
       repoError = error instanceof Error ? error.message : String(error);
+      // 这条分支故意不抛错、也不改状态码（见上面的注释），所以它永远不会
+      // 走到 createApp 里那个集中记日志的 app.onError —— 这是整个服务端
+      // 唯一还需要在这里单独打一行日志的地方。不记 token/私钥，只记消息。
+      console.error(`[me] getRepoInfo failed: ${repoError}`);
     }
 
     return c.json<MeResponse>({ email: identity.email, repo, repoError });
