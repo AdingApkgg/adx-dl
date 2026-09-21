@@ -1,6 +1,6 @@
 # g510 上已经跑着谱面 vhost（nginx 0.0.0.0:12701）、一个 pageview 计数器（12700）
 # 和两条 token 管理的 cloudflared 隧道。这个 compose 项目独立命名，不与它们共享
-# 网络或端口。
+# 网络或端口——dash 占用宿主机端口 12702（不是 3000，见下）。
 name: astrodx-dash
 
 services:
@@ -12,12 +12,17 @@ services:
     env_file:
       - .env
     ports:
-      # 只绑 127.0.0.1，绝不能改成 "3000:3000"（等价于 0.0.0.0:3000:3000）。
+      # 宿主机端口用 12702（不是容器内部监听的 3000）：3000 按用户要求不占用，
+      # 12702 与既有的谱面 vhost（12701）、pageview 计数器（12700）连号，已确认
+      # 空闲。容器内部仍然监听 3000 不变——healthcheck 打的就是容器内的
+      # 127.0.0.1:3000，这一段不受宿主机端口号影响。
+      #
+      # 只绑 127.0.0.1，绝不能改成 "12702:3000"（等价于 0.0.0.0:12702:3000）。
       #
       # g510 上没有 cloudflared 容器可以在 compose 网络内部用 http://dash:3000
       # 够到这个服务 —— 两条既有隧道都是 token 管理的、跑在宿主机上的
       # cloudflared 进程，ingress 规则在 Cloudflare 控制台配置，指向
-      # http://localhost:3000。它们只能通过宿主机的回环地址接触到 dash。
+      # http://localhost:12702。它们只能通过宿主机的回环地址接触到 dash。
       #
       # 这个端口后面直接是能对 GitHub 仓库做写操作的后端（Contents/Actions/
       # Pull requests RW 的 GitHub App）。Cloudflare Access 的 JWT 校验是
@@ -25,7 +30,7 @@ services:
       # 设备都能绕过 Access 直接打这个端口 —— Access 中间件本身没坏，但
       # 网络层已经把它变得形同虚设。绑定 127.0.0.1 让宿主机上的 cloudflared
       # 够得着，局域网够不着。
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:12702:3000"
     healthcheck:
       # /api/ping 在 Access 中间件之前注册，healthcheck 没有断言也能过。
       test: ["CMD", "bun", "-e", "await fetch('http://127.0.0.1:3000/api/ping').then(r=>{if(!r.ok)process.exit(1)})"]

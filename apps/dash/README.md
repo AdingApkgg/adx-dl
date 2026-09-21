@@ -22,13 +22,13 @@ Copy `.env.example` to `.env` and fill in:
 
 | Variable | Meaning |
 | --- | --- |
-| `CF_ACCESS_TEAM_DOMAIN` | Cloudflare Access team domain, e.g. `https://saop-pages.cloudflareaccess.com`. No trailing slash. Used to build the JWKS URL and validate the JWT `iss` claim. |
-| `CF_ACCESS_AUD` | The Access application's Application Audience (AUD) Tag. Only exists once the Access application has been created in the Zero Trust dashboard — see below. |
+| `CF_ACCESS_TEAM_DOMAIN` | **Confirmed:** `https://saop-pages.cloudflareaccess.com`. This is the real team domain — verified against this Mac's local Access cache (`~/.cloudflared/saop-pages.cloudflareaccess.com-jwks`), not a placeholder. No trailing slash. Used to build the JWKS URL and validate the JWT `iss` claim. |
+| `CF_ACCESS_AUD` | **Still pending.** The Access application's Application Audience (AUD) Tag. It does not exist yet — it's generated only once the Access application is created in the Zero Trust dashboard — see below. |
 | `GITHUB_APP_ID` | `5020220` — the AstroDX dash GitHub App. |
 | `GITHUB_APP_PRIVATE_KEY` | The App's private key (PEM). Write it as a single line with literal `\n` in place of newlines; `env.ts` unescapes them. |
 | `GITHUB_APP_INSTALLATION_ID` | `163475623` — the installation on `AdingApkgg/adx-dl`. |
 | `GITHUB_REPO_OWNER` / `GITHUB_REPO_NAME` | `AdingApkgg` / `adx-dl`. |
-| `PORT` | Optional, defaults to `3000`. |
+| `PORT` | Optional, defaults to `3000`. This is the port the Hono process itself listens on *inside* the container (or locally) — not the host-published port on g510, which is 12702 (see "Deployment on g510" below). |
 | `DASH_CLIENT_ROOT` | Optional, defaults to `./build/client`. Where the Hono server serves the built SPA from. |
 
 The GitHub App has Contents RW, Actions RW, Pull requests RW, and Metadata R
@@ -63,15 +63,26 @@ g510 already runs two token-based (remotely-managed) `cloudflared` tunnels
 as templated systemd units (`cloudflared@<uuid>.service`); their ingress
 rules live in the Cloudflare dashboard, not in a local `config.yml`. dash
 reuses one of those tunnels rather than running its own `cloudflared`
-container: a Public Hostname entry in the Cloudflare dashboard points at
-`http://localhost:3000` on the host. Because of that, `compose.yaml` binds
-the container's port to `127.0.0.1:3000` on the host — see the comment in
-that file for why `0.0.0.0` or a bare `3000:3000` publish would be a
-security hole (LAN-wide access to a repo-write-credentialed backend).
+container: a Public Hostname entry in the Cloudflare dashboard should
+point at **`http://localhost:12702`** on the host. That entry is created by
+hand in the Zero Trust console (Access → Applications → the dash
+application → its tunnel's Public Hostname) — it is not part of anything
+this repo runs.
 
-Port 3000 is confirmed free on g510; it doesn't collide with nginx (80/443),
-the chart vhost (12701), or the pageview counter (12700). The compose
-project is named `astrodx-dash` to keep it independent of those.
+The container listens on port **3000 inside the container** — that part
+never changes, and the healthcheck (which runs inside the container) still
+targets `127.0.0.1:3000`. Only the *published* host-side port is different:
+`compose.yaml` binds it as `127.0.0.1:12702:3000`, i.e. host port 12702
+forwards to the container's port 3000. See the comment in that file for why
+the bind must stay `127.0.0.1`-scoped — publishing on `0.0.0.0` (or a bare
+`12702:3000`, which docker treats the same way) would be a security hole
+(LAN-wide access to a repo-write-credentialed backend).
+
+Port 12702 is confirmed free on g510; it doesn't collide with nginx
+(80/443), the chart vhost (12701), or the pageview counter (12700). It sits
+in the same range as those other AstroDX services. Port 3000 is
+deliberately not published on the host at all. The compose project is
+named `astrodx-dash` to keep it independent of those other services.
 
 ### First deploy / updating
 
@@ -92,15 +103,19 @@ Run this after any change to auth or deployment config — on g510, not
 through the tunnel:
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3000/api/me
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:12702/api/me
 # must print 403
 
-curl -s http://127.0.0.1:3000/api/ping
+curl -s http://127.0.0.1:12702/api/ping
 # must print {"ok":true}
 ```
 
+Note the port here is **12702** — the host-published port from
+`compose.yaml` — not the container's internal 3000, which isn't reachable
+from the host at all.
+
 This matters because the container's port is bound on the host
-(`127.0.0.1:3000`). Cloudflare Access normally sits in front of the tunnel,
+(`127.0.0.1:12702`). Cloudflare Access normally sits in front of the tunnel,
 but once the port is exposed on the host, the JWT check inside the app is
 the *only* thing standing between any process on g510 and a backend that
 can write to the repository. If `/api/me` ever returns anything other than

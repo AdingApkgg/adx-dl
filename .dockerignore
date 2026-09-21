@@ -1,0 +1,45 @@
+# This file exists specifically to keep real secrets out of Docker build
+# contexts in this repo — most importantly apps/dash/.env, which on g510
+# holds a live GitHub App private key (Contents/Actions/Pull-requests write
+# on AdingApkgg/adx-dl) plus the Cloudflare Access AUD tag. Without this
+# file, `docker compose up -d --build` (context: repo root, per
+# apps/dash/compose.yaml) would tar that file into the build context and
+# apps/dash/Dockerfile's builder stage would COPY it into an image layer —
+# recoverable later via `docker history` / `docker save` / the build cache,
+# even though the final runner stage never copies it forward. Do not delete
+# this file without replacing what it does. apps/dash/Dockerfile also lists
+# its builder-stage COPY sources explicitly (not a directory-wide copy) as
+# a second, independent line of defense — the two are meant to overlap.
+#
+# Secondary purpose: apps/dash's Dockerfile only ever needs a handful of
+# package.json manifests plus apps/dash's own source — everything else
+# below is either generated output, VCS/tooling metadata, or unrelated
+# workspace content (large data/asset directories included) that would
+# otherwise be tarred up and sent to the Docker daemon on every build.
+
+# --- secrets: exclude every .env variant at any depth, keep the template ---
+**/.env
+**/.env.*
+!**/.env.example
+
+# --- VCS / editor metadata: never needed inside a build ---
+.git
+**/.gitignore
+**/.DS_Store
+
+# --- generated output: the builder stage produces these itself; stale ---
+# --- host-side copies (if any exist) must never be copied in instead ---
+**/node_modules
+**/build
+**/dist
+**/.react-router
+**/*.tsbuildinfo
+
+# --- unrelated workspace content: not read by apps/dash/Dockerfile at all ---
+/assets
+/data
+/pipeline
+/.github
+/.superpowers
+/apps/web/public
+/apps/web/src
