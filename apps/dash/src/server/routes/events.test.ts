@@ -68,4 +68,32 @@ describe("GET /api/events", () => {
 
     await reader.cancel();
   });
+
+  test("处理函数异常退出时仍会退订，不留下泄漏的订阅", async () => {
+    // 构造一个会让 JSON.stringify 抛错的 run：自引用对象。这不是真实
+    // GitHub 数据会出现的形状，但足以确定性地复现「处理函数异常退出」
+    // 这条路径——不这样测，unsubscribe 被跳过这件事就只能靠读代码发现。
+    const poller = createFakePoller();
+    const res = await makeApp(poller).request("/api/events");
+    const reader = res.body!.getReader();
+
+    const circular: Record<string, unknown> = { id: 1 };
+    circular.self = circular;
+
+    poller.emit([{ kind: "added", run: circular as unknown as RunSummary }]);
+
+    // 一直读到流关闭：streamSSE 的 run() 会在 catch 里吞掉这个异常，
+    // 然后在 finally 里关闭流——这是一个确定性的同步点，不用猜时间。
+    let done = false;
+    while (!done) {
+      const result = await reader.read();
+      done = result.done;
+    }
+
+    // 处理函数已经异常退出。如果 unsubscribe() 没有在 finally 里保证
+    // 执行，这个假 poller 的订阅者 Set 里会一直留着这个已经死掉的闭包，
+    // 之后每次 diffRuns 广播都会继续往它的 pending 数组里塞东西，
+    // 没有人再读——无界增长。
+    expect(poller.subscriberCount()).toBe(0);
+  });
 });

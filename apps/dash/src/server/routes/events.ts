@@ -25,58 +25,80 @@ export function registerEventsRoute(
     c.header("Cache-Control", "no-cache");
     c.header("X-Accel-Buffering", "no");
 
-    return streamSSE(c, async (stream) => {
-      let unsubscribe = () => {};
+    return streamSSE(
+      c,
+      async (stream) => {
+        let unsubscribe = () => {};
 
-      // `stream.closed` is only set by `.close()` (a normal end-of-callback
-      // exit); a client disconnect goes through `.abort()` instead, which
-      // only flips `stream.aborted`. Racing on a promise that resolves from
-      // `onAbort` but then re-checking `stream.closed` never breaks the loop:
-      // the already-settled promise makes `Promise.race` resolve instantly
-      // on every subsequent turn, spinning a tight, CPU-pinning loop forever.
-      // `isDone()` has to check both flags.
-      const aborted = new Promise<void>((resolve) => {
-        stream.onAbort(() => {
-          unsubscribe();
-          resolve();
-        });
-      });
-      const isDone = () => stream.closed || stream.aborted;
-
-      const pending: RunChange[][] = [];
-      let notify: (() => void) | null = null;
-
-      unsubscribe = deps.poller.subscribe((changes) => {
-        pending.push(changes);
-        notify?.();
-      });
-
-      while (!isDone()) {
-        while (pending.length > 0 && !isDone()) {
-          await stream.writeSSE({
-            event: "runs",
-            data: JSON.stringify(pending.shift()),
+        // `stream.closed` is only set by `.close()` (a normal end-of-callback
+        // exit); a client disconnect goes through `.abort()` instead, which
+        // only flips `stream.aborted`. Racing on a promise that resolves from
+        // `onAbort` but then re-checking `stream.closed` never breaks the loop:
+        // the already-settled promise makes `Promise.race` resolve instantly
+        // on every subsequent turn, spinning a tight, CPU-pinning loop forever.
+        // `isDone()` has to check both flags.
+        const aborted = new Promise<void>((resolve) => {
+          stream.onAbort(() => {
+            unsubscribe();
+            resolve();
           });
-        }
-
-        if (isDone()) break;
-
-        // 等下一批变化，或者等客户端断开；30 秒没动静就发一次心跳，
-        // 免得中间的代理把这条闲置连接掐掉。
-        const woken = new Promise<void>((resolve) => {
-          notify = resolve;
         });
-        const heartbeat = new Promise<void>((resolve) => setTimeout(resolve, 30_000));
-        await Promise.race([woken, heartbeat, aborted]);
-        notify = null;
+        const isDone = () => stream.closed || stream.aborted;
 
-        if (isDone()) break;
-        if (pending.length === 0) {
-          await stream.writeSSE({ event: "ping", data: "" });
+        const pending: RunChange[][] = [];
+        let notify: (() => void) | null = null;
+
+        unsubscribe = deps.poller.subscribe((changes) => {
+          pending.push(changes);
+          notify?.();
+        });
+
+        // try/finally, not a bare call after the loop: any exception thrown
+        // inside the loop (e.g. JSON.stringify choking on a bad payload)
+        // would otherwise skip unsubscribe() entirely. Hono's streamSSE
+        // catches the throw and still closes the stream, so the connection
+        // ends either way — but without this, the orphaned closure stays in
+        // the poller's subscriber set forever, keeps receiving every future
+        // broadcast, and keeps pushing into a `pending` array nobody drains
+        // again. unsubscribe() is idempotent (Set#delete on an absent entry
+        // is a no-op), so calling it again from onAbort is harmless.
+        try {
+          while (!isDone()) {
+            while (pending.length > 0 && !isDone()) {
+              await stream.writeSSE({
+                event: "runs",
+                data: JSON.stringify(pending.shift()),
+              });
+            }
+
+            if (isDone()) break;
+
+            // 等下一批变化，或者等客户端断开；30 秒没动静就发一次心跳，
+            // 免得中间的代理把这条闲置连接掐掉。
+            const woken = new Promise<void>((resolve) => {
+              notify = resolve;
+            });
+            const heartbeat = new Promise<void>((resolve) => setTimeout(resolve, 30_000));
+            await Promise.race([woken, heartbeat, aborted]);
+            notify = null;
+
+            if (isDone()) break;
+            if (pending.length === 0) {
+              await stream.writeSSE({ event: "ping", data: "" });
+            }
+          }
+        } finally {
+          unsubscribe();
         }
+      },
+      async (error) => {
+        // 不给 onError 的话，Hono 会把异常吞进一句裸的 console.error(e)，
+        // 排障时很难从一堆日志里认出这是 /api/events 出的问题；给了之后
+        // Hono 还会顺带给客户端补一条 `event: error` 再关闭连接，比直接
+        // 断线一声不吭要好——至少前端将来有机会区分「连接正常结束」和
+        // 「服务端这边出错了」。
+        console.error("[events] /api/events handler failed:", error);
       }
-
-      unsubscribe();
-    });
+    );
   });
 }
