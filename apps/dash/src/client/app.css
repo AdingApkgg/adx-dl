@@ -4,6 +4,9 @@
   --dash-muted: #6b6b76;
   --dash-line: #e2e2e8;
   --dash-accent: #2f5fd0;
+  --dash-ok: #1a7f4b;
+  --dash-bad: #c0392b;
+  --dash-running: #b8860b;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -13,6 +16,9 @@
     --dash-muted: #9a9aa6;
     --dash-line: #2c2c34;
     --dash-accent: #7aa2f7;
+    --dash-ok: #5ed39a;
+    --dash-bad: #ff7b6b;
+    --dash-running: #e3b341;
   }
 }
 
@@ -37,4 +43,128 @@ body {
 .dash-loading {
   padding: 2rem 1rem;
   color: var(--dash-muted);
+}
+
+.dash-muted {
+  color: var(--dash-muted);
+  font-size: 0.9rem;
+}
+
+.dash-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.4rem 1rem;
+  margin: 1.5rem 0;
+}
+
+.dash-facts dt {
+  color: var(--dash-muted);
+}
+
+.dash-facts dd {
+  margin: 0;
+}
+
+.dash-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.5rem 0;
+}
+
+button {
+  font: inherit;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--dash-fg);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--dash-accent);
+  color: var(--dash-accent);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.dash-notice {
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--dash-accent) 8%, transparent);
+}
+
+.dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0 2rem;
+}
+
+.dash-table th,
+.dash-table td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--dash-line);
+  vertical-align: middle;
+}
+
+.dash-table th {
+  color: var(--dash-muted);
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.dash-row-actions {
+  text-align: right;
+}
+
+.dash-pill {
+  display: inline-block;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  border: 1px solid currentColor;
+}
+
+.dash-pill--ok { color: var(--dash-ok); }
+.dash-pill--bad { color: var(--dash-bad); }
+.dash-pill--running { color: var(--dash-running); }
+.dash-pill--muted { color: var(--dash-muted); }
+
+.dash-failure {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  border: 1px solid var(--dash-bad);
+  border-radius: 0.5rem;
+}
+
+.dash-failure h2 {
+  margin-top: 0;
+  font-size: 1rem;
+  color: var(--dash-bad);
+}
+
+.dash-failure pre {
+  margin: 0;
+  max-height: 24rem;
+  overflow: auto;
+  /* 构建日志的行很长。换行而不是横向滚一屏，手机上才读得了。 */
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+/* 窄屏下让表格能横滚，而不是把整页撑出横向滚动条。 */
+@media (max-width: 40rem) {
+  .dash-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
 }

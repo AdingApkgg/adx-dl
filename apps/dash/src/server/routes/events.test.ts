@@ -67,6 +67,19 @@ describe("GET /api/events", () => {
     expect(chunk).toContain('"kind":"finished"');
 
     await reader.cancel();
+
+    // reader.cancel() 对应的是浏览器标签页关掉这条最常见的生产路径
+    // （不是异常，也不是服务端主动 close）。streamSSE 的 run() 通过
+    // stream.onAbort() 才会跑到 unsubscribe()，而这条回调是否已经执行
+    // 完成不保证跟 reader.cancel() 这个 await 落在同一个 microtask 里
+    // ——轮询几个 microtask，而不是猜一个固定的 sleep 时长。
+    let ticks = 0;
+    while (poller.subscriberCount() > 0 && ticks < 50) {
+      await Promise.resolve();
+      ticks++;
+    }
+
+    expect(poller.subscriberCount()).toBe(0);
   });
 
   test("处理函数异常退出时仍会退订，不留下泄漏的订阅", async () => {
