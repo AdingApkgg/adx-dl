@@ -4,8 +4,29 @@
 # 但下面按文件名显式 COPY，而不是整目录 COPY apps/dash/，是第二道独立的防线：
 # 就算哪天 .dockerignore 被误删，这里也不会把 .env 拷进镜像层，因为它压根没
 # 被列进来。两道防线都要留着，不要图省事合并成一道。
+
+# 只借它的 node 二进制：SPA 预渲染在 bun 的 node 兼容 shim
+# （/usr/local/bun-node-fallback-bin/node，其实是 bun 自己伪装的）下跑
+# entry.server.tsx 会失败，构建卡在
+#   "SPA Mode: Received a 500 status code from `entry.server.tsx`
+#    while prerendering your SPA Fallback HTML file."
+# 换成这个阶段里的真 Node 二进制就能跑通。这个阶段本身不装依赖、不跑构建，
+# 只是拿来源文件用的，不会拖慢关心层缓存的其它步骤。
+FROM node:22-slim AS realnode
+
 FROM oven/bun:1.3.14 AS builder
 WORKDIR /repo
+
+# 必须放在 bun install / bun run build 之前，且落在 /usr/local/bin——bun 官方
+# 镜像把 /usr/local/bun-node-fallback-bin 追加在继承的 PATH 末尾
+# （见 oven-sh/bun 仓库 dockerhub/*/Dockerfile 里的
+# `ENV PATH "${PATH}:/usr/local/bun-node-fallback-bin"`），而 /usr/local/bin
+# 在基础 Debian 镜像里本来就排在 PATH 前面，所以 /usr/local/bin/node 会先于
+# fallback shim 被解析到。不要把这步挪到 build 之后，也不要"优化"掉整个
+# realnode 阶段——上面这条 entry.server.tsx 500 就是删掉它之后会复现的故障，
+# 而且只有在真实部署容器里才会现形，本地 `bun run build`（Mac 上没有这个 shim
+# 问题）测不出来。
+COPY --from=realnode /usr/local/bin/node /usr/local/bin/node
 
 # 先只拷清单，让依赖层能被缓存住：改源码不必重装依赖。
 COPY package.json bun.lock ./

@@ -42,3 +42,19 @@ jobs:
       - name: Typecheck and test
         working-directory: apps/dash
         run: bun run check
+
+      # bun run build was never part of CI, so the build path had only ever run
+      # on one developer's Mac. A real deploy to g510 failed at this exact step
+      # (ECONNREFUSED from the SPA prerender, plus a separate entry.server.tsx
+      # 500 under bun's node shim — see apps/dash/vite.config.ts and Dockerfile
+      # for the fixes). A build that only ever runs at deploy time makes
+      # deployment the place you discover build breakage, which is the most
+      # expensive place to discover it. This step is NOT a substitute for a
+      # deploy rehearsal: ubuntu-latest here isn't the oven/bun container that
+      # ships to g510, so it will not reproduce that container's IPv6-only
+      # preview-server binding or its node-shim behaviour. It only catches
+      # build breakage in general (syntax errors, type errors that slip past
+      # tsc in build-only codepaths, broken imports, etc.).
+      - name: Build
+        working-directory: apps/dash
+        run: bun run build
