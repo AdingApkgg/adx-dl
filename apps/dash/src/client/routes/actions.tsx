@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { Link, useRevalidator } from "react-router";
 
 import { api } from "../lib/api";
@@ -16,15 +16,35 @@ export default function Actions({ loaderData }: Route.ComponentProps) {
   const [notice, setNotice] = useState<string | null>(null);
 
   // 后端已经在轮询 GitHub 了，这里只是订阅它的结论，不再各自轮询一遍。
+  //
+  // 连接只应该在这个组件挂载时开一次、卸载时关一次——但 revalidator 本身
+  // 不是一个能放心放进依赖数组的值：react-router 的 useRevalidator() 每次
+  // revalidate() 都会把 router 的 revalidation 状态从 idle 甩到 loading
+  // 再甩回 idle，每一次甩动都让 useRevalidator() 返回一个新对象（哪怕
+  // revalidate 这个函数本身从来没变过）。而"runs" 事件恰好就是触发
+  // revalidate() 的原因——如果拿 revalidator 当依赖，这个连接会在 run
+  // 正在跑、最需要它保持在线的时候，被自己收到的每一条事件反复拆掉重连，
+  // 中间还会留出一个"旧连接已关、新连接未开"的窗口，事件可能在这个窗口
+  // 里被漏掉。用 useEffectEvent 读最新的 revalidator，让下面这个 effect
+  // 的依赖数组保持空——它只关心"组件是否还活着"，不关心 revalidator 变没变。
+  const onRunsEvent = useEffectEvent(() => {
+    revalidator.revalidate();
+  });
+
   useEffect(() => {
     const source = new EventSource("/api/events");
     source.addEventListener("runs", () => {
-      revalidator.revalidate();
+      onRunsEvent();
     });
     return () => source.close();
-  }, [revalidator]);
+  }, []);
 
   const act = async (label: string, fn: () => Promise<void>) => {
+    // disabled={busy} 只挡得住"React 已经重新渲染过"之后的点击；两次点击
+    // 落在同一个渲染帧里时，DOM 属性还没来得及更新，第二次点击照样会跑
+    // 进这里。这几个按钮背后是真的 dispatch/rerun/cancel，会在活的仓库上
+    // 启动/打断真实的 CI——不能只靠 DOM 属性兜底，这里要挡一次。
+    if (busy) return;
     setBusy(true);
     setNotice(null);
     try {
