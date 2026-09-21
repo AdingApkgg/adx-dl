@@ -61,14 +61,30 @@ function toRunSummary(raw: RawRun): RunSummary {
   };
 }
 
-export function createOctokitGitHubClient(config: OctokitClientConfig): GitHubClient {
-  const app = new App({ appId: config.appId, privateKey: config.privateKey });
+/** 铸出一枚新的、已完成安装态鉴权的 octokit 实例。 */
+export type MintOctokit = () => Promise<Octokit>;
 
+/** 生产环境用的默认铸造函数：真的构造一个 App 并向 GitHub 换安装态 token。 */
+function defaultMintOctokit(config: OctokitClientConfig): MintOctokit {
+  const app = new App({ appId: config.appId, privateKey: config.privateKey });
+  return () => app.getInstallationOctokit(config.installationId);
+}
+
+/**
+ * @param mintOctokit 铸造函数，缺省时用真的 GitHub App 换 token。测试注入一个
+ *   不打网络的假实现，用来验证 `withOctokit` 的「失败后清缓存、下次真的换新
+ *   实例」这条契约——这是 `createOctokitGitHubClient` 唯一的可测试缝隙，
+ *   因为它内部原本直接 `new App(...)`，没有缝隙就只能连真 GitHub 才能测。
+ */
+export function createOctokitGitHubClient(
+  config: OctokitClientConfig,
+  mintOctokit: MintOctokit = defaultMintOctokit(config)
+): GitHubClient {
   // 缓存的是 octokit 实例，不是 token —— token 的换取、缓存与到期刷新
   // 由 @octokit/auth-app 在实例内部处理，我们不重复造一份会过期的状态。
   let cached: Promise<Octokit> | null = null;
   const octokit = () => {
-    cached ??= app.getInstallationOctokit(config.installationId);
+    cached ??= mintOctokit();
     return cached;
   };
 

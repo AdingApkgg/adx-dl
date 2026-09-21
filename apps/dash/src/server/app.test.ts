@@ -93,4 +93,40 @@ describe("createApp", () => {
 
     expect(res.status).toBe(200);
   });
+
+  test("除了 /api/ping，每个已注册路由在没有 Access 断言时都是 403", async () => {
+    // 枚举 app.routes 而不是一条条硬编码路径：Task 9/10 往 app.ts 里加新路由时，
+    // 这条测试自动跟着覆盖，不用记得回来加一行。/api/ping 是容器 healthcheck，
+    // 必须是唯一的例外——如果以后不小心把别的路由挪到了 accessJwt 中间件
+    // 之前（哪怕只是注册顺序写反），这里会红，而不是要靠人肉审查发现。
+    const { app } = await makeApp();
+
+    const routes = app.routes.filter(
+      (route) => !(route.method === "GET" && route.path === "/api/ping")
+    );
+
+    // 防的是筛选条件本身写错、把所有路由都滤掉了，导致下面的循环空转、
+    // 测试看着绿实则什么也没断言过。
+    expect(routes.length).toBeGreaterThan(0);
+
+    for (const route of routes) {
+      // Hono 的 `.use()`/通配符路由在 app.routes 里方法记的是 "ALL"，
+      // fetch 请求没有这个方法，随便挑一个具体方法即可——accessJwt 中间件
+      // 按路径拦截，不按方法区分。
+      const method = route.method === "ALL" ? "GET" : route.method;
+      // 把路径参数（:runId）和通配符（*）段替换成占位值，好拼出一个
+      // 真能发出去的具体请求路径。
+      const path = route.path
+        .split("/")
+        .map((segment) => (segment === "*" || segment.startsWith(":") ? "probe-value" : segment))
+        .join("/");
+
+      const res = await app.request(path, { method });
+
+      // 只看状态码，不读 body。以后加的 SSE 路由会在鉴权通过后才开始
+      // 流式返回；鉴权失败时中间件在流开始之前就短路了，所以这里不会
+      // 挂起——但也没必要为了这条断言去 await 一个可能是流的 body。
+      expect(res.status).toBe(403);
+    }
+  });
 });
