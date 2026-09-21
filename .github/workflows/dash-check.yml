@@ -5,8 +5,12 @@ name: Dash check
 # 手动 docker compose 拉起的，不经 GitHub。
 on:
   push:
+    # Check on main, dev, and pre. The pre branch is what the g510 deployment
+    # is built from, so it must not receive unchecked commits.
     branches:
       - main
+      - dev
+      - pre
     paths:
       - "apps/dash/**"
       - "bun.lock"
