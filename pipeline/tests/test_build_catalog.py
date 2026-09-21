@@ -566,6 +566,65 @@ class BuildCatalogTests(unittest.TestCase):
         self.assertEqual(attempts["n"], 1)  # 404 is permanent — no retry
         sleep.assert_not_called()
 
+    def test_fetch_text_retries_on_cloudflare_origin_error(self) -> None:
+        # This is what actually broke the 2026-09-18 scheduled build: the
+        # Cloudflare-fronted origin blipped and returned 530 (usually paired
+        # with a 1xxx origin error), which wasn't in _RETRYABLE_HTTP_STATUS,
+        # so the fetch failed after a single 0.25s attempt instead of
+        # retrying. 530 describes the origin/network being unreachable, not
+        # a static misconfiguration, so it should recover on a later retry.
+        class FakeResponse:
+            def __enter__(self) -> "FakeResponse":
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return b"recovered"
+
+        attempts = {"n": 0}
+
+        def flaky_urlopen(request, context=None, timeout=0):
+            attempts["n"] += 1
+            if attempts["n"] < 2:
+                raise HTTPError(
+                    "https://example.test/", 530, "Origin DNS Error", {}, None
+                )
+            return FakeResponse()
+
+        with patch("tools.remote_catalog.time.sleep") as sleep, patch(
+            "tools.remote_catalog.urlopen", side_effect=flaky_urlopen
+        ):
+            self.assertEqual(fetch_text("https://example.test/"), "recovered")
+
+        self.assertEqual(attempts["n"], 2)  # failed once, then succeeded
+        self.assertEqual(sleep.call_count, 1)  # backed off once
+
+    def test_fetch_text_does_not_retry_on_cloudflare_invalid_origin_certificate(
+        self,
+    ) -> None:
+        # 526 means the origin's own TLS certificate is broken (expired,
+        # self-signed, wrong host) — that's a static misconfiguration, not a
+        # blip. Retrying moments later hits the exact same bad certificate
+        # and fails the same way, so it must not be retried.
+        attempts = {"n": 0}
+
+        def invalid_cert(request, context=None, timeout=0):
+            attempts["n"] += 1
+            raise HTTPError(
+                "https://example.test/", 526, "Invalid SSL Certificate", {}, None
+            )
+
+        with patch("tools.remote_catalog.time.sleep") as sleep, patch(
+            "tools.remote_catalog.urlopen", side_effect=invalid_cert
+        ):
+            with self.assertRaises(HTTPError):
+                fetch_text("https://example.test/")
+
+        self.assertEqual(attempts["n"], 1)  # 526 is permanent — no retry
+        sleep.assert_not_called()
+
     def test_aliases_resolve_with_dx_and_utage_offset_fallback(self) -> None:
         # Lxns keys aliases on the base maimai song id; AstroDX short_ids carry
         # the +10000 (DX) / +100000 (UTAGE) offset, so the lookup de-offsets.

@@ -16,9 +16,26 @@ _T = TypeVar("_T")
 # (read timeouts, dropped connections, 5xx/429) with exponential backoff so a
 # single blip doesn't fail the whole catalog build. Permanent failures (404,
 # certificate verification) are not retried.
+#
+# INDEX_URL is served through Cloudflare, whose origin-side failures come
+# back as a non-standard 520-527/530 range rather than a textbook 5xx. The
+# 2026-09-18 scheduled build failed after a single 0.25s attempt on an HTTP
+# 530 because 530 wasn't in this set, so the retry machinery never engaged.
+# Of that range we retry the connectivity/availability codes — 520 unknown
+# error, 521 origin refused the connection, 522/524 origin timeouts, 523
+# origin unreachable, 527 Railgun error, and 530 (usually paired with a 1xxx
+# origin error) — because those describe the origin or the network between
+# Cloudflare and the origin blipping, which a few seconds of backoff can
+# outlive. We deliberately do NOT retry 525 (SSL handshake failed) or 526
+# (invalid origin SSL certificate): both describe a static TLS/certificate
+# misconfiguration on the origin itself, so an identical request a moment
+# later hits the exact same broken certificate/handshake and fails the same
+# way — retrying just burns the build's time before failing anyway.
 _MAX_ATTEMPTS = 3
 _RETRY_BACKOFF = 1.5  # seconds; doubles each retry (1.5s, then 3.0s)
-_RETRYABLE_HTTP_STATUS = frozenset({408, 425, 429, 500, 502, 503, 504})
+_RETRYABLE_HTTP_STATUS = frozenset(
+    {408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524, 527, 530}
+)
 
 
 def _is_retryable(error: Exception) -> bool:
