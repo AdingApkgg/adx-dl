@@ -23,7 +23,7 @@ Copy `.env.example` to `.env` and fill in:
 | Variable | Meaning |
 | --- | --- |
 | `CF_ACCESS_TEAM_DOMAIN` | **Confirmed:** `https://saop-pages.cloudflareaccess.com`. This is the real team domain — verified against this Mac's local Access cache (`~/.cloudflared/saop-pages.cloudflareaccess.com-jwks`), not a placeholder. No trailing slash. Used to build the JWKS URL and validate the JWT `iss` claim. |
-| `CF_ACCESS_AUD` | **Still pending.** The Access application's Application Audience (AUD) Tag. It does not exist yet — it's generated only once the Access application is created in the Zero Trust dashboard — see below. |
+| `CF_ACCESS_AUD` | **Confirmed, deployed.** The Access application's Application Audience (AUD) Tag, generated when the Access application was created in the Zero Trust dashboard. It is now set in `apps/dash/.env` on g510 — verified by observing the JWKS `kid` in the login redirect from an unauthenticated request, which matches this value exactly. |
 | `GITHUB_APP_ID` | `5020220` — the AstroDX dash GitHub App. |
 | `GITHUB_APP_PRIVATE_KEY` | The App's private key (PEM). Write it as a single line with literal `\n` in place of newlines; `env.ts` unescapes them. |
 | `GITHUB_APP_INSTALLATION_ID` | `163475623` — the installation on `AdingApkgg/adx-dl`. |
@@ -69,6 +69,15 @@ hand in the Zero Trust console (Access → Applications → the dash
 application → its tunnel's Public Hostname) — it is not part of anything
 this repo runs.
 
+The deployed public hostname is **`adxdls-dash.saop.cc`**.
+
+**Caution — stick to one subdomain level.** An earlier attempt used a
+three-level subdomain (e.g. `dash.adx.saop.cc`-shaped). It failed TLS,
+because Cloudflare's Universal SSL certificate on this zone covers only
+`saop.cc` and `*.saop.cc` — exactly one level of subdomain, not two. Any
+new Public Hostname for this project (or a future one) must be a direct
+`*.saop.cc` name, or it needs its own certificate arranged first.
+
 The container listens on port **3000 inside the container** — that part
 never changes, and the healthcheck (which runs inside the container) still
 targets `127.0.0.1:3000`. Only the *published* host-side port is different:
@@ -97,29 +106,117 @@ docker compose logs --tail=50
 Expect the container to reach `running (healthy)` and the log line
 `dash listening on :3000 (repo AdingApkgg/adx-dl)`.
 
-### Mandatory negative check
+**The clone on g510 is a sparse, partial checkout, not a full clone.** It
+was created with `--filter=blob:none --sparse`, limited to the paths the
+Docker build actually needs, with a repo-local proxy configured. A full
+clone of the whole repository over that link runs at a few KB/s and is not
+practical. If this is ever set up again on a fresh machine, replicate the
+sparse + partial + proxy setup rather than doing a plain `git clone` —
+plan for that up front, since converting a full clone into a sparse one
+after the fact is more work than starting sparse.
 
-Run this after any change to auth or deployment config — on g510, not
-through the tunnel:
+### Mandatory post-change smoke checklist
 
-```bash
-curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:12702/api/me
-# must print 403
+Run this after **any** change to auth, deployment config, or the
+workflows. It is not optional — the first item is the one thing standing
+between any process on g510 and a backend that can write to the
+repository, so if it fails, stop and fix it before checking anything else.
+Below each step is the result it actually produced the one time this was
+run end-to-end against the live deployment (commit `3c6c5db`,
+2026-09-22) — treat a different result as a regression, not as "probably
+fine."
 
-curl -s http://127.0.0.1:12702/api/ping
-# must print {"ok":true}
-```
+1. **Host-direct 403 check (leads the list; most important step).** On
+   g510 itself, not through the tunnel:
 
-Note the port here is **12702** — the host-published port from
-`compose.yaml` — not the container's internal 3000, which isn't reachable
-from the host at all.
+   ```bash
+   curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:12702/api/me
+   curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:12702/api/runs
+   curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:12702/api/events
+   ```
 
-This matters because the container's port is bound on the host
-(`127.0.0.1:12702`). Cloudflare Access normally sits in front of the tunnel,
-but once the port is exposed on the host, the JWT check inside the app is
-the *only* thing standing between any process on g510 and a backend that
-can write to the repository. If `/api/me` ever returns anything other than
-`403` without a valid Access assertion, the Access middleware is not
-actually doing its job — stop and fix it before doing anything else.
-`/api/ping` must stay open (`{"ok":true}`) since it's the container
-healthcheck endpoint, registered before the Access middleware on purpose.
+   Expected: **403** for all three, every time. `compose.yaml` binds the
+   container's port on the host (`127.0.0.1:12702`); Cloudflare Access
+   normally sits in front of the tunnel, but once a port is exposed on the
+   host at all, the JWT check inside the app is the *only* thing standing
+   between any process on g510 and a backend that can write to the
+   repository. `/api/events` (the SSE stream) must also 403 and must not
+   hang — the auth denial has to short-circuit before streaming starts.
+   Actually observed: all three returned 403, and `/api/events` did not
+   hang.
+
+2. **Healthcheck endpoint stays open:**
+
+   ```bash
+   curl -s http://127.0.0.1:12702/api/ping
+   ```
+
+   Expected: `{"ok":true}` — it's registered before the Access middleware
+   on purpose, since it's also the container healthcheck target (hit
+   internally at `127.0.0.1:3000`). Actually observed: `{"ok":true}`.
+
+3. **LAN unreachability.** From another machine on the LAN (not g510
+   itself):
+
+   ```bash
+   curl -s -o /dev/null -w "%{http_code}\n" http://192.168.1.3:12702/api/ping
+   ```
+
+   Expected: connection failure / unreachable — the bind is
+   `127.0.0.1`-scoped, so nothing off-host should be able to reach the
+   port at all. Actually observed: unreachable.
+
+4. **Public, unauthenticated access redirects to Access login.** From any
+   browser, not logged in:
+
+   ```
+   https://adxdls-dash.saop.cc/
+   https://adxdls-dash.saop.cc/api/me
+   ```
+
+   Expected: **302** to
+   `https://saop-pages.cloudflareaccess.com/cdn-cgi/access/login/adxdls-dash.saop.cc?kid=...`.
+   Check that the `kid` query parameter matches `CF_ACCESS_AUD` in the
+   deployed `.env` — if it doesn't, the wrong Access application is
+   fronting this hostname. Actually observed: 302 to that login page, `kid`
+   matched `CF_ACCESS_AUD` exactly.
+
+5. **Logged in, through Cloudflare Access, in a browser:**
+   - `/` renders with the correct email and `AdingApkgg/adx-dl`, no
+     `repoError`.
+   - `/actions` lists runs with status, trigger source and duration,
+     matching the GitHub web UI.
+   - Click "触发 Dash check" (or any dispatchable workflow). Expected: a
+     new run appears in the list **without a manual refresh**, and its
+     status advances to completion on its own via the SSE stream.
+     Actually observed once end to end: the first click hit a workflow
+     that did not yet have a `workflow_dispatch` trigger and returned
+     GitHub's 422 verbatim (`{"error":"GitHubRequestError: Workflow does
+     not have 'workflow_dispatch' trigger - ..."}`) — that was the correct
+     behavior for that state. After `workflow_dispatch` was added and
+     merged to `main`, clicking again worked: a new run appeared
+     automatically and reached `success` on its own (independently
+     confirmed via the API: run `35634055473`,
+     `event=workflow_dispatch`, `conclusion=success`).
+   - Open a historical failed run, if one exists, and confirm the failed
+     step and the tail of its log are visible in the run detail view.
+
+**Known rough edges, not regressions:** the "触发" (trigger) button
+renders for every workflow, including GitHub's own
+`pages-build-deployment`, which cannot be dispatched — GitHub's
+workflow-list API doesn't report whether a workflow accepts
+`workflow_dispatch`, so the client can't filter it out in advance. The
+422 text is clear enough that this is tolerable. Separately, dispatch
+always targets the repository's default branch; the UI has no ref
+picker even though `POST /api/workflows/:workflowId/dispatch` accepts
+one — a real gap now that the repo uses a `dev` → `pre` → `main` model,
+but not a checklist failure.
+
+**Known unverified item:** the `paths-ignore: ['apps/dash/**']` rule on
+`deploy-gh-pages.yml` has never actually been demonstrated. The merge to
+`main` in step 5 above did trigger the site deploy workflow, but that
+push also touched `bun.lock`, `.github/` and `pipeline/` — all outside
+the ignore rule — so it proves nothing about whether the rule itself
+works. A real check needs a push to `main` that touches **only**
+`apps/dash/**`, followed by confirming `deploy-gh-pages.yml` did *not*
+run for that push.
