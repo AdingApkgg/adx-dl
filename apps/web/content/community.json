@@ -1,21 +1,37 @@
 {
   "contactChannels": [
     {
-      "name": { "zh": "GitHub Issues", "en": "GitHub Issues", "ja": "GitHub Issues" },
+      "name": {
+        "zh": "GitHub Issues",
+        "en": "GitHub Issues",
+        "ja": "GitHub Issues"
+      },
       "url": "https://github.com/AdingApkgg/adx-dl/issues"
     },
     {
-      "name": { "zh": "QQ 交流群", "en": "QQ Group", "ja": "QQ グループ" },
+      "name": {
+        "zh": "QQ 交流群",
+        "en": "QQ Group",
+        "ja": "QQ グループ"
+      },
       "url": "https://qm.qq.com/q/xltNzTdL1u"
     },
     {
-      "name": { "zh": "Telegram 群组", "en": "Telegram Group", "ja": "Telegram グループ" },
+      "name": {
+        "zh": "Telegram 群组",
+        "en": "Telegram Group",
+        "ja": "Telegram グループ"
+      },
       "url": "https://t.me/FullDiveSAO"
     }
   ],
   "communityChannels": [
     {
-      "name": { "zh": "QQ 交流群", "en": "QQ Group", "ja": "QQ グループ" },
+      "name": {
+        "zh": "QQ 交流群",
+        "en": "QQ Group",
+        "ja": "QQ グループ"
+      },
       "url": "https://qm.qq.com/q/xltNzTdL1u",
       "description": {
         "zh": "国内玩家的主要交流群，谱面讨论、问题反馈与站点动态。",
@@ -24,7 +40,11 @@
       }
     },
     {
-      "name": { "zh": "Telegram 群组", "en": "Telegram Group", "ja": "Telegram グループ" },
+      "name": {
+        "zh": "Telegram 群组",
+        "en": "Telegram Group",
+        "ja": "Telegram グループ"
+      },
       "url": "https://t.me/FullDiveSAO",
       "description": {
         "zh": "Telegram 社区群组，国际玩家交流与本站更新通知。",

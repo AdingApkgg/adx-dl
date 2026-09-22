@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import { CONTENT_FILES, CONTENT_LOCALES, validateContentFile } from "@astrodx/content-schema";
 
@@ -64,4 +65,25 @@ describe("constants that were inlined into JSON have not drifted", () => {
   test("friend-links.json's first URL equals ASTRODX_APP_REPOSITORY", () => {
     expect(friendLinksJson.links[0].url).toBe(ASTRODX_APP_REPOSITORY);
   });
+});
+
+describe("content JSON is stored exactly as dash will write it", () => {
+  // dash's content-commit endpoint serializes with `JSON.stringify(data, null, 2) + "\n"`
+  // (see `serialize` in apps/dash/src/server/routes/content.ts). If the file on disk uses
+  // a different layout, the first edit made through dash to any of these files produces a
+  // whole-file whitespace diff that buries the real change underneath it. This test pins
+  // the invariant that matters: the format on disk equals the format dash writes. If
+  // `serialize` ever changes, these three files need to be regenerated together with it.
+  for (const file of CONTENT_FILES) {
+    test(`${file.key}.json is canonical`, () => {
+      // file.path is repo-root relative. This test file lives at
+      // apps/web/src/lib, four directories below the repo root — hence
+      // "../../../..". `import.meta.dir` would be simpler but isn't declared
+      // on this project's `ImportMeta` type (see bun-test.d.ts: `@types/bun`
+      // is deliberately not pulled in), so this follows the same
+      // `import.meta.url` + `URL` pattern color-contrast.test.ts already uses.
+      const text = readFileSync(new URL(`../../../../${file.path}`, import.meta.url), "utf-8");
+      expect(text).toBe(`${JSON.stringify(JSON.parse(text), null, 2)}\n`);
+    });
+  }
 });

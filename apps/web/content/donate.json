@@ -1,7 +1,11 @@
 {
   "methods": [
     {
-      "name": { "zh": "爱发电", "en": "Afdian (爱发电)", "ja": "爱发电 (Afdian)" },
+      "name": {
+        "zh": "爱发电",
+        "en": "Afdian (爱发电)",
+        "ja": "爱发电 (Afdian)"
+      },
       "url": "https://afdian.com/a/scale",
       "description": {
         "zh": "适合国内用户，支持支付宝与微信支付。",
@@ -10,7 +14,11 @@
       }
     },
     {
-      "name": { "zh": "Patreon", "en": "Patreon", "ja": "Patreon" },
+      "name": {
+        "zh": "Patreon",
+        "en": "Patreon",
+        "ja": "Patreon"
+      },
       "url": "https://patreon.com/KirigayaAsuna",
       "description": {
         "zh": "适合国际用户，支持信用卡等支付方式。",
