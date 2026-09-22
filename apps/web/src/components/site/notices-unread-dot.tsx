@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import { readReadIds } from "@/lib/notice-storage";
+import { isStorageAvailable, readReadIds } from "@/lib/notice-storage";
 import { notices, todayUtc, unreadCount } from "@/lib/notices";
 import { cn } from "@/lib/utils";
 
@@ -11,12 +11,15 @@ import { cn } from "@/lib/utils";
  *
  * Returns 0 until mounted: the count depends on localStorage, which the static
  * export cannot know. Blocked storage also yields 0 — a dot that can never be
- * cleared would be pure noise on every single visit.
+ * cleared would be pure noise on every single visit. `readReadIds()` alone
+ * cannot tell "blocked" apart from "nothing read yet" (both read as `[]`), so
+ * this checks `isStorageAvailable()` first rather than trusting an empty list.
  */
 export function useUnreadNoticeCount(): number {
   const [count, setCount] = React.useState(0);
 
   React.useEffect(() => {
+    if (!isStorageAvailable()) return;
     /* eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync from localStorage after mount */
     setCount(unreadCount(notices, readReadIds(), todayUtc()));
   }, []);

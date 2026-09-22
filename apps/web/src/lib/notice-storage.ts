@@ -50,3 +50,21 @@ export function markRead(ids: string[], list: Notice[] = defaultNotices): void {
   if (merged.length === current.length) return;
   writeIdList(READ_KEY, merged);
 }
+
+/**
+ * Whether this browser will actually remember anything.
+ *
+ * `readReadIds()` cannot answer this: it returns `[]` both when nothing has
+ * been read and when storage threw. The unread dot needs to tell those apart —
+ * a dot that can never be cleared would show on every visit forever.
+ */
+export function isStorageAvailable(): boolean {
+  try {
+    const probe = "__adx-storage-probe";
+    window.localStorage.setItem(probe, "1");
+    window.localStorage.removeItem(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}

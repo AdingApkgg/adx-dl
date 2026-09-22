@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import type { Notice } from "@/lib/notices";
+import { type Notice, unreadCount } from "@/lib/notices";
 import {
   addDismissedId,
+  isStorageAvailable,
   markRead,
   readDismissedIds,
   readReadIds,
@@ -33,6 +34,10 @@ function installStorage({ throwing = false } = {}): void {
     setItem(key: string, value: string): void {
       if (throwing) throw new Error("blocked");
       data.set(key, value);
+    },
+    removeItem(key: string): void {
+      if (throwing) throw new Error("blocked");
+      data.delete(key);
     },
   };
   (globalThis as unknown as { window: unknown }).window = { localStorage: storage };
@@ -88,5 +93,31 @@ describe("read ids", () => {
     markRead(["a"], list);
     markRead(["b"], list);
     expect(readReadIds(list).sort()).toEqual(["a", "b"]);
+  });
+});
+
+describe("isStorageAvailable", () => {
+  test("true when storage works", () => {
+    expect(isStorageAvailable()).toBe(true);
+  });
+
+  test("false when storage throws", () => {
+    installStorage({ throwing: true });
+    expect(isStorageAvailable()).toBe(false);
+  });
+
+  // End-to-end direction: readReadIds() alone cannot tell "blocked" apart from
+  // "nothing read yet" (both read as []), so on its own it would report every
+  // active notice as unread for a blocked visitor exactly as it would for a
+  // genuine first-time one. isStorageAvailable() is what a caller must check
+  // to tell the two apart. useUnreadNoticeCount (notices-unread-dot.tsx) does
+  // exactly that — it returns 0 without calling unreadCount() at all when
+  // isStorageAvailable() is false — but that early return lives in a React
+  // effect and isn't re-asserted here; this test only proves the seam it
+  // depends on: that readReadIds() would otherwise mislead the count.
+  test("blocked storage would otherwise mislead unreadCount into reporting unread notices", () => {
+    installStorage({ throwing: true });
+    expect(isStorageAvailable()).toBe(false);
+    expect(unreadCount(list, readReadIds(list), "2026-09-02")).toBe(list.length);
   });
 });
