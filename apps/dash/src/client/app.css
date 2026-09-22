@@ -215,3 +215,102 @@ button:disabled {
     white-space: nowrap;
   }
 }
+
+.dash-content-list {
+  list-style: none;
+  margin: 1.5rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.dash-content-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 0.4rem;
+}
+
+.dash-content-list code {
+  color: var(--dash-muted);
+  font-size: 0.85rem;
+}
+
+.dash-array {
+  margin: 1.5rem 0;
+  padding: 0.2rem 1rem 1rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 0.5rem;
+}
+
+.dash-array legend {
+  padding: 0 0.4rem;
+  color: var(--dash-muted);
+  font-size: 0.85rem;
+}
+
+.dash-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--dash-line);
+}
+
+.dash-entry:last-of-type {
+  border-bottom: none;
+}
+
+.dash-entry-locales {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.dash-entry-locales legend {
+  padding: 0;
+  color: var(--dash-muted);
+  font-size: 0.8rem;
+}
+
+.dash-entry-locales label,
+.dash-entry-url {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.9rem;
+  min-width: 10rem;
+}
+
+.dash-entry-locales label span,
+.dash-entry-url span {
+  color: var(--dash-muted);
+  font-size: 0.8rem;
+}
+
+.dash-entry-locales input,
+.dash-entry-locales textarea,
+.dash-entry-url input {
+  font: inherit;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 0.4rem;
+  background: var(--dash-bg);
+  color: var(--dash-fg);
+}
+
+/* 文字色直接复用 --dash-bad，铺在页面默认背景 --dash-bg 之上——跟
+   color-contrast.test.ts 里「text directly on page bg」那组已经测过的
+   配对（.dash-pill--bad / .dash-failure h2）完全同一种组合，没有引入
+   新的文字/底色配对，所以不需要再往那个套件补断言。 */
+.dash-field-error {
+  margin: 0;
+  color: var(--dash-bad);
+  font-size: 0.85rem;
+}
