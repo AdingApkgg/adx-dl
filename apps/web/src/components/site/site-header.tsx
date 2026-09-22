@@ -20,6 +20,7 @@ import {
   LibraryBigIcon,
   LifeBuoyIcon,
   Link2Icon,
+  MegaphoneIcon,
   MenuIcon,
   MessageSquareIcon,
   Music2Icon,
@@ -47,6 +48,7 @@ import {
 import { CompatibleImage, compatibleSourcesFromPng } from "@/components/site/compatible-image";
 import { HEADER_ACTION_CLASS } from "@/components/site/header-actions";
 import { LanguageSwitcher } from "@/components/site/language-switcher";
+import { NoticesUnreadDot, useUnreadNoticeCount } from "@/components/site/notices-unread-dot";
 import { useRandomChartNavigation } from "@/components/site/random-chart-button";
 import { SiteSettingsPanel } from "@/components/site/site-settings-panel";
 import {
@@ -86,6 +88,10 @@ type NavItem = {
   icon?: React.ReactNode;
   exact?: boolean;
   external?: boolean;
+  /** Rendered after the label in NavItemContent — currently only the notices item's unread dot. */
+  badge?: React.ReactNode;
+  /** Overrides the rendered link's accessible name — currently only the notices item's unread count. */
+  ariaLabel?: string;
 };
 
 export function SiteHeader({ totalEntries }: SiteHeaderProps) {
@@ -114,6 +120,9 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (scrollY.get() > COMPACT_ENTER) setCompact(true);
   }, [scrollY]);
+
+  // 0 until mounted (and forever, if storage is blocked) — see notices-unread-dot.tsx.
+  const unread = useUnreadNoticeCount();
 
   const primaryNav: NavItem[] = [
     {
@@ -204,6 +213,13 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
         href: switchLocale("/comments", locale),
         label: dictionary.guestbook.navLabel,
         icon: <MessageSquareIcon />,
+      },
+      {
+        href: switchLocale("/notices", locale),
+        label: dictionary.notices.navLabel,
+        icon: <MegaphoneIcon />,
+        badge: <NoticesUnreadDot className="ml-auto" />,
+        ariaLabel: unread > 0 ? dictionary.notices.unreadLabel(unread) : undefined,
       },
       {
         href: switchLocale("/post", locale),
@@ -349,11 +365,15 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
                 size="sm"
                 aria-label={dictionary.nav.moreLabel}
                 className={cn(
+                  "relative",
                   secondaryNav.some(isActive) && "bg-secondary text-secondary-foreground"
                 )}
               >
                 <EllipsisIcon data-icon="inline-start" />
                 {dictionary.nav.moreLabel}
+                {/* Absolutely positioned so the dot's appearance/disappearance never
+                    changes this button's (and therefore the nav's) width. */}
+                <NoticesUnreadDot className="absolute top-0.5 right-0.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -381,6 +401,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
                           <Link
                             href={item.href}
                             aria-current={isActive(item) ? "page" : undefined}
+                            aria-label={item.ariaLabel}
                           >
                             <NavItemContent item={item} />
                           </Link>
@@ -440,11 +461,14 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               <Button
                 variant="outline"
                 size="icon-sm"
-                className="md:hidden"
+                className="relative md:hidden"
                 aria-label={dictionary.nav.menuLabel}
                 title={dictionary.nav.menuLabel}
               >
                 <MenuIcon />
+                {/* Absolutely positioned so the dot's appearance/disappearance never
+                    changes this button's fixed icon-size box. */}
+                <NoticesUnreadDot className="absolute top-0.5 right-0.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -532,6 +556,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
                           <Link
                             href={item.href}
                             aria-current={active ? "page" : undefined}
+                            aria-label={item.ariaLabel}
                             data-state={active ? "checked" : undefined}
                           >
                             <NavItemContent item={item} />
@@ -608,6 +633,7 @@ function NavItemContent({
         </span>
       ) : null}
       <span className="min-w-0 flex-1 break-words">{item.label}</span>
+      {item.badge}
       {showExternal ? (
         // New-tab hint keeps external destinations distinct without making
         // their semantic icon compete for the trailing position.

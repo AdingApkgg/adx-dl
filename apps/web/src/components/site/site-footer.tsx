@@ -95,6 +95,9 @@ export function SiteFooter({
           <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/comments", locale)}>
             {dictionary.guestbook.navLabel}
           </Link>
+          <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/notices", locale)}>
+            {dictionary.notices.navLabel}
+          </Link>
           <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/post", locale)}>
             {dictionary.post.navLabel}
           </Link>
