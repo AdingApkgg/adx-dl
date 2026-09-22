@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
   buildTemplate,
+  decideInsert,
   firstFieldOffset,
   parseComposeParam,
   type ComposeKind,
@@ -57,6 +58,7 @@ export function GuestbookCompose({ locale }: { locale: Locale }) {
   const [confirming, setConfirming] = React.useState<ComposeKind | null>(null);
   const [fallback, setFallback] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
+  const confirmButtonRef = React.useRef<HTMLButtonElement>(null);
 
   const insert = React.useCallback(
     (kind: ComposeKind, force: boolean) => {
@@ -67,7 +69,7 @@ export function GuestbookCompose({ locale }: { locale: Locale }) {
         return;
       }
       // Never stomp what the visitor typed — ask first.
-      if (!force && editor.value.trim() && editor.value !== template) {
+      if (decideInsert(editor.value, template, force) === "confirm") {
         setConfirming(kind);
         return;
       }
@@ -77,6 +79,14 @@ export function GuestbookCompose({ locale }: { locale: Locale }) {
     [locale]
   );
 
+  // Move focus to the confirm button so a screen-reader user lands somewhere
+  // when the question appears — pressing a template button otherwise produces
+  // no announcement and no indication of where to Tab.
+  React.useEffect(() => {
+    if (!confirming) return;
+    confirmButtonRef.current?.focus();
+  }, [confirming]);
+
   React.useEffect(() => {
     if (!waitingFor) return;
     const startedAt = Date.now();
@@ -84,7 +94,17 @@ export function GuestbookCompose({ locale }: { locale: Locale }) {
       const editor = findEditor();
       if (editor) {
         window.clearInterval(timer);
-        applyTemplate(editor, buildTemplate(waitingFor, locale));
+        const template = buildTemplate(waitingFor, locale);
+        // Artalk loads from an external origin, so finding no editor yet is
+        // the common case for a ?compose= deep link, not an edge case. This
+        // used to apply unconditionally, which could silently destroy an
+        // unsent draft Artalk had already restored into the editor while this
+        // poll was still waiting for it to mount.
+        if (decideInsert(editor.value, template, false) === "confirm") {
+          setConfirming(waitingFor);
+        } else {
+          applyTemplate(editor, template);
+        }
         setWaitingFor(null);
         return;
       }
@@ -104,14 +124,22 @@ export function GuestbookCompose({ locale }: { locale: Locale }) {
   React.useEffect(() => {
     if (!hasComposeParam) return;
     if (requested) {
-      // The ?compose= hand-off starts on arrival by design, mirroring
-      // GuestbookPrefill's mount-time draft hand-off in the same file group.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      insert(requested, false);
+      // The ?compose= hand-off starts on arrival by design — the deleted
+      // /post and /survey pages used to hand their draft to the guestbook the
+      // same way, before they were folded into these template buttons.
+      if (online) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        insert(requested, false);
+      } else {
+        // Offline: insert() would only wait out the full editor poll before
+        // landing on this same fallback anyway — same reason the manual
+        // buttons below are disabled. Skip straight to it.
+        setFallback(buildTemplate(requested, locale));
+      }
     }
     // An unrecognised value is dropped too — no error, no dirty URL left behind.
     clearComposeParam();
-    /* eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per arrival, not per insert identity */
+    /* eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per arrival, not per insert/online identity */
   }, [requested, hasComposeParam]);
 
   React.useEffect(() => {
@@ -144,9 +172,14 @@ export function GuestbookCompose({ locale }: { locale: Locale }) {
         ))}
       </div>
       {confirming ? (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm" role="status">
           <span>{copy.replaceQuestion}</span>
-          <Button type="button" size="sm" onClick={() => insert(confirming, true)}>
+          <Button
+            ref={confirmButtonRef}
+            type="button"
+            size="sm"
+            onClick={() => insert(confirming, true)}
+          >
             {copy.replaceConfirm}
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(null)}>
@@ -160,7 +193,7 @@ export function GuestbookCompose({ locale }: { locale: Locale }) {
       {fallback ? (
         <div className="flex flex-col gap-2">
           <p className="text-sm text-destructive">{copy.unavailable}</p>
-          <Textarea readOnly value={fallback} rows={6} />
+          <Textarea readOnly value={fallback} rows={6} aria-label={copy.fallbackLabel} />
           <Button
             type="button"
             size="sm"

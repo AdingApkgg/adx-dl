@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   buildTemplate,
+  decideInsert,
   firstFieldOffset,
   parseComposeParam,
 } from "@/lib/compose-templates";
@@ -29,6 +30,31 @@ describe("buildTemplate", () => {
 
   test("ja survey is a fill-in skeleton, one field per line", () => {
     expect(buildTemplate("survey", "ja").split("\n").length).toBe(6);
+  });
+});
+
+describe("decideInsert", () => {
+  // Regression coverage for the polling path that used to apply unconditionally
+  // once Artalk's editor appeared, destroying an unsent (or Artalk-restored)
+  // draft. Both insert() and the poll route through this same function now.
+  test("force always applies, no matter what the editor holds", () => {
+    expect(decideInsert("something the visitor typed", "template", true)).toBe("apply");
+  });
+
+  test("an empty editor applies without asking", () => {
+    expect(decideInsert("", "template", false)).toBe("apply");
+  });
+
+  test("a whitespace-only editor applies without asking", () => {
+    expect(decideInsert("   \n\t ", "template", false)).toBe("apply");
+  });
+
+  test("an editor already holding exactly this template applies without asking", () => {
+    expect(decideInsert("template", "template", false)).toBe("apply");
+  });
+
+  test("an editor holding anything else asks first", () => {
+    expect(decideInsert("something the visitor typed", "template", false)).toBe("confirm");
   });
 });
 

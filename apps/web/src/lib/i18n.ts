@@ -577,6 +577,8 @@ export type SiteDictionary = {
       replaceConfirm: string;
       replaceCancel: string;
       unavailable: string;
+      /** Accessible name for the read-only fallback textarea holding the template text. */
+      fallbackLabel: string;
       copy: string;
       copied: string;
       offline: string;
@@ -1281,6 +1283,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         replaceConfirm: "替换",
         replaceCancel: "取消",
         unavailable: "评论区没能加载出来。可以先复制下面的模板，稍后再发。",
+        fallbackLabel: "模板内容",
         copy: "复制模板",
         copied: "已复制",
         offline: "当前离线，联网后才能使用模板。",
@@ -2017,6 +2020,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         replaceConfirm: "Replace",
         replaceCancel: "Cancel",
         unavailable: "The comment box didn't load. Copy the template below and post it later.",
+        fallbackLabel: "Template text",
         copy: "Copy template",
         copied: "Copied",
         offline: "You're offline — templates need a connection.",
@@ -2744,6 +2748,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         replaceCancel: "キャンセル",
         unavailable:
           "コメント欄を読み込めませんでした。下のテンプレートをコピーして、あとで投稿してください。",
+        fallbackLabel: "テンプレートの内容",
         copy: "テンプレートをコピー",
         copied: "コピーしました",
         offline: "オフラインです。テンプレートの利用には接続が必要です。",

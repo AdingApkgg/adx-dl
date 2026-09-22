@@ -14,6 +14,23 @@ export function buildTemplate(kind: ComposeKind, locale: Locale): string {
 }
 
 /**
+ * Whether a template may be written straight into the editor, or the visitor
+ * has to be asked first.
+ *
+ * Both the direct click and the poll-until-Artalk-mounts path go through this:
+ * the poll used to write unconditionally, which destroyed an unsent draft that
+ * Artalk had restored while we were waiting for it.
+ */
+export function decideInsert(
+  editorValue: string,
+  template: string,
+  force: boolean
+): "apply" | "confirm" {
+  if (force) return "apply";
+  return editorValue.trim() && editorValue !== template ? "confirm" : "apply";
+}
+
+/**
  * Where the caret belongs after the template is inserted: just past the first
  * field's colon, so the visitor starts typing an answer rather than hunting for
  * the spot. Both the ASCII `:` (en) and the fullwidth `：` (zh/ja) count, and the
