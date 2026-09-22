@@ -2,7 +2,6 @@
 
 import { WifiOffIcon, XIcon } from "lucide-react";
 import Link from "next/link";
-import * as React from "react";
 
 import { AnimatePresence, EASE_OUT, motion, useReducedMotion } from "@/components/motion";
 import { useConnectionBanner } from "@/components/site/banners/use-connection-banner";
@@ -15,7 +14,7 @@ import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { resolveText } from "@/lib/notices";
 import { pickBanner } from "@/lib/site-banners";
 
-const BAR = "flex items-center justify-center gap-2 border-b border-border/60 px-4 py-1.5 text-sm";
+const BAR = "flex items-center justify-center gap-2 border-b border-border/60 px-4 py-1.5";
 
 /**
  * The single top-of-page bar slot.
@@ -32,6 +31,7 @@ export function SiteBanners({ locale }: { locale: Locale }) {
   const suggestion = useLocaleSuggestion(locale === "zh");
   const prefersReducedMotion = useReducedMotion();
   const dictionary = getDictionary(locale);
+  const suggestionDictionary = suggestion ? getDictionary(suggestion.target).localeBanner : null;
 
   const kind = pickBanner({
     connection: connection !== null,
@@ -66,7 +66,7 @@ export function SiteBanners({ locale }: { locale: Locale }) {
             ) : null}
 
             {kind === "notice" && urgent ? (
-              <div className={`${BAR} bg-destructive/10 text-destructive`}>
+              <div className={`${BAR} bg-destructive/10 text-sm text-destructive`}>
                 <span className="font-medium">
                   {resolveText(urgent.notice.title, locale).value}
                 </span>
@@ -87,19 +87,19 @@ export function SiteBanners({ locale }: { locale: Locale }) {
               </div>
             ) : null}
 
-            {kind === "locale" && suggestion ? (
-              <div className={`${BAR} bg-primary/10`}>
+            {kind === "locale" && suggestion && suggestionDictionary ? (
+              <div className={`${BAR} bg-primary/10 text-sm`}>
                 <Link
                   href={suggestion.href}
                   lang={suggestion.target}
                   className="font-medium text-primary underline-offset-4 hover:underline"
                   onClick={() => storePreferredLocale(suggestion.target)}
                 >
-                  {getDictionary(suggestion.target).localeBanner.continueIn}
+                  {suggestionDictionary.continueIn}
                 </Link>
                 <button
                   type="button"
-                  aria-label={getDictionary(suggestion.target).localeBanner.dismiss}
+                  aria-label={suggestionDictionary.dismiss}
                   className="rounded-sm p-1 text-muted-foreground transition-colors hover:text-foreground"
                   onClick={suggestion.dismiss}
                 >

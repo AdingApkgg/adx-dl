@@ -23,4 +23,9 @@ describe("pickBanner", () => {
     expect(pickBanner({ connection: true, notice: false, locale: false })).toBe("connection");
     expect(pickBanner({ connection: false, notice: true, locale: false })).toBe("notice");
   });
+
+  test("connection also wins over either other flag alone — exhaustive over the remaining pairs", () => {
+    expect(pickBanner({ connection: true, notice: true, locale: false })).toBe("connection");
+    expect(pickBanner({ connection: true, notice: false, locale: true })).toBe("connection");
+  });
 });
