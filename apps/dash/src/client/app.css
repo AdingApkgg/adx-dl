@@ -4,9 +4,23 @@
   --dash-muted: #6b6b76;
   --dash-line: #e2e2e8;
   --dash-accent: #2f5fd0;
-  --dash-ok: #1a7f4b;
-  --dash-bad: #c0392b;
-  --dash-running: #b8860b;
+  /* ok/bad/running are darkened from their first-cut values (same hue and
+     saturation, lower lightness only) — the originals read as text on this
+     light background (either directly, as in .dash-pill, or through the 12%
+     color-mix tint in .dash-notice--*) at 3.15–4.86:1, three of the eight
+     light-mode text/background pairings below the 4.5:1 AA threshold for
+     normal text. Ratios are computed, not eyeballed — see
+     src/client/lib/color-contrast.ts / color-contrast.test.ts, which pins
+     every pairing down as a regression test. Dark mode was already clear of
+     4.5:1 on every pairing and is untouched.
+       light .dash-notice--ok  (text on 12%-tint bg): 5.37:1
+       light .dash-notice--bad (text on 12%-tint bg): 5.41:1
+       light .dash-pill--ok    (text on page bg):      6.41:1
+       light .dash-pill--bad   (text on page bg, also .dash-failure h2): 6.54:1
+       light .dash-pill--running (text on page bg):    5.06:1 (was 3.15:1) */
+  --dash-ok: #166a3f;
+  --dash-bad: #a73125;
+  --dash-running: #8c6608;
 }
 
 @media (prefers-color-scheme: dark) {
