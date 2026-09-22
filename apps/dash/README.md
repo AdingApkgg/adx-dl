@@ -24,7 +24,7 @@ Copy `.env.example` to `.env` and fill in:
 | --- | --- |
 | `CF_ACCESS_TEAM_DOMAIN` | **Confirmed:** `https://saop-pages.cloudflareaccess.com`. This is the real team domain — verified against this Mac's local Access cache (`~/.cloudflared/saop-pages.cloudflareaccess.com-jwks`), not a placeholder. No trailing slash. Used to build the JWKS URL and validate the JWT `iss` claim. |
 | `CF_ACCESS_AUD` | **Confirmed, deployed.** The Access application's Application Audience (AUD) Tag, generated when the Access application was created in the Zero Trust dashboard. It is now set in `apps/dash/.env` on g510 — verified by observing the JWKS `kid` in the login redirect from an unauthenticated request, which matches this value exactly. |
-| `DASH_PUBLIC_ORIGIN` | **Required, no default.** The origin the browser actually sends (`https://adxdls-dash.saop.cc` for this deployment, no trailing slash). Passed to `hono/csrf`'s `origin` option to reject cross-origin writes (see Finding I-2). Must be set explicitly: this process sits behind `cloudflared`, so the origin Hono would otherwise derive from the incoming request is the tunnel's local address (`http://localhost:12702`), not the public domain the browser sends — the two never match, so there is no safe default to fall back to. `parseEnv` throws if it's unset, the same fail-fast treatment as the other required variables: a container that starts up looking healthy with this protection silently disabled is worse than one that refuses to start. **This means an existing deployment's `.env` on g510 must be updated with this variable before/when this change ships, or the container will fail to start.** |
+| `DASH_PUBLIC_ORIGIN` | **Required, no default.** The origin the browser actually sends (`https://dash.saop.cc` for this deployment, no trailing slash). Passed to `hono/csrf`'s `origin` option to reject cross-origin writes (see Finding I-2). Must be set explicitly: this process sits behind `cloudflared`, so the origin Hono would otherwise derive from the incoming request is the tunnel's local address (`http://localhost:12702`), not the public domain the browser sends — the two never match, so there is no safe default to fall back to. `parseEnv` throws if it's unset, the same fail-fast treatment as the other required variables: a container that starts up looking healthy with this protection silently disabled is worse than one that refuses to start. **This means an existing deployment's `.env` on g510 must be updated with this variable before/when this change ships, or the container will fail to start.** |
 | `GITHUB_APP_ID` | `5020220` — the AstroDX dash GitHub App. |
 | `GITHUB_APP_PRIVATE_KEY` | The App's private key (PEM). Write it as a single line with literal `\n` in place of newlines; `env.ts` unescapes them. |
 | `GITHUB_APP_INSTALLATION_ID` | `163475623` — the installation on `AdingApkgg/adx-dl`. |
@@ -70,7 +70,7 @@ hand in the Zero Trust console (Access → Applications → the dash
 application → its tunnel's Public Hostname) — it is not part of anything
 this repo runs.
 
-The deployed public hostname is **`adxdls-dash.saop.cc`**.
+The deployed public hostname is **`dash.saop.cc`**.
 
 **Caution — stick to one subdomain level.** An earlier attempt used a
 three-level subdomain (e.g. `dash.adx.saop.cc`-shaped). It failed TLS,
@@ -109,7 +109,7 @@ Expect the container to reach `running (healthy)` and the log line
 
 **Before pulling the commit that introduces `DASH_PUBLIC_ORIGIN`** (Finding
 I-2's csrf protection), add it to `apps/dash/.env` on g510 —
-`DASH_PUBLIC_ORIGIN=https://adxdls-dash.saop.cc` — first. It's a required
+`DASH_PUBLIC_ORIGIN=https://dash.saop.cc` — first. It's a required
 variable with no default; `docker compose up -d --build` will build fine
 but the container will exit immediately (`环境变量有问题：- DASH_PUBLIC_ORIGIN
 未设置`) without it.
@@ -178,12 +178,12 @@ fine."
    browser, not logged in:
 
    ```
-   https://adxdls-dash.saop.cc/
-   https://adxdls-dash.saop.cc/api/me
+   https://dash.saop.cc/
+   https://dash.saop.cc/api/me
    ```
 
    Expected: **302** to
-   `https://saop-pages.cloudflareaccess.com/cdn-cgi/access/login/adxdls-dash.saop.cc?kid=...`.
+   `https://saop-pages.cloudflareaccess.com/cdn-cgi/access/login/dash.saop.cc?kid=...`.
    Check that the `kid` query parameter matches `CF_ACCESS_AUD` in the
    deployed `.env` — if it doesn't, the wrong Access application is
    fronting this hostname. Actually observed: 302 to that login page, `kid`

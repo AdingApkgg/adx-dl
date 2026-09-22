@@ -16,7 +16,7 @@ export type AppDeps = {
   accessConfig: AccessConfig;
   poller: EventsPoller;
   /**
-   * 浏览器实际会发的公网 origin（如 https://adxdls-dash.saop.cc），喂给
+   * 浏览器实际会发的公网 origin（如 https://dash.saop.cc），喂给
    * csrf() 的白名单。见下面 csrf() 调用处的长注释——这个值绝不能留空
    * 或者猜一个默认值。
    */

@@ -8,7 +8,7 @@ export type DashEnv = {
   repoOwner: string;
   repoName: string;
   clientRoot: string;
-  /** 浏览器实际看到的公网 origin（如 https://adxdls-dash.saop.cc），喂给 csrf() 的 Origin 白名单。 */
+  /** 浏览器实际看到的公网 origin（如 https://dash.saop.cc），喂给 csrf() 的 Origin 白名单。 */
   dashPublicOrigin: string;
 };
 
