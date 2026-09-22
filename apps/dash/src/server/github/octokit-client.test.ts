@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Octokit as OctokitCtor } from "octokit";
 
+import { GitHubRequestError } from "./client";
 import { createOctokitGitHubClient, noRetryOnRateLimit, type OctokitClientConfig } from "./octokit-client";
 
 // 这个文件测四类东西：
@@ -166,6 +167,32 @@ describe("createOctokitGitHubClient 的缓存契约", () => {
 
     await client.getRepoInfo().catch(() => {});
     expect(mintCount).toBe(1);
+  });
+
+  test("已经是 GitHubRequestError 的错误原样上抛，不被重新包成基类", async () => {
+    // GitDataStepError 这类子类带着 step/conflictPaths，重新包一次就只剩
+    // message 和 status 了。用一个最小的子类来钉住这条契约，不依赖
+    // GitDataStepError 本身是否已经写好。
+    class TaggedError extends GitHubRequestError {
+      constructor(readonly tag: string) {
+        super("tagged failure", 500);
+      }
+    }
+    const thrown = new TaggedError("keep-me");
+    const kit = {
+      rest: {
+        repos: {
+          get: async () => {
+            throw thrown;
+          },
+        },
+      },
+    } as any;
+    const client = createOctokitGitHubClient(config, async () => kit);
+
+    const error = await client.getRepoInfo().catch((e: unknown) => e);
+    expect(error).toBe(thrown);
+    expect((error as TaggedError).tag).toBe("keep-me");
   });
 
   test("没失败就不重新铸造：同一个实例被复用", async () => {

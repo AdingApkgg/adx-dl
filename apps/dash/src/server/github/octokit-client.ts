@@ -101,6 +101,11 @@ type Octokit = InstanceType<typeof OctokitCtor>;
 
 /** 把 octokit 抛出来的任意错误收敛成我们自己的错误类型。 */
 function toRequestError(error: unknown): GitHubRequestError {
+  // 已经是我们自己的错误类型就原样返回。重新包一次会把子类降级成基类——
+  // GitDataStepError 的 step / conflictPaths 正是路由要用来分辨「创建 blob
+  // 失败」和「更新 ref 失败」这两种处境完全不同的情况的，丢了它们，界面上
+  // 这两件事会长得一模一样。
+  if (error instanceof GitHubRequestError) return error;
   if (error && typeof error === "object" && "status" in error) {
     const status = (error as { status?: unknown }).status;
     const message = error instanceof Error ? error.message : String(error);
