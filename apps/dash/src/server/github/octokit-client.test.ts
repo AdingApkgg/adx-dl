@@ -282,8 +282,17 @@ describe("限流时的策略：不等、不重试，立刻失败", () => {
         headers: {
           "content-type": "application/json",
           "x-ratelimit-remaining": "0",
-          // reset 定在 1 秒后：retryAfter 算出来 ~2 秒，测试还能保持够快。
-          "x-ratelimit-reset": String(Math.floor(Date.now() / 1000) + 1),
+          // reset 定在 3 秒后，不是 1 秒——@octokit/plugin-throttling 算
+          // retryAfter 时对 x-ratelimit-reset 做的是整秒截断
+          // （`Math.floor(Date.now() / 1000)` 生成 header，`Math.ceil((reset
+          // - Date.now()) / 1000) + 1` 算 retryAfter），如果 reset 只定在
+          // 1 秒后，retryAfter 实际会在 1～2 秒之间摆动，取决于测试跑的
+          // 那一刻恰好落在当前这一整秒的开头还是结尾——这不是假设，是在
+          // 这个文件里真实翻过车的 flaky：某次运行 elapsed 量到
+          // 1032ms，断言「> 1500」直接炸。定在 3 秒后能把 retryAfter 的下界
+          // 稳定推到 3 秒（同样的截断误差只在 3～4 秒之间摆动，不会再跌到
+          // 2 秒以下），断言阈值相应地留出安全余量，不再是「刚好卡在边界」。
+          "x-ratelimit-reset": String(Math.floor(Date.now() / 1000) + 3),
         },
       });
     };
@@ -296,6 +305,8 @@ describe("限流时的策略：不等、不重试，立刻失败", () => {
     const elapsed = performance.now() - t0;
 
     expect(calls).toBeGreaterThan(1); // 默认策略重试了。
-    expect(elapsed).toBeGreaterThan(1_500); // 默认策略真的等了。
+    // 下界稳定在 3 秒（见上面注释），2.5 秒的阈值留了 500ms 安全余量，
+    // 不会因为整秒截断的抖动变成 flaky。
+    expect(elapsed).toBeGreaterThan(2_500); // 默认策略真的等了。
   });
 });

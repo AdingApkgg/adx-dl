@@ -63,15 +63,34 @@ export function createRunPoller(deps: RunPollerDeps) {
   const subscribers = new Set<Subscriber>();
 
   const tick = async () => {
-    // 预先定好兜底的下一轮间隔：不管 try 里发生什么，`finally` 里都有一个
-    // 可用的值可以重新调度，不会因为算「下一轮该等多久」本身出错就连累
-    // 重新调度也不执行。
+    // 预先定好兜底的下一轮间隔，并且——这一点必须留在这里，不要挪走——
+    // 定成 idleIntervalMs，不是「按 snapshot 现在的状态算一个」：
     //
-    // 这里刻意把 `hasActiveRun(snapshot)` 挪到了 try 内部——修复前它在
+    //   1. 不管 try 里发生什么，`finally` 里都有一个可用的值可以重新
+    //      调度，不会因为算「下一轮该等多久」本身出错就连累重新调度
+    //      也不执行。
+    //   2. 这同时是现在唯一挡住「限流时被打爆」的机制。下面 try 块里，
+    //      只有 *成功* 轮询的最后一步才会把它改成 activeIntervalMs；
+    //      任何异常——包括 octokit-client.ts 里 noRetryOnRateLimit 让
+    //      限流立刻失败产生的那种异常——都不会走到那一步，
+    //      `nextIntervalMs` 就停在这里预设的 idleIntervalMs。换句话说：
+    //      一次成功、后面全是失败，退避会自动生效，不需要额外的状态机。
+    //      octokit 自己「等满 retryAfter 再重试」的行为已经被关掉（换
+    //      来的是立刻失败、界面能看到），如果这里“简化”成无条件
+    //      `hasActiveRun(snapshot) ? activeIntervalMs : idleIntervalMs`，
+    //      一次持续限流会变成每个 activeIntervalMs（生产环境 5 秒）打
+    //      一次 GitHub，而不是退避到 idleIntervalMs（60 秒）——这个回归
+    //      不会让任何类型检查或明显的测试失败，只会在真的撞上限流那天
+    //      才现形，所以务必保留这个「只在成功路径上前进、失败一律回落
+    //      到 idle」的结构，并且有 run-poller.test.ts 里「轮询失败后
+    //      退回空闲间隔」那条测试钉住它。
+    //
+    // 这里还刻意把 `hasActiveRun(snapshot)` 挪到了 try 内部——修复前它在
     // try/catch 外面（紧跟着 `setTimeout` 调用那一行），如果它本身抛错
     // （比如 snapshot 里混进了形状不对的数据），会让整个 tick() 抛出未
     // 处理的异常，重新调度那行代码根本不会执行到。挪进 try 之后，这类
-    // 错误跟其它处理阶段的错误一样，被下面的 catch 统一接住。
+    // 错误跟其它处理阶段的错误一样，被下面的 catch 统一接住——同样落到
+    // 上面第 2 点说的「失败就回落到 idle」这条规则里。
     let nextIntervalMs = idleIntervalMs;
     try {
       const next = await withTimeout(

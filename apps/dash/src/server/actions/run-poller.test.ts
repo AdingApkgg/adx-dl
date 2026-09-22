@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { RunSummary } from "@/shared/dto";
 
 import { createFakeGitHubClient } from "../github/fake-client";
-import type { RunChange } from "./run-diff";
+import { hasActiveRun, type RunChange } from "./run-diff";
 import { createRunPoller } from "./run-poller";
 
 // 刻意不测「等了 5 秒还是 60 秒」——那是纯计时断言，慢机器上会抖。
@@ -39,7 +39,9 @@ function sleep(ms: number) {
 function createControllableGitHubClient(initialRuns: RunSummary[] = []) {
   const base = createFakeGitHubClient({ runs: initialRuns });
   let calls = 0;
+  const timestamps: number[] = [];
   let pendingError: Error | null = null;
+  let persistentError: Error | null = null;
   let pendingHang = false;
   let pendingMalformed = false;
 
@@ -47,6 +49,12 @@ function createControllableGitHubClient(initialRuns: RunSummary[] = []) {
     ...base,
     async listRuns(opts?: { perPage?: number }) {
       calls++;
+      timestamps.push(Date.now());
+      if (persistentError) {
+        // 跟 queueError 的一次性错误不同：这个一直抛，直到测试自己清掉，
+        // 用来模拟「持续被限流/持续故障」这种场景——不是抖一下就好。
+        throw persistentError;
+      }
       if (pendingHang) {
         pendingHang = false;
         // 永远不 settle 的 promise——模拟 I-1 说的那种请求：既不成功也不
@@ -69,8 +77,17 @@ function createControllableGitHubClient(initialRuns: RunSummary[] = []) {
       return base.seed.runs.slice(0, opts?.perPage ?? 30);
     },
     callCount: () => calls,
+    /** 每次 listRuns 被调用时记下的 `Date.now()`，按调用顺序排列。 */
+    callTimestamps: () => timestamps,
     queueError(error: Error) {
       pendingError = error;
+    },
+    /** 让接下来每一次 listRuns 调用都抛这个错，直到显式清掉——模拟持续故障/持续限流。 */
+    queuePersistentError(error: Error) {
+      persistentError = error;
+    },
+    clearPersistentError() {
+      persistentError = null;
     },
     /** 让下一次 listRuns 调用返回一个永远不会 settle 的 promise。 */
     hangNextCall() {
@@ -180,6 +197,59 @@ describe("createRunPoller resilience", () => {
     expect(changes[0].kind).toBe("added");
     expect(poller.snapshot()).toEqual(nextRuns);
     expect(github.callCount()).toBeGreaterThanOrEqual(2);
+  });
+
+  test("轮询失败后退回空闲间隔——即使失败前那一轮 snapshot 里还有活跃 run", async () => {
+    // 这条测的是 re-reviewer 点名的隐藏行为：tick() 里 `nextIntervalMs`
+    // 只在成功轮询的最后一行被设成 activeIntervalMs；任何异常（包括限流
+    // 触发的 fail-fast）都让它维持在 try 之前预设的 idleIntervalMs 兜底值，
+    // 完全不看 snapshot 里上一轮是不是还有活跃 run。这不是巧合，是现在
+    // 唯一挡住「限流时每个 activeIntervalMs 打一次」的机制——见
+    // octokit-client.ts 里 noRetryOnRateLimit 的决定：octokit 自己「等满
+    // retryAfter 再重试」的行为已经被关掉，如果这里的退避也跟着丢了，
+    // 一次持续限流会变成生产环境里每 5 秒打一次 GitHub、一小时 720 次，
+    // 而不是退避到每 60 秒一次。
+    //
+    // 用真实计时器验证，但只对比「明显更接近 idle 还是 active」，不断言
+    // 等了多少毫秒——active/idle 之间留足够大的比例差（1:20），量到的
+    // 间隔不可能被调度抖动混淆成另一档。
+    const activeIntervalMs = 15;
+    const idleIntervalMs = 300;
+    const github = createControllableGitHubClient([
+      run({ id: 1, status: "in_progress", conclusion: null }),
+    ]);
+    const poller = createRunPoller({ github, activeIntervalMs, idleIntervalMs });
+
+    // 第一轮成功：snapshot 里有一个活跃 run，hasActiveRun(snapshot) 为真，
+    // 这一轮结束时 nextIntervalMs 被设成 activeIntervalMs（15ms）。
+    const first = nextBroadcast(poller);
+    poller.start();
+    await first;
+    expect(github.callCount()).toBe(1);
+    expect(hasActiveRun(poller.snapshot())).toBe(true);
+
+    // 从现在起持续失败——模拟被限流后每次都 fail-fast 的场景。第二次调用
+    // （紧跟在第一次成功后面，间隔是上面算出的 activeIntervalMs）会失败。
+    github.queuePersistentError(new Error("rate limited"));
+
+    // 等足够久：正确行为下，第二轮失败之后要等 idleIntervalMs（300ms）
+    // 才会有第三轮；错误行为（无条件用 hasActiveRun(snapshot)）下，
+    // 这段时间里会发生远不止 3 次调用。400ms 对两种情况都足够分辨。
+    await sleep(400);
+    poller.stop();
+
+    const timestamps = github.callTimestamps();
+    expect(timestamps.length).toBeGreaterThanOrEqual(3);
+
+    // timestamps[0] = 第一轮（成功）；timestamps[1] = 第二轮（第一次失败）；
+    // timestamps[2] = 第三轮，也就是失败之后重新调度出来的那一轮。
+    const gapAfterFailure = timestamps[2] - timestamps[1];
+
+    // 退避正常：这段间隔应该接近 idleIntervalMs（300ms）。
+    // 退避被删掉、改成无条件 hasActiveRun(snapshot)：这段间隔会接近
+    // activeIntervalMs（15ms）。用「远大于 activeIntervalMs 的好几倍」
+    // 而不是「约等于 idleIntervalMs」断言，两种情况差 20 倍，没有歧义。
+    expect(gapAfterFailure).toBeGreaterThan(activeIntervalMs * 5);
   });
 
   test("stop() 真的会停掉轮询——之后调用次数不再增长", async () => {
