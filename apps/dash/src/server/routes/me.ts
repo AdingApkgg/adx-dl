@@ -2,11 +2,13 @@ import type { Hono } from "hono";
 
 import type { MeResponse } from "@/shared/dto";
 
-import type { GitHubClient } from "../github/client";
+import type { RepoClient } from "../github/client";
 import type { AccessVariables } from "../middleware/access-jwt";
 
 export type MeDeps = {
-  github: GitHubClient;
+  // 只依赖仓库元数据：这个路由只调用 getRepoInfo，不该要求调用方也实现
+  // 整个 GitHub Actions 领域。
+  github: RepoClient;
 };
 
 export function registerMeRoute(

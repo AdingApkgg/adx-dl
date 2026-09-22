@@ -9,7 +9,12 @@ import type {
   WorkflowSummary,
 } from "@/shared/dto";
 
-import { GitHubRequestError, type GitHubClient } from "./client";
+import {
+  GitHubRequestError,
+  type ActionsClient,
+  type GitHubClient,
+  type RepoClient,
+} from "./client";
 
 export type OctokitClientConfig = {
   appId: string;
@@ -228,187 +233,206 @@ export function createOctokitGitHubClient(
     }
   }
 
-  return {
-    async getRepoInfo(): Promise<RepoInfo> {
-      return withOctokit(async (kit) => {
-        const { data } = await kit.rest.repos.get({
-          owner: config.owner,
-          repo: config.repo,
-          request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
-        });
-        return {
-          owner: data.owner.login,
-          repo: data.name,
-          defaultBranch: data.default_branch,
-        };
-      });
-    },
+  // 两个领域方法组都闭包同一个 `withOctokit`（进而闭包同一个 `cached`）——
+  // 这不是两份各自独立的实现凑巧长得像，是故意只留一处铸造/缓存逻辑，两个
+  // 领域共用。以后新增领域（比如 Git Data API）时照这个样子加一个
+  // `createXxxMethods()`，一样传不了别的 `withOctokit` 进来，因为它压根
+  // 不是参数，是闭包——这正是「一个 octokit 实例、一份缓存」在类型层面之外
+  // 的结构性保证：想给某个领域另开一个实例，得先把 withOctokit 从闭包改成
+  // 参数，这个改动本身足够显眼，不会在重构中被不小心带过去。
 
-    async listWorkflows(): Promise<WorkflowSummary[]> {
-      return withOctokit(async (kit) => {
-        const { data } = await kit.rest.actions.listRepoWorkflows({
-          owner: config.owner,
-          repo: config.repo,
-          per_page: 100,
-          request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+  function createRepoMethods(): RepoClient {
+    return {
+      async getRepoInfo(): Promise<RepoInfo> {
+        return withOctokit(async (kit) => {
+          const { data } = await kit.rest.repos.get({
+            owner: config.owner,
+            repo: config.repo,
+            request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+          });
+          return {
+            owner: data.owner.login,
+            repo: data.name,
+            defaultBranch: data.default_branch,
+          };
         });
-        return data.workflows.map((w) => ({
-          id: w.id,
-          name: w.name,
-          path: w.path,
-          state: w.state,
-        }));
-      });
-    },
+      },
 
-    /**
-     * 喂分支选择器（见 routes/actions.ts 的 /api/branches）。跟
-     * listWorkflows 一样只取一页——`kit.rest.repos.listBranches` 的签名与
-     * 返回形状是对着安装的 `@octokit/plugin-rest-endpoint-methods@17.0.0`
-     * 类型定义（`dist-types/generated/parameters-and-response-types.d.ts`）
-     * 核实过的，不是凭记忆写的：`data` 是 `short-branch[]`，每项形状是
-     * `{ name, commit: { sha, url }, protected, protection?, protection_url? }`。
-     * adx-dl 目前只有个位数的分支（dev/pre/main 加几个短命的临时分支），
-     * 100 条页大小不会漏；真长到要分页时再加。
-     */
-    async listBranches(): Promise<BranchSummary[]> {
-      return withOctokit(async (kit) => {
-        const { data } = await kit.rest.repos.listBranches({
-          owner: config.owner,
-          repo: config.repo,
-          per_page: 100,
-          request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+      /**
+       * 喂分支选择器（见 routes/actions.ts 的 /api/branches）。跟
+       * listWorkflows 一样只取一页——`kit.rest.repos.listBranches` 的签名与
+       * 返回形状是对着安装的 `@octokit/plugin-rest-endpoint-methods@17.0.0`
+       * 类型定义（`dist-types/generated/parameters-and-response-types.d.ts`）
+       * 核实过的，不是凭记忆写的：`data` 是 `short-branch[]`，每项形状是
+       * `{ name, commit: { sha, url }, protected, protection?, protection_url? }`。
+       * adx-dl 目前只有个位数的分支（dev/pre/main 加几个短命的临时分支），
+       * 100 条页大小不会漏；真长到要分页时再加。
+       */
+      async listBranches(): Promise<BranchSummary[]> {
+        return withOctokit(async (kit) => {
+          const { data } = await kit.rest.repos.listBranches({
+            owner: config.owner,
+            repo: config.repo,
+            per_page: 100,
+            request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+          });
+          return data.map((branch) => ({
+            name: branch.name,
+            protected: branch.protected,
+          }));
         });
-        return data.map((branch) => ({
-          name: branch.name,
-          protected: branch.protected,
-        }));
-      });
-    },
+      },
+    };
+  }
 
-    async listRuns(opts?: { perPage?: number }): Promise<RunSummary[]> {
-      return withOctokit(async (kit) => {
-        const { data } = await kit.rest.actions.listWorkflowRunsForRepo({
-          owner: config.owner,
-          repo: config.repo,
-          per_page: opts?.perPage ?? 30,
-          request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+  function createActionsMethods(): ActionsClient {
+    return {
+      async listWorkflows(): Promise<WorkflowSummary[]> {
+        return withOctokit(async (kit) => {
+          const { data } = await kit.rest.actions.listRepoWorkflows({
+            owner: config.owner,
+            repo: config.repo,
+            per_page: 100,
+            request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+          });
+          return data.workflows.map((w) => ({
+            id: w.id,
+            name: w.name,
+            path: w.path,
+            state: w.state,
+          }));
         });
-        return data.workflow_runs.map(toRunSummary);
-      });
-    },
+      },
 
-    async getRun(runId: number): Promise<RunDetail> {
-      return withOctokit(async (kit) => {
-        const [run, jobs] = await Promise.all([
-          kit.rest.actions.getWorkflowRun({
+      async listRuns(opts?: { perPage?: number }): Promise<RunSummary[]> {
+        return withOctokit(async (kit) => {
+          const { data } = await kit.rest.actions.listWorkflowRunsForRepo({
+            owner: config.owner,
+            repo: config.repo,
+            per_page: opts?.perPage ?? 30,
+            request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+          });
+          return data.workflow_runs.map(toRunSummary);
+        });
+      },
+
+      async getRun(runId: number): Promise<RunDetail> {
+        return withOctokit(async (kit) => {
+          const [run, jobs] = await Promise.all([
+            kit.rest.actions.getWorkflowRun({
+              owner: config.owner,
+              repo: config.repo,
+              run_id: runId,
+              request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+            }),
+            kit.rest.actions.listJobsForWorkflowRun({
+              owner: config.owner,
+              repo: config.repo,
+              run_id: runId,
+              per_page: 100,
+              request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+            }),
+          ]);
+
+          return {
+            run: toRunSummary(run.data),
+            jobs: jobs.data.jobs.map((job) => ({
+              id: job.id,
+              name: job.name,
+              status: job.status,
+              conclusion: job.conclusion ?? null,
+              startedAt: job.started_at ?? null,
+              completedAt: job.completed_at ?? null,
+              steps: (job.steps ?? []).map((step) => ({
+                name: step.name,
+                status: step.status,
+                conclusion: step.conclusion ?? null,
+                number: step.number,
+                startedAt: step.started_at ?? null,
+                completedAt: step.completed_at ?? null,
+              })),
+            })),
+          };
+        });
+      },
+
+      async dispatchWorkflow(workflowId: number, ref: string): Promise<void> {
+        return withOctokit(async (kit) => {
+          await kit.rest.actions.createWorkflowDispatch({
+            owner: config.owner,
+            repo: config.repo,
+            workflow_id: workflowId,
+            ref,
+            request: { signal: timeoutSignal(WRITE_TIMEOUT_MS) },
+          });
+        });
+      },
+
+      async rerunRun(runId: number): Promise<void> {
+        return withOctokit(async (kit) => {
+          await kit.rest.actions.reRunWorkflow({
             owner: config.owner,
             repo: config.repo,
             run_id: runId,
-            request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
-          }),
-          kit.rest.actions.listJobsForWorkflowRun({
+            request: { signal: timeoutSignal(WRITE_TIMEOUT_MS) },
+          });
+        });
+      },
+
+      async cancelRun(runId: number): Promise<void> {
+        return withOctokit(async (kit) => {
+          await kit.rest.actions.cancelWorkflowRun({
+            owner: config.owner,
+            repo: config.repo,
+            run_id: runId,
+            request: { signal: timeoutSignal(WRITE_TIMEOUT_MS) },
+          });
+        });
+      },
+
+      async getFailedStepLog(runId: number): Promise<FailedStepLog | null> {
+        return withOctokit(async (kit) => {
+          const { data } = await kit.rest.actions.listJobsForWorkflowRun({
             owner: config.owner,
             repo: config.repo,
             run_id: runId,
             per_page: 100,
             request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
-          }),
-        ]);
+          });
 
-        return {
-          run: toRunSummary(run.data),
-          jobs: jobs.data.jobs.map((job) => ({
-            id: job.id,
-            name: job.name,
-            status: job.status,
-            conclusion: job.conclusion ?? null,
-            startedAt: job.started_at ?? null,
-            completedAt: job.completed_at ?? null,
-            steps: (job.steps ?? []).map((step) => ({
-              name: step.name,
-              status: step.status,
-              conclusion: step.conclusion ?? null,
-              number: step.number,
-              startedAt: step.started_at ?? null,
-              completedAt: step.completed_at ?? null,
-            })),
-          })),
-        };
-      });
-    },
+          const failedJob = data.jobs.find((job) => job.conclusion === "failure");
+          if (!failedJob) return null;
+          const failedStep = (failedJob.steps ?? []).find((step) => step.conclusion === "failure");
 
-    async dispatchWorkflow(workflowId: number, ref: string): Promise<void> {
-      return withOctokit(async (kit) => {
-        await kit.rest.actions.createWorkflowDispatch({
-          owner: config.owner,
-          repo: config.repo,
-          workflow_id: workflowId,
-          ref,
-          request: { signal: timeoutSignal(WRITE_TIMEOUT_MS) },
+          // 单个 job 的日志是纯文本（整个 run 的日志是 zip，不要用那个）。
+          const log = await kit.rest.actions.downloadJobLogsForWorkflowRun({
+            owner: config.owner,
+            repo: config.repo,
+            job_id: failedJob.id,
+            request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+          });
+
+          const text = typeof log.data === "string" ? log.data : String(log.data ?? "");
+          // 先按空行过滤，再取尾部：过滤要在切片之前做，否则最后 200 行里可能
+          // 混进一堆空行，把真正有信息量的日志行挤出这个窗口。构建日志动辄
+          // 上万行，全量传到浏览器没有意义，失败原因也几乎总在末尾。
+          const lines = text
+            .split("\n")
+            .filter((line) => line.trim())
+            .slice(-200);
+
+          return {
+            jobName: failedJob.name,
+            stepName: failedStep?.name ?? "(未知步骤)",
+            lines,
+          };
         });
-      });
-    },
+      },
+    };
+  }
 
-    async rerunRun(runId: number): Promise<void> {
-      return withOctokit(async (kit) => {
-        await kit.rest.actions.reRunWorkflow({
-          owner: config.owner,
-          repo: config.repo,
-          run_id: runId,
-          request: { signal: timeoutSignal(WRITE_TIMEOUT_MS) },
-        });
-      });
-    },
-
-    async cancelRun(runId: number): Promise<void> {
-      return withOctokit(async (kit) => {
-        await kit.rest.actions.cancelWorkflowRun({
-          owner: config.owner,
-          repo: config.repo,
-          run_id: runId,
-          request: { signal: timeoutSignal(WRITE_TIMEOUT_MS) },
-        });
-      });
-    },
-
-    async getFailedStepLog(runId: number): Promise<FailedStepLog | null> {
-      return withOctokit(async (kit) => {
-        const { data } = await kit.rest.actions.listJobsForWorkflowRun({
-          owner: config.owner,
-          repo: config.repo,
-          run_id: runId,
-          per_page: 100,
-          request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
-        });
-
-        const failedJob = data.jobs.find((job) => job.conclusion === "failure");
-        if (!failedJob) return null;
-        const failedStep = (failedJob.steps ?? []).find((step) => step.conclusion === "failure");
-
-        // 单个 job 的日志是纯文本（整个 run 的日志是 zip，不要用那个）。
-        const log = await kit.rest.actions.downloadJobLogsForWorkflowRun({
-          owner: config.owner,
-          repo: config.repo,
-          job_id: failedJob.id,
-          request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
-        });
-
-        const text = typeof log.data === "string" ? log.data : String(log.data ?? "");
-        // 先按空行过滤，再取尾部：过滤要在切片之前做，否则最后 200 行里可能
-        // 混进一堆空行，把真正有信息量的日志行挤出这个窗口。构建日志动辄
-        // 上万行，全量传到浏览器没有意义，失败原因也几乎总在末尾。
-        const lines = text
-          .split("\n")
-          .filter((line) => line.trim())
-          .slice(-200);
-
-        return {
-          jobName: failedJob.name,
-          stepName: failedStep?.name ?? "(未知步骤)",
-          lines,
-        };
-      });
-    },
+  return {
+    ...createRepoMethods(),
+    ...createActionsMethods(),
   };
 }

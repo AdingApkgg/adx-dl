@@ -1,10 +1,13 @@
 import type { RunSummary } from "@/shared/dto";
 
-import type { GitHubClient } from "../github/client";
+import type { ActionsClient } from "../github/client";
 import { diffRuns, hasActiveRun, type RunChange } from "./run-diff";
 
 export type RunPollerDeps = {
-  github: GitHubClient;
+  // 只依赖 listRuns 这一个方法——poller 不触发 workflow、不读 job 日志、
+  // 不查仓库元数据，没有理由要求调用方实现整个 ActionsClient（更不用说
+  // RepoClient）。
+  github: Pick<ActionsClient, "listRuns">;
   /** 有 run 在跑时的间隔，默认 5 秒。 */
   activeIntervalMs?: number;
   /** 全部空闲时的间隔，默认 60 秒。 */
@@ -16,7 +19,7 @@ export type RunPollerDeps = {
    * 这是独立于 `github` 具体实现的最后一道保险：`octokit-client.ts` 已经给
    * 每个真实请求挂了 20 秒的 `AbortSignal.timeout`，但 poller 不应该依赖
    * 「注入进来的 `github` 恰好实现了超时」这件事——测试注入的假实现、以后
-   * 可能出现的别的 `GitHubClient` 实现，都不保证会自己 settle。这里的超时
+   * 可能出现的别的 `listRuns` 实现，都不保证会自己 settle。这里的超时
    * 比 octokit-client 的请求超时略长，正常情况下应该是 octokit-client 自己
    * 先超时、给出一个带状态码的 GitHubRequestError；这一层只在那道防线也
    * 失效时兜底，保证 `tick()` 无论如何都会走到下面重新调度那一步。
@@ -29,7 +32,7 @@ type Subscriber = (changes: RunChange[]) => void;
 /**
  * 把 `promise` 跟一个超时赛跑：谁先 settle 用谁的结果。
  *
- * 超时赢了之后，原始 `promise` 不会被取消（`GitHubClient` 接口没给取消的
+ * 超时赢了之后，原始 `promise` 不会被取消（`listRuns` 的签名没给取消的
  * 缝隙）——它会在后台继续跑，最终的结果被下面这个 `.then` 接住之后直接
  * 丢弃（`resolve`/`reject` 在一个已经 settle 的 promise 上调用是没有效果
  * 的空操作）。已经挂了 `.then(onFulfilled, onRejected)`，所以就算它最终

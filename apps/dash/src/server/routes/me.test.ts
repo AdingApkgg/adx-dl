@@ -4,12 +4,15 @@ import { Hono } from "hono";
 import type { MeResponse } from "@/shared/dto";
 
 import { GitHubRequestError } from "../github/client";
-import { createFakeGitHubClient } from "../github/fake-client";
+import { createFakeRepoClient } from "../github/fake-client";
 import type { AccessVariables } from "../middleware/access-jwt";
 import { registerMeRoute } from "./me";
 
-/** 绕开 Access 中间件，直接把身份塞进 context，只测路由本身。 */
-function makeApp(github = createFakeGitHubClient()) {
+/** 绕开 Access 中间件，直接把身份塞进 context，只测路由本身。
+ *  `registerMeRoute` 只依赖 RepoClient（见 me.ts 的 MeDeps），所以这里
+ *  用只覆盖仓库元数据领域的 createFakeRepoClient，不用连带种一份
+ *  Actions 数据。 */
+function makeApp(github = createFakeRepoClient()) {
   const app = new Hono<{ Variables: AccessVariables }>();
   app.use("*", async (c, next) => {
     c.set("identity", { email: "someone@example.com", sub: "user-1" });
@@ -35,7 +38,7 @@ describe("GET /api/me", () => {
   test("App 连不通时仍返回 200，把错误放进 repoError", async () => {
     // 这是刻意的：/api/me 是连通性自检页面的数据源，它自己不能因为
     // 「被检查的东西坏了」而挂掉，否则界面只会白屏，看不到原因。
-    const github = createFakeGitHubClient({
+    const github = createFakeRepoClient({
       repoError: new GitHubRequestError("Bad credentials", 401),
     });
 
