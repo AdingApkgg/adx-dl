@@ -88,3 +88,21 @@ export function pruneIds(stored: string[], list: Notice[]): string[] {
   const known = new Set(list.map((notice) => notice.id));
   return stored.filter((id) => known.has(id));
 }
+
+/**
+ * Whether a notice link's href is safe to render as a clickable anchor.
+ *
+ * Allowlisted, not blocklisted: today the only writer is hand-committed JSON,
+ * but the spec calls for an admin form later, so every href is treated as
+ * untrusted input rather than trusted because of where it currently comes
+ * from. Absolute http(s), protocol-relative (`//host/...`) and site-relative
+ * (`/path`) all pass; anything else — notably `javascript:` — does not.
+ */
+export function isSafeNoticeHref(href: string): boolean {
+  return (
+    href.startsWith("https:") ||
+    href.startsWith("http:") ||
+    href.startsWith("//") ||
+    href.startsWith("/")
+  );
+}

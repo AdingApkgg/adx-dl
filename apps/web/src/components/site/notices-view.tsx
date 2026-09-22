@@ -5,15 +5,33 @@ import { NoticesReadMarker } from "@/components/site/notices-read-marker";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { Badge } from "@/components/ui/badge";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
-import { isActive, notices, resolveText, sortNotices, todayUtc } from "@/lib/notices";
+import {
+  isActive,
+  isSafeNoticeHref,
+  notices,
+  resolveText,
+  sortNotices,
+  todayUtc,
+  type Notice,
+} from "@/lib/notices";
 import { buildInfoPageStructuredData } from "@/lib/structured-data";
 
-export function NoticesView({ locale = "zh" }: { locale?: Locale }) {
+export function NoticesView({
+  locale = "zh",
+  list = notices,
+}: {
+  locale?: Locale;
+  /**
+   * Defaults to the real build-time data. Overridable so tests can cover
+   * specific badge/empty-state branches without depending on notices.json.
+   */
+  list?: Notice[];
+}) {
   const { notices: copy, seo } = getDictionary(locale);
   // Evaluated at build time. CI redeploys the whole site daily, so an expiry can
   // be at most a day stale here; the banner is client-side and always exact.
   const today = todayUtc();
-  const ordered = sortNotices(notices, today);
+  const ordered = sortNotices(list, today);
   const activeIds = ordered.filter((notice) => isActive(notice, today)).map((notice) => notice.id);
 
   return (
@@ -43,7 +61,8 @@ export function NoticesView({ locale = "zh" }: { locale?: Locale }) {
             const body = resolveText(notice.body, locale);
             const active = isActive(notice, today);
             const label = notice.link ? resolveText(notice.link.label, locale).value : null;
-            const internal = notice.link?.href.startsWith("/") ?? false;
+            const linkSafe = notice.link ? isSafeNoticeHref(notice.link.href) : false;
+            const internal = linkSafe && (notice.link?.href.startsWith("/") ?? false);
 
             return (
               <li
@@ -63,22 +82,28 @@ export function NoticesView({ locale = "zh" }: { locale?: Locale }) {
                 <h2 className="text-lg font-semibold">{title.value}</h2>
                 <p className="whitespace-pre-line text-sm text-muted-foreground">{body.value}</p>
                 {notice.link && label ? (
-                  internal ? (
-                    <Link
-                      href={buildLocalePath(notice.link.href, locale)}
-                      className="w-fit text-sm font-medium text-primary underline-offset-4 hover:underline"
-                    >
-                      {label}
-                    </Link>
+                  linkSafe ? (
+                    internal ? (
+                      <Link
+                        href={buildLocalePath(notice.link.href, locale)}
+                        className="w-fit text-sm font-medium text-primary underline-offset-4 hover:underline"
+                      >
+                        {label}
+                      </Link>
+                    ) : (
+                      <a
+                        href={notice.link.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-fit text-sm font-medium text-primary underline-offset-4 hover:underline"
+                      >
+                        {label}
+                      </a>
+                    )
                   ) : (
-                    <a
-                      href={notice.link.href}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-fit text-sm font-medium text-primary underline-offset-4 hover:underline"
-                    >
-                      {label}
-                    </a>
+                    // Fails the href allowlist (isSafeNoticeHref) — render the
+                    // label as inert text instead of a clickable anchor.
+                    <span className="w-fit text-sm font-medium">{label}</span>
                   )
                 ) : null}
                 {title.translated && body.translated ? null : (

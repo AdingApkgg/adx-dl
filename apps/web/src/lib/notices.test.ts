@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   isActive,
+  isSafeNoticeHref,
   pickUrgentNotice,
   pruneIds,
   resolveText,
@@ -117,5 +118,28 @@ describe("unreadCount", () => {
 describe("pruneIds", () => {
   test("drops ids that no longer exist in the data", () => {
     expect(pruneIds(["a", "gone"], [buildNotice({ id: "a" })])).toEqual(["a"]);
+  });
+});
+
+describe("isSafeNoticeHref", () => {
+  test("accepts absolute https and http URLs", () => {
+    expect(isSafeNoticeHref("https://example.com/post")).toBe(true);
+    expect(isSafeNoticeHref("http://example.com/post")).toBe(true);
+  });
+
+  test("accepts protocol-relative and site-relative hrefs", () => {
+    expect(isSafeNoticeHref("//example.com/post")).toBe(true);
+    expect(isSafeNoticeHref("/notices")).toBe(true);
+  });
+
+  test("rejects javascript: and any other scheme", () => {
+    expect(isSafeNoticeHref("javascript:alert(1)")).toBe(false);
+    expect(isSafeNoticeHref("JavaScript:alert(1)")).toBe(false);
+    expect(isSafeNoticeHref("data:text/html,evil")).toBe(false);
+    expect(isSafeNoticeHref("mailto:a@example.com")).toBe(false);
+  });
+
+  test("rejects a bare scheme-relative string with no leading slash", () => {
+    expect(isSafeNoticeHref("example.com/post")).toBe(false);
   });
 });
