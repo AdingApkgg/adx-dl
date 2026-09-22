@@ -53,6 +53,27 @@ function ContentForm({ file, spec, initial, onNotice }: ContentFormProps) {
   const [errors, setErrors] = useState<Map<string, string[]>>(new Map());
   const revalidator = useRevalidator();
 
+  /**
+   * 改变条目顺序或数量。
+   *
+   * 顺带清掉 errors：它是按带下标的路径索引的（`links[2].url`），结构一变
+   * 下标就对不上了——留着会把错误标记挂到另一个条目上，真正有问题的那条
+   * 反而不再显示。
+   *
+   * 不做"下标跟着变换"：那要为移动/删除/新增各写一套映射，而结构变了之后
+   * 上一次的校验结论在实质上也已经过期（新增的空条目本来就会引入新错误，
+   * 删除可能正好删掉了唯一出问题的那条）。把一份过期的结论精确搬到新下标上，
+   * 搬得再准也还是过期的。清掉，让操作员重新点一次「暂存」拿到新结果。
+   *
+   * 编辑字段（下面 LinkEntryFields 的 onChange）不走这个 helper：那是改值不是
+   * 改结构，下标没变；而且每次击键都清的话，错误提示会在刚开始打字时就闪掉，
+   * 反而看不清要改的是什么。
+   */
+  const applyStructural = (arrayKey: string, next: LinkEntryDraft[]) => {
+    setDraft({ ...draft, [arrayKey]: next });
+    setErrors(new Map());
+  };
+
   const stage = () => {
     // 只喂客户端这次自己跑出来的 errors——绝不能喂服务端 commit 失败时
     // 回的 errors（那份消息前面冠了文件标题，errorsByPath 会切错路径，
@@ -96,7 +117,7 @@ function ContentForm({ file, spec, initial, onNotice }: ContentFormProps) {
                     type="button"
                     aria-label={`上移第 ${index + 1} 条`}
                     disabled={index === 0}
-                    onClick={() => setDraft({ ...draft, [array.key]: moveEntry(entries, index, -1) })}
+                    onClick={() => applyStructural(array.key, moveEntry(entries, index, -1))}
                   >
                     ↑
                   </button>
@@ -104,7 +125,7 @@ function ContentForm({ file, spec, initial, onNotice }: ContentFormProps) {
                     type="button"
                     aria-label={`下移第 ${index + 1} 条`}
                     disabled={index === entries.length - 1}
-                    onClick={() => setDraft({ ...draft, [array.key]: moveEntry(entries, index, 1) })}
+                    onClick={() => applyStructural(array.key, moveEntry(entries, index, 1))}
                   >
                     ↓
                   </button>
@@ -115,7 +136,7 @@ function ContentForm({ file, spec, initial, onNotice }: ContentFormProps) {
                       // 删掉的是一段手打的三语文案，撤不回来（草稿不做历史）。
                       // 这是这个页面上唯一一个会丢内容的操作，所以问一句。
                       if (!window.confirm(`删除「${entry.name.zh || "（未命名）"}」？`)) return;
-                      setDraft({ ...draft, [array.key]: removeEntry(entries, index) });
+                      applyStructural(array.key, removeEntry(entries, index));
                     }}
                   >
                     删除
@@ -125,9 +146,7 @@ function ContentForm({ file, spec, initial, onNotice }: ContentFormProps) {
             ))}
             <button
               type="button"
-              onClick={() =>
-                setDraft({ ...draft, [array.key]: [...entries, emptyEntry(array.requireDescription)] })
-              }
+              onClick={() => applyStructural(array.key, [...entries, emptyEntry(array.requireDescription)])}
             >
               新增条目
             </button>
