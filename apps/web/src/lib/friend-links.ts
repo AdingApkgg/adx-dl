@@ -74,6 +74,28 @@ export const friendLinks: FriendLink[] = [
     },
   },
   {
+    name: {
+      zh: "溯洌のAstroDX谱面下载站",
+      en: "Sulie's AstroDX Chart Downloads",
+      ja: "溯洌の AstroDX 譜面ダウンロードサイト",
+    },
+    url: "https://adx.talobot.top/",
+    description: {
+      zh: "支持标题与别名模糊搜索的 AstroDX 谱面下载站，另附 Maichart 转换器。",
+      en: "An AstroDX chart download site with fuzzy title and alias search, plus a bundled Maichart converter.",
+      ja: "タイトル・別名のあいまい検索に対応した AstroDX 譜面ダウンロードサイト。Maichart コンバーターも併設。",
+    },
+  },
+  {
+    name: { zh: "Maicharts-in-Zip", en: "Maicharts-in-Zip", ja: "Maicharts-in-Zip" },
+    url: "https://github.com/I21b/Maicharts-in-Zip",
+    description: {
+      zh: "以 Simai 格式按版本打包的 maimai 谱面合集，通过 GitHub Release 发布。",
+      en: "maimai charts in Simai format, packaged per version and published as GitHub Releases.",
+      ja: "Simai 形式の maimai 譜面をバージョンごとにまとめ、GitHub Release として公開。",
+    },
+  },
+  {
     name: { zh: "AWMC BBS", en: "AWMC BBS", ja: "AWMC BBS" },
     url: "https://awmc.cc/",
     description: {
