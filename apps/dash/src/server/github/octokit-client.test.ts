@@ -1,7 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { Octokit as OctokitCtor } from "octokit";
 
-import { GitHubRequestError } from "./client";
+import { GitDataStepError, GitHubRequestError } from "./client";
 import { createOctokitGitHubClient, noRetryOnRateLimit, type OctokitClientConfig } from "./octokit-client";
 
 // 这个文件测四类东西：
@@ -1102,5 +1102,333 @@ describe("决策：getFailedStepLog", () => {
     expect(result?.lines[49]).toBe("prefix-line-50");
     expect(result?.lines[50]).toBe("tail-line-151");
     expect(result?.lines[149]).toBe("tail-line-250");
+  });
+});
+
+// ============================================================================
+// 内容领域（Git Data API）：六步编排与错误语义
+// ============================================================================
+//
+// 这一段测的是 commitFiles 的**编排**（哪一步先跑、拿到的 sha 往哪一步传、
+// 哪一步失败会怎样），不是「GitHub 字段名 → DTO」的映射，所以用的是上半部分
+// `makeFakeKit` 那种手写假 kit 的风格，而不是「铸一个真 Octokit、只换
+// request.fetch」那种：后者要为 git/blob/tree/commit/ref 五个端点各造一份
+// 结构完整的 wire fixture，而这里真正要钉住的是调用之间传的那几个 sha。
+//
+// `createContentMethods` 既不导出也不接参数（它是 createOctokitGitHubClient
+// 内部的嵌套函数，闭包同一个 withOctokit——见那里的注释），所以测试一律走
+// 工厂注入假 kit：`createOctokitGitHubClient(config, async () => octokit)`。
+
+/** 造一个带 `.status` 的错误——octokit 抛出来的就长这样。 */
+function httpError(status: number): Error {
+  const error = new Error(`simulated GitHub failure ${status}`);
+  (error as unknown as { status: number }).status = status;
+  return error;
+}
+
+type FakeOctokitOptions = {
+  /** 按调用顺序回调，用来断言六步真的按顺序跑了。 */
+  onCall?: (name: string) => void;
+  /** getRef 回的 HEAD commit sha。 */
+  refSha?: string;
+  /** getCommit 回的 tree sha——base_tree 该用的就是它，不是上面那个 commit sha。 */
+  commitTreeSha?: string;
+  /** verify-blob 那一步看到的「仓库现状」：路径 → 当前 blob sha。 */
+  blobShaByPath?: Record<string, string>;
+  /**
+   * 路径不在 blobShaByPath 里时怎么回：true 抛 404（文件被删了），
+   * false（默认）回一个数组（GitHub 对目录就是这么回的）。两条分支在实现里
+   * 走的是不同的代码路径，结论都该是「冲突」。
+   */
+  missingIs404?: boolean;
+  newBlobSha?: string;
+  newTreeSha?: string;
+  newCommitSha?: string;
+  /** 给某一步配一个 HTTP 状态码，让它抛错。 */
+  getRefStatus?: number;
+  getCommitStatus?: number;
+  createBlobStatus?: number;
+  createTreeStatus?: number;
+  createCommitStatus?: number;
+  updateRefStatus?: number;
+  /** getContentFile 用：正文与它的 blob sha。 */
+  fileContent?: string;
+  fileSha?: string;
+  /** 让 getContent 回一个数组（目录），验证实现不会把它当成空文件。 */
+  contentIsDirectory?: boolean;
+};
+
+/**
+ * 造一个假的 REST 方法。
+ *
+ * 参数声明成 `options: any` 并真的传给 `record`/`result`，不是摆设：无参的
+ * `mock()` 推出来的 Args 是 `[]`，`mock.calls[0][0]` 会直接编译失败——而
+ * 「createTree 收到的 base_tree 是什么」正是这一组测试最要紧的断言。
+ */
+function restStub<T>(
+  name: string,
+  record: (name: string) => void,
+  status: number | undefined,
+  result: (options: any) => T
+) {
+  return mock(async (options: any) => {
+    record(name);
+    if (status !== undefined) throw httpError(status);
+    return result(options);
+  });
+}
+
+function fakeOctokit(options: FakeOctokitOptions = {}) {
+  const blobShaByPath = options.blobShaByPath ?? {};
+  const record = (name: string) => options.onCall?.(name);
+
+  const getContent = restStub("getContent", record, undefined, (opts: { path: string }) => {
+    if (options.contentIsDirectory) return { data: [] as unknown[] };
+    // getContentFile 的测试配 fileContent；commitFiles 的 verify-blob 查的是
+    // blobShaByPath（仓库现状）。两组测试不会同时配这两个字段。
+    if (options.fileContent !== undefined) {
+      return {
+        data: {
+          type: "file",
+          content: Buffer.from(options.fileContent, "utf-8").toString("base64"),
+          sha: options.fileSha ?? "sha1",
+        },
+      };
+    }
+    const sha = blobShaByPath[opts.path];
+    if (sha === undefined) {
+      if (options.missingIs404) throw httpError(404);
+      return { data: [] as unknown[] };
+    }
+    return { data: { type: "file", content: "", sha } };
+  });
+
+  return {
+    rest: {
+      repos: { getContent },
+      git: {
+        getRef: restStub("getRef", record, options.getRefStatus, () => ({
+          data: { object: { sha: options.refSha ?? "head1" } },
+        })),
+        getCommit: restStub("getCommit", record, options.getCommitStatus, () => ({
+          data: { tree: { sha: options.commitTreeSha ?? "tree1" } },
+        })),
+        createBlob: restStub("createBlob", record, options.createBlobStatus, () => ({
+          data: { sha: options.newBlobSha ?? "blobNew" },
+        })),
+        createTree: restStub("createTree", record, options.createTreeStatus, () => ({
+          data: { sha: options.newTreeSha ?? "treeNew" },
+        })),
+        createCommit: restStub("createCommit", record, options.createCommitStatus, () => ({
+          data: { sha: options.newCommitSha ?? "commitNew" },
+        })),
+        updateRef: restStub("updateRef", record, options.updateRefStatus, () => ({ data: {} })),
+      },
+    },
+  };
+}
+
+/** 把假 kit 包成客户端——`as any` 同 makeFakeKit：假实现不需要满足完整 Octokit 类型。 */
+function makeContentClient(octokit: ReturnType<typeof fakeOctokit>) {
+  return createOctokitGitHubClient(config, async () => octokit as any);
+}
+
+describe("createContentMethods.commitFiles", () => {
+  test("commits every file in one commit, parented on the head it just read", async () => {
+    const calls: string[] = [];
+    const octokit = fakeOctokit({
+      onCall: (name) => calls.push(name),
+      refSha: "head1",
+      commitTreeSha: "tree1",
+      blobShaByPath: { "a.json": "shaA", "b.json": "shaB" },
+      newBlobSha: "blobNew",
+      newTreeSha: "treeNew",
+      newCommitSha: "commitNew",
+    });
+    const client = makeContentClient(octokit);
+
+    const result = await client.commitFiles({
+      branch: "main",
+      message: "content: 更新",
+      files: [
+        { path: "a.json", content: "{}\n", baseSha: "shaA" },
+        { path: "b.json", content: "[]\n", baseSha: "shaB" },
+      ],
+    });
+
+    expect(result.commitSha).toBe("commitNew");
+    expect(result.commitUrl).toBe(
+      `https://github.com/${config.owner}/${config.repo}/commit/commitNew`
+    );
+    expect(octokit.rest.git.createBlob).toHaveBeenCalledTimes(2);
+    expect(octokit.rest.git.createCommit).toHaveBeenCalledTimes(1);
+    expect(octokit.rest.git.createCommit.mock.calls[0][0]).toMatchObject({
+      message: "content: 更新",
+      tree: "treeNew",
+      parents: ["head1"],
+    });
+    expect(octokit.rest.git.updateRef.mock.calls[0][0]).toMatchObject({
+      ref: "heads/main",
+      sha: "commitNew",
+      force: false,
+    });
+    // 六步真的按顺序跑了，且 createTree/createCommit/updateRef 各只跑一次
+    // ——「多文件一个 commit」这件事本身。
+    expect(calls).toEqual([
+      "getRef",
+      "getCommit",
+      "getContent",
+      "getContent",
+      "createBlob",
+      "createBlob",
+      "createTree",
+      "createCommit",
+      "updateRef",
+    ]);
+    // verify 读的是刚拿到的那个 HEAD，不是一个浮动的「最新」——否则第一层锁
+    // 校验的仓库状态和 commit 挂上去的 parent 可能根本不是同一个快照。
+    for (const call of octokit.rest.repos.getContent.mock.calls) {
+      expect(call[0]).toMatchObject({ ref: "head1" });
+    }
+  });
+
+  test("createTree gets the base commit's TREE sha, never the commit sha", async () => {
+    // GitHub 只接受 tree 对象的 sha 作为 base_tree。把 commit sha 传进去是
+    // 一个「看起来能跑」的写法（两者都是 40 位 hex），但会得到一棵空树，
+    // 结果是这次 commit 把仓库里其他所有文件都删掉。
+    const octokit = fakeOctokit({
+      refSha: "head1",
+      commitTreeSha: "tree1",
+      blobShaByPath: { "a.json": "shaA" },
+    });
+    const client = makeContentClient(octokit);
+    await client.commitFiles({
+      branch: "main",
+      message: "m",
+      files: [{ path: "a.json", content: "{}\n", baseSha: "shaA" }],
+    });
+
+    const treeOptions = octokit.rest.git.createTree.mock.calls[0][0];
+    expect(treeOptions).toMatchObject({ base_tree: "tree1" });
+    // refSha 与 commitTreeSha 故意取了两个不同的值，所以上面那条断言真的能
+    // 分辨「传了 tree sha」和「传了 commit sha」，不是碰巧相等而蒙混过关。
+    expect(treeOptions.base_tree).not.toBe("head1");
+    // 树里挂的是新建 blob 的 sha、模式是普通文件——写错这里同样会毁掉文件。
+    expect(treeOptions.tree).toEqual([
+      { path: "a.json", mode: "100644", type: "blob", sha: "blobNew" },
+    ]);
+  });
+
+  test("a changed blob sha is a conflict naming the file, and nothing is written", async () => {
+    const octokit = fakeOctokit({
+      refSha: "head1",
+      commitTreeSha: "tree1",
+      blobShaByPath: { "a.json": "shaOTHER" },
+    });
+    const client = makeContentClient(octokit);
+
+    const error = await client
+      .commitFiles({
+        branch: "main",
+        message: "m",
+        files: [{ path: "a.json", content: "{}\n", baseSha: "shaA" }],
+      })
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(GitDataStepError);
+    expect(error).toMatchObject({ step: "verify-blob", status: 409, conflictPaths: ["a.json"] });
+    expect(octokit.rest.git.createBlob).not.toHaveBeenCalled();
+  });
+
+  test("a deleted file is a conflict too, not a crash", async () => {
+    const octokit = fakeOctokit({
+      refSha: "head1",
+      commitTreeSha: "tree1",
+      blobShaByPath: {},
+      missingIs404: true,
+    });
+    const client = makeContentClient(octokit);
+    const error = await client
+      .commitFiles({
+        branch: "main",
+        message: "m",
+        files: [{ path: "a.json", content: "{}\n", baseSha: "shaA" }],
+      })
+      .catch((e: unknown) => e);
+    expect(error).toMatchObject({ step: "verify-blob", status: 409, conflictPaths: ["a.json"] });
+  });
+
+  test("every conflicting file is named, not just the first", async () => {
+    const octokit = fakeOctokit({
+      refSha: "head1",
+      commitTreeSha: "tree1",
+      blobShaByPath: { "a.json": "x", "b.json": "y" },
+    });
+    const client = makeContentClient(octokit);
+    const error = await client
+      .commitFiles({
+        branch: "main",
+        message: "m",
+        files: [
+          { path: "a.json", content: "{}\n", baseSha: "shaA" },
+          { path: "b.json", content: "{}\n", baseSha: "shaB" },
+        ],
+      })
+      .catch((e: unknown) => e);
+    expect((error as GitDataStepError).conflictPaths).toEqual(["a.json", "b.json"]);
+  });
+
+  test("updateRef's 422 becomes a 409, because non-fast-forward IS a conflict", async () => {
+    const octokit = fakeOctokit({
+      refSha: "head1",
+      commitTreeSha: "tree1",
+      blobShaByPath: { "a.json": "shaA" },
+      updateRefStatus: 422,
+    });
+    const client = makeContentClient(octokit);
+    const error = await client
+      .commitFiles({
+        branch: "main",
+        message: "m",
+        files: [{ path: "a.json", content: "{}\n", baseSha: "shaA" }],
+      })
+      .catch((e: unknown) => e);
+    expect(error).toMatchObject({ step: "update-ref", status: 409 });
+  });
+
+  test("a failure in the middle carries the step it failed at", async () => {
+    const octokit = fakeOctokit({
+      refSha: "head1",
+      commitTreeSha: "tree1",
+      blobShaByPath: { "a.json": "shaA" },
+      createTreeStatus: 500,
+    });
+    const client = makeContentClient(octokit);
+    const error = await client
+      .commitFiles({
+        branch: "main",
+        message: "m",
+        files: [{ path: "a.json", content: "{}\n", baseSha: "shaA" }],
+      })
+      .catch((e: unknown) => e);
+    expect(error).toMatchObject({ step: "create-tree", status: 500 });
+  });
+});
+
+describe("createContentMethods.getContentFile", () => {
+  test("decodes base64 content and returns the blob sha", async () => {
+    const octokit = fakeOctokit({ fileContent: '{"a":1}\n', fileSha: "sha1" });
+    const client = makeContentClient(octokit);
+    expect(await client.getContentFile("a.json")).toEqual({
+      path: "a.json",
+      text: '{"a":1}\n',
+      sha: "sha1",
+    });
+  });
+
+  test("a directory response is an error, not a silent empty file", async () => {
+    const octokit = fakeOctokit({ contentIsDirectory: true });
+    const client = makeContentClient(octokit);
+    await expect(client.getContentFile("some/dir")).rejects.toThrow();
   });
 });

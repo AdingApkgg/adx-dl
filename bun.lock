@@ -9,6 +9,7 @@
       "name": "dash",
       "version": "0.1.0",
       "dependencies": {
+        "@astrodx/content-schema": "workspace:*",
         "@react-router/node": "8.4.0",
         "hono": "^4.13.8",
         "isbot": "^5",
