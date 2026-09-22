@@ -6,6 +6,7 @@ import { HTTPException } from "hono/http-exception";
 import type { GitHubClient } from "./github/client";
 import { accessJwt, type AccessConfig, type AccessVariables } from "./middleware/access-jwt";
 import { registerActionsRoutes } from "./routes/actions";
+import { registerContentRoutes } from "./routes/content";
 import { registerEventsRoute, type EventsPoller } from "./routes/events";
 import { registerMeRoute } from "./routes/me";
 
@@ -81,6 +82,7 @@ export function createApp(deps: AppDeps) {
   registerMeRoute(app, { github: deps.github });
   registerActionsRoutes(app, { github: deps.github });
   registerEventsRoute(app, { poller: deps.poller });
+  registerContentRoutes(app, { github: deps.github });
 
   // /api 下的未命中显式收口成 JSON 404。放在 SPA fallback 之前，
   // 否则下面的 * 会把它们当成前端路由，回一份 index.html。

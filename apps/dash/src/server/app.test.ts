@@ -118,6 +118,18 @@ describe("createApp", () => {
     expect(res.status).toBe(200);
   });
 
+  test("没有 Access 断言时，/api/content 也被挡在外面", async () => {
+    // 下面那条枚举 app.routes 的测试已经结构性地覆盖了它。这一条按名字把
+    // 新加的这一族端点钉一遍：内容编辑是这个后台里唯一会往仓库写东西的
+    // 路径，「它挂在 accessJwt 之后」这件事该在这个文件里一眼读得到，而不
+    // 是只能从一个枚举循环里推出来。
+    const { app } = await makeApp();
+
+    const res = await app.request("/api/content");
+
+    expect(res.status).toBe(403);
+  });
+
   test("除了 /api/ping，每个已注册路由在没有 Access 断言时都是 403", async () => {
     // 枚举 app.routes 而不是一条条硬编码路径：Task 9/10 往 app.ts 里加新路由时，
     // 这条测试自动跟着覆盖，不用记得回来加一行。/api/ping 是容器 healthcheck，
