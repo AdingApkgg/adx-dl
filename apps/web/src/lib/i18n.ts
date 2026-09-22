@@ -577,6 +577,21 @@ export type SiteDictionary = {
       copy: string;
       copied: string;
     };
+    /** Template buttons on the guestbook that replace the old /post and /survey forms. */
+    compose: {
+      heading: string;
+      survey: string;
+      post: string;
+      publicNotice: string;
+      replaceQuestion: string;
+      replaceConfirm: string;
+      replaceCancel: string;
+      unavailable: string;
+      copy: string;
+      copied: string;
+      offline: string;
+      templates: { survey: string; post: string };
+    };
   };
   links: {
     navLabel: string;
@@ -1319,6 +1334,36 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         draftLabel: "你填写的内容",
         copy: "复制内容",
         copied: "已复制",
+      },
+      compose: {
+        heading: "用模板开始",
+        survey: "问卷反馈",
+        post: "谱面投稿",
+        publicNotice:
+          "填好后点编辑器的发送即可。内容会作为公开留言显示在本页，且需要填写昵称——请不要写个人信息。",
+        replaceQuestion: "编辑器里已有内容，仍要替换？",
+        replaceConfirm: "替换",
+        replaceCancel: "取消",
+        unavailable: "评论区没能加载出来。可以先复制下面的模板，稍后再发。",
+        copy: "复制模板",
+        copied: "已复制",
+        offline: "当前离线，联网后才能使用模板。",
+        templates: {
+          survey: [
+            "【问卷反馈】",
+            "游玩平台（Android / iOS / 其他）：",
+            "整体满意度（1-5）：",
+            "如何得知本站：",
+            "最希望增加：",
+            "其他：",
+          ].join("\n"),
+          post: [
+            "【谱面投稿】",
+            "曲名（可含别名）：",
+            "谱面来源 / 下载链接：",
+            "补充说明：",
+          ].join("\n"),
+        },
       },
     },
     links: {
@@ -2094,6 +2139,36 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         copy: "Copy text",
         copied: "Copied",
       },
+      compose: {
+        heading: "Start from a template",
+        survey: "Survey",
+        post: "Submit a chart",
+        publicNotice:
+          "Fill it in, then hit send in the editor. Your text appears as a public comment on this page and needs a nickname — don't include personal details.",
+        replaceQuestion: "The editor already has text. Replace it?",
+        replaceConfirm: "Replace",
+        replaceCancel: "Cancel",
+        unavailable: "The comment box didn't load. Copy the template below and post it later.",
+        copy: "Copy template",
+        copied: "Copied",
+        offline: "You're offline — templates need a connection.",
+        templates: {
+          survey: [
+            "[Survey]",
+            "Platform (Android / iOS / other):",
+            "Overall satisfaction (1-5):",
+            "How you found this site:",
+            "What you'd most like added:",
+            "Anything else:",
+          ].join("\n"),
+          post: [
+            "[Chart Submission]",
+            "Song title (aliases welcome):",
+            "Chart source / download link:",
+            "Notes:",
+          ].join("\n"),
+        },
+      },
     },
     links: {
       navLabel: "Links",
@@ -2857,6 +2932,37 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         draftLabel: "入力した内容",
         copy: "内容をコピー",
         copied: "コピーしました",
+      },
+      compose: {
+        heading: "テンプレートから始める",
+        survey: "アンケート",
+        post: "譜面の投稿",
+        publicNotice:
+          "記入したらエディタの送信を押してください。内容は公開コメントとしてこのページに表示され、ニックネームの入力が必要です。個人情報は書かないでください。",
+        replaceQuestion: "エディタに入力済みの内容があります。置き換えますか？",
+        replaceConfirm: "置き換える",
+        replaceCancel: "キャンセル",
+        unavailable:
+          "コメント欄を読み込めませんでした。下のテンプレートをコピーして、あとで投稿してください。",
+        copy: "テンプレートをコピー",
+        copied: "コピーしました",
+        offline: "オフラインです。テンプレートの利用には接続が必要です。",
+        templates: {
+          survey: [
+            "【アンケート】",
+            "プレイ環境（Android / iOS / その他）：",
+            "総合満足度（1-5）：",
+            "当サイトを知ったきっかけ：",
+            "追加してほしいもの：",
+            "その他：",
+          ].join("\n"),
+          post: [
+            "【譜面の投稿】",
+            "曲名（別名可）：",
+            "譜面の入手元 / ダウンロードリンク：",
+            "補足：",
+          ].join("\n"),
+        },
       },
     },
     links: {
