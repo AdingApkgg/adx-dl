@@ -14,6 +14,9 @@
 .DS_Store
 *.tsbuildinfo
 
+# eslint --cache
+.eslintcache
+
 # env files: ignore real secrets at every level, but never block committing
 # documentation like .env.example (Task 3 adds and commits that file).
 .env

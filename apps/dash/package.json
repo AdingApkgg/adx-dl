@@ -9,7 +9,8 @@
     "start": "bun run src/server/main.ts",
     "test": "bun test",
     "typegen": "react-router typegen",
-    "check": "bun run typegen && tsc --noEmit && bun test"
+    "lint": "eslint --cache",
+    "check": "bun run lint && bun run typegen && tsc --noEmit && bun test"
   },
   "dependencies": {
     "@react-router/node": "8.4.0",
@@ -22,11 +23,17 @@
     "isbot": "^5"
   },
   "devDependencies": {
+    "@eslint/js": "^9",
     "@react-router/dev": "8.4.0",
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-plugin-react": "^7",
+    "eslint-plugin-react-hooks": "^7",
+    "globals": "^16",
     "typescript": "^6",
+    "typescript-eslint": "^8",
     "vite": "^8.3.0"
   }
 }
