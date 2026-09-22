@@ -17,16 +17,6 @@ export default defineConfig([
 
   js.configs.recommended,
   tseslint.configs.recommended,
-  {
-    rules: {
-      // `const { key, ...rest } = obj` to omit `key` from `rest` is a
-      // deliberate, common idiom (see env.test.ts's "DASH_PUBLIC_ORIGIN
-      // 未设置时报错" test) — the extracted binding is never meant to be
-      // used. Without this, the rule can't distinguish that from an
-      // actually-forgotten variable.
-      "@typescript-eslint/no-unused-vars": ["error", { ignoreRestSiblings: true }],
-    },
-  },
 
   // Server + shared code runs on Bun, not in a browser: Node-flavored
   // globals (process, console, ...), no DOM.
@@ -88,6 +78,16 @@ export default defineConfig([
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-non-null-assertion": "off",
+      // `const { key, ...rest } = obj` to omit `key` from `rest` is a
+      // deliberate idiom this suite uses (env.test.ts's "DASH_PUBLIC_ORIGIN
+      // 未设置时报错" test) — the extracted binding is never meant to be
+      // used. Scoped to tests only, not repo-wide: outside a test file, a
+      // destructured field going unused right next to a `...rest` is
+      // exactly the shape this rule exists to catch — this app handles a
+      // GitHub App private key, JWTs, and CSRF tokens, and "forgot to use
+      // a field that got pulled out of a credentials/claims object" is a
+      // real bug shape, not a hypothetical one.
+      "@typescript-eslint/no-unused-vars": ["error", { ignoreRestSiblings: true }],
     },
   },
 
