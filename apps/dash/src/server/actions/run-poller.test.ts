@@ -40,11 +40,27 @@ function createControllableGitHubClient(initialRuns: RunSummary[] = []) {
   const base = createFakeGitHubClient({ runs: initialRuns });
   let calls = 0;
   let pendingError: Error | null = null;
+  let pendingHang = false;
+  let pendingMalformed = false;
 
   return {
     ...base,
     async listRuns(opts?: { perPage?: number }) {
       calls++;
+      if (pendingHang) {
+        pendingHang = false;
+        // 永远不 settle 的 promise——模拟 I-1 说的那种请求：既不成功也不
+        // 失败，就是没有响应。没有内部计时器，不会让测试进程挂着退不出去。
+        return new Promise<RunSummary[]>(() => {});
+      }
+      if (pendingMalformed) {
+        pendingMalformed = false;
+        // 成功 settle，但载荷本身会让后续处理（diffRuns/hasActiveRun）
+        // 炸掉——`for (const run of next)` 对 `null` 直接抛 TypeError。
+        // 这不是「请求失败」，是「请求成功了，但拿到手之后的处理崩了」，
+        // 用来测 tick() 里 try 之外还有没有能让重新调度失败的路径。
+        return null as unknown as RunSummary[];
+      }
       if (pendingError) {
         const error = pendingError;
         pendingError = null;
@@ -55,6 +71,14 @@ function createControllableGitHubClient(initialRuns: RunSummary[] = []) {
     callCount: () => calls,
     queueError(error: Error) {
       pendingError = error;
+    },
+    /** 让下一次 listRuns 调用返回一个永远不会 settle 的 promise。 */
+    hangNextCall() {
+      pendingHang = true;
+    },
+    /** 让下一次 listRuns 调用成功返回，但返回值会让后续处理本身抛错。 */
+    returnMalformedNextCall() {
+      pendingMalformed = true;
     },
     setRuns(next: RunSummary[]) {
       base.seed.runs = next;
@@ -93,6 +117,68 @@ describe("createRunPoller resilience", () => {
     expect(changes[0].kind).toBe("added");
     expect(poller.snapshot()).toEqual(nextRuns);
     // 至少两次调用：失败的那次 + 成功的那次。
+    expect(github.callCount()).toBeGreaterThanOrEqual(2);
+  });
+
+  test("listRuns 挂住不返回，也不会让轮询停掉——poller 自己的超时兜底，下一轮照常发生", async () => {
+    // 这条测的是 I-1 里被点名的那条路径：github.listRuns() 返回的 promise
+    // 永远不 settle（不是失败，是压根没有响应——半开 TCP 连接、
+    // octokit 限流插件内部等 retryAfter 都是这个形状）。真实实现
+    // （octokit-client.ts）现在给每个请求都挂了 AbortSignal 超时，但这里
+    // 刻意不依赖那道防线：用一个完全不知道超时是什么的假 listRuns 挂住，
+    // 验证 poller 自己的 `pollTimeoutMs` 兜底能不能独立地把 tick() 从这个
+    // 挂起状态里拽出来，走到重新调度那一步。
+    const github = createControllableGitHubClient([]);
+    const poller = createRunPoller({
+      github,
+      activeIntervalMs: 15,
+      idleIntervalMs: 15,
+      pollTimeoutMs: 20,
+    });
+
+    // 第一次轮询挂住不返回；等 pollTimeoutMs 判它超时之后的下一轮成功返回。
+    github.hangNextCall();
+    const nextRuns = [run({ id: 1, status: "in_progress", conclusion: null })];
+    github.setRuns(nextRuns);
+
+    const broadcast = nextBroadcast(poller);
+    poller.start();
+    const changes = await broadcast;
+    poller.stop();
+
+    // 挂住的那一轮不可能产出变化（tick() 里 diffRuns 根本没机会跑），
+    // 所以等到的这条广播必然来自超时之后的下一轮成功轮询——如果 poller
+    // 没有自己的超时兜底，这个 await 会一直挂着，这条测试会超时失败。
+    expect(changes).toHaveLength(1);
+    expect(changes[0].kind).toBe("added");
+    expect(poller.snapshot()).toEqual(nextRuns);
+    // 至少两次调用：挂住的那次 + 超时之后重新调度、真的返回的那次。
+    expect(github.callCount()).toBeGreaterThanOrEqual(2);
+  });
+
+  test("处理阶段本身抛错（不是 listRuns 失败），也不会阻止下一轮调度", async () => {
+    // 这条测的是 reviewer 那句「即使请求本身有超时兜底，tick() 里还有没有
+    // 别的路径能让重新调度失败？」——answer: 有，「计算下一轮间隔」这一步
+    // （`hasActiveRun(snapshot)`）如果抛错，在旧代码里发生在 try/catch 之外，
+    // 会直接让 tick() 整个中断、重新调度那行代码根本不会跑到。这里不 mock
+    // 内部的 diffRuns/hasActiveRun，而是让 listRuns *成功* settle、但返回
+    // 一个会让后续处理自然抛错的值（`null`），更接近真实世界里「数据形状
+    // 意外」的样子。
+    const github = createControllableGitHubClient([]);
+    const poller = createRunPoller({ github, activeIntervalMs: 15, idleIntervalMs: 15 });
+
+    github.returnMalformedNextCall();
+    const nextRuns = [run({ id: 1, status: "in_progress", conclusion: null })];
+    github.setRuns(nextRuns);
+
+    const broadcast = nextBroadcast(poller);
+    poller.start();
+    const changes = await broadcast;
+    poller.stop();
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0].kind).toBe("added");
+    expect(poller.snapshot()).toEqual(nextRuns);
     expect(github.callCount()).toBeGreaterThanOrEqual(2);
   });
 
