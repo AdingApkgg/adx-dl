@@ -218,10 +218,8 @@ describe("localized routes", () => {
     expect(jaDonateHtml).toContain("アドレスをコピー");
   });
 
-  test("localized about, post and survey routes render shared en and ja views", async () => {
+  test("localized about route renders shared en and ja views", async () => {
     const { default: LocalizedAboutPage } = await import("./[locale]/about/page");
-    const { default: LocalizedPostPage } = await import("./[locale]/post/page");
-    const { default: LocalizedSurveyPage } = await import("./[locale]/survey/page");
 
     const enAboutHtml = renderToStaticMarkup(
       await LocalizedAboutPage({ params: Promise.resolve({ locale: "en" }) })
@@ -233,18 +231,6 @@ describe("localized routes", () => {
     expect(enAboutHtml).toContain("Credits");
     expect(jaAboutHtml).toContain("本サイトについて");
     expect(jaAboutHtml).toContain("免責事項");
-
-    const enPostHtml = renderToStaticMarkup(
-      await LocalizedPostPage({ params: Promise.resolve({ locale: "en" }) })
-    );
-    expect(enPostHtml).toContain("Submit a Chart");
-    expect(enPostHtml).toContain("Submit via Guestbook");
-
-    const jaSurveyHtml = renderToStaticMarkup(
-      await LocalizedSurveyPage({ params: Promise.resolve({ locale: "ja" }) })
-    );
-    expect(jaSurveyHtml).toContain("アンケート");
-    expect(jaSurveyHtml).toContain("ゲストブックで送信する");
   });
 
   test("localized notices routes render en and ja", async () => {

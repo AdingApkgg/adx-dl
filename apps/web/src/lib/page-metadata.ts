@@ -223,26 +223,6 @@ function buildNoticesSeoTitle(locale: Locale): string {
   return "ADX Chart Archive Site Notices";
 }
 
-function buildPostSeoTitle(locale: Locale): string {
-  if (locale === "zh") {
-    return "AstroDX 谱面投稿";
-  }
-  if (locale === "ja") {
-    return "AstroDX 譜面の投稿";
-  }
-  return "Submit an AstroDX Chart";
-}
-
-function buildSurveySeoTitle(locale: Locale): string {
-  if (locale === "zh") {
-    return "ADX 谱面资源问卷调查";
-  }
-  if (locale === "ja") {
-    return "ADX 譜面アーカイブのアンケート";
-  }
-  return "ADX Chart Archive Survey";
-}
-
 function buildVersionsSeoTitle(locale: Locale): string {
   if (locale === "zh") {
     return "maimai DX 版本谱面浏览";
@@ -462,28 +442,6 @@ export function buildNoticesPageMetadata(locale: Locale): Metadata {
       "notices",
       "announcements",
     ],
-  });
-}
-
-export function buildPostPageMetadata(locale: Locale): Metadata {
-  const dictionary = getDictionary(locale);
-  return buildPageMetadata({
-    locale,
-    pathname: "/post",
-    title: buildPostSeoTitle(locale),
-    description: dictionary.seo.post,
-    keywords: ["AstroDX", siteName(locale), dictionary.post.title, "maimai", "投稿", "submit"],
-  });
-}
-
-export function buildSurveyPageMetadata(locale: Locale): Metadata {
-  const dictionary = getDictionary(locale);
-  return buildPageMetadata({
-    locale,
-    pathname: "/survey",
-    title: buildSurveySeoTitle(locale),
-    description: dictionary.seo.survey,
-    keywords: ["AstroDX", siteName(locale), dictionary.survey.title, "maimai", "问卷", "survey", "feedback"],
   });
 }
 

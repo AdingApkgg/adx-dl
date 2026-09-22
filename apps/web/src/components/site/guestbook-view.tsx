@@ -3,7 +3,6 @@ import * as React from "react";
 import { Reveal } from "@/components/motion";
 import { ChartComments } from "@/components/site/chart-comments";
 import { GuestbookCompose } from "@/components/site/guestbook-compose";
-import { GuestbookPrefill } from "@/components/site/guestbook-prefill";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { buildInfoPageStructuredData } from "@/lib/structured-data";
@@ -34,10 +33,6 @@ export function GuestbookView({ locale = "zh" }: { locale?: Locale }) {
       </Reveal>
       <React.Suspense fallback={null}>
         <GuestbookCompose locale={locale} />
-      </React.Suspense>
-      {/* Applies ?draft= from /post and /survey into the Artalk editor. */}
-      <React.Suspense fallback={null}>
-        <GuestbookPrefill locale={locale} />
       </React.Suspense>
       <ChartComments pageKey={GUESTBOOK_PAGE_KEY} pageTitle={guestbook.title} locale={locale} />
     </main>

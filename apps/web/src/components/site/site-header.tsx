@@ -222,13 +222,13 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
         ariaLabel: unread > 0 ? dictionary.notices.unreadLabel(unread) : undefined,
       },
       {
-        href: switchLocale("/post", locale),
-        label: dictionary.post.navLabel,
+        href: `${switchLocale("/comments", locale)}?compose=post`,
+        label: dictionary.guestbook.compose.post,
         icon: <UploadIcon />,
       },
       {
-        href: switchLocale("/survey", locale),
-        label: dictionary.survey.navLabel,
+        href: `${switchLocale("/comments", locale)}?compose=survey`,
+        label: dictionary.guestbook.compose.survey,
         icon: <ClipboardListIcon />,
       },
     ],

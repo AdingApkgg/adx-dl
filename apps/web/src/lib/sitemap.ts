@@ -22,8 +22,6 @@ const staticPaths = [
   "/guide",
   "/community",
   "/comments",
-  "/post",
-  "/survey",
   "/links",
   "/donate",
   "/about",

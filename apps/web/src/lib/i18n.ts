@@ -567,16 +567,6 @@ export type SiteDictionary = {
     title: string;
     description: string;
     intro: string;
-    /** Hand-off of a /post or /survey draft into the Artalk composer. */
-    prefill: {
-      pending: string;
-      success: string;
-      failedTitle: string;
-      failedBody: string;
-      draftLabel: string;
-      copy: string;
-      copied: string;
-    };
     /** Template buttons on the guestbook that replace the old /post and /survey forms. */
     compose: {
       heading: string;
@@ -676,48 +666,6 @@ export type SiteDictionary = {
     moreVersions: (count: number) => string;
     empty: string;
   };
-  post: {
-    navLabel: string;
-    title: string;
-    description: string;
-    intro: string;
-    songTitleLabel: string;
-    songTitlePlaceholder: string;
-    sourceLabel: string;
-    sourcePlaceholder: string;
-    notesLabel: string;
-    notesPlaceholder: string;
-    requiredHint: string;
-    /** Per-field message, linked by aria-describedby so the error names its field. */
-    songTitleRequired: string;
-    sourceRequired: string;
-    submit: string;
-    submitting: string;
-    composedTitle: string;
-  };
-  survey: {
-    navLabel: string;
-    title: string;
-    description: string;
-    intro: string;
-    selectPlaceholder: string;
-    platformLabel: string;
-    platformOptions: { value: string; label: string }[];
-    discoverLabel: string;
-    discoverPlaceholder: string;
-    satisfactionLabel: string;
-    satisfactionOptions: { value: string; label: string }[];
-    wishLabel: string;
-    wishPlaceholder: string;
-    otherLabel: string;
-    otherPlaceholder: string;
-    requiredHint: string;
-    platformRequired: string;
-    satisfactionRequired: string;
-    submit: string;
-    submitting: string;
-    composedTitle: string;
-  };
   /** Site notices: a top-of-page banner for urgent ones, plus the /notices list. */
   notices: {
     navLabel: string;
@@ -785,8 +733,6 @@ export type SiteDictionary = {
     guide: string;
     music: string;
     changelog: string;
-    post: string;
-    survey: string;
     notices: string;
   };
 };
@@ -1325,16 +1271,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       title: "留言板",
       description: "在这里留言、反馈或闲聊。",
       intro: "欢迎留下你的想法、建议或问题。评论由 Artalk 提供支持，可匿名或登录后发表。",
-      prefill: {
-        pending: "正在把你填写的内容送入评论框…",
-        success: "内容已填入下方评论框，检查无误后点击发送即可完成。",
-        failedTitle: "没能自动填入评论框",
-        failedBody:
-          "评论组件可能被网络拦截或加载失败。你填写的内容仍在下面，可复制后手动粘贴，或通过社区渠道发给我们。",
-        draftLabel: "你填写的内容",
-        copy: "复制内容",
-        copied: "已复制",
-      },
       compose: {
         heading: "用模板开始",
         survey: "问卷反馈",
@@ -1439,59 +1375,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       moreVersions: (count) => `另有 ${count} 个版本`,
       empty: "还没有带入库时间的谱面记录。",
     },
-    post: {
-      navLabel: "投稿",
-      title: "谱面投稿",
-      description: "想让某首谱面被收录？把它推荐给我们。",
-      intro:
-        "填写下方信息并提交，内容会自动预填到留言板的评论框中，确认无误后发布即完成投稿。站长看到后会尽快处理。",
-      songTitleLabel: "曲名（可含别名）",
-      songTitlePlaceholder: "例：系ぎて / Tsunagite",
-      sourceLabel: "谱面来源 / 下载链接",
-      sourcePlaceholder: "例：majdata.net 链接、网盘链接等",
-      notesLabel: "补充说明（可选）",
-      notesPlaceholder: "例：谱面作者、难度、版本归属等",
-      requiredHint: "请先填写曲名与谱面来源。",
-      songTitleRequired: "请填写曲名。",
-      sourceRequired: "请填写谱面来源或下载链接。",
-      submit: "前往留言板投稿",
-      submitting: "正在前往留言板…",
-      composedTitle: "【谱面投稿】",
-    },
-    survey: {
-      navLabel: "问卷",
-      title: "问卷调查",
-      description: "花一分钟告诉我们你的使用体验。",
-      intro:
-        "你的回答对本站今后的发展很重要！提交后内容会自动预填到留言板的评论框中，确认无误后发布即可。",
-      selectPlaceholder: "请选择…",
-      platformLabel: "你在哪个平台游玩 AstroDX？",
-      platformOptions: [
-        { value: "Android", label: "Android" },
-        { value: "iOS", label: "iOS / iPadOS" },
-        { value: "其他", label: "其他 / 尚未游玩" },
-      ],
-      discoverLabel: "你是如何得知本站的？",
-      discoverPlaceholder: "例：朋友推荐、搜索引擎、QQ 群等",
-      satisfactionLabel: "对本站的整体满意度？",
-      satisfactionOptions: [
-        { value: "5", label: "5 - 非常满意" },
-        { value: "4", label: "4 - 满意" },
-        { value: "3", label: "3 - 一般" },
-        { value: "2", label: "2 - 不满意" },
-        { value: "1", label: "1 - 很不满意" },
-      ],
-      wishLabel: "最希望本站增加什么功能或内容？",
-      wishPlaceholder: "例：更多谱面、更好的搜索、深色模式优化等",
-      otherLabel: "其他建议（可选）",
-      otherPlaceholder: "任何想说的话都可以写在这里",
-      requiredHint: "请先选择平台并填写满意度。",
-      platformRequired: "请选择你的游玩平台。",
-      satisfactionRequired: "请选择整体满意度。",
-      submit: "前往留言板提交",
-      submitting: "正在前往留言板…",
-      composedTitle: "【问卷反馈】",
-    },
     notices: {
       navLabel: "公告",
       title: "站点公告",
@@ -1560,10 +1443,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "ADX 谱面资源音乐库：按 maimai DX 版本连续播放曲库中的音源，跨页面播放不中断，可随时切换版本、随机播放或单曲循环。",
       changelog:
         "ADX 谱面资源更新日志：按入库日期查看每一批新收录的 AstroDX 谱面，了解各批次涉及的 maimai DX 版本与谱面数量，快速找到最近新增的曲目。",
-      post:
-        "向 ADX 谱面资源投稿谱面：填写曲名与谱面来源，内容会预填到留言板评论框，发布即完成投稿，帮助更多 AstroDX 玩家找到好谱。",
-      survey:
-        "参与 ADX 谱面资源问卷调查：告诉我们你的游玩平台与使用体验，你的反馈将直接影响本站的功能规划与内容方向。",
       notices: "ADX 谱面资源的站点公告：维护计划、镜像变更、数据迁移等通知的发布页。",
     },
   },
@@ -2128,17 +2007,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "Leave a message, feedback, or just say hi.",
       intro:
         "Share your thoughts, suggestions, or questions. Comments are powered by Artalk — post anonymously or sign in.",
-      prefill: {
-        pending: "Moving what you filled in into the comment box…",
-        success:
-          "Your text is in the comment box below. Check it over and hit send to finish.",
-        failedTitle: "Couldn't fill the comment box automatically",
-        failedBody:
-          "The comment widget may have been blocked or failed to load. Your text is still here — copy it and paste it in by hand, or send it to us through one of the community channels.",
-        draftLabel: "What you wrote",
-        copy: "Copy text",
-        copied: "Copied",
-      },
       compose: {
         heading: "Start from a template",
         survey: "Survey",
@@ -2245,59 +2113,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       moreVersions: (count) => `and ${count} more versions`,
       empty: "No dated import records yet.",
     },
-    post: {
-      navLabel: "Submit",
-      title: "Submit a Chart",
-      description: "Want a chart added to the archive? Recommend it here.",
-      intro:
-        "Fill in the form and submit — your entry is prefilled into the guestbook's comment box; review it and post to finish. The maintainer will follow up as soon as possible.",
-      songTitleLabel: "Song title (aliases welcome)",
-      songTitlePlaceholder: "e.g. 系ぎて / Tsunagite",
-      sourceLabel: "Chart source / download link",
-      sourcePlaceholder: "e.g. a majdata.net link or a drive link",
-      notesLabel: "Notes (optional)",
-      notesPlaceholder: "e.g. chart designer, difficulty, version",
-      requiredHint: "Please fill in the song title and the chart source first.",
-      songTitleRequired: "Enter the song title.",
-      sourceRequired: "Enter where the chart came from, or a download link.",
-      submit: "Submit via Guestbook",
-      submitting: "Opening the guestbook…",
-      composedTitle: "[Chart Submission]",
-    },
-    survey: {
-      navLabel: "Survey",
-      title: "Survey",
-      description: "Spare a minute to tell us how the site works for you.",
-      intro:
-        "Your answers shape where this site goes next! After submitting, your responses are prefilled into the guestbook's comment box — review and post to finish.",
-      selectPlaceholder: "Select…",
-      platformLabel: "Which platform do you play AstroDX on?",
-      platformOptions: [
-        { value: "Android", label: "Android" },
-        { value: "iOS", label: "iOS / iPadOS" },
-        { value: "Other", label: "Other / not playing yet" },
-      ],
-      discoverLabel: "How did you find this site?",
-      discoverPlaceholder: "e.g. a friend, a search engine, a QQ group",
-      satisfactionLabel: "Overall, how satisfied are you with the site?",
-      satisfactionOptions: [
-        { value: "5", label: "5 - Very satisfied" },
-        { value: "4", label: "4 - Satisfied" },
-        { value: "3", label: "3 - Neutral" },
-        { value: "2", label: "2 - Dissatisfied" },
-        { value: "1", label: "1 - Very dissatisfied" },
-      ],
-      wishLabel: "What would you most like to see added?",
-      wishPlaceholder: "e.g. more charts, better search, dark-mode polish",
-      otherLabel: "Anything else? (optional)",
-      otherPlaceholder: "Anything you want to tell us",
-      requiredHint: "Please pick a platform and a satisfaction score first.",
-      platformRequired: "Pick the platform you play on.",
-      satisfactionRequired: "Pick an overall satisfaction score.",
-      submit: "Submit via Guestbook",
-      submitting: "Opening the guestbook…",
-      composedTitle: "[Survey Feedback]",
-    },
     notices: {
       navLabel: "Notices",
       title: "Site Notices",
@@ -2372,10 +2187,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "The ADX chart archive music library: play the catalog's audio continuously by maimai DX version, keep it running across pages, and switch versions, shuffle or repeat at any time.",
       changelog:
         "The ADX chart archive changelog: every batch of newly added AstroDX charts by import date, which maimai DX versions each batch touched, and how many charts it brought in.",
-      post:
-        "Submit a chart to the ADX archive: fill in the song title and chart source, review the prefilled guestbook comment and post it — helping more AstroDX players find great charts.",
-      survey:
-        "Take the ADX chart archive survey: tell us your platform and experience — your feedback directly shapes the site's roadmap and content.",
       notices:
         "Site notices for the ADX chart archive: maintenance windows, mirror changes, data migrations and other announcements.",
     },
@@ -2922,17 +2733,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       description: "メッセージやフィードバック、雑談などお気軽にどうぞ。",
       intro:
         "ご意見・ご提案・ご質問をお寄せください。コメントは Artalk によって提供され、匿名でもサインインしても投稿できます。",
-      prefill: {
-        pending: "入力内容をコメント欄へ転記しています…",
-        success:
-          "入力内容を下のコメント欄に転記しました。内容を確認して送信すると完了です。",
-        failedTitle: "コメント欄への自動入力に失敗しました",
-        failedBody:
-          "コメント機能が読み込めなかった可能性があります。入力内容は下に残っているので、コピーして手動で貼り付けるか、コミュニティ経由でお知らせください。",
-        draftLabel: "入力した内容",
-        copy: "内容をコピー",
-        copied: "コピーしました",
-      },
       compose: {
         heading: "テンプレートから始める",
         survey: "アンケート",
@@ -3040,59 +2840,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       moreVersions: (count) => `ほか ${count} バージョン`,
       empty: "収録日つきの記録はまだありません。",
     },
-    post: {
-      navLabel: "投稿",
-      title: "譜面の投稿",
-      description: "収録してほしい譜面があれば、こちらから推薦できます。",
-      intro:
-        "フォームに記入して送信すると、内容がゲストブックのコメント欄に自動で入力されます。確認して投稿すれば完了です。管理人ができるだけ早く対応します。",
-      songTitleLabel: "曲名（別名も可）",
-      songTitlePlaceholder: "例：系ぎて / Tsunagite",
-      sourceLabel: "譜面の入手元 / ダウンロードリンク",
-      sourcePlaceholder: "例：majdata.net のリンク、クラウドのリンクなど",
-      notesLabel: "補足（任意）",
-      notesPlaceholder: "例：譜面作者、難易度、収録バージョンなど",
-      requiredHint: "曲名と入手元を先に入力してください。",
-      songTitleRequired: "曲名を入力してください。",
-      sourceRequired: "入手元またはダウンロードリンクを入力してください。",
-      submit: "ゲストブックで投稿する",
-      submitting: "ゲストブックへ移動しています…",
-      composedTitle: "【譜面投稿】",
-    },
-    survey: {
-      navLabel: "アンケート",
-      title: "アンケート",
-      description: "1 分だけ、使い心地を教えてください。",
-      intro:
-        "皆さまの回答が今後の改善につながります！送信すると回答がゲストブックのコメント欄に自動で入力されるので、確認して投稿してください。",
-      selectPlaceholder: "選択してください…",
-      platformLabel: "AstroDX をどのプラットフォームで遊んでいますか？",
-      platformOptions: [
-        { value: "Android", label: "Android" },
-        { value: "iOS", label: "iOS / iPadOS" },
-        { value: "その他", label: "その他 / まだ遊んでいない" },
-      ],
-      discoverLabel: "本サイトをどこで知りましたか？",
-      discoverPlaceholder: "例：友人の紹介、検索エンジン、コミュニティなど",
-      satisfactionLabel: "本サイトの総合的な満足度は？",
-      satisfactionOptions: [
-        { value: "5", label: "5 - とても満足" },
-        { value: "4", label: "4 - 満足" },
-        { value: "3", label: "3 - ふつう" },
-        { value: "2", label: "2 - 不満" },
-        { value: "1", label: "1 - とても不満" },
-      ],
-      wishLabel: "いちばん追加してほしい機能・コンテンツは？",
-      wishPlaceholder: "例：譜面の追加、検索の改善、ダークモードの調整など",
-      otherLabel: "そのほかのご意見（任意）",
-      otherPlaceholder: "伝えたいことがあれば何でもどうぞ",
-      requiredHint: "プラットフォームと満足度を先に選択してください。",
-      platformRequired: "プレイしているプラットフォームを選択してください。",
-      satisfactionRequired: "全体の満足度を選択してください。",
-      submit: "ゲストブックで送信する",
-      submitting: "ゲストブックへ移動しています…",
-      composedTitle: "【アンケート回答】",
-    },
     notices: {
       navLabel: "お知らせ",
       title: "サイトのお知らせ",
@@ -3165,10 +2912,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "ADX 譜面アーカイブのミュージックライブラリ：収録楽曲を maimai DX のバージョンごとに連続再生。ページを移動しても途切れず、バージョン切り替え・シャッフル・1 曲リピートにも対応しています。",
       changelog:
         "ADX 譜面アーカイブの更新履歴：新しく追加された AstroDX 譜面を収録日ごとに一覧。各バッチが対象とした maimai DX のバージョンと収録曲数を確認できます。",
-      post:
-        "ADX 譜面アーカイブへの譜面投稿：曲名と入手元を記入すると内容がゲストブックのコメント欄に自動入力され、投稿するだけで完了します。",
-      survey:
-        "ADX 譜面アーカイブのアンケートにご協力ください。プレイ環境や使い心地を教えていただくことで、今後の機能とコンテンツの方向性に反映されます。",
       notices:
         "ADX 譜面アーカイブのお知らせ：メンテナンス予定、ミラーの変更、データ移行などの告知ページ。",
     },

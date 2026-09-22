@@ -260,28 +260,6 @@ describe("default zh routes", () => {
     expect(html).toContain("1 首");
   });
 
-  test("post route renders the zh submission form", async () => {
-    const { default: PostPage } = await import("./(default)/post/page");
-
-    const html = renderToStaticMarkup(<PostPage />);
-
-    expect(html).toContain("谱面投稿");
-    expect(html).toContain("曲名（可含别名）");
-    expect(html).toContain("谱面来源 / 下载链接");
-    expect(html).toContain("前往留言板投稿");
-  });
-
-  test("survey route renders the zh survey form", async () => {
-    const { default: SurveyPage } = await import("./(default)/survey/page");
-
-    const html = renderToStaticMarkup(<SurveyPage />);
-
-    expect(html).toContain("问卷调查");
-    expect(html).toContain("你在哪个平台游玩 AstroDX？");
-    expect(html).toContain("对本站的整体满意度？");
-    expect(html).toContain("前往留言板提交");
-  });
-
   test("notices route renders the zh notices list", async () => {
     const { default: NoticesPage } = await import("./(default)/notices/page");
 
