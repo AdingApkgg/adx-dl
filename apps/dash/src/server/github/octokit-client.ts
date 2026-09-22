@@ -485,8 +485,13 @@ export function createOctokitGitHubClient(
           // getContent 对目录回数组、对 submodule/symlink 回别的 type。只有
           // type === "file" 才有 content/sha 可用；别的形状必须显式报错，
           // 否则会变成「读到一个空文件」然后被原样提交上去。
-          if (Array.isArray(res.data) || res.data.type !== "file") {
-            throw new GitHubRequestError(`${path} 不是一个文件`, 422);
+          //
+          // encoding !== "base64" 覆盖的是 1MB–100MB 那一档：GitHub 照样
+          // 回 type: "file"，但 content 是空串、encoding 是 "none"。不判这
+          // 一下的话，Buffer.from("", "base64") 解出空串，而调用方会把这个
+          // 空串当成文件的真实内容——下一次提交就把文件清空了。
+          if (Array.isArray(res.data) || res.data.type !== "file" || res.data.encoding !== "base64") {
+            throw new GitHubRequestError(`${path} 不是一个可直接读取的文件`, 422);
           }
           return {
             path,

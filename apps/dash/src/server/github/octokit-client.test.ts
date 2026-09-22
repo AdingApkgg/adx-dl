@@ -1154,6 +1154,12 @@ type FakeOctokitOptions = {
   /** getContentFile 用：正文与它的 blob sha。 */
   fileContent?: string;
   fileSha?: string;
+  /**
+   * getContent 回的 encoding。真实 API 对 1MB 以下的文件回 "base64"；
+   * 1MB–100MB 的文件照样是 type: "file"，但 content 是空串、encoding 是
+   * "none"。默认 "base64" 是常规那一档。
+   */
+  fileEncoding?: string;
   /** 让 getContent 回一个数组（目录），验证实现不会把它当成空文件。 */
   contentIsDirectory?: boolean;
 };
@@ -1191,6 +1197,7 @@ function fakeOctokit(options: FakeOctokitOptions = {}) {
         data: {
           type: "file",
           content: Buffer.from(options.fileContent, "utf-8").toString("base64"),
+          encoding: options.fileEncoding ?? "base64",
           sha: options.fileSha ?? "sha1",
         },
       };
@@ -1430,5 +1437,14 @@ describe("createContentMethods.getContentFile", () => {
     const octokit = fakeOctokit({ contentIsDirectory: true });
     const client = makeContentClient(octokit);
     await expect(client.getContentFile("some/dir")).rejects.toThrow();
+  });
+
+  test("超过 1MB 的文件 GitHub 不回正文，必须报错而不是解出一个空串", async () => {
+    // GitHub 对 1MB–100MB 的文件仍然回 type: "file"，但 content 是空串、
+    // encoding 是 "none"。照原样解 base64 会得到 ""，然后这个空串会被当成
+    // 「文件的真实内容」提交回去——把文件清空。
+    const octokit = fakeOctokit({ fileContent: "", fileEncoding: "none", fileSha: "sha1" });
+    const client = makeContentClient(octokit);
+    await expect(client.getContentFile("apps/web/content/community.json")).rejects.toThrow();
   });
 });
