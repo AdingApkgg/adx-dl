@@ -247,6 +247,22 @@ describe("localized routes", () => {
     expect(jaSurveyHtml).toContain("ゲストブックで送信する");
   });
 
+  test("localized notices routes render en and ja", async () => {
+    const { default: LocalizedNoticesPage } = await import("./[locale]/notices/page");
+
+    const enHtml = renderToStaticMarkup(
+      await LocalizedNoticesPage({ params: Promise.resolve({ locale: "en" }) })
+    );
+    expect(enHtml).toContain("Site Notices");
+    expect(enHtml).toContain("The site now has a notices page");
+
+    const jaHtml = renderToStaticMarkup(
+      await LocalizedNoticesPage({ params: Promise.resolve({ locale: "ja" }) })
+    );
+    expect(jaHtml).toContain("サイトのお知らせ");
+    expect(jaHtml).toContain("お知らせページを追加しました");
+  });
+
   test("localized guide, music and changelog routes render en and ja views", async () => {
     const { default: LocalizedGuidePage, generateStaticParams } = await import(
       "./[locale]/guide/page"

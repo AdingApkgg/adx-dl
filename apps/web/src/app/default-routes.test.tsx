@@ -281,4 +281,18 @@ describe("default zh routes", () => {
     expect(html).toContain("对本站的整体满意度？");
     expect(html).toContain("前往留言板提交");
   });
+
+  test("notices route renders the zh notices list", async () => {
+    const { default: NoticesPage } = await import("./(default)/notices/page");
+
+    const html = renderToStaticMarkup(<NoticesPage />);
+
+    expect(html).toContain("站点公告");
+    expect(html).toContain("本站新增公告页");
+    // React's SSR serializer preserves the `dateTime` JSX prop's casing verbatim
+    // (verified against this repo's react-dom 19.2.7) rather than lowercasing it
+    // to the HTML-spec spelling; browsers parse attribute names case-insensitively
+    // either way, so this doesn't change what ships.
+    expect(html).toContain('dateTime="2026-09-23"');
+  });
 });

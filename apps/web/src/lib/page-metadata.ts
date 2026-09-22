@@ -213,6 +213,16 @@ function buildChangelogSeoTitle(locale: Locale): string {
   return "AstroDX Chart Archive Changelog";
 }
 
+function buildNoticesSeoTitle(locale: Locale): string {
+  if (locale === "zh") {
+    return "ADX 谱面资源站点公告";
+  }
+  if (locale === "ja") {
+    return "ADX 譜面アーカイブのお知らせ";
+  }
+  return "ADX Chart Archive Site Notices";
+}
+
 function buildPostSeoTitle(locale: Locale): string {
   if (locale === "zh") {
     return "AstroDX 谱面投稿";
@@ -432,6 +442,25 @@ export function buildChangelogPageMetadata(locale: Locale): Metadata {
       "更新日志",
       "changelog",
       "new charts",
+    ],
+  });
+}
+
+export function buildNoticesPageMetadata(locale: Locale): Metadata {
+  const dictionary = getDictionary(locale);
+  return buildPageMetadata({
+    locale,
+    pathname: "/notices",
+    title: buildNoticesSeoTitle(locale),
+    description: dictionary.seo.notices,
+    keywords: [
+      "AstroDX",
+      siteName(locale),
+      dictionary.notices.title,
+      "maimai",
+      "公告",
+      "notices",
+      "announcements",
     ],
   });
 }

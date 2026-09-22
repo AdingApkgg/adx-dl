@@ -49,6 +49,7 @@ The archive currently lists ${catalog.total_entries} charts across ${versions.le
 
 ## Community pages
 - Comments / guestbook: ${siteUrl}/comments
+- Site notices (maintenance, mirror changes): ${siteUrl}/notices
 - Friend links & resources: ${siteUrl}/links
 - Telegram community: https://t.me/FullDiveSAO
 

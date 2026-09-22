@@ -703,6 +703,21 @@ export type SiteDictionary = {
     submitting: string;
     composedTitle: string;
   };
+  /** Site notices: a top-of-page banner for urgent ones, plus the /notices list. */
+  notices: {
+    navLabel: string;
+    title: string;
+    description: string;
+    intro: string;
+    empty: string;
+    urgentBadge: string;
+    endedBadge: string;
+    untranslated: string;
+    publishedOn: (date: string) => string;
+    detail: string;
+    dismiss: string;
+    unreadLabel: (count: number) => string;
+  };
   notFound: {
     title: string;
     description: string;
@@ -757,6 +772,7 @@ export type SiteDictionary = {
     changelog: string;
     post: string;
     survey: string;
+    notices: string;
   };
 };
 
@@ -1431,6 +1447,20 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       submitting: "正在前往留言板…",
       composedTitle: "【问卷反馈】",
     },
+    notices: {
+      navLabel: "公告",
+      title: "站点公告",
+      description: "维护、变更与重要通知都会发布在这里。",
+      intro: "紧急通知会额外在页面顶部显示一次；关闭后不再打扰，内容仍留在本页。",
+      empty: "目前没有公告。",
+      urgentBadge: "紧急",
+      endedBadge: "已结束",
+      untranslated: "本条暂无译文，显示的是中文原文。",
+      publishedOn: (date) => `发布于 ${date}`,
+      detail: "查看详情",
+      dismiss: "关闭这条公告",
+      unreadLabel: (count) => `公告，${count} 条未读`,
+    },
     notFound: {
       title: "页面不存在",
       description: "你访问的页面不存在或已被移动，试试从首页或曲库重新出发。",
@@ -1489,6 +1519,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "向 ADX 谱面资源投稿谱面：填写曲名与谱面来源，内容会预填到留言板评论框，发布即完成投稿，帮助更多 AstroDX 玩家找到好谱。",
       survey:
         "参与 ADX 谱面资源问卷调查：告诉我们你的游玩平台与使用体验，你的反馈将直接影响本站的功能规划与内容方向。",
+      notices: "ADX 谱面资源的站点公告：维护计划、镜像变更、数据迁移等通知的发布页。",
     },
   },
   en: {
@@ -2192,6 +2223,21 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       submitting: "Opening the guestbook…",
       composedTitle: "[Survey Feedback]",
     },
+    notices: {
+      navLabel: "Notices",
+      title: "Site Notices",
+      description: "Maintenance, changes and anything else worth knowing.",
+      intro:
+        "Urgent notices also appear once at the top of the page; dismissing one keeps it out of your way but leaves it here.",
+      empty: "No notices right now.",
+      urgentBadge: "Urgent",
+      endedBadge: "Ended",
+      untranslated: "No translation yet — showing the original Chinese.",
+      publishedOn: (date) => `Published ${date}`,
+      detail: "Read more",
+      dismiss: "Dismiss this notice",
+      unreadLabel: (count) => `Notices, ${count} unread`,
+    },
     notFound: {
       title: "Page not found",
       description:
@@ -2255,6 +2301,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "Submit a chart to the ADX archive: fill in the song title and chart source, review the prefilled guestbook comment and post it — helping more AstroDX players find great charts.",
       survey:
         "Take the ADX chart archive survey: tell us your platform and experience — your feedback directly shapes the site's roadmap and content.",
+      notices:
+        "Site notices for the ADX chart archive: maintenance windows, mirror changes, data migrations and other announcements.",
     },
   },
   ja: {
@@ -2939,6 +2987,21 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       submitting: "ゲストブックへ移動しています…",
       composedTitle: "【アンケート回答】",
     },
+    notices: {
+      navLabel: "お知らせ",
+      title: "サイトのお知らせ",
+      description: "メンテナンスや変更など、知っておいてほしいことを掲載します。",
+      intro:
+        "緊急のお知らせはページ上部にも一度だけ表示されます。閉じても本ページには残ります。",
+      empty: "現在お知らせはありません。",
+      urgentBadge: "緊急",
+      endedBadge: "終了",
+      untranslated: "このお知らせはまだ翻訳されていません。中国語の原文を表示しています。",
+      publishedOn: (date) => `${date} 公開`,
+      detail: "詳しく見る",
+      dismiss: "このお知らせを閉じる",
+      unreadLabel: (count) => `お知らせ、未読 ${count} 件`,
+    },
     notFound: {
       title: "ページが見つかりません",
       description:
@@ -3000,6 +3063,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         "ADX 譜面アーカイブへの譜面投稿：曲名と入手元を記入すると内容がゲストブックのコメント欄に自動入力され、投稿するだけで完了します。",
       survey:
         "ADX 譜面アーカイブのアンケートにご協力ください。プレイ環境や使い心地を教えていただくことで、今後の機能とコンテンツの方向性に反映されます。",
+      notices:
+        "ADX 譜面アーカイブのお知らせ：メンテナンス予定、ミラーの変更、データ移行などの告知ページ。",
     },
   },
 };

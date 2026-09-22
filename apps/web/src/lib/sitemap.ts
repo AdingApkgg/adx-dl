@@ -17,6 +17,7 @@ const staticPaths = [
   "/charts",
   "/versions",
   "/changelog",
+  "/notices",
   "/music",
   "/guide",
   "/community",
