@@ -1,17 +1,22 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import type { Notice } from "@/lib/notices";
+import { notices as siteNotices, type Notice } from "@/lib/notices";
 import {
   addDismissedId,
   isStorageAvailable,
   markRead,
+  NOTICES_READ_EVENT,
   readDismissedIds,
   readReadIds,
   resetStorageAvailableForTests,
 } from "@/lib/notice-storage";
 // Reuses this file's fake-window harness rather than duplicating it: see the
 // "unreadDotCount" describe block below for why these tests live here.
-import { unreadDotCount } from "@/components/site/notices-unread-dot";
+import {
+  getUnreadNoticeCountSnapshot,
+  subscribeUnreadNoticeCount,
+  unreadDotCount,
+} from "@/components/site/notices-unread-dot";
 
 function buildNotice(id: string): Notice {
   return {
@@ -27,7 +32,12 @@ function buildNotice(id: string): Notice {
 
 const list = [buildNotice("a"), buildNotice("b")];
 
-/** Minimal in-memory Storage. `throwing` models Safari private mode. */
+/**
+ * Minimal in-memory Storage plus a real EventTarget, standing in for `window`.
+ * `throwing` models Safari private mode. The EventTarget base (Bun provides
+ * one as a global, no DOM needed) is what lets `subscribeUnreadNoticeCount`'s
+ * `addEventListener`/`dispatchEvent`/`removeEventListener` calls work as-is.
+ */
 function installStorage({ throwing = false } = {}): void {
   const data = new Map<string, string>();
   const storage = {
@@ -44,7 +54,8 @@ function installStorage({ throwing = false } = {}): void {
       data.delete(key);
     },
   };
-  (globalThis as unknown as { window: unknown }).window = { localStorage: storage };
+  const fakeWindow = Object.assign(new EventTarget(), { localStorage: storage });
+  (globalThis as unknown as { window: unknown }).window = fakeWindow;
 }
 
 beforeEach(() => {
@@ -135,5 +146,83 @@ describe("unreadDotCount", () => {
   test("working storage with every notice already read returns 0", () => {
     markRead(["a", "b"], list);
     expect(unreadDotCount(list)).toBe(0);
+  });
+});
+
+// subscribeUnreadNoticeCount / getUnreadNoticeCountSnapshot (notices-unread-dot.tsx)
+// back useUnreadNoticeCount's useSyncExternalStore. Both are plain functions,
+// same rationale as unreadDotCount above: exercise the exact code the dot
+// ships, reusing this file's fake-window harness rather than mounting anything
+// (this repo has no DOM shim).
+describe("subscribeUnreadNoticeCount", () => {
+  test("notifies when markRead actually changes the read set", () => {
+    let notifications = 0;
+    const unsubscribe = subscribeUnreadNoticeCount(() => {
+      notifications += 1;
+    });
+
+    markRead(["a"], list);
+
+    expect(notifications).toBe(1);
+    unsubscribe();
+  });
+
+  test("does not notify when markRead is a no-op (id already read)", () => {
+    markRead(["a"], list);
+    let notifications = 0;
+    const unsubscribe = subscribeUnreadNoticeCount(() => {
+      notifications += 1;
+    });
+
+    markRead(["a"], list);
+
+    expect(notifications).toBe(0);
+    unsubscribe();
+  });
+
+  test("notifies on the native storage event, for another tab's write", () => {
+    let notifications = 0;
+    const unsubscribe = subscribeUnreadNoticeCount(() => {
+      notifications += 1;
+    });
+
+    window.dispatchEvent(new Event("storage"));
+
+    expect(notifications).toBe(1);
+    unsubscribe();
+  });
+
+  test("stops notifying once unsubscribed", () => {
+    let notifications = 0;
+    const unsubscribe = subscribeUnreadNoticeCount(() => {
+      notifications += 1;
+    });
+    unsubscribe();
+
+    markRead(["a"], list);
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event(NOTICES_READ_EVENT));
+
+    expect(notifications).toBe(0);
+  });
+});
+
+describe("getUnreadNoticeCountSnapshot", () => {
+  test("agrees with unreadDotCount against the real default notice list", () => {
+    expect(getUnreadNoticeCountSnapshot()).toBe(unreadDotCount());
+  });
+
+  test("goes to 0 after markRead marks every known notice read", () => {
+    // Every id, not just the active ones — unreadCount() already ignores
+    // expired notices either way, so this is a superset that stays correct
+    // regardless of which real notices happen to be active right now.
+    const allIds = siteNotices.map((notice) => notice.id);
+    // Sanity check the test is actually exercising something: if this ever
+    // reads 0 already, the assertion below would pass vacuously.
+    expect(getUnreadNoticeCountSnapshot()).toBeGreaterThan(0);
+
+    markRead(allIds);
+
+    expect(getUnreadNoticeCountSnapshot()).toBe(0);
   });
 });

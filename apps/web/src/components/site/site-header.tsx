@@ -363,7 +363,11 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={dictionary.nav.moreLabel}
+                aria-label={
+                  unread > 0
+                    ? `${dictionary.nav.moreLabel}: ${dictionary.notices.unreadLabel(unread)}`
+                    : dictionary.nav.moreLabel
+                }
                 className={cn(
                   "relative",
                   secondaryNav.some(isActive) && "bg-secondary text-secondary-foreground"
@@ -462,7 +466,11 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
                 variant="outline"
                 size="icon-sm"
                 className="relative md:hidden"
-                aria-label={dictionary.nav.menuLabel}
+                aria-label={
+                  unread > 0
+                    ? `${dictionary.nav.menuLabel}: ${dictionary.notices.unreadLabel(unread)}`
+                    : dictionary.nav.menuLabel
+                }
                 title={dictionary.nav.menuLabel}
               >
                 <MenuIcon />

@@ -6,6 +6,17 @@ import { notices as defaultNotices, pruneIds, type Notice } from "@/lib/notices"
 const DISMISSED_KEY = "adx-notice-dismissed";
 const READ_KEY = "adx-notice-read";
 
+/**
+ * Dispatched on `window` whenever `markRead` actually changes something.
+ *
+ * `SiteHeader` renders outside `PageTransition`, and the App Router does not
+ * remount a layout on client-side navigation within the same segment — so the
+ * unread dot's `useSyncExternalStore` (notices-unread-dot.tsx) needs something
+ * to listen for besides the native `storage` event, which only fires in
+ * *other* tabs/documents, never the one that made the write.
+ */
+export const NOTICES_READ_EVENT = "adx:notices-read";
+
 function readIdList(key: string, list: Notice[]): string[] {
   try {
     const raw = window.localStorage.getItem(key);
@@ -49,6 +60,13 @@ export function markRead(ids: string[], list: Notice[] = defaultNotices): void {
   const merged = [...new Set([...current, ...ids])];
   if (merged.length === current.length) return;
   writeIdList(READ_KEY, merged);
+  try {
+    window.dispatchEvent(new Event(NOTICES_READ_EVENT));
+  } catch {
+    // Same defensive stance as the storage access above — a visitor whose
+    // browser can't dispatch this must still keep a working page; the dot
+    // simply won't live-update until the next full read.
+  }
 }
 
 let storageAvailableCache: boolean | undefined;
