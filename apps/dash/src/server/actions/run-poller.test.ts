@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunSummary } from "@/shared/dto";
 
-import { createFakeGitHubClient } from "../github/fake-client";
+import { createFakeActionsClient } from "../github/fake-client";
 import { hasActiveRun, type RunChange } from "./run-diff";
 import { createRunPoller } from "./run-poller";
 
@@ -35,9 +35,17 @@ function sleep(ms: number) {
 /**
  * 在 fake client 之上包一层，让 listRuns 的行为在测试里可控：
  * 数调用次数、按需让某一次调用抛错、随时替换下一次返回的数据。
+ *
+ * 用 `createFakeActionsClient` 而不是 `createFakeGitHubClient`：
+ * `createRunPoller` 只依赖 `Pick<ActionsClient, "listRuns">`（见
+ * run-poller.ts 的 `RunPollerDeps`），这里的假实现照同样的窄度来搭，不用
+ * 连带种一份 `RepoClient` 用不到的 repo/branches 数据——顺带也是
+ * `createFakeActionsClient` 本身唯一的直接调用方，让它的构造路径
+ * （seed 合并、`seed` 属性）真的被测过，而不是只靠
+ * `createFakeGitHubClient` 内部间接复用同一份 `actionsMethods()`。
  */
 function createControllableGitHubClient(initialRuns: RunSummary[] = []) {
-  const base = createFakeGitHubClient({ runs: initialRuns });
+  const base = createFakeActionsClient({ runs: initialRuns });
   let calls = 0;
   const timestamps: number[] = [];
   let pendingError: Error | null = null;
