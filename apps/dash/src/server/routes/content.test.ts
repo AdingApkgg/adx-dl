@@ -70,6 +70,10 @@ async function setup(overrides: Partial<FakeSeed> = {}) {
       [pathOf("donate")]: serialize(seededDonate),
       [pathOf("friend-links")]: serialize(seededFriendLinks),
     },
+    // 默认分支故意**不是** "main"：路由该提交到 getRepoInfo().defaultBranch，
+    // 而种子里取 "main" 的话，一个硬编码 branch: "main" 的实现也照样绿——
+    // 断言分辨不出这两者。
+    repo: { owner: "AdingApkgg", repo: "adx-dl", defaultBranch: "trunk" },
     ...overrides,
   });
 
@@ -198,6 +202,8 @@ describe("POST /api/content/commit", () => {
       "apps/web/content/community.json",
       "apps/web/content/donate.json",
     ]);
+    // 提交的目标分支来自 getRepoInfo().defaultBranch，不是硬编码的 "main"。
+    expect(seed.commits[0].branch).toBe("trunk");
   });
 
   test("落盘格式是 2 空格缩进加末尾换行", async () => {
@@ -272,6 +278,22 @@ describe("POST /api/content/commit", () => {
     expect(await res.json()).toMatchObject({ step: "create-tree" });
   });
 
+  test("上游给的是不可重试的 422：原样透传，不压成 502", async () => {
+    // step() 会把六步里任何上游错误连同原状态码包进 GitDataStepError，
+    // 状态码该由 statusFor 决定。手写「409 就 409、其余一律 502」的映射在
+    // 500 上看不出区别（上面那条），422/404 才分辨得出来。
+    const { post, seed, shaOf } = await setup();
+    seed.commitError = new GitDataStepError("create-commit", "invalid tree sha", 422);
+
+    const res = await post({
+      message: "m",
+      files: [{ key: "community", data: editedCommunity, baseSha: await shaOf("community") }],
+    });
+
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ step: "create-commit" });
+  });
+
   test("空的文件列表是 400——不能推一个空 commit 出去", async () => {
     // commitFiles 自己不拦空数组，会一路跑完六步推一个空 commit 上 main，
     // 白白触发一轮数分钟的完整部署。
@@ -280,15 +302,24 @@ describe("POST /api/content/commit", () => {
     const res = await post({ message: "m", files: [] });
 
     expect(res.status).toBe(400);
+    // 连 error 串一起断言：删掉这个守卫之后请求会一路走到
+    // `changed.length === 0`，照样 400、照样 0 commit，只有这句话会变成
+    // 「没有实际改动」——只看状态码的话这条测的其实是另一个守卫。
+    expect(await res.json()).toMatchObject({ error: "没有要提交的文件" });
     expect(seed.commits).toHaveLength(0);
   });
 
-  test("文件列表里有未知的 key：400，且什么都不提交", async () => {
+  test("文件列表里有未知的 key：400，且消息不把 key 回显出去", async () => {
     const { post, seed } = await setup();
 
-    const res = await post({ message: "m", files: [{ key: "nope", data: {}, baseSha: "x" }] });
+    const res = await post({
+      message: "m",
+      // 取一个「回显出去就一眼看得出来」的值：body 里不该出现它的任何片段。
+      files: [{ key: "<img src=x onerror=alert(1)>", data: {}, baseSha: "x" }],
+    });
 
     expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "校验未通过", errors: ["未知的内容键"] });
     expect(seed.commits).toHaveLength(0);
   });
 

@@ -247,6 +247,92 @@ describe("Finding I-2 — 写端点的同源保护（csrf）", () => {
   });
 });
 
+describe("Finding F-1 — 带 JSON body 的写端点也要过同源检查", () => {
+  // 上面 I-2 那三条之所以绿，不是因为 csrf 覆盖了所有写端点：hono/csrf 只在
+  // content-type 属于表单那三类（x-www-form-urlencoded / multipart/form-data
+  // / text/plain）**或者缺省**时才检查，而 rerun/cancel 不带 body、也就不带
+  // content-type，落进「缺省」那一档。client/lib/api.ts 只要有 body 就发
+  // application/json——于是 /api/content/commit（这个后台唯一一条往 main 写
+  // 的路径）把整条规则整个跳过去了。app.ts 里那段「不能假设 SameSite 挡得
+  // 住」的论证对它并不成立。这一组钉的就是补上的那一层。
+
+  /** 形状合法的 donate 内容：数组至少一条，name/description 三语齐全，url 是 https。 */
+  const VALID_DONATE = {
+    methods: [
+      {
+        name: { zh: "爱发电", en: "Afdian", ja: "Afdian" },
+        url: "https://afdian.com/a/example",
+        description: { zh: "月度赞助", en: "Monthly", ja: "月額" },
+      },
+    ],
+  };
+
+  /** baseSha 得是仓库现状那个 sha，否则会先撞上第一层锁的 409，测不到这里想测的东西。 */
+  async function commitBody(github: ReturnType<typeof createFakeGitHubClient>) {
+    const blob = await github.getContentFile("apps/web/content/donate.json");
+    return JSON.stringify({
+      message: "content: 更新",
+      files: [{ key: "donate", data: VALID_DONATE, baseSha: blob.sha }],
+    });
+  }
+
+  test("Origin 与 DASH_PUBLIC_ORIGIN 匹配：放行，commit 真的推出去了", async () => {
+    const github = createFakeGitHubClient();
+    const { app, assertion } = await makeApp({ github });
+
+    const res = await app.request("/api/content/commit", {
+      method: "POST",
+      headers: {
+        "Cf-Access-Jwt-Assertion": assertion,
+        "content-type": "application/json",
+        Origin: PUBLIC_ORIGIN,
+      },
+      body: await commitBody(github),
+    });
+
+    expect(res.status).toBe(200);
+    expect(github.seed.commits).toHaveLength(1);
+  });
+
+  test("Origin 是第三方站点：403，且 commit 没有被推出去", async () => {
+    const github = createFakeGitHubClient();
+    const { app, assertion } = await makeApp({ github });
+
+    const res = await app.request("/api/content/commit", {
+      method: "POST",
+      headers: {
+        "Cf-Access-Jwt-Assertion": assertion,
+        "content-type": "application/json",
+        Origin: "https://evil.example.com",
+      },
+      body: await commitBody(github),
+    });
+
+    expect(res.status).toBe(403);
+    // 光看状态码不够——它证明不了 handler 真的没跑。这条路径推出去的是一个
+    // 真实的 commit，副作用必须断言。修之前这里实测是 1：跨站的 JSON POST
+    // 拿到 200，commit 真的被推上去了。
+    expect(github.seed.commits).toEqual([]);
+  });
+
+  test("完全没有 Origin 头：403，且 commit 没有被推出去", async () => {
+    const github = createFakeGitHubClient();
+    const { app, assertion } = await makeApp({ github });
+
+    const res = await app.request("/api/content/commit", {
+      method: "POST",
+      headers: {
+        "Cf-Access-Jwt-Assertion": assertion,
+        "content-type": "application/json",
+      },
+      body: await commitBody(github),
+    });
+
+    expect(res.status).toBe(403);
+    expect(github.seed.commits).toEqual([]);
+  });
+});
+
 describe("Finding I-5 — app.onError 集中记录、集中拼 body", () => {
   test("GitHub 错误：状态码来自 statusFor，body 不带异常类名前缀", async () => {
     const github = createFakeGitHubClient();

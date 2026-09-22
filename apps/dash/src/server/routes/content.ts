@@ -6,7 +6,7 @@ import { CONTENT_FILES, findContentFile, validateContentFile } from "@astrodx/co
 import type { ContentCommitRequest, ContentFileMeta, ContentFileResponse } from "@/shared/dto";
 
 import { GitDataStepError, type ContentClient, type RepoClient } from "../github/client";
-import { withGitHubErrors } from "../github/status";
+import { statusFor, withGitHubErrors } from "../github/status";
 import type { AccessVariables } from "../middleware/access-jwt";
 
 export type ContentDeps = {
@@ -100,7 +100,10 @@ export function registerContentRoutes(app: Hono<{ Variables: AccessVariables }>,
     for (const file of payload.files) {
       const spec = findContentFile(file.key);
       if (!spec) {
-        errors.push(`未知的内容键：${file.key}`);
+        // 同样不回显 key——理由和上面 GET 那条一样（回显任意客户端输入等于
+        // 给了一个反射点），而这里的 key 同样完全由请求体决定。同一个文件对
+        // 同一类输入不该用两种相反的策略。
+        errors.push("未知的内容键");
         continue;
       }
       const result = validateContentFile(file.key, file.data);
@@ -147,7 +150,13 @@ export function registerContentRoutes(app: Hono<{ Variables: AccessVariables }>,
         // step 与 conflictPaths 是这个端点独有的信息，app.ts 的 onError
         // 只会保留 message——所以在这里就把它们放进 body。
         if (error instanceof GitDataStepError) {
-          const status = error.status === 409 ? 409 : 502;
+          // 状态码交给 statusFor，不在这里另写一套映射：`step()` 会把六步里
+          // 任何上游错误连同原状态码包进 GitDataStepError，手写
+          // 「409 就 409、其余一律 502」会把 404/422 这两个同样不可重试的
+          // 状态一起压成 502——在一条每次成功提交都要换一轮数分钟部署的路径
+          // 上，把「这次操作本身有问题」报成「上游临时抽风、重试吧」是错误的
+          // 信号。理由见 status.ts 开头那段长注释。
+          const status = statusFor(error);
           throw new HTTPException(status, {
             res: Response.json(
               { error: error.message, step: error.step, conflictPaths: error.conflictPaths },
