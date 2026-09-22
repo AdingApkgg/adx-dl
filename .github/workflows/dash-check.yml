@@ -13,11 +13,13 @@ on:
       - pre
     paths:
       - "apps/dash/**"
+      - "packages/content-schema/**"
       - "bun.lock"
       - ".github/workflows/dash-check.yml"
   pull_request:
     paths:
       - "apps/dash/**"
+      - "packages/content-schema/**"
       - "bun.lock"
       - ".github/workflows/dash-check.yml"
   # Lets the dashboard's Actions panel dispatch this workflow on demand: it's
@@ -43,6 +45,10 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Test content schema
+        working-directory: packages/content-schema
+        run: bun test
 
       - name: Typecheck and test
         working-directory: apps/dash

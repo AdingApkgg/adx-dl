@@ -1,6 +1,6 @@
 import { CONTENT_LOCALES } from "@astrodx/content-schema";
 
-import type { LinkEntryDraft, LocalizedDraft } from "../lib/content-draft";
+import { setLocalizedField, type LinkEntryDraft } from "../lib/content-draft";
 
 const LOCALE_LABELS: Record<string, string> = { zh: "中文", en: "English", ja: "日本語" };
 
@@ -29,11 +29,6 @@ function FieldErrors({ path, errors }: { path: string; errors: Map<string, strin
  * 增删排序、以及把整个数组写回草稿，都是调用方（content.$key.tsx）的事。
  */
 export function LinkEntryFields({ entry, path, errors, onChange }: Props) {
-  const setLocalized = (field: "name" | "description", locale: string, value: string) => {
-    const current = (entry[field] ?? {}) as LocalizedDraft;
-    onChange({ ...entry, [field]: { ...current, [locale]: value } });
-  };
-
   return (
     <div className="dash-entry">
       <fieldset className="dash-entry-locales">
@@ -43,7 +38,7 @@ export function LinkEntryFields({ entry, path, errors, onChange }: Props) {
             <span>{LOCALE_LABELS[locale]}</span>
             <input
               value={entry.name[locale] ?? ""}
-              onChange={(event) => setLocalized("name", locale, event.target.value)}
+              onChange={(event) => onChange(setLocalizedField(entry, "name", locale, event.target.value))}
             />
             <FieldErrors path={`${path}.name.${locale}`} errors={errors} />
           </label>
@@ -70,7 +65,7 @@ export function LinkEntryFields({ entry, path, errors, onChange }: Props) {
               <textarea
                 rows={3}
                 value={entry.description?.[locale] ?? ""}
-                onChange={(event) => setLocalized("description", locale, event.target.value)}
+                onChange={(event) => onChange(setLocalizedField(entry, "description", locale, event.target.value))}
               />
               <FieldErrors path={`${path}.description.${locale}`} errors={errors} />
             </label>

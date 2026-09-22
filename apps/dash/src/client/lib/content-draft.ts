@@ -40,6 +40,23 @@ export function replaceEntry<T>(list: readonly T[], index: number, next: T): T[]
 }
 
 /**
+ * 改一个条目里某个三语字段的某一种语言，返回新条目。
+ *
+ * 单独提出来是因为它和 moveEntry/removeEntry/replaceEntry 同属"草稿变换"，
+ * 只是恰好被一个表单组件调用。漏掉任何一层展开（`...entry` 或 `...current`）
+ * 的后果都是静默丢数据——打字时把别的语言已填的内容抹掉，没有任何提示。
+ */
+export function setLocalizedField(
+  entry: LinkEntryDraft,
+  field: "name" | "description",
+  locale: string,
+  value: string
+): LinkEntryDraft {
+  const current = entry[field] ?? {};
+  return { ...entry, [field]: { ...current, [locale]: value } };
+}
+
+/**
  * 把校验错误按路径归拢，供表单把每条消息放到对应的输入框下面。
  *
  * 消息格式是 `<路径>: <说明>`（见 content-schema 的 link-list.ts —— 那边的注释
@@ -93,4 +110,18 @@ export function errorsByPath(errors: readonly string[]): Map<string, string[]> {
     else index.set(path, [message]);
   }
   return index;
+}
+
+/**
+ * 表单组件的重建键。
+ *
+ * 三段缺一不可：
+ * - `fileKey`：切换到另一个文件时必须重建，否则 draft 会留在上一个文件上，
+ *   而 React Router 在同一路由、只有路径参数变化时**不会**重新挂载组件。
+ *   这是一次静默串档——校验可能照样通过，存进去的是别人的内容。
+ * - `sha`：仓库那边变了就重建。
+ * - `staged`：从"有草稿"变成"没草稿"（丢弃改动）时必须重建，好让表单回到仓库版本。
+ */
+export function contentFormKey(fileKey: string, sha: string, hasStaged: boolean): string {
+  return `${fileKey}:${sha}:${hasStaged ? "staged" : "clean"}`;
 }

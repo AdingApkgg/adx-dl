@@ -2,7 +2,15 @@ import { describe, expect, test } from "bun:test";
 
 import { validateLinkListFile } from "@astrodx/content-schema";
 
-import { emptyEntry, errorsByPath, moveEntry, removeEntry, replaceEntry } from "./content-draft";
+import {
+  contentFormKey,
+  emptyEntry,
+  errorsByPath,
+  moveEntry,
+  removeEntry,
+  replaceEntry,
+  setLocalizedField,
+} from "./content-draft";
 
 describe("moveEntry", () => {
   test("移动一个条目，返回一个新数组", () => {
@@ -32,6 +40,35 @@ describe("removeEntry / replaceEntry", () => {
 
   test("replaceEntry 只替换一个，不动相邻条目", () => {
     expect(replaceEntry(["a", "b"], 0, "z")).toEqual(["z", "b"]);
+  });
+});
+
+describe("setLocalizedField", () => {
+  test("只改指定的那一种语言，另外两种原样保留", () => {
+    const entry = { name: { zh: "中", en: "EN", ja: "日" }, url: "https://example.com/" };
+    expect(setLocalizedField(entry, "name", "en", "New").name).toEqual({ zh: "中", en: "New", ja: "日" });
+  });
+
+  test("不改入参", () => {
+    const entry = { name: { zh: "中", en: "EN", ja: "日" }, url: "https://example.com/" };
+    setLocalizedField(entry, "name", "en", "New");
+    expect(entry.name.en).toBe("EN");
+  });
+
+  test("条目上的其它字段原样保留", () => {
+    const entry = {
+      name: { zh: "中", en: "EN", ja: "日" },
+      url: "https://example.com/",
+      description: { zh: "说明", en: "Desc", ja: "説明" },
+    };
+    const next = setLocalizedField(entry, "name", "zh", "新");
+    expect(next.url).toBe("https://example.com/");
+    expect(next.description).toEqual(entry.description);
+  });
+
+  test("字段原本不存在时也能建起来（description 可选）", () => {
+    const entry = { name: { zh: "中", en: "EN", ja: "日" }, url: "https://example.com/" };
+    expect(setLocalizedField(entry, "description", "zh", "说明").description).toEqual({ zh: "说明" });
   });
 });
 
@@ -101,5 +138,19 @@ describe("errorsByPath", () => {
     expect(index.get(realFieldPath)).toBeUndefined();
     // 唯一存在的 key 带着文件标题前缀，一眼就能看出不是表单会用的字段路径。
     expect(Array.from(index.keys())).toEqual([`社区与联系方式：${realFieldPath}`]);
+  });
+});
+
+describe("contentFormKey", () => {
+  test("换一个文件就换一个 key——这是防串档的那一段", () => {
+    expect(contentFormKey("community", "sha1", false)).not.toBe(contentFormKey("donate", "sha1", false));
+  });
+
+  test("同一个文件、仓库版本变了也换 key", () => {
+    expect(contentFormKey("community", "sha1", false)).not.toBe(contentFormKey("community", "sha2", false));
+  });
+
+  test("有草稿和没草稿是两个 key——丢弃改动后表单要回到仓库版本", () => {
+    expect(contentFormKey("community", "sha1", true)).not.toBe(contentFormKey("community", "sha1", false));
   });
 });

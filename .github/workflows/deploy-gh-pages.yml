@@ -91,6 +91,10 @@ jobs:
           key: next-${{ hashFiles('bun.lock') }}-${{ github.sha }}
           restore-keys: next-${{ hashFiles('bun.lock') }}-
 
+      - name: Test content schema
+        working-directory: packages/content-schema
+        run: bun test
+
       # Fast quality gate before the expensive build: full builds no longer run
       # locally, so CI is where type errors and test regressions get caught.
       - name: Typecheck and test
