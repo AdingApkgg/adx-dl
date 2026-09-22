@@ -1,4 +1,5 @@
 import type {
+  BranchSummary,
   FailedStepLog,
   RepoInfo,
   RunDetail,
@@ -15,6 +16,8 @@ import type {
 export interface GitHubClient {
   getRepoInfo(): Promise<RepoInfo>;
   listWorkflows(): Promise<WorkflowSummary[]>;
+  /** 分支选择器用（见 routes/actions.ts 的 /api/branches）；不分页——见 octokit-client.ts 的实现注释。 */
+  listBranches(): Promise<BranchSummary[]>;
   listRuns(opts?: { perPage?: number }): Promise<RunSummary[]>;
   getRun(runId: number): Promise<RunDetail>;
   dispatchWorkflow(workflowId: number, ref: string): Promise<void>;

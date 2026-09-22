@@ -68,8 +68,27 @@ body {
 .dash-toolbar {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
   margin: 1.5rem 0;
+}
+
+.dash-branch-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--dash-muted);
+  font-size: 0.9rem;
+  margin-right: 0.4rem;
+}
+
+.dash-branch-select select {
+  font: inherit;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 0.4rem;
+  background: var(--dash-bg);
+  color: var(--dash-fg);
 }
 
 button {
@@ -96,7 +115,21 @@ button:disabled {
   padding: 0.6rem 0.9rem;
   border: 1px solid var(--dash-line);
   border-radius: 0.4rem;
-  background: color-mix(in srgb, var(--dash-accent) 8%, transparent);
+}
+
+/* 成功/失败必须能靠颜色一眼分辨——文案会被跳着看漏，颜色不会。两者都从
+   --dash-ok/--dash-bad 取色，深色模式下自动跟着那两个变量换，不在这里
+   另外写一份硬编码的颜色。 */
+.dash-notice--ok {
+  border-color: var(--dash-ok);
+  background: color-mix(in srgb, var(--dash-ok) 12%, transparent);
+  color: var(--dash-ok);
+}
+
+.dash-notice--bad {
+  border-color: var(--dash-bad);
+  background: color-mix(in srgb, var(--dash-bad) 12%, transparent);
+  color: var(--dash-bad);
 }
 
 .dash-table {

@@ -1,6 +1,7 @@
 import { App, Octokit as OctokitCtor } from "octokit";
 
 import type {
+  BranchSummary,
   FailedStepLog,
   RepoInfo,
   RunDetail,
@@ -256,6 +257,31 @@ export function createOctokitGitHubClient(
           name: w.name,
           path: w.path,
           state: w.state,
+        }));
+      });
+    },
+
+    /**
+     * 喂分支选择器（见 routes/actions.ts 的 /api/branches）。跟
+     * listWorkflows 一样只取一页——`kit.rest.repos.listBranches` 的签名与
+     * 返回形状是对着安装的 `@octokit/plugin-rest-endpoint-methods@17.0.0`
+     * 类型定义（`dist-types/generated/parameters-and-response-types.d.ts`）
+     * 核实过的，不是凭记忆写的：`data` 是 `short-branch[]`，每项形状是
+     * `{ name, commit: { sha, url }, protected, protection?, protection_url? }`。
+     * adx-dl 目前只有个位数的分支（dev/pre/main 加几个短命的临时分支），
+     * 100 条页大小不会漏；真长到要分页时再加。
+     */
+    async listBranches(): Promise<BranchSummary[]> {
+      return withOctokit(async (kit) => {
+        const { data } = await kit.rest.repos.listBranches({
+          owner: config.owner,
+          repo: config.repo,
+          per_page: 100,
+          request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+        });
+        return data.map((branch) => ({
+          name: branch.name,
+          protected: branch.protected,
         }));
       });
     },

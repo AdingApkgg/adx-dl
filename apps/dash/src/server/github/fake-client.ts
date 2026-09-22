@@ -1,4 +1,5 @@
 import type {
+  BranchSummary,
   FailedStepLog,
   RepoInfo,
   RunDetail,
@@ -14,6 +15,7 @@ export type FakeSeed = {
   /** 设为非 null 时，getRepoInfo 抛这个错，用来测连不通的分支。 */
   repoError: GitHubRequestError | null;
   workflows: WorkflowSummary[];
+  branches: BranchSummary[];
   runs: RunSummary[];
   /** 按 runId 索引的 job 列表。没有条目的 run 视为「没有 job」。 */
   jobs: Record<number, RunJob[]>;
@@ -44,6 +46,12 @@ function createDefaultSeed(): FakeSeed {
         state: "active",
       },
       { id: 2, name: "Dash check", path: ".github/workflows/dash-check.yml", state: "active" },
+    ],
+    // dev → pre → main：仓库真实的分支模型（见 Change 4 的分支选择器）。
+    branches: [
+      { name: "main", protected: true },
+      { name: "pre", protected: false },
+      { name: "dev", protected: false },
     ],
     runs: [
       {
@@ -123,6 +131,10 @@ export function createFakeGitHubClient(seed: Partial<FakeSeed> = {}) {
 
     async listWorkflows() {
       return state.workflows;
+    },
+
+    async listBranches() {
+      return state.branches;
     },
 
     async listRuns(opts) {
