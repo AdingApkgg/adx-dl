@@ -20,9 +20,13 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  // The vendored chart engine ships raw TypeScript (no build step), so Next must
-  // transpile it like first-party source.
-  transpilePackages: ["@lxns-network/maimai-chart-engine"],
+  // Both packages ship raw TypeScript with no build step (`main` points
+  // straight at a .ts file), so Next must transpile them like first-party
+  // source. @astrodx/content-schema is only imported from test files today
+  // (apps/web/src/lib/content-json.test.ts) — harmless while that stays true,
+  // but the moment any component imports it, the first place it breaks is the
+  // ~7-minute gh-pages deploy build, not a local dev run. Listed preemptively.
+  transpilePackages: ["@lxns-network/maimai-chart-engine", "@astrodx/content-schema"],
   turbopack: {
     root: rootDir,
   },

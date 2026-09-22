@@ -98,22 +98,28 @@ export default function ContentLayout({ loaderData }: Route.ComponentProps) {
       <section className="dash-staging" aria-live="polite">
         <p>
           待发布改动：<strong>{pending.length}</strong>
-          {pending.length > 0 ? (
-            <>
-              （
-              {/* 每个待发布文件都链到它的编辑页——这正是 Step 0b 修的那个
-                  坑会被触发的主路径：点这里从一个 :key 切到另一个，同一个
-                  路由只有路径参数变了，组件不会卸载重挂载。 */}
-              {pending.map((key, index) => (
-                <span key={key}>
-                  {index > 0 ? "、" : null}
-                  <Link to={`/content/${key}`}>{titleOf(key)}</Link>
-                </span>
-              ))}
-              ）
-            </>
-          ) : null}
         </p>
+        {pending.length > 0 ? (
+          // 每个待发布文件都链到它的编辑页——这正是 Step 0b 修的那个坑会被
+          // 触发的主路径：点这里从一个 :key 切到另一个，同一个路由只有路径
+          // 参数变了，组件不会卸载重挂载。
+          //
+          // 「丢弃」按钮直接复用 discard(key)（它自带 window.confirm）——在
+          // 这之前，唯一能把一个文件从暂存区拿掉的地方是冲突横幅，而那个
+          // 按钮只在服务端回了 conflictPaths 时才会出现。误暂存了一个文件
+          // 的操作员，原本要么把它一起发布出去（= 一轮 7 分钟部署），要么
+          // 手动清 localStorage。
+          <ul>
+            {pending.map((key) => (
+              <li key={key}>
+                <Link to={`/content/${key}`}>{titleOf(key)}</Link>
+                <button type="button" onClick={() => discard(key)}>
+                  丢弃
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {pending.length > 0 ? (
           <>
             <label>

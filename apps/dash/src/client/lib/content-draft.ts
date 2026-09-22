@@ -113,6 +113,62 @@ export function errorsByPath(errors: readonly string[]): Map<string, string[]> {
 }
 
 /**
+ * 表单会为哪些路径渲染错误提示。
+ *
+ * 只有三种形状：`<arr>[i].name.<locale>`、`<arr>[i].url`、
+ * `<arr>[i].description.<locale>`（description 仅在条目带它时——跟
+ * `LinkEntryFields` 里 `entry.description ? ... : null` 那个判断严格对应，
+ * 不是看 `array.requireDescription`：一份不该有 description 却意外带了它的
+ * 草稿，表单照样会把那个 fieldset 渲染出来，也就照样会认领那几个路径）。
+ * 数组级（`contactChannels: 至少要有一个条目`）和条目级（`links[0]: 必须是对象`）
+ * 的消息不属于这三种形状里的任何一种，不会被这个函数收进结果——那正是
+ * `unclaimedErrors` 要兜的部分。
+ */
+export function claimedErrorPaths(
+  draft: Record<string, LinkEntryDraft[]>,
+  arrays: readonly { key: string; requireDescription: boolean }[]
+): Set<string> {
+  const claimed = new Set<string>();
+  for (const array of arrays) {
+    const entries = draft[array.key] ?? [];
+    entries.forEach((entry, index) => {
+      const path = `${array.key}[${index}]`;
+      for (const locale of CONTENT_LOCALES) {
+        claimed.add(`${path}.name.${locale}`);
+      }
+      claimed.add(`${path}.url`);
+      if (entry.description) {
+        for (const locale of CONTENT_LOCALES) {
+          claimed.add(`${path}.description.${locale}`);
+        }
+      }
+    });
+  }
+  return claimed;
+}
+
+/**
+ * 校验错误里没有任何输入框会认领的那些，摊平成 `路径: 消息` 的字符串。
+ *
+ * 数组级（`contactChannels: 至少要有一个条目`）和条目级（`links[0]: 必须是对象`）
+ * 的消息不属于 `claimedErrorPaths` 认的三种形状，不兜住的话界面只会说"还有
+ * N 处要改"而不指出是哪一处——比如数组被删空之后，连一行能标红的输入框都
+ * 不存在了，那条错误就这么静默消失在 `errors` 这个 Map 里，没有人去认领它。
+ * 这跟 `errorsByPath` 顶部长注释警告的是同一类失效，只是这次是从渲染端漏的，
+ * 不是从切分端切错的。
+ */
+export function unclaimedErrors(errors: Map<string, string[]>, claimed: ReadonlySet<string>): string[] {
+  const result: string[] = [];
+  for (const [path, messages] of errors) {
+    if (claimed.has(path)) continue;
+    for (const message of messages) {
+      result.push(`${path}: ${message}`);
+    }
+  }
+  return result;
+}
+
+/**
  * 表单组件的重建键。
  *
  * 三段缺一不可：

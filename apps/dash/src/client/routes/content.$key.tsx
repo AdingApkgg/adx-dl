@@ -8,12 +8,14 @@ import type { ContentFileResponse } from "@/shared/dto";
 import { LinkEntryFields } from "../components/link-entry-fields";
 import { api } from "../lib/api";
 import {
+  claimedErrorPaths,
   contentFormKey,
   emptyEntry,
   errorsByPath,
   moveEntry,
   removeEntry,
   replaceEntry,
+  unclaimedErrors,
   type LinkEntryDraft,
 } from "../lib/content-draft";
 import { loadStaging, saveStaging, stageFile } from "../lib/content-staging";
@@ -23,10 +25,19 @@ type Draft = Record<string, LinkEntryDraft[]>;
 
 export async function clientLoader({ params }: Route.ClientLoaderArgs) {
   const file = await api.contentFile(params.key);
-  // 有草稿就用草稿，但 sha 始终用这次读到的：草稿里那个是上次打开时的，
-  // 拿它去提交会平白触发一次冲突。
   const staged = loadStaging(globalThis.localStorage ?? null)[params.key];
-  return { file, staged: staged?.data as Draft | undefined };
+  // 草稿一旦建立就锁定它所基于的 sha，后续重新暂存不刷新它。
+  // blob sha 只在文件内容真的变了时才变，所以 staged.baseSha !== file.sha
+  // 恰恰就是"这个文件在仓库里被别人改过"——那正是第一层乐观锁（spec §10.2，
+  // 服务端 verify-blob 步）要挡的情况，不是什么"平白触发的冲突"。用这次读到
+  // 的 file.sha 覆盖它等于把这层锁关掉：提交时声称基于的版本永远是最新的，
+  // verify-blob 永远比对通过，别人的改动会被静默回退——commit 照样成功，
+  // 横幅照样显示"已提交"，没有 409、没有冲突列表。
+  return {
+    file,
+    staged: staged?.data as Draft | undefined,
+    stagedBaseSha: staged?.baseSha,
+  };
 }
 
 type ContentFormProps = {
@@ -35,6 +46,9 @@ type ContentFormProps = {
   initial: Draft;
   /** 暂存成功或校验失败时往上报一句话。外层持有它，好让它在组件重建后仍然留在屏幕上。 */
   onNotice: (message: string) => void;
+  /** 这份草稿最初建立时基于的 sha；undefined 表示还没有草稿。重新暂存时必须
+   *  原样带回去，不能换成这次读到的 file.sha——见 clientLoader 里的长注释。 */
+  stagedBaseSha: string | undefined;
 };
 
 /**
@@ -48,7 +62,7 @@ type ContentFormProps = {
  * 则相反，留在这里——丢弃改动、切换草稿之后，旧的错误标记没有意义，应该跟着
  * 重建一起清掉。
  */
-function ContentForm({ file, spec, initial, onNotice }: ContentFormProps) {
+function ContentForm({ file, spec, initial, onNotice, stagedBaseSha }: ContentFormProps) {
   const [draft, setDraft] = useState<Draft>(() => structuredClone(initial));
   const [errors, setErrors] = useState<Map<string, string[]>>(new Map());
   const revalidator = useRevalidator();
@@ -86,13 +100,27 @@ function ContentForm({ file, spec, initial, onNotice }: ContentFormProps) {
     }
     setErrors(new Map());
     const storage = globalThis.localStorage ?? null;
-    saveStaging(stageFile(loadStaging(storage), file.key, draft, file.sha, Date.now()), storage);
+    // stagedBaseSha ?? file.sha：第一次暂存这个文件时还没有 stagedBaseSha，
+    // 这时才用这次读到的 file.sha 当基准；一旦有了 stagedBaseSha，之后每次
+    // 重新暂存都原样沿用它，不能换成 file.sha——见 clientLoader 里的长注释。
+    saveStaging(
+      stageFile(loadStaging(storage), file.key, draft, stagedBaseSha ?? file.sha, Date.now()),
+      storage
+    );
     onNotice("已暂存，到顶部点「发布」才会提交");
     // 顶部暂存条的计数是从 content.tsx 的 clientLoader 读的，这里的 setState
     // 不会自动传到那一层——revalidate() 重跑包括祖先在内的所有活跃 loader，
     // 让它读到刚写进 localStorage 的新值。
     revalidator.revalidate();
   };
+
+  // 每次渲染都重新算，不落 useState：claimed/unclaimed 完全由 draft 和
+  // errors 派生，存起来只会多一个需要记得同步的地方（这条分支已经因为
+  // "忘记同步"栽了两次）。数组级（"至少要有一个条目"）和条目级（"必须是
+  // 对象"）的错误没有任何输入框会认领——最常见的触发路径是把一个数组删空
+  // 再点「暂存改动」：那时候连一行能标红的输入框都不存在了。
+  const claimed = claimedErrorPaths(draft, spec.arrays);
+  const unclaimed = unclaimedErrors(errors, claimed);
 
   return (
     <>
@@ -154,6 +182,14 @@ function ContentForm({ file, spec, initial, onNotice }: ContentFormProps) {
         );
       })}
 
+      {unclaimed.length > 0 ? (
+        <ul className="dash-notice dash-notice--bad">
+          {unclaimed.map((message) => (
+            <li key={message}>{message}</li>
+          ))}
+        </ul>
+      ) : null}
+
       <button type="button" onClick={stage}>
         暂存改动
       </button>
@@ -162,7 +198,7 @@ function ContentForm({ file, spec, initial, onNotice }: ContentFormProps) {
 }
 
 export default function ContentFile({ loaderData }: Route.ComponentProps) {
-  const { file, staged } = loaderData;
+  const { file, staged, stagedBaseSha } = loaderData;
   const spec = findContentFile(file.key);
   // 带上 fileKey 而不是裸 string：这个组件本身不会因为切换 :key 而重挂载
   // （React Router 同一路由、只有路径参数变化时不会卸载重挂载），只有
@@ -194,6 +230,19 @@ export default function ContentFile({ loaderData }: Route.ComponentProps) {
         暂存前会检查三语字段与链接格式。类型层面的错只有 CI 的 tsc 知道——发布后留意那次构建。
       </p>
 
+      {/* 纯粹从 loaderData 派生，不落 useState：每次渲染都用这次读到的
+          file.sha 和草稿自己锁定的 stagedBaseSha 重新算一遍，不存在"算过
+          一次之后就跟不上变化"这回事。stagedBaseSha 为 undefined 时（还没
+          有草稿）条件自然为假，不用另外判断。
+          这句话要解决的问题：在 F-2 之前，操作员从暂存条的链接回到这个文件
+          时界面不提示仓库已经变了——正是这条静默回退能一路走到底的原因
+          之一。现在提前说穿，逼操作员在继续编辑前先决定要不要丢弃重来。 */}
+      {stagedBaseSha && stagedBaseSha !== file.sha ? (
+        <p className="dash-notice dash-notice--bad">
+          仓库里这个文件在你暂存之后被改过。现在发布会撞冲突——到顶部用「丢弃我的改动，用仓库最新版重来」再改一次。
+        </p>
+      ) : null}
+
       <ContentForm
         // loaderData 变了就重建，让 useState 重新初始化。比在 effect 里
         // 手动 setDraft 可靠——那种写法要自己判断"什么时候该覆盖用户正在
@@ -205,6 +254,7 @@ export default function ContentFile({ loaderData }: Route.ComponentProps) {
         spec={spec}
         initial={staged ?? (file.data as Draft)}
         onNotice={(text) => setNotice({ fileKey: file.key, text })}
+        stagedBaseSha={stagedBaseSha}
       />
 
       {notice?.fileKey === file.key ? <p className="dash-notice">{notice.text}</p> : null}

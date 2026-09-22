@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { validateLinkListFile } from "@astrodx/content-schema";
 
 import {
+  claimedErrorPaths,
   contentFormKey,
   emptyEntry,
   errorsByPath,
@@ -10,6 +11,7 @@ import {
   removeEntry,
   replaceEntry,
   setLocalizedField,
+  unclaimedErrors,
 } from "./content-draft";
 
 describe("moveEntry", () => {
@@ -138,6 +140,91 @@ describe("errorsByPath", () => {
     expect(index.get(realFieldPath)).toBeUndefined();
     // 唯一存在的 key 带着文件标题前缀，一眼就能看出不是表单会用的字段路径。
     expect(Array.from(index.keys())).toEqual([`社区与联系方式：${realFieldPath}`]);
+  });
+});
+
+describe("claimedErrorPaths", () => {
+  test("三种形状都被认领：name.<locale>、url、description.<locale>", () => {
+    const draft = {
+      links: [
+        {
+          name: { zh: "中", en: "EN", ja: "日" },
+          url: "https://example.com/",
+          description: { zh: "1", en: "2", ja: "3" },
+        },
+      ],
+    };
+    const claimed = claimedErrorPaths(draft, [{ key: "links", requireDescription: true }]);
+    expect(claimed.has("links[0].name.zh")).toBe(true);
+    expect(claimed.has("links[0].name.en")).toBe(true);
+    expect(claimed.has("links[0].name.ja")).toBe(true);
+    expect(claimed.has("links[0].url")).toBe(true);
+    expect(claimed.has("links[0].description.zh")).toBe(true);
+    expect(claimed.has("links[0].description.en")).toBe(true);
+    expect(claimed.has("links[0].description.ja")).toBe(true);
+  });
+
+  test("条目不带 description 时不把 description 路径算进认领", () => {
+    // 按 entry.description 的实际有无判断，不是按 array.requireDescription——
+    // 跟 LinkEntryFields 的渲染条件（`entry.description ? ... : null`）严格对应。
+    const draft = {
+      contactChannels: [{ name: { zh: "中", en: "EN", ja: "日" }, url: "https://example.com/" }],
+    };
+    const claimed = claimedErrorPaths(draft, [{ key: "contactChannels", requireDescription: false }]);
+    expect(claimed.has("contactChannels[0].description.zh")).toBe(false);
+    expect(claimed.has("contactChannels[0].description.en")).toBe(false);
+    expect(claimed.has("contactChannels[0].description.ja")).toBe(false);
+    // name/url 这两种形状不受影响，照样认领。
+    expect(claimed.has("contactChannels[0].name.zh")).toBe(true);
+    expect(claimed.has("contactChannels[0].url")).toBe(true);
+  });
+});
+
+describe("unclaimedErrors", () => {
+  test("字段级消息（三种已认领形状之一）不落进未认领", () => {
+    const draft = {
+      links: [
+        {
+          name: { zh: "", en: "EN", ja: "日" },
+          url: "https://example.com/",
+          description: { zh: "1", en: "2", ja: "3" },
+        },
+      ],
+    };
+    const claimed = claimedErrorPaths(draft, [{ key: "links", requireDescription: true }]);
+    const errors = errorsByPath(["links[0].name.zh: 必须是非空字符串"]);
+    expect(unclaimedErrors(errors, claimed)).toEqual([]);
+  });
+
+  test("数组级消息（比如数组被删空）落进未认领", () => {
+    // 对应终审实测的那条真实路径：删完一个数组的全部条目再点「暂存改动」，
+    // errorsByPath 会产出 key "contactChannels"，但已经没有任何一行输入框
+    // 能认领它——页面只会说"还有 1 处要改"，不指出是哪一处。
+    const draft = { contactChannels: [] };
+    const claimed = claimedErrorPaths(draft, [{ key: "contactChannels", requireDescription: false }]);
+    const errors = errorsByPath(["contactChannels: 至少要有一个条目"]);
+    expect(unclaimedErrors(errors, claimed)).toEqual(["contactChannels: 至少要有一个条目"]);
+  });
+
+  test("条目级消息（整条不是对象）落进未认领", () => {
+    const draft = {
+      links: [
+        {
+          name: { zh: "中", en: "EN", ja: "日" },
+          url: "https://example.com/",
+          description: { zh: "1", en: "2", ja: "3" },
+        },
+      ],
+    };
+    const claimed = claimedErrorPaths(draft, [{ key: "links", requireDescription: true }]);
+    const errors = errorsByPath(["links[0]: 必须是对象"]);
+    expect(unclaimedErrors(errors, claimed)).toEqual(["links[0]: 必须是对象"]);
+  });
+
+  test("同一个未认领路径下的多条消息都摊平出来", () => {
+    const claimed = new Set<string>();
+    const errors = errorsByPath(["a: one", "a: two"]);
+    expect(unclaimedErrors(errors, claimed)).toEqual(["a: one", "a: two"]);
   });
 });
 

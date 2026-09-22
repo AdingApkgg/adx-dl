@@ -54,16 +54,27 @@ describe("constants that were inlined into JSON have not drifted", () => {
     expect(urls).toContain(SITE_ISSUES_URL);
     expect(urls).toContain(QQ_COMMUNITY);
     expect(urls).toContain(TELEGRAM_COMMUNITY);
-    expect(community.communityChannels.map((channel) => channel.url)).toEqual([
-      QQ_COMMUNITY,
-      TELEGRAM_COMMUNITY,
-    ]);
+
+    // Order-independent on purpose: dash's content editor (apps/dash, Task 7)
+    // has up/down buttons that let an operator reorder communityChannels as a
+    // normal, intended edit (spec §12.1). A position-sensitive assertion here
+    // would fail CI — and block the gh-pages deploy workflow's `bun run check`
+    // gate, so the whole site stops updating — on a perfectly valid reorder.
+    // What this test actually guards is "the JSON literal hasn't drifted from
+    // the exported constant"; order was never part of that invariant.
+    const communityChannelUrls = community.communityChannels.map((channel) => channel.url);
+    expect(communityChannelUrls).toContain(QQ_COMMUNITY);
+    expect(communityChannelUrls).toContain(TELEGRAM_COMMUNITY);
   });
 
   // Migrating friend-links.ts turned the first entry's `url: ASTRODX_APP_REPOSITORY`
   // reference into a literal. Same drift risk as above, one URL instead of three.
-  test("friend-links.json's first URL equals ASTRODX_APP_REPOSITORY", () => {
-    expect(friendLinksJson.links[0].url).toBe(ASTRODX_APP_REPOSITORY);
+  test("friend-links.json's URLs contain ASTRODX_APP_REPOSITORY", () => {
+    // Order-independent for the same reason as communityChannels above: dash's
+    // reorder buttons can move this entry to any position as a normal edit.
+    // `links[0]` pinned a position that was never part of the invariant this
+    // test guards (the literal still matches the constant, wherever it sits).
+    expect(friendLinksJson.links.some((link) => link.url === ASTRODX_APP_REPOSITORY)).toBe(true);
   });
 });
 
