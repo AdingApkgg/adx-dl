@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { type Notice, unreadCount } from "@/lib/notices";
+import type { Notice } from "@/lib/notices";
 import {
   addDismissedId,
   isStorageAvailable,
   markRead,
   readDismissedIds,
   readReadIds,
+  resetStorageAvailableForTests,
 } from "@/lib/notice-storage";
+// Reuses this file's fake-window harness rather than duplicating it: see the
+// "unreadDotCount" describe block below for why these tests live here.
+import { unreadDotCount } from "@/components/site/notices-unread-dot";
 
 function buildNotice(id: string): Notice {
   return {
@@ -45,10 +49,14 @@ function installStorage({ throwing = false } = {}): void {
 
 beforeEach(() => {
   installStorage();
+  // isStorageAvailable() memoizes at module scope; without resetting it here,
+  // whichever test runs first would decide the answer for every test after it.
+  resetStorageAvailableForTests();
 });
 
 afterEach(() => {
   delete (globalThis as unknown as { window?: unknown }).window;
+  resetStorageAvailableForTests();
 });
 
 describe("dismissed ids", () => {
@@ -105,19 +113,27 @@ describe("isStorageAvailable", () => {
     installStorage({ throwing: true });
     expect(isStorageAvailable()).toBe(false);
   });
+});
 
-  // End-to-end direction: readReadIds() alone cannot tell "blocked" apart from
-  // "nothing read yet" (both read as []), so on its own it would report every
-  // active notice as unread for a blocked visitor exactly as it would for a
-  // genuine first-time one. isStorageAvailable() is what a caller must check
-  // to tell the two apart. useUnreadNoticeCount (notices-unread-dot.tsx) does
-  // exactly that — it returns 0 without calling unreadCount() at all when
-  // isStorageAvailable() is false — but that early return lives in a React
-  // effect and isn't re-asserted here; this test only proves the seam it
-  // depends on: that readReadIds() would otherwise mislead the count.
-  test("blocked storage would otherwise mislead unreadCount into reporting unread notices", () => {
+// unreadDotCount (notices-unread-dot.tsx) is the composed function the dot
+// actually calls: isStorageAvailable() gating unreadCount(readReadIds()).
+// It lives in a "use client" component file with no JSX/hooks of its own, so
+// it's a plain function safe to call directly here — imported rather than
+// re-implemented so these tests exercise the exact code the dot ships, and
+// placed in this file (not a new one) to reuse the fake-window harness above
+// instead of duplicating it.
+describe("unreadDotCount", () => {
+  test("regression: blocked storage must yield 0, not every active notice marked unread", () => {
     installStorage({ throwing: true });
-    expect(isStorageAvailable()).toBe(false);
-    expect(unreadCount(list, readReadIds(list), "2026-09-02")).toBe(list.length);
+    expect(unreadDotCount(list)).toBe(0);
+  });
+
+  test("working storage with nothing read returns the active-notice count", () => {
+    expect(unreadDotCount(list)).toBe(list.length);
+  });
+
+  test("working storage with every notice already read returns 0", () => {
+    markRead(["a", "b"], list);
+    expect(unreadDotCount(list)).toBe(0);
   });
 });

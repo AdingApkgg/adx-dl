@@ -51,20 +51,36 @@ export function markRead(ids: string[], list: Notice[] = defaultNotices): void {
   writeIdList(READ_KEY, merged);
 }
 
+let storageAvailableCache: boolean | undefined;
+
 /**
  * Whether this browser will actually remember anything.
  *
  * `readReadIds()` cannot answer this: it returns `[]` both when nothing has
  * been read and when storage threw. The unread dot needs to tell those apart —
  * a dot that can never be cleared would show on every visit forever.
+ *
+ * Memoized at module scope after the first call. The probe is a real
+ * `setItem` + `removeItem`, and `theme-provider.tsx` listens for the
+ * resulting `storage` event without filtering by key — re-probing on every
+ * mount (the header alone renders the dot up to five times) would make every
+ * other open tab of the site redundantly re-sync its theme on every page
+ * load. One probe per page load, not one per mount.
  */
 export function isStorageAvailable(): boolean {
+  if (storageAvailableCache !== undefined) return storageAvailableCache;
   try {
     const probe = "__adx-storage-probe";
     window.localStorage.setItem(probe, "1");
     window.localStorage.removeItem(probe);
-    return true;
+    storageAvailableCache = true;
   } catch {
-    return false;
+    storageAvailableCache = false;
   }
+  return storageAvailableCache;
+}
+
+/** Test seam: the memo is module state, so it must reset between test cases. */
+export function resetStorageAvailableForTests(): void {
+  storageAvailableCache = undefined;
 }
