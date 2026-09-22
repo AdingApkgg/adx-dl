@@ -41,7 +41,7 @@ export function SiteBanners({ locale }: { locale: Locale }) {
 
   return (
     <div aria-live="polite" role="status">
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {kind ? (
           <motion.div
             key={kind}
