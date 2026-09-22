@@ -4,6 +4,76 @@ Admin dashboard for the AstroDX site repo: a React Router 8 SPA served by a
 Hono process, gated by Cloudflare Access, backed by a GitHub App that can
 read and write `AdingApkgg/adx-dl`.
 
+## Content editing
+
+dash edits three of the site's copy modules — community links, donate methods,
+friend links — through a structured form instead of hand-editing JSON on
+github.com. The design spans three workspaces, so the reasoning lives here
+rather than in any one of them. Per-decision rationale is in comments next to
+the code it explains; this section is the thread connecting them.
+
+**Why the data left TypeScript.** The arrays live in `apps/web/content/*.json`;
+the modules in `apps/web/src/lib/` import them and re-export with `satisfies`.
+Only data moved — cross-module constants (`QQ_COMMUNITY`,
+`ASTRODX_APP_REPOSITORY`, …) and every explanatory comment stayed in
+TypeScript. `satisfies` is not decoration: it is the only static constraint
+between the JSON and the types, so a missing `ja` field fails `tsc`. Replacing
+it with a `: Type[]` annotation turns that check into a downcast and the
+guarantee silently vanishes.
+
+**Why a separate package.** `packages/content-schema` holds the validator and
+the registry of editable files. It has three consumers — dash's form, dash's
+server (the client-side check can be bypassed by posting to the API directly),
+and `apps/web`'s test suite — and they live in different workspaces, so a
+validator under `apps/web/` could not have been shared without dash depending
+on the whole Next app.
+
+**Why edits are batched.** Every commit on `main` triggers a full site deploy
+(catalog → enrich → check → build → deploy, roughly seven minutes). Editing
+five fields as five commits would be five deploys. So edits accumulate in the
+browser's `localStorage` and "publish" turns the whole batch into **one**
+commit via the Git Data API (blob → tree → commit → update ref); the
+`contents` API cannot write more than one file per call.
+
+**Why the lock has two layers.** Nothing in the Git Data API validates a blob
+sha, so the server re-reads each staged file's sha before building the tree and
+refuses with a 409 naming the offending files. `updateRef` then runs with
+`force: false` to catch the few hundred milliseconds between that check and the
+commit. Neither layer is redundant: without the first, a concurrent edit to an
+unrelated file produces a confusing failure; without the second there is a
+TOCTOU window.
+
+**Deliberately not done.** Reordering uses up/down buttons rather than
+drag-and-drop (keyboard-reachable, no new dependency, longest list is ten
+entries). There is no PR panel — github.com does that better. The endpoint can
+only edit files that already exist: adding a row to `CONTENT_FILES` is not
+enough, the JSON has to be committed first.
+
+**Traps worth knowing before changing this code.** Each of these was a real
+defect caught in review, not a hypothetical:
+
+- Validation errors are addressed by path (`links[0].name.ja`) and the form
+  indexes them by that exact string. The *server* prefixes each message with
+  the file's title when several files are committed at once — feeding that copy
+  to `errorsByPath` makes every error silently fail to render.
+- The drift guards in `apps/web/src/lib/content-json.test.ts` assert that URLs
+  in the JSON match the exported constants. They must stay order-independent:
+  dash can reorder entries, and an order-sensitive assertion turns a normal
+  edit into a red CI run that stops the site from deploying.
+- A draft's `baseSha` is fixed when the draft is created and must not be
+  refreshed on re-stage. A blob sha only changes when the file's content
+  changes, so a mismatch *is* the concurrent-edit case the first lock exists to
+  catch — refreshing it silently reverts whoever edited in the meantime.
+- The JSON files are stored exactly as the publish endpoint serialises them
+  (`JSON.stringify(data, null, 2)` plus a trailing newline), pinned by a test.
+  Change the serialiser and the three files have to be regenerated, or the next
+  publish produces a whole-file whitespace diff.
+- State derived from the route's `:key` parameter does not reset on its own —
+  React Router reuses the component when only a path parameter changes. Either
+  give the component a `key` that includes the file key, or make the state
+  carry its own scope. Clearing it in an effect is the version that gets
+  forgotten.
+
 ## Local development
 
 Run these from `apps/dash` (in two terminals):

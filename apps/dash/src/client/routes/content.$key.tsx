@@ -239,7 +239,7 @@ export default function ContentFile({ loaderData }: Route.ComponentProps) {
           之一。现在提前说穿，逼操作员在继续编辑前先决定要不要丢弃重来。 */}
       {stagedBaseSha && stagedBaseSha !== file.sha ? (
         <p className="dash-notice dash-notice--bad">
-          仓库里这个文件在你暂存之后被改过。现在发布会撞冲突——到顶部用「丢弃我的改动，用仓库最新版重来」再改一次。
+          仓库里这个文件在你暂存之后被改过。现在发布会撞冲突——到顶部这个文件旁边点「丢弃」，再按仓库的最新版改一次。
         </p>
       ) : null}
 
