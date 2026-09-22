@@ -37,6 +37,7 @@
       "name": "web",
       "version": "0.1.0",
       "dependencies": {
+        "@astrodx/content-schema": "workspace:*",
         "@fontsource-variable/noto-sans": "^5.2.10",
         "@lxns-network/maimai-chart-engine": "workspace:*",
         "class-variance-authority": "^0.7.1",
@@ -73,6 +74,10 @@
         "typescript": "^6",
       },
     },
+    "packages/content-schema": {
+      "name": "@astrodx/content-schema",
+      "version": "0.0.0",
+    },
     "packages/maimai-chart-engine": {
       "name": "@lxns-network/maimai-chart-engine",
       "version": "0.0.0",
@@ -86,6 +91,8 @@
   },
   "packages": {
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "", {}, "sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw=="],
+
+    "@astrodx/content-schema": ["@astrodx/content-schema@workspace:packages/content-schema"],
 
     "@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],
 
