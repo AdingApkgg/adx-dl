@@ -78,6 +78,17 @@ export default function ContentLayout({ loaderData }: Route.ComponentProps) {
     // 重跑 loader：这个布局的暂存计数、以及子路由表单页里那份草稿，
     // 两边都要按 localStorage 的新状态重读。
     revalidator.revalidate();
+    // 草稿已经丢掉了，横幅里那句"你的草稿还留着"对这个文件就不再成立。
+    // 不摘掉的话它会带着一个已经是空操作的按钮一直留到下次发布——`result`
+    // 是这次发布尝试留下的历史记录，不会因为 loader 重跑而自动更新，
+    // 得在这里手动把已经处理掉的那一项摘出去。用函数式更新，不读闭包里
+    // 的 result：discard 本身不依赖它，没道理让它进依赖考虑。
+    setResult((current) => {
+      if (!current) return current;
+      const path = CONTENT_FILES.find((candidate) => candidate.key === key)?.path;
+      const conflicts = current.conflicts.filter((candidate) => candidate !== path);
+      return conflicts.length === 0 ? null : { ...current, conflicts };
+    });
   };
 
   return (

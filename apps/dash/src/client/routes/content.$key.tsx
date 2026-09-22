@@ -145,7 +145,19 @@ function ContentForm({ file, spec, initial, onNotice }: ContentFormProps) {
 export default function ContentFile({ loaderData }: Route.ComponentProps) {
   const { file, staged } = loaderData;
   const spec = findContentFile(file.key);
-  const [notice, setNotice] = useState<string | null>(null);
+  // 带上 fileKey 而不是裸 string：这个组件本身不会因为切换 :key 而重挂载
+  // （React Router 同一路由、只有路径参数变化时不会卸载重挂载），只有
+  // ContentForm 会（它的 key 里含 file.key，见 contentFormKey）。如果
+  // notice 只是个裸字符串，从 community 暂存完（notice = "已暂存…"）
+  // 再点链接切到 donate，这个组件不重挂载，notice 会原样带过去，在
+  // donate 页面上显示一句关于 community 的话。
+  //
+  // 修法不是在 useEffect 里 setNotice(null)（那是"记得去同步"，漏一次
+  // 就会复发，而且这仓库的 react-hooks lint 规则大概率会拦 effect 里
+  // 直接 setState），而是让状态自己带上它的归属，渲染时只认当前文件的
+  // 那条——旧文件的 notice 不需要被清掉，只是不再被认领，结构上不可能
+  // 显示错文件。
+  const [notice, setNotice] = useState<{ fileKey: string; text: string } | null>(null);
 
   if (!spec) return <p className="dash-notice dash-notice--bad">没有这个内容文件</p>;
 
@@ -173,10 +185,10 @@ export default function ContentFile({ loaderData }: Route.ComponentProps) {
         file={file}
         spec={spec}
         initial={staged ?? (file.data as Draft)}
-        onNotice={setNotice}
+        onNotice={(text) => setNotice({ fileKey: file.key, text })}
       />
 
-      {notice ? <p className="dash-notice">{notice}</p> : null}
+      {notice?.fileKey === file.key ? <p className="dash-notice">{notice.text}</p> : null}
     </section>
   );
 }
