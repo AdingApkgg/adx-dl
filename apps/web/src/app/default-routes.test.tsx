@@ -260,25 +260,17 @@ describe("default zh routes", () => {
     expect(html).toContain("1 首");
   });
 
-  test("post route renders the zh submission form", async () => {
-    const { default: PostPage } = await import("./(default)/post/page");
+  test("notices route renders the zh notices list", async () => {
+    const { default: NoticesPage } = await import("./(default)/notices/page");
 
-    const html = renderToStaticMarkup(<PostPage />);
+    const html = renderToStaticMarkup(<NoticesPage />);
 
-    expect(html).toContain("谱面投稿");
-    expect(html).toContain("曲名（可含别名）");
-    expect(html).toContain("谱面来源 / 下载链接");
-    expect(html).toContain("前往留言板投稿");
-  });
-
-  test("survey route renders the zh survey form", async () => {
-    const { default: SurveyPage } = await import("./(default)/survey/page");
-
-    const html = renderToStaticMarkup(<SurveyPage />);
-
-    expect(html).toContain("问卷调查");
-    expect(html).toContain("你在哪个平台游玩 AstroDX？");
-    expect(html).toContain("对本站的整体满意度？");
-    expect(html).toContain("前往留言板提交");
+    expect(html).toContain("站点公告");
+    expect(html).toContain("本站新增公告页");
+    // React's SSR serializer preserves the `dateTime` JSX prop's casing verbatim
+    // (verified against this repo's react-dom 19.2.7) rather than lowercasing it
+    // to the HTML-spec spelling; browsers parse attribute names case-insensitively
+    // either way, so this doesn't change what ships.
+    expect(html).toContain('dateTime="2026-09-23"');
   });
 });

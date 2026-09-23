@@ -213,24 +213,14 @@ function buildChangelogSeoTitle(locale: Locale): string {
   return "AstroDX Chart Archive Changelog";
 }
 
-function buildPostSeoTitle(locale: Locale): string {
+function buildNoticesSeoTitle(locale: Locale): string {
   if (locale === "zh") {
-    return "AstroDX 谱面投稿";
+    return "ADX 谱面资源站点公告";
   }
   if (locale === "ja") {
-    return "AstroDX 譜面の投稿";
+    return "ADX 譜面アーカイブのお知らせ";
   }
-  return "Submit an AstroDX Chart";
-}
-
-function buildSurveySeoTitle(locale: Locale): string {
-  if (locale === "zh") {
-    return "ADX 谱面资源问卷调查";
-  }
-  if (locale === "ja") {
-    return "ADX 譜面アーカイブのアンケート";
-  }
-  return "ADX Chart Archive Survey";
+  return "ADX Chart Archive Site Notices";
 }
 
 function buildVersionsSeoTitle(locale: Locale): string {
@@ -436,25 +426,22 @@ export function buildChangelogPageMetadata(locale: Locale): Metadata {
   });
 }
 
-export function buildPostPageMetadata(locale: Locale): Metadata {
+export function buildNoticesPageMetadata(locale: Locale): Metadata {
   const dictionary = getDictionary(locale);
   return buildPageMetadata({
     locale,
-    pathname: "/post",
-    title: buildPostSeoTitle(locale),
-    description: dictionary.seo.post,
-    keywords: ["AstroDX", siteName(locale), dictionary.post.title, "maimai", "投稿", "submit"],
-  });
-}
-
-export function buildSurveyPageMetadata(locale: Locale): Metadata {
-  const dictionary = getDictionary(locale);
-  return buildPageMetadata({
-    locale,
-    pathname: "/survey",
-    title: buildSurveySeoTitle(locale),
-    description: dictionary.seo.survey,
-    keywords: ["AstroDX", siteName(locale), dictionary.survey.title, "maimai", "问卷", "survey", "feedback"],
+    pathname: "/notices",
+    title: buildNoticesSeoTitle(locale),
+    description: dictionary.seo.notices,
+    keywords: [
+      "AstroDX",
+      siteName(locale),
+      dictionary.notices.title,
+      "maimai",
+      "公告",
+      "notices",
+      "announcements",
+    ],
   });
 }
 

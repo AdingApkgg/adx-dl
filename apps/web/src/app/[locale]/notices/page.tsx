@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
-import { PostView } from "@/components/site/post-view";
-import { buildPostPageMetadata } from "@/lib/page-metadata";
+import { NoticesView } from "@/components/site/notices-view";
+import { buildNoticesPageMetadata } from "@/lib/page-metadata";
 
 import { generatePrefixedLocaleParams, getPrefixedRouteLocale } from "../route-locale";
 
@@ -15,14 +15,14 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  return buildPostPageMetadata(getPrefixedRouteLocale(locale));
+  return buildNoticesPageMetadata(getPrefixedRouteLocale(locale));
 }
 
-export default async function LocalizedPostPage({
+export default async function LocalizedNoticesPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  return <PostView locale={getPrefixedRouteLocale(locale)} />;
+  return <NoticesView locale={getPrefixedRouteLocale(locale)} />;
 }
