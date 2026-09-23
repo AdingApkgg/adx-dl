@@ -1,6 +1,78 @@
 {
   "notices": [
     {
+      "id": "chart-install-video",
+      "level": "normal",
+      "publishedAt": "2026-09-23",
+      "expiresAt": null,
+      "title": {
+        "zh": "不会装谱面？看这个视频",
+        "en": "Not sure how to install a chart? Watch this",
+        "ja": "譜面の入れ方が分からないときは"
+      },
+      "body": {
+        "zh": "下载下来的谱面怎么导进 AstroDX，视频里从头到尾演示了一遍。照着做一般三分钟就能搞定。",
+        "en": "A walkthrough of getting a downloaded chart into AstroDX, start to finish. Following along usually takes about three minutes.",
+        "ja": "ダウンロードした譜面を AstroDX に取り込むまでを、最初から最後まで通して解説した動画です。手順どおりなら 3 分ほどで終わります。"
+      },
+      "link": {
+        "href": "https://www.bilibili.com/video/BV1sPtF6mE24",
+        "label": {
+          "zh": "观看安装教程",
+          "en": "Watch the guide",
+          "ja": "導入手順の動画を見る"
+        }
+      }
+    },
+    {
+      "id": "survey-open",
+      "level": "normal",
+      "publishedAt": "2026-09-23",
+      "expiresAt": null,
+      "title": {
+        "zh": "用着顺手吗？花一分钟告诉我们",
+        "en": "Got a minute? Tell us how it's going",
+        "ja": "使い心地はいかがですか？1 分だけお聞かせください"
+      },
+      "body": {
+        "zh": "想知道你在哪个平台玩、怎么找到这里、还希望加点什么。留言板上点「问卷反馈」会自动带出模板，填完发出来就行。\n回答会作为公开留言显示在留言板上，请不要写个人信息。",
+        "en": "We'd like to know which platform you play on, how you found the site, and what you'd want added next. The guestbook's \"Survey\" button fills in a template for you — answer it and post.\nReplies show publicly on the guestbook, so please leave personal details out.",
+        "ja": "どの端末で遊んでいるか、当サイトをどう知ったか、次に何を追加してほしいかを知りたいです。ゲストブックの「アンケート」ボタンを押すとテンプレートが入力されます。\n回答はゲストブック上に公開されるので、個人情報は書かないでください。"
+      },
+      "link": {
+        "href": "/comments?compose=survey",
+        "label": {
+          "zh": "去填问卷",
+          "en": "Open the survey",
+          "ja": "アンケートへ"
+        }
+      }
+    },
+    {
+      "id": "donate-support",
+      "level": "normal",
+      "publishedAt": "2026-09-23",
+      "expiresAt": null,
+      "title": {
+        "zh": "好用吗？有能力就捐赠一下吧",
+        "en": "Finding this useful? Consider chipping in",
+        "ja": "役に立っていますか？よければ支援をお願いします"
+      },
+      "body": {
+        "zh": "服务器、镜像站和流量都是自费在跑。这个站如果帮到了你，又正好有余力，捐一点就够它继续跑下去。\n没有余力也完全不影响使用——所有内容始终免费。",
+        "en": "The servers, the mirrors and the bandwidth all come out of pocket. If the site has helped you and you can spare a little, a donation keeps it running.\nIf you can't, nothing changes — everything here stays free.",
+        "ja": "サーバーもミラーも通信費も自費で運用しています。このサイトが役に立ち、余裕があれば少しだけ支援していただけると助かります。\n支援がなくても利用は変わりません。すべて無料のままです。"
+      },
+      "link": {
+        "href": "/donate",
+        "label": {
+          "zh": "查看捐赠方式",
+          "en": "See how to donate",
+          "ja": "支援方法を見る"
+        }
+      }
+    },
+    {
       "id": "2026-09-notices-launched",
       "level": "normal",
       "publishedAt": "2026-09-23",
