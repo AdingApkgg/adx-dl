@@ -200,6 +200,7 @@ html[data-motion="off"] *::after {
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-strong: var(--destructive-strong);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -245,6 +246,11 @@ html[data-motion="off"] *::after {
   --accent: oklch(0.95 0.04 248);
   --accent-foreground: oklch(0.28 0.04 264);
   --destructive: oklch(0.577 0.245 27.325);
+  /* Destructive text on a destructive-tinted surface. Measured on the urgent
+     notice banner (bg-destructive/10): plain --destructive reached only
+     3.85:1 there, under WCAG AA's 4.5:1 for body text. Mixing in 15% black
+     brings it to 5.48:1 while staying the same hue. */
+  --destructive-strong: color-mix(in oklab, var(--destructive) 85%, black);
   --border: oklch(0.89 0.02 255);
   --input: oklch(0.89 0.02 255);
   /* Focus indicators must clear 3:1 against the adjacent surface (WCAG 2.2
@@ -294,6 +300,9 @@ html[data-motion="off"] *::after {
   --accent: oklch(0.3 0.04 250);
   --accent-foreground: oklch(0.97 0.01 260);
   --destructive: oklch(0.704 0.191 22.216);
+  /* The dark theme's destructive already reaches 5.85:1 on the same tinted
+     surface, so it needs no darkening — and darkening it here would hurt. */
+  --destructive-strong: var(--destructive);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 10%);
   --ring: oklch(0.72 0.11 259);

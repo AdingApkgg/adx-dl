@@ -66,7 +66,7 @@ export function SiteBanners({ locale }: { locale: Locale }) {
             ) : null}
 
             {kind === "notice" && urgent ? (
-              <div className={`${BAR} bg-destructive/10 text-sm text-destructive`}>
+              <div className={`${BAR} bg-destructive/10 text-sm text-destructive-strong`}>
                 <span className="font-medium">
                   {resolveText(urgent.notice.title, locale).value}
                 </span>
