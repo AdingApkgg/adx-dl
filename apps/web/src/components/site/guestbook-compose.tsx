@@ -16,6 +16,9 @@ import {
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { useOnlineStatus } from "@/lib/use-online-status";
 
+/** Ties the confirmation's buttons to the question they are answering. */
+const REPLACE_QUESTION_ID = "compose-replace-question";
+
 // Artalk mounts its editor from an external origin, so allow a generous window
 // before deciding it is never coming.
 const POLL_INTERVAL_MS = 250;
@@ -58,7 +61,7 @@ export function GuestbookCompose({ locale }: { locale: Locale }) {
   const [confirming, setConfirming] = React.useState<ComposeKind | null>(null);
   const [fallback, setFallback] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
-  const confirmButtonRef = React.useRef<HTMLButtonElement>(null);
+  const cancelButtonRef = React.useRef<HTMLButtonElement>(null);
 
   const insert = React.useCallback(
     (kind: ComposeKind, force: boolean) => {
@@ -79,12 +82,16 @@ export function GuestbookCompose({ locale }: { locale: Locale }) {
     [locale]
   );
 
-  // Move focus to the confirm button so a screen-reader user lands somewhere
-  // when the question appears — pressing a template button otherwise produces
-  // no announcement and no indication of where to Tab.
+  // Move focus into the question when it appears — pressing a template button
+  // otherwise produces no announcement and no indication of where to Tab.
+  //
+  // Focus lands on Cancel, not Replace. The confirmation exists to protect an
+  // unsent draft, and on the polling path it appears on its own a moment after
+  // Artalk mounts: auto-focusing the destructive option would mean a stray
+  // Space or Enter performs the very overwrite this is guarding against.
   React.useEffect(() => {
     if (!confirming) return;
-    confirmButtonRef.current?.focus();
+    cancelButtonRef.current?.focus();
   }, [confirming]);
 
   React.useEffect(() => {
@@ -173,16 +180,25 @@ export function GuestbookCompose({ locale }: { locale: Locale }) {
       </div>
       {confirming ? (
         <div className="flex flex-wrap items-center gap-2 text-sm" role="status">
-          <span>{copy.replaceQuestion}</span>
+          {/* Both buttons point at the question: their own labels are just
+              "替换"/"取消", which on their own never say what is being replaced. */}
+          <span id={REPLACE_QUESTION_ID}>{copy.replaceQuestion}</span>
           <Button
-            ref={confirmButtonRef}
             type="button"
             size="sm"
+            aria-describedby={REPLACE_QUESTION_ID}
             onClick={() => insert(confirming, true)}
           >
             {copy.replaceConfirm}
           </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(null)}>
+          <Button
+            ref={cancelButtonRef}
+            type="button"
+            size="sm"
+            variant="ghost"
+            aria-describedby={REPLACE_QUESTION_ID}
+            onClick={() => setConfirming(null)}
+          >
             {copy.replaceCancel}
           </Button>
         </div>
