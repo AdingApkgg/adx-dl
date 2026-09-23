@@ -233,6 +233,22 @@ describe("localized routes", () => {
     expect(jaAboutHtml).toContain("免責事項");
   });
 
+  test("localized ui routes render en and ja", async () => {
+    const { default: LocalizedUiPage } = await import("./[locale]/ui/page");
+
+    const enHtml = renderToStaticMarkup(
+      await LocalizedUiPage({ params: Promise.resolve({ locale: "en" }) })
+    );
+    expect(enHtml).toContain("Design System");
+    expect(enHtml).toContain("Palette");
+
+    const jaHtml = renderToStaticMarkup(
+      await LocalizedUiPage({ params: Promise.resolve({ locale: "ja" }) })
+    );
+    expect(jaHtml).toContain("デザインシステム");
+    expect(jaHtml).toContain("カラーパレット");
+  });
+
   test("localized notices routes render en and ja", async () => {
     const { default: LocalizedNoticesPage } = await import("./[locale]/notices/page");
 

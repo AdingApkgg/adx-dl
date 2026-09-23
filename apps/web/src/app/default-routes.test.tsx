@@ -260,6 +260,20 @@ describe("default zh routes", () => {
     expect(html).toContain("1 首");
   });
 
+  test("ui route renders the zh design-system showcase from real catalog entries", async () => {
+    const { default: UiPage } = await import("./(default)/ui/page");
+
+    const html = renderToStaticMarkup(await UiPage());
+
+    expect(html).toContain("设计系统");
+    expect(html).toContain("色板");
+    // Token names are shown verbatim so the page doubles as a token reference.
+    expect(html).toContain("destructive");
+    // Real components against real data, not a hand-written copy.
+    expect(html).toContain("曲目 1");
+    expect(html).toContain('href="/charts/song-1"');
+  });
+
   test("notices route renders the zh notices list", async () => {
     const { default: NoticesPage } = await import("./(default)/notices/page");
 

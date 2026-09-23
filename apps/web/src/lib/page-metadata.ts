@@ -35,6 +35,12 @@ const robots = {
   follow: true,
 } as const;
 
+/** For pages that exist for developers, not for search results. */
+const noIndexRobots = {
+  index: false,
+  follow: false,
+} as const;
+
 const ogLocaleMap: Record<Locale, string> = {
   zh: "zh_CN",
   en: "en_US",
@@ -52,6 +58,8 @@ type PageMetadataOptions = {
   image?: string;
   imageAlt?: string;
   ogType?: OpenGraphType;
+  /** Defaults to indexable; pass `false` for developer-facing pages. */
+  indexable?: boolean;
 };
 
 const staticSeoTitles: Record<Locale, Record<StaticPageMetadataKey, string>> = {
@@ -242,6 +250,7 @@ export function buildPageMetadata({
   image,
   imageAlt,
   ogType = "website",
+  indexable = true,
 }: PageMetadataOptions): Metadata {
   const canonicalUrl = buildCanonicalUrl(pathname, locale);
   const fullTitle = `${title} | ${siteName(locale)}`;
@@ -252,7 +261,7 @@ export function buildPageMetadata({
     title: fullTitle,
     description,
     keywords,
-    robots,
+    robots: indexable ? robots : noIndexRobots,
     alternates: {
       canonical: canonicalUrl,
       languages: buildLanguageAlternates(pathname),
@@ -442,6 +451,33 @@ export function buildNoticesPageMetadata(locale: Locale): Metadata {
       "notices",
       "announcements",
     ],
+  });
+}
+
+function buildUiSeoTitle(locale: Locale): string {
+  if (locale === "zh") {
+    return "ADX 谱面资源设计系统";
+  }
+  if (locale === "ja") {
+    return "ADX 譜面アーカイブのデザインシステム";
+  }
+  return "ADX Chart Archive Design System";
+}
+
+/**
+ * The /ui showcase. Deliberately not indexed, not in the sitemap and not in the
+ * nav: it documents the design system for whoever maintains the site, and a
+ * chart archive's search presence should not be diluted with a component list.
+ */
+export function buildUiPageMetadata(locale: Locale): Metadata {
+  const dictionary = getDictionary(locale);
+  return buildPageMetadata({
+    locale,
+    pathname: "/ui",
+    title: buildUiSeoTitle(locale),
+    description: dictionary.ui.description,
+    keywords: ["AstroDX", siteName(locale), dictionary.ui.title, "design system", "UI"],
+    indexable: false,
   });
 }
 

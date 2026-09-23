@@ -683,6 +683,27 @@ export type SiteDictionary = {
     dismiss: string;
     unreadLabel: (count: number) => string;
   };
+  /** The /ui design-system showcase. Developer-facing, not indexed, not in the nav. */
+  ui: {
+    title: string;
+    description: string;
+    intro: string;
+    themeNote: string;
+    typographyNote: string;
+    badgesUi: string;
+    badgesDomain: string;
+    cardsNote: string;
+    sections: {
+      palette: string;
+      difficulty: string;
+      typography: string;
+      buttons: string;
+      badges: string;
+      cards: string;
+      controls: string;
+      loading: string;
+    };
+  };
   notFound: {
     title: string;
     description: string;
@@ -1391,6 +1412,29 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       detail: "查看详情",
       dismiss: "关闭这条公告",
       unreadLabel: (count) => `公告，${count} 条未读`,
+    },
+    ui: {
+      title: "设计系统",
+      description: "本站用到的颜色、字体与组件，直接取自代码而不是副本。",
+      intro:
+        "这一页用真组件渲染——改了组件源码这里立刻跟着变，不会像截图那样和代码漂移。它不进导航，也不进搜索索引。",
+      themeNote:
+        "下面的颜色随你当前的主题与主色而变。明暗、以及默认蓝之外的四套主色（紫 / 青绿 / 橙 / 玫红），都在「设置」里切换。",
+      typographyNote:
+        "拉丁字形用自托管的 Noto Sans，中日文回落到系统字体栈——不引 Google Fonts，也不额外下载 CJK 字重。",
+      badgesUi: "通用徽章",
+      badgesDomain: "业务徽章",
+      cardsNote: "下面几张来自真实目录，不是占位数据。",
+      sections: {
+        palette: "色板",
+        difficulty: "难度色阶",
+        typography: "字体",
+        buttons: "按钮",
+        badges: "徽章",
+        cards: "卡片",
+        controls: "表单控件",
+        loading: "加载态",
+      },
     },
     notFound: {
       title: "页面不存在",
@@ -2132,6 +2176,30 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       dismiss: "Dismiss this notice",
       unreadLabel: (count) => `Notices, ${count} unread`,
     },
+    ui: {
+      title: "Design System",
+      description:
+        "The colours, type and components this site is built from, taken from the code rather than copied.",
+      intro:
+        "This page renders the real components — edit a component's source and it changes here immediately, instead of drifting the way a screenshot would. It is not in the nav and not indexed.",
+      themeNote:
+        "The colours below follow your current theme and accent. Light/dark, and the four accents beyond the default blue (violet, teal, orange, rose), are switched under Settings.",
+      typographyNote:
+        "Latin glyphs come from a self-hosted Noto Sans; Chinese and Japanese fall back to the system stack — no Google Fonts, and no extra CJK weight to download.",
+      badgesUi: "Generic badges",
+      badgesDomain: "Domain badges",
+      cardsNote: "These come from the real catalogue, not placeholder data.",
+      sections: {
+        palette: "Palette",
+        difficulty: "Difficulty scale",
+        typography: "Typography",
+        buttons: "Buttons",
+        badges: "Badges",
+        cards: "Cards",
+        controls: "Form controls",
+        loading: "Loading states",
+      },
+    },
     notFound: {
       title: "Page not found",
       description:
@@ -2859,6 +2927,30 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       detail: "詳しく見る",
       dismiss: "このお知らせを閉じる",
       unreadLabel: (count) => `お知らせ、未読 ${count} 件`,
+    },
+    ui: {
+      title: "デザインシステム",
+      description:
+        "このサイトを構成する色・書体・コンポーネント。写しではなく、コードそのものから取っています。",
+      intro:
+        "このページは実際のコンポーネントを描画します。ソースを直せばここも即座に変わるので、スクリーンショットのようにコードとずれることがありません。ナビゲーションには載せず、検索インデックスにも入れていません。",
+      themeNote:
+        "以下の色は現在のテーマとアクセントカラーに追従します。ライト／ダークと、既定の青以外の 4 色（紫・ティール・オレンジ・ローズ）は「設定」で切り替えられます。",
+      typographyNote:
+        "ラテン文字はセルフホストの Noto Sans、日本語と中国語はシステムのフォントスタックにフォールバックします。Google Fonts は使わず、CJK のウェイトを追加で読み込むこともしません。",
+      badgesUi: "汎用バッジ",
+      badgesDomain: "ドメインバッジ",
+      cardsNote: "以下はプレースホルダーではなく、実際のカタログのデータです。",
+      sections: {
+        palette: "カラーパレット",
+        difficulty: "難易度カラー",
+        typography: "タイポグラフィ",
+        buttons: "ボタン",
+        badges: "バッジ",
+        cards: "カード",
+        controls: "フォーム部品",
+        loading: "ローディング",
+      },
     },
     notFound: {
       title: "ページが見つかりません",
