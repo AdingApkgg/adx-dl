@@ -475,8 +475,12 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               >
                 <MenuIcon />
                 {/* Absolutely positioned so the dot's appearance/disappearance never
-                    changes this button's fixed icon-size box. */}
-                <NoticesUnreadDot className="absolute top-0.5 right-0.5" />
+                    changes this button's fixed icon-size box. Tighter and smaller than
+                    the desktop trigger's dot: this button is a 28px square around a
+                    16px icon, so at `top-0.5 right-0.5` the 8px dot covered the right
+                    end of the menu glyph's top bar (measured on the live site). Pinned
+                    to the corner at 6px it clears every stroke by ~2.7px. */}
+                <NoticesUnreadDot className="absolute top-0 right-0 size-1.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
