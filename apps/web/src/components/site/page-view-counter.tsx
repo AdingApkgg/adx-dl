@@ -177,13 +177,24 @@ function CountValue({
   );
 }
 
-/** Site-wide PV/UV totals, rendered in the footer on every page. */
+/**
+ * Site-wide PV/UV totals plus this page's own count, rendered in the footer on
+ * every page.
+ *
+ * `pagePv` rides along in the same response the provider already fetches, so
+ * showing it costs no extra request. Chart detail pages also render it in the
+ * body via {@link ChartPageViews}; the repetition is deliberate — there the
+ * number means "how many people opened this chart", here it is one more line
+ * of site statistics.
+ */
 export function SitePageViews({
   siteViewsLabel,
   siteVisitorsLabel,
+  pageViewsLabel,
 }: {
   siteViewsLabel: string;
   siteVisitorsLabel: string;
+  pageViewsLabel: string;
 }) {
   const views = usePageViews();
   const { unavailable } = usePageViewsDictionary();
@@ -197,6 +208,11 @@ export function SitePageViews({
       </span>
       {siteVisitorsLabel}{" "}
       <CountValue views={views} field="siteUv" unavailableLabel={unavailable} />
+      <span aria-hidden="true" className="px-2">
+        ·
+      </span>
+      {pageViewsLabel}{" "}
+      <CountValue views={views} field="pagePv" unavailableLabel={unavailable} />
     </p>
   );
 }

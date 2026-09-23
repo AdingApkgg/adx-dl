@@ -146,6 +146,7 @@ export function SiteFooter({
         <SitePageViews
           siteViewsLabel={dictionary.pageViews.siteViews}
           siteVisitorsLabel={dictionary.pageViews.siteVisitors}
+          pageViewsLabel={dictionary.pageViews.pageViews}
         />
         <p className="text-xs text-muted-foreground">{dictionary.footer.disclaimer}</p>
         <p className="text-xs text-muted-foreground">{dictionary.footer.aiNotice}</p>
