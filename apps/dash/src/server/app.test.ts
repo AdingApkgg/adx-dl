@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 
 import { createApp, type AppDeps } from "./app";
@@ -9,8 +9,26 @@ const TEAM = "https://example.cloudflareaccess.com";
 const AUD = "aud-tag-abc";
 const PUBLIC_ORIGIN = "https://dash.example.com";
 
-/** 造一组测试密钥，返回可注入的 accessConfig 与一个合法断言。 */
-async function makeAccess() {
+// 这个文件不测 JWT 校验边界本身——aud/issuer/algorithm/签名这些逐条
+// 覆盖在 access-jwt.test.ts 里。这里的每一条用例只需要「一个能通过
+// accessJwt 中间件的合法断言」，好把请求送到后面的路由匹配/csrf/错误
+// 处理逻辑上去；没有任何一条用例要求这把密钥和别的用例不一样，或者
+// 依赖它是新生成的。原先 12 条测试各自调用 makeAccess()，每条都重新
+// generateKeyPair 一遍——这是这个文件里唯一慢的操作（真实 CPU 时间），
+// 12 遍纯粹是在反复证明同一件事，也是这个文件跑起来慢、在 CPU 紧张时
+// 容易撞上默认 5s 超时的直接原因。这里只生成一次，所有测试共享。
+//
+// 放在 beforeAll 而不是模块顶层 await，原因与 access-jwt.test.ts 里
+// 同样的取舍一致：generateKeyPair 一旦抛错，beforeAll 会被测试框架
+// 当成「这个文件的 setup hook 失败」清楚地报出来，只影响这一个文件；
+// 模块顶层 await 抛错则是一次更笼统的 import 失败。
+//
+// 声明在所有 describe(...) 之外：这个文件有三个并列的 describe 块
+// （createApp / Finding I-2 / Finding I-5），全都要用同一把共享密钥，
+// 所以 hook 要挂在文件顶层，而不是嵌进某一个 describe 里只对它生效。
+let sharedAccess: { config: AppDeps["accessConfig"]; assertion: string };
+
+beforeAll(async () => {
   const { privateKey, publicKey } = await generateKeyPair("RS256", { extractable: true });
   const jwk = await exportJWK(publicKey);
   jwk.kid = "test-key";
@@ -25,26 +43,25 @@ async function makeAccess() {
     .setExpirationTime("1h")
     .sign(privateKey);
 
-  return {
+  sharedAccess = {
     config: { teamDomain: TEAM, aud: AUD, getKey: createLocalJWKSet({ keys: [jwk] }) },
     assertion,
   };
-}
+});
 
 // 不带定时器的最小假货：这些测试只关心路由挂没挂上，不关心推送。
 const stubPoller = { subscribe: () => () => {}, snapshot: () => [] };
 
-async function makeApp(overrides: Partial<AppDeps> = {}) {
-  const access = await makeAccess();
+function makeApp(overrides: Partial<AppDeps> = {}) {
   const deps: AppDeps = {
     clientRoot: "./build/client",
     github: createFakeGitHubClient(),
-    accessConfig: access.config,
+    accessConfig: sharedAccess.config,
     poller: stubPoller,
     dashPublicOrigin: PUBLIC_ORIGIN,
     ...overrides,
   };
-  return { app: createApp(deps), assertion: access.assertion };
+  return { app: createApp(deps), assertion: sharedAccess.assertion };
 }
 
 describe("createApp", () => {

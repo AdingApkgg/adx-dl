@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunSummary } from "@/shared/dto";
 
-import { createFakeGitHubClient } from "../github/fake-client";
-import type { RunChange } from "./run-diff";
+import { createFakeActionsClient } from "../github/fake-client";
+import { hasActiveRun, type RunChange } from "./run-diff";
 import { createRunPoller } from "./run-poller";
 
 // 刻意不测「等了 5 秒还是 60 秒」——那是纯计时断言，慢机器上会抖。
@@ -35,16 +35,48 @@ function sleep(ms: number) {
 /**
  * 在 fake client 之上包一层，让 listRuns 的行为在测试里可控：
  * 数调用次数、按需让某一次调用抛错、随时替换下一次返回的数据。
+ *
+ * 用 `createFakeActionsClient` 而不是 `createFakeGitHubClient`：
+ * `createRunPoller` 只依赖 `Pick<ActionsClient, "listRuns">`（见
+ * run-poller.ts 的 `RunPollerDeps`），这里的假实现照同样的窄度来搭，不用
+ * 连带种一份 `RepoClient` 用不到的 repo/branches 数据——顺带也是
+ * `createFakeActionsClient` 本身唯一的直接调用方，让它的构造路径
+ * （seed 合并、`seed` 属性）真的被测过，而不是只靠
+ * `createFakeGitHubClient` 内部间接复用同一份 `actionsMethods()`。
  */
 function createControllableGitHubClient(initialRuns: RunSummary[] = []) {
-  const base = createFakeGitHubClient({ runs: initialRuns });
+  const base = createFakeActionsClient({ runs: initialRuns });
   let calls = 0;
+  const timestamps: number[] = [];
   let pendingError: Error | null = null;
+  let persistentError: Error | null = null;
+  let pendingHang = false;
+  let pendingMalformed = false;
 
   return {
     ...base,
     async listRuns(opts?: { perPage?: number }) {
       calls++;
+      timestamps.push(Date.now());
+      if (persistentError) {
+        // 跟 queueError 的一次性错误不同：这个一直抛，直到测试自己清掉，
+        // 用来模拟「持续被限流/持续故障」这种场景——不是抖一下就好。
+        throw persistentError;
+      }
+      if (pendingHang) {
+        pendingHang = false;
+        // 永远不 settle 的 promise——模拟 I-1 说的那种请求：既不成功也不
+        // 失败，就是没有响应。没有内部计时器，不会让测试进程挂着退不出去。
+        return new Promise<RunSummary[]>(() => {});
+      }
+      if (pendingMalformed) {
+        pendingMalformed = false;
+        // 成功 settle，但载荷本身会让后续处理（diffRuns/hasActiveRun）
+        // 炸掉——`for (const run of next)` 对 `null` 直接抛 TypeError。
+        // 这不是「请求失败」，是「请求成功了，但拿到手之后的处理崩了」，
+        // 用来测 tick() 里 try 之外还有没有能让重新调度失败的路径。
+        return null as unknown as RunSummary[];
+      }
       if (pendingError) {
         const error = pendingError;
         pendingError = null;
@@ -53,8 +85,25 @@ function createControllableGitHubClient(initialRuns: RunSummary[] = []) {
       return base.seed.runs.slice(0, opts?.perPage ?? 30);
     },
     callCount: () => calls,
+    /** 每次 listRuns 被调用时记下的 `Date.now()`，按调用顺序排列。 */
+    callTimestamps: () => timestamps,
     queueError(error: Error) {
       pendingError = error;
+    },
+    /** 让接下来每一次 listRuns 调用都抛这个错，直到显式清掉——模拟持续故障/持续限流。 */
+    queuePersistentError(error: Error) {
+      persistentError = error;
+    },
+    clearPersistentError() {
+      persistentError = null;
+    },
+    /** 让下一次 listRuns 调用返回一个永远不会 settle 的 promise。 */
+    hangNextCall() {
+      pendingHang = true;
+    },
+    /** 让下一次 listRuns 调用成功返回，但返回值会让后续处理本身抛错。 */
+    returnMalformedNextCall() {
+      pendingMalformed = true;
     },
     setRuns(next: RunSummary[]) {
       base.seed.runs = next;
@@ -94,6 +143,121 @@ describe("createRunPoller resilience", () => {
     expect(poller.snapshot()).toEqual(nextRuns);
     // 至少两次调用：失败的那次 + 成功的那次。
     expect(github.callCount()).toBeGreaterThanOrEqual(2);
+  });
+
+  test("listRuns 挂住不返回，也不会让轮询停掉——poller 自己的超时兜底，下一轮照常发生", async () => {
+    // 这条测的是 I-1 里被点名的那条路径：github.listRuns() 返回的 promise
+    // 永远不 settle（不是失败，是压根没有响应——半开 TCP 连接、
+    // octokit 限流插件内部等 retryAfter 都是这个形状）。真实实现
+    // （octokit-client.ts）现在给每个请求都挂了 AbortSignal 超时，但这里
+    // 刻意不依赖那道防线：用一个完全不知道超时是什么的假 listRuns 挂住，
+    // 验证 poller 自己的 `pollTimeoutMs` 兜底能不能独立地把 tick() 从这个
+    // 挂起状态里拽出来，走到重新调度那一步。
+    const github = createControllableGitHubClient([]);
+    const poller = createRunPoller({
+      github,
+      activeIntervalMs: 15,
+      idleIntervalMs: 15,
+      pollTimeoutMs: 20,
+    });
+
+    // 第一次轮询挂住不返回；等 pollTimeoutMs 判它超时之后的下一轮成功返回。
+    github.hangNextCall();
+    const nextRuns = [run({ id: 1, status: "in_progress", conclusion: null })];
+    github.setRuns(nextRuns);
+
+    const broadcast = nextBroadcast(poller);
+    poller.start();
+    const changes = await broadcast;
+    poller.stop();
+
+    // 挂住的那一轮不可能产出变化（tick() 里 diffRuns 根本没机会跑），
+    // 所以等到的这条广播必然来自超时之后的下一轮成功轮询——如果 poller
+    // 没有自己的超时兜底，这个 await 会一直挂着，这条测试会超时失败。
+    expect(changes).toHaveLength(1);
+    expect(changes[0].kind).toBe("added");
+    expect(poller.snapshot()).toEqual(nextRuns);
+    // 至少两次调用：挂住的那次 + 超时之后重新调度、真的返回的那次。
+    expect(github.callCount()).toBeGreaterThanOrEqual(2);
+  });
+
+  test("处理阶段本身抛错（不是 listRuns 失败），也不会阻止下一轮调度", async () => {
+    // 这条测的是 reviewer 那句「即使请求本身有超时兜底，tick() 里还有没有
+    // 别的路径能让重新调度失败？」——answer: 有，「计算下一轮间隔」这一步
+    // （`hasActiveRun(snapshot)`）如果抛错，在旧代码里发生在 try/catch 之外，
+    // 会直接让 tick() 整个中断、重新调度那行代码根本不会跑到。这里不 mock
+    // 内部的 diffRuns/hasActiveRun，而是让 listRuns *成功* settle、但返回
+    // 一个会让后续处理自然抛错的值（`null`），更接近真实世界里「数据形状
+    // 意外」的样子。
+    const github = createControllableGitHubClient([]);
+    const poller = createRunPoller({ github, activeIntervalMs: 15, idleIntervalMs: 15 });
+
+    github.returnMalformedNextCall();
+    const nextRuns = [run({ id: 1, status: "in_progress", conclusion: null })];
+    github.setRuns(nextRuns);
+
+    const broadcast = nextBroadcast(poller);
+    poller.start();
+    const changes = await broadcast;
+    poller.stop();
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0].kind).toBe("added");
+    expect(poller.snapshot()).toEqual(nextRuns);
+    expect(github.callCount()).toBeGreaterThanOrEqual(2);
+  });
+
+  test("轮询失败后退回空闲间隔——即使失败前那一轮 snapshot 里还有活跃 run", async () => {
+    // 这条测的是 re-reviewer 点名的隐藏行为：tick() 里 `nextIntervalMs`
+    // 只在成功轮询的最后一行被设成 activeIntervalMs；任何异常（包括限流
+    // 触发的 fail-fast）都让它维持在 try 之前预设的 idleIntervalMs 兜底值，
+    // 完全不看 snapshot 里上一轮是不是还有活跃 run。这不是巧合，是现在
+    // 唯一挡住「限流时每个 activeIntervalMs 打一次」的机制——见
+    // octokit-client.ts 里 noRetryOnRateLimit 的决定：octokit 自己「等满
+    // retryAfter 再重试」的行为已经被关掉，如果这里的退避也跟着丢了，
+    // 一次持续限流会变成生产环境里每 5 秒打一次 GitHub、一小时 720 次，
+    // 而不是退避到每 60 秒一次。
+    //
+    // 用真实计时器验证，但只对比「明显更接近 idle 还是 active」，不断言
+    // 等了多少毫秒——active/idle 之间留足够大的比例差（1:20），量到的
+    // 间隔不可能被调度抖动混淆成另一档。
+    const activeIntervalMs = 15;
+    const idleIntervalMs = 300;
+    const github = createControllableGitHubClient([
+      run({ id: 1, status: "in_progress", conclusion: null }),
+    ]);
+    const poller = createRunPoller({ github, activeIntervalMs, idleIntervalMs });
+
+    // 第一轮成功：snapshot 里有一个活跃 run，hasActiveRun(snapshot) 为真，
+    // 这一轮结束时 nextIntervalMs 被设成 activeIntervalMs（15ms）。
+    const first = nextBroadcast(poller);
+    poller.start();
+    await first;
+    expect(github.callCount()).toBe(1);
+    expect(hasActiveRun(poller.snapshot())).toBe(true);
+
+    // 从现在起持续失败——模拟被限流后每次都 fail-fast 的场景。第二次调用
+    // （紧跟在第一次成功后面，间隔是上面算出的 activeIntervalMs）会失败。
+    github.queuePersistentError(new Error("rate limited"));
+
+    // 等足够久：正确行为下，第二轮失败之后要等 idleIntervalMs（300ms）
+    // 才会有第三轮；错误行为（无条件用 hasActiveRun(snapshot)）下，
+    // 这段时间里会发生远不止 3 次调用。400ms 对两种情况都足够分辨。
+    await sleep(400);
+    poller.stop();
+
+    const timestamps = github.callTimestamps();
+    expect(timestamps.length).toBeGreaterThanOrEqual(3);
+
+    // timestamps[0] = 第一轮（成功）；timestamps[1] = 第二轮（第一次失败）；
+    // timestamps[2] = 第三轮，也就是失败之后重新调度出来的那一轮。
+    const gapAfterFailure = timestamps[2] - timestamps[1];
+
+    // 退避正常：这段间隔应该接近 idleIntervalMs（300ms）。
+    // 退避被删掉、改成无条件 hasActiveRun(snapshot)：这段间隔会接近
+    // activeIntervalMs（15ms）。用「远大于 activeIntervalMs 的好几倍」
+    // 而不是「约等于 idleIntervalMs」断言，两种情况差 20 倍，没有歧义。
+    expect(gapAfterFailure).toBeGreaterThan(activeIntervalMs * 5);
   });
 
   test("stop() 真的会停掉轮询——之后调用次数不再增长", async () => {

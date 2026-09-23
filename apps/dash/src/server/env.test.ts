@@ -10,7 +10,7 @@ const complete = {
   GITHUB_APP_INSTALLATION_ID: "7890",
   GITHUB_REPO_OWNER: "AdingApkgg",
   GITHUB_REPO_NAME: "adx-dl",
-  DASH_PUBLIC_ORIGIN: "https://adxdls-dash.saop.cc",
+  DASH_PUBLIC_ORIGIN: "https://your-dash-domain.example.com",
 };
 
 describe("parseEnv", () => {
@@ -23,7 +23,7 @@ describe("parseEnv", () => {
     expect(env.githubInstallationId).toBe(7890);
     expect(env.repoOwner).toBe("AdingApkgg");
     expect(env.repoName).toBe("adx-dl");
-    expect(env.dashPublicOrigin).toBe("https://adxdls-dash.saop.cc");
+    expect(env.dashPublicOrigin).toBe("https://your-dash-domain.example.com");
   });
 
   test("把私钥里的字面 \\n 还原成真换行", () => {
@@ -75,15 +75,15 @@ describe("parseEnv", () => {
   });
 
   test("DASH_PUBLIC_ORIGIN 不带 scheme 时报错", () => {
-    expect(() => parseEnv({ ...complete, DASH_PUBLIC_ORIGIN: "adxdls-dash.saop.cc" })).toThrow(
+    expect(() => parseEnv({ ...complete, DASH_PUBLIC_ORIGIN: "your-dash-domain.example.com" })).toThrow(
       /DASH_PUBLIC_ORIGIN/
     );
   });
 
   test("DASH_PUBLIC_ORIGIN 末尾的斜杠会被去掉", () => {
     // Origin 请求头永远不带尾部斜杠；留着它，字符串相等比较永远不会命中。
-    const env = parseEnv({ ...complete, DASH_PUBLIC_ORIGIN: "https://adxdls-dash.saop.cc/" });
-    expect(env.dashPublicOrigin).toBe("https://adxdls-dash.saop.cc");
+    const env = parseEnv({ ...complete, DASH_PUBLIC_ORIGIN: "https://your-dash-domain.example.com/" });
+    expect(env.dashPublicOrigin).toBe("https://your-dash-domain.example.com");
   });
 
   // Fix round 1: Finding 1 — CF_ACCESS_TEAM_DOMAIN scheme validation

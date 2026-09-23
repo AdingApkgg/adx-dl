@@ -1,4 +1,5 @@
 import type {
+  BranchSummary,
   FailedStepLog,
   MeResponse,
   RunDetail,
@@ -73,6 +74,7 @@ async function post(path: string, body?: unknown): Promise<void> {
 export const api = {
   me: () => get<MeResponse>("/api/me"),
   workflows: () => get<WorkflowSummary[]>("/api/workflows"),
+  branches: () => get<BranchSummary[]>("/api/branches"),
   runs: () => get<RunSummary[]>("/api/runs"),
   run: (runId: number) => get<RunDetail>(`/api/runs/${runId}`),
   failureLog: async (runId: number): Promise<FailedStepLog | null> => {

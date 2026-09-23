@@ -41,6 +41,11 @@ export type WorkflowSummary = {
   state: string;
 };
 
+export type BranchSummary = {
+  name: string;
+  protected: boolean;
+};
+
 export type RunSummary = {
   id: number;
   name: string;

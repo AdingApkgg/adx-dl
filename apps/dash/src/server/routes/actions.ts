@@ -25,6 +25,12 @@ export function registerActionsRoutes(
     return c.json(await withGitHubErrors(() => deps.github.listWorkflows()));
   });
 
+  // 喂 Actions 页的分支选择器（Change 4）——没有它，dispatch 永远只能打
+  // 仓库默认分支，dev → pre → main 的模型里这是个真实限制。
+  app.get("/api/branches", async (c) => {
+    return c.json(await withGitHubErrors(() => deps.github.listBranches()));
+  });
+
   app.get("/api/runs", async (c) => {
     const perPage = parsePerPage(c.req.query("perPage"));
     return c.json(await withGitHubErrors(() => deps.github.listRuns({ perPage })));

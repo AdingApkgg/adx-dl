@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Hono } from "hono";
 
-import type { RunDetail, RunSummary, WorkflowSummary } from "@/shared/dto";
+import type { BranchSummary, RunDetail, RunSummary, WorkflowSummary } from "@/shared/dto";
 
 import { GitHubRequestError } from "../github/client";
 import { createFakeGitHubClient } from "../github/fake-client";
@@ -26,6 +26,32 @@ describe("GET /api/workflows", () => {
     const body = (await res.json()) as WorkflowSummary[];
     expect(body).toHaveLength(2);
     expect(body[0].path).toBe(".github/workflows/deploy-gh-pages.yml");
+  });
+});
+
+describe("GET /api/branches", () => {
+  test("列出分支，映射成 camelCase 的 BranchSummary", async () => {
+    const res = await makeApp().request("/api/branches");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as BranchSummary[];
+    expect(body).toEqual([
+      { name: "main", protected: true },
+      { name: "pre", protected: false },
+      { name: "dev", protected: false },
+    ]);
+  });
+
+  test("GitHub 那边连不通：走 withGitHubErrors 的映射，不是裸 500", async () => {
+    const github = createFakeGitHubClient();
+    github.listBranches = async () => {
+      throw new GitHubRequestError("Bad credentials", 401);
+    };
+
+    const res = await makeApp(github).request("/api/branches");
+
+    // 401 属于「不原样透传」的那一类（见 status.ts），统一按 502。
+    expect(res.status).toBe(502);
   });
 });
 
