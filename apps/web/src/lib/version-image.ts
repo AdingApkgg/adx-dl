@@ -3,6 +3,7 @@
 // matched before their base version. Returns null when no version icon applies
 // (e.g. empty/unknown version) so callers fall back to a text label.
 const VERSION_IMAGE_RULES: ReadonlyArray<readonly [RegExp, number]> = [
+  [/magical/i, 27],
   [/circle\s*plus/i, 26],
   [/circle/i, 25],
   [/buddies\s*plus/i, 22],
@@ -81,7 +82,7 @@ export function versionImageSourcesByIndex(index: number): VersionImageSources {
 
 export type MaimaiVersion = { index: number; name: string; slug: string };
 
-// The full maimai version lineup in chronological order (matches genrepics 0–26).
+// The full maimai version lineup in chronological order (matches genrepics 0–27).
 // Names follow the catalog's convention so slugs line up with catalog-derived ones.
 const VERSION_NAMES: ReadonlyArray<readonly [number, string]> = [
   [0, "maimai"],
@@ -111,6 +112,7 @@ const VERSION_NAMES: ReadonlyArray<readonly [number, string]> = [
   [24, "maimai DX PRiSM PLUS"],
   [25, "maimai DX CiRCLE"],
   [26, "maimai DX CiRCLE PLUS"],
+  [27, "maimai DX MAGiCAL"],
 ];
 
 function toVersionSlug(name: string): string {
