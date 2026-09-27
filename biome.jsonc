@@ -108,6 +108,80 @@
       }
     },
     {
+      // 前端代码不能引用服务端和 worker 的代码（spec 第 2.3 节第 1 条、第 7 节）。
+      // 唯一的例外是只有类型的 app-type。
+      "includes": ["apps/community/src/client/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "pg": "The database driver is server-only.",
+                  "pg-boss": "The job queue is server-only.",
+                  "drizzle-orm": "Drizzle is server-only; share types through src/shared.",
+                  "bun": "Bun APIs are server-only."
+                },
+                "patterns": [
+                  {
+                    "group": [
+                      "@/server",
+                      "@/server/**",
+                      "../**/server",
+                      "../**/server/**",
+                      "@/worker",
+                      "@/worker/**",
+                      "../**/worker",
+                      "../**/worker/**",
+                      "!**/server/api/app-type"
+                    ],
+                    "message": "src/client must not import src/server or src/worker (only `import type` from @/server/api/app-type); move shared code to src/shared."
+                  },
+                  { "group": ["drizzle-orm/**"], "message": "Drizzle is server-only." }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      // shared 必须两边都能用，所以既不能引用服务端、worker，也不能引用前端。
+      "includes": ["apps/community/src/shared/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "@/server",
+                      "@/server/**",
+                      "../**/server",
+                      "../**/server/**",
+                      "@/worker",
+                      "@/worker/**",
+                      "../**/worker",
+                      "../**/worker/**",
+                      "@/client",
+                      "@/client/**",
+                      "../**/client",
+                      "../**/client/**",
+                      "!**/server/api/app-type"
+                    ],
+                    "message": "src/shared must not depend on server, worker or client code (only `import type` from @/server/api/app-type)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       // Tests shape mock data with `any` on purpose.
       "includes": ["**/*.test.ts", "**/*.test.tsx"],
       "linter": {

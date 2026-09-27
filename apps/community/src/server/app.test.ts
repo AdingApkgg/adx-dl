@@ -92,4 +92,19 @@ describe("createApp", () => {
     expect((await app.request("/api/anything", { headers: { "cf-connecting-ip": "198.51.100.2" } })).status).toBe(404);
     expect((await app.request("/healthz", { headers })).status).toBe(200);
   });
+
+  test("GET /api/v1/meta", async () => {
+    const res = await createApp(testAppDeps().deps).request("/api/v1/meta");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ name: "astrodx-community", apiVersion: 1 });
+  });
+
+  test("/api/v1 的写请求要过 CSRF 检查", async () => {
+    const res = await createApp(testAppDeps().deps).request("/api/v1/meta", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "a=1",
+    });
+    expect(res.status).toBe(415);
+  });
 });

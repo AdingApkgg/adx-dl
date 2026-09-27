@@ -2,10 +2,12 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { requestId } from "hono/request-id";
 
+import { apiRoutes } from "./api/v1";
 import type { AppEnv } from "./app-env";
 import { jsonError } from "./errors";
 import type { Logger } from "./log";
 import { clientIp } from "./middleware/client-ip";
+import { csrfGuard } from "./middleware/csrf";
 import { rateLimit, type RateLimitStore } from "./middleware/rate-limit";
 import { requestLog } from "./middleware/request-log";
 import { securityHeaders } from "./middleware/security-headers";
@@ -17,6 +19,8 @@ export type AppDeps = {
   isProduction: boolean;
   checks: Record<string, HealthCheck>;
   rateLimitStore: RateLimitStore;
+  /** 浏览器看到的站点地址，CSRF 校验拿它和 Origin 头比较。 */
+  publicOrigin: string;
 };
 
 // 中间件顺序是 spec 第 8.1 节定的，改动前先对照 spec。
@@ -65,6 +69,9 @@ export function createApp(deps: AppDeps) {
         }),
     })
   );
+
+  app.use("/api/v1/*", csrfGuard({ publicOrigin: deps.publicOrigin }));
+  app.route("/", apiRoutes);
 
   // 必须是最后一个 /api 路由：没有它，未知接口会落到 React Router，拿到一个 HTML 404。
   app.all("/api/*", (c) => jsonError(c, 404, "NOT_FOUND", "Not found"));

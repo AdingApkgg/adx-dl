@@ -2,6 +2,8 @@ import type { AppDeps } from "../app";
 import { createLogger } from "../log";
 import { createMemoryRateLimitStore } from "../middleware/rate-limit";
 
+export const TEST_PUBLIC_ORIGIN = "https://community.test";
+
 export function testAppDeps(overrides: Partial<AppDeps> = {}) {
   const lines: string[] = [];
   const deps: AppDeps = {
@@ -9,6 +11,7 @@ export function testAppDeps(overrides: Partial<AppDeps> = {}) {
     isProduction: true,
     checks: {},
     rateLimitStore: createMemoryRateLimitStore(),
+    publicOrigin: TEST_PUBLIC_ORIGIN,
     ...overrides,
   };
   return {

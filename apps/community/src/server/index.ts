@@ -21,6 +21,7 @@ export default await createHonoServer<AppEnv>({
     isProduction: env.nodeEnv === "production",
     checks: { db: () => pingDb(db), redis: () => pingRedis(redis) },
     rateLimitStore: createRedisRateLimitStore(redis),
+    publicOrigin: env.publicOrigin,
   }),
   defaultLogger: false,
   port: env.port,
