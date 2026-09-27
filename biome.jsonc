@@ -13,9 +13,12 @@
     "includes": [
       "apps/web/**",
       "apps/dash/**",
+      "apps/community/**",
       "!apps/web/public",
       "!apps/web/next-env.d.ts",
-      "!apps/dash/.react-router"
+      "!apps/dash/.react-router",
+      "!apps/community/.react-router",
+      "!apps/community/build"
     ]
   },
   "formatter": {
@@ -96,6 +99,12 @@
             }
           }
         }
+      }
+    },
+    {
+      "includes": ["apps/community/**"],
+      "linter": {
+        "domains": { "react": "recommended" }
       }
     },
     {

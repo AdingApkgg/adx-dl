@@ -16,6 +16,7 @@ venv/
 .env
 .env.local
 apps/dash/.env
+apps/community/.env
 
 # Generated or temporary workspace files
 apps/web/.tmp-server-ws.json
@@ -24,6 +25,8 @@ apps/web/.tmp-server-ws.json
 node_modules/
 apps/web/.next/
 apps/web/out/
+apps/community/build/
+apps/community/.react-router/
 apps/web/public/covers/
 # adxcs holds committed maidata.txt (served same-origin); bg.png and any other
 # generated/mirrored assets stay ignored.
