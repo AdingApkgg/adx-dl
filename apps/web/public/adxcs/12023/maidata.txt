@@ -12,7 +12,7 @@
 &clock_count=4
 &chartconverter=MaiChartManager v26.5.1.0
 &ChartConvertTool=MuConvert
-&ChartConvertToolVersion=0.4.0-rc.7+4561737465726567672E746F2E5241494E286D6169322E6D6F616E742E636E29
+&ChartConvertToolVersion=0.4.0-rc.7
 
 &lv_4=12.8
 &des_4=サファ太
