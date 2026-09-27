@@ -95,11 +95,20 @@ export function SiteFooter({
           <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/comments", locale)}>
             {dictionary.guestbook.navLabel}
           </Link>
-          <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/post", locale)}>
-            {dictionary.post.navLabel}
+          <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/notices", locale)}>
+            {dictionary.notices.navLabel}
           </Link>
-          <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/survey", locale)}>
-            {dictionary.survey.navLabel}
+          <Link
+            className="text-muted-foreground hover:text-foreground"
+            href={`${buildLocalePath("/comments", locale)}?compose=post`}
+          >
+            {dictionary.guestbook.compose.post}
+          </Link>
+          <Link
+            className="text-muted-foreground hover:text-foreground"
+            href={`${buildLocalePath("/comments", locale)}?compose=survey`}
+          >
+            {dictionary.guestbook.compose.survey}
           </Link>
           <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/links", locale)}>
             {dictionary.links.navLabel}
@@ -137,6 +146,7 @@ export function SiteFooter({
         <SitePageViews
           siteViewsLabel={dictionary.pageViews.siteViews}
           siteVisitorsLabel={dictionary.pageViews.siteVisitors}
+          pageViewsLabel={dictionary.pageViews.pageViews}
         />
         <p className="text-xs text-muted-foreground">{dictionary.footer.disclaimer}</p>
         <p className="text-xs text-muted-foreground">{dictionary.footer.aiNotice}</p>

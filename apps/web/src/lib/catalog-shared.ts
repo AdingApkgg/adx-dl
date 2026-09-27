@@ -57,7 +57,7 @@ export type CatalogEntry = {
   source_archive: string;
   source_folder: string;
   version: string;
-  /** maimai version index (0 = maimai … 26 = CiRCLE PLUS); used for release ordering. */
+  /** maimai version index (0 = maimai … 27 = MAGiCAL); used for release ordering. */
   versionid?: number;
   genre: string;
   /** maimai genre id (101–107); stable key for genre color + localized label. */
@@ -714,7 +714,7 @@ export const UNKNOWN_VERSION_ROUTE_ID = "unknown";
 
 const KNOWN_VERSION_INDEXES = new Set(MAIMAI_VERSIONS.map((version) => version.index));
 
-/** Whether a value is one of the canonical maimai version ids (currently 0–26). */
+/** Whether a value is one of the canonical maimai version ids (currently 0–27). */
 export function isKnownVersionIndex(value: unknown): value is number {
   return (
     typeof value === "number" &&
@@ -736,7 +736,7 @@ export function resolveVersionIndex(
 }
 
 /**
- * Stable URL value for a version: the maimai versionid (0–26, the same value
+ * Stable URL value for a version: the maimai versionid (0–27, the same value
  * stored in each chart's maidata `&versionid=`), or "unknown" for the untagged
  * bucket. It is shared by legacy route redirects and catalog query parameters.
  */
@@ -1200,7 +1200,7 @@ function compactVersionName(name: string): string {
 }
 
 /**
- * Compact version folder name for downloads: a stable 00-26 order prefix plus
+ * Compact version folder name for downloads: a stable 00-27 order prefix plus
  * the agreed short version name.
  */
 export function versionFolderName(name: string): string {

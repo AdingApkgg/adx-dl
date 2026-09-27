@@ -1,9 +1,8 @@
 import type { Viewport } from "next";
 
-import { LocaleSuggestionBanner } from "@/app/locale-suggestion-banner";
 import { PageTransition } from "@/app/page-transition";
 import { MotionProvider } from "@/components/motion";
-import { ConnectionStatusBar } from "@/components/site/connection-status-bar";
+import { SiteBanners } from "@/components/site/banners/site-banners";
 import { DownloadDock } from "@/components/site/downloads/download-dock";
 import { MusicPlayer } from "@/components/site/music-player/music-player";
 import { PageViewsProvider } from "@/components/site/page-view-counter";
@@ -123,9 +122,7 @@ export async function RootLayoutShell({
             <SWRProvider>
             <PageViewsProvider>
               <div className="site-shell-background flex min-h-screen flex-col">
-                {/* Only the zh (default) tree suggests switching: prefixed trees were an explicit choice. */}
-                {locale === "zh" ? <LocaleSuggestionBanner /> : null}
-                <ConnectionStatusBar locale={locale} />
+                <SiteBanners locale={locale} />
                 <SiteHeader totalEntries={catalog.total_entries} />
                 <PageTransition>{children}</PageTransition>
                 <SiteFooter locale={locale} updatedDate={updatedDate} deriveLocaleFromPath={deriveLocaleFromPath} />

@@ -62,7 +62,7 @@ describe("download source latency probe", () => {
   });
 
   test("aborts a probe that exceeds its timeout", async () => {
-    const result = await probeDownloadSource("g400s", {
+    const result = await probeDownloadSource("g510", {
       timeoutMs: 1,
       fetcher: ((_input, init) =>
         new Promise<Response>((_resolve, reject) => {

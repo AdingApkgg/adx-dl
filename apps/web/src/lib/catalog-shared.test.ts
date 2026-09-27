@@ -92,7 +92,8 @@ function buildEntry(overrides: Partial<CatalogEntry> = {}): CatalogEntry {
 describe("catalog shared helpers", () => {
   test("resolves stable version ids with a canonical-name fallback", () => {
     expect(isKnownVersionIndex(24)).toBe(true);
-    expect(isKnownVersionIndex(27)).toBe(false);
+    expect(isKnownVersionIndex(27)).toBe(true);
+    expect(isKnownVersionIndex(28)).toBe(false);
     expect(resolveVersionIndex(buildEntry({ versionid: 24, version: "stale-name" }))).toBe(24);
     expect(resolveVersionIndex(buildEntry({ versionid: 999, version: "maimai DX PRiSM" }))).toBe(23);
     expect(resolveVersionIndex(buildEntry({ versionid: undefined, version: "unmapped" }))).toBeNull();
@@ -360,6 +361,7 @@ describe("catalog shared helpers", () => {
       ["maimai DX PRiSM PLUS", "PRiSM PLUS", "24 PRiSM PLUS"],
       ["maimai DX CiRCLE", "CiRCLE", "25 CiRCLE"],
       ["maimai DX CiRCLE PLUS", "CiRCLE PLUS", "26 CiRCLE PLUS"],
+      ["maimai DX MAGiCAL", "MAGiCAL", "27 MAGiCAL"],
     ];
 
     for (const [source, shortName, folder] of expected) {

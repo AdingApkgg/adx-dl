@@ -218,10 +218,8 @@ describe("localized routes", () => {
     expect(jaDonateHtml).toContain("アドレスをコピー");
   });
 
-  test("localized about, post and survey routes render shared en and ja views", async () => {
+  test("localized about route renders shared en and ja views", async () => {
     const { default: LocalizedAboutPage } = await import("./[locale]/about/page");
-    const { default: LocalizedPostPage } = await import("./[locale]/post/page");
-    const { default: LocalizedSurveyPage } = await import("./[locale]/survey/page");
 
     const enAboutHtml = renderToStaticMarkup(
       await LocalizedAboutPage({ params: Promise.resolve({ locale: "en" }) })
@@ -233,18 +231,38 @@ describe("localized routes", () => {
     expect(enAboutHtml).toContain("Credits");
     expect(jaAboutHtml).toContain("本サイトについて");
     expect(jaAboutHtml).toContain("免責事項");
+  });
 
-    const enPostHtml = renderToStaticMarkup(
-      await LocalizedPostPage({ params: Promise.resolve({ locale: "en" }) })
-    );
-    expect(enPostHtml).toContain("Submit a Chart");
-    expect(enPostHtml).toContain("Submit via Guestbook");
+  test("localized ui routes render en and ja", async () => {
+    const { default: LocalizedUiPage } = await import("./[locale]/ui/page");
 
-    const jaSurveyHtml = renderToStaticMarkup(
-      await LocalizedSurveyPage({ params: Promise.resolve({ locale: "ja" }) })
+    const enHtml = renderToStaticMarkup(
+      await LocalizedUiPage({ params: Promise.resolve({ locale: "en" }) })
     );
-    expect(jaSurveyHtml).toContain("アンケート");
-    expect(jaSurveyHtml).toContain("ゲストブックで送信する");
+    expect(enHtml).toContain("Design System");
+    expect(enHtml).toContain("Palette");
+
+    const jaHtml = renderToStaticMarkup(
+      await LocalizedUiPage({ params: Promise.resolve({ locale: "ja" }) })
+    );
+    expect(jaHtml).toContain("デザインシステム");
+    expect(jaHtml).toContain("カラーパレット");
+  });
+
+  test("localized notices routes render en and ja", async () => {
+    const { default: LocalizedNoticesPage } = await import("./[locale]/notices/page");
+
+    const enHtml = renderToStaticMarkup(
+      await LocalizedNoticesPage({ params: Promise.resolve({ locale: "en" }) })
+    );
+    expect(enHtml).toContain("Site Notices");
+    expect(enHtml).toContain("The site now has a notices page");
+
+    const jaHtml = renderToStaticMarkup(
+      await LocalizedNoticesPage({ params: Promise.resolve({ locale: "ja" }) })
+    );
+    expect(jaHtml).toContain("サイトのお知らせ");
+    expect(jaHtml).toContain("お知らせページを追加しました");
   });
 
   test("localized guide, music and changelog routes render en and ja views", async () => {

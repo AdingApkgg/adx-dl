@@ -118,6 +118,7 @@ CANONICAL_VERSIONS: dict[int, str] = {
     24: "maimai DX PRiSM PLUS",
     25: "maimai DX CiRCLE",
     26: "maimai DX CiRCLE PLUS",
+    27: "maimai DX MAGiCAL",
 }
 
 

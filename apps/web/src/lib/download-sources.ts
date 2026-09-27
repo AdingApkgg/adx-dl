@@ -8,8 +8,7 @@ export type BuiltInDownloadSourceId =
   | "alice"
   | "tsumugi"
   | "awmc"
-  | "g510"
-  | "g400s";
+  | "g510";
 export type CustomDownloadSourceId = `custom:${string}`;
 /** Stable target used when migrating the old single custom-mirror setting. */
 export const CUSTOM_DOWNLOAD_SOURCE_ID = "custom:legacy" as const;
@@ -36,8 +35,15 @@ export type DownloadSource = {
 };
 
 const DOWNLOAD_SOURCE_PROBE_PATH = "/0/10/track.mp3";
-/** Jobs saved before the mirror migration can still contain this dead origin. */
-const LEGACY_DOWNLOAD_SOURCE_ORIGINS = ["https://adxcs.saop.cc"] as const;
+/**
+ * Retired origins that saved jobs can still contain: the pre-migration origin
+ * and the G400s mirror (withdrawn 2026-09-27). Recognising them lets a resumed
+ * job be rewritten onto a live route instead of retrying a dead host.
+ */
+const LEGACY_DOWNLOAD_SOURCE_ORIGINS = [
+  "https://adxcs.saop.cc",
+  "https://astrodx-charts-g400s.saop.cc",
+] as const;
 
 /**
  * Download routes are intentionally data-driven. Adding another CDN or mirror
@@ -79,13 +85,6 @@ export const DOWNLOAD_SOURCES = [
     role: "backup",
     status: "available" as DownloadSourceStatus,
     baseUrl: "https://astrodx-charts-g510.saop.cc",
-  },
-  {
-    id: "g400s",
-    copyKey: "g400s",
-    role: "backup",
-    status: "available" as DownloadSourceStatus,
-    baseUrl: "https://astrodx-charts-g400s.saop.cc",
   },
 ] as const satisfies readonly DownloadSource[];
 
@@ -352,7 +351,7 @@ export function rerouteDownloadFiles<T extends { url: string }>(
  * The route a failed job should retry on: the fastest mirror the live probe
  * currently calls healthy that this run has not already burned.
  *
- * Six routes were measured every five minutes and the result only ever painted
+ * Every route was measured every five minutes and the result only ever painted
  * a coloured dot — a failing job stayed on the same dead host until the user
  * found the wordless ⇄ icon. Latency alone decides between healthy candidates
  * (a probe with no latency sorts last); an unprobed or failing route is never

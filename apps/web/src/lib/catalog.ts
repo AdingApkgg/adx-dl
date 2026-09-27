@@ -169,11 +169,11 @@ const readVersionData = cache(async () => {
   return { byIndex, unknown };
 });
 
-// Full grid: all 27 canonical versions in chronological order (count may be 0),
+// Full grid: all 28 canonical versions in chronological order (count may be 0),
 // plus an "Unknown" bucket appended when non-empty.
 export async function readVersionGroups(): Promise<VersionGroup[]> {
   const { byIndex, unknown } = await readVersionData();
-  // Newest version first (descending: CiRCLE -> maimai); Unknown appended last.
+  // Newest version first (descending: MAGiCAL -> maimai); Unknown appended last.
   const groups: VersionGroup[] = [...MAIMAI_VERSIONS].reverse().map((version) => ({
     slug: version.slug,
     name: version.name,
@@ -214,7 +214,7 @@ export async function readVersionChartSpecs(): Promise<Record<string, ChartDownl
   return specs;
 }
 
-// Resolves a version by its route id — the maimai versionid (0–26 as a string)
+// Resolves a version by its route id — the maimai versionid (0–27 as a string)
 // or "unknown" for the untagged bucket.
 export async function readVersionGroup(routeId: string): Promise<VersionDetail | undefined> {
   const { byIndex, unknown } = await readVersionData();

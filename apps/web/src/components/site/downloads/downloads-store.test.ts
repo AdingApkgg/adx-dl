@@ -723,7 +723,6 @@ describe("downloads-store", () => {
       "https://astrodx-charts-tsumugi.saop.cc/0/10/track.mp3",
       "https://astrodx-charts-wmc.saop.cc/0/10/track.mp3",
       "https://astrodx-charts-g510.saop.cc/0/10/track.mp3",
-      "https://astrodx-charts-g400s.saop.cc/0/10/track.mp3",
       `${customSourceUrl}/0/10/track.mp3`,
     ]);
 
@@ -882,23 +881,22 @@ describe("downloads-store", () => {
       "https://astrodx-charts-tsumugi.saop.cc/0/10/track.mp3",
       "https://astrodx-charts-wmc.saop.cc/0/10/track.mp3",
       "https://astrodx-charts-g510.saop.cc/0/10/track.mp3",
-      "https://astrodx-charts-g400s.saop.cc/0/10/track.mp3",
     ]);
     expect(
-      ["r2", "alice", "tsumugi", "awmc", "g510", "g400s"].every((sourceId) => {
+      ["r2", "alice", "tsumugi", "awmc", "g510"].every((sourceId) => {
         const probe =
           useDownloadsStore.getState().sourceProbes[
-            sourceId as "r2" | "alice" | "tsumugi" | "awmc" | "g510" | "g400s"
+            sourceId as "r2" | "alice" | "tsumugi" | "awmc" | "g510"
           ];
         return probe?.state === "ok" && probe.latencyMs !== null;
       })
     ).toBe(true);
     expect(
       Object.keys(useDownloadsStore.getState().sourceProbes).sort()
-    ).toEqual(["alice", "awmc", "g400s", "g510", "r2", "tsumugi"]);
+    ).toEqual(["alice", "awmc", "g510", "r2", "tsumugi"]);
 
     await refresh();
-    expect(fetchedUrls).toHaveLength(6);
+    expect(fetchedUrls).toHaveLength(5);
   });
 
   test("reuses only a complete matching resource, including across mirror hosts", () => {
@@ -1196,7 +1194,7 @@ describe("downloads-store", () => {
     const id = newBatchJobId();
     useDownloadsStore.getState().startBatch({
       id,
-      title: "G400s batch",
+      title: "G510 batch",
       charts: [
         {
           dir: "Song A",
@@ -1210,12 +1208,12 @@ describe("downloads-store", () => {
       ],
       includeVideo: true,
       format: "adx",
-      sourceId: "g400s",
+      sourceId: "g510",
     });
 
     await waitForSettled(id);
     expect(fetchedUrls).toContain(
-      "https://astrodx-charts-g400s.saop.cc/25/11951/track.mp3"
+      "https://astrodx-charts-g510.saop.cc/25/11951/track.mp3"
     );
   });
 
