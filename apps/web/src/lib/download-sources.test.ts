@@ -46,7 +46,6 @@ describe("download source routing", () => {
       "tsumugi",
       "awmc",
       "g510",
-      "g400s",
     ]);
     expect(routeChartDownloadSpec(spec, "r2")).toEqual(spec);
   });
@@ -63,9 +62,6 @@ describe("download source routing", () => {
     );
     expect(resolveDownloadUrl(spec.files[1].url, "awmc")).toBe(
       "https://astrodx-charts-wmc.saop.cc/25/11951/track.mp3"
-    );
-    expect(resolveDownloadUrl(spec.files[1].url, "g400s")).toBe(
-      "https://astrodx-charts-g400s.saop.cc/25/11951/track.mp3"
     );
     expect(
       resolveDownloadUrl(
@@ -208,12 +204,24 @@ describe("download source routing", () => {
     ).toBe(CUSTOM_DOWNLOAD_SOURCE_ID);
   });
 
+  test("moves saved jobs and preferences off the retired G400s route", () => {
+    // A preference saved while G400s existed falls back to the default route.
+    expect(getSelectableDownloadSource("g400s").id).toBe("r2");
+    // A queued job still pointing at the dead host is rewritten, not retried.
+    expect(
+      resolveDownloadUrl("https://astrodx-charts-g400s.saop.cc/25/11951/track.mp3", "g510")
+    ).toBe("https://astrodx-charts-g510.saop.cc/25/11951/track.mp3");
+    expect(
+      canonicalDownloadResourceUrl("https://astrodx-charts-g400s.saop.cc/25/11951/bg.png")
+    ).toBe("https://astrodx-charts.saop.cc/25/11951/bg.png");
+  });
+
   test("builds each latency probe URL from the configured mirror root", () => {
     expect(getDownloadSourceProbeUrl("r2")).toBe(
       "https://astrodx-charts.saop.cc/0/10/track.mp3"
     );
-    expect(getDownloadSourceProbeUrl("g400s")).toBe(
-      "https://astrodx-charts-g400s.saop.cc/0/10/track.mp3"
+    expect(getDownloadSourceProbeUrl("g510")).toBe(
+      "https://astrodx-charts-g510.saop.cc/0/10/track.mp3"
     );
     expect(getDownloadSourceProbeUrl("awmc")).toBe(
       "https://astrodx-charts-wmc.saop.cc/0/10/track.mp3"

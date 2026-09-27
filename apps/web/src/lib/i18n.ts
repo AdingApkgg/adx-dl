@@ -367,7 +367,6 @@ export type SiteDictionary = {
         tsumugi: { name: string; description: string };
         awmc: { name: string; description: string };
         g510: { name: string; description: string };
-        g400s: { name: string; description: string };
         custom: { name: string; description: string };
       };
       statuses: {
@@ -1102,7 +1101,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
           tsumugi: { name: "Tsumugi", description: "Tsumugi 下载分流" },
           awmc: { name: "AWMC", description: "AWMC 下载分流" },
           g510: { name: "G510", description: "G510 下载分流" },
-          g400s: { name: "G400s", description: "G400s 下载分流" },
           custom: { name: "自定义", description: "使用你自己的同结构镜像地址" },
         },
         statuses: {
@@ -1843,7 +1841,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
           tsumugi: { name: "Tsumugi", description: "Tsumugi download route" },
           awmc: { name: "AWMC", description: "AWMC download route" },
           g510: { name: "G510", description: "G510 download route" },
-          g400s: { name: "G400s", description: "G400s download route" },
           custom: { name: "Custom", description: "Use your own path-compatible mirror" },
         },
         statuses: {
@@ -2606,7 +2603,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
           tsumugi: { name: "Tsumugi", description: "Tsumugi ダウンロード回線" },
           awmc: { name: "AWMC", description: "AWMC ダウンロード回線" },
           g510: { name: "G510", description: "G510 ダウンロード回線" },
-          g400s: { name: "G400s", description: "G400s ダウンロード回線" },
           custom: { name: "カスタム", description: "同じパス構成の独自ミラーを使用" },
         },
         statuses: {

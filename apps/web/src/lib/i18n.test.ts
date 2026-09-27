@@ -102,7 +102,6 @@ describe("i18n helpers", () => {
       "Tsumugi",
       "AWMC",
       "G510",
-      "G400s",
       "Custom",
     ]);
     expect(ja?.options.r2.name).toBe("R2");
