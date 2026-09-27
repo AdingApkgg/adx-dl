@@ -6,6 +6,7 @@ import type { AppEnv } from "./app-env";
 import { jsonError } from "./errors";
 import type { Logger } from "./log";
 import { clientIp } from "./middleware/client-ip";
+import { rateLimit, type RateLimitStore } from "./middleware/rate-limit";
 import { requestLog } from "./middleware/request-log";
 import { securityHeaders } from "./middleware/security-headers";
 
@@ -15,6 +16,7 @@ export type AppDeps = {
   log: Logger;
   isProduction: boolean;
   checks: Record<string, HealthCheck>;
+  rateLimitStore: RateLimitStore;
 };
 
 // 中间件顺序是 spec 第 8.1 节定的，改动前先对照 spec。
@@ -48,6 +50,21 @@ export function createApp(deps: AppDeps) {
     const ok = results.every(([, status]) => status === "ok");
     return c.json({ ok, checks: Object.fromEntries(results) }, ok ? 200 : 503);
   });
+
+  app.use(
+    "/api/*",
+    rateLimit<AppEnv>({
+      store: deps.rateLimitStore,
+      name: "api-ip",
+      limit: 300,
+      windowSec: 60,
+      key: (c) => c.get("clientIp"),
+      onStoreError: (error) =>
+        deps.log.error("rate_limit_store_error", {
+          message: error instanceof Error ? error.message : String(error),
+        }),
+    })
+  );
 
   // 必须是最后一个 /api 路由：没有它，未知接口会落到 React Router，拿到一个 HTML 404。
   app.all("/api/*", (c) => jsonError(c, 404, "NOT_FOUND", "Not found"));

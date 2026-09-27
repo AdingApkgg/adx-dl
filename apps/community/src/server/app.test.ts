@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { createApp } from "./app";
+import { createMemoryRateLimitStore } from "./middleware/rate-limit";
 import { testAppDeps } from "./testing/app-deps";
 
 describe("createApp", () => {
@@ -76,5 +77,19 @@ describe("createApp", () => {
       check: "redis",
       message: "connection refused",
     });
+  });
+
+  test("/api 按 IP 限流，每分钟 300 次", async () => {
+    const { deps } = testAppDeps({ rateLimitStore: createMemoryRateLimitStore() });
+    const app = createApp(deps);
+    const headers = { "cf-connecting-ip": "198.51.100.1" };
+
+    for (let i = 0; i < 300; i++) {
+      expect((await app.request("/api/anything", { headers })).status).toBe(404);
+    }
+    expect((await app.request("/api/anything", { headers })).status).toBe(429);
+    // 别的 IP 不受影响；页面和健康检查不走这条规则。
+    expect((await app.request("/api/anything", { headers: { "cf-connecting-ip": "198.51.100.2" } })).status).toBe(404);
+    expect((await app.request("/healthz", { headers })).status).toBe(200);
   });
 });
