@@ -40,13 +40,13 @@ GitHub API rather than receiving events.
 
 `Dockerfile` builds in two stages:
 
-- **builder** (`oven/bun:1.3.14`): installs the full workspace (the lockfile
+- **builder** (`oven/bun:1.4.2`): installs the full workspace (the lockfile
   lives at the repo root, so the build context is the repo root, not
   `apps/dash` — see `compose.yaml`'s `context: ../..`), then runs
   `bun run build` (the SPA, via `react-router build`) and
   `bun run build:server` (bundles `src/server/main.ts` into a single
   `dist/server.js` with `bun build --target=bun`).
-- **runner** (`oven/bun:1.3.14-slim`): copies only `dist/server.js` and
+- **runner** (`oven/bun:1.4.2-slim`): copies only `dist/server.js` and
   `build/client` out of the builder — no `node_modules`. The bundle is
   ~0.40 MB and runs standalone.
 
