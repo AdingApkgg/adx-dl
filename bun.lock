@@ -38,7 +38,6 @@
         "@lxns-network/maimai-chart-engine": "workspace:*",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
-        "dayjs": "^1.11.23",
         "fflate": "^0.8.3",
         "framer-motion": "^13.4.4",
         "fuse.js": "^7.5.0",
@@ -831,8 +830,6 @@
     "d3-timer": ["d3-timer@3.0.1", "", {}, "sha512-ndfJ/JxxMd3nw31uyKoY2naivF+r29V+Lc0svZxe1JvvIRmi8hUsrMvdOwgS1o6uBHmiz91geQ0ylPP0aj1VUA=="],
 
     "dash": ["dash@workspace:apps/dash"],
-
-    "dayjs": ["dayjs@1.11.23", "", {}, "sha512-QDTCU0M0MxR3hQfnlDJfwekQiaanm1ubOD231u73WBckQ/fsamwRLiE2GBz6D3a/xF1NgfiDLJjXBa1hYOYTtQ=="],
 
     "debug": ["debug@4.4.3", "", { "dependencies": { "ms": "^2.1.3" }, "peerDependencies": { "supports-color": "*" }, "optionalPeers": ["supports-color"] }, "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="],
 
