@@ -26,11 +26,26 @@ export const FULLSCREEN_QUALITY_MP: Record<FullscreenQuality, number> = {
 export const MIN_PLAYBACK_SPEED = 0.1;
 export const MAX_PLAYBACK_SPEED = 2;
 
+/**
+ * Slide delay (lxns "星星延迟"): shifts when slide tracks appear, from -1
+ * (earliest) to +1 (latest), in 0.1 steps. It never moves the judgment time.
+ * Same clamp and rounding as upstream and `MainRenderer.setSlideDelay`.
+ */
+export const MIN_SLIDE_DELAY = -1;
+export const MAX_SLIDE_DELAY = 1;
+
+export function clampSlideDelay(delay: number): number | null {
+  if (!Number.isFinite(delay)) return null;
+  // `|| 0` folds the -0 that rounding -0.04 produces back to 0.
+  return Math.round(Math.max(MIN_SLIDE_DELAY, Math.min(MAX_SLIDE_DELAY, delay)) * 10) / 10 || 0;
+}
+
 export interface GameSettingsState {
   hiSpeed: number;
   playbackSpeed: number;
   alwaysKeepHiSpeed: boolean;
   slideRotation: boolean;
+  slideDelay: number;
   mirrorMode: MirrorMode;
   judgmentLineDesign: JudgmentLineDesign;
   pinkSlideStart: boolean;
@@ -62,6 +77,7 @@ export interface GameSettingsActions {
   setPlaybackSpeed: (speed: number) => void;
   setAlwaysKeepHiSpeed: (enabled: boolean) => void;
   setSlideRotation: (enabled: boolean) => void;
+  setSlideDelay: (delay: number) => void;
   setMirrorMode: (mode: MirrorMode) => void;
   setJudgmentLineDesign: (design: JudgmentLineDesign) => void;
   setPinkSlideStart: (enabled: boolean) => void;
@@ -93,6 +109,7 @@ const initialState: GameSettingsState = {
   playbackSpeed: 1,
   alwaysKeepHiSpeed: false,
   slideRotation: true,
+  slideDelay: 0,
   mirrorMode: "none",
   judgmentLineDesign: "simple",
   pinkSlideStart: false,
@@ -126,6 +143,10 @@ export const useGameSettingsStore = create<GameSettingsStore>()(
         }),
       setAlwaysKeepHiSpeed: (enabled: boolean) => set({ alwaysKeepHiSpeed: enabled }),
       setSlideRotation: (enabled: boolean) => set({ slideRotation: enabled }),
+      setSlideDelay: (delay: number) => {
+        const next = clampSlideDelay(delay);
+        if (next !== null) set({ slideDelay: next });
+      },
       setMirrorMode: (mode: MirrorMode) => set({ mirrorMode: mode }),
       setJudgmentLineDesign: (design: JudgmentLineDesign) => set({ judgmentLineDesign: design }),
       setPinkSlideStart: (enabled: boolean) => set({ pinkSlideStart: enabled }),
@@ -162,6 +183,7 @@ export const useGameSettingsStore = create<GameSettingsStore>()(
         playbackSpeed: state.playbackSpeed,
         alwaysKeepHiSpeed: state.alwaysKeepHiSpeed,
         slideRotation: state.slideRotation,
+        slideDelay: state.slideDelay,
         mirrorMode: state.mirrorMode,
         judgmentLineDesign: state.judgmentLineDesign,
         pinkSlideStart: state.pinkSlideStart,

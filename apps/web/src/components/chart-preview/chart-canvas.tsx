@@ -113,6 +113,7 @@ export function ChartCanvas({
   const alwaysKeepHiSpeed = useGameSettingsStore((s) => s.alwaysKeepHiSpeed);
   const viewRotation = useGameSettingsStore((s) => s.viewRotation);
   const slideRotation = useGameSettingsStore((s) => s.slideRotation);
+  const slideDelay = useGameSettingsStore((s) => s.slideDelay);
   const mirrorMode = useGameSettingsStore((s) => s.mirrorMode);
   const judgmentLineDesign = useGameSettingsStore((s) => s.judgmentLineDesign);
   const pinkSlideStart = useGameSettingsStore((s) => s.pinkSlideStart);
@@ -253,6 +254,7 @@ export function ChartCanvas({
     renderer.setHiSpeed(settingsState.hiSpeed);
     renderer.setAlwaysKeepHiSpeed(settingsState.alwaysKeepHiSpeed);
     renderer.setSlideRotation(settingsState.slideRotation);
+    renderer.setSlideDelay(settingsState.slideDelay);
     renderer.setMirrorMode(settingsState.mirrorMode);
     renderer.setJudgmentLineDesign(settingsState.judgmentLineDesign);
     renderer.setPinkSlideStart(settingsState.pinkSlideStart);
@@ -568,6 +570,13 @@ export function ChartCanvas({
       renderFrame(playbackTimeRef.current);
     }
   }, [slideRotation, renderFrame]);
+
+  useEffect(() => {
+    if (rendererRef.current) {
+      rendererRef.current.setSlideDelay(slideDelay);
+      renderFrame(playbackTimeRef.current);
+    }
+  }, [slideDelay, renderFrame]);
 
   useEffect(() => {
     if (rendererRef.current) {
