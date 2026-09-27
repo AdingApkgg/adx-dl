@@ -12,13 +12,15 @@
     "test": "bun test src",
     "check": "bun run lint && bun run typegen && tsc --noEmit && bun test src",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "bun run src/server/db/migrate.ts"
+    "db:migrate": "bun run src/server/db/migrate.ts",
+    "worker": "bun run src/worker/main.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.3",
     "hono": "^4.13.9",
     "isbot": "^5.2.2",
     "pg": "^8.23.0",
+    "pg-boss": "^12.35.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-router": "8.4.0",
