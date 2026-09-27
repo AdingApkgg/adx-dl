@@ -6,6 +6,7 @@ export function testAppDeps(overrides: Partial<AppDeps> = {}) {
   const deps: AppDeps = {
     log: createLogger((line) => lines.push(line)),
     isProduction: true,
+    checks: {},
     ...overrides,
   };
   return {

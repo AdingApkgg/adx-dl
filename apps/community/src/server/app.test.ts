@@ -50,4 +50,31 @@ describe("createApp", () => {
     const res = await createApp(testAppDeps().deps).request("/healthz");
     expect(res.headers.get("content-security-policy")).toContain("'nonce-");
   });
+
+  test("/readyz 在所有检查通过时返回 200", async () => {
+    const { deps } = testAppDeps({ checks: { db: async () => {}, redis: async () => {} } });
+    const res = await createApp(deps).request("/readyz");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, checks: { db: "ok", redis: "ok" } });
+  });
+
+  test("/readyz 有一项失败时返回 503，原因写进日志", async () => {
+    const { deps, logs } = testAppDeps({
+      checks: {
+        db: async () => {},
+        redis: async () => {
+          throw new Error("connection refused");
+        },
+      },
+    });
+    const res = await createApp(deps).request("/readyz");
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ ok: false, checks: { db: "ok", redis: "fail" } });
+    expect(logs().find((entry) => entry.event === "readiness_check_failed")).toMatchObject({
+      check: "redis",
+      message: "connection refused",
+    });
+  });
 });

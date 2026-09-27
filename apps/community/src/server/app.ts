@@ -9,9 +9,12 @@ import { clientIp } from "./middleware/client-ip";
 import { requestLog } from "./middleware/request-log";
 import { securityHeaders } from "./middleware/security-headers";
 
+export type HealthCheck = () => Promise<void>;
+
 export type AppDeps = {
   log: Logger;
   isProduction: boolean;
+  checks: Record<string, HealthCheck>;
 };
 
 // 中间件顺序是 spec 第 8.1 节定的，改动前先对照 spec。
@@ -26,6 +29,25 @@ export function createApp(deps: AppDeps) {
   app.all("/media/*", (c) => jsonError(c, 404, "NOT_FOUND", "Not found"));
 
   app.get("/healthz", (c) => c.json({ ok: true }));
+
+  app.get("/readyz", async (c) => {
+    const results = await Promise.all(
+      Object.entries(deps.checks).map(async ([name, check]) => {
+        try {
+          await withTimeout(check(), 2000);
+          return [name, "ok"] as const;
+        } catch (error) {
+          deps.log.error("readiness_check_failed", {
+            check: name,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          return [name, "fail"] as const;
+        }
+      })
+    );
+    const ok = results.every(([, status]) => status === "ok");
+    return c.json({ ok, checks: Object.fromEntries(results) }, ok ? 200 : 503);
+  });
 
   // 必须是最后一个 /api 路由：没有它，未知接口会落到 React Router，拿到一个 HTML 404。
   app.all("/api/*", (c) => jsonError(c, 404, "NOT_FOUND", "Not found"));
@@ -60,5 +82,19 @@ function codeForStatus(status: number): string {
       return "RATE_LIMITED";
     default:
       return `HTTP_${status}`;
+  }
+}
+
+async function withTimeout(promise: Promise<void>, ms: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
   }
 }
