@@ -126,7 +126,6 @@ export function ChartComments({
     // Intentional reset: the prior instance was just destroyed, so without this
     // the area would sit blank through the next load instead of showing the
     // skeleton.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatus("loading");
     const artalkLocale = ARTALK_LOCALE[locale] ?? "zh-CN";
 

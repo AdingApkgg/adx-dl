@@ -128,6 +128,7 @@ export function GuestbookCompose({ locale }: { locale: Locale }) {
   const requested = parseComposeParam(searchParams.get("compose"));
   const hasComposeParam = searchParams.has("compose");
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per arrival, not per insert/online identity
   React.useEffect(() => {
     if (!hasComposeParam) return;
     if (requested) {
@@ -135,7 +136,6 @@ export function GuestbookCompose({ locale }: { locale: Locale }) {
       // /post and /survey pages used to hand their draft to the guestbook the
       // same way, before they were folded into these template buttons.
       if (online) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         insert(requested, false);
       } else {
         // Offline: insert() would only wait out the full editor poll before
@@ -146,7 +146,6 @@ export function GuestbookCompose({ locale }: { locale: Locale }) {
     }
     // An unrecognised value is dropped too — no error, no dirty URL left behind.
     clearComposeParam();
-    /* eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per arrival, not per insert/online identity */
   }, [requested, hasComposeParam]);
 
   React.useEffect(() => {

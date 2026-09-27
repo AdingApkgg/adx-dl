@@ -73,7 +73,7 @@ function buildSitemapEntry(
     url: toAbsoluteUrl(buildLocalePath(pathname, locale)),
     alternates: buildLanguageAlternates(pathname),
     ...(options?.lastModified ? { lastModified: options.lastModified } : {}),
-    ...(options?.images && options.images.length ? { images: options.images } : {}),
+    ...(options?.images?.length ? { images: options.images } : {}),
   } satisfies MetadataRoute.Sitemap[number];
 }
 

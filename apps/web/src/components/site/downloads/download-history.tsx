@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { RotateCwIcon, Trash2Icon } from "lucide-react";
 
 import { getDictionary, type Locale } from "@/lib/i18n";

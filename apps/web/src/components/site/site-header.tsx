@@ -117,7 +117,6 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
   React.useEffect(() => {
     // "change" never fires for a page restored mid-scroll (bfcache, #anchor
     // loads), so sync once from the live value after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (scrollY.get() > COMPACT_ENTER) setCompact(true);
   }, [scrollY]);
 

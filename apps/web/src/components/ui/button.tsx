@@ -1,6 +1,6 @@
 "use client"
 
-import * as React from "react"
+import type * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import type { HTMLMotionProps } from "framer-motion"
 import { Slot } from "radix-ui"

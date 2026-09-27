@@ -107,7 +107,7 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time localStorage sync after hydration
+      // One-time localStorage sync after hydration.
       setModeState(
         parseMotionMode(window.localStorage.getItem(REDUCE_MOTION_STORAGE_KEY))
       );

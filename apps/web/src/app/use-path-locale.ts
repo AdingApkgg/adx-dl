@@ -20,6 +20,7 @@ import { getHtmlLang, isSupportedLocale, type Locale } from "@/lib/i18n";
 export function usePathLocale(initial: Locale, enabled: boolean): Locale {
   const [locale, setLocale] = React.useState<Locale>(initial);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs only when `enabled`/`initial` change — re-running on every locale change would fight a later user switch
   React.useEffect(() => {
     if (!enabled) {
       return;
@@ -30,12 +31,10 @@ export function usePathLocale(initial: Locale, enabled: boolean): Locale {
     if (derived !== locale) {
       // Intentional one-time sync from an external system (the URL) after
       // mount: the SSR markup must stay zh so hydration matches.
-      /* eslint-disable-next-line react-hooks/set-state-in-effect */
       setLocale(derived);
     }
     // `locale` is deliberately not a dependency: this runs once to adopt the
     // URL's locale, and re-running on every change would fight a later switch.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, initial]);
 
   return locale;

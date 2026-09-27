@@ -102,7 +102,7 @@ function weightedOrder(
     .map((entry) => {
       const u = mulberry32(seed ^ seedFromString(entry.id))();
       const weight = selectionWeight(entry, referenceMs, newestVersionId);
-      return { entry, key: Math.pow(u, 1 / weight) };
+      return { entry, key: u ** (1 / weight) };
     })
     .sort((a, b) => b.key - a.key)
     .map((ranked) => ranked.entry);

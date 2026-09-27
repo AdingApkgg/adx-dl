@@ -26,6 +26,7 @@ export function SeoJsonLd({ data }: SeoJsonLdProps) {
         <script
           key={index}
           type="application/ld+json"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD must be inline; serializeJsonLd escapes `<` so the payload cannot close the tag
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(item) }}
         />
       ))}

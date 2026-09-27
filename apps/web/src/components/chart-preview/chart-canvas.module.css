@@ -26,6 +26,7 @@
   max-width: 100vmin;
   width: 100vmin;
   height: 100vmin;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: the vmin values above are the fallback for browsers without dvmin */
   max-width: 100dvmin;
   width: 100dvmin;
   height: 100dvmin;

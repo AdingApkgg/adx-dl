@@ -90,6 +90,7 @@ export async function RootLayoutShell({
             the hydrated tag, which is fine — the attributes are already set. */}
         <script
           id="theme-init"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: a fixed, build-time boot script (no user input) that must run before first paint
           dangerouslySetInnerHTML={{ __html: NO_FLASH_BOOT_SCRIPT }}
         />
         {/* Resource hints — every cover image is served from this cross-origin

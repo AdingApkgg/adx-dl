@@ -1,5 +1,5 @@
 import { genreInfo, type CatalogEntry } from "@/lib/catalog-shared";
-import { type Locale } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type GenreBadgeProps = {

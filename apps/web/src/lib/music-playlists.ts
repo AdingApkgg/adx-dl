@@ -122,7 +122,8 @@ export function buildMusicPlaylistManifest(
     }
 
     const key = String(track.versionId);
-    (playlists[key] ??= []).push(track);
+    playlists[key] ??= [];
+    playlists[key].push(track);
   }
 
   return {

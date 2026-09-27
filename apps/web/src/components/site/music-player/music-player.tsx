@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { VersionGroup } from "@/lib/catalog-shared";
-import { type Locale } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
 import {
   announceMediaPlay,
   MEDIA_PLAY_EVENT,
@@ -387,7 +387,7 @@ function MusicPlayerSurface({
         time: persisted.currentTime,
       };
       currentTimeRef.current = persisted.currentTime;
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time device-local resume position
+      // One-time device-local resume position.
       setCurrentTime(persisted.currentTime);
     }
   }, [bootstrap, hydrated, initialTracks, initialVersionId]);
@@ -747,7 +747,7 @@ function MusicPlayerSurface({
     const { trackId: selectedTrackId } = useMusicPlayerStore.getState();
     const track =
       tracks.find((candidate) => candidate.id === selectedTrackId) ?? tracks[0];
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- driving the <audio> singleton from a one-shot cross-page intent; the state it touches mirrors that element
+    // Driving the <audio> singleton from a one-shot cross-page intent; the state it touches mirrors that element.
     playTrack(track, 0, true);
   }, [
     clearPlayRequest,
@@ -1056,6 +1056,7 @@ function MusicPlayerSurface({
       }}
     >
       <div
+        role="region"
         aria-label={copy.playerLabel}
         className={cn(
           "pointer-events-none fixed z-50",

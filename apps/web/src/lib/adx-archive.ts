@@ -198,7 +198,7 @@ async function packZip(
 function tarHeader(name: string, size: number, mtime: Date): Uint8Array {
   const encoder = new TextEncoder();
   const octalField = (value: number, length: number): Uint8Array =>
-    encoder.encode(value.toString(8).padStart(length - 1, "0") + "\0");
+    encoder.encode(`${value.toString(8).padStart(length - 1, "0")}\0`);
 
   // USTAR splits long paths into a 155-byte prefix (dir) + 100-byte name (basename),
   // which keeps nested batch paths like "<chart dir>/maidata.txt" within the format.
@@ -240,7 +240,7 @@ function tarHeader(name: string, size: number, mtime: Date): Uint8Array {
   for (const byte of header) {
     checksum += byte;
   }
-  header.set(encoder.encode(checksum.toString(8).padStart(6, "0") + "\0 "), 148);
+  header.set(encoder.encode(`${checksum.toString(8).padStart(6, "0")}\0 `), 148);
 
   return header;
 }

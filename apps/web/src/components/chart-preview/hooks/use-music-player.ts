@@ -299,11 +299,9 @@ export function useMusicPlayer() {
       }
       // Reset local load state when the URL is cleared — intentional external
       // sync from the audio engine, not a render-derived value.
-      /* eslint-disable react-hooks/set-state-in-effect */
       setIsLoaded(false);
       setIsLoading(false);
       setError(null);
-      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [musicUrl, stopSource]);
 
@@ -408,7 +406,7 @@ export function useMusicPlayer() {
     if (!state.audioBuffer || !isLoaded) return;
 
     const duration = state.audioBuffer.duration;
-    if (!isFinite(duration) || duration <= 0) return;
+    if (!Number.isFinite(duration) || duration <= 0) return;
 
     if (isPlaying) {
       let animationFrameId: number | null = null;

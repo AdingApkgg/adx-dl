@@ -52,7 +52,6 @@ export function ErrorView({ error, reset, locale: fixedLocale }: ErrorViewProps)
     if (firstSegment && isSupportedLocale(firstSegment)) {
       // One-time sync from the URL (an external system) after mount, matching
       // NotFoundView: the SSR markup must stay zh so hydration lines up.
-      /* eslint-disable-next-line react-hooks/set-state-in-effect */
       setLocale(firstSegment);
     }
   }, [fixedLocale]);

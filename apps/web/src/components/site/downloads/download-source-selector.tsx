@@ -171,6 +171,7 @@ export function DownloadSourceSummary({
 
   return (
     <span
+      role="group"
       data-download-source={source.id}
       aria-label={ariaLabel}
       className={cn(

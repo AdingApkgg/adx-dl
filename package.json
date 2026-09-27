@@ -11,7 +11,7 @@
     "dev": "bun run --filter web dev",
     "build": "bun run --filter web build",
     "start": "bun run --filter web start",
-    "lint": "bun run --filter web lint",
+    "lint": "biome lint",
     "test": "bun run --filter web test",
     "submit:indexnow": "bun run --filter web submit:indexnow",
     "build:catalog": "cd pipeline && python3 -c \"from pathlib import Path; from tools.build_catalog import build_catalog; print(build_catalog(Path('..').resolve(), max_workers=16))\"",
@@ -21,5 +21,8 @@
   },
   "patchedDependencies": {
     "@radix-ui/react-slot@1.3.3": "patches/@radix-ui%2Freact-slot@1.3.3.patch"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14"
   }
 }

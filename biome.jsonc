@@ -1,0 +1,111 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  // Lint only. The repo never had a formatter, and turning Biome's on (or its
+  // import sorting) would rewrite every file.
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    // packages/maimai-chart-engine is vendored from upstream and kept
+    // verbatim so it can be re-synced; pipeline/ is Python.
+    "includes": [
+      "apps/web/**",
+      "apps/dash/**",
+      "!apps/web/public",
+      "!apps/web/next-env.d.ts",
+      "!apps/dash/.react-router"
+    ]
+  },
+  "formatter": {
+    "enabled": false
+  },
+  "assist": {
+    "enabled": false
+  },
+  "css": {
+    "parser": {
+      "cssModules": true,
+      "tailwindDirectives": true
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "a11y": {
+        // shadcn's <Input>/<Textarea> render native controls; Biome cannot see
+        // through the component otherwise.
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": { "inputComponents": ["Input", "Textarea"] }
+        },
+        // All media is music or PV without dialogue; there are no caption files.
+        "useMediaCaption": "off",
+        // Only suggests swapping valid ARIA roles (group, region, search,
+        // checkbox) for native elements, which would change default styling.
+        "useSemanticElements": "off"
+      },
+      "complexity": {
+        // The few !important uses override third-party widgets and
+        // reduced-motion on purpose.
+        "noImportantStyles": "off"
+      },
+      "correctness": {
+        // Match react-hooks/exhaustive-deps: effects may list extra "trigger"
+        // dependencies on purpose. dash turns this back on below.
+        "useExhaustiveDependencies": {
+          "level": "error",
+          "options": { "reportUnnecessaryDependencies": false }
+        }
+      },
+      "style": {
+        // Source order in the CSS modules is deliberate.
+        "noDescendingSpecificity": "off",
+        // Non-null assertions are used after checks TS cannot follow; ESLint
+        // never enforced this either.
+        "noNonNullAssertion": "off"
+      },
+      "suspicious": {
+        // Index keys only appear on static lists (skeleton rows and the like).
+        "noArrayIndexKey": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["apps/web/**"],
+      "linter": {
+        "domains": { "next": "recommended", "react": "recommended" }
+      }
+    },
+    {
+      "includes": ["apps/dash/**"],
+      "linter": {
+        "domains": { "react": "recommended" },
+        "rules": {
+          "correctness": {
+            // The SSE effect in src/client/routes/actions.tsx keeps an empty
+            // dependency array by reading `revalidator` through
+            // useEffectEvent. Re-adding `revalidator` reopens the EventSource
+            // on every event; reporting unnecessary deps is what catches that.
+            "useExhaustiveDependencies": {
+              "level": "error",
+              "options": { "reportUnnecessaryDependencies": true }
+            }
+          }
+        }
+      }
+    },
+    {
+      // Tests shape mock data with `any` on purpose.
+      "includes": ["**/*.test.ts", "**/*.test.tsx"],
+      "linter": {
+        "rules": {
+          "suspicious": { "noExplicitAny": "off" }
+        }
+      }
+    }
+  ]
+}

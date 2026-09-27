@@ -158,7 +158,7 @@ export function EntryCover({
             />
           </picture>
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element -- static export: next/image is unoptimized here
+          // biome-ignore lint/performance/noImgElement: static export: next/image is unoptimized here
           <img
             src={original}
             alt={alt}

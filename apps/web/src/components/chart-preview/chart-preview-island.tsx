@@ -44,7 +44,6 @@ export function ChartPreviewIsland({
     if (typeof IntersectionObserver === "undefined") {
       // No IO support: mount immediately — intentional external capability
       // check, not a render-derived value.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNearViewport(true);
       return;
     }

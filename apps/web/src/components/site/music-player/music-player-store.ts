@@ -308,7 +308,7 @@ function hasVersion(
 ): versionId is string {
   return (
     versionId !== null &&
-    Object.prototype.hasOwnProperty.call(tracksByVersion, versionId)
+    Object.hasOwn(tracksByVersion, versionId)
   );
 }
 

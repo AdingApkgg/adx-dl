@@ -353,6 +353,7 @@ export function CatalogBrowser({
   // keeps the static export free of a useSearchParams Suspense boundary. A
   // layout effect (not useEffect) so the filtered state commits before the
   // first client paint instead of flashing the unfiltered grid.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time mount effect; the bounds and name sets it resolves against are derived from `entries`, fixed for the page
   React.useLayoutEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const q = params.get("q");
@@ -365,7 +366,6 @@ export function CatalogBrowser({
       const items = raw.split(",").filter(Boolean);
       return items.length > 0 ? new Set(items) : null;
     };
-    /* eslint-disable react-hooks/set-state-in-effect */
     if (q) {
       setInputValue(q);
       setQuery(q);
@@ -451,11 +451,9 @@ export function CatalogBrowser({
       );
     }
     setUrlReady(true);
-    /* eslint-enable react-hooks/set-state-in-effect */
     // Mount-only by design: this reads the landing URL exactly once, and re-running
     // it would overwrite whatever the user has since picked. The level/BPM scales it
     // resolves ranges against are derived from `entries`, fixed for the page.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   React.useEffect(
@@ -2138,6 +2136,7 @@ function DesignerFilterRow({
         {showList ? (
           <ul
             id={listboxId}
+            // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: ARIA combobox pattern; the list roles are what screen readers need here
             role="listbox"
             aria-label={dictionary.designerListLabel}
             className="max-h-48 list-none overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground"
@@ -2156,9 +2155,11 @@ function DesignerFilterRow({
                 // be undone.
                 const deadEnd = count === 0 && !picked;
                 return (
+                  // biome-ignore lint/a11y/useFocusableInteractive: ARIA combobox (aria-activedescendant): focus stays on the input, so the listbox/options are intentionally non-focusable
                   <li
                     key={facet.name}
                     id={optionId(index)}
+                    // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: ARIA combobox pattern; the list roles are what screen readers need here
                     role="option"
                     // The name and the count are two separate spans inside;
                     // spell the option out so it isn't read as "はっぴー 645".

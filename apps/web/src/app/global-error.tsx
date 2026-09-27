@@ -26,7 +26,6 @@ export default function GlobalError({
   React.useEffect(() => {
     const [firstSegment] = window.location.pathname.split("/").filter(Boolean);
     if (firstSegment && isSupportedLocale(firstSegment)) {
-      /* eslint-disable-next-line react-hooks/set-state-in-effect */
       setLocale(firstSegment);
     }
   }, []);

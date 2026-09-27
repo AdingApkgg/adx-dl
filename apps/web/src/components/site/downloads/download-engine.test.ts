@@ -170,7 +170,7 @@ describe("runMultiFileDownload", () => {
     await expect(
       runMultiFileDownload(
         [{ name: "a", url: "https://x/a", completedBlob: null }],
-        { onFileComplete: () => void (completed += 1) }
+        { onFileComplete: () => { completed += 1; } }
       )
     ).rejects.toThrow("File download failed");
     expect(completed).toBe(0);
@@ -513,7 +513,7 @@ describe("runMultiFileDownload", () => {
     await expect(
       runMultiFileDownload(
         [{ name: "a", url: "https://x/a", completedBlob: null }],
-        { retryBaseDelayMs: 1, onFileComplete: () => void (completed += 1) }
+        { retryBaseDelayMs: 1, onFileComplete: () => { completed += 1; } }
       )
     ).rejects.toThrow("File download failed");
     // Untrusted bytes end the run immediately — no retry, no checkpoint.
@@ -730,7 +730,7 @@ describe("runMultiFileDownload", () => {
         { retryBaseDelayMs: 1 }
       );
       let rejected = false;
-      void run.catch(() => void (rejected = true));
+      void run.catch(() => { rejected = true; });
 
       // Six consecutive failures — well past MAX_FAILURES_WITHOUT_PROGRESS (4).
       // An outage must not spend the retry budget, so the run stays alive.
@@ -802,8 +802,8 @@ describe("runMultiFileDownload", () => {
     );
     let settled = false;
     void run.then(
-      () => void (settled = true),
-      () => void (settled = true)
+      () => { settled = true; },
+      () => { settled = true; }
     );
 
     await slowAborted;

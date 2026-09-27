@@ -7,7 +7,7 @@
     "build": "next build && serwist build serwist.config.mjs",
     "build:sw": "serwist build serwist.config.mjs",
     "start": "next start",
-    "lint": "eslint --cache",
+    "lint": "biome lint",
     "test": "bun test",
     "check": "tsc --noEmit && bun test",
     "submit:indexnow": "bun run scripts/submit-indexnow.ts",
@@ -43,10 +43,8 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "esbuild": "^0.28.2",
-    "eslint": "^9.39.5",
-    "eslint-config-next": "16.3.6",
     "serwist": "^9.5.12",
     "tailwindcss": "^4.3.3",
-    "typescript": "^6.0.3"
+    "typescript": "7.0.2"
   }
 }

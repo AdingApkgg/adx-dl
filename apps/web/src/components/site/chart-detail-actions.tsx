@@ -60,7 +60,7 @@ export function getChartPreviewAssets(entry: CatalogEntry) {
   return {
     maidataUrl: localChartAssetUrl(entry, "maidata.txt"),
     coverUrl:
-      entry.assets.has_background || Boolean(entry.media.cover_url)
+      entry.assets.has_background || entry.media.cover_url
         ? entry.media.cover_url || undefined
         : undefined,
     audioUrl: entry.media.audio_url || undefined,
@@ -120,12 +120,11 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
       previewFlagInitializedRef.current = true;
       if (flagged && hasChartPreview) {
         const requested = readDifficultyParam(url.searchParams);
-        /* eslint-disable react-hooks/set-state-in-effect -- one-time URL-derived initial state, applied post-hydration on purpose */
+        // One-time URL-derived initial state, applied post-hydration on purpose.
         if (requested !== null) {
           setPreviewDifficulty(requested);
         }
         setActivePanel("preview");
-        /* eslint-enable react-hooks/set-state-in-effect */
         return;
       }
     }

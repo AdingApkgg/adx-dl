@@ -43,7 +43,7 @@ export function NotFoundView() {
       // A malformed %-sequence in the URL is exactly the sort of typo that
       // lands here; fall back to the raw segment.
     }
-    /* eslint-disable-next-line react-hooks/set-state-in-effect -- one-time URL-derived seed, post-hydration on purpose */
+    // One-time URL-derived seed, post-hydration on purpose.
     setSeedQuery(decoded.replace(/[-_]+/g, " ").trim());
   }, []);
 

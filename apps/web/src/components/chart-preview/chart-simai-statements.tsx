@@ -126,6 +126,7 @@ const StatementRow = memo(function StatementRow({
   registerRef: (index: number, el: HTMLDivElement | null) => void;
 }) {
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions lint/a11y/useKeyWithClickEvents: click-to-seek is a pointer shortcut; the density timeline and the arrow-key shortcuts cover keyboard seeking
     <div
       ref={(el) => registerRef(index, el)}
       className={cn(classes.row, isActive && classes.rowActive, isMarkerOnly && classes.rowMarker)}
@@ -134,6 +135,7 @@ const StatementRow = memo(function StatementRow({
       <span className={classes.beat}>{statement.beat.toFixed(2)}</span>
       <span className={classes.chunks}>
         {statement.chunks.map((c, ci) => (
+          // biome-ignore lint/a11y/noStaticElementInteractions lint/a11y/useKeyWithClickEvents: same pointer-only seek shortcut as the row
           <span
             key={ci}
             className={cn(classes.chunk, isActive && ci === activeChunkIdx && classes.chunkActive)}
@@ -198,7 +200,6 @@ export function ChartSimaiStatements({
   useEffect(() => {
     if (!expanded) {
       // Clear highlight when collapsed — intentional reset, not a render-derived value.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActive({ line: -1, chunk: -1 });
       return;
     }

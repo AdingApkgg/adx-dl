@@ -63,7 +63,7 @@ export function buildChangelogBatches(
   const byDate = new Map<string, CatalogEntry[]>();
   for (const entry of entries) {
     const date = entry.imported_at?.slice(0, 10);
-    if (!date || date.length !== 10) {
+    if (date?.length !== 10) {
       continue;
     }
     const bucket = byDate.get(date);

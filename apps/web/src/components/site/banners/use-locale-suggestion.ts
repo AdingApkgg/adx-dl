@@ -41,10 +41,8 @@ export function useLocaleSuggestion(enabled: boolean): LocaleSuggestion | null {
     const { pathname, search, hash } = window.location;
     // Intentional one-time sync from external systems (localStorage + URL)
     // after mount — SSR must render nothing to keep the static zh HTML clean.
-    /* eslint-disable react-hooks/set-state-in-effect */
     setHref(`${buildLocalePath(pathname, candidate)}${search}${hash}`);
     setTarget(candidate);
-    /* eslint-enable react-hooks/set-state-in-effect */
   }, [enabled]);
 
   const dismiss = React.useCallback(() => {

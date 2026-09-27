@@ -278,9 +278,9 @@ describe("catalog shared helpers", () => {
     expect(levelDisplayTone("15")).toBe("remaster");
 
     const gradient = buildLevelGradient(["1", "8", "15"]);
-    expect(gradient).toContain(DIFFICULTY_TONE_COLOR.basic + " 0.00%");
-    expect(gradient).toContain(DIFFICULTY_TONE_COLOR.advanced + " 50.00%");
-    expect(gradient).toContain(DIFFICULTY_TONE_COLOR.remaster + " 100.00%");
+    expect(gradient).toContain(`${DIFFICULTY_TONE_COLOR.basic} 0.00%`);
+    expect(gradient).toContain(`${DIFFICULTY_TONE_COLOR.advanced} 50.00%`);
+    expect(gradient).toContain(`${DIFFICULTY_TONE_COLOR.remaster} 100.00%`);
     // Degenerate scales still yield a usable gradient rather than NaN stops.
     expect(buildLevelGradient([])).not.toContain("NaN");
     expect(buildLevelGradient(["12"])).not.toContain("NaN");

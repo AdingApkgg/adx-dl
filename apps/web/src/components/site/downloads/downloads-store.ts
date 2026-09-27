@@ -399,7 +399,7 @@ export function reusablePersistedFile(
   prior: PersistedFile | undefined,
   sourceBaseUrl?: string
 ): PersistedFile | undefined {
-  if (!prior || prior.complete !== true || prior.size !== prior.blob.size) {
+  if (prior?.complete !== true || prior.size !== prior.blob.size) {
     return undefined;
   }
   const knownSourceBaseUrls = [sourceBaseUrl ?? "", prior.sourceBaseUrl ?? ""];

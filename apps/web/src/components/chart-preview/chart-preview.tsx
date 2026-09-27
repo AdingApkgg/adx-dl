@@ -709,8 +709,10 @@ export function ChartPreview({
     ) : null;
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: the player root owns the keyboard shortcuts (onKeyDown)
     <div
       ref={assignContainer}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable on purpose so the shortcuts work once clicked or tabbed into
       tabIndex={0}
       onKeyDown={onKeyDown}
       className={cn(
@@ -745,6 +747,7 @@ export function ChartPreview({
           auto-hidden controls", and stacking play/pause on the same tap would
           pause the chart every time you went looking for a button. Keyboard
           users get the same action from Space (see onKeyDown). */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions lint/a11y/useKeyWithClickEvents: tap-to-play is a pointer shortcut; keyboard users have Space on the focusable player root */}
       <div
         className={cn(isFullscreen ? "contents" : "w-full lg:[grid-area:canvas]")}
         onClick={() => {

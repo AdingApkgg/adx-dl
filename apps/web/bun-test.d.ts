@@ -45,7 +45,7 @@ declare module "bun:test" {
 
   interface BunExpect {
     (value: unknown): BunMatchers;
-    any: (constructor: unknown) => unknown;
+    any: (ctor: unknown) => unknown;
     anything: () => unknown;
     arrayContaining: (sample: readonly unknown[]) => unknown;
     objectContaining: (sample: Record<string, unknown>) => unknown;

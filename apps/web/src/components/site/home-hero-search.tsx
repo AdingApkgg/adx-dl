@@ -396,9 +396,11 @@ export function HomeHeroSearch({
                 {suggestions.map((result, suggestionIndex) => {
                   const active = suggestionIndex === activeIndex;
                   return (
+                    // biome-ignore lint/a11y/useFocusableInteractive: ARIA combobox (aria-activedescendant): focus stays on the input, so the listbox/options are intentionally non-focusable
                     <li
                       key={result.entry.id}
                       id={optionId(suggestionIndex)}
+                      // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: ARIA combobox pattern; the list roles are what screen readers need here
                       role="option"
                       aria-selected={active}
                     >

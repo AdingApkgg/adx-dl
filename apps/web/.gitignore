@@ -13,8 +13,6 @@
 # testing
 /coverage
 
-# eslint --cache
-.eslintcache
 
 # next.js
 /.next/

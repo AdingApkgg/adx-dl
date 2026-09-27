@@ -210,7 +210,7 @@ function ReactiveAudioPlayer({
     let ctx: AudioContext | null = null;
     try {
       const audio = audioRef.current;
-      if (!audio || audio.crossOrigin !== "anonymous") {
+      if (audio?.crossOrigin !== "anonymous") {
         deadRef.current = true;
         return;
       }

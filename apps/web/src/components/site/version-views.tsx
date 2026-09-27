@@ -2,9 +2,9 @@ import { Reveal } from "@/components/motion";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { VersionScrollSpine } from "@/components/site/version-scroll-spine";
 import { VersionsBatchGrid } from "@/components/site/versions-batch-grid";
-import {
-  type ChartDownloadSpec,
-  type VersionGroup,
+import type {
+  ChartDownloadSpec,
+  VersionGroup,
 } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { buildVersionsIndexStructuredData } from "@/lib/structured-data";

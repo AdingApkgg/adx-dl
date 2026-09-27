@@ -17,7 +17,7 @@ export function useUrgentNotice(): UrgentNotice | null {
   const [dismissedIds, setDismissedIds] = React.useState<string[] | null>(null);
 
   React.useEffect(() => {
-    /* eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync from localStorage after mount */
+    // One-time sync from localStorage after mount.
     setDismissedIds(readDismissedIds());
   }, []);
 

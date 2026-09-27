@@ -221,7 +221,7 @@ function ScrollingLabel({
           scrolling
             ? ({
                 animation: `marquee-reveal ${duration}s ease-in-out infinite`,
-                ["--marquee-shift"]: `-${shift}px`,
+                "--marquee-shift": `-${shift}px`,
               } as React.CSSProperties)
             : undefined
         }

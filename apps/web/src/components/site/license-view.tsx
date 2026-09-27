@@ -2,7 +2,7 @@ import { ArrowUpRightIcon } from "lucide-react";
 
 import { Reveal, RevealGroup, RevealItem } from "@/components/motion";
 import { contactChannels } from "@/lib/community-links";
-import { type Locale } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
 
 // Transform-only cascade: legal text must stay readable pre-hydration, so the
 // sections never get an opacity-hidden state — they only settle upward.

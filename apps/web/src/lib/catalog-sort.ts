@@ -82,11 +82,11 @@ function entryBpmValue(entry: SortableEntry): number | null {
 function compareByOptionalNumber<T extends SortableEntry>(
   a: T,
   b: T,
-  valueOf: (entry: T) => number | null,
+  getValue: (entry: T) => number | null,
   direction: "asc" | "desc"
 ): number {
-  const valueA = valueOf(a);
-  const valueB = valueOf(b);
+  const valueA = getValue(a);
+  const valueB = getValue(b);
   if (valueA === null || valueB === null) {
     if (valueA === valueB) return compareByReleaseDesc(a, b);
     return valueA === null ? 1 : -1;

@@ -270,7 +270,7 @@ export function getChartAssetFiles(
       ? { name: "pv.mp4", url: entry.media.pv_url, ...(sizes?.pv ? { bytes: sizes.pv } : {}) }
       : null,
   ];
-  return candidates.filter((file): file is ChartAssetFile => Boolean(file && file.url));
+  return candidates.filter((file): file is ChartAssetFile => Boolean(file?.url));
 }
 
 /**
