@@ -1,26 +1,21 @@
 name: Build and Publish gh-pages
 
+# 推送不触发部署，发布是一个手动动作：
+# - workflow_dispatch：发布所选分支的最新提交。GitHub 的 Actions 页、`gh workflow run`、
+#   dash 的 Actions 面板都能触发。成功后把 `pages-live` 标签移到这个提交上。
+# - schedule：重建 `pages-live` 指向的提交，只为轮换首页精选、吃进上游新数据，
+#   不会把 main 上还没发布的代码带上线。
+# 推送和 PR 的检查（lint、类型、测试、构建）在 web-check.yml。
 on:
-  push:
-    branches:
-      - main
-    # dash 是独立部署的管理后台（apps/dash），它的改动产不出主站内容，
-    # 所以不该触发一轮 catalog→build→deploy。它有自己的 CI：dash-check.yml。
-    # 注意 paths-ignore 只作用于 push —— workflow_dispatch 与 schedule 不受影响，
-    # 这正是我们要的：手动触发和每日轮换仍然照常跑。
-    paths-ignore:
-      - "apps/dash/**"
   workflow_dispatch:
   schedule:
     # Daily 04:00 Asia/Shanghai (20:00 UTC): rotates the homepage spotlight /
     # featured picks, whose seed is the build day (see featured-selection.ts).
     - cron: "0 20 * * *"
 
-# Artifact-based GitHub Pages deploy (no gh-pages branch).
+# Artifact-based GitHub Pages deploy (no gh-pages branch). Jobs widen this as needed.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # Allow one concurrent deployment; let an in-progress run finish.
 concurrency:
@@ -28,8 +23,47 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  # 决定这次构建哪个提交，以及 IndexNow 拿哪个提交做对比基准。
+  # 线上版本记在 `pages-live` 标签上，而不是查部署记录：部署记录存的是触发这次
+  # 运行的 github.sha，定时任务的 github.sha 永远是 main 的最新提交，和它实际
+  # 检出构建的提交对不上，跑过一次记录就指向了没发布的代码。
+  resolve:
     runs-on: ubuntu-latest
+    outputs:
+      build_sha: ${{ steps.pick.outputs.build_sha }}
+      live_sha: ${{ steps.pick.outputs.live_sha }}
+    steps:
+      - name: Pick the commit to build
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          live_sha="$(gh api "repos/${{ github.repository }}/git/ref/tags/pages-live" --jq .object.sha 2>/dev/null || true)"
+          # 标签不存在时 gh 会把 404 的 JSON 写到标准输出（--jq 也拦不住），只认 40 位十六进制的提交号。
+          if ! [[ "$live_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            live_sha=""
+          fi
+
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            build_sha="$live_sha"
+            if [ -z "$build_sha" ]; then
+              echo "::warning::pages-live 标签还不存在（还没有手动发布过），跳过这次定时重建。"
+            fi
+          else
+            build_sha="${{ github.sha }}"
+          fi
+
+          echo "build_sha=$build_sha" >> "$GITHUB_OUTPUT"
+          echo "live_sha=$live_sha" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: resolve
+    if: needs.resolve.outputs.build_sha != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -41,6 +75,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: ${{ needs.resolve.outputs.build_sha }}
           fetch-depth: 0
           filter: blob:none
 
@@ -88,7 +123,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: apps/web/.next/cache
-          key: next-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          key: next-${{ hashFiles('bun.lock') }}-${{ needs.resolve.outputs.build_sha }}
           restore-keys: next-${{ hashFiles('bun.lock') }}-
 
       # Fast quality gate before the expensive build: full builds no longer run
@@ -117,9 +152,30 @@ jobs:
         continue-on-error: true
         working-directory: apps/web
         # Key file, site URL, and CNAME all ship in the repo — no Actions secrets or variables needed.
-        # INDEXNOW_BASE_REF is the last deployed commit, so only charts and pages that
-        # actually changed get submitted; unset on workflow_dispatch, which falls back
-        # to a full submission.
+        # INDEXNOW_BASE_REF 是这次发布前的线上提交（pages-live），只提交真正变了的谱面和页面。
+        # 定时重建时它就是正在构建的提交，于是只剩上游数据带来的变化；标签还不存在时
+        # 为空，脚本退回全量提交。
         env:
-          INDEXNOW_BASE_REF: ${{ github.event.before }}
+          INDEXNOW_BASE_REF: ${{ needs.resolve.outputs.live_sha }}
         run: bun run submit:indexnow
+
+  # 只有手动发布才移动 `pages-live`；定时重建构建的本来就是它指向的提交。
+  # 写权限只给这一个不装任何第三方 action 的 job，上面的构建 job 仍然只读。
+  mark-live:
+    needs: [resolve, deploy]
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Move pages-live to the published commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.resolve.outputs.build_sha }}
+        run: |
+          repo="repos/${{ github.repository }}"
+          if gh api "$repo/git/ref/tags/pages-live" >/dev/null 2>&1; then
+            gh api -X PATCH "$repo/git/refs/tags/pages-live" -f sha="$SHA" -F force=true
+          else
+            gh api "$repo/git/refs" -f ref=refs/tags/pages-live -f sha="$SHA"
+          fi

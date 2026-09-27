@@ -1,0 +1,88 @@
+name: Web check
+
+# 主站推送和 PR 只检查、不部署；发布是手动的，见 deploy-gh-pages.yml。
+# 步骤和部署工作流的前半段保持一致（生成目录 → 补全谱面信息 → 类型检查与测试 → 构建），
+# "检查通过"才基本等于"发布时也能构建成功"。本机不跑 next build，构建只在这里验证。
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - pre
+    paths:
+      - "apps/web/**"
+      - "packages/**"
+      - "pipeline/**"
+      - "data/**"
+      - "patches/**"
+      - "package.json"
+      - "bun.lock"
+      - "biome.jsonc"
+      - ".github/workflows/web-check.yml"
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "packages/**"
+      - "pipeline/**"
+      - "data/**"
+      - "patches/**"
+      - "package.json"
+      - "bun.lock"
+      - "biome.jsonc"
+      - ".github/workflows/web-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 同一分支连续推送时，前一轮没跑完的检查已经没有意义。
+concurrency:
+  group: web-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Build catalog
+        working-directory: pipeline
+        run: python3 -c "from pathlib import Path; from tools.build_catalog import build_catalog; print(build_catalog(Path('..').resolve(), max_workers=16))"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # 同部署工作流：详情页的物量、时长、BPM 等数字都靠这一步，构建前必须跑。
+      - name: Enrich chart details
+        working-directory: apps/web
+        run: bun run enrich:details
+
+      - name: Cache Next.js build
+        uses: actions/cache@v6
+        with:
+          path: apps/web/.next/cache
+          key: next-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: next-${{ hashFiles('bun.lock') }}-
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck and test
+        working-directory: apps/web
+        run: bun run check
+
+      - name: Build site
+        working-directory: apps/web
+        run: bun run build

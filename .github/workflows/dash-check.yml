@@ -1,8 +1,8 @@
 name: Dash check
 
-# 主站的 deploy 工作流用 paths-ignore 排除了 apps/dash，所以 dash 的类型检查
-# 与单测由这条工作流负责。它只跑 check，不构建镜像、不部署 —— 部署是 g510 上
-# 手动 docker compose 拉起的，不经 GitHub。
+# 主站的检查（web-check.yml）只看主站相关路径，部署工作流也不再由推送触发，
+# 所以 dash 的类型检查与单测由这条工作流负责。它只跑 check，不构建镜像、不部署
+# —— 部署是 g510 上手动 docker compose 拉起的，不经 GitHub。
 on:
   push:
     # Check on main, dev, and pre. The pre branch is what the g510 deployment
