@@ -7,9 +7,11 @@ import { jsonError } from "./errors";
 import type { Logger } from "./log";
 import { clientIp } from "./middleware/client-ip";
 import { requestLog } from "./middleware/request-log";
+import { securityHeaders } from "./middleware/security-headers";
 
 export type AppDeps = {
   log: Logger;
+  isProduction: boolean;
 };
 
 // 中间件顺序是 spec 第 8.1 节定的，改动前先对照 spec。
@@ -19,6 +21,7 @@ export function createApp(deps: AppDeps) {
   app.use("*", requestId());
   app.use("*", clientIp());
   app.use("*", requestLog(deps.log));
+  app.use("*", securityHeaders({ isProduction: deps.isProduction }));
 
   app.all("/media/*", (c) => jsonError(c, 404, "NOT_FOUND", "Not found"));
 

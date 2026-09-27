@@ -45,4 +45,9 @@ describe("createApp", () => {
       message: "db password is hunter2",
     });
   });
+
+  test("安全响应头已经挂上", async () => {
+    const res = await createApp(testAppDeps().deps).request("/healthz");
+    expect(res.headers.get("content-security-policy")).toContain("'nonce-");
+  });
 });
