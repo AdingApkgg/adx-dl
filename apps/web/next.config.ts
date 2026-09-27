@@ -9,8 +9,9 @@ const nextConfig: NextConfig = {
   // Client-side navigations (the normal case — RSC payloads ship in the static
   // export) animate via React's <ViewTransition>; see PageTransition in
   // src/app/page-transition.tsx. Hard loads use @view-transition in globals.css.
+  // Since Next 16.3 the App Router enables view transitions with no config, so
+  // the old `experimental.viewTransition` flag is gone.
   experimental: {
-    viewTransition: true,
     // `radix-ui` is a namespace barrel over ~35 primitives; the app renders 9 of
     // them, but the whole barrel landed in the shared first-load chunk. Same
     // story for lucide-react's icon index. Rewriting these to per-primitive

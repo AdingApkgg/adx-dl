@@ -1,8 +1,8 @@
 diff --git a/dist/index.js b/dist/index.js
-index 066f52b5afb294441f020ddeb64930423c47478a..2999edda332553f8f283f0adfff0f7a25e0bfb5b 100644
+index 6806be1e729e0d348b0cc8890e87236e71331980..7e2fab90208e31b4bd37dcc997e51b6879c69bb5 100644
 --- a/dist/index.js
 +++ b/dist/index.js
-@@ -48,7 +48,7 @@ function createSlot(ownerName) {
+@@ -49,7 +49,7 @@ function createSlot(ownerName) {
      let slottableElement = null;
      let hasSlottable = false;
      const newChildren = [];
@@ -11,7 +11,7 @@ index 066f52b5afb294441f020ddeb64930423c47478a..2999edda332553f8f283f0adfff0f7a2
        children = use(children._payload);
      }
      React.Children.forEach(children, (maybeSlottable) => {
-@@ -56,7 +56,7 @@ function createSlot(ownerName) {
+@@ -57,7 +57,7 @@ function createSlot(ownerName) {
          hasSlottable = true;
          const slottable = maybeSlottable;
          let child = "child" in slottable.props ? slottable.props.child : slottable.props.children;
@@ -21,10 +21,10 @@ index 066f52b5afb294441f020ddeb64930423c47478a..2999edda332553f8f283f0adfff0f7a2
          }
          slottableElement = getSlottableElementFromSlottable(slottable, child);
 diff --git a/dist/index.mjs b/dist/index.mjs
-index 8a86d522deab07bfcaa1fa07db14337b6f28a955..62f80f2668085c5e61f0a3a26bdf7c09726b68a0 100644
+index 217af5391d66a92241b546d3435647cfc2669c2f..3cb6384f8711f1d592b090376b83776e2a1f83cc 100644
 --- a/dist/index.mjs
 +++ b/dist/index.mjs
-@@ -8,7 +8,7 @@ function createSlot(ownerName) {
+@@ -11,7 +11,7 @@ function createSlot(ownerName) {
      let slottableElement = null;
      let hasSlottable = false;
      const newChildren = [];
@@ -33,7 +33,7 @@ index 8a86d522deab07bfcaa1fa07db14337b6f28a955..62f80f2668085c5e61f0a3a26bdf7c09
        children = use(children._payload);
      }
      React.Children.forEach(children, (maybeSlottable) => {
-@@ -16,7 +16,7 @@ function createSlot(ownerName) {
+@@ -19,7 +19,7 @@ function createSlot(ownerName) {
          hasSlottable = true;
          const slottable = maybeSlottable;
          let child = "child" in slottable.props ? slottable.props.child : slottable.props.children;
