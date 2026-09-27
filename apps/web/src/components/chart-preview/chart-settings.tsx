@@ -51,6 +51,7 @@ type Labels = {
   audio: string;
   musicVolume: string;
   soundVolume: string;
+  judgeVolume: string;
   musicOffset: string;
   soundOffset: string;
   quality: string;
@@ -89,9 +90,10 @@ const LABELS: Record<Locale, Labels> = {
     showVideo: "背景 PV",
     audio: "音频",
     musicVolume: "音乐音量",
-    soundVolume: "判定音音量",
+    soundVolume: "正解音音量",
+    judgeVolume: "打击音效音量",
     musicOffset: "音乐偏移 (ms)",
-    soundOffset: "判定音偏移 (ms)",
+    soundOffset: "音效偏移 (ms)",
     quality: "全屏画质",
     qSmooth: "流畅",
     qBalanced: "均衡",
@@ -127,6 +129,7 @@ const LABELS: Record<Locale, Labels> = {
     audio: "Audio",
     musicVolume: "Music volume",
     soundVolume: "Answer SFX volume",
+    judgeVolume: "Hit SFX volume",
     musicOffset: "Music offset (ms)",
     soundOffset: "SFX offset (ms)",
     quality: "Fullscreen quality",
@@ -163,9 +166,10 @@ const LABELS: Record<Locale, Labels> = {
     showVideo: "背景 PV",
     audio: "オーディオ",
     musicVolume: "音楽音量",
-    soundVolume: "判定音音量",
+    soundVolume: "正解音音量",
+    judgeVolume: "打鍵音音量",
     musicOffset: "音楽オフセット (ms)",
-    soundOffset: "判定音オフセット (ms)",
+    soundOffset: "効果音オフセット (ms)",
     quality: "全画面画質",
     qSmooth: "スムーズ",
     qBalanced: "バランス",
@@ -427,6 +431,19 @@ export function ChartSettingsAudio({ locale = "zh" }: { locale?: Locale }) {
               onChange={(e) => s.setSoundVolume(Number(e.target.value))}
               className="h-1.5 flex-1 cursor-pointer accent-primary"
               aria-label={t.soundVolume}
+            />
+          </label>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="w-24 shrink-0">{t.judgeVolume}</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={s.judgeVolume}
+              onChange={(e) => s.setJudgeVolume(Number(e.target.value))}
+              className="h-1.5 flex-1 cursor-pointer accent-primary"
+              aria-label={t.judgeVolume}
             />
           </label>
           <label className="flex items-center gap-2 text-xs text-muted-foreground">

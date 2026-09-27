@@ -1,18 +1,16 @@
 /**
- * 滑条类型
+ * 滑条路径类型（simai 语法记号）：
  * - `-`: 直线
- * - `>`: 顺时针弧线（从左侧开始）
- * - `<`: 逆时针弧线（从左侧开始）
- * - `^`: 短弧线（取较短路径）
- * - `v`: V 形穿过中心
- * - `p`: 顺时针曲线
- * - `pp`: 顺时针曲线（双倍）
- * - `q`: 逆时针曲线
- * - `qq`: 逆时针曲线（双倍）
- * - `s`: S 形曲线（从左到右）
- * - `z`: Z 形曲线（从右到左）
- * - `w`: Wi-Fi 滑条（扇形图案）
- * - `V`: V 形带有中间点
+ * - `>`: 顺时针外圈圆弧
+ * - `<`: 逆时针外圈圆弧
+ * - `^`: 两点间较短圆弧
+ * - `v`: 穿过圆心的折线
+ * - `p` / `pp`: 顺时针回旋曲线（pp 为双倍）
+ * - `q` / `qq`: 逆时针回旋曲线（qq 为双倍）
+ * - `s`: S 形平滑曲线
+ * - `z`: 反向 Z 形平滑曲线
+ * - `w`: 扇形 Wi-Fi 滑条
+ * - `V`: 经由指定拐点的折线
  */
 export type SlidePathType =
   | "-"
@@ -30,12 +28,7 @@ export type SlidePathType =
   | "V";
 
 /**
- * 触摸判定区
- * - A1-A8: 外环判定区
- * - B1-B8: 内环判定区
- * - C1, C2: 中心判定区
- * - D1-D8: 按钮区域判定区
- * - E1-E8: 边缘判定区
+ * 屏幕触摸传感器分区（A1~A8 外环、B1~B8 内环、C/C1/C2 中心、D1~D8 按键内侧、E1~E8 边缘）。
  */
 export type TouchPosition =
   | "A1"
@@ -75,33 +68,29 @@ export type TouchPosition =
   | "E8";
 
 /**
- * 按钮位置（1-8，顺时针从右上开始）
+ * 外圈按键方位编号（1 ~ 8，右上 1 号键起顺时针排列）。
  */
 export type ButtonPosition = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
-/**
- * 镜像模式
- * - none: 无
- * - horizontal: 水平
- * - vertical: 垂直
- * - rotate180: 旋转180度
- */
+/** 谱面镜像模式（无镜像、左右翻转、上下翻转、旋转 180 度）。 */
 export type MirrorMode = "none" | "horizontal" | "vertical" | "rotate180";
 
 /**
- * 判定线显示
- * - blind: 无
- * - noLine: 判定点
- * - simple: 判定点 + 判定线
- * - sensor: 判定点 + 判定线 + 判定区
+ * 判定线显示样式：
+ * - `blind`: 隐藏判定线与判定点
+ * - `noLine`: 仅显示判定点
+ * - `simple`: 判定点 + 外圈判定线
+ * - `sensor`: 判定点 + 外圈线 + 触摸传感器分区
  */
 export type JudgmentLineDesign = "blind" | "noLine" | "simple" | "sensor";
 
+/** 谱面难度编号（1: EASY ~ 6: Re:MASTER，7: 宴）。 */
 // 本地补丁：7 = 宴 (UTAGE)。simai 用 &inote_7= 存宴谱，须与 1–6 一同支持，否则
 // 宴会场谱面（只有槽 7）会被误判为单难度谱、退化成默认 MASTER(4)，解析时抛
 // "Difficulty 4 not found. Available: 7"。上游至今仍只支持 1–6，re-sync 时须重打。
 export type ChartDifficulty = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
+/** 各难度显示名称 */
 export const DIFFICULTY_NAMES: Record<ChartDifficulty, string> = {
   1: "EASY",
   2: "BASIC",
@@ -112,6 +101,7 @@ export const DIFFICULTY_NAMES: Record<ChartDifficulty, string> = {
   7: "宴",
 };
 
+/** 各难度主题色 */
 export const DIFFICULTY_COLORS: Record<ChartDifficulty, string> = {
   1: "#1E3A8A",
   2: "#22C55E",
@@ -122,166 +112,196 @@ export const DIFFICULTY_COLORS: Record<ChartDifficulty, string> = {
   7: "#EC4899",
 };
 
+/**
+ * 滑条路径采样查找表（LUT）中的离散点。
+ */
 export interface SlideArcLutPoint {
+  /** 画布像素 X 坐标 */
   x: number;
+  /** 画布像素 Y 坐标 */
   y: number;
-  /** 入向切线角（rad） */
+  /** 该点的切线角度（rad） */
   angle: number;
-  /** 累计弧长 */
+  /** 从起点到该点的累计弧长（px） */
   s: number;
 }
 
+/**
+ * 单段滑条的几何参数与采样缓存。
+ */
 export interface SlideSegment {
-  /** 滑条路径类型 */
   type: SlidePathType;
-  /** 起始按钮位置（1-8） */
   startPos: ButtonPosition;
-  /** 结束按钮位置（1-8） */
   endPos: ButtonPosition;
-  /** V（大写折返）滑条的拐点按钮（仅 type==="V" 时存在），detectSlideShape 用它判 L/R 侧 */
+  /** 折线滑条（V）的拐点按键（1~8） */
   midPos?: ButtonPosition;
-  /** 缓存长度（懒计算） */
+  /** 缓存的滑条总弧长（px，半径或镜像变化时失效） */
   cachedLength?: number;
-  /** 缓存弧长 LUT（懒计算，star 头部按弧长定位） */
+  /** 引导星插值定位用的弧长采样表（LUT，半径或镜像变化时失效） */
   cachedLut?: readonly SlideArcLutPoint[];
-  /** 缓存对应的 canvas radius，size 变化（全屏切换/窗口 resize）时用于失效 */
+  /** 缓存 LUT 时记录的判定圈半径，用于尺寸变化时失效 */
   cachedRadius?: number;
-  /** 缓存对应的 mirror mode，切换 mirror 时用于失效 */
+  /** 缓存 LUT 时记录的镜像模式，用于镜像变化时失效 */
   cachedMirrorMode?: string;
-  /** 缓存 bar chain（懒计算，每帧不变；按 radius/mirror 失效，与 LUT 同源依赖） */
+  /** 缓存的引导箭头点位和角度序列（半径或镜像变化时失效） */
   cachedChain?: { x: number; y: number; angle: number }[];
+  /** 缓存引导点序列时的判定圈半径，用于失效判定 */
   cachedChainRadius?: number;
+  /** 缓存引导点序列时的镜像模式，用于失效判定 */
   cachedChainMirror?: string;
 }
 
+/**
+ * 所有 Note 的基础字段。
+ */
 export interface BaseNote {
-  /** 按钮位置（1-8） */
+  /** 原始谱面音符记录序号；合成的 Hold 尾不占用序号。 */
+  sourceNoteIndex?: number;
+  /** 按键方位（1~8）或触摸传感器区域 */
   position: ButtonPosition | TouchPosition;
-  /** 时间（拍） */
+  /** 判定时刻（拍） */
   timing: number;
-  /** 时间（毫秒） */
+  /** 判定时刻（ms） */
   timingMs: number;
-  /** 小节号（0-indexed in parser, 1-indexed after adjustment） */
+  /** 小节序号（解析阶段为 0 起始，后处理后转为 1 起始） */
   measure: number;
-  /** 小节内位置（0-511） */
+  /** 小节内细分位置（0~511，基于 512 分音符解析度） */
   positionInMeasure: number;
-  /** 视觉缩放因子（用于接近动画） */
+  /** 进场缩放倍率 */
   scale: number;
-  /** 此 Note 的时间 BPM */
+  /** 该时刻的 BPM */
   bpm: number;
-  /** 此 Note 是否有延迟标记（simai 中的反引号） */
+  /** 是否有延迟起滑/等待标记 */
   hasDelayMarker?: boolean;
-  /** 视觉流速倍率（simai `<HS*x>`），只缩放接近速度，不影响判定时刻 */
+  /** 局部流速倍率（仅缩放进场速度，不改变判定时刻） */
   hiSpeed?: number;
 }
 
+/**
+ * Tap 音符（普通 Tap、Break 或同压）。
+ */
 export interface TapNote extends BaseNote {
   type: "tap" | "break" | "simultaneous";
   position: ButtonPosition;
-  /** 是否为星形 TAP（simai `$`） */
+  /** 是否显示为星星外观 */
   isStar?: boolean;
-  /** 星形 TAP 是否旋转（simai `$$`） */
+  /** 星星是否持续自转 */
   isSpinningStar?: boolean;
-  /** 是否有保护套 */
+  /** 是否为 EX 音符（带发光外环） */
   isEx?: boolean;
 }
 
+/**
+ * Hold 起始端数据。
+ */
 export interface HoldStartNote extends BaseNote {
   type: "hold-start" | "hold-start-simultaneous";
   position: ButtonPosition;
-  /** 持续时间（拍） */
+  /** Hold 持续时长（拍） */
   duration: number;
-  /** 是否为 Hold 开始 */
   isHoldStart: true;
-  /** 是否为绝赞 Note */
+  /** 是否为 EX 音符（带发光外环） */
   isEx?: boolean;
-  /** 是否为绝赞 Hold */
+  /** 是否为 Break Hold */
   isBreakHold?: boolean;
 }
 
+/**
+ * Hold 结束端数据。
+ */
 export interface HoldEndNote extends BaseNote {
   type: "hold-end" | "hold-end-simultaneous";
   position: ButtonPosition;
-  /** 对应的 Hold 开始时间（拍） */
+  /** 对应 Hold 起始端的判定时刻（拍） */
   holdStartTiming: number;
-  /** 是否为 Hold 结束 */
   isHoldEnd: true;
-  /** 是否有保护套 */
+  /** 是否为 EX 音符（带发光外环） */
   isEx?: boolean;
-  /** 是否为绝赞 Hold */
+  /** 是否为 Break Hold */
   isBreakHold?: boolean;
 }
 
+/**
+ * Slide 音符，包含引导头、轨迹路径段和时序配置。
+ */
 export interface SlideNote extends BaseNote {
   type: "slide";
   position: ButtonPosition;
-  /** 是否隐藏滑条起始星星 */
+  /** 是否隐藏起点引导星（无头 Slide） */
   isHeadless?: boolean;
-  /** 无头滑条 tracing star 显示方式：simai `?` 为 fade，`!` 为 pop */
+  /** 无头 Slide 引导星出现方式："fade" 淡入，"pop" 弹出 */
   headlessMode?: "fade" | "pop";
-  /** 滑条头是否画成普通 TAP 而非星星头（simai `@`）；isHeadless 时无意义 */
+  /** 起点是否显示为普通 Tap 外观而非星星（isHeadless 时无效） */
   hasTapHead?: boolean;
-  /** 滑条起始 Note 是否为绝赞 */
+  /** 起点是否为 Break */
   isStartBreak?: boolean;
-  /** 每个滑条路径是否为绝赞 */
+  /** 并发多滑条时，各条路径是否分别为 Break */
   allSlideBreaks?: boolean[];
-  /** 是否有保护套 */
+  /** 是否为 EX 音符（带发光外环） */
   isEx?: boolean;
-  /** 持续时间（拍） */
+  /** 滑行时长（拍） */
   duration: number;
-  /** 持续时间（毫秒） */
+  /** 滑行时长（ms） */
   durationMs: number;
-  /** 滑条开始前的延迟时间（毫秒） */
+  /** 到达判定线后到起滑前的等待延迟（ms） */
   delayMs?: number;
-  /** 滑条路径段 */
+  /** 第一条滑条的路径段 */
   slideSegments: SlideSegment[];
-  /** 所有滑条路径段（用于分段滑条） */
+  /** 各并发滑条的路径段（多滑条场景） */
   allSlideSegments?: SlideSegment[][];
-  /** 所有持续时间（拍）（用于分段滑条） */
+  /** 各并发滑条的滑行时长（拍） */
   allDurations?: number[];
-  /** 所有持续时间（毫秒）（用于分段滑条） */
+  /** 各并发滑条的滑行时长（ms） */
   allDurationMs?: number[];
-  /** 所有延迟时间（毫秒）（用于分段滑条） */
+  /** 各并发滑条的等待延迟（ms） */
   allDelayMs?: number[];
-  /** 所有自定义长度（用于分段滑条） */
+  /** 各并发滑条的自定义显示长度比例 */
   allCustomLengths?: (number | null)[];
-  /** 是否为分段滑条（多个滑条路径） */
+  /** 是否包含多条同时起动的并发滑条 */
   isSplitSlide?: boolean;
-  /** 自定义显示长度 */
+  /** 自定义显示长度比例（null 为完整路径） */
   customLength?: number | null;
 }
 
+/**
+ * Touch 音符。
+ */
 export interface TouchNote extends BaseNote {
   type: "touch";
   position: TouchPosition;
-  /** 是否有烟花效果 */
+  /** 是否附带烟花特效（simai f 标记） */
   hasFirework?: boolean;
 }
 
+/**
+ * Touch Hold 起始端数据。
+ */
 export interface TouchHoldStartNote extends BaseNote {
   type: "touch-hold-start";
   position: TouchPosition;
-  /** 持续时间（拍） */
+  /** Hold 持续时长（拍） */
   duration: number;
-  /** 持续时间（毫秒） */
+  /** Hold 持续时长（ms） */
   durationMs: number;
-  /** 是否有烟花效果 */
+  /** 是否附带烟花特效（simai f 标记） */
   hasFirework?: boolean;
-  /** 是否为 Hold 开始 */
   isHoldStart: true;
 }
 
+/**
+ * Touch Hold 结束端数据。
+ */
 export interface TouchHoldEndNote extends BaseNote {
   type: "touch-hold-end";
   position: TouchPosition;
-  /** 对应的 Hold 开始时间（拍） */
+  /** 对应 Hold 起始端的判定时刻（拍） */
   holdStartTiming: number;
-  /** 是否有烟花效果 */
+  /** 是否附带烟花特效（simai f 标记） */
   hasFirework?: boolean;
-  /** 是否为 Hold 结束 */
   isHoldEnd: true;
 }
 
+/** 所有音符对象的联合类型 */
 export type Note =
   | TapNote
   | HoldStartNote
@@ -291,20 +311,23 @@ export type Note =
   | TouchHoldStartNote
   | TouchHoldEndNote;
 
+/** BPM 变更事件 */
 export interface BpmEvent {
-  /** BPM 变化时间（拍） */
+  /** 发生变更的时刻（拍） */
   timing: number;
-  /** 新 BPM 值 */
+  /** 变更后的 BPM */
   bpm: number;
 }
 
+/** 节拍分频变更事件 */
 export interface DivisorEvent {
-  /** 拍子变化时间（拍） */
+  /** 发生变更的时刻（拍） */
   timing: number;
-  /** 新拍子值（例如：4, 8, 16, 20） */
+  /** 变更后的小节分频数（如 4、8、16、20 等） */
   divisor: number;
 }
 
+/** 各难度等级文本映射（lv_1 ~ lv_6 对应难度编号 1 ~ 6） */
 export interface ChartLevels {
   lv_1?: string;
   lv_2?: string;
@@ -315,6 +338,7 @@ export interface ChartLevels {
   lv_7?: string; // 本地补丁：宴 (UTAGE)
 }
 
+/** 各难度谱师名称映射（des_1 ~ des_6 对应难度编号 1 ~ 6） */
 export interface ChartDesigners {
   des_1?: string;
   des_2?: string;
@@ -325,6 +349,7 @@ export interface ChartDesigners {
   des_7?: string; // 本地补丁：宴 (UTAGE)
 }
 
+/** 各难度可用状态（key 为难度编号 1 ~ 6） */
 export interface AvailableDifficulties {
   1?: boolean;
   2?: boolean;
@@ -335,63 +360,64 @@ export interface AvailableDifficulties {
   7?: boolean; // 本地补丁：宴 (UTAGE)
 }
 
+/**
+ * 完整解析后的谱面数据。
+ */
 export interface Chart {
-  /** 曲目标题 */
   title: string;
-  /** 曲目艺术家 */
   artist: string;
-  /** 谱师 */
   designer: string;
   /** 初始 BPM */
   bpm: number;
-  /** 难度等级 */
   level: ChartLevels;
-  /** 谱师 */
   designers: ChartDesigners;
-  /** 选择难度 */
   difficulty?: ChartDifficulty;
-  /** 可用难度 */
   availableDifficulties?: AvailableDifficulties;
   /** 总小节数 */
   measures: number;
-  /** 所有 Note */
+  /** 所有音符列表 */
   notes: Note[];
-  /** BPM 变化事件 */
+  /** 按节拍时刻排序的 BPM 变更事件 */
   bpmEvents: BpmEvent[];
-  /** 拍子变化事件 */
+  /** 按节拍时刻排序的节拍分频变更事件 */
   divisorEvents: DivisorEvent[];
-  /** 谱面正文起点在音频中的偏移（`&first`，毫秒） */
+  /** 谱面正文起点在音频中的偏移（&first，ms） */
   firstMs?: number;
 }
 
+/**
+ * 谱面全局元数据（包含各难度未解析的原始谱面文本）。
+ */
 export interface ChartMetadata {
   /** 初始 BPM */
   bpm: number;
-  /** 曲目标题 */
   title: string;
-  /** 曲目艺术家 */
   artist: string;
-  /** 谱师 */
   designer: string;
-  /** 难度等级 */
   level: ChartLevels;
-  /** 谱师 */
   designers: ChartDesigners;
-  /** 可用难度 */
   availableDifficulties: AvailableDifficulties;
-  /** 谱面内容 */
+  /** 各难度原始谱面文本（键为难度编号 1 ~ 6） */
   inotes: Record<number, string>;
-  /** 谱面正文起点在音频中的偏移（`&first`，秒） */
+  /** 谱面正文起点在音频中的偏移（&first，s） */
   firstSec?: number;
 }
 
+/**
+ * 音符在特定渲染帧中的屏幕坐标与可视状态。
+ */
 export interface NoteRenderPosition {
   x: number;
   y: number;
+  /** 当前缩放倍率 */
   scale: number;
+  /** 是否处于可见进场范围 */
   visible: boolean;
 }
 
+/**
+ * 二维平面坐标点（px）。
+ */
 export interface Point2D {
   x: number;
   y: number;
@@ -408,82 +434,97 @@ export interface HudLabels {
   breakNoEx: string;
 }
 
+/**
+ * 渲染器全局视觉与播放配置。
+ */
 export interface RendererConfig {
-  /** 谱面流速：3-9 */
+  /** 基准流速倍率（通常 3.0 ~ 9.0） */
   hiSpeed: number;
-  /** 保持固定流速 */
+  /** 调整播放倍速时是否保持固定进场速度（自动补偿倍速） */
   alwaysKeepHiSpeed: boolean;
-  /** 播放速度：0.1-2.0（本地补丁把上游的 1.0 上限提到 2.0） */
+  /** 星星轨迹出现时机（-1.0 最早 ~ 1.0 最晚，步长 0.1，不改变判定时刻） */
+  slideDelay: number;
+  /** 播放速度倍率（0.1 ~ 2.0；本地补丁把上游的 1.0 上限提到 2.0） */
   playbackSpeed: number;
-  /** 镜像模式：上下反、左右反、全反 */
   mirrorMode: MirrorMode;
-  /** 是否高亮保护套 Note */
+  /** 是否高亮带发光外环的 EX 音符 */
   highlightExNotes: boolean;
-  /** 是否使用正常颜色显示绝赞滑条 */
+  /** 是否用常规颜色显示 Break 滑条（而非黄色） */
   normalColorBreakSlide: boolean;
-  /** 是否使用粉色显示滑条起点 */
+  /** 是否将滑条起点显示为粉色 */
   pinkSlideStart: boolean;
-  /** 是否旋转滑条起点 */
+  /** 滑条起点的星星是否随时间自转 */
   slideRotation: boolean;
-  /** 判定线显示：无、判定点、判定线、判定区 */
   judgmentLineDesign: JudgmentLineDesign;
-  /** 是否显示当前 BPM */
+  /** 是否显示实时 BPM */
   showBpm: boolean;
   /** 是否显示 Note 总数 */
   showNoteTotal: boolean;
-  /** 是否显示绝赞总数 */
+  /** 是否显示 Break 总数 */
   showBreakCount: boolean;
-  /** 是否显示当前绝赞位置 */
+  /** 是否在 Break 上显示打击序号 */
   showBreakIndex: boolean;
-  /** 是否使用彩虹色显示当前 BPM */
+  /** 是否以彩虹色显示 BPM */
   rainbowBpm: boolean;
-  /** 是否使用 DDR 风格显示判定线 */
+  /** 是否启用按拍位分频的着色模式（1/1、1/2、1/4 等） */
   ddrColorMode: boolean;
-  /** 是否使用扩展 DDR 风格显示判定线 */
+  /** 是否启用扩展拍位着色模式（额外区分 1/8、1/6 等） */
   ddrColorExtended: boolean;
-  /** 是否显示烟花特效（touch `f` 标记） */
+  /** 是否显示 Touch 烟花特效 */
   showFireworks: boolean;
-  /** 是否显示判定点打击特效（tap / hold 尾 / 星星头 / 绝赞） */
+  /** 是否显示打击命中特效（Tap / Hold 尾 / 引导星 / Break） */
   showHitEffect: boolean;
 }
 
+/**
+ * 击打音效播放配置。
+ */
 export interface AudioConfig {
-  /** 是否启用正解音 */
+  /** 是否启用击打音效 */
   enabled: boolean;
-  /** 是否启用长条结束音 */
+  /** 是否启用 Hold 结束音效 */
   holdEndSoundEnabled: boolean;
-  /** 是否启用触摸正解音 */
+  /** 是否启用 Touch 击打音效 */
   touchSoundEnabled: boolean;
-  /** 音量：0-1 */
+  /** 正解音层音量（0 ~ 1） */
   volume: number;
-  /** 正解音延迟时间（毫秒） */
+  /** 判定音层音量（0 ~ 1） */
+  judgeVolume: number;
+  /** 音效播放时间偏移（ms，正数延迟，负数提前） */
   timingOffsetMs: number;
 }
 
+/** 判断音符是否为点按类（tap、break、simultaneous） */
 export function isTapNote(note: Note): note is TapNote {
   return note.type === "tap" || note.type === "break" || note.type === "simultaneous";
 }
 
+/** 判断音符是否为 Hold 起始端（hold-start、hold-start-simultaneous） */
 export function isHoldStartNote(note: Note): note is HoldStartNote {
   return note.type === "hold-start" || note.type === "hold-start-simultaneous";
 }
 
+/** 判断音符是否为 Hold 结束端（hold-end、hold-end-simultaneous） */
 export function isHoldEndNote(note: Note): note is HoldEndNote {
   return note.type === "hold-end" || note.type === "hold-end-simultaneous";
 }
 
+/** 判断音符是否为滑条（slide） */
 export function isSlideNote(note: Note): note is SlideNote {
   return note.type === "slide";
 }
 
+/** 判断音符是否为 Touch 音符（touch） */
 export function isTouchNote(note: Note): note is TouchNote {
   return note.type === "touch";
 }
 
+/** 判断音符是否为 Touch Hold 起始端（touch-hold-start） */
 export function isTouchHoldStartNote(note: Note): note is TouchHoldStartNote {
   return note.type === "touch-hold-start";
 }
 
+/** 判断音符方位是否属于外圈 1~8 号按键（区别于屏幕触摸传感器） */
 export function isButtonNote(note: Note): boolean {
   return typeof note.position === "number" && note.position >= 1 && note.position <= 8;
 }

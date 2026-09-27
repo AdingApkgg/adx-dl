@@ -10,11 +10,31 @@ Vendored from **Lxns-Network/maimai-prober-frontend** (`packages/maimai-chart-en
 MIT licensed — see `LICENSE`. Copy taken verbatim; keep changes minimal so it can
 be re-synced from upstream. If you patch it, note the change here.
 
-**Last synced:** upstream commit `8ef0d710e` (2026-08-21, cherry-picked by hand —
-the only engine change since the previous full sync). Pulled PR #82: simai `@`
-slide-head modifier (`hasTapHead` on `SlideNote` — head renders as a plain TAP
-in `TAP_PINK` instead of a star) and order-free TAP modifiers (`1$b` ≡ `1b$`,
-spinning star by `$` count).
+**Last synced:** upstream commit `6c8195b95` (2026-09-25, full sync). Pulled
+everything since `8ef0d710e`: the rebuilt hit effects (new `src/effects/` —
+Tap/Touch hit effects, Touch fireworks, Hold effect), the Touch rendering
+rework with arcade cross-note draw order (`utils/drawGroupSort`,
+`touchDrawOrder`, `touchGeometry`, `touchSourceIndices`), slide delay and
+arcade-timed slide fade-in (`core/timing/slideAppearance`,
+`MainRenderer.setSlideDelay`, `RendererConfig.slideDelay`), the AudioManager
+rewrite with a separate hit-sound layer (`AudioConfig.judgeVolume` /
+`setJudgeVolume`, ten new SFX assets), render performance work, and the
+comment cleanup. The local patches below were re-applied with a three-way
+merge (base `8ef0d710e`, ours, upstream HEAD); all six survived.
+
+App-layer migration for this sync: `AudioConfig` gained the required
+`judgeVolume`, so `hooks/use-audio.ts` exposes `setJudgeVolume`, the settings
+store persists `judgeVolume` (default 1, like upstream), `chart-canvas.tsx`
+applies it, and the audio settings group has a "hit SFX volume" slider next to
+the (renamed) answer SFX volume. Upstream also dropped its answer-sound toggle;
+we keep ours in the transport bar — it now mutes both layers.
+
+Upstream's engine tests now live in `tests/` (vitest API; `bun test` runs them
+unchanged, 64 tests). Run `bun test` in this package after every re-sync.
+
+Earlier sync: upstream commit `8ef0d710e` (2026-08-21, cherry-picked by hand) —
+PR #82, simai `@` slide-head modifier (`hasTapHead`) and order-free TAP
+modifiers (`1$b` ≡ `1b$`).
 
 Previous full sync: upstream commit `b3ec6089b2834f4074ef590a39b1b137b2904609` (2026-07-24).
 That sync pulled the extreme-density render optimizations (time-window binary
@@ -87,15 +107,15 @@ manager no longer creates the `AudioContext` (the app owns it), so a mid-fetch
 
 ## Runtime assets
 
-The renderer fetches two files (paths overridable via constructor config):
+The renderer and audio manager fetch these files from
+`apps/web/public/assets/maimai/chart/` (paths overridable via constructor config
+for the sensor image):
 
-- `MainRenderer(canvas, bpm, { sensorImagePath })` → default `/assets/maimai/chart/sensor.webp`
-- `AudioManager({ answerSoundPath })` → default `/assets/maimai/chart/answer.wav`
+- `MainRenderer(canvas, { sensorImagePath })` → default `/assets/maimai/chart/sensor.webp`
+- `AudioManager` answer layer → `answer.wav`
+- `AudioManager` hit-sound layer → `tap.wav`, `touch.wav`, `break.wav`, `slide.wav`,
+  `cheer.wav`, `ex.wav`, `firework.wav`, `break_slide.wav`, `break_slide_cheer.wav`,
+  `touch_hold.wav`
 
-Both are shipped in `apps/web/public/assets/maimai/chart/`.
-
-## Public API
-
-`parseSimaiChart`, `getAvailableDifficulties`, `MainRenderer`, `AudioManager`,
-plus the `Chart` / `Note` / `ChartDifficulty` / `HudLabels` types. See
-`src/index.ts`.
+Copy them from upstream `public/assets/maimai/chart/` on every re-sync — the
+2026-09 sync also replaced `answer.wav`.

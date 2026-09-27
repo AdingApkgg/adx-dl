@@ -7,9 +7,9 @@ interface BpmPoint {
 }
 
 /**
- * 谱面 beat 与物理 ms 互转的权威原语。构造时把 BPM 变速事件积分成累积毫秒，
- * 之后 msFromBeat / beatFromMs 为 O(log n) 二分查询。
- * 应用层 timeConversion 与渲染器热路径都应复用本类，避免各自开码 BPM 扫描。
+ * 谱面 beat 与物理 ms 互转的权威原语。
+ * 构造时把所有 BPM 变速事件积分为累积毫秒，后续换算全走 O(log n) 二分查询。
+ * 应用层和渲染热路径一律复用本类，千万别自己再写一套扫描 BPM 的循环。
  */
 export class TimingTimeline {
   private defaultBpm: number;
@@ -32,6 +32,7 @@ export class TimingTimeline {
     return new TimingTimeline(chart.bpm, chart.bpmEvents, chart.divisorEvents);
   }
 
+  /** 计算指定节拍对应的绝对时刻（ms）。负数或首个变速前的节拍按默认 BPM 线性推算。 */
   msFromBeat(beat: number): number {
     const pointIndex = this.findLastLe(this.bpmPoints, (p) => p.timing, beat);
     if (pointIndex < 0) {
@@ -42,6 +43,7 @@ export class TimingTimeline {
     return point.cumulativeMs + ((beat - point.timing) * 60000) / point.bpm;
   }
 
+  /** 计算指定绝对时刻（ms）对应的节拍。负数或首个变速前的时间按默认 BPM 线性推算。 */
   beatFromMs(ms: number): number {
     const pointIndex = this.findLastLe(this.bpmPoints, (p) => p.cumulativeMs, ms);
     if (pointIndex < 0) {
@@ -52,11 +54,13 @@ export class TimingTimeline {
     return point.timing + ((ms - point.cumulativeMs) * point.bpm) / 60000;
   }
 
+  /** 获取指定节拍处生效的 BPM。早于首个变速事件时返回默认 BPM。 */
   bpmAtBeat(beat: number): number {
     const pointIndex = this.findLastLe(this.bpmPoints, (p) => p.timing, beat);
     return pointIndex < 0 ? this.defaultBpm : this.bpmPoints[pointIndex].bpm;
   }
 
+  /** 获取指定节拍处生效的分频数。早于首个分频事件或未提供时默认返回 4。 */
   divisorAtBeat(beat: number): number {
     const index = this.findLastLe(this.divisorEvents, (e) => e.timing, beat);
     return index < 0 ? 4 : this.divisorEvents[index].divisor;
@@ -85,7 +89,6 @@ export class TimingTimeline {
     return points;
   }
 
-  /** 二分查找最后一个 value &lt;= target 的元素索引，不存在则返回 -1。 */
   private findLastLe<T>(arr: readonly T[], getValue: (item: T) => number, target: number): number {
     let lo = 0;
     let hi = arr.length - 1;

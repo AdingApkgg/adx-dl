@@ -1,33 +1,24 @@
 import { ButtonPosition, SlidePathType } from "../types";
 
 /**
- * Slide 分区消失（chunky disappearance）的数据驱动表。
- *
- * 每种 slide 形状路径上的箭头总数 + progress 分位上的累积消失到第几个 bar。
- *
- * 用法：
- *   1. `detectSlideShape(slideType, startPos, endPos)` → `{ shape, mirror }`
- *   2. `SLIDE_AREA_STEP_MAP[shape]` → `number[]`，N+1 个值（含起始 0 和终点）。
- *   3. 非 wifi 渲染：`hiddenCount = steps[floor(progress * (steps.length - 1))]`
- *   4. wifi 渲染（chunky 隐藏 inclusive）：`hiddenCount = steps[i] + 1`
+ * 滑条分段消失（chunky disappearance）的形状判定与步进数据。
  */
 
 const MIRROR_KEYS: readonly number[] = [-1, 1, 8, 7, 6, 5, 4, 3, 2];
 const UPPER_HALF: ReadonlySet<number> = new Set([1, 2, 7, 8]);
 
-/** 沿 button 1-5 对角轴的反射：1↔1, 2↔8, 3↔7, 4↔6, 5↔5。 */
+/** 按 1-5 对角轴翻转按键编号（1↔1, 2↔8, 3↔7, 4↔6, 5↔5）。 */
 export function mirrorKey(key: number): number {
   return MIRROR_KEYS[key] ?? key;
 }
 
-/** 起点在上半盘（button 1/2/7/8）。用于 `>` / `<` 方向消歧。 */
 export function isUpperHalf(key: number): boolean {
   return UPPER_HALF.has(key);
 }
 
 /**
- * 起点 → 终点的 CW 相对距离（1..8）。结果 1 表示原地（少数 slide 允许），
- * 2 表示 CW 一步，以此类推；7 表示 CW 七步 = CCW 一步。
+ * 计算从起点顺时针到终点的相对步长（返回 1..8）。
+ * 注意重合时返回 1（非 0），顺时针隔 1 步返回 2，逆时针 1 步返回 8。
  */
 export function relativeEnd(startPos: ButtonPosition, endPos: ButtonPosition): number {
   const d = (((endPos - startPos) % 8) + 8) % 8;
@@ -35,16 +26,15 @@ export function relativeEnd(startPos: ButtonPosition, endPos: ButtonPosition): n
 }
 
 export interface SlideShape {
-  /** SLIDE_AREA_STEP_MAP 的键。 */
+  /** 对应 SLIDE_AREA_STEP_MAP 的形状 key */
   shape: string;
-  /** 是否需要沿 button 1-5 对角轴反射（左右卷互换）。 */
+  /** 是否沿 1-5 轴做镜像翻转 */
   mirror: boolean;
 }
 
 /**
- * simai 字符 + 起止按钮 → 形状模板名 + 是否镜像；V 折返还需传入 midPos 拐点。
- * 返回 null 表示 slide 不合法（如 `1-2` 太近、`1v5` 穿心、`1^1` 同点，
- * 或 V 缺 midPos / midPos 不在 start±2 / 长度越界）。
+ * 把滑条路径和起止键位匹配到基础形状模板与镜像标记（对应 SLIDE_AREA_STEP_MAP）。
+ * 折线（V）必须传入拐点 midPos。非法滑条或不支持的类型返回 null。
  */
 export function detectSlideShape(
   slideType: SlidePathType,
@@ -56,16 +46,15 @@ export function detectSlideShape(
 
   switch (slideType) {
     case "-": {
-      // 必须至少隔一键：rel ∈ [3, 7]
       if (rel < 3 || rel > 7) return null;
-      // 归一化到短弧方向：line6→line4, line7→line3，bar 数和 area step 完全一致。
+      // 对称两端的分区步进和箭头数完全一致，镜像复用跨度较小的模板（line6→line4, line7→line3）
       const normRel = rel > 5 ? 10 - rel : rel;
       const mirror = normRel !== rel;
       return { shape: `line${normRel}`, mirror };
     }
 
     case ">":
-      // 顺时针弧；起点在上半盘走原版，否则走镜像版本（保证视觉永远偏外侧）
+      // 基础模板默认向上外凸，下半区起点沿 1-5 轴镜像以保持外凸朝向
       return isUpperHalf(startPos)
         ? { shape: `circle${rel}`, mirror: false }
         : { shape: `circle${mirrorKey(rel)}`, mirror: true };
@@ -76,14 +65,13 @@ export function detectSlideShape(
         : { shape: `circle${mirrorKey(rel)}`, mirror: true };
 
     case "^":
-      // 取短边方向。rel<5 走 CW 短边 = circle 原版；rel>5 走 CCW 短边 = 镜像。
       if (rel === 1 || rel === 5) return null;
+      // 短弧走较短一侧：跨度超半圆（rel > 5）时逆时针更短，镜像复用顺时针模板
       return rel < 5
         ? { shape: `circle${rel}`, mirror: false }
         : { shape: `circle${mirrorKey(rel)}`, mirror: true };
 
     case "v":
-      // 穿心 V，不能终点 = 起点对称（rel = 5）
       if (rel === 5) return null;
       return { shape: `v${rel}`, mirror: false };
 
@@ -100,7 +88,6 @@ export function detectSlideShape(
       return { shape: `pq${mirrorKey(rel)}`, mirror: true };
 
     case "s":
-      // s 必须穿心
       if (rel !== 5) return null;
       return { shape: "s", mirror: false };
 
@@ -110,12 +97,13 @@ export function detectSlideShape(
 
     case "V": {
       if (midPos === undefined) return null;
-      const leftCorner = (((startPos + 5) % 8) + 1) as ButtonPosition; // start-2
-      const rightCorner = (((startPos + 1) % 8) + 1) as ButtonPosition; // start+2
+      // 拐点必须在起点左右两键（start ± 2）；右侧拐点镜像复用 L 模板
+      const leftCorner = (((startPos + 5) % 8) + 1) as ButtonPosition;
+      const rightCorner = (((startPos + 1) % 8) + 1) as ButtonPosition;
       if (midPos === leftCorner && rel >= 2 && rel <= 5) {
         return { shape: `L${rel}`, mirror: false };
       }
-      const mirrorRel = ((8 - (rel - 1)) % 8) + 1; // 镜像侧相对距
+      const mirrorRel = ((8 - (rel - 1)) % 8) + 1;
       if (midPos === rightCorner && mirrorRel >= 2 && mirrorRel <= 5) {
         return { shape: `L${mirrorRel}`, mirror: true };
       }
@@ -131,15 +119,15 @@ export function detectSlideShape(
 }
 
 /**
- * 每个形状的 bar 累积索引序列 `[s0, s1, ..., sN]`：sN 是箭头总数，progress 区间
- * [i/N, (i+1)/N) 内已消失的箭头数 = s_i，跨区间时差 `s_{i+1} - s_i` 一次性消失
- * （chunk 大小非均匀，跟 slide 横穿的触摸 zone 挂钩）。
+ * 各形状分段消失（chunky disappearance）的已隐藏箭头累积步进表。
+ * 数组首项为 0，末项为总箭头数。步长不均匀，对应滑条穿过的各个触摸判定区。
+ * 注意 wifi 滑条为包含性判定（步进值 + 1），普通滑条则按进度所在区间整批隐藏。
  */
 export const SLIDE_AREA_STEP_MAP: { readonly [shape: string]: readonly number[] } = {
   line3: [0, 2, 8, 13],
   line4: [0, 3, 8, 12, 18],
   line5: [0, 3, 6, 11, 15, 19],
-  // line6/line7 已归一化到 line4/line3
+  // line6 / line7 镜像复用 line4 / line3
 
   circle1: [0, 3, 11, 19, 27, 35, 43, 50, 58, 63],
   circle2: [0, 3, 7],
@@ -158,7 +146,7 @@ export const SLIDE_AREA_STEP_MAP: { readonly [shape: string]: readonly number[] 
   v7: [0, 3, 6, 11, 15, 19],
   v8: [0, 3, 6, 11, 15, 19],
 
-  // ppqq = 长卷（pp / qq 共用，qq 在 detectSlideShape 处用 mirror=true 转出）
+  // pp / qq 互为镜像，共用 ppqq 模板（qq 标记 mirror: true）
   ppqq1: [0, 3, 7, 13, 17, 26, 32, 35],
   ppqq2: [0, 3, 7, 12, 16, 25, 28],
   ppqq3: [0, 3, 6, 12, 15, 22],
@@ -168,7 +156,7 @@ export const SLIDE_AREA_STEP_MAP: { readonly [shape: string]: readonly number[] 
   ppqq7: [0, 3, 7, 13, 17, 27, 31, 37, 41, 46],
   ppqq8: [0, 3, 7, 12, 16, 25, 29, 35, 41],
 
-  // pq = 短卷（p / q 共用，q 用 mirror=true）
+  // p / q 互为镜像，共用 pq 模板（q 标记 mirror: true）
   pq1: [0, 3, 8, 11, 14, 17, 21, 24, 27, 33],
   pq2: [0, 3, 8, 11, 14, 18, 21, 24, 30],
   pq3: [0, 3, 9, 12, 16, 19, 23, 27],

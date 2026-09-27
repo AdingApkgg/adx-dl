@@ -7,7 +7,6 @@ import {
   NOTE_STROKE_WIDTH_RATIO,
   COLORS,
   NOTE_VISIBILITY_AFTER_MS,
-  NOTE_HIT_EFFECT_DURATION_MS,
   NOTE_LIGHTEN_RATIO,
 } from "../utils/constants";
 
@@ -18,12 +17,19 @@ export const INVISIBLE_NOTE_POSITION: NoteRenderPosition = Object.freeze({
   visible: false,
 });
 
-// sprite 相对基准尺寸的边距倍率（覆盖 EX 环 ×1.43 + 描边）与超采样倍率。
 const TAP_SPRITE_HALF_RATIO = 1.7;
 const TAP_SPRITE_SUPERSAMPLE = 2;
 
+/**
+ * 精灵合成范围按实际墨迹算：留白的全透明像素每帧都会参与合成，Tap 裁掉烘焙画布的透明边缘再贴图。
+ * Tap 仍按旧尺寸烘焙，以保持原有的像素中心与抗锯齿结果；裁剪矩形与原画布保持同奇偶，
+ * source/destination 比例固定为 noteScale / SS，因此只跳过全透明边缘，不改变图形映射。
+ */
+const TAP_SPRITE_CROP_MARGIN_PX = 1;
+
+/** 基础音符渲染器，负责 Tap、接近弧、双押线、EX 环及 Break 标记等。 */
 export class NoteRenderer extends BaseRenderer {
-  // 按 (方位,配色,EX) 预渲染的 tap sprite，radius/mirror 变化时整体失效。
+  // Tap 贴图缓存（按方位/配色/EX 键），radius 或 mirrorMode 变化时失效
   private tapSpriteCache = new Map<string, HTMLCanvasElement>();
   private tapSpriteBasis = "";
 
@@ -31,29 +37,17 @@ export class NoteRenderer extends BaseRenderer {
     super(context);
   }
 
+  /** 获取按键在判定圈上的坐标。 */
   getPositionOnRing(position: ButtonPosition): Point2D {
     return this.getButtonPosition(position);
   }
 
+  /** 获取按键弧度角。 */
   getAngle(position: ButtonPosition): number {
     return this.getButtonAngle(position);
   }
 
-  calculateHitEffectPosition(
-    note: Note,
-    currentTimeMs: number,
-  ): { x: number; y: number; progress: number } {
-    const position = note.position as ButtonPosition;
-    const angle = this.getButtonAngle(position);
-    const timeDiff = currentTimeMs - note.timingMs;
-    if (timeDiff < 0 || timeDiff > NOTE_HIT_EFFECT_DURATION_MS) return { x: 0, y: 0, progress: -1 };
-    return {
-      x: this.context.centerX + Math.cos(angle) * this.context.radius,
-      y: this.context.centerY + Math.sin(angle) * this.context.radius,
-      progress: timeDiff / NOTE_HIT_EFFECT_DURATION_MS,
-    };
-  }
-
+  /** 计算音符当前渲染位置与缩放；超出可见范围返回 INVISIBLE_NOTE_POSITION。 */
   calculateNotePosition(
     note: Note,
     _currentBeat: number,
@@ -64,7 +58,7 @@ export class NoteRenderer extends BaseRenderer {
     const timeDiff = note.timingMs - currentTimeMs;
     const approachTime = this.getNoteApproachTimeMs(note);
 
-    // Hold 起点在 hold duration 内一直可见；普通 note 只有 NOTE_VISIBILITY_AFTER_MS。
+    // Hold 起点在 duration 内持续可见；普通音符保留 NOTE_VISIBILITY_AFTER_MS
     let holdWindow = NOTE_VISIBILITY_AFTER_MS;
     if ("isHoldStart" in note && note.isHoldStart && "duration" in note) {
       holdWindow = this.durationToMs(note.duration, note.bpm);
@@ -73,7 +67,7 @@ export class NoteRenderer extends BaseRenderer {
       return INVISIBLE_NOTE_POSITION;
     }
 
-    // 上半段起点淡入、下半段推进判定线；dir=-1 时路径关于判定圈镜像（自圈外 1.75R 向内）。
+    // 上半段淡入、下半段推进到判定线；dir=-1 从圈外 1.75R 向内
     const dir = this.getNoteApproachDir(note);
     const halfApproach = approachTime / 2;
     let distance: number;
@@ -102,105 +96,7 @@ export class NoteRenderer extends BaseRenderer {
     };
   }
 
-  private hexagonSubPath(
-    p: Path2D,
-    centerX: number,
-    centerY: number,
-    radius: number,
-    angle: number,
-  ): void {
-    for (let i = 0; i < 6; i++) {
-      const a = (i * Math.PI) / 3 + angle;
-      const px = centerX + radius * Math.cos(a);
-      const py = centerY + radius * Math.sin(a);
-      if (i === 0) p.moveTo(px, py);
-      else p.lineTo(px, py);
-    }
-    p.closePath();
-  }
-
-  private starSubPath(
-    p: Path2D,
-    centerX: number,
-    centerY: number,
-    spikesCount: number,
-    outerRadius: number,
-    innerRadius: number,
-    angle: number,
-  ): void {
-    const step = Math.PI / spikesCount;
-    let a = (Math.PI / 2) * 3 + angle;
-    for (let i = 0; i < spikesCount; i++) {
-      const ox = centerX + Math.cos(a) * outerRadius;
-      const oy = centerY + Math.sin(a) * outerRadius;
-      if (i === 0) p.moveTo(ox, oy);
-      else p.lineTo(ox, oy);
-      a += step;
-      p.lineTo(centerX + Math.cos(a) * innerRadius, centerY + Math.sin(a) * innerRadius);
-      a += step;
-    }
-    p.closePath();
-  }
-
-  renderTapHitEffect(
-    x: number,
-    y: number,
-    position: ButtonPosition,
-    color: string,
-    progress: number,
-    type: "hexagon" | "star",
-  ): void {
-    // progress ∈ [0,1] 驱动 scale 上升 + 中段最亮 + 子图形旋转/离心。
-    const scale = 1 - 0.75 * (progress - 1) * (progress - 1);
-    const alpha = 1 - 4 * (progress - 0.5) * (progress - 0.5);
-    if (alpha <= 0 || scale <= 0) return;
-    const subAng = 1 - (progress - 1) * (progress - 1);
-    const subRad = Math.max(0, Math.min(1, 1 - (8 / 9) * progress * progress));
-
-    const baseR = this.scaleByRadius(NOTE_SIZE_RATIO) * 1.36 * 1.5;
-    const angle = this.getButtonAngle(position);
-    const sub1 = angle + Math.PI / 6;
-    const sub2 = angle - Math.PI / 6;
-    const r0 = baseR * scale;
-    const rSmall = r0 * 0.7;
-    const rBig = r0 * 0.8;
-    const off = baseR * subRad * 0.7;
-
-    // 中心 + ±15° 偏轴各 2 个旋转副本合进同一条 Path2D，一次 stroke 触发一次 filter pass。
-    const path = new Path2D();
-    const add = (cx: number, cy: number, r: number) => {
-      if (type === "star") {
-        this.starSubPath(path, cx, cy, 5, r, r * 0.5, angle + Math.PI);
-      } else {
-        this.hexagonSubPath(path, cx, cy, r, angle);
-      }
-    };
-
-    add(x, y, r0);
-    const a1a = sub1 + Math.PI * subAng;
-    add(x + Math.cos(a1a) * off, y + Math.sin(a1a) * off * 0.7, rSmall);
-    const a1b = sub1 + Math.PI * (1 + subAng);
-    add(x + Math.cos(a1b) * off, y + Math.sin(a1b) * off, rSmall);
-    const a2a = sub2 - Math.PI * subAng;
-    add(x + Math.cos(a2a) * off, y + Math.sin(a2a) * off, rBig);
-    const a2b = sub2 + Math.PI * (1 - subAng);
-    add(x + Math.cos(a2b) * off, y + Math.sin(a2b) * off, rBig);
-
-    // blur < 0.5px 时跳过 filter 设置（progress 端点处不可感知，避免 GPU pass）。
-    const blurPx = this.scaleByRadius(4 / 300) * subAng * 0.7;
-    const useBlur = blurPx >= 0.5;
-
-    this.withContext(() => {
-      const ctx = this.context.ctx;
-      ctx.strokeStyle = color;
-      ctx.globalAlpha = alpha;
-      ctx.lineWidth = this.scaleByRadius(NOTE_STROKE_WIDTH_RATIO) * 2;
-      ctx.lineJoin = "round";
-      if (useBlur) ctx.filter = `blur(${blurPx}px)`;
-      ctx.stroke(path);
-    });
-  }
-
+  /** 渲染单个音符接近弧（中心主弧与两侧渐隐拖影）。 */
   renderApproachArc(position: ButtonPosition, noteX: number, noteY: number, color: string): void {
     const angle = this.getButtonAngle(position);
     const distance = this.distanceToCenter(noteX, noteY);
@@ -212,7 +108,7 @@ export class NoteRenderer extends BaseRenderer {
 
     ctx.save();
 
-    // i=0 是主弧（按钮中心 ±π/8），i>0 是左右两侧的拖影（按 alpha 递减）。
+    // i=0 主弧（±π/8），i>0 左右两侧拖影
     for (let i = 4; i >= 0; i--) {
       const alpha = i === 0 ? 0.4 : 0.4 * (1 - i / 5);
       ctx.globalAlpha = alpha;
@@ -248,7 +144,7 @@ export class NoteRenderer extends BaseRenderer {
     ctx.restore();
   }
 
-  /** 所有接近弧共享圆心，按 (颜色, 拖影档) 合并 path，一档一次 stroke，总次数与 note 数无关。 */
+  /** 批量渲染接近弧：同心弧按 (颜色, 拖影档) 合并绘制，每档一次 stroke。 */
   renderApproachArcsBatch(
     arcs: { position: ButtonPosition; distance: number; color: string }[],
   ): void {
@@ -297,6 +193,7 @@ export class NoteRenderer extends BaseRenderer {
     ctx.restore();
   }
 
+  /** 渲染双押圆弧连接线（取两键间短弧；间距 4 键正对时连整圈）。 */
   renderSimultaneousConnector(
     startPos: ButtonPosition,
     endPos: ButtonPosition,
@@ -306,7 +203,7 @@ export class NoteRenderer extends BaseRenderer {
     const startAngle = this.getButtonAngle(startPos);
     const endAngle = this.getButtonAngle(endPos);
 
-    // 取较短方向；diff=±4 时是正对位（无短弧），整圈连。
+    // 沿短弧连；正对位（diff=±4）连整圈
     let angleDiff = endPos - startPos;
     while (angleDiff > 4) angleDiff -= 8;
     while (angleDiff < -4) angleDiff += 8;
@@ -327,6 +224,7 @@ export class NoteRenderer extends BaseRenderer {
     });
   }
 
+  /** 渲染 EX 发光外环。 */
   renderExRing(
     x: number,
     y: number,
@@ -338,7 +236,6 @@ export class NoteRenderer extends BaseRenderer {
     const innerRadius = noteSize;
     const outerRadius = noteSize * 1.19 * scaleFactor;
 
-    // 根据类型选择颜色
     let color: string;
     if (noteType === "break") {
       color = COLORS.EX_OVERLAY_BREAK;
@@ -355,6 +252,7 @@ export class NoteRenderer extends BaseRenderer {
     });
   }
 
+  /** 渲染 Break 尖角标记（尖端朝外）。 */
   renderBreakTriangle(x: number, y: number, size: number, position: ButtonPosition): void {
     const angle = this.getButtonAngle(position);
     const triangleSize = size * 1.4;
@@ -390,6 +288,7 @@ export class NoteRenderer extends BaseRenderer {
     return getGradientColors(ddrColor, isBreak, isSimultaneous);
   }
 
+  /** 渲染四段方向渐变圆环（起始角与按键方位对齐）。 */
   private renderDirectionalTapRing(
     x: number,
     y: number,
@@ -425,6 +324,7 @@ export class NoteRenderer extends BaseRenderer {
     }
   }
 
+  /** 渲染 Tap 音符（优先用离屏精灵，DDR 节拍着色模式回退矢量绘制）。 */
   renderTapNote(
     x: number,
     y: number,
@@ -436,7 +336,7 @@ export class NoteRenderer extends BaseRenderer {
     timing: number,
     highlightExScale: number = 1,
   ): void {
-    // DDR 配色随 timing 变化，无法 sprite 化，走矢量路径。
+    // DDR 节拍颜色随 timing 实时变化，无法烘焙缓存，回退矢量路径绘制
     if (this.context.config.ddrColorMode) {
       this.drawTapNoteVector(
         x,
@@ -452,10 +352,84 @@ export class NoteRenderer extends BaseRenderer {
       return;
     }
     const sprite = this.getTapSprite(position, isBreak, isSimultaneous, isEx, highlightExScale);
-    const size = (sprite.width / TAP_SPRITE_SUPERSAMPLE) * noteScale;
-    this.context.ctx.drawImage(sprite, x - size / 2, y - size / 2, size, size);
+    let cropSize = Math.ceil(
+      this.getTapSpriteCropHalf(isEx, highlightExScale) * 2 * TAP_SPRITE_SUPERSAMPLE,
+    );
+    if (cropSize % 2 !== sprite.width % 2) cropSize++;
+    cropSize = Math.min(cropSize, sprite.width);
+    const sourceOffset = (sprite.width - cropSize) / 2;
+    const size = (cropSize / TAP_SPRITE_SUPERSAMPLE) * noteScale;
+    this.context.ctx.drawImage(
+      sprite,
+      sourceOffset,
+      sourceOffset,
+      cropSize,
+      cropSize,
+      x - size / 2,
+      y - size / 2,
+      size,
+      size,
+    );
   }
 
+  /** 计算 Tap 贴图实际墨迹裁剪半径（逻辑像素，EX 为外环外径，普通为外黑边）。 */
+  private getTapSpriteCropHalf(isEx: boolean, highlightExScale: number): number {
+    const outerRadius = this.scaleByRadius(NOTE_SIZE_RATIO) * 1.36;
+    const strokeW = this.getNoteStrokeWidth();
+    const ink = isEx
+      ? Math.max(outerRadius * 1.19 * highlightExScale, outerRadius + strokeW / 2)
+      : outerRadius + strokeW * 1.5;
+    return ink + TAP_SPRITE_CROP_MARGIN_PX;
+  }
+
+  /**
+   * 校验已烘焙 Tap 精灵的裁剪矩形是否完整覆盖墨迹（用于防回归手工推导漏裁）。
+   * 含 getImageData 开销，严禁在渲染热路径中调用；只能校验当前缓存已烘焙的贴图。
+   */
+  validateTapSpriteCrops(): string[] {
+    const violations: string[] = [];
+    for (const [key, sprite] of this.tapSpriteCache) {
+      const parts = key.split("|");
+      const isEx = parts[3] === "1";
+      const highlightExScale = Number(parts[4]);
+      let cropSize = Math.ceil(
+        this.getTapSpriteCropHalf(isEx, highlightExScale) * 2 * TAP_SPRITE_SUPERSAMPLE,
+      );
+      if (cropSize % 2 !== sprite.width % 2) cropSize++;
+      cropSize = Math.min(cropSize, sprite.width);
+      const inset = (sprite.width - cropSize) / 2;
+      const spriteCtx = sprite.getContext("2d");
+      if (!spriteCtx) continue;
+      const { data } = spriteCtx.getImageData(0, 0, sprite.width, sprite.height);
+      let minX = sprite.width;
+      let minY = sprite.height;
+      let maxX = -1;
+      let maxY = -1;
+      for (let y = 0; y < sprite.height; y++) {
+        for (let x = 0; x < sprite.width; x++) {
+          if (data[(y * sprite.width + x) * 4 + 3] === 0) continue;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+      if (maxX < 0) continue;
+      if (
+        minX < inset ||
+        minY < inset ||
+        maxX >= sprite.width - inset ||
+        maxY >= sprite.height - inset
+      ) {
+        violations.push(
+          `tap sprite ${key}: ink [${minX},${minY}]-[${maxX},${maxY}] escapes crop inset ${inset} of ${sprite.width}px`,
+        );
+      }
+    }
+    return violations;
+  }
+
+  /** 获取或烘焙 Tap 贴图，radius 或 mirrorMode 变化时失效。 */
   private getTapSprite(
     position: ButtonPosition,
     isBreak: boolean,
@@ -495,6 +469,7 @@ export class NoteRenderer extends BaseRenderer {
     return sprite;
   }
 
+  /** 矢量绘制 Tap 各图层（离屏烘焙或 DDR 模式使用）。 */
   private drawTapNoteVector(
     x: number,
     y: number,
@@ -528,8 +503,7 @@ export class NoteRenderer extends BaseRenderer {
       const ringColors = this.getTapRingColors(ddrColor, isBreak, isSimultaneous);
       this.renderDirectionalTapRing(x, y, innerRadius, outerRadius, position, ringColors);
 
-      // 外侧 + 内侧空心各加一圈黑边（贴在白描边之外）。EX 占用外圈，跳过外侧黑边
-      // 但保留内侧。黑边宽度跟随 strokeW 缩放，避免小屏下显得过粗。
+      // 白边外各贴一圈黑边；EX 占用外圈跳过外黑边保留内黑边，黑边宽度跟随 strokeW 缩放
       const strokeW = this.getNoteStrokeWidth();
       const blackBandW = strokeW;
       if (!isEx) {
@@ -561,6 +535,7 @@ export class NoteRenderer extends BaseRenderer {
     });
   }
 
+  /** 渲染 Break 序号。 */
   renderBreakIndex(x: number, y: number, scale: number, index: number): void {
     const fontSize = Math.round(((30 * this.context.radius) / 300) * scale);
 
@@ -570,7 +545,7 @@ export class NoteRenderer extends BaseRenderer {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillStyle = COLORS.WHITE;
-      // 纯偏移阴影代替 shadowBlur
+      // 纯偏移阴影避免 shadowBlur 开销
       ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
       ctx.shadowOffsetX = 1;
       ctx.shadowOffsetY = 1;

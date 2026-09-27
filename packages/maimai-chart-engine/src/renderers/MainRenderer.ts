@@ -1,3 +1,9 @@
+import { prepareTouchSourceIndices } from "../utils/touchSourceIndices";
+import {
+  flushTouchDrawCommands,
+  TouchDrawOrder,
+  type TouchDrawCommand,
+} from "../utils/touchDrawOrder";
 import { RenderContext, getGradientColors } from "./BaseRenderer";
 import { NoteRenderer } from "./NoteRenderer";
 import { SlideRenderer } from "./SlideRenderer";
@@ -34,8 +40,13 @@ import {
   RAINBOW_SPEED_DEG_PER_SEC,
   NOTE_HIT_EFFECT_DURATION_MS,
   NOTE_VISIBILITY_AFTER_MS,
+  TOUCH_HOLD_CENTRE_BURST_ANGLE,
 } from "../utils/constants";
-import { fireworkTriggerMs } from "./TouchRenderer";
+
+import { HoldEffectRenderer } from "../effects/HoldEffectRenderer";
+import { TapHitEffectRenderer } from "../effects/TapHitEffectRenderer";
+import { TouchHitEffectRenderer } from "../effects/TouchHitEffectRenderer";
+import { TouchFireworkRenderer, fireworkTriggerMs } from "../effects/TouchFireworkRenderer";
 
 const MAX_DPR = 2;
 const FULLSCREEN_MIN_DPR = 1;
@@ -43,9 +54,44 @@ const STAR_TAP_ROTATION_SPEED_RAD_PER_MS = (2 * Math.PI) / 1000;
 
 export interface MainRendererConfig {
   sensorImagePath?: string;
+  showStatistics?: boolean;
 }
 
-// tap / hold / slide 星星头同层、按时间分层（早的在上）的合并列表，按 timingMs 降序（晚的先画/在底）。
+/** renderFrame 分阶段性能打点，按执行顺序排列；total 统计整帧。 */
+export const RENDER_PROFILE_STAGES = [
+  "prepare",
+  "clear",
+  "judgeLine",
+  "fireworks",
+  "hud",
+  "tracks",
+  "slideStars",
+  "approach",
+  "heads",
+  "touches",
+  "effects",
+  "total",
+] as const;
+export type RenderProfileStage = (typeof RENDER_PROFILE_STAGES)[number];
+
+/**
+ * 采样窗口内的分阶段耗时统计（ms）。
+ * 只覆盖 JS 计算和 Canvas 指令录制的 CPU 耗时，GPU 光栅化（如 filter、shadowBlur）不计入。
+ */
+export interface RenderFrameProfile {
+  frames: number;
+  avgMs: Record<RenderProfileStage, number>;
+  maxMs: Record<RenderProfileStage, number>;
+}
+
+const PROFILE_STAGE_INDEX = Object.fromEntries(
+  RENDER_PROFILE_STAGES.map((stage, index) => [stage, index]),
+) as Record<RenderProfileStage, number>;
+
+/**
+ * Tap、Hold、Slide 星头同层合并列表。
+ * 按 timingMs 降序排列：晚到达的先画在底层，早到达的后绘制以叠在顶层。
+ */
 type LayeredNote =
   | { kind: "tap"; note: TapNote }
   | { kind: "hold"; note: HoldStartNote }
@@ -67,6 +113,7 @@ interface TimeWindowIndex {
 
 const EMPTY_TIME_WINDOW_INDEX: TimeWindowIndex = { timingMs: [], prefixMaxEndMs: [] };
 
+// 记录音符起始时间与前缀最大结束时间，供时间窗口二分检索
 function buildTimeWindowIndex<T>(
   items: readonly T[],
   getTimingMs: (item: T) => number,
@@ -85,7 +132,7 @@ function buildTimeWindowIndex<T>(
   return { timingMs, prefixMaxEndMs };
 }
 
-/** 返回可能可见的切片 [lo, hi)。 */
+// 按当前时间与预见时间二分粗筛可见音符区间 [lo, hi)
 function windowRange(index: TimeWindowIndex, nowMs: number, lookAheadMs: number): [number, number] {
   const { timingMs, prefixMaxEndMs } = index;
   const limit = nowMs + lookAheadMs;
@@ -107,7 +154,7 @@ function windowRange(index: TimeWindowIndex, nowMs: number, lookAheadMs: number)
   return [lo, end];
 }
 
-/** 滑条可见结束时间：所有路径中最晚的 timingMs + delay + duration。 */
+// Slide 所有分支中最晚的可见结束时间（timingMs + delay + duration）
 function slideVisibleEndMs(note: SlideNote): number {
   const pathCount = note.allSlideSegments?.length ?? 1;
   let end = note.timingMs;
@@ -120,7 +167,7 @@ function slideVisibleEndMs(note: SlideNote): number {
   return end;
 }
 
-/** hold 起点整个按住期间可见；tap / slide 星星头命中后仅 NOTE_VISIBILITY_AFTER_MS。 */
+// 同层头部可见结束时间：Hold 在按住期间全程可见，Tap 和 Slide 星头命中后仅保留 NOTE_VISIBILITY_AFTER_MS
 function layeredHeadEndMs(item: LayeredNote): number {
   if (item.kind === "hold") {
     return item.note.timingMs + (60000 * item.note.duration) / item.note.bpm;
@@ -128,7 +175,7 @@ function layeredHeadEndMs(item: LayeredNote): number {
   return item.note.timingMs + NOTE_VISIBILITY_AFTER_MS;
 }
 
-/** touch 命中后可见 50ms（renderTouch 同款窗口）；touch-hold 额外持续 durationMs。 */
+// Touch 可见结束时间：Touch 命中后保留 50ms，Touch Hold 额外持续 durationMs
 function touchVisibleEndMs(note: TouchNote | TouchHoldStartNote): number {
   const holdMs = note.type === "touch-hold-start" ? note.durationMs : 0;
   return note.timingMs + holdMs + 50;
@@ -144,6 +191,8 @@ interface PreparedRenderNotes {
   touches: (TouchNote | TouchHoldStartNote)[];
   fireworkTouches: (TouchNote | TouchHoldStartNote)[];
   holds: HoldStartNote[];
+  holdEffectNotes: HoldStartNote[];
+  touchHoldNotes: TouchHoldStartNote[];
   holdEndMap: Map<string, HoldEndNote>;
   noteMeta: WeakMap<Note, RenderNoteMeta>;
   approachGroups: ApproachIndicatorGroup[];
@@ -156,7 +205,9 @@ interface PreparedRenderNotes {
   touchIndex: TimeWindowIndex;
   layeredIndex: TimeWindowIndex;
   approachIndex: TimeWindowIndex;
-  /** 谱面内最小的 note 流速倍率幅值（|<HS*x>|，≤1），粗筛窗口按它放大提前量 */
+  holdEffectIndex: TimeWindowIndex;
+  touchHoldIndex: TimeWindowIndex;
+  /** 谱面内最小的 Hi-Speed 倍率幅值（≤1），用来按比例放大粗筛窗口的预见时间。 */
   minHiSpeed: number;
 }
 
@@ -166,6 +217,7 @@ interface RenderNoteMeta {
   simultaneousNonTouchCount: number;
   simultaneousTouchCount: number;
   noExBreakIndex?: number;
+  sourceNoteIndex?: number;
 }
 
 const EMPTY_RENDER_NOTE_META: RenderNoteMeta = {
@@ -182,6 +234,9 @@ interface RenderFrameTiming {
   divisor: number;
 }
 
+/**
+ * 谱面主渲染器，驱动背景、判定线、HUD、各类 Note、烟花与特效的整帧绘制及性能分析。
+ */
 export class MainRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -195,6 +250,7 @@ export class MainRenderer {
   private config: RendererConfig = {
     hiSpeed: HI_SPEED_DEFAULT * HI_SPEED_CONVERSION_FACTOR,
     alwaysKeepHiSpeed: false,
+    slideDelay: 0,
     playbackSpeed: 1.0,
     mirrorMode: "none",
     highlightExNotes: false,
@@ -233,6 +289,11 @@ export class MainRenderer {
   private slideRenderer!: SlideRenderer;
   private holdRenderer!: HoldRenderer;
   private touchRenderer!: TouchRenderer;
+  private touchDrawOrder = new TouchDrawOrder();
+  private holdEffectRenderer!: HoldEffectRenderer;
+  private touchHitEffectRenderer!: TouchHitEffectRenderer;
+  private touchFireworkRenderer!: TouchFireworkRenderer;
+  private tapHitEffectRenderer!: TapHitEffectRenderer;
 
   private sensorImage: HTMLImageElement | null = null;
   private sensorImagePath: string;
@@ -246,14 +307,16 @@ export class MainRenderer {
   private timingTimelineChart: Chart | null = null;
   private timingTimeline: TimingTimeline | null = null;
 
-  // simulCounts / breakIdx 是静态元数据，只依赖 chart 本身。
-  // 用 notes 数组引用做缓存键——chart 切换时引用变化自然 invalidate。
+  // 缓存预处理好的 Note 数据。
+  // 同押计数和 Break 序号只依赖 chart 本身，以 notes 数组引用为缓存键，切谱时自然失效。
   private preparedNotesRef: Note[] | null = null;
   private preparedRenderNotes: PreparedRenderNotes = {
     slides: [],
     touches: [],
     fireworkTouches: [],
     holds: [],
+    holdEffectNotes: [],
+    touchHoldNotes: [],
     holdEndMap: new Map(),
     noteMeta: new WeakMap(),
     approachGroups: [],
@@ -266,6 +329,8 @@ export class MainRenderer {
     touchIndex: EMPTY_TIME_WINDOW_INDEX,
     layeredIndex: EMPTY_TIME_WINDOW_INDEX,
     approachIndex: EMPTY_TIME_WINDOW_INDEX,
+    holdEffectIndex: EMPTY_TIME_WINDOW_INDEX,
+    touchHoldIndex: EMPTY_TIME_WINDOW_INDEX,
     minHiSpeed: 1,
   };
   private visibleTouchCountByPos = new Map<string, number>();
@@ -273,13 +338,29 @@ export class MainRenderer {
   private pendingTapArcs: { position: ButtonPosition; distance: number; color: string }[] = [];
   private pendingStableTracks: { note: SlideNote; index: number; isSimultaneous: boolean }[] = [];
 
+  private profilingEnabled = false;
+  private profileSumMs = new Float64Array(RENDER_PROFILE_STAGES.length);
+  private profileMaxMs = new Float64Array(RENDER_PROFILE_STAGES.length);
+  private profileLastMs = new Float64Array(RENDER_PROFILE_STAGES.length);
+  private profileFrames = 0;
+  private profileFrameStartMs = 0;
+  private profileStageStartMs = 0;
+
+  /**
+   * @throws {Error} 无法获取 Canvas 2D 绘图上下文时抛出
+   */
   constructor(canvas: HTMLCanvasElement, config: MainRendererConfig = {}) {
     this.canvas = canvas;
     this.sensorImagePath = config.sensorImagePath ?? "/assets/maimai/chart/sensor.webp";
 
-    // alpha: false 让浏览器知道 canvas 不透明（CSS 已经把 background 设成 #000），
-    // 合成时走 RGB 路径而不是 RGBA，省一次 alpha blend pass。
-    // 144Hz 高刷显示器下这是 MDN 推荐的 canvas 优化中最直接的一个。
+    if (config.showStatistics === false) {
+      this.config.showBpm = false;
+      this.config.showNoteTotal = false;
+      this.config.showBreakCount = false;
+    }
+
+    // CSS 已将背景设为 #000，关掉 alpha 让浏览器走 RGB 快速合成路径，省掉一次 alpha blend pass。
+    // 在 144Hz 高刷显示器下这是最直接的 Canvas 帧预算优化。
     const context = canvas.getContext("2d", { alpha: false });
     if (!context) {
       throw new Error("Failed to get 2D canvas context");
@@ -300,6 +381,10 @@ export class MainRenderer {
     this.slideRenderer = new SlideRenderer(context, this.noteRenderer);
     this.holdRenderer = new HoldRenderer(context);
     this.touchRenderer = new TouchRenderer(context);
+    this.holdEffectRenderer = new HoldEffectRenderer(context);
+    this.touchHitEffectRenderer = new TouchHitEffectRenderer(context);
+    this.touchFireworkRenderer = new TouchFireworkRenderer(context);
+    this.tapHitEffectRenderer = new TapHitEffectRenderer(context);
   }
 
   private createRenderContext(): RenderContext {
@@ -321,6 +406,10 @@ export class MainRenderer {
     this.slideRenderer.updateContext(context);
     this.holdRenderer.updateContext(context);
     this.touchRenderer.updateContext(context);
+    this.holdEffectRenderer.updateContext(context);
+    this.touchHitEffectRenderer.updateContext(context);
+    this.touchFireworkRenderer.updateContext(context);
+    this.tapHitEffectRenderer.updateContext(context);
   }
 
   private loadAssets(): void {
@@ -328,6 +417,9 @@ export class MainRenderer {
     this.sensorImage.src = this.sensorImagePath;
   }
 
+  /**
+   * 随父容器更新画布尺寸与变换矩阵。全屏时受 fullscreenMaxPixels 像素上限压制 DPR。
+   */
   resize(isFullscreen: boolean = false): void {
     const parent = this.canvas.parentElement;
     if (!parent) return;
@@ -352,8 +444,9 @@ export class MainRenderer {
     this.applySize(size, effectiveDpr);
   }
 
-  resizeToSize(size: number): void {
-    this.applySize(size, 1);
+  /** 离屏测试或 GIF 导出等脱离 DOM 的场景：size 为逻辑边长，dpr 决定实际像素。 */
+  resizeToSize(size: number, dpr: number = 1): void {
+    this.applySize(size, dpr);
   }
 
   private applySize(logicalSize: number, dpr: number): void {
@@ -373,7 +466,9 @@ export class MainRenderer {
     }
   }
 
+  /** 渲染当前节拍的单帧画面（背景、判定线、HUD、Note、烟花与特效）。 */
   renderFrame(chart: Chart, currentBeats: number, beatsPerMeasure: number): void {
+    this.profileBegin();
     const prepared = this.getPreparedRenderNotes(chart.notes);
     const timingTimeline = this.getTimingTimeline(chart);
     const timing: RenderFrameTiming = {
@@ -388,12 +483,18 @@ export class MainRenderer {
     const fraction = beatInMeasure - Math.floor(beatInMeasure);
 
     this.setBeatDisplayInfo(measure, beat, fraction, timing.divisor);
+    this.profileMark("prepare");
     this.clear();
+    this.profileMark("clear");
     this.renderJudgmentLine();
+    this.profileMark("judgeLine");
     this.renderFireworks(prepared.fireworkTouches, timing);
+    this.profileMark("fireworks");
     this.renderNotes(prepared, timing);
+    this.profileEnd();
   }
 
+  /** 设置 Note 流速（范围 [3, 9]），并同步更新子渲染器。 */
   setHiSpeed(hiSpeed: number): void {
     if (hiSpeed >= 3 && hiSpeed <= 9) {
       this.config.hiSpeed = hiSpeed * HI_SPEED_CONVERSION_FACTOR;
@@ -406,9 +507,17 @@ export class MainRenderer {
     this.updateRenderersContext();
   }
 
+  /** 设置 Slide 轨迹提前/延后显示的时机。限制在 [-1, 1] 且步长 0.1，同步更新子渲染器。 */
+  setSlideDelay(slideDelay: number): void {
+    if (!Number.isFinite(slideDelay)) return;
+    this.config.slideDelay = Math.round(Math.max(-1, Math.min(1, slideDelay)) * 10) / 10 || 0;
+    this.updateRenderersContext();
+  }
+
   // 本地补丁：上游上限 1.0（只做减速练习），我们也允许 2.0 倍速跟打；
   // alwaysKeepHiSpeed 的补偿式 (base / (hi / speed)) 在 >1 时同样成立。
   // re-sync 时须重打。
+  /** 设置回放速率（范围 [0.1, 2.0]），并同步更新子渲染器。 */
   setPlaybackSpeed(playbackSpeed: number): void {
     if (playbackSpeed >= 0.1 && playbackSpeed <= 2.0) {
       this.config.playbackSpeed = playbackSpeed;
@@ -485,10 +594,25 @@ export class MainRenderer {
     this.config.showHitEffect = enabled;
   }
 
+  /**
+   * 清空舞台并绘制判定线；背景视频行为与正常播放一致。
+   * 供 hit-fx 预览等工具复用舞台素材，不要自行画圈/渐变。
+   */
+  renderEmptyStage(): void {
+    this.clear();
+    this.renderJudgmentLine();
+  }
+
+  /** 获取当前逻辑坐标系下的 RenderContext（在 resize 后有效）。 */
+  getRenderContext(): RenderContext {
+    return this.createRenderContext();
+  }
+
   setFullscreenMaxPixels(maxPixels: number): void {
     this.fullscreenMaxPixels = maxPixels;
   }
 
+  /** 设置背景视频元素。视频源改变时会自动失效当前帧缓存。 */
   setBackgroundVideo(video: HTMLVideoElement | null): void {
     if (video && video.src !== this.backgroundVideoSrc) {
       this.backgroundVideoSrc = video.src;
@@ -544,8 +668,12 @@ export class MainRenderer {
     this.ctx.restore();
   }
 
-  // fillRect 保证导出的背景不透明。
-  // clearRect 依赖 alpha:false，移动端 Safari 不可靠，会导致导出图透明。
+  /**
+   * 清空画布并绘制背景底色、当前背景视频帧或封面图（本地补丁：封面回落）。
+   *
+   * fillRect 保证导出的背景不透明。
+   * clearRect 依赖 alpha:false，移动端 Safari 不可靠，会导致导出图透明。
+   */
   clear(): void {
     const video = this.backgroundVideo;
     if (video && video.videoWidth > 0) {
@@ -572,6 +700,7 @@ export class MainRenderer {
     this.ctx.fillRect(0, 0, s, s);
   }
 
+  /** 绘制判定线圆环与各按键点。blind 模式跳过绘制。 */
   renderJudgmentLine(): void {
     if (this.config.judgmentLineDesign === "blind") {
       return;
@@ -613,7 +742,7 @@ export class MainRenderer {
     this.ctx.restore();
   }
 
-  /** 火花特效：判定线之上、note 之下渲染，canvas 内切圆裁切。 */
+  // Touch 烟花在判定线上方、音符下方渲染，裁剪至舞台内切圆
   private renderFireworks(
     touches: readonly (TouchNote | TouchHoldStartNote)[],
     timing: RenderFrameTiming,
@@ -621,12 +750,12 @@ export class MainRenderer {
     if (!this.config.showFireworks) return;
     if (touches.length === 0) return;
 
-    this.touchRenderer.warmFireworkResources();
+    this.touchFireworkRenderer.warmFireworkResources();
     this.ctx.save();
     this.ctx.beginPath();
     this.ctx.arc(this.centerX, this.centerY, this.logicalSize / 2, 0, Math.PI * 2);
     this.ctx.clip();
-    this.touchRenderer.renderTouchFireworks(touches, timing.currentTimeMs);
+    this.touchFireworkRenderer.renderTouchFireworks(touches, timing.currentTimeMs);
     this.ctx.restore();
   }
 
@@ -638,18 +767,30 @@ export class MainRenderer {
     if (this.config.showNoteTotal || this.config.showBreakCount) {
       this.renderNoteCounts(prepared, timing.currentTimeMs);
     }
+    this.profileMark("hud");
 
     this.ctx.save();
-    // 与烟花同款内切圆裁剪：负流速 note 从圈外进场，超出部分裁掉。
+    // 裁剪至舞台内切圆：负流速 Note 从圈外进场，超出部分裁掉
     this.ctx.beginPath();
     this.ctx.arc(this.centerX, this.centerY, this.logicalSize / 2, 0, Math.PI * 2);
     this.ctx.clip();
 
-    const { slides, touches, approachGroups, hitEffectNotes, layeredHeads, holdEndMap, noteMeta } =
-      prepared;
+    const {
+      slides,
+      touches,
+      approachGroups,
+      hitEffectNotes,
+      layeredHeads,
+      holdEffectNotes,
+      holdEffectIndex,
+      touchHoldNotes,
+      touchHoldIndex,
+      holdEndMap,
+      noteMeta,
+    } = prepared;
 
     const nowMs = timing.currentTimeMs;
-    // HS<1 的 note 接近时间更长,粗筛提前量按谱面最小倍率放大
+    // 流速倍率小于 1 的 Note 接近时间更长，粗筛提前量需按全谱最小倍率放大
     const lookAheadMs = BASE_APPROACH_TIME_MS / this.config.hiSpeed / prepared.minHiSpeed;
 
     const [slideLo, slideHi] = windowRange(prepared.slideIndex, nowMs, lookAheadMs);
@@ -662,7 +803,13 @@ export class MainRenderer {
         isSimultaneous: this.getNoteMeta(noteMeta, slides[i]).simultaneousSlideCount >= 2,
       });
     }
-    this.slideRenderer.renderStableTracks(layerTracks, timing.currentBeat, timing.currentTimeMs);
+    this.slideRenderer.renderStableTracks(
+      layerTracks,
+      timing.currentBeat,
+      timing.currentTimeMs,
+      !this.isPlaying,
+    );
+    this.profileMark("tracks");
 
     for (let i = slideHi - 1; i >= slideLo; i--) {
       this.slideRenderer.renderSlide(
@@ -673,34 +820,142 @@ export class MainRenderer {
         this.getNoteMeta(noteMeta, slides[i]).simultaneousSlideCount >= 2,
       );
     }
+    this.profileMark("slideStars");
 
     const [groupLo, groupHi] = windowRange(prepared.approachIndex, nowMs, lookAheadMs);
     this.renderApproachIndicators(approachGroups, groupLo, groupHi, noteMeta, timing);
 
-    // tap / hold / slide 星星头同层、按时间分层（早的在上）；列表在 prepareRenderNotes 预排序。
+    // Tap、Hold、Slide 星头同层按时间分层（早到的在上），已在 prepareRenderNotes 预排序
     const [headLo, headHi] = windowRange(prepared.layeredIndex, nowMs, lookAheadMs);
     this.renderTapApproachArcs(layeredHeads, headLo, headHi, noteMeta, timing);
+    this.profileMark("approach");
     this.renderLayeredHeads(layeredHeads, headLo, headHi, holdEndMap, noteMeta, timing);
+    this.profileMark("heads");
 
-    // touch 最上层，覆盖普通 note。
+    // Touch 放在最上层，覆盖普通 Note
     const [touchLo, touchHi] = windowRange(prepared.touchIndex, nowMs, lookAheadMs);
     this.renderTouchBorders(touches, touchLo, touchHi, noteMeta, timing.currentTimeMs);
 
+    const touchCommands: TouchDrawCommand[] = [];
     for (let i = touchHi - 1; i >= touchLo; i--) {
       this.touchRenderer.renderTouch(
         touches[i],
         timing.currentBeat,
         timing.currentTimeMs,
         this.getNoteMeta(noteMeta, touches[i]).simultaneousNoteCount >= 2,
+        touchCommands,
+        this.getNoteMeta(noteMeta, touches[i]).sourceNoteIndex,
       );
     }
+    flushTouchDrawCommands(touchCommands, this.touchDrawOrder);
+    this.profileMark("touches");
 
-    // 击打特效画在最上层，盖住所有 note。
+    // 特效层统一盖在最上层：先画 Hold / Touch Hold 持续按压波纹，再叠命中/释放特效
     if (this.config.showHitEffect) {
+      const [holdLo, holdHi] = windowRange(holdEffectIndex, nowMs, lookAheadMs);
+      const [touchHoldLo, touchHoldHi] = windowRange(touchHoldIndex, nowMs, lookAheadMs);
+      this.holdEffectRenderer.renderHoldPressEffects(
+        holdEffectNotes,
+        holdEndMap,
+        timing.currentTimeMs,
+        (position, holdStartTiming) => this.getHoldEndKey(position, holdStartTiming),
+        undefined,
+        holdLo,
+        holdHi,
+      );
+      this.renderTouchHoldPressEffects(
+        touchHoldNotes,
+        timing.currentTimeMs,
+        touchHoldLo,
+        touchHoldHi,
+      );
+      this.renderTouchHoldReleaseEffects(
+        touchHoldNotes,
+        timing.currentTimeMs,
+        touchHoldLo,
+        touchHoldHi,
+      );
+      this.touchHitEffectRenderer.renderTouchHitEffects(touches, timing.currentTimeMs);
       this.renderTapHitEffect(hitEffectNotes, timing.currentTimeMs);
     }
+    this.profileMark("effects");
 
     this.ctx.restore();
+  }
+
+  /** 供基准测试和回归测试调用，检查 Tap 精灵图裁剪是否越界（实现见 NoteRenderer）。 */
+  validateSpriteCrops(): string[] {
+    return this.noteRenderer.validateTapSpriteCrops();
+  }
+
+  /**
+   * 开关分阶段计时。关闭时各打点仅剩布尔判断并清空累计数据；开启后由 takeFrameProfile 消费。
+   */
+  setProfilingEnabled(enabled: boolean): void {
+    this.profilingEnabled = enabled;
+    if (!enabled) this.resetProfile();
+  }
+
+  /**
+   * 取出并清空累计的分阶段耗时。未开启计时或期间未渲染返回 null，调用方应沿用上一份结果。
+   */
+  takeFrameProfile(): RenderFrameProfile | null {
+    if (!this.profilingEnabled || this.profileFrames === 0) return null;
+    const frames = this.profileFrames;
+    const avgMs = {} as Record<RenderProfileStage, number>;
+    const maxMs = {} as Record<RenderProfileStage, number>;
+    for (let i = 0; i < RENDER_PROFILE_STAGES.length; i++) {
+      const stage = RENDER_PROFILE_STAGES[i];
+      avgMs[stage] = this.profileSumMs[i] / frames;
+      maxMs[stage] = this.profileMaxMs[i];
+    }
+    this.resetProfile();
+    return { frames, avgMs, maxMs };
+  }
+
+  /**
+   * 最近一帧 renderFrame 各阶段耗时（ms），不受 takeFrameProfile 清零影响，供与 rAF 间隔配对。未开启返回 null。
+   */
+  getLastFrameProfile(): Record<RenderProfileStage, number> | null {
+    if (!this.profilingEnabled) return null;
+    const result = {} as Record<RenderProfileStage, number>;
+    for (let i = 0; i < RENDER_PROFILE_STAGES.length; i++) {
+      result[RENDER_PROFILE_STAGES[i]] = this.profileLastMs[i];
+    }
+    return result;
+  }
+
+  private resetProfile(): void {
+    this.profileSumMs.fill(0);
+    this.profileMaxMs.fill(0);
+    this.profileFrames = 0;
+  }
+
+  private profileBegin(): void {
+    if (!this.profilingEnabled) return;
+    const now = performance.now();
+    this.profileFrameStartMs = now;
+    this.profileStageStartMs = now;
+  }
+
+  // 记录上一计时点到现在的阶段耗时，并推进计时点
+  private profileMark(stage: RenderProfileStage): void {
+    if (!this.profilingEnabled) return;
+    const now = performance.now();
+    this.profileRecord(PROFILE_STAGE_INDEX[stage], now - this.profileStageStartMs);
+    this.profileStageStartMs = now;
+  }
+
+  private profileEnd(): void {
+    if (!this.profilingEnabled) return;
+    this.profileRecord(PROFILE_STAGE_INDEX.total, performance.now() - this.profileFrameStartMs);
+    this.profileFrames++;
+  }
+
+  private profileRecord(index: number, durationMs: number): void {
+    this.profileSumMs[index] += durationMs;
+    this.profileLastMs[index] = durationMs;
+    if (durationMs > this.profileMaxMs[index]) this.profileMaxMs[index] = durationMs;
   }
 
   private getPreparedRenderNotes(notes: Note[]): PreparedRenderNotes {
@@ -799,6 +1054,7 @@ export class MainRenderer {
   }
 
   private prepareRenderNotes(notes: Note[]): PreparedRenderNotes {
+    this.slideRenderer.invalidateTrackLayer();
     const slides: SlideNote[] = [];
     const touches: (TouchNote | TouchHoldStartNote)[] = [];
     const fireworkTouches: (TouchNote | TouchHoldStartNote)[] = [];
@@ -823,6 +1079,10 @@ export class MainRenderer {
       } else if (isTapNote(note) && !isHoldEndNote(note)) {
         taps.push(note);
       }
+    }
+
+    for (const [note, sourceNoteIndex] of prepareTouchSourceIndices(notes)) {
+      this.getOrCreateNoteMeta(noteMeta, note).sourceNoteIndex = sourceNoteIndex;
     }
 
     this.calculateSimultaneousCounts(notes, noteMeta);
@@ -880,6 +1140,7 @@ export class MainRenderer {
         }
       }
 
+      // Hold 尾也在列表里：实测采样显示 Hold 结束播放的就是 Tap 命中特效，按是否 Break 选择形状。
       if (
         isButtonNote(note) &&
         !isTouchNote(note) &&
@@ -896,8 +1157,8 @@ export class MainRenderer {
     breakCompletionTimes.sort((a, b) => a - b);
     breakNoExCompletionTimes.sort((a, b) => a - b);
 
-    // tap / hold / slide 星星头同层按 timingMs 降序（早到的后画/在上层，与 maimai noteSortOrder 一致）。
-    // 在此预算一次（本函数被 notes 引用 memoize），渲染热路径直接迭代，省每帧的合并+排序+分配。
+    // Tap、Hold、Slide 星头同层按 timingMs 降序预排（早到达的后绘制以位于顶层，与实测渲染层级一致）。
+    // 在此预先计算（本函数由 notes 引用 memoize），渲染热路径直接迭代，避免每帧合并与排序。
     const layeredHeads: LayeredNote[] = [
       ...taps.map((note) => ({ kind: "tap" as const, note })),
       ...holds.map((note) => ({ kind: "hold" as const, note })),
@@ -917,6 +1178,9 @@ export class MainRenderer {
     fireworkTouches.sort((a, b) => fireworkTriggerMs(a) - fireworkTriggerMs(b));
 
     const timingOf = (note: Note) => note.timingMs;
+    const holdEffectNotes = [...holds].sort((a, b) => a.timingMs - b.timingMs);
+    // touches 此时已按 timingMs 升序，filter 保序；按压和释放特效共用该索引
+    const touchHoldNotes = touches.filter(isTouchHoldStartNote);
 
     let minHiSpeed = 1;
     for (const note of notes) {
@@ -930,6 +1194,8 @@ export class MainRenderer {
       touches,
       fireworkTouches,
       holds,
+      holdEffectNotes,
+      touchHoldNotes,
       holdEndMap,
       noteMeta,
       approachGroups,
@@ -950,6 +1216,21 @@ export class MainRenderer {
         approachGroups,
         (group) => group.timingMs,
         (group) => group.timingMs,
+      ),
+      holdEffectIndex: buildTimeWindowIndex(
+        holdEffectNotes,
+        (hold) => hold.timingMs,
+        (hold) => {
+          // 仅按压波纹使用该索引，可见窗口到 Hold 结束为止即可
+          const holdEnd = holdEndMap.get(this.getHoldEndKey(hold.position, hold.timing));
+          return holdEnd ? holdEnd.timingMs : hold.timingMs;
+        },
+      ),
+      touchHoldIndex: buildTimeWindowIndex(
+        touchHoldNotes,
+        (note) => note.timingMs,
+        // 覆盖按压波纹（到 Hold 尾）与尾部释放特效窗口
+        (note) => note.timingMs + note.durationMs + NOTE_HIT_EFFECT_DURATION_MS,
       ),
     };
   }
@@ -1160,7 +1441,7 @@ export class MainRenderer {
     const meta = this.getNoteMeta(noteMeta, slide);
     const isSimultaneous = meta.simultaneousNoteCount >= 2;
 
-    // 接近圈由 renderApproachIndicators 统一画（在底层），这里只画滑条头。
+    // 接近环已由 renderApproachIndicators 统一在底层绘制，此处仅绘制 Slide 头部
     if (slide.hasTapHead) {
       this.noteRenderer.renderTapNote(
         pos.x,
@@ -1231,7 +1512,7 @@ export class MainRenderer {
       this.ctx.translate(-x, -y);
     }
 
-    // 黑色描边（同 drawStar 的 strokeW*3 黑边）画最底层；EX 时外圈让给 EX 环，跳过
+    // 黑色外轮廓（同 drawStar 的 strokeW*3 黑边）画最底层；EX 状态下外圈让给发光环，跳过
     if (!isEx) {
       this.ctx.strokeStyle = COLORS.BLACK;
       this.ctx.lineWidth = ((2 * this.radius) / 300) * 3;
@@ -1357,7 +1638,7 @@ export class MainRenderer {
     return COLORS.SLIDE_CYAN;
   }
 
-  // 按 prepareRenderNotes 预排好的时间分层顺序（早到的 note 在上层）渲染 tap/hold/slideStart 星星头。
+  // 按预排序好的时间分层顺序（早到达的后绘制以位于顶层）依次渲染 Tap、Hold、Slide 头部
   private renderLayeredHeads(
     layered: LayeredNote[],
     headLo: number,
@@ -1376,7 +1657,7 @@ export class MainRenderer {
     }
   }
 
-  // tap 接近弧共享圆心，整窗收集后按 (颜色,拖影档) 合批 stroke，次数与可见数无关。
+  // Tap 接近弧共享圆心，整窗收集后按 (颜色, 拖影档) 合批 stroke，绘制调用次数与可见 Note 数无关
   private renderTapApproachArcs(
     layered: LayeredNote[],
     headLo: number,
@@ -1469,8 +1750,62 @@ export class MainRenderer {
     );
   }
 
+  // 绘制 Touch Hold 头～尾期间在传感器点的持续按压波纹特效，[startIndex, endIndex) 来自 touchHoldIndex 粗筛
+  private renderTouchHoldPressEffects(
+    touchHolds: readonly TouchHoldStartNote[],
+    currentTimeMs: number,
+    startIndex: number,
+    endIndex: number,
+  ): void {
+    for (let i = startIndex; i < endIndex; i++) {
+      const note = touchHolds[i];
+      const startMs = note.timingMs;
+      const endMs = note.timingMs + note.durationMs;
+      if (currentTimeMs < startMs || currentTimeMs >= endMs) continue;
+      const origin = this.touchRenderer.getTouchPosition(note.position);
+      this.holdEffectRenderer.renderPressRippleAt(
+        origin.x,
+        origin.y,
+        startMs,
+        endMs,
+        currentTimeMs,
+      );
+    }
+  }
+
+  // 绘制 Touch Hold 尾部在传感器点的释放命中特效，[startIndex, endIndex) 来自 touchHoldIndex 粗筛
+  private renderTouchHoldReleaseEffects(
+    touchHolds: readonly TouchHoldStartNote[],
+    currentTimeMs: number,
+    startIndex: number,
+    endIndex: number,
+  ): void {
+    for (let i = startIndex; i < endIndex; i++) {
+      const note = touchHolds[i];
+      const endMs = note.timingMs + note.durationMs;
+      if (currentTimeMs < endMs || currentTimeMs >= endMs + NOTE_HIT_EFFECT_DURATION_MS) {
+        continue;
+      }
+      const origin = this.touchRenderer.getTouchPosition(note.position);
+      // 按钮 Note 特效朝外（沿按键角度），Touch Hold 反向朝向圆心——录像测量证实
+      // 两边设计不同是有意的。中心位置（C）因在圆心上无径向方向，单独取固定爆发角度。
+      const angle =
+        note.position === "C"
+          ? TOUCH_HOLD_CENTRE_BURST_ANGLE
+          : Math.atan2(this.centerY - origin.y, this.centerX - origin.x);
+      this.tapHitEffectRenderer.renderHitEffectAt(
+        origin.x,
+        origin.y,
+        angle,
+        COLORS.HIT_EFFECT_GOLD,
+        (currentTimeMs - endMs) / NOTE_HIT_EFFECT_DURATION_MS,
+        "hexagon",
+      );
+    }
+  }
+
   private renderTapHitEffect(notes: Note[], currentTimeMs: number): void {
-    // hitEffectNotes 按 timingMs 升序，二分定位窗口下界（currentTimeMs - DURATION），之后线性扫。
+    // hitEffectNotes 按 timingMs 升序，二分定位进入特效窗口的起始 Note（currentTimeMs - DURATION），之后线性扫描
     const windowStartMs = currentTimeMs - NOTE_HIT_EFFECT_DURATION_MS;
     let lo = 0;
     let hi = notes.length;
@@ -1480,7 +1815,7 @@ export class MainRenderer {
       else hi = mid;
     }
 
-    // 同 position 后到的 note 已命中时让前面的特效退场。
+    // 同一按键若有更晚的 Note 已命中，提前终止先前 Note 的命中特效
     const lastHitTimingByPos = new Map<ButtonPosition, number>();
     for (let i = lo; i < notes.length; i++) {
       const n = notes[i];
@@ -1497,16 +1832,22 @@ export class MainRenderer {
       const latest = lastHitTimingByPos.get(note.position as ButtonPosition);
       if (latest !== undefined && latest > note.timingMs) continue;
 
-      const pos = this.noteRenderer.calculateHitEffectPosition(note, currentTimeMs);
+      const pos = this.tapHitEffectRenderer.calculateHitEffectPosition(note, currentTimeMs);
       if (!(0 <= pos.progress && pos.progress <= 1)) continue;
 
-      this.noteRenderer.renderTapHitEffect(
+      this.tapHitEffectRenderer.renderTapHitEffect(
         pos.x,
         pos.y,
         note.position as ButtonPosition,
         COLORS.HIT_EFFECT_GOLD,
         pos.progress,
-        note.type === "break" || (isTapNote(note) && note.isStar) ? "star" : "hexagon",
+        // Hold 尾与 Slide 头自身类型非 break，需通过各自的标记判断是否展示 Break 星形特效
+        note.type === "break" ||
+          (isTapNote(note) && note.isStar) ||
+          (isHoldEndNote(note) && note.isBreakHold) ||
+          (isSlideNote(note) && note.isStartBreak)
+          ? "star"
+          : "hexagon",
       );
     }
   }
@@ -1532,7 +1873,7 @@ export class MainRenderer {
     this.ctx.save();
     this.ctx.textAlign = "left";
     this.ctx.textBaseline = "top";
-    // 纯偏移阴影代替 shadowBlur：避免 GPU 高斯模糊 pass
+    // 纯偏移阴影代替 shadowBlur，避免 GPU 高斯模糊 pass
     this.ctx.shadowColor = "rgba(0, 0, 0, 0.75)";
     this.ctx.shadowOffsetX = (2 * this.radius) / 300;
     this.ctx.shadowOffsetY = (2 * this.radius) / 300;
@@ -1589,7 +1930,7 @@ export class MainRenderer {
       const { measure, beat, fraction, divisor } = this.beatDisplayInfo;
 
       this.ctx.font = `bold ${smallFontSize}px sans-serif`;
-      this.ctx.fillStyle = "#94a3b8"; // slate-400
+      this.ctx.fillStyle = "#94a3b8";
 
       const fractionStr = Math.floor(fraction * 100)
         .toString()
@@ -1632,7 +1973,7 @@ export class MainRenderer {
 
     this.ctx.save();
     this.ctx.font = `bold ${fontSize}px sans-serif`;
-    // 纯偏移阴影代替 shadowBlur
+    // 纯偏移阴影代替 shadowBlur，避免 GPU 高斯模糊 pass
     this.ctx.shadowColor = "rgba(0, 0, 0, 0.75)";
     this.ctx.shadowOffsetX = (2 * this.radius) / 300;
     this.ctx.shadowOffsetY = (2 * this.radius) / 300;

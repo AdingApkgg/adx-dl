@@ -40,8 +40,11 @@ export interface GameSettingsState {
   showHitEffect: boolean;
   fpsLimit: number;
   soundEnabled: boolean;
+  /** Answer-sound layer volume (the engine's `volume`). */
   soundVolume: number;
   soundOffset: number;
+  /** Hit-sound layer volume (tap/break/slide/touch; the engine's `judgeVolume`). */
+  judgeVolume: number;
   musicVolume: number;
   musicOffset: number;
   fullscreenQuality: FullscreenQuality;
@@ -69,6 +72,7 @@ export interface GameSettingsActions {
   setFpsLimit: (limit: number) => void;
   setSoundEnabled: (enabled: boolean) => void;
   setSoundVolume: (volume: number) => void;
+  setJudgeVolume: (volume: number) => void;
   setSoundOffset: (offset: number) => void;
   setMusicVolume: (volume: number) => void;
   setMusicOffset: (offset: number) => void;
@@ -100,6 +104,7 @@ const initialState: GameSettingsState = {
   soundEnabled: false,
   soundVolume: 0.5,
   soundOffset: 0,
+  judgeVolume: 1,
   musicVolume: 0.8,
   musicOffset: 0,
   fullscreenQuality: "balanced",
@@ -132,6 +137,7 @@ export const useGameSettingsStore = create<GameSettingsStore>()(
       setSoundEnabled: (enabled: boolean) => set({ soundEnabled: enabled }),
       setSoundVolume: (volume: number) => set({ soundVolume: Math.max(0, Math.min(1, volume)) }),
       setSoundOffset: (offset: number) => set({ soundOffset: offset }),
+      setJudgeVolume: (volume: number) => set({ judgeVolume: Math.max(0, Math.min(1, volume)) }),
       setMusicVolume: (volume: number) => set({ musicVolume: Math.max(0, Math.min(1, volume)) }),
       setMusicOffset: (offset: number) => set({ musicOffset: offset }),
       setFullscreenQuality: (quality: FullscreenQuality) => set({ fullscreenQuality: quality }),
@@ -167,6 +173,7 @@ export const useGameSettingsStore = create<GameSettingsStore>()(
         soundEnabled: state.soundEnabled,
         soundVolume: state.soundVolume,
         soundOffset: state.soundOffset,
+        judgeVolume: state.judgeVolume,
         musicVolume: state.musicVolume,
         musicOffset: state.musicOffset,
         fullscreenQuality: state.fullscreenQuality,

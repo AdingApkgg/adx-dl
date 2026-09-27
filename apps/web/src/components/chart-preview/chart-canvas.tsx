@@ -80,6 +80,7 @@ export function ChartCanvas({
     reset: answerSound.reset,
     setEnabled: answerSound.setEnabled,
     setVolume: answerSound.setVolume,
+    setJudgeVolume: answerSound.setJudgeVolume,
     setTimingOffset: answerSound.setTimingOffset,
     resume: answerSound.resume,
   });
@@ -90,6 +91,7 @@ export function ChartCanvas({
       reset: answerSound.reset,
       setEnabled: answerSound.setEnabled,
       setVolume: answerSound.setVolume,
+      setJudgeVolume: answerSound.setJudgeVolume,
       setTimingOffset: answerSound.setTimingOffset,
       resume: answerSound.resume,
     };
@@ -124,6 +126,7 @@ export function ChartCanvas({
   const soundEnabled = useGameSettingsStore((s) => s.soundEnabled);
   const soundVolume = useGameSettingsStore((s) => s.soundVolume);
   const soundOffset = useGameSettingsStore((s) => s.soundOffset);
+  const judgeVolume = useGameSettingsStore((s) => s.judgeVolume);
   const fullscreenQuality = useGameSettingsStore((s) => s.fullscreenQuality);
 
   const playbackSpeedRef = useRef(playbackSpeed);
@@ -643,6 +646,10 @@ export function ChartCanvas({
   useEffect(() => {
     answerSoundRefs.current.setVolume(soundVolume);
   }, [soundVolume]);
+
+  useEffect(() => {
+    answerSoundRefs.current.setJudgeVolume(judgeVolume);
+  }, [judgeVolume]);
 
   useEffect(() => {
     answerSoundRefs.current.setTimingOffset(ANSWER_SOUND_BASE_OFFSET_MS + soundOffset);

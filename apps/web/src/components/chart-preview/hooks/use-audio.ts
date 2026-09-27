@@ -38,6 +38,7 @@ export interface UseAudioReturn {
   setHoldEndSoundEnabled: (enabled: boolean) => void;
   setTouchSoundEnabled: (enabled: boolean) => void;
   setVolume: (volume: number) => void;
+  setJudgeVolume: (volume: number) => void;
   setTimingOffset: (offsetMs: number) => void;
 }
 
@@ -46,6 +47,7 @@ const defaultConfig: AudioConfig = {
   holdEndSoundEnabled: true,
   touchSoundEnabled: true,
   volume: 0.5,
+  judgeVolume: 1,
   timingOffsetMs: ANSWER_SOUND_BASE_OFFSET_MS,
 };
 
@@ -166,6 +168,15 @@ export function useAudio(options: UseAudioOptions = {}): UseAudioReturn {
     [updateConfig],
   );
 
+  // 上游 2026-09 把打击音拆成两层：正解音（volume）与判定音/打击音效（judgeVolume）。
+  const setJudgeVolume = useCallback(
+    (volume: number) => {
+      managerRef.current?.setJudgeVolume(volume);
+      updateConfig();
+    },
+    [updateConfig],
+  );
+
   const setTimingOffset = useCallback(
     (offsetMs: number) => {
       managerRef.current?.setTimingOffset(offsetMs);
@@ -185,6 +196,7 @@ export function useAudio(options: UseAudioOptions = {}): UseAudioReturn {
     setHoldEndSoundEnabled,
     setTouchSoundEnabled,
     setVolume,
+    setJudgeVolume,
     setTimingOffset,
   };
 }
