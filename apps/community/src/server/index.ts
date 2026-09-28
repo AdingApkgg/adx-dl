@@ -8,6 +8,7 @@ import { apiContext, queryClientContext, requestMetaContext } from "@/shared/rou
 
 import { createApp } from "./app";
 import type { AppEnv } from "./app-env";
+import { createAuth } from "./auth/auth";
 import { getDb, pingDb } from "./db/client";
 import { parseEnv } from "./env";
 import { createInProcessApi } from "./in-process-api";
@@ -21,13 +22,25 @@ const { db, pool } = getDb(env.databaseUrl, {
 });
 const redis = getRedis(env.redisUrl);
 await connectRedis(redis, log);
+const rateLimitStore = createRedisRateLimitStore(redis);
+
+const auth = createAuth({
+  db,
+  log,
+  publicOrigin: env.publicOrigin,
+  secret: env.betterAuthSecret,
+  google: env.google,
+  rateLimitStore,
+  rateLimitEnabled: env.nodeEnv === "production",
+});
 
 const app = createApp({
   log,
   isProduction: env.nodeEnv === "production",
   publicOrigin: env.publicOrigin,
   checks: { db: () => pingDb(db), redis: () => pingRedis(redis) },
-  rateLimitStore: createRedisRateLimitStore(redis),
+  rateLimitStore,
+  auth,
 });
 
 // 生产环境里，这个模块一被 import 就会自己调用 Bun.serve。默认导出必须原样是

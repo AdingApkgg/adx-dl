@@ -7,6 +7,8 @@ import type { Logger } from "@/shared/log";
 
 import { apiRoutes } from "./api/v1";
 import type { AppEnv } from "./app-env";
+import type { Auth } from "./auth/auth";
+import { mountAuth } from "./auth/mount";
 import { jsonError } from "./errors";
 import { clientIp } from "./middleware/client-ip";
 import { csrfGuard } from "./middleware/csrf";
@@ -24,6 +26,8 @@ export type AppDeps = {
   rateLimitStore: RateLimitStore;
   /** 浏览器看到的站点地址，CSRF 校验拿它和 Origin 头比较。 */
   publicOrigin: string;
+  /** Better Auth 实例（createAuth 的返回值）。 */
+  auth: Auth;
 };
 
 // 中间件顺序是 spec 第 8.1 节定的，改动前先对照 spec。
@@ -66,6 +70,22 @@ export function createApp(deps: AppDeps) {
       onStoreError: (error) => deps.log.error("rate_limit_store_error", describeError(error)),
     })
   );
+
+  // spec 第 10.2 节：登录相关的接口按 IP 每分钟 30 次（Cloudflare 边缘另有一条更宽的规则挡洪水）。
+  app.use(
+    "/api/auth/*",
+    rateLimit<AppEnv>({
+      store: deps.rateLimitStore,
+      name: "auth-ip",
+      limit: 30,
+      windowSec: 60,
+      key: (c) => c.get("clientIp"),
+      onStoreError: (error) => deps.log.error("rate_limit_store_error", describeError(error)),
+    })
+  );
+
+  // spec 第 8.1 节第 8 步。
+  mountAuth(app, deps.auth);
 
   app.use("/api/v1/*", csrfGuard({ publicOrigin: deps.publicOrigin }));
   app.route("/", apiRoutes);

@@ -187,7 +187,7 @@
     },
     {
       // Tests shape mock data with `any` on purpose.
-      "includes": ["**/*.test.ts", "**/*.test.tsx"],
+      "includes": ["**/*.test.ts", "**/*.test.tsx", "apps/community/src/server/testing/**"],
       "linter": {
         "rules": {
           "suspicious": { "noExplicitAny": "off" }
