@@ -9,8 +9,9 @@
     "start": "bun ./build/server/index.js",
     "typegen": "react-router typegen",
     "lint": "biome lint",
-    "test": "bun test src",
-    "check": "bun run lint && bun run typegen && tsc --noEmit && bun test src",
+    "i18n": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy url baseLocale --output-structure message-modules --emit-ts-declarations",
+    "test": "bun run i18n && bun test src",
+    "check": "bun run lint && bun run i18n && bun run typegen && tsc --noEmit && bun test src",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/server/db/migrate.ts",
     "worker": "bun run src/worker/main.ts"
@@ -28,6 +29,8 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@inlang/paraglide-js": "2.25.4",
+    "@inlang/plugin-message-format": "4.4.4",
     "@react-router/dev": "8.4.0",
     "@types/bun": "^1.4.2",
     "@types/pg": "^8.23.1",

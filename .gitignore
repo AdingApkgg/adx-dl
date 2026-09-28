@@ -27,6 +27,7 @@ apps/web/.next/
 apps/web/out/
 apps/community/build/
 apps/community/.react-router/
+apps/community/src/paraglide/
 apps/web/public/covers/
 # adxcs holds committed maidata.txt (served same-origin); bg.png and any other
 # generated/mirrored assets stay ignored.

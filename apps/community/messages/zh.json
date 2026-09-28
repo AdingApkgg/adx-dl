@@ -1,0 +1,13 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "site_name": "AstroDX 自制谱社区",
+  "home_title": "AstroDX 自制谱社区",
+  "home_description": "分享、预览和下载 maimai 自制谱。",
+  "home_api_version": "接口版本 v{version}",
+  "error_not_found_title": "页面不存在",
+  "error_not_found_body": "这个地址没有对应的页面，可能已经被删除或者输错了。",
+  "error_server_title": "出错了",
+  "error_server_body": "服务器处理这个请求时出了问题，请稍后再试。",
+  "error_request_id": "请求 ID",
+  "error_retry": "重试"
+}

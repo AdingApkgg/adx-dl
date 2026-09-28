@@ -18,7 +18,9 @@
       "!apps/web/next-env.d.ts",
       "!apps/dash/.react-router",
       "!apps/community/.react-router",
-      "!apps/community/build"
+      "!apps/community/build",
+      "!apps/community/src/paraglide",
+      "!apps/community/project.inlang"
     ]
   },
   "formatter": {
@@ -121,7 +123,9 @@
                   "pg": "The database driver is server-only.",
                   "pg-boss": "The job queue is server-only.",
                   "drizzle-orm": "Drizzle is server-only; share types through src/shared.",
-                  "bun": "Bun APIs are server-only."
+                  "bun": "Bun APIs are server-only.",
+                  "react-dom/server": "react-router-hono-server aliases this to react-dom/server.browser on Bun, which loses AsyncLocalStorage while streaming. Import react-dom/server.edge.",
+                  "react-dom/server.browser": "Loses AsyncLocalStorage while streaming, so Paraglide renders late Suspense content in the base locale. Import react-dom/server.edge."
                 },
                 "patterns": [
                   {
