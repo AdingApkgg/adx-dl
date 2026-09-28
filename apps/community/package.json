@@ -11,6 +11,7 @@
     "lint": "biome lint",
     "i18n": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy url baseLocale --output-structure message-modules --emit-ts-declarations",
     "test": "bun run i18n && bun test src",
+    "test:http": "bun test test/http",
     "check": "bun run lint && bun run i18n && bun run typegen && tsc --noEmit && bun test src",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/server/db/migrate.ts",

@@ -1,0 +1,92 @@
+name: Community check
+
+# 社区站的检查：lint、类型检查、单元与集成测试、构建、对构建产物的 HTTP 测试、
+# Docker 构建（只构建不推送）。部署是在 g510 上手动做的，不经 GitHub。
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - pre
+    paths:
+      - "apps/community/**"
+      - "packages/**"
+      - "patches/**"
+      - "package.json"
+      - "bun.lock"
+      - "biome.jsonc"
+      - ".github/workflows/community-check.yml"
+  pull_request:
+    paths:
+      - "apps/community/**"
+      - "packages/**"
+      - "patches/**"
+      - "package.json"
+      - "bun.lock"
+      - "biome.jsonc"
+      - ".github/workflows/community-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: community-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: community
+          POSTGRES_PASSWORD: community
+          POSTGRES_DB: community_test
+        options: >-
+          --health-cmd "pg_isready -U community -d community_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:8
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 6379:6379
+    env:
+      TEST_DATABASE_URL: postgres://community:community@localhost:5432/community_test
+      TEST_REDIS_URL: redis://localhost:6379
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint, typecheck and test
+        working-directory: apps/community
+        run: bun run check
+
+      - name: Build
+        working-directory: apps/community
+        run: bun run build
+
+      - name: HTTP tests against the built server
+        working-directory: apps/community
+        run: bun run test:http
+
+      # 构建只在部署时才跑，构建坏了就要到部署时才发现（dash 踩过的坑）。
+      - name: Docker build
+        run: docker build -f apps/community/Dockerfile -t community:ci .
