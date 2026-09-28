@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { requestId } from "hono/request-id";
 
+import { describeError } from "@/shared/describe-error";
 import type { Logger } from "@/shared/log";
 
 import { apiRoutes } from "./api/v1";
@@ -44,10 +45,7 @@ export function createApp(deps: AppDeps) {
           await withTimeout(check(), 2000);
           return [name, "ok"] as const;
         } catch (error) {
-          deps.log.error("readiness_check_failed", {
-            check: name,
-            message: error instanceof Error ? error.message : String(error),
-          });
+          deps.log.error("readiness_check_failed", { check: name, ...describeError(error) });
           return [name, "fail"] as const;
         }
       })
@@ -85,7 +83,7 @@ export function createApp(deps: AppDeps) {
       requestId: c.get("requestId"),
       method: c.req.method,
       path: c.req.path,
-      message: error instanceof Error ? error.message : String(error),
+      ...describeError(error),
     });
     return jsonError(c, 500, "INTERNAL", "Internal server error");
   });
@@ -105,6 +103,8 @@ function codeForStatus(status: number): string {
       return "NOT_FOUND";
     case 429:
       return "RATE_LIMITED";
+    case 500:
+      return "INTERNAL";
     default:
       return `HTTP_${status}`;
   }

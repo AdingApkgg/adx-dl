@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { DrizzleQueryError } from "drizzle-orm";
+import { HTTPException } from "hono/http-exception";
 
 import { createApp } from "./app";
 import { createMemoryRateLimitStore } from "./middleware/rate-limit";
@@ -47,6 +49,41 @@ describe("createApp", () => {
     });
   });
 
+  // DrizzleQueryError 的 message 是 "Failed query: <sql>\nparams: <参数值>"，参数里会有
+  // 令牌、QQ 号这类绝不能进日志的值。
+  test("数据库查询出错时，日志里有 SQL，没有查询参数", async () => {
+    const { deps, logs } = testAppDeps();
+    const app = createApp(deps);
+    const query = 'select * from "sessions" where "token" = $1';
+    app.get("/test-db-error", () => {
+      throw new DrizzleQueryError(query, ["sess_secret_token"], new Error("boom"));
+    });
+
+    const res = await app.request("/test-db-error");
+
+    expect(res.status).toBe(500);
+    expect(logs().find((entry) => entry.event === "unhandled_error")).toMatchObject({ path: "/test-db-error", query });
+    expect(JSON.stringify(logs())).not.toContain("sess_secret_token");
+  });
+
+  test("HTTPException 按状态码给出错误码，message 原样返回", async () => {
+    const app = createApp(testAppDeps().deps);
+    app.get("/test-forbidden", () => {
+      throw new HTTPException(403, { message: "Not your post" });
+    });
+    app.get("/test-http-500", () => {
+      throw new HTTPException(500);
+    });
+
+    const forbidden = await app.request("/test-forbidden");
+    expect(forbidden.status).toBe(403);
+    expect(await forbidden.json()).toEqual({ error: { code: "FORBIDDEN", message: "Not your post" } });
+
+    const internal = await app.request("/test-http-500");
+    expect(internal.status).toBe(500);
+    expect(await internal.json()).toEqual({ error: { code: "INTERNAL", message: "Request failed" } });
+  });
+
   test("安全响应头已经挂上", async () => {
     const res = await createApp(testAppDeps().deps).request("/healthz");
     expect(res.headers.get("content-security-policy")).toContain("'nonce-");
@@ -77,6 +114,24 @@ describe("createApp", () => {
       check: "redis",
       message: "connection refused",
     });
+  });
+
+  test("/readyz 的失败原因同样不带查询参数", async () => {
+    const { deps, logs } = testAppDeps({
+      checks: {
+        db: async () => {
+          throw new DrizzleQueryError("select $1::text", ["sess_secret_token"], new Error("boom"));
+        },
+      },
+    });
+    const res = await createApp(deps).request("/readyz");
+
+    expect(res.status).toBe(503);
+    expect(logs().find((entry) => entry.event === "readiness_check_failed")).toMatchObject({
+      check: "db",
+      query: "select $1::text",
+    });
+    expect(JSON.stringify(logs())).not.toContain("sess_secret_token");
   });
 
   test("/api 按 IP 限流，每分钟 300 次", async () => {
