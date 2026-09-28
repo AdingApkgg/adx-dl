@@ -1,9 +1,14 @@
+import { RouterContextProvider } from "react-router";
 import { createHonoServer } from "react-router-hono-server/bun";
+
+import { makeQueryClient } from "@/shared/query-client";
+import { apiContext, queryClientContext, requestMetaContext } from "@/shared/router-context";
 
 import { createApp } from "./app";
 import type { AppEnv } from "./app-env";
 import { getDb, pingDb } from "./db/client";
 import { parseEnv } from "./env";
+import { createInProcessApi } from "./in-process-api";
 import { createLogger } from "./log";
 import { createRedisRateLimitStore } from "./middleware/rate-limit";
 import { getRedis, pingRedis } from "./redis/client";
@@ -13,19 +18,46 @@ const log = createLogger();
 const { db, pool } = getDb(env.databaseUrl);
 const redis = getRedis(env.redisUrl);
 
+const app = createApp({
+  log,
+  isProduction: env.nodeEnv === "production",
+  publicOrigin: env.publicOrigin,
+  checks: { db: () => pingDb(db), redis: () => pingRedis(redis) },
+  rateLimitStore: createRedisRateLimitStore(redis),
+});
+
 // 生产环境里，这个模块一被 import 就会自己调用 Bun.serve。默认导出必须原样是
 // createHonoServer 的返回值：换成别的 fetch，Bun 会再按默认导出起一个服务，端口冲突。
 export default await createHonoServer<AppEnv>({
-  app: createApp({
-    log,
-    isProduction: env.nodeEnv === "production",
-    checks: { db: () => pingDb(db), redis: () => pingRedis(redis) },
-    rateLimitStore: createRedisRateLimitStore(redis),
-    publicOrigin: env.publicOrigin,
-  }),
+  app,
   defaultLogger: false,
   port: env.port,
   customBunServer: { hostname: env.host },
+  serveStaticOptions: {
+    // 构建产物文件名带哈希，内容永远不变；默认的缓存头里没有 immutable。
+    clientAssets: {
+      onFound: (_path, c) => {
+        c.header("Cache-Control", "public, max-age=31536000, immutable");
+      },
+    },
+  },
+  // 必须返回 RouterContextProvider：React Router 8 用 instanceof 检查。
+  // 它在我们的中间件都跑过之后才调用，所以请求 ID、nonce、访客 IP 都已经有了。
+  getLoadContext(c) {
+    const requestId = c.get("requestId");
+    const context = new RouterContextProvider();
+    context.set(requestMetaContext, {
+      requestId,
+      nonce: c.get("secureHeadersNonce"),
+      origin: env.publicOrigin,
+    });
+    context.set(
+      apiContext,
+      createInProcessApi(app, c.req.raw, { origin: env.publicOrigin, requestId, clientIp: c.get("clientIp") })
+    );
+    context.set(queryClientContext, makeQueryClient());
+    return context;
+  },
   onGracefulShutdown: async () => {
     redis.close();
     await pool.end();

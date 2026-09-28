@@ -17,6 +17,7 @@
     "worker": "bun run src/worker/main.ts"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.104.0",
     "drizzle-orm": "^0.45.3",
     "hono": "^4.13.9",
     "isbot": "^5.2.2",
