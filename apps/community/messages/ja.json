@@ -9,5 +9,6 @@
   "error_server_title": "エラーが発生しました",
   "error_server_body": "リクエストの処理中に問題が発生しました。しばらくしてから再度お試しください。",
   "error_request_id": "リクエスト ID",
-  "error_retry": "再試行"
+  "error_retry": "再試行",
+  "qq_code_message": "【AstroDX コミュニティ】ログイン認証コード：{code}（5 分間有効）。本サイトへのログインにのみ使います。コードを聞き出そうとする人は詐欺です。心当たりがない場合は無視してください。"
 }

@@ -9,5 +9,6 @@
   "error_server_title": "出错了",
   "error_server_body": "服务器处理这个请求时出了问题，请稍后再试。",
   "error_request_id": "请求 ID",
-  "error_retry": "重试"
+  "error_retry": "重试",
+  "qq_code_message": "【AstroDX 自制谱社区】登录验证码：{code}，5 分钟内有效。验证码只用于登录本站，任何人向你索要都是诈骗；如果不是你本人操作，请忽略。"
 }

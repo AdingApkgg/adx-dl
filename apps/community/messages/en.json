@@ -9,5 +9,6 @@
   "error_server_title": "Something went wrong",
   "error_server_body": "The server ran into a problem with this request. Please try again later.",
   "error_request_id": "Request ID",
-  "error_retry": "Try again"
+  "error_retry": "Try again",
+  "qq_code_message": "[AstroDX Community] Your sign-in code is {code}. It expires in 5 minutes. Only use it to sign in to this site; anyone who asks you for it is a scammer. If you didn't request it, ignore this message."
 }
