@@ -1,6 +1,7 @@
 import { RouterContextProvider } from "react-router";
 import { createHonoServer } from "react-router-hono-server/bun";
 
+import { describeError } from "@/shared/describe-error";
 import { createLogger } from "@/shared/log";
 import { makeQueryClient } from "@/shared/query-client";
 import { apiContext, queryClientContext, requestMetaContext } from "@/shared/router-context";
@@ -15,7 +16,9 @@ import { connectRedis, getRedis, pingRedis } from "./redis/client";
 
 const env = parseEnv(process.env);
 const log = createLogger();
-const { db, pool } = getDb(env.databaseUrl);
+const { db, pool } = getDb(env.databaseUrl, {
+  onPoolError: (error) => log.error("pg_pool_error", describeError(error)),
+});
 const redis = getRedis(env.redisUrl);
 await connectRedis(redis, log);
 

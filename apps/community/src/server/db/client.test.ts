@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, spyOn, test } from "bun:test";
 import { sql } from "drizzle-orm";
 import { jsonb, pgTable } from "drizzle-orm/pg-core";
 
@@ -50,5 +50,47 @@ describe("数据库连接", () => {
     });
 
     expect(kind).toBe("object");
+  });
+});
+
+// 这几条不连数据库：建连接池时不会马上连接。
+const UNREACHABLE_URL = "postgres://community:community@127.0.0.1:1/none";
+
+describe("连接池出错", () => {
+  // Postgres 重启或网络断开时，pg 把空闲连接的错误转发到连接池的 error 事件上；
+  // 没人监听，Bun 进程直接退出。
+  test("error 事件交给 onPoolError，不会抛出", async () => {
+    const errors: Error[] = [];
+    const handle = createDb(UNREACHABLE_URL, { onPoolError: (error) => errors.push(error) });
+    const error = new Error("terminating connection due to administrator command");
+
+    expect(handle.pool.listenerCount("error")).toBeGreaterThan(0);
+    expect(() => handle.pool.emit("error", error)).not.toThrow();
+    expect(errors).toEqual([error]);
+    await handle.pool.end();
+  });
+
+  test("没传 onPoolError 时写一行 JSON 到 console.error", async () => {
+    const spy = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const handle = createDb(UNREACHABLE_URL);
+      expect(() => handle.pool.emit("error", new Error("Connection terminated unexpectedly"))).not.toThrow();
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(String(spy.mock.calls[0]?.[0]))).toMatchObject({
+        level: "error",
+        event: "pg_pool_error",
+        message: "Connection terminated unexpectedly",
+      });
+      await handle.pool.end();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  // pg 默认没有连接超时：Postgres 不回应时，请求就一直挂着。
+  test("连接超时 5 秒", async () => {
+    const { pool } = createDb(UNREACHABLE_URL);
+    expect(pool.options.connectionTimeoutMillis).toBe(5000);
+    await pool.end();
   });
 });
