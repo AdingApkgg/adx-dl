@@ -13,6 +13,7 @@ import { csrfGuard } from "./middleware/csrf";
 import { rateLimit, type RateLimitStore } from "./middleware/rate-limit";
 import { requestLog } from "./middleware/request-log";
 import { securityHeaders } from "./middleware/security-headers";
+import { withTimeout } from "./with-timeout";
 
 export type HealthCheck = () => Promise<void>;
 
@@ -62,10 +63,7 @@ export function createApp(deps: AppDeps) {
       limit: 300,
       windowSec: 60,
       key: (c) => c.get("clientIp"),
-      onStoreError: (error) =>
-        deps.log.error("rate_limit_store_error", {
-          message: error instanceof Error ? error.message : String(error),
-        }),
+      onStoreError: (error) => deps.log.error("rate_limit_store_error", describeError(error)),
     })
   );
 
@@ -107,19 +105,5 @@ function codeForStatus(status: number): string {
       return "INTERNAL";
     default:
       return `HTTP_${status}`;
-  }
-}
-
-async function withTimeout(promise: Promise<void>, ms: number): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms);
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
   }
 }

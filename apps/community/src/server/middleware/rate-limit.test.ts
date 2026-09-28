@@ -55,4 +55,17 @@ describe("rateLimit", () => {
     expect(res.status).toBe(200);
     expect(errors).toHaveLength(1);
   });
+
+  // 网络断了而连接还没察觉时，Redis 命令会一直等回复；每个接口请求和服务端渲染都跟着卡住。
+  test("计数存储迟迟不回应时，超时放行，并报告错误", async () => {
+    const errors: unknown[] = [];
+    const stuck: RateLimitStore = { hit: () => new Promise(() => {}) };
+
+    const started = performance.now();
+    const res = await probe(stuck, "203.0.113.7", (error) => errors.push(error)).request("/");
+
+    expect(res.status).toBe(200);
+    expect(performance.now() - started).toBeLessThan(1000);
+    expect(errors).toHaveLength(1);
+  }, 2000);
 });

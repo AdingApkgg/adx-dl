@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import { createRedis } from "../redis/client";
 import { testRedisUrl } from "../testing/services";
@@ -7,6 +7,11 @@ import { createRedisRateLimitStore } from "./rate-limit";
 const redis = createRedis(testRedisUrl());
 const store = createRedisRateLimitStore(redis);
 const key = `test:rl:${crypto.randomUUID()}`;
+
+// 命令不排队，没连上之前发的命令会直接失败，所以先连上。
+beforeAll(async () => {
+  await redis.connect();
+});
 
 afterAll(async () => {
   await redis.del(key);

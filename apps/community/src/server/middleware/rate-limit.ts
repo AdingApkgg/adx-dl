@@ -1,6 +1,7 @@
 import type { Context, Env, MiddlewareHandler } from "hono";
 
 import { jsonError } from "../errors";
+import { withTimeout } from "../with-timeout";
 
 export type RateLimitHit = { count: number; resetSec: number };
 
@@ -63,6 +64,10 @@ export type RateLimitOptions<E extends Env> = {
   onStoreError?: (error: unknown) => void;
 };
 
+// 计数存储最多等这么久。服务端渲染时 loader 调的接口也要过限流，Redis 卡住时
+// 页面不能跟着卡住，超时和出错一样放行。
+const STORE_TIMEOUT_MS = 250;
+
 export function rateLimit<E extends Env>(options: RateLimitOptions<E>): MiddlewareHandler<E> {
   return async (c, next) => {
     const id = options.key(c);
@@ -73,7 +78,7 @@ export function rateLimit<E extends Env>(options: RateLimitOptions<E>): Middlewa
 
     let hit: RateLimitHit;
     try {
-      hit = await options.store.hit(`rl:${options.name}:${id}`, options.windowSec);
+      hit = await withTimeout(options.store.hit(`rl:${options.name}:${id}`, options.windowSec), STORE_TIMEOUT_MS);
     } catch (error) {
       options.onStoreError?.(error);
       await next();

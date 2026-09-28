@@ -11,12 +11,13 @@ import { getDb, pingDb } from "./db/client";
 import { parseEnv } from "./env";
 import { createInProcessApi } from "./in-process-api";
 import { createRedisRateLimitStore } from "./middleware/rate-limit";
-import { getRedis, pingRedis } from "./redis/client";
+import { connectRedis, getRedis, pingRedis } from "./redis/client";
 
 const env = parseEnv(process.env);
 const log = createLogger();
 const { db, pool } = getDb(env.databaseUrl);
 const redis = getRedis(env.redisUrl);
+await connectRedis(redis, log);
 
 const app = createApp({
   log,
