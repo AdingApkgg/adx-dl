@@ -8,14 +8,16 @@ import type { Logger } from "@/shared/log";
 import { apiRoutes } from "./api/v1";
 import type { AppEnv } from "./app-env";
 import type { Auth } from "./auth/auth";
-import { mountAuth } from "./auth/mount";
+import { mountAuth, sessionContext } from "./auth/mount";
 import { jsonError } from "./errors";
-import { clientIp } from "./middleware/client-ip";
+import { clientIp, rateLimitKeyForIp } from "./middleware/client-ip";
 import { csrfGuard } from "./middleware/csrf";
 import { rateLimit, type RateLimitStore } from "./middleware/rate-limit";
 import { requestLog } from "./middleware/request-log";
 import { securityHeaders } from "./middleware/security-headers";
 import { withTimeout } from "./with-timeout";
+
+const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 export type HealthCheck = () => Promise<void>;
 
@@ -66,7 +68,7 @@ export function createApp(deps: AppDeps) {
       name: "api-ip",
       limit: 300,
       windowSec: 60,
-      key: (c) => c.get("clientIp"),
+      key: (c) => rateLimitKeyForIp(c.get("clientIp")),
       onStoreError: (error) => deps.log.error("rate_limit_store_error", describeError(error)),
     })
   );
@@ -79,7 +81,7 @@ export function createApp(deps: AppDeps) {
       name: "auth-ip",
       limit: 30,
       windowSec: 60,
-      key: (c) => c.get("clientIp"),
+      key: (c) => rateLimitKeyForIp(c.get("clientIp")),
       onStoreError: (error) => deps.log.error("rate_limit_store_error", describeError(error)),
     })
   );
@@ -87,7 +89,21 @@ export function createApp(deps: AppDeps) {
   // spec 第 8.1 节第 8 步。
   mountAuth(app, deps.auth);
 
+  // spec 第 8.1 节第 9、10 步：先识别会话，再做 CSRF 校验。
+  app.use("/api/v1/*", sessionContext(deps.auth));
   app.use("/api/v1/*", csrfGuard({ publicOrigin: deps.publicOrigin }));
+  // spec 第 10.2 节：改数据的接口按用户每分钟 60 次。读请求和未登录的请求不算。
+  app.use(
+    "/api/v1/*",
+    rateLimit<AppEnv>({
+      store: deps.rateLimitStore,
+      name: "api-user-write",
+      limit: 60,
+      windowSec: 60,
+      key: (c) => (READ_METHODS.has(c.req.method) ? null : (c.get("auth")?.user.id ?? null)),
+      onStoreError: (error) => deps.log.error("rate_limit_store_error", describeError(error)),
+    })
+  );
   app.route("/", apiRoutes);
 
   // 必须是最后一个 /api 路由：没有它，未知接口会落到 React Router，拿到一个 HTML 404。

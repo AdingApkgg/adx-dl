@@ -162,4 +162,16 @@ describe("createApp", () => {
     });
     expect(res.status).toBe(415);
   });
+
+  test("/api/auth/* 按 IP 每分钟 30 次，同一个 /64 里的 IPv6 地址共用计数", async () => {
+    const app = createApp(testAppDeps().deps);
+    const statuses: number[] = [];
+    for (let i = 0; i < 31; i++) {
+      const ip = i % 2 === 0 ? "2001:db8:1:2::a" : "2001:db8:1:2::b";
+      statuses.push((await app.request("/api/auth/ok", { headers: { "cf-connecting-ip": ip } })).status);
+    }
+
+    expect(statuses.slice(0, 30).every((status) => status === 200)).toBe(true);
+    expect(statuses[30]).toBe(429);
+  });
 });
