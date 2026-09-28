@@ -13,12 +13,16 @@ on:
       - pre
     paths:
       - "apps/dash/**"
+      - "patches/**"
+      - "package.json"
       - "bun.lock"
       - "biome.jsonc"
       - ".github/workflows/dash-check.yml"
   pull_request:
     paths:
       - "apps/dash/**"
+      - "patches/**"
+      - "package.json"
       - "bun.lock"
       - "biome.jsonc"
       - ".github/workflows/dash-check.yml"
