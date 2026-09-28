@@ -47,6 +47,17 @@ describe("parseEnv", () => {
     );
   });
 
+  // 浏览器发来的 Origin 是规范写法；不一致时 CSRF 校验永远不通过，canonical、hreflang
+  // 拼出来的地址也是坏的。
+  test("PUBLIC_ORIGIN 必须是规范写法：主机名小写、不写默认端口、不带查询串", () => {
+    for (const value of ["https://x.com?a", "https://X.com", "https://x.com:443", "https://user@x.com"]) {
+      expect(() => parseEnv({ ...complete, PUBLIC_ORIGIN: value }), value).toThrow(/PUBLIC_ORIGIN/);
+    }
+    expect(parseEnv({ ...complete, PUBLIC_ORIGIN: "http://127.0.0.1:3000" }).publicOrigin).toBe(
+      "http://127.0.0.1:3000"
+    );
+  });
+
   test("数据库和 Redis 地址必须是对应的协议", () => {
     expect(() => parseEnv({ ...complete, DATABASE_URL: "mysql://x" })).toThrow(/DATABASE_URL/);
     expect(() => parseEnv({ ...complete, REDIS_URL: "http://x" })).toThrow(/REDIS_URL/);
