@@ -1,6 +1,6 @@
 import { parseEnv } from "@/server/env";
 import { createBoss } from "@/server/jobs/boss";
-import { createLogger } from "@/server/log";
+import { createLogger } from "@/shared/log";
 
 import { ensureQueues, QUEUES } from "./queues";
 

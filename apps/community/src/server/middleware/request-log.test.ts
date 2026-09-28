@@ -2,8 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { Hono } from "hono";
 import { requestId } from "hono/request-id";
 
+import { createLogger } from "@/shared/log";
+
 import type { AppEnv } from "../app-env";
-import { createLogger } from "../log";
 import { clientIp } from "./client-ip";
 import { requestLog } from "./request-log";
 

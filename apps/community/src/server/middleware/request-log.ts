@@ -1,7 +1,8 @@
 import type { MiddlewareHandler } from "hono";
 
+import type { Logger } from "@/shared/log";
+
 import type { AppEnv } from "../app-env";
-import type { Logger } from "../log";
 
 export function requestLog(log: Logger): MiddlewareHandler<AppEnv> {
   return async (c, next) => {

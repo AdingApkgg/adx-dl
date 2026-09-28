@@ -1,6 +1,7 @@
 import { RouterContextProvider } from "react-router";
 import { createHonoServer } from "react-router-hono-server/bun";
 
+import { createLogger } from "@/shared/log";
 import { makeQueryClient } from "@/shared/query-client";
 import { apiContext, queryClientContext, requestMetaContext } from "@/shared/router-context";
 
@@ -9,7 +10,6 @@ import type { AppEnv } from "./app-env";
 import { getDb, pingDb } from "./db/client";
 import { parseEnv } from "./env";
 import { createInProcessApi } from "./in-process-api";
-import { createLogger } from "./log";
 import { createRedisRateLimitStore } from "./middleware/rate-limit";
 import { getRedis, pingRedis } from "./redis/client";
 

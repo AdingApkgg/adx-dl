@@ -1,5 +1,6 @@
+import { createLogger } from "@/shared/log";
+
 import type { AppDeps } from "../app";
-import { createLogger } from "../log";
 import { createMemoryRateLimitStore } from "../middleware/rate-limit";
 
 export const TEST_PUBLIC_ORIGIN = "https://community.test";

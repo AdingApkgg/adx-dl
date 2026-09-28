@@ -2,10 +2,11 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { requestId } from "hono/request-id";
 
+import type { Logger } from "@/shared/log";
+
 import { apiRoutes } from "./api/v1";
 import type { AppEnv } from "./app-env";
 import { jsonError } from "./errors";
-import type { Logger } from "./log";
 import { clientIp } from "./middleware/client-ip";
 import { csrfGuard } from "./middleware/csrf";
 import { rateLimit, type RateLimitStore } from "./middleware/rate-limit";
