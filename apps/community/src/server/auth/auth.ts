@@ -14,7 +14,12 @@ import type { RateLimitStore } from "../middleware/rate-limit";
 import { withTimeout } from "../with-timeout";
 import { accountRules } from "./account-rules";
 import { accountAdditionalFields, sessionAdditionalFields, userAdditionalFields } from "./fields";
+import type { QqCodeStore } from "./qq/codes";
+import type { QqHasher } from "./qq/hasher";
+import { qqLogin } from "./qq/plugin";
+import type { QqSender } from "./qq/sender";
 import { shortId } from "./short-id";
+import type { TurnstileVerifier } from "./turnstile";
 
 export type AuthDeps = {
   db: Db;
@@ -27,6 +32,9 @@ export type AuthDeps = {
   rateLimitStore: RateLimitStore;
   /** Better Auth 自带的限流默认只在 NODE_ENV=production 时开；测试要测它就显式传 true。 */
   rateLimitEnabled: boolean;
+  /** QQ 发码、只用通行密钥注册之前的人机验证。 */
+  verifyTurnstile: TurnstileVerifier;
+  qq: { codes: QqCodeStore; sender: QqSender; hasher: QqHasher };
 };
 
 // Better Auth 自带限流的存储：一次原子的 consume。复用 1a 的计数存储，Redis 卡住或出错时放行，
@@ -263,7 +271,11 @@ export function createAuth(deps: AuthDeps) {
         prompt: "select_account",
       },
     },
-    plugins: [bearer({ requireSignature: true }), accountRules({ db })],
+    plugins: [
+      bearer({ requireSignature: true }),
+      accountRules({ db }),
+      qqLogin({ ...deps.qq, verifyTurnstile: deps.verifyTurnstile, log }),
+    ],
   });
 }
 

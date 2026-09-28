@@ -9,10 +9,16 @@ import { apiContext, queryClientContext, requestMetaContext } from "@/shared/rou
 import { createApp } from "./app";
 import type { AppEnv } from "./app-env";
 import { createAuth } from "./auth/auth";
+import { createRedisQqCodeStore } from "./auth/qq/codes";
+import { createQqHasher } from "./auth/qq/hasher";
+import { createConsoleSender } from "./auth/qq/sender";
+import { createTurnstileVerifier } from "./auth/turnstile";
 import { getDb, pingDb } from "./db/client";
 import { parseEnv } from "./env";
 import { createInProcessApi } from "./in-process-api";
 import { createRedisRateLimitStore } from "./middleware/rate-limit";
+import { createOneBotClient } from "./napcat/client";
+import { createNapcatSender } from "./napcat/sender";
 import { connectRedis, getRedis, pingRedis } from "./redis/client";
 
 const env = parseEnv(process.env);
@@ -24,6 +30,12 @@ const redis = getRedis(env.redisUrl);
 await connectRedis(redis, log);
 const rateLimitStore = createRedisRateLimitStore(redis);
 
+const verifyTurnstile = createTurnstileVerifier({ secretKey: env.turnstile.secretKey, log });
+const qqSender =
+  env.qq.sender === "napcat"
+    ? createNapcatSender(createOneBotClient({ httpUrl: env.qq.httpUrl, accessToken: env.qq.accessToken }), log)
+    : createConsoleSender();
+
 const auth = createAuth({
   db,
   log,
@@ -32,6 +44,12 @@ const auth = createAuth({
   google: env.google,
   rateLimitStore,
   rateLimitEnabled: env.nodeEnv === "production",
+  verifyTurnstile,
+  qq: {
+    codes: createRedisQqCodeStore({ redis, limits: rateLimitStore }),
+    sender: qqSender,
+    hasher: createQqHasher(env.qqCodeHmacKey),
+  },
 });
 
 const app = createApp({
