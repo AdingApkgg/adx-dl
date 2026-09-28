@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, test } from "bun:test";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { createApp } from "../app";
 import { account, session, user } from "../db/schema";
@@ -30,6 +30,23 @@ function newApp(options?: TestAuthOptions) {
 
 function accountsOf(userId: string) {
   return testDbHandle().db.select().from(account).where(eq(account.userId, userId));
+}
+
+// 走 Bearer 而不是 Cookie 调一个改数据的接口（unlink-account 是 POST）。
+function bearerRequest(app: ReturnType<typeof createApp>, token: string, path: string, body: unknown) {
+  return app.request(path, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+// 把会话"续期"的时间推到一天以前、但有效期还没到：下一次 get-session 会触发 Better Auth
+// 自动续期（更新会话 Cookie），用来测续期时响应头的处理。
+function markSessionDueForRefresh(userId: string) {
+  return testDbHandle().db.execute(
+    sql`update session set expires_at = now() + interval '28 days', updated_at = now() - interval '2 days' where user_id = ${userId}`
+  );
 }
 
 describe("Google 登录", () => {
@@ -90,6 +107,27 @@ describe("Google 登录", () => {
     expect(bindings[0]).toMatchObject({ accessToken: null, idToken: null });
   });
 
+  test("重新绑定已经绑过的同一个 Google 账号：令牌还是不存", async () => {
+    const app = newApp();
+    const browser = new Browser(app);
+    const profile = googleProfile();
+    await signInWithGoogle(browser, profile);
+    const userId = await currentUserId(browser);
+
+    // linkOAuthAccount 对"已经绑在自己名下"的账号走的是 update，不是 create；create.before 管不到它。
+    const relink = await signInWithGoogle(browser, profile, { link: true, callbackURL: "/settings/account" });
+    expect(relink.headers.get("location")).toBe("/settings/account");
+
+    const [row] = await accountsOf(userId);
+    expect(row).toMatchObject({
+      accessToken: null,
+      refreshToken: null,
+      idToken: null,
+      accessTokenExpiresAt: null,
+      refreshTokenExpiresAt: null,
+    });
+  });
+
   test("网页响应里没有 set-auth-token；同一个令牌放进 Authorization 头也能认出会话", async () => {
     const app = newApp();
     const browser = new Browser(app);
@@ -147,6 +185,100 @@ describe("解绑", () => {
   });
 });
 
+describe("绑定要求最近登录", () => {
+  test("会话超过 10 分钟时，绑定新的 Google 账号要求重新登录", async () => {
+    const browser = new Browser(newApp());
+    await signInWithGoogle(browser, googleProfile());
+    const userId = await currentUserId(browser);
+    await ageSessions(userId, 11);
+
+    // 偷来的旧会话不该能拿来绑一个新账号——不然攻击者可以绑自己的 Google，再正常登录一次，
+    // 之后每次"会话 10 分钟内创建"的检查都能用那个新会话轻松过关。
+    const stale = await browser.request("POST", "/api/auth/link-social", {
+      body: { provider: "google", callbackURL: "/settings/account" },
+    });
+    expect(stale.status).toBe(403);
+    expect(stale.json.code).toBe("REAUTH_REQUIRED");
+  });
+});
+
+describe("Bearer 会话也要过账号规则", () => {
+  // before-hook 之间互相看不到彼此对 context 的改动（hook-session.ts 顶部注释），账号规则原本
+  // 只用 getSessionFromCtx 时，纯 Bearer 请求会被误判成"没登录"，从而放过下面两条检查。
+  test("Bearer 解绑唯一的登录方式：400 LAST_LOGIN_METHOD", async () => {
+    const app = newApp();
+    const browser = new Browser(app);
+    await signInWithGoogle(browser, googleProfile());
+    const userId = await currentUserId(browser);
+    const [only] = await accountsOf(userId);
+    const token = decodeURIComponent(browser.cookies.get(SESSION_COOKIE) ?? "");
+
+    const res = await bearerRequest(app, token, "/api/auth/unlink-account", { accountId: only?.id });
+
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { code: string }).code).toBe("LAST_LOGIN_METHOD");
+  });
+
+  test("Bearer 解绑：会话超过 10 分钟也要求重新登录", async () => {
+    const app = newApp();
+    const browser = new Browser(app);
+    await signInWithGoogle(browser, googleProfile());
+    const userId = await currentUserId(browser);
+    const [first] = await accountsOf(userId);
+    await signInWithGoogle(browser, googleProfile(), { link: true, callbackURL: "/settings/account" });
+    await ageSessions(userId, 11);
+    const token = decodeURIComponent(browser.cookies.get(SESSION_COOKIE) ?? "");
+
+    const res = await bearerRequest(app, token, "/api/auth/unlink-account", { accountId: first?.id });
+
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { code: string }).code).toBe("REAUTH_REQUIRED");
+  });
+
+  test("Bearer 解绑：两种登录方式、会话刚创建时能成功", async () => {
+    const app = newApp();
+    const browser = new Browser(app);
+    await signInWithGoogle(browser, googleProfile());
+    const userId = await currentUserId(browser);
+    const [first] = await accountsOf(userId);
+    await signInWithGoogle(browser, googleProfile(), { link: true, callbackURL: "/settings/account" });
+    const token = decodeURIComponent(browser.cookies.get(SESSION_COOKIE) ?? "");
+
+    const res = await bearerRequest(app, token, "/api/auth/unlink-account", { accountId: first?.id });
+
+    expect(res.status).toBe(200);
+    expect(await accountsOf(userId)).toHaveLength(1);
+  });
+});
+
+describe("set-auth-token 响应头", () => {
+  test("刷新会话时，Cookie 请求上加个假 Authorization 头也不会泄露 set-auth-token", async () => {
+    const browser = new Browser(newApp());
+    await signInWithGoogle(browser, googleProfile());
+    const userId = await currentUserId(browser);
+
+    await markSessionDueForRefresh(userId);
+    const res = await browser.request("GET", "/api/auth/get-session", { headers: { authorization: "Bearer junk" } });
+
+    // 先确认这次请求确实触发了续期（否则下面"没有 set-auth-token"这条断言没有意义）。
+    expect(res.headers.getSetCookie().some((line) => line.startsWith(`${SESSION_COOKIE}=`))).toBe(true);
+    expect(res.headers.get("set-auth-token")).toBeNull();
+  });
+
+  test("真正的纯 Bearer 请求（没有 Cookie，也没有 Sec-Fetch-*）刷新会话时带着 set-auth-token", async () => {
+    const app = newApp();
+    const browser = new Browser(app);
+    await signInWithGoogle(browser, googleProfile());
+    const userId = await currentUserId(browser);
+    const token = decodeURIComponent(browser.cookies.get(SESSION_COOKIE) ?? "");
+
+    await markSessionDueForRefresh(userId);
+    const res = await app.request("/api/auth/get-session", { headers: { authorization: `Bearer ${token}` } });
+
+    expect(res.headers.get("set-auth-token")).not.toBeNull();
+  });
+});
+
 describe("关掉的接口和来源校验", () => {
   test("自带的改资料、会话列表、邮箱密码等接口一律 404", async () => {
     const app = newApp();
@@ -176,11 +308,13 @@ describe("关掉的接口和来源校验", () => {
 
     const noOrigin = await browser.request("POST", "/api/auth/sign-out", { body: {}, origin: null });
     expect(noOrigin.status).toBe(403);
+    expect(noOrigin.json.code).toBe("MISSING_OR_NULL_ORIGIN");
 
     const evil = await browser.request("POST", "/api/auth/sign-in/social", {
       body: { provider: "google", callbackURL: "https://evil.example/steal" },
     });
     expect(evil.status).toBe(403);
+    expect(evil.json.code).toBe("INVALID_CALLBACK_URL");
   });
 });
 

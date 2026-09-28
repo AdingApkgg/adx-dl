@@ -1,9 +1,10 @@
 import { APIError, type BetterAuthPlugin, defineErrorCodes } from "better-auth";
-import { createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
+import { createAuthMiddleware } from "better-auth/api";
 import { eq } from "drizzle-orm";
 
 import type { Db } from "../db/client";
 import { account, passkey } from "../db/schema";
+import { type HookContext, sessionForHook } from "./hook-session";
 import { isRecentLogin } from "./recent-login";
 
 export const ACCOUNT_ERROR_CODES = defineErrorCodes({
@@ -11,11 +12,11 @@ export const ACCOUNT_ERROR_CODES = defineErrorCodes({
   LAST_LOGIN_METHOD: "Keep at least one way to sign in",
 });
 
-type HookContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0];
-
-// 已登录才检查；没登录时交给端点自己的会话中间件返回 401。
+// 已登录才检查；没登录时交给端点自己的会话中间件返回 401。用 sessionForHook 而不是直接调
+// getSessionFromCtx：before-hook 之间互相看不到彼此对 context 的改动，Bearer 令牌要在这里自己转
+// 一遍才认得出来（见 hook-session.ts 顶部注释）。
 async function requireRecentSession(ctx: HookContext) {
-  const current = await getSessionFromCtx(ctx);
+  const current = await sessionForHook(ctx);
   if (current && !isRecentLogin(current.session.createdAt)) {
     throw APIError.from("FORBIDDEN", ACCOUNT_ERROR_CODES.REAUTH_REQUIRED);
   }
@@ -44,6 +45,14 @@ export function accountRules(deps: { db: Db }) {
             if (current && (await loginMethodCount(deps.db, current.user.id)) <= 1) {
               throw APIError.from("BAD_REQUEST", ACCOUNT_ERROR_CODES.LAST_LOGIN_METHOD);
             }
+          }),
+        },
+        {
+          // 不要求重新登录的话，偷来的旧会话能绑一个攻击者自己的 Google，再用它正常登录一次，
+          // 之后每次敏感操作的"会话 10 分钟内创建"检查都能用这个新会话轻松过关。
+          matcher: (ctx) => ctx.path === "/link-social",
+          handler: createAuthMiddleware(async (ctx) => {
+            await requireRecentSession(ctx);
           }),
         },
       ],

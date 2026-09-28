@@ -60,6 +60,9 @@ async function unusedUserId(db: Db): Promise<string> {
   throw new APIError("INTERNAL_SERVER_ERROR", { code: "USER_ID_EXHAUSTED", message: "Could not allocate a user id" });
 }
 
+// account 表上第三方令牌相关的列：create 和 update 两个钩子都要把它们清空（见下面 databaseHooks.account）。
+const TOKEN_FIELDS = ["accessToken", "refreshToken", "idToken", "accessTokenExpiresAt", "refreshTokenExpiresAt"] as const;
+
 // Google 回调时 Better Auth 从令牌接口直接拿到 id_token，这里只解出 email，不需要验签。
 function emailFromIdToken(idToken: string): string | null {
   try {
@@ -226,6 +229,19 @@ export function createAuth(deps: AuthDeps) {
                 refreshTokenExpiresAt: null,
               },
             };
+          },
+        },
+        update: {
+          // 重新绑定已经绑过的 Google 账号时，linkOAuthAccount 会带着新的令牌调 update（不会走
+          // 上面的 create.before）：同样一律清空，没出现在这次更新里的列不动。
+          before: async (data) => {
+            const cleared: Record<string, null> = {};
+            for (const field of TOKEN_FIELDS) {
+              if (field in data) {
+                cleared[field] = null;
+              }
+            }
+            return { data: { ...data, ...cleared } };
           },
         },
       },
