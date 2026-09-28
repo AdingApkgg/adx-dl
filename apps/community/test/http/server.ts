@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 
 import { testDatabaseUrl, testRedisUrl } from "../../src/server/testing/services";
+import { resetTestDatabase } from "../../src/server/testing/test-db";
 
 export type RunningServer = {
   origin: string;
@@ -12,6 +13,9 @@ const appRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 // 启动 bun run build 的产物。必须在 apps/community 下启动：静态资源的路径相对于当前目录。
 export async function startBuiltServer(): Promise<RunningServer> {
+  // 页面会读会话，表必须已经建好；单独跑 test:http 时也不依赖先跑过 bun run check。
+  await resetTestDatabase();
+
   const port = 40_000 + Math.floor(Math.random() * 10_000);
   const origin = `http://127.0.0.1:${port}`;
   const proc = Bun.spawn(["bun", "./build/server/index.js"], {
