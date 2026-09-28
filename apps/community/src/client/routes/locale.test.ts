@@ -32,6 +32,30 @@ describe("语言前缀路由", () => {
     expect(response.headers.get("location")).toBe("/foo?x=1");
   });
 
+  test("/zh 本身跳到根路径", () => {
+    for (const url of ["https://x.test/zh", "https://x.test/zh/"]) {
+      const response = thrownBy(() => run("zh", url)) as Response;
+      expect(response.headers.get("location"), url).toBe("/");
+    }
+  });
+
+  // //evil.com 这样的 Location 是"协议相对"地址，浏览器会跳到 https://evil.com。
+  // URL 解析器会把 \ 当成 /，所以 /zh/\evil.com 到这里已经是 /zh//evil.com。
+  test("/zh 后面多余的斜杠不会让跳转离开本站", () => {
+    const cases = [
+      ["https://x.test/zh//evil.com", "/evil.com"],
+      ["https://x.test/zh/\\evil.com", "/evil.com"],
+      ["https://x.test/zh///evil.com", "/evil.com"],
+      ["https://x.test/zh//evil.com?x=1", "/evil.com?x=1"],
+    ] as const;
+    for (const [url, expected] of cases) {
+      const location = (thrownBy(() => run("zh", url)) as Response).headers.get("location") ?? "";
+      expect(location, url).toBe(expected);
+      expect(location, url).toMatch(/^\/[^/\\]/);
+      expect(new URL(location, "https://x.test").origin, url).toBe("https://x.test");
+    }
+  });
+
   // /foo 这样的地址会被 :lang? 匹配成 lang=foo，要当成页面不存在。
   // /EN/... 在 Paraglide 眼里是英文，这里同样拒绝，免得一个页面有两个地址。
   test("不认识的第一段返回 404，大小写不对也算", () => {

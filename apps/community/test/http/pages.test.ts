@@ -58,6 +58,13 @@ describe("页面", () => {
     expect(res.headers.get("location")).toBe("/foo?x=1");
   });
 
+  // Cloudflare 原样转发路径，//evil.com 这样的 Location 会把访客带到别的站。
+  test("/zh//evil.com 仍然跳回本站", async () => {
+    const res = await fetch(server.url("/zh//evil.com"), { redirect: "manual" });
+    expect(res.status).toBe(301);
+    expect(res.headers.get("location")).toBe("/evil.com");
+  });
+
   test("未知地址返回真正的 404，也不缓存", async () => {
     const res = await fetch(server.url("/definitely-missing"));
     expect(res.status).toBe(404);
