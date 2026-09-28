@@ -1,0 +1,25 @@
+# 本机开发和测试用。端口只绑本机，并且换成不常用的端口号，避免和本机已有的 PG/Redis 冲突。
+name: astrodx-community-dev
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: community
+      POSTGRES_PASSWORD: community
+      POSTGRES_DB: community
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      # PG 18 镜像的数据卷挂载点是 /var/lib/postgresql（不再是 .../data）。
+      - pgdata:/var/lib/postgresql
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+
+  redis:
+    image: redis:8
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:56379:6379"
+
+volumes:
+  pgdata:

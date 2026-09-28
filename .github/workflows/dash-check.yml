@@ -1,8 +1,8 @@
 name: Dash check
 
-# 主站的 deploy 工作流用 paths-ignore 排除了 apps/dash，所以 dash 的类型检查
-# 与单测由这条工作流负责。它只跑 check，不构建镜像、不部署 —— 部署是 g510 上
-# 手动 docker compose 拉起的，不经 GitHub。
+# 主站的检查（web-check.yml）只看主站相关路径，部署工作流也不再由推送触发，
+# 所以 dash 的类型检查与单测由这条工作流负责。它只跑 check，不构建镜像、不部署
+# —— 部署是 g510 上手动 docker compose 拉起的，不经 GitHub。
 on:
   push:
     # Check on main, dev, and pre. The pre branch is what the g510 deployment
@@ -13,12 +13,16 @@ on:
       - pre
     paths:
       - "apps/dash/**"
+      - "patches/**"
+      - "package.json"
       - "bun.lock"
       - "biome.jsonc"
       - ".github/workflows/dash-check.yml"
   pull_request:
     paths:
       - "apps/dash/**"
+      - "patches/**"
+      - "package.json"
       - "bun.lock"
       - "biome.jsonc"
       - ".github/workflows/dash-check.yml"
@@ -41,7 +45,9 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.14
+          # 以根 package.json 的 packageManager 为唯一版本来源。定时重建旧提交时，
+          # 用的也是那个提交当时固定的版本。
+          bun-version-file: package.json
 
       - name: Install dependencies
         run: bun install --frozen-lockfile

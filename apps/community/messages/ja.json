@@ -1,0 +1,13 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "site_name": "AstroDX コミュニティ",
+  "home_title": "AstroDX コミュニティ",
+  "home_description": "maimai の自作譜面を共有・プレビュー・ダウンロードできます。",
+  "home_api_version": "API v{version}",
+  "error_not_found_title": "ページが見つかりません",
+  "error_not_found_body": "このアドレスに対応するページはありません。削除されたか、入力が間違っている可能性があります。",
+  "error_server_title": "エラーが発生しました",
+  "error_server_body": "リクエストの処理中に問題が発生しました。しばらくしてから再度お試しください。",
+  "error_request_id": "リクエスト ID",
+  "error_retry": "再試行"
+}

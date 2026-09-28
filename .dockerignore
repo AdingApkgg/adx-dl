@@ -33,6 +33,7 @@
 **/build
 **/dist
 **/.react-router
+**/src/paraglide
 **/*.tsbuildinfo
 
 # --- unrelated workspace content: not read by apps/dash/Dockerfile at all ---

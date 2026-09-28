@@ -1,0 +1,13 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "site_name": "AstroDX Community",
+  "home_title": "AstroDX Community",
+  "home_description": "Share, preview and download custom maimai charts.",
+  "home_api_version": "API v{version}",
+  "error_not_found_title": "Page not found",
+  "error_not_found_body": "Nothing lives at this address. It may have been removed or mistyped.",
+  "error_server_title": "Something went wrong",
+  "error_server_body": "The server ran into a problem with this request. Please try again later.",
+  "error_request_id": "Request ID",
+  "error_retry": "Try again"
+}
