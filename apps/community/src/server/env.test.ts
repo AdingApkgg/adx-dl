@@ -2,11 +2,32 @@ import { describe, expect, test } from "bun:test";
 
 import { parseEnv } from "./env";
 
+const SECRET = "0123456789abcdef0123456789abcdef";
+
 const complete = {
   PUBLIC_ORIGIN: "https://community.example.com",
   DATABASE_URL: "postgres://community:secret@db:5432/community",
   REDIS_URL: "redis://redis:6379",
+  BETTER_AUTH_SECRET: SECRET,
+  GOOGLE_CLIENT_ID: "google-id",
+  GOOGLE_CLIENT_SECRET: "google-secret",
+  TURNSTILE_SITE_KEY: "site-key",
+  TURNSTILE_SECRET_KEY: "turnstile-secret",
+  QQ_SENDER: "console",
+  QQ_CODE_HMAC_KEY: SECRET,
 };
+
+const napcat = {
+  QQ_SENDER: "napcat",
+  NAPCAT_HTTP_URL: "http://napcat:3000",
+  NAPCAT_WS_URL: "ws://napcat:3001",
+  NAPCAT_ACCESS_TOKEN: SECRET,
+  NAPCAT_BOT_QQ: "10001",
+};
+
+function without(source: Record<string, string>, key: string): Record<string, string> {
+  return Object.fromEntries(Object.entries(source).filter(([name]) => name !== key));
+}
 
 describe("parseEnv", () => {
   test("解析完整配置，并填上默认值", () => {
@@ -17,6 +38,11 @@ describe("parseEnv", () => {
       publicOrigin: "https://community.example.com",
       databaseUrl: "postgres://community:secret@db:5432/community",
       redisUrl: "redis://redis:6379",
+      betterAuthSecret: SECRET,
+      google: { clientId: "google-id", clientSecret: "google-secret" },
+      turnstile: { siteKey: "site-key", secretKey: "turnstile-secret" },
+      qqCodeHmacKey: SECRET,
+      qq: { sender: "console" },
     });
   });
 
@@ -26,9 +52,20 @@ describe("parseEnv", () => {
       throw new Error("应当抛错");
     } catch (error) {
       const message = (error as Error).message;
-      expect(message).toContain("PUBLIC_ORIGIN 未设置");
-      expect(message).toContain("DATABASE_URL 未设置");
-      expect(message).toContain("REDIS_URL 未设置");
+      for (const key of [
+        "PUBLIC_ORIGIN",
+        "DATABASE_URL",
+        "REDIS_URL",
+        "BETTER_AUTH_SECRET",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "TURNSTILE_SITE_KEY",
+        "TURNSTILE_SECRET_KEY",
+        "QQ_SENDER",
+        "QQ_CODE_HMAC_KEY",
+      ]) {
+        expect(message).toContain(`${key} 未设置`);
+      }
     }
   });
 
@@ -70,5 +107,39 @@ describe("parseEnv", () => {
 
   test("去掉 compose env_file 可能保留的引号", () => {
     expect(parseEnv({ ...complete, REDIS_URL: '"redis://redis:6379"' }).redisUrl).toBe("redis://redis:6379");
+  });
+
+  test("密钥少于 32 个字符时报错", () => {
+    expect(() => parseEnv({ ...complete, BETTER_AUTH_SECRET: "short" })).toThrow(/BETTER_AUTH_SECRET/);
+    expect(() => parseEnv({ ...complete, QQ_CODE_HMAC_KEY: "short" })).toThrow(/QQ_CODE_HMAC_KEY/);
+  });
+
+  test("QQ_SENDER 只能是 napcat 或 console", () => {
+    expect(() => parseEnv({ ...complete, QQ_SENDER: "sms" })).toThrow(/QQ_SENDER/);
+  });
+
+  test("QQ_SENDER=napcat 时解析机器人配置", () => {
+    expect(parseEnv({ ...complete, ...napcat }).qq).toEqual({
+      sender: "napcat",
+      httpUrl: "http://napcat:3000",
+      wsUrl: "ws://napcat:3001",
+      accessToken: SECRET,
+      botQq: "10001",
+    });
+  });
+
+  test("QQ_SENDER=napcat 时机器人配置缺一项就报错", () => {
+    expect(() => parseEnv({ ...complete, ...without(napcat, "NAPCAT_WS_URL") })).toThrow(/NAPCAT_WS_URL 未设置/);
+  });
+
+  // NapCat 的访问令牌留空等于关掉它的鉴权（调研报告第 2.1 节），所以和密钥一样要求长度。
+  test("NapCat 访问令牌太短、机器人 QQ 号格式不对时报错", () => {
+    expect(() => parseEnv({ ...complete, ...napcat, NAPCAT_ACCESS_TOKEN: "x" })).toThrow(/NAPCAT_ACCESS_TOKEN/);
+    expect(() => parseEnv({ ...complete, ...napcat, NAPCAT_BOT_QQ: "0123" })).toThrow(/NAPCAT_BOT_QQ/);
+  });
+
+  test("生产环境不能用控制台发送器", () => {
+    expect(() => parseEnv({ ...complete, NODE_ENV: "production" })).toThrow(/QQ_SENDER/);
+    expect(parseEnv({ ...complete, ...napcat, NODE_ENV: "production" }).qq.sender).toBe("napcat");
   });
 });

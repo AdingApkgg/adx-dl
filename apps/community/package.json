@@ -18,7 +18,10 @@
     "worker": "bun run src/worker/main.ts"
   },
   "dependencies": {
+    "@better-auth/passkey": "1.7.6",
     "@tanstack/react-query": "^5.104.0",
+    "better-auth": "1.7.6",
+    "bowser": "2.14.1",
     "drizzle-orm": "^0.45.3",
     "hono": "^4.13.9",
     "isbot": "^5.2.2",
