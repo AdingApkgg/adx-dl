@@ -8,6 +8,7 @@ export type Logger = {
 
 // 单行 JSON，方便 docker logs 里直接 grep 和过滤。调用方只传结构化字段，
 // 这里不接收任意对象，避免把请求头、Cookie 之类整包写进日志。
+// 放在 shared：服务端渲染入口 src/client/entry.server.tsx 也用它记错误。
 export function createLogger(write: (line: string) => void = (line) => console.log(line)): Logger {
   const emit = (level: "info" | "error", event: string, fields: LogFields = {}) => {
     const fixed = { time: new Date().toISOString(), level, event };
