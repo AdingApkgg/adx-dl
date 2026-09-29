@@ -15,7 +15,7 @@ import {
   waitForCode,
 } from "../testing/auth";
 import { Browser } from "../testing/auth-browser";
-import { TEST_PUBLIC_ORIGIN } from "../testing/constants";
+import { TEST_PUBLIC_ORIGIN, TEST_USER_AGENT } from "../testing/constants";
 import { SoftAuthenticator } from "../testing/soft-authenticator";
 import { resetTestDatabase, testDbHandle } from "../testing/test-db";
 
@@ -96,6 +96,10 @@ describe("登录设备", () => {
     // CF-IPCountry 是 XX（判断不出）时当作没有。
     expect(other).toMatchObject({ browser: "Safari", os: "iOS", country: null });
     expect(other).toHaveProperty("lastActiveAt");
+    // 精确的键集合：不会多出 token、ipAddress 这样的字段。
+    for (const item of res.json.sessions) {
+      expect(Object.keys(item).sort()).toEqual(["browser", "country", "createdAt", "current", "id", "lastActiveAt", "os"]);
+    }
   });
 
   test("踢下线：要求刚登录过；不能踢当前会话；踢掉后那台设备就掉线；不存在或不合法的 id 返回 404", async () => {
@@ -175,5 +179,189 @@ describe("登录设备", () => {
     await signInWithGoogle(browser, profile);
 
     expect(await sessionsOf(userId)).toHaveLength(1);
+    // 删掉的是旧会话，不是新会话：这个浏览器仍然是登录状态。
+    expect(await currentUserId(browser)).toBe(userId);
+  });
+
+  // 请求头最长 16 KiB，而设备列表要用 Bowser 解析 User-Agent，它的兜底正则对超长的串是平方级的：存进库之前先截断。
+  test("存进库的 User-Agent 最长 1024 个字符，短的原样存", async () => {
+    const { app } = setup();
+    const profile = googleProfile();
+    const userAgent = `Mozilla/5.0 ${"a".repeat(20_000)}`;
+    const long = new Browser(app, { userAgent });
+    const normal = new Browser(app);
+    await signInWithGoogle(long, profile);
+    await signInWithGoogle(normal, profile);
+
+    const stored = (await sessionsOf(await currentUserId(long))).map((row) => row.userAgent ?? "");
+
+    expect(stored).toHaveLength(2);
+    expect(stored).toContain(TEST_USER_AGENT);
+    const capped = stored.find((value) => value !== TEST_USER_AGENT);
+    expect(capped).toHaveLength(1024);
+    expect(capped).toBe(userAgent.slice(0, 1024));
+  });
+
+  // 钩子存之前已经截断了；这条防的是库里已经存在的长行（钩子上线前登录的）。
+  test("库里已有的超长 User-Agent 也只解析前 1024 个字符", async () => {
+    const { app } = setup();
+    const browser = new Browser(app);
+    await signInWithGoogle(browser, googleProfile());
+    // 能认出 Safari 的部分在 1024 个字符之后：整串解析认得出，只取前 1024 个字符就认不出。
+    await testDbHandle()
+      .db.insert(session)
+      .values({
+        token: `long-${crypto.randomUUID()}`,
+        userId: await currentUserId(browser),
+        expiresAt: new Date(Date.now() + 86_400_000),
+        userAgent: `${"a".repeat(1100)} ${IPHONE_SAFARI}`,
+      });
+
+    const res = await browser.request("GET", "/api/v1/me/sessions");
+
+    const other = res.json.sessions.find((item: { current: boolean }) => !item.current);
+    expect(other).toMatchObject({ browser: null, os: null });
+  });
+
+  // 每个会话都要解析一次 User-Agent：一次请求最多列 50 个，限制总的解析量。超出的会话仍然能被"退出其他设备"清掉。
+  test("设备列表最多 50 个会话：取最近活跃的，当前会话不会被更新的会话挤出去", async () => {
+    const { app } = setup();
+    const browser = new Browser(app);
+    await signInWithGoogle(browser, googleProfile());
+    const userId = await currentUserId(browser);
+    const currentId = (await sessionsOf(userId))[0]?.id ?? "";
+    const now = Date.now();
+    // 当前会话是最久没活跃的：另外 60 个都比它新（index 越大越旧）。
+    await testDbHandle()
+      .db.update(session)
+      .set({ updatedAt: new Date(now - 3_600_000) })
+      .where(eq(session.id, currentId));
+    const inserted = await testDbHandle()
+      .db.insert(session)
+      .values(
+        Array.from({ length: 60 }, (_, index) => ({
+          token: `cap-${index}-${crypto.randomUUID()}`,
+          userId,
+          expiresAt: new Date(now + 86_400_000),
+          updatedAt: new Date(now - index * 1000),
+          userAgent: IPHONE_SAFARI,
+        }))
+      )
+      .returning({ id: session.id, token: session.token });
+
+    const res = await browser.request("GET", "/api/v1/me/sessions");
+
+    const listed = res.json.sessions as { id: string; current: boolean; lastActiveAt: string }[];
+    expect(listed).toHaveLength(50);
+    expect(listed.filter((item) => item.current).map((item) => item.id)).toEqual([currentId]);
+    // 其余 49 个是最近活跃的 49 个（index 0 到 48），最久没活跃的 11 个不在里面。
+    const newest = inserted.filter((row) => Number(row.token.split("-")[1]) < 49).map((row) => row.id);
+    expect(
+      listed
+        .filter((item) => !item.current)
+        .map((item) => item.id)
+        .sort()
+    ).toEqual(newest.sort());
+    // 显示的顺序仍然是最近活跃的在前。
+    const activity = listed.map((item) => item.lastActiveAt);
+    expect(activity).toEqual([...activity].sort().reverse());
+  });
+
+  // Bowser 认不出来的客户端（curl、okhttp……）返回空串，不能原样给出去：页面要的是 null。
+  test("认不出来的客户端：浏览器和系统是 null，不是空串", async () => {
+    const { app } = setup();
+    const browser = new Browser(app, { userAgent: "curl/8.7.1" });
+    await signInWithGoogle(browser, googleProfile());
+
+    const res = await browser.request("GET", "/api/v1/me/sessions");
+
+    expect(res.json.sessions).toHaveLength(1);
+    expect(res.json.sessions[0]).toMatchObject({ browser: null, os: null });
+  });
+
+  // uuid 不分大小写：大写的 id 不能绕过"不能踢当前会话"的检查（否则等于用这个接口退出登录）。
+  test("大写的会话 id 按小写处理：当前会话踢不掉，别的会话照常能踢", async () => {
+    const { app } = setup();
+    const profile = googleProfile();
+    const laptop = new Browser(app);
+    const phone = new Browser(app);
+    await signInWithGoogle(phone, profile);
+    await signInWithGoogle(laptop, profile);
+    const list = (await laptop.request("GET", "/api/v1/me/sessions")).json.sessions as { id: string; current: boolean }[];
+    const currentId = list.find((item) => item.current)?.id ?? "";
+    const otherId = list.find((item) => !item.current)?.id ?? "";
+
+    const self = await laptop.request("DELETE", `/api/v1/me/sessions/${currentId.toUpperCase()}`, { headers: JSON_HEADERS });
+    expect([self.status, self.json.error.code]).toEqual([400, "CURRENT_SESSION"]);
+    expect((await laptop.request("GET", "/api/v1/me")).status).toBe(200);
+
+    const other = await laptop.request("DELETE", `/api/v1/me/sessions/${otherId.toUpperCase()}`, { headers: JSON_HEADERS });
+    expect(other.json).toEqual({ ok: true });
+    expect((await phone.request("GET", "/api/v1/me")).status).toBe(401);
+  });
+
+  test("退出其他设备：已过期的会话照样清掉，但不计入返回的数量", async () => {
+    const { app } = setup();
+    const profile = googleProfile();
+    const phone = new Browser(app);
+    const tablet = new Browser(app);
+    const laptop = new Browser(app);
+    for (const browser of [phone, tablet, laptop]) {
+      await signInWithGoogle(browser, profile);
+    }
+    const userId = await currentUserId(laptop);
+    const list = (await laptop.request("GET", "/api/v1/me/sessions")).json.sessions as { id: string; current: boolean }[];
+    const currentId = list.find((item) => item.current)?.id ?? "";
+    const expiredId = list.find((item) => !item.current)?.id ?? "";
+    await testDbHandle()
+      .db.update(session)
+      .set({ expiresAt: new Date(Date.now() - 3_600_000) })
+      .where(eq(session.id, expiredId));
+
+    const res = await laptop.request("POST", "/api/v1/me/sessions/revoke-others", { body: {} });
+
+    // 删掉了 2 行（一个还有效、一个已过期），只数没过期的那个。
+    expect(res.json).toEqual({ revoked: 1 });
+    expect((await sessionsOf(userId)).map((row) => row.id)).toEqual([currentId]);
+  });
+
+  test("退出其他设备也要求刚登录过；被拒时其他会话都还在", async () => {
+    const { app } = setup();
+    const profile = googleProfile();
+    const phone = new Browser(app);
+    const laptop = new Browser(app);
+    await signInWithGoogle(phone, profile);
+    await signInWithGoogle(laptop, profile);
+    const userId = await currentUserId(laptop);
+
+    await ageSessions(userId, 11);
+    const res = await laptop.request("POST", "/api/v1/me/sessions/revoke-others", { body: {} });
+
+    expect([res.status, res.json.error.code]).toEqual([403, "REAUTH_REQUIRED"]);
+    expect(await sessionsOf(userId)).toHaveLength(2);
+    expect((await phone.request("GET", "/api/v1/me")).status).toBe(200);
+  });
+
+  test("退出其他设备不影响别的用户", async () => {
+    const { app } = setup();
+    const aliceProfile = googleProfile();
+    const aliceLaptop = new Browser(app);
+    const alicePhone = new Browser(app);
+    await signInWithGoogle(alicePhone, aliceProfile);
+    await signInWithGoogle(aliceLaptop, aliceProfile);
+    const bobProfile = googleProfile();
+    const bobLaptop = new Browser(app);
+    const bobPhone = new Browser(app);
+    await signInWithGoogle(bobPhone, bobProfile);
+    await signInWithGoogle(bobLaptop, bobProfile);
+    const bobId = await currentUserId(bobLaptop);
+
+    const res = await aliceLaptop.request("POST", "/api/v1/me/sessions/revoke-others", { body: {} });
+
+    expect(res.json).toEqual({ revoked: 1 });
+    expect((await alicePhone.request("GET", "/api/v1/me")).status).toBe(401);
+    expect(await sessionsOf(bobId)).toHaveLength(2);
+    expect((await bobLaptop.request("GET", "/api/v1/me")).status).toBe(200);
+    expect((await bobPhone.request("GET", "/api/v1/me")).status).toBe(200);
   });
 });

@@ -33,7 +33,8 @@ export const meRoutes = new Hono<AppEnv>()
     if (!isRecentLogin(session.createdAt)) {
       return jsonError(c, 403, "REAUTH_REQUIRED", "Sign in again to continue");
     }
-    const id = c.req.param("id");
+    // uuid 不分大小写，而 session.id 在库里是小写：先转成小写，大写的当前会话 id 才绕不过下面的比较。
+    const id = c.req.param("id").toLowerCase();
     if (id === session.id) {
       return jsonError(c, 400, "CURRENT_SESSION", "Sign out to end the current session");
     }

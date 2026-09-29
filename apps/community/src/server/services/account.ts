@@ -1,5 +1,5 @@
 import Bowser from "bowser";
-import { and, asc, desc, eq, gt, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ne, sql } from "drizzle-orm";
 
 import { maskQq } from "../auth/qq/sender";
 import type { Db } from "../db/client";
@@ -68,7 +68,15 @@ function countryOf(value: string | null): string | null {
   return value && /^[A-Z]{2}$/.test(value) && value !== "XX" ? value : null;
 }
 
-/** 账号设置页的"登录设备"：本人还没过期的会话，最近活跃的在前。令牌不出服务端。 */
+// 一次请求最多列出的会话数。每个会话都要解析一次 User-Agent，这个上限就限制了一次请求要做的解析量。
+// 超出的会话不会消失：仍然能被"退出其他设备"清掉。
+const SESSION_LIST_LIMIT = 50;
+
+// 只解析 User-Agent 的前这么多个字符：Bowser 的兜底正则对超长的串是平方级的。session.create.before 存之前
+// 已经按同样的上限截过（src/server/auth/auth.ts），这里防的是钩子上线之前就在库里的长行。
+const USER_AGENT_PARSE_LIMIT = 1024;
+
+/** 账号设置页的"登录设备"：本人还没过期的会话，最近活跃的在前，最多 50 个（当前会话一定在里面）。令牌不出服务端。 */
 export async function listSessions(db: Db, userId: string, currentSessionId: string): Promise<DeviceSession[]> {
   const rows = await db
     .select({
@@ -80,13 +88,18 @@ export async function listSessions(db: Db, userId: string, currentSessionId: str
     })
     .from(session)
     .where(and(eq(session.userId, userId), gt(session.expiresAt, new Date())))
-    .orderBy(desc(session.updatedAt));
+    // 当前会话先入选（页面靠它标出"这台设备"，不能被别的更新的会话挤出去），再按最近活跃取够上限。
+    .orderBy(desc(sql`${session.id} = ${currentSessionId}`), desc(session.updatedAt))
+    .limit(SESSION_LIST_LIMIT);
+  // 入选之后，显示的顺序仍然是最近活跃的在前。
+  rows.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   return rows.map((row) => {
-    const parsed = row.userAgent ? Bowser.parse(row.userAgent) : null;
+    const parsed = row.userAgent ? Bowser.parse(row.userAgent.slice(0, USER_AGENT_PARSE_LIMIT)) : null;
     return {
       id: row.id,
-      browser: parsed?.browser.name ?? null,
-      os: parsed?.os.name ?? null,
+      // Bowser 认不出浏览器时给的是空串（curl、okhttp……），认不出系统时是 undefined：用 || 一起变成 null。
+      browser: parsed?.browser.name || null,
+      os: parsed?.os.name || null,
       country: countryOf(row.country),
       createdAt: row.createdAt,
       lastActiveAt: row.updatedAt,
@@ -105,9 +118,11 @@ export async function revokeSession(db: Db, userId: string, sessionId: string): 
 }
 
 export async function revokeOtherSessions(db: Db, userId: string, currentSessionId: string): Promise<number> {
+  const now = Date.now();
   const deleted = await db
     .delete(session)
     .where(and(eq(session.userId, userId), ne(session.id, currentSessionId)))
-    .returning({ id: session.id });
-  return deleted.length;
+    .returning({ id: session.id, expiresAt: session.expiresAt });
+  // 已过期的会话也一并删掉（顺便清理），但不计入返回的数量：设备列表里本来就看不到它们。
+  return deleted.filter((row) => row.expiresAt.getTime() > now).length;
 }

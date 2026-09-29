@@ -58,6 +58,12 @@ function rateLimitStorage(store: RateLimitStore, log: Logger): BetterAuthRateLim
 // account 表上第三方令牌相关的列：create 和 update 两个钩子都要把它们清空（见下面 databaseHooks.account）。
 const TOKEN_FIELDS = ["accessToken", "refreshToken", "idToken", "accessTokenExpiresAt", "refreshTokenExpiresAt"] as const;
 
+// 会话表里存的 User-Agent 最多这么多个字符。请求头最长 16 KiB，而登录设备列表要用 Bowser 解析它，
+// Bowser 的兜底正则对超长的串是平方级的（16000 个 "/" 解析一次约 0.3 秒）：不截的话，任何人不带 Cookie
+// 反复登录，攒一堆超长 UA 的会话，就能让每次列设备的请求把单线程的事件循环占住，所有用户一起等。
+// 1024 而不是更短：QQ、微信内置浏览器的 UA 就有五百来个字符。
+const USER_AGENT_MAX_LENGTH = 1024;
+
 // Google 回调时 Better Auth 从令牌接口直接拿到 id_token，这里只解出 email，不需要验签。
 function emailFromIdToken(idToken: string): string | null {
   try {
@@ -250,7 +256,9 @@ export function createAuth(deps: AuthDeps) {
           // Google 回调、QQ、通行密钥建的会话都经过这里。
           before: async (data, ctx) => {
             const country = ctx?.request?.headers.get("cf-ipcountry") ?? ctx?.headers?.get("cf-ipcountry") ?? null;
-            return { data: { ...data, country } };
+            const userAgent =
+              typeof data.userAgent === "string" ? data.userAgent.slice(0, USER_AGENT_MAX_LENGTH) : data.userAgent;
+            return { data: { ...data, country, userAgent } };
           },
           // 这个浏览器原来的会话：新 Cookie 会覆盖旧的，旧会话从此没人能用，却会一直留在
           // 登录设备列表里（本计划"与 spec 的偏离"第 12 条）。签名不对的 Cookie 取不出令牌，不会误删。
@@ -258,9 +266,15 @@ export function createAuth(deps: AuthDeps) {
             if (!ctx) {
               return;
             }
-            const previous = await ctx.getSignedCookie(ctx.context.authCookies.sessionToken.name, ctx.context.secret);
-            if (previous && previous !== created.token) {
-              await ctx.context.internalAdapter.deleteSession(previous);
+            // 这个钩子在事务提交之后才跑，新会话已经建好了：删旧会话失败不能让登录报 500（用户拿不到
+            // Cookie，还白白留下一个没人用的会话）。记下来就行：旧会话多留一阵，用户在设备列表里看得到，也踢得掉。
+            try {
+              const previous = await ctx.getSignedCookie(ctx.context.authCookies.sessionToken.name, ctx.context.secret);
+              if (previous && previous !== created.token) {
+                await ctx.context.internalAdapter.deleteSession(previous);
+              }
+            } catch (error) {
+              log.error("previous_session_delete_failed", describeError(error));
             }
           },
         },
