@@ -39,4 +39,15 @@ describe("createLoginOptions", () => {
     const options = createLoginOptions({ turnstileSiteKey: "site", qq: napcat, redis: broken });
     expect((await options()).qq.available).toBe(true);
   });
+
+  // 连接还在、命令却一直没有回应（Redis 卡住）时，登录页的配置不能跟着挂住：等到 250 毫秒的上限就放弃。
+  test("Redis 一直没有回应时，等到上限（250 毫秒）就当作可用", async () => {
+    const hanging: RedisCommandSender = { send: () => new Promise<never>(() => {}) };
+    const options = createLoginOptions({ turnstileSiteKey: "site", qq: napcat, redis: hanging });
+
+    const started = performance.now();
+    expect((await options()).qq).toEqual({ available: true, botQq: "10001" });
+    // 确实是等到了上限才返回，不是别的路径提前返回的（留出计时器的误差）。
+    expect(performance.now() - started).toBeGreaterThanOrEqual(200);
+  }, 2000);
 });

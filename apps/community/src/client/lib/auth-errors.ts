@@ -26,7 +26,15 @@ const MESSAGES: Record<string, () => string> = {
 };
 
 // 用户自己关掉了通行密钥对话框，或者在 Google 那边点了取消：不算错误。
-const SILENT = new Set(["AUTH_CANCELLED", "ERROR_CEREMONY_ABORTED", "access_denied"]);
+// ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY 是 @simplewebauthn/browser 对 NotAllowedError 的包装：用户点"取消"、
+// 超时、浏览器不允许，这几种情况浏览器自己已经提示过用户，页面不用再提示一遍。通行密钥客户端把它原样
+// 交出来（signIn.passkey 和 addPasskey 都是）；AUTH_CANCELLED 只在抛出的不是 WebAuthn 错误时才出现。
+const SILENT = new Set([
+  "AUTH_CANCELLED",
+  "ERROR_CEREMONY_ABORTED",
+  "ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY",
+  "access_denied",
+]);
 
 /** 错误码：Better Auth 客户端的 { code }、我们接口的 ApiError，或者地址里 ?error= 的字符串。 */
 export function errorCodeOf(error: unknown): string | undefined {
@@ -48,7 +56,8 @@ export function errorMessage(error: unknown): string | null {
   if (code && SILENT.has(code)) {
     return null;
   }
-  const known = code ? MESSAGES[code] : undefined;
+  // 只认 MESSAGES 自己的键：?error= 来自地址，"constructor"、"__proto__" 这样的名字不能顺着原型链查到东西。
+  const known = code && Object.hasOwn(MESSAGES, code) ? MESSAGES[code] : undefined;
   if (known) {
     return known();
   }

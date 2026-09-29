@@ -154,6 +154,29 @@ describe("createApp", () => {
     expect(await res.json()).toEqual({ name: "astrodx-community", apiVersion: 1 });
   });
 
+  // 登录页用它拿 Turnstile 的站点密钥和 QQ 登录能不能用；不要求登录，所以这里不带 Cookie。
+  test("GET /api/v1/login-options：不用登录，返回 testAppDeps 里的那份配置", async () => {
+    const res = await createApp(testAppDeps().deps).request("/api/v1/login-options");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      turnstileSiteKey: "1x00000000000000000000AA",
+      qq: { available: true, botQq: "10001" },
+    });
+  });
+
+  test("GET /api/v1/login-options 返回的是服务给出的值，QQ 登录不可用时也一样", async () => {
+    const { deps } = testAppDeps();
+    const loginOptions = async () => ({ turnstileSiteKey: "site", qq: { available: false, botQq: "10001" } });
+
+    const res = await createApp({ ...deps, services: { ...deps.services, loginOptions } }).request(
+      "/api/v1/login-options"
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(await loginOptions());
+  });
+
   test("/api/v1 的写请求要过 CSRF 检查", async () => {
     const res = await createApp(testAppDeps().deps).request("/api/v1/meta", {
       method: "POST",

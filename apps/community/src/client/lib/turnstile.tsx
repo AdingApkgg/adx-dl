@@ -54,7 +54,7 @@ export type Turnstile = {
   /** 拿到的令牌；还没通过或已过期时是 null。令牌只能用一次，提交后要 reset()。 */
   token: string | null;
   reset(): void;
-  /** 脚本加载失败。 */
+  /** 脚本加载失败、widget 渲染失败，或者 widget 自己报了错（它会自动重试，重试成功后又变回 false）。 */
   failed: boolean;
 };
 
@@ -71,13 +71,26 @@ export function useTurnstile(siteKey: string): Turnstile {
         if (cancelled || !ref.current) {
           return;
         }
-        widgetId.current = api.render(ref.current, {
-          sitekey: siteKey,
-          language: LANGUAGES[getLocale()],
-          callback: (value) => setToken(value),
-          "expired-callback": () => setToken(null),
-          "error-callback": () => setToken(null),
-        });
+        try {
+          widgetId.current = api.render(ref.current, {
+            sitekey: siteKey,
+            language: LANGUAGES[getLocale()],
+            callback: (value) => {
+              setToken(value);
+              // widget 出错后自己重试成功了：失败的提示要跟着消失。
+              setFailed(false);
+            },
+            "expired-callback": () => setToken(null),
+            "error-callback": () => {
+              setToken(null);
+              setFailed(true);
+            },
+          });
+        } catch {
+          // render 会直接抛错（例如站点密钥不对）。这时没有 widget 可用，和脚本加载失败一样提示用户；
+          // 不接住的话它会变成未处理的 rejection，页面上也不会有任何提示。
+          setFailed(true);
+        }
       },
       () => {
         if (!cancelled) {
