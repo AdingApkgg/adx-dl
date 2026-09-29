@@ -4,13 +4,15 @@ import { baseLocale, isLocale } from "@/paraglide/runtime.js";
 
 import type { Route } from "./+types/locale";
 
-export function loader({ params, url }: Route.LoaderArgs) {
+type LocaleArgs = { params: { lang?: string }; url: URL };
+
+// 基础语言不加前缀（spec 第 11.1 节）。Paraglide 会把 /zh/... 也当成中文照常渲染，
+// 不在这里跳走，同一个页面就有两个地址。
+export function checkLocale({ params, url }: LocaleArgs): void {
   const lang = params.lang;
   if (lang === undefined) {
-    return { locale: baseLocale };
+    return;
   }
-  // 基础语言不加前缀（spec 第 11.1 节）。Paraglide 会把 /zh/... 也当成中文照常渲染，
-  // 不在这里跳走，同一个页面就有两个地址。
   if (lang === baseLocale) {
     // 开头的斜杠（URL 解析器把 \ 也变成了 /）只留一个：/zh//evil.com 若跳到 //evil.com，
     // 浏览器会当成 https://evil.com。
@@ -21,7 +23,18 @@ export function loader({ params, url }: Route.LoaderArgs) {
   if (!isLocale(lang)) {
     throw data(null, { status: 404 });
   }
-  return { locale: lang };
+}
+
+// 放在中间件里：它在这个路由和所有子路由的 loader 之前执行（1a 评审遗留 #5）。
+export const middleware: Route.MiddlewareFunction[] = [
+  (args, next) => {
+    checkLocale(args);
+    return next();
+  },
+];
+
+export function loader({ params }: Route.LoaderArgs) {
+  return { locale: params.lang ?? baseLocale };
 }
 
 export default function LocaleLayout() {

@@ -125,7 +125,9 @@
                   "drizzle-orm": "Drizzle is server-only; share types through src/shared.",
                   "bun": "Bun APIs are server-only.",
                   "react-dom/server": "react-router-hono-server aliases this to react-dom/server.browser on Bun, which loses AsyncLocalStorage while streaming. Import react-dom/server.edge.",
-                  "react-dom/server.browser": "Loses AsyncLocalStorage while streaming, so Paraglide renders late Suspense content in the base locale. Import react-dom/server.edge."
+                  "react-dom/server.browser": "Loses AsyncLocalStorage while streaming, so Paraglide renders late Suspense content in the base locale. Import react-dom/server.edge.",
+                  "better-auth": "Server entry point. Import better-auth/client in the browser.",
+                  "@better-auth/passkey": "Server entry point. Import @better-auth/passkey/client in the browser."
                 },
                 "patterns": [
                   {
@@ -138,9 +140,10 @@
                       "@/worker/**",
                       "../**/worker",
                       "../**/worker/**",
-                      "!**/server/api/app-type"
+                      "!**/server/api/app-type",
+                      "!**/server/auth/auth-type"
                     ],
-                    "message": "src/client must not import src/server or src/worker (only `import type` from @/server/api/app-type); move shared code to src/shared."
+                    "message": "src/client must not import src/server or src/worker (only `import type` from @/server/api/app-type and @/server/auth/auth-type); move shared code to src/shared."
                   },
                   { "group": ["drizzle-orm/**"], "message": "Drizzle is server-only." }
                 ]
@@ -174,9 +177,10 @@
                       "@/client/**",
                       "../**/client",
                       "../**/client/**",
-                      "!**/server/api/app-type"
+                      "!**/server/api/app-type",
+                      "!**/server/auth/auth-type"
                     ],
-                    "message": "src/shared must not depend on server, worker or client code (only `import type` from @/server/api/app-type)."
+                    "message": "src/shared must not depend on server, worker or client code (only `import type` from @/server/api/app-type and @/server/auth/auth-type)."
                   }
                 ]
               }

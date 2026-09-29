@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { loader } from "./locale";
+import { checkLocale, loader } from "./locale";
 
 function run(lang: string | undefined, url: string) {
-  // loader 只用到 params 和 url，测试里只传这两项。
-  return loader({ params: { lang }, url: new URL(url) } as unknown as Parameters<typeof loader>[0]);
+  // 先跑中间件里的检查（会抛出跳转或 404），再跑 loader；两者都只用到 params 和 url。
+  const args = { params: { lang }, url: new URL(url) };
+  checkLocale(args);
+  return loader(args as unknown as Parameters<typeof loader>[0]);
 }
 
 function thrownBy(fn: () => unknown): unknown {

@@ -20,6 +20,7 @@ import { createRedisRateLimitStore } from "./middleware/rate-limit";
 import { createOneBotClient } from "./napcat/client";
 import { createNapcatSender } from "./napcat/sender";
 import { connectRedis, getRedis, pingRedis } from "./redis/client";
+import { createLoginOptions } from "./services/login-options";
 
 const env = parseEnv(process.env);
 const log = createLogger();
@@ -59,7 +60,10 @@ const app = createApp({
   checks: { db: () => pingDb(db), redis: () => pingRedis(redis) },
   rateLimitStore,
   auth,
-  services: { db },
+  services: {
+    db,
+    loginOptions: createLoginOptions({ turnstileSiteKey: env.turnstile.siteKey, qq: env.qq, redis }),
+  },
 });
 
 // 生产环境里，这个模块一被 import 就会自己调用 Bun.serve。默认导出必须原样是

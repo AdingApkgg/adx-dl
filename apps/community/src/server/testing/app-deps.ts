@@ -21,7 +21,10 @@ export function testAppDeps(overrides: Partial<AppDeps> = {}) {
     rateLimitStore: createMemoryRateLimitStore(),
     publicOrigin: TEST_PUBLIC_ORIGIN,
     auth: sharedAuth,
-    services: { db: testDbHandle().db },
+    services: {
+      db: testDbHandle().db,
+      loginOptions: async () => ({ turnstileSiteKey: "1x00000000000000000000AA", qq: { available: true, botQq: "10001" } }),
+    },
     ...overrides,
   };
   return {
