@@ -84,6 +84,25 @@ describe("createApp", () => {
     expect(await internal.json()).toEqual({ error: { code: "INTERNAL", message: "Request failed" } });
   });
 
+  // 页面由 createHonoServer 在 createApp 之后挂上的 React Router 处理：这里照样在 createApp 之后挂一个
+  // "页面"，像 getLoadContext 那样把进程内请求收到的 Set-Cookie 放进 inProcessSetCookies。
+  test("进程内请求收到的 Set-Cookie 补到页面响应上，同名的只留最后一条", async () => {
+    const app = createApp(testAppDeps().deps);
+    app.get("/test-page", (c) => {
+      c.set("inProcessSetCookies", [
+        "adxc.session_token=first; Max-Age=2592000; Path=/",
+        "other=1; Path=/",
+        "adxc.session_token=second; Max-Age=2592000; Path=/",
+      ]);
+      return c.html("<p>ok</p>");
+    });
+
+    const res = await app.request("/test-page");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.getSetCookie()).toEqual(["adxc.session_token=second; Max-Age=2592000; Path=/", "other=1; Path=/"]);
+  });
+
   test("安全响应头已经挂上", async () => {
     const res = await createApp(testAppDeps().deps).request("/healthz");
     expect(res.headers.get("content-security-policy")).toContain("'nonce-");

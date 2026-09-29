@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, test } from "bun:test";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { createApp } from "../app";
+import { session } from "../db/schema";
 import { testAppDeps } from "../testing/app-deps";
 import { createTestAuth, currentUserId, googleProfile, signInWithGoogle } from "../testing/auth";
 import { Browser } from "../testing/auth-browser";
@@ -52,6 +53,26 @@ describe("GET /api/v1/me", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.getSetCookie().some((cookie) => cookie.startsWith("__Secure-adxc.session_token="))).toBe(true);
+  });
+
+  // 同一个浏览器重新登录时旧会话会被删掉。还带着旧 Cookie、晚到的请求（另一个标签页、聚焦时的自动刷新）
+  // 如果收到"清掉 Cookie"的 Set-Cookie，会把刚登录的新 Cookie 也清掉。
+  test("Cookie 指向的会话已经不在时，响应里没有任何 Set-Cookie", async () => {
+    const app = newApp();
+    const browser = new Browser(app);
+    await signInWithGoogle(browser, googleProfile());
+    const userId = await currentUserId(browser);
+    // 直接用 app.request 带着同一个 Cookie 发：Browser 收到清掉 Cookie 的响应后会把它扔掉，第二个请求就不带了。
+    const cookie = browser.cookieHeader();
+    await testDbHandle().db.delete(session).where(eq(session.userId, userId));
+
+    const options = await app.request("/api/v1/login-options", { headers: { cookie } });
+    const me = await app.request("/api/v1/me", { headers: { cookie } });
+
+    expect(options.status).toBe(200);
+    expect(options.headers.getSetCookie()).toEqual([]);
+    expect(me.status).toBe(401);
+    expect(me.headers.getSetCookie()).toEqual([]);
   });
 });
 

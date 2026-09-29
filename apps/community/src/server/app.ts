@@ -44,6 +44,25 @@ export function createApp(deps: AppDeps) {
   app.use("*", requestLog(deps.log));
   app.use("*", securityHeaders({ isProduction: deps.isProduction }));
 
+  // 服务端渲染时 loader 经进程内 API 调 /api/v1（in-process-api.ts）。会话满一天时续期发生在那次进程内
+  // 的请求里，新的会话 Cookie 只在它的响应上，页面响应默认带不出去：浏览器的 Cookie 会停在登录后第 30 天
+  // 过期，库里的会话却一直在续。getLoadContext 把这些 Set-Cookie 收进 inProcessSetCookies，这里补到页面
+  // 响应上（文档请求和站内切换页面的 .data 请求都经过这里）。loader 会并发调几个接口，同名的只留最后一条。
+  app.use("*", async (c, next) => {
+    await next();
+    const cookies = c.get("inProcessSetCookies");
+    if (!cookies?.length) {
+      return;
+    }
+    const byName = new Map<string, string>();
+    for (const cookie of cookies) {
+      byName.set(cookie.split("=", 1)[0], cookie);
+    }
+    for (const cookie of byName.values()) {
+      c.res.headers.append("set-cookie", cookie);
+    }
+  });
+
   app.all("/media/*", (c) => jsonError(c, 404, "NOT_FOUND", "Not found"));
 
   app.get("/healthz", (c) => c.json({ ok: true }));

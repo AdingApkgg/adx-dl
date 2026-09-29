@@ -10,5 +10,10 @@ export type AppEnv = {
     auth: AuthSession | null;
     /** /api/v1 的依赖；只在 /api/v1/* 上设置。 */
     services: ApiServices;
+    /**
+     * 服务端渲染时 loader 经进程内 API 调接口，接口响应里的 Set-Cookie（会话续期）收在这里，
+     * 由 createApp 里的中间件补到页面响应上。只在页面请求上由 getLoadContext 设置。
+     */
+    inProcessSetCookies: string[];
   };
 };

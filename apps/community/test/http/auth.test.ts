@@ -1,6 +1,46 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { makeSignature } from "better-auth/crypto";
+import { eq } from "drizzle-orm";
 
-import { type RunningServer, startBuiltServer } from "./server";
+import { shortId } from "../../src/server/auth/short-id";
+import { session, user } from "../../src/server/db/schema";
+import { testDbHandle } from "../../src/server/testing/test-db";
+import { HTTP_TEST_AUTH_SECRET, type RunningServer, startBuiltServer } from "./server";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+// HTTP 测试走 http，会话 Cookie 不带 __Secure- 前缀。
+const SESSION_COOKIE = "adxc.session_token";
+
+// 往测试库里直接放一个用户和一个"该续期了"的会话（上次续期在两天前，还剩 28 天过期），再用构建产物的
+// 密钥照 Better Auth 的方式签出会话 Cookie。HTTP 测试走不通真的登录：Google、Turnstile 都要连外网。
+async function seedSessionDueForRenewal(name: string) {
+  const { db } = testDbHandle();
+  const id = shortId();
+  await db.insert(user).values({ id, name, email: `${id}@placeholder.invalid` });
+  const token = crypto.randomUUID().replaceAll("-", "");
+  const now = Date.now();
+  await db.insert(session).values({
+    token,
+    userId: id,
+    expiresAt: new Date(now + 28 * DAY_MS),
+    createdAt: new Date(now - 2 * DAY_MS),
+    updatedAt: new Date(now - 2 * DAY_MS),
+  });
+  const signed = `${token}.${await makeSignature(token, HTTP_TEST_AUTH_SECRET)}`;
+  return { token, cookie: `${SESSION_COOKIE}=${encodeURIComponent(signed)}` };
+}
+
+async function expiresAtOf(token: string): Promise<number | undefined> {
+  const [row] = await testDbHandle()
+    .db.select({ expiresAt: session.expiresAt })
+    .from(session)
+    .where(eq(session.token, token));
+  return row?.expiresAt.getTime();
+}
+
+function sessionCookiesIn(res: Response): string[] {
+  return res.headers.getSetCookie().filter((line) => line.startsWith(`${SESSION_COOKIE}=`));
+}
 
 let server: RunningServer;
 
@@ -105,5 +145,50 @@ describe("账号接口", () => {
       turnstileSiteKey: "1x00000000000000000000AA",
       qq: { available: true, botQq: "10001" },
     });
+  });
+});
+
+// 每天第一次打开网站多半是服务端渲染：续期发生在 loader 经进程内 API 发的请求里。新的 Cookie 要跟着
+// 页面响应回到浏览器，否则 Cookie 永远停在登录后第 30 天过期，天天用也会被登出。
+describe("服务端渲染时的会话续期", () => {
+  test("文档请求：页面响应带回 30 天的会话 Cookie，库里的有效期也延长到约 30 天后", async () => {
+    const { token, cookie } = await seedSessionDueForRenewal("续期测试");
+
+    const res = await fetch(server.url("/"), { headers: { cookie } });
+    const html = await res.text();
+
+    expect(res.status).toBe(200);
+    expect(html).toContain("已登录：续期测试");
+    const renewed = sessionCookiesIn(res);
+    expect(renewed).toHaveLength(1);
+    expect(renewed[0]).toContain("Max-Age=2592000");
+    expect(await expiresAtOf(token)).toBeGreaterThan(Date.now() + 29 * DAY_MS);
+  });
+
+  // 站内切换页面时浏览器请求的是 .data（首页是 /_.data），loader 一样经进程内 API 续期。
+  test(".data 请求：响应同样带回 30 天的会话 Cookie", async () => {
+    const { token, cookie } = await seedSessionDueForRenewal("续期测试");
+
+    const res = await fetch(server.url("/_.data"), { headers: { cookie } });
+    await res.text();
+
+    expect(res.status).toBe(200);
+    const renewed = sessionCookiesIn(res);
+    expect(renewed).toHaveLength(1);
+    expect(renewed[0]).toContain("Max-Age=2592000");
+    expect(await expiresAtOf(token)).toBeGreaterThan(Date.now() + 29 * DAY_MS);
+  });
+
+  // 会话已经被删掉（比如同一个浏览器重新登录过）时，进程内的请求也不能把"清掉 Cookie"带到页面上。
+  test("会话已经被删掉：页面响应不带任何 Set-Cookie", async () => {
+    const { token, cookie } = await seedSessionDueForRenewal("续期测试");
+    await testDbHandle().db.delete(session).where(eq(session.token, token));
+
+    const res = await fetch(server.url("/"), { headers: { cookie } });
+    const html = await res.text();
+
+    expect(res.status).toBe(200);
+    expect(html).toContain('href="/login?next=%2F"');
+    expect(res.headers.getSetCookie()).toEqual([]);
   });
 });

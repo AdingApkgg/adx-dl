@@ -51,6 +51,12 @@ export function sessionContext(auth: Auth): MiddlewareHandler<AppEnv> {
     c.set("auth", response);
     await next();
     // 会话满一天会续期：数据库里的过期时间已经延长，新的 Set-Cookie 要带回浏览器。
+    // 只有取到了会话才转发。Cookie 指向的会话已经不在时（同一个浏览器重新登录，旧会话被删掉了），
+    // Better Auth 会发出清掉会话 Cookie 的 Set-Cookie；还带着旧 Cookie、晚到的请求（另一个标签页、
+    // 聚焦时的自动刷新）把它带回浏览器，会连刚登录的新 Cookie 一起清掉。
+    if (!response) {
+      return;
+    }
     for (const cookie of headers.getSetCookie()) {
       c.res.headers.append("set-cookie", cookie);
     }

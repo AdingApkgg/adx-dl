@@ -91,9 +91,17 @@ export default await createHonoServer<AppEnv>({
       nonce: c.get("secureHeadersNonce"),
       origin: env.publicOrigin,
     });
+    // 进程内请求收到的 Set-Cookie（会话续期）先收在这里，createApp 里的中间件再补到页面响应上。
+    const setCookies: string[] = [];
+    c.set("inProcessSetCookies", setCookies);
     context.set(
       apiContext,
-      createInProcessApi(app, c.req.raw, { origin: env.publicOrigin, requestId, clientIp: c.get("clientIp") })
+      createInProcessApi(
+        app,
+        c.req.raw,
+        { origin: env.publicOrigin, requestId, clientIp: c.get("clientIp") },
+        (cookie) => setCookies.push(cookie)
+      )
     );
     context.set(queryClientContext, makeQueryClient());
     return context;
