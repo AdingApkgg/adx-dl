@@ -1,0 +1,253 @@
+import { dehydrate, HydrationBoundary, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useLocation, useSearchParams } from "react-router";
+
+import { m } from "@/paraglide/messages.js";
+import { getLocale, localizeHref } from "@/paraglide/runtime.js";
+import { expectOk } from "@/shared/api-client";
+import { htmlLang } from "@/shared/i18n/locale";
+import { apiContext, queryClientContext } from "@/shared/router-context";
+
+import { QqCodeForm } from "../components/qq-code-form";
+import { authClient } from "../lib/auth-client";
+import { errorCodeOf, errorMessage } from "../lib/auth-errors";
+import { getBrowserApi, getRenderApi, jsonRequest } from "../lib/browser";
+import { loginHref, requireUser } from "../lib/require-user";
+import { useHydrated } from "../lib/use-hydrated";
+import { loginsQuery, sessionsQuery } from "../queries/account";
+import { loginOptionsQuery } from "../queries/login-options";
+import type { Route } from "./+types/settings-account";
+
+export async function loader({ context, url }: Route.LoaderArgs) {
+  await requireUser(context, url);
+  const queryClient = context.get(queryClientContext);
+  const api = context.get(apiContext);
+  await Promise.all([
+    queryClient.query(loginsQuery(api)),
+    queryClient.query(sessionsQuery(api)),
+    queryClient.query(loginOptionsQuery(api)),
+  ]);
+  return { dehydratedState: dehydrate(queryClient) };
+}
+
+export function meta() {
+  return [
+    { title: `${m.settings_account_title()} - ${m.site_name()}` },
+    { name: "robots", content: "noindex" },
+  ];
+}
+
+export default function SettingsAccount({ loaderData }: Route.ComponentProps) {
+  return (
+    <HydrationBoundary state={loaderData.dehydratedState}>
+      <SettingsContent />
+    </HydrationBoundary>
+  );
+}
+
+type Failure = { message: string; reauth: boolean };
+
+// 设备名来自 User-Agent，构造出来的可以有上千个字符：每个名字最多显示 64 个字符，超出的换成省略号。
+// 按字符（码点）数截，边界上的表情符号不会被劈成半个。
+const DEVICE_NAME_MAX = 64;
+
+function clipDeviceName(name: string | null): string | null {
+  const chars = name ? Array.from(name) : [];
+  return chars.length > DEVICE_NAME_MAX ? `${chars.slice(0, DEVICE_NAME_MAX).join("")}…` : name;
+}
+
+function SettingsContent() {
+  const api = getRenderApi();
+  const queryClient = useQueryClient();
+  const location = useLocation();
+  const [params] = useSearchParams();
+  const hydrated = useHydrated();
+  const { data: logins } = useQuery(loginsQuery(api));
+  const { data: sessions } = useQuery(sessionsQuery(api));
+  const { data: options } = useQuery(loginOptionsQuery(api));
+  const [failure, setFailure] = useState<Failure | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const here = `${location.pathname}${location.search}`;
+  const callbackMessage = params.get("error") ? errorMessage(params.get("error")) : null;
+
+  const locale = htmlLang(getLocale());
+  const formatDate = (iso: string | null) =>
+    hydrated && iso ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(iso)) : "";
+  const placeName = (country: string | null) =>
+    country
+      ? hydrated
+        ? (new Intl.DisplayNames([locale], { type: "region" }).of(country) ?? country)
+        : ""
+      : m.settings_device_unknown_place();
+
+  // 所有按钮共用：出错时翻译成文案；未登录跳去登录页（spec 第 11.4 节）；要求刚登录的给出"重新登录"链接。
+  async function run(action: () => Promise<unknown>) {
+    setPending(true);
+    setFailure(null);
+    setNotice(null);
+    try {
+      const outcome = await action();
+      const error = outcome && typeof outcome === "object" && "error" in outcome ? outcome.error : null;
+      if (error) {
+        throw error;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+    } catch (error) {
+      const code = errorCodeOf(error);
+      const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
+      if (code === "UNAUTHORIZED" || status === 401) {
+        window.location.assign(loginHref(here));
+        return;
+      }
+      const message = errorMessage(error);
+      if (message) {
+        setFailure({ message, reauth: code === "REAUTH_REQUIRED" || code === "SESSION_NOT_FRESH" });
+      }
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function revokeOthers() {
+    const res = await expectOk(await getBrowserApi().api.v1.me.sessions["revoke-others"].$post(undefined, jsonRequest));
+    const body = await res.json();
+    // 响应类型里还有 403 的 { error }：expectOk 已经把非 2xx 都抛掉了，这里只是让类型收窄到成功的那种。
+    if ("revoked" in body) {
+      setNotice(m.settings_revoked_others({ count: body.revoked }));
+    }
+  }
+
+  if (!logins || !sessions || !options) {
+    return null;
+  }
+  return (
+    <main>
+      <h1>{m.settings_account_title()}</h1>
+      {params.get("welcome") === "1" ? <p>{m.settings_welcome()}</p> : null}
+      {callbackMessage ? <p role="alert">{callbackMessage}</p> : null}
+      {failure ? (
+        <p role="alert">
+          {failure.message}{" "}
+          {failure.reauth ? <a href={loginHref(here, { reauth: "1" })}>{m.settings_reauth()}</a> : null}
+        </p>
+      ) : null}
+      {notice ? <p>{notice}</p> : null}
+
+      <section>
+        <h2>{m.settings_logins_heading()}</h2>
+        <ul>
+          {logins.accounts.map((item) => (
+            <li key={item.id}>
+              {item.provider === "google"
+                ? item.email
+                  ? m.settings_login_google({ email: item.email })
+                  : "Google"
+                : item.nickname
+                  ? m.settings_login_qq({ nickname: item.nickname, number: item.maskedQq })
+                  : m.settings_login_qq_number({ number: item.maskedQq })}{" "}
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => run(() => authClient.unlinkAccount({ accountId: item.id }))}
+              >
+                {m.settings_unlink()}
+              </button>
+            </li>
+          ))}
+          {logins.passkeys.map((item) => (
+            <li key={item.id}>
+              {item.name ?? m.settings_passkey_default_name()} · {m.settings_passkey_added({ date: formatDate(item.createdAt) })} ·{" "}
+              {item.lastUsedAt
+                ? m.settings_passkey_last_used({ date: formatDate(item.lastUsedAt) })
+                : m.settings_passkey_never_used()}{" "}
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => run(() => authClient.passkey.deletePasskey({ id: item.id }))}
+              >
+                {m.settings_remove_passkey()}
+              </button>
+            </li>
+          ))}
+        </ul>
+        <p>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              run(() =>
+                authClient.linkSocial({
+                  provider: "google",
+                  callbackURL: localizeHref("/settings/account"),
+                  errorCallbackURL: localizeHref("/settings/account"),
+                })
+              )
+            }
+          >
+            {m.settings_link_google()}
+          </button>{" "}
+          {/* 不传 name：它会同时变成系统密码管理器里显示的账号名和存下来的标签。 */}
+          <button type="button" disabled={pending} onClick={() => run(() => authClient.passkey.addPasskey())}>
+            {m.settings_add_passkey()}
+          </button>
+        </p>
+        <details>
+          <summary>{m.settings_link_qq()}</summary>
+          {options.qq.available ? (
+            <QqCodeForm
+              siteKey={options.turnstileSiteKey}
+              intent="link"
+              reauthHref={loginHref(here, { reauth: "1" })}
+              onVerified={() => void queryClient.invalidateQueries({ queryKey: ["me"] })}
+            />
+          ) : (
+            <p>{m.login_qq_unavailable()}</p>
+          )}
+        </details>
+      </section>
+
+      <section>
+        <h2>{m.settings_devices_heading()}</h2>
+        <ul>
+          {sessions.sessions.map((item) => (
+            <li key={item.id}>
+              {[clipDeviceName(item.browser), clipDeviceName(item.os)].filter(Boolean).join(" · ") || m.settings_device_unknown()} ·{" "}
+              {placeName(item.country)} · {m.settings_device_last_active({ date: formatDate(item.lastActiveAt) })}{" "}
+              {item.current ? (
+                <strong>{m.settings_device_current()}</strong>
+              ) : (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() =>
+                    run(async () =>
+                      expectOk(await getBrowserApi().api.v1.me.sessions[":id"].$delete({ param: { id: item.id } }, jsonRequest))
+                    )
+                  }
+                >
+                  {m.settings_revoke()}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+        <button type="button" disabled={pending} onClick={() => run(revokeOthers)}>
+          {m.settings_revoke_others()}
+        </button>
+      </section>
+
+      <p>
+        <button
+          type="button"
+          onClick={async () => {
+            await authClient.signOut();
+            window.location.assign(localizeHref("/"));
+          }}
+        >
+          {m.settings_sign_out()}
+        </button>
+      </p>
+    </main>
+  );
+}

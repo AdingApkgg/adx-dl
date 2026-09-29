@@ -55,6 +55,7 @@
   "settings_logins_heading": "ログイン方法",
   "settings_login_google": "Google：{email}",
   "settings_login_qq": "QQ：{nickname}（{number}）",
+  "settings_login_qq_number": "QQ：{number}",
   "settings_passkey_default_name": "パスキー",
   "settings_passkey_added": "{date} に追加",
   "settings_passkey_last_used": "最終使用 {date}",

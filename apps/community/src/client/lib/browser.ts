@@ -24,3 +24,6 @@ const renderPlaceholderApi = createApiClient("http://render-placeholder.invalid"
 export function getRenderApi(): ApiClient {
   return typeof window === "undefined" ? renderPlaceholderApi : getBrowserApi();
 }
+
+// /api/v1 改数据的接口只接受 JSON（spec 第 8.1 节的 CSRF 规则），没有请求体的 POST、DELETE 也要带这个头。
+export const jsonRequest = { headers: { "content-type": "application/json" } };

@@ -40,6 +40,14 @@ describe("页面", () => {
     expect(await (await fetch(server.url("/"))).text()).toContain("接口版本 v1");
   });
 
+  // 首页的 loader 经进程内 API 问了当前用户（没登录是 401），页面据此显示"登录"链接。
+  test("首页：未登录显示登录链接，登录后回到首页", async () => {
+    const html = await (await fetch(server.url("/"))).text();
+
+    expect(html).toContain('href="/login?next=%2F"');
+    expect(html).not.toContain('href="/settings/account"');
+  });
+
   // 文案对了，说明 Paraglide 的中间件把语言带进了服务端渲染。
   test("英文和日文前缀：服务端用对应的语言渲染", async () => {
     const en = await (await fetch(server.url("/en"))).text();
