@@ -17,14 +17,23 @@ const OPTIONS = { turnstileSiteKey: "site", qq: { available: true, botQq: "10001
 type LoaderArgs = Parameters<typeof loader>[0];
 type LoaderData = Awaited<ReturnType<typeof loader>>;
 type Visit = { redirect: { status: number; location: string | null } } | { data: LoaderData };
+/** 让 /api/v1/me 返回这个错误状态码（限流 429、服务端出错 5xx）。 */
+type Failures = { meStatus?: number };
 
 // 只实现登录页 loader 会调用的两个接口（/api/v1/me 和 /api/v1/login-options）。QueryClient 用真的
 // （和服务端每个请求一份的那个一样）。
-function contextFor(signedIn: boolean) {
+function contextFor(signedIn: boolean, { meStatus }: Failures = {}) {
   const api = {
     api: {
       v1: {
-        me: { $get: async () => (signedIn ? Response.json(USER) : new Response(null, { status: 401 })) },
+        me: {
+          $get: async () => {
+            if (meStatus) {
+              return new Response(null, { status: meStatus });
+            }
+            return signedIn ? Response.json(USER) : new Response(null, { status: 401 });
+          },
+        },
         "login-options": { $get: async () => Response.json(OPTIONS) },
       },
     },
@@ -36,8 +45,11 @@ function contextFor(signedIn: boolean) {
 }
 
 // 访问 /login：要么渲染（返回 loader 的数据），要么被 loader 跳走（redirect() 抛出的是 Response）。
-async function visit(signedIn: boolean, search = ""): Promise<Visit> {
-  const args = { context: contextFor(signedIn), url: new URL(`https://x.test/login${search}`) } as unknown as LoaderArgs;
+async function visit(signedIn: boolean, search = "", failures: Failures = {}): Promise<Visit> {
+  const args = {
+    context: contextFor(signedIn, failures),
+    url: new URL(`https://x.test/login${search}`),
+  } as unknown as LoaderArgs;
   try {
     return { data: await loader(args) };
   } catch (thrown) {
@@ -102,12 +114,37 @@ describe("登录页 loader", () => {
   test("已登录、reauth=1、带 error：不跳转", async () => {
     renderedData(await visit(true, "?next=%2Fsettings%2Faccount&reauth=1&error=state_mismatch"));
   });
+
+  // Google 回调的 state 过期这类错误，Better Auth 走全局的 errorURL（/login?error=…，不带 reauth）：
+  // 已登录的用户要是被直接跳走，就看不到错误提示了。
+  test("已登录、带 error、没有 reauth：也不跳转", async () => {
+    renderedData(await visit(true, "?error=state_mismatch"));
+  });
+});
+
+// 和首页一样：当前用户取不到（429 限流、5xx）时照常显示成未登录，不进错误页。
+describe("登录页 loader：当前用户取不到", () => {
+  // 500 会被查询客户端重试一次（间隔约 1 秒）才算失败，429 这类 4xx 不重试。
+  for (const status of [429, 500]) {
+    test(`/api/v1/me 返回 ${status}：照常渲染成未登录，登录方式照样在`, async () => {
+      // 用户其实登录着也一样：取不到就当没登录，不能猜。
+      const data = renderedData(await visit(true, "?next=%2Fsettings%2Faccount", { meStatus: status }));
+      const html = renderLoaderData(data, "?next=%2Fsettings%2Faccount");
+
+      expect(data.dehydratedState.queries.map((query) => String(query.queryKey[0]))).toEqual(["login-options"]);
+      expect(html).toContain(m.login_google());
+      expect(html).toContain(m.login_passkey_signup());
+    });
+  }
 });
 
 // 页面按 loader 的数据渲染出来的样子。服务端渲染只输出静态标记（不跑 effect 和事件），
 // 这里要的正是这个：登录页在服务端渲染时该有哪些块。
 async function renderLogin(signedIn: boolean, search = ""): Promise<string> {
-  const data = renderedData(await visit(signedIn, search));
+  return renderLoaderData(renderedData(await visit(signedIn, search)), search);
+}
+
+function renderLoaderData(data: LoaderData, search = ""): string {
   return renderToStaticMarkup(
     createElement(
       QueryClientProvider,
@@ -151,6 +188,12 @@ describe("登录页渲染", () => {
 
   test("已登录、reauth=1、Google 出错回来：错误提示看得到", async () => {
     const html = await renderLogin(true, "?next=%2Fsettings%2Faccount&reauth=1&error=state_mismatch");
+
+    expect(html).toContain(m.error_google_failed());
+  });
+
+  test("已登录、没有 reauth、Google 出错回来（全局的 errorURL）：错误提示也看得到", async () => {
+    const html = await renderLogin(true, "?error=state_mismatch");
 
     expect(html).toContain(m.error_google_failed());
   });

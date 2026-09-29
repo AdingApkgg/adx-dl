@@ -19,12 +19,19 @@ import { loginOptionsQuery } from "../queries/login-options";
 import { meQuery } from "../queries/me";
 import type { Route } from "./+types/login";
 
+// 当前用户（me）取不到不算出错，和首页一样：429 限流、5xx 时页面照常显示成未登录，没进 dehydrate 的 me，
+// 浏览器里的 useQuery 会在 hydrate 之后重试。登录方式取不到照旧抛错，页面显示根错误边界。
 export async function loader({ context, url }: Route.LoaderArgs) {
   const queryClient = context.get(queryClientContext);
   const api = context.get(apiContext);
-  const [me] = await Promise.all([queryClient.query(meQuery(api)), queryClient.query(loginOptionsQuery(api))]);
-  // 已经登录就直接回去；"重新登录"（reauth=1）例外：用户要的正是一个刚创建的会话。
-  if (me && url.searchParams.get("reauth") !== "1") {
+  const [me] = await Promise.all([
+    queryClient.query(meQuery(api)).catch(() => null),
+    queryClient.query(loginOptionsQuery(api)),
+  ]);
+  // 已经登录就直接回去。两种情况例外："重新登录"（reauth=1），用户要的正是一个刚创建的会话；
+  // 地址里带着 error，是登录出错回来的（Google 回调的 state 过期这类错误，Better Auth 走全局的
+  // errorURL，地址里没有 reauth），跳走了用户就看不到错误提示。
+  if (me && url.searchParams.get("reauth") !== "1" && !url.searchParams.get("error")) {
     throw redirect(safeNextPath(url.searchParams.get("next"), localizeHref("/")));
   }
   return { dehydratedState: dehydrate(queryClient) };
@@ -51,7 +58,8 @@ export default function Login({ loaderData }: Route.ComponentProps) {
 
 function LoginContent() {
   const { data: options } = useQuery(loginOptionsQuery(getRenderApi()));
-  // loader 已经取过当前用户并 dehydrate。已登录只会出现在"重新登录"（reauth=1）时，这时不显示"只用通行密钥注册"。
+  // loader 已经取过当前用户并 dehydrate。已登录只会出现在"重新登录"（reauth=1）或登录出错回来（带 error）时，
+  // 这时不显示"只用通行密钥注册"。
   const { data: me } = useQuery(meQuery(getRenderApi()));
   const [params] = useSearchParams();
   const next = safeNextPath(params.get("next"), localizeHref("/"));
