@@ -147,8 +147,70 @@ describe("只用通行密钥注册", () => {
       body: { response, createSession: true },
     });
 
-    expect(res.status).not.toBe(200);
+    // 插件只会把非 APIError（这里是 PG 的唯一约束错误）映射成这个错误码，所以它证明请求走到了"存通行密钥"
+    // 这一步：用户已经在同一个事务里建出来了，下面查不到他，说明回滚真的发生了。
+    expect([res.status, res.json.code]).toEqual([500, "FAILED_TO_VERIFY_REGISTRATION"]);
     expect(await usersNamed(nickname)).toEqual([]);
+  }, 30_000);
+
+  // verify-registration 的 name 是客户端随便写的字段：1b 的前端从不发它（名字来自认证器型号），
+  // 这条规则只挡手工构造的请求。
+  test("注册时带的通行密钥名字：空白、超过 64 个码点、带控制字符、不是字符串都拒绝，而且不建号；正好 64 个码点可以", async () => {
+    const browser = new Browser(newApp());
+    const nickname = uniqueNickname();
+    const options = await browser.request("GET", `/api/auth/passkey/generate-register-options?${signupQuery(nickname)}`);
+    const response = await new SoftAuthenticator(TEST_PUBLIC_ORIGIN, RP_ID).createCredential(options.json);
+    const verify = (name: unknown) =>
+      browser.request("POST", "/api/auth/passkey/verify-registration", {
+        body: { response, createSession: true, name },
+      });
+    const rejected: [string, unknown][] = [
+      ["65 个字符", "A".repeat(65)],
+      // 表情符号在 UTF-16 里占两个单元：按码点数，65 个也是超了。
+      ["65 个码点", "😀".repeat(65)],
+      ["控制字符", "abc\u0007def"],
+      ["空白", "   "],
+      ["null", null],
+      ["数字", 123],
+    ];
+
+    // 这个钩子在插件消耗挑战之前就拒绝，所以同一份注册响应可以接着再试。
+    for (const [label, name] of rejected) {
+      const res = await verify(name);
+      expect([res.status, res.json.code], label).toEqual([400, "PASSKEY_NAME_INVALID"]);
+    }
+    expect(await usersNamed(nickname)).toEqual([]);
+
+    const exact = "😀".repeat(64);
+    expect((await verify(exact)).status).toBe(200);
+    const userId = await currentUserId(browser);
+    expect((await passkeysOf(userId)).map((row) => row.name)).toEqual([exact]);
+  }, 30_000);
+
+  // 6 = 测试连接池上限（test-db.ts 里是 5）+ 1。注册事务各占着一个连接；以前 user.create.before 里还要再从池里
+  // 另要一个连接去查 id 有没有被占用，"池大小 + 1"个新用户同时进来时，事务全都在等第二个连接，互相等死，
+  // 约 5 秒后一起返回 500（线上池是 10）。
+  test("同时 6 个人只用通行密钥注册（连接池上限 5 + 1）：全部成功，各自建出了用户", async () => {
+    const app = newApp();
+    const prepared = [];
+    for (let i = 0; i < 6; i++) {
+      const browser = new Browser(app, { ip: `203.0.113.${10 + i}` });
+      const nickname = uniqueNickname();
+      const options = await browser.request("GET", `/api/auth/passkey/generate-register-options?${signupQuery(nickname)}`);
+      const response = await new SoftAuthenticator(TEST_PUBLIC_ORIGIN, RP_ID).createCredential(options.json);
+      prepared.push({ browser, nickname, response });
+    }
+
+    const results = await Promise.all(
+      prepared.map(({ browser, response }) =>
+        browser.request("POST", "/api/auth/passkey/verify-registration", { body: { response, createSession: true } })
+      )
+    );
+
+    expect(results.map((res) => res.status)).toEqual([200, 200, 200, 200, 200, 200]);
+    for (const { nickname } of prepared) {
+      expect(await usersNamed(nickname)).toHaveLength(1);
+    }
   }, 30_000);
 });
 
@@ -159,6 +221,8 @@ describe("通行密钥登录和管理", () => {
     const first = new Browser(app);
     await signUp(first, authn, uniqueNickname());
     const userId = await currentUserId(first);
+    // 注册时不算"使用"：登录前是空的，下面的断言才说明它是登录写进去的。
+    expect((await passkeysOf(userId))[0]?.lastUsedAt).toBeNull();
 
     const second = new Browser(app);
     const res = await signIn(second, authn);
@@ -224,6 +288,121 @@ describe("通行密钥登录和管理", () => {
     expect(await testDbHandle().db.select().from(account).where(eq(account.userId, userId))).toEqual([]);
     expect(await passkeysOf(userId)).toHaveLength(1);
   }, 30_000);
+
+  // 改名不要求刚登录、不用人机验证，任何登录用户都能反复写：名字必须有上限。
+  test("改名：超过 64 个码点、带控制字符、空白的名字被拒，库里的名字没变；首尾空白不算长度；正常名字改得成", async () => {
+    const browser = new Browser(newApp());
+    await signUp(browser, new SoftAuthenticator(TEST_PUBLIC_ORIGIN, RP_ID), uniqueNickname());
+    const userId = await currentUserId(browser);
+    const [key] = await passkeysOf(userId);
+    const rename = (name: unknown) =>
+      browser.request("POST", "/api/auth/passkey/update-passkey", { body: { id: key?.id, name } });
+    const storedName = async () => (await passkeysOf(userId))[0]?.name;
+
+    const fine = "我的手机".repeat(5);
+    expect((await rename(fine)).status).toBe(200);
+    expect(await storedName()).toBe(fine);
+
+    const rejected: [string, unknown][] = [
+      ["65 个字符", "A".repeat(65)],
+      ["65 个码点", "😀".repeat(65)],
+      ["控制字符", "abc\u0007def"],
+      ["空白", "   "],
+      ["数字", 123],
+    ];
+    for (const [label, name] of rejected) {
+      const res = await rename(name);
+      expect([res.status, res.json.code], label).toEqual([400, "PASSKEY_NAME_INVALID"]);
+    }
+    expect(await storedName()).toBe(fine);
+
+    // 首尾空白会被去掉，不算长度；正好 64 个码点可以。
+    expect((await rename(`${" ".repeat(100)}${"😀".repeat(64)}  `)).status).toBe(200);
+    expect(await storedName()).toBe("😀".repeat(64));
+  }, 30_000);
+
+  // 传输方式只查形状（个数、长度、字符），不用白名单：规范允许浏览器以后加新的传输方式，
+  // 白名单会把新浏览器的正常注册挡掉。
+  test("已登录添加时 transports 只查形状：混进超长元素、超过 10 个、不是数组都拒绝，没有加上；以后新增的传输方式照常通过", async () => {
+    const browser = new Browser(newApp());
+    await signUp(browser, new SoftAuthenticator(TEST_PUBLIC_ORIGIN, RP_ID), uniqueNickname());
+    const userId = await currentUserId(browser);
+    const options = await browser.request("GET", "/api/auth/passkey/generate-register-options");
+    const created = await new SoftAuthenticator(TEST_PUBLIC_ORIGIN, RP_ID).createCredential(options.json);
+    const add = (transports: unknown) =>
+      browser.request("POST", "/api/auth/passkey/verify-registration", {
+        body: { response: { ...created, response: { ...(created.response as object), transports } } },
+      });
+    const rejected: [string, unknown][] = [
+      ["混进一个 1000 字符的元素", ["internal", "x".repeat(1000)]],
+      ["11 个元素", Array.from({ length: 11 }, (_, i) => `t${i}`)],
+      ["33 个字符的元素", ["a".repeat(33)]],
+      ["大写", ["Internal"]],
+      ["不是字符串", [1]],
+      ["不是数组", "internal"],
+      ["null", null],
+    ];
+
+    // 这个钩子在插件消耗挑战之前就拒绝，所以同一份注册响应可以接着再试。
+    for (const [label, transports] of rejected) {
+      const res = await add(transports);
+      expect([res.status, res.json.code], label).toEqual([400, "PASSKEY_RESPONSE_INVALID"]);
+    }
+    expect(await passkeysOf(userId)).toHaveLength(1);
+
+    // 正好 10 个，其中一个 32 个字符，还有规范里没有的名字：形状都合法。
+    const accepted = ["internal", "hybrid", "usb", "nfc", "ble", "smart-card", "quantum-link", "a".repeat(32), "x1", "y-2"];
+    expect((await add(accepted)).status).toBe(200);
+    expect((await passkeysOf(userId)).map((row) => row.transports)).toContain(accepted.join(","));
+  }, 30_000);
+
+  // passkey.ts 里 afterVerification 的会话检查：删掉它，其他测试都不会失败，只有这一条会。
+  test("已登录时拿到注册选项，退出登录后再完成：拒绝，没有加上通行密钥", async () => {
+    const browser = new Browser(newApp());
+    await signUp(browser, new SoftAuthenticator(TEST_PUBLIC_ORIGIN, RP_ID), uniqueNickname());
+    const userId = await currentUserId(browser);
+    const options = await browser.request("GET", "/api/auth/passkey/generate-register-options");
+    expect((await browser.request("POST", "/api/auth/sign-out", { body: {} })).status).toBe(200);
+    expect(browser.cookies.has(SESSION_COOKIE)).toBe(false);
+    const response = await new SoftAuthenticator(TEST_PUBLIC_ORIGIN, RP_ID).createCredential(options.json);
+
+    // 挑战 Cookie 还在，只是这次请求已经没有会话了。
+    const res = await browser.request("POST", "/api/auth/passkey/verify-registration", { body: { response } });
+
+    expect([res.status, res.json.code]).toEqual([401, "REAUTH_REQUIRED"]);
+    expect(await passkeysOf(userId)).toHaveLength(1);
+  }, 30_000);
+
+  // 归属检查是插件的 requireResourceOwnership：改名给出带错误码的 401，删除是不带错误码的 401。
+  test("不能改名、删除别人的通行密钥（大写的 uuid 也不行），对方的通行密钥原样还在", async () => {
+    const app = newApp();
+    const victim = new Browser(app);
+    await signUp(victim, new SoftAuthenticator(TEST_PUBLIC_ORIGIN, RP_ID), uniqueNickname());
+    const victimId = await currentUserId(victim);
+    const victimKeys = await passkeysOf(victimId);
+    const victimKeyId = victimKeys[0]?.id ?? "";
+
+    const attacker = new Browser(app);
+    await signUp(attacker, new SoftAuthenticator(TEST_PUBLIC_ORIGIN, RP_ID), uniqueNickname());
+    // 多加一个通行密钥：免得"至少留一种登录方式"先把删除挡回去，盖住归属检查。
+    await addPasskey(attacker, new SoftAuthenticator(TEST_PUBLIC_ORIGIN, RP_ID));
+    const attackerId = await currentUserId(attacker);
+    const rename = (id: string) =>
+      attacker.request("POST", "/api/auth/passkey/update-passkey", { body: { id, name: "pwned" } });
+    const remove = (id: string) => attacker.request("POST", "/api/auth/passkey/delete-passkey", { body: { id } });
+
+    const renamed = await rename(victimKeyId);
+    const renamedUpper = await rename(victimKeyId.toUpperCase());
+    const removed = await remove(victimKeyId);
+    const removedUpper = await remove(victimKeyId.toUpperCase());
+
+    expect([renamed.status, renamed.json.code]).toEqual([401, "YOU_ARE_NOT_ALLOWED_TO_REGISTER_THIS_PASSKEY"]);
+    expect([renamedUpper.status, renamedUpper.json.code]).toEqual([401, "YOU_ARE_NOT_ALLOWED_TO_REGISTER_THIS_PASSKEY"]);
+    expect(removed.status).toBe(401);
+    expect(removedUpper.status).toBe(401);
+    expect(await passkeysOf(victimId)).toEqual(victimKeys);
+    expect(await passkeysOf(attackerId)).toHaveLength(2);
+  }, 30_000);
 });
 
 describe("Bearer 会话也要过通行密钥的规则", () => {
@@ -247,5 +426,25 @@ describe("Bearer 会话也要过通行密钥的规则", () => {
 
     expect(stale.status).toBe(403);
     expect(((await stale.json()) as { code: string }).code).toBe("REAUTH_REQUIRED");
+  }, 30_000);
+});
+
+describe("请求体上限", () => {
+  // /api/auth/* 的请求体上限是 64 KiB（mount.ts）。凭据 id、公钥这些插件自己不检查长度的字段，
+  // 靠的就是这一条。Hono 有两条路：请求头带 Content-Length 就直接比大小；没带（分块传输）就边读边数。
+  test("超过 64 KiB 的请求体返回 413，不管有没有 Content-Length；在上限内的照常交给 Better Auth", async () => {
+    const browser = new Browser(newApp());
+    const padded = (kib: number) => ({ response: { padding: "A".repeat(kib * 1024) } });
+    const post = (body: unknown, headers?: Record<string, string>) =>
+      browser.request("POST", "/api/auth/passkey/verify-registration", { body, headers });
+
+    const streamed = await post(padded(70));
+    const declared = await post(padded(70), { "content-length": String(JSON.stringify(padded(70)).length) });
+    const within = await post(padded(60));
+
+    expect([streamed.status, streamed.json.code]).toEqual([413, "PAYLOAD_TOO_LARGE"]);
+    expect([declared.status, declared.json.code]).toEqual([413, "PAYLOAD_TOO_LARGE"]);
+    // 没有挑战 Cookie，所以 Better Auth 自己拒绝；重点是没被 413 挡掉。
+    expect([within.status, within.json.code]).toEqual([400, "CHALLENGE_NOT_FOUND"]);
   }, 30_000);
 });

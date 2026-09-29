@@ -1,8 +1,14 @@
 import type { Context, Hono, MiddlewareHandler } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
 
 import type { AppEnv } from "../app-env";
 import type { Auth, AuthSession } from "./auth";
+
+// /api/auth/* 的请求体上限。这里所有接口的请求都很小（登录、验证码、通行密钥的注册响应最多几 KB），
+// 64 KiB 绰绰有余。这一条同时限住了通行密钥的凭据 id、公钥这些插件自己不检查长度的字段：
+// 它们只能靠请求体的总大小来限。
+const AUTH_BODY_LIMIT = 64 * 1024;
 
 // 浏览器发出的请求总是带着 Sec-Fetch-* 头（Fetch 规范要求，页面脚本改不掉），也会带上这个源上的
 // Cookie（如果有）。真正的非浏览器 Bearer 调用（App）两者都没有：只有这种请求才算"genuine"。
@@ -14,7 +20,17 @@ function isGenuineBearerRequest(c: Context<AppEnv>): boolean {
 }
 
 // spec 第 8.1 节第 8 步。它前面的中间件都不能读请求体：c.req.raw 的请求体只能读一次。
+// 下面的 bodyLimit 是例外：请求没带 Content-Length（分块传输）时，它要把请求体读进内存来数大小，
+// 然后换一个装着这份内容的新 c.req.raw，后面的处理函数照常读得到。
 export function mountAuth(app: Hono<AppEnv>, auth: Auth): void {
+  app.use(
+    "/api/auth/*",
+    bodyLimit({
+      maxSize: AUTH_BODY_LIMIT,
+      // 响应体照 Better Auth 自己的错误格式：{ code, message }。
+      onError: (c) => c.json({ code: "PAYLOAD_TOO_LARGE", message: "Request body is too large" }, 413),
+    })
+  );
   app.on(["GET", "POST"], "/api/auth/*", async (c) => {
     const res = await auth.handler(c.req.raw);
     // bearer 插件会把会话令牌放进 set-auth-token 响应头，页面脚本读得到，等于绕过了 HttpOnly。

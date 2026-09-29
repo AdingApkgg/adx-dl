@@ -2,7 +2,6 @@ import { betterAuth, type BetterAuthRateLimitStorage } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, isAPIError } from "better-auth/api";
 import { bearer } from "better-auth/plugins";
-import { eq } from "drizzle-orm";
 
 import { describeError } from "@/shared/describe-error";
 import type { Logger } from "@/shared/log";
@@ -54,19 +53,6 @@ function rateLimitStorage(store: RateLimitStore, log: Logger): BetterAuthRateLim
       }
     },
   };
-}
-
-// spec 写的是"插入冲突时重试"，但插入失败时 Better Auth 的流程已经中断（Google 回调会直接报错），
-// 所以改成插入前查一次。49.5 bit 的空间里，两个并发请求恰好撞上同一个 id 可以忽略。
-async function unusedUserId(db: Db): Promise<string> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const id = shortId();
-    const [taken] = await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.id, id)).limit(1);
-    if (!taken) {
-      return id;
-    }
-  }
-  throw new APIError("INTERNAL_SERVER_ERROR", { code: "USER_ID_EXHAUSTED", message: "Could not allocate a user id" });
 }
 
 // account 表上第三方令牌相关的列：create 和 update 两个钩子都要把它们清空（见下面 databaseHooks.account）。
@@ -196,8 +182,13 @@ export function createAuth(deps: AuthDeps) {
       user: {
         create: {
           // 钩子里拿不到 Better Auth 生成的 id（调研实测），所以在这里自己生成，同时写占位邮箱。
+          // 不先查 id 有没有被占用：这个钩子跑在建号的事务里（通行密钥注册、Google 新用户），查重要从连接池
+          // 另占一个连接；同时进来"池大小 + 1"个新用户时，事务全都占着一个连接在等第二个，互相等死。
+          // 31^10 ≈ 8.2×10^14 个 id 里撞上已有 id 的概率约为"用户数 ÷ 8.2×10^14"，真撞上了，主键约束
+          // 让这一次建号失败（500），用户重试即可。spec 写的"插入冲突时重试"做不到：失败时 Better Auth 的
+          // 流程已经中断。唯一性由主键保证。
           before: async (data) => {
-            const id = await unusedUserId(db);
+            const id = shortId();
             return {
               data: {
                 ...data,
