@@ -323,7 +323,7 @@ describe("set-auth-token 响应头", () => {
 });
 
 describe("关掉的接口和来源校验", () => {
-  test("自带的改资料、会话列表、邮箱密码等接口一律 404", async () => {
+  test("自带的改资料、会话列表、账号和通行密钥列表、邮箱密码等接口一律 404", async () => {
     const app = newApp();
     const cases = [
       ["POST", "/update-user"],
@@ -334,6 +334,8 @@ describe("关掉的接口和来源校验", () => {
       ["POST", "/sign-up/email"],
       ["POST", "/delete-user"],
       ["POST", "/change-email"],
+      ["GET", "/list-accounts"],
+      ["GET", "/passkey/list-user-passkeys"],
     ] as const;
     for (const [method, path] of cases) {
       const res = await app.request(`/api/auth${path}`, {
@@ -342,6 +344,13 @@ describe("关掉的接口和来源校验", () => {
         ...(method === "POST" ? { body: "{}" } : {}),
       });
       expect(res.status, path).toBe(404);
+    }
+
+    // 两个读接口登录了也拿不到：/list-accounts 会给出没打码的 QQ 号和 Google 的 sub。
+    const browser = new Browser(app);
+    await signInWithGoogle(browser, googleProfile());
+    for (const path of ["/list-accounts", "/passkey/list-user-passkeys"]) {
+      expect((await browser.request("GET", `/api/auth${path}`)).status, `${path}（已登录）`).toBe(404);
     }
   });
 

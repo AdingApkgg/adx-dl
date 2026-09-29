@@ -83,6 +83,15 @@ export function createApp(deps: AppDeps) {
     return c.json({ ok, checks: Object.fromEntries(results) }, ok ? 200 : 503);
   });
 
+  // /api/v1/me 这类是每个用户自己的数据：接口的响应（包括限流的 429、出错的响应）一律不让浏览器和 Cloudflare
+  // 缓存。接口自己设了 Cache-Control 的（比如 Better Auth 的 get-session）照它的。
+  app.use("/api/*", async (c, next) => {
+    await next();
+    if (!c.res.headers.has("cache-control")) {
+      c.res.headers.set("Cache-Control", "private, no-store");
+    }
+  });
+
   app.use(
     "/api/*",
     rateLimit<AppEnv>({

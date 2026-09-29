@@ -202,6 +202,26 @@ describe("登录设备", () => {
     expect(capped).toBe(userAgent.slice(0, 1024));
   });
 
+  // CF-IPCountry 是 Cloudflare 加的，但直连源站的请求可以自己随便带：存进库之前按登录设备列表的同一个
+  // 规则检查，只存两位大写字母的国家代码。
+  test("存进库的国家代码：JP 原样存，超长、小写、XX（判断不出）、T1（Tor）存成 null", async () => {
+    const { app } = setup();
+    const cases: [string, string | null][] = [
+      ["JP", "JP"],
+      ["J".repeat(300), null],
+      ["jp", null],
+      ["XX", null],
+      ["T1", null],
+    ];
+
+    for (const [header, stored] of cases) {
+      const browser = new Browser(app, { country: header });
+      await signInWithGoogle(browser, googleProfile());
+      const [row] = await sessionsOf(await currentUserId(browser));
+      expect(row?.country ?? null, header.slice(0, 10)).toBe(stored);
+    }
+  });
+
   // 钩子存之前已经截断了；这条防的是库里已经存在的长行（钩子上线前登录的）。
   test("库里已有的超长 User-Agent 也只解析前 1024 个字符", async () => {
     const { app } = setup();

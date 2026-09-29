@@ -10,6 +10,7 @@ import { normalizeNickname } from "@/shared/nickname";
 import type { Db } from "../db/client";
 import * as schema from "../db/schema";
 import type { RateLimitStore } from "../middleware/rate-limit";
+import { countryOf } from "../services/account";
 import { withTimeout } from "../with-timeout";
 import { accountRules } from "./account-rules";
 import { accountAdditionalFields, sessionAdditionalFields, userAdditionalFields } from "./fields";
@@ -168,6 +169,10 @@ export function createAuth(deps: AuthDeps) {
       "/revoke-session",
       "/revoke-sessions",
       "/revoke-other-sessions",
+      // 登录方式用 /api/v1/me/logins（QQ 号打码）：/list-accounts 会把没打码的 QQ 号和 Google 的 sub 交给
+      // 任何持有会话的人，哪怕是很久以前的旧会话。通行密钥列表前端也不用。以后要用得先想清楚再打开。
+      "/list-accounts",
+      "/passkey/list-user-passkeys",
       // 不存第三方令牌。
       "/refresh-token",
       "/get-access-token",
@@ -255,7 +260,11 @@ export function createAuth(deps: AuthDeps) {
         create: {
           // Google 回调、QQ、通行密钥建的会话都经过这里。
           before: async (data, ctx) => {
-            const country = ctx?.request?.headers.get("cf-ipcountry") ?? ctx?.headers?.get("cf-ipcountry") ?? null;
+            // 这个头是 Cloudflare 加的，但直连源站的请求可以自己随便带：只存像样的两位国家代码，别的存成 null
+            // （和登录设备列表读出来时的规则相同）。
+            const country = countryOf(
+              ctx?.request?.headers.get("cf-ipcountry") ?? ctx?.headers?.get("cf-ipcountry") ?? null
+            );
             const userAgent =
               typeof data.userAgent === "string" ? data.userAgent.slice(0, USER_AGENT_MAX_LENGTH) : data.userAgent;
             return { data: { ...data, country, userAgent } };

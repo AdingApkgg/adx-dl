@@ -36,7 +36,9 @@ bun run test:http    # 启动构建产物，做页面和接口的 HTTP 级测试
 用 `TEST_DATABASE_URL`、`TEST_REDIS_URL` 可以改。
 
 测试库每轮重建：每个 `bun test` 进程第一次用到数据库时，会删掉测试库里的表、重新跑一遍迁移
-（`src/server/testing/test-db.ts`）。各测试文件之间的数据会留着，测试里的用户、QQ 号一律用随机值。
+（`src/server/testing/test-db.ts`）。所以 `TEST_DATABASE_URL` 必须指向名字以 `_test` 结尾的专用测试库
+（库名不对时直接报错，不会动它）；也不要同时跑两轮测试：每轮都会先重建测试库。
+各测试文件之间的数据会留着，测试里的用户、QQ 号一律用随机值。
 测试不连外网：Google、Cloudflare、NapCat 都用替身或本机起的假服务。
 
 数据库在远端（比如经 SSH 隧道）时往返慢：`test`、`check`、`test:http` 脚本已经带了 `--timeout 30000`，单独跑某个测试文件时也加上。

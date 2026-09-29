@@ -173,6 +173,22 @@ describe("createApp", () => {
     expect(await res.json()).toEqual({ name: "astrodx-community", apiVersion: 1 });
   });
 
+  // /api/v1/me 这类是每个用户自己的数据：接口的响应一律不让浏览器和 Cloudflare 缓存，出错的也一样。
+  test("/api 的响应都带 Cache-Control: private, no-store：正常的、未知接口的 404、未登录的 401", async () => {
+    const app = createApp(testAppDeps().deps);
+    const cases = [
+      ["/api/v1/meta", 200],
+      ["/api/nope", 404],
+      ["/api/v1/me", 401],
+    ] as const;
+
+    for (const [path, status] of cases) {
+      const res = await app.request(path);
+      expect(res.status, path).toBe(status);
+      expect(res.headers.get("cache-control"), path).toBe("private, no-store");
+    }
+  });
+
   // 登录页用它拿 Turnstile 的站点密钥和 QQ 登录能不能用；不要求登录，所以这里不带 Cookie。
   test("GET /api/v1/login-options：不用登录，返回 testAppDeps 里的那份配置", async () => {
     const res = await createApp(testAppDeps().deps).request("/api/v1/login-options");

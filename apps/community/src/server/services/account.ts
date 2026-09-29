@@ -64,7 +64,8 @@ export type DeviceSession = {
 };
 
 // CF-IPCountry 是两位国家代码；XX 表示判断不出，T1 表示 Tor（调研报告第 7 节），都当作没有。
-function countryOf(value: string | null): string | null {
+// 建会话时存之前（src/server/auth/auth.ts）和列设备时读出来都用它。
+export function countryOf(value: string | null): string | null {
   return value && /^[A-Z]{2}$/.test(value) && value !== "XX" ? value : null;
 }
 

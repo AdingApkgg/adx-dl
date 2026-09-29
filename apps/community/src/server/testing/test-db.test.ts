@@ -3,13 +3,35 @@ import { eq, sql } from "drizzle-orm";
 
 import { shortId } from "../auth/short-id";
 import { passkey, session, user } from "../db/schema";
-import { resetTestDatabase, testDbHandle } from "./test-db";
+import { assertTestDatabaseUrl, resetTestDatabase, testDbHandle } from "./test-db";
 
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 beforeAll(async () => {
   await resetTestDatabase();
 }, 30_000);
+
+// 重建测试库会删掉整个库的 public、drizzle、pgboss 三个 schema，而开发库 community 和测试库 community_test
+// 在同一个 PG 上：TEST_DATABASE_URL 写错一个字就会清空开发库。
+describe("只重建专用的测试库", () => {
+  test("库名以 _test 结尾才放行：community_test 通过，community 和没写库名的地址拒绝", () => {
+    for (const url of [
+      "postgres://community:community@127.0.0.1:55432/community_test",
+      "postgres://community:community@127.0.0.1:55432/community_test?sslmode=disable",
+    ]) {
+      expect(() => assertTestDatabaseUrl(url), url).not.toThrow();
+    }
+    for (const url of [
+      "postgres://community:community@127.0.0.1:55432/community",
+      "postgres://community:community@127.0.0.1:55432/community_test_backup",
+      "postgres://community:community@127.0.0.1:55432/",
+      "postgres://community:community@127.0.0.1:55432",
+      "not a url",
+    ]) {
+      expect(() => assertTestDatabaseUrl(url), url).toThrow(/_test/);
+    }
+  });
+});
 
 describe("Better Auth 的表", () => {
   test("五张表都在", async () => {
