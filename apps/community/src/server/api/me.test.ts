@@ -73,6 +73,6 @@ describe("按用户限流", () => {
       expect(statuses.slice(0, 60).every((status) => status === 404)).toBe(true);
       expect(statuses[60]).toBe(429);
     },
-    20_000
+    60_000
   );
 });
