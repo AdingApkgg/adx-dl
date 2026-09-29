@@ -88,6 +88,31 @@ describe("Google 登录", () => {
     expect(sessionRow).toMatchObject({ country: "JP", ipAddress: "203.0.113.7" });
   });
 
+  // https 下（TEST_PUBLIC_ORIGIN）Better Auth 自动给名字加 __Secure- 前缀、设 Secure。不设 Domain：Cookie
+  // 只属于这个站点，不会发给子域名。有效期 30 天。
+  test("会话 Cookie：名字带 __Secure-adxc. 前缀，HttpOnly、Secure、SameSite=Lax、Path=/、30 天，没有 Domain", async () => {
+    const callback = await signInWithGoogle(new Browser(newApp()), googleProfile());
+
+    const line = callback.headers.getSetCookie().find((cookie) => cookie.startsWith("__Secure-adxc.session_token=")) ?? "";
+    const attributes = new Map(
+      line
+        .split(";")
+        .slice(1)
+        .map((part) => {
+          const [name = "", ...value] = part.trim().split("=");
+          return [name.toLowerCase(), value.join("=")] as const;
+        })
+    );
+
+    expect(line).not.toBe("");
+    expect(attributes.has("httponly")).toBe(true);
+    expect(attributes.has("secure")).toBe(true);
+    expect(attributes.get("samesite")?.toLowerCase()).toBe("lax");
+    expect(attributes.get("path")).toBe("/");
+    expect(attributes.get("max-age")).toBe("2592000");
+    expect(attributes.has("domain")).toBe(false);
+  });
+
   test("同一个 Google 账号再次登录是同一个用户，令牌也不会被写回", async () => {
     const app = newApp();
     const profile = googleProfile();

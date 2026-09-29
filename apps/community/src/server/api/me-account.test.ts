@@ -26,6 +26,9 @@ const IPHONE_SAFARI =
 // Browser 只在有请求体时才补 content-type，不带的话请求过不了 csrfGuard（415）。
 const JSON_HEADERS = { "content-type": "application/json" };
 
+// TEST_PUBLIC_ORIGIN 是 https，所以 Cookie 名带 __Secure- 前缀。
+const SESSION_COOKIE = "__Secure-adxc.session_token";
+
 beforeAll(async () => {
   await resetTestDatabase();
 }, 30_000);
@@ -383,5 +386,64 @@ describe("登录设备", () => {
     expect(await sessionsOf(bobId)).toHaveLength(2);
     expect((await bobLaptop.request("GET", "/api/v1/me")).status).toBe(200);
     expect((await bobPhone.request("GET", "/api/v1/me")).status).toBe(200);
+  });
+});
+
+// App 以后用 Authorization: Bearer 调 /api/v1（令牌就是会话 Cookie 的值），和网页走同一套规则。这里的请求只带
+// Authorization：没有 Cookie、Origin，也没有 content-type。
+describe("/api/v1 的 Bearer 用法", () => {
+  function bearer(browser: Browser) {
+    return { authorization: `Bearer ${decodeURIComponent(browser.cookies.get(SESSION_COOKIE) ?? "")}` };
+  }
+
+  test("Bearer 取当前用户：200", async () => {
+    const { app } = setup();
+    const browser = new Browser(app);
+    await signInWithGoogle(browser, googleProfile());
+
+    const res = await app.request("/api/v1/me", { headers: bearer(browser) });
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { id: string }).id).toBe(await currentUserId(browser));
+  });
+
+  test("会话超过 10 分钟时，Bearer 踢下线要求重新登录，那台设备的会话还在", async () => {
+    const { app } = setup();
+    const profile = googleProfile();
+    const laptop = new Browser(app);
+    const phone = new Browser(app);
+    await signInWithGoogle(laptop, profile);
+    await signInWithGoogle(phone, profile);
+    const userId = await currentUserId(laptop);
+    const list = (await laptop.request("GET", "/api/v1/me/sessions")).json.sessions as { id: string; current: boolean }[];
+    const otherId = list.find((item) => !item.current)?.id;
+    await ageSessions(userId, 11);
+
+    const res = await app.request(`/api/v1/me/sessions/${otherId}`, { method: "DELETE", headers: bearer(laptop) });
+
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("REAUTH_REQUIRED");
+    expect(await sessionsOf(userId)).toHaveLength(2);
+  });
+
+  // Bearer 请求没有 Cookie，CSRF 的"只收 JSON"规则不管它：不带 content-type 的空 POST 照样能用。
+  test("刚登录的 Bearer 退出其他设备：不带 content-type 也行，只删掉其他会话", async () => {
+    const { app } = setup();
+    const profile = googleProfile();
+    const phone = new Browser(app);
+    const tablet = new Browser(app);
+    const laptop = new Browser(app);
+    for (const browser of [phone, tablet, laptop]) {
+      await signInWithGoogle(browser, profile);
+    }
+    const userId = await currentUserId(laptop);
+    const list = (await laptop.request("GET", "/api/v1/me/sessions")).json.sessions as { id: string; current: boolean }[];
+    const currentId = list.find((item) => item.current)?.id ?? "";
+
+    const res = await app.request("/api/v1/me/sessions/revoke-others", { method: "POST", headers: bearer(laptop) });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ revoked: 2 });
+    expect((await sessionsOf(userId)).map((row) => row.id)).toEqual([currentId]);
   });
 });
