@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, test } from "bun:test";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { createApp } from "../../app";
 import { account, user } from "../../db/schema";
@@ -25,8 +25,8 @@ beforeAll(async () => {
 }, 30_000);
 
 function setup(options?: TestAuthOptions) {
-  const { auth, outbox } = createTestAuth(options);
-  return { app: createApp(testAppDeps({ auth }).deps), outbox };
+  const { auth, outbox, logs } = createTestAuth(options);
+  return { app: createApp(testAppDeps({ auth }).deps), outbox, logs };
 }
 
 function sendCode(browser: Browser, qq: string, turnstileToken = "pass", locale?: string) {
@@ -63,6 +63,57 @@ describe("发码", () => {
     expect(res.json).toEqual({ status: true });
     expect(await waitForCode(outbox, qq)).toMatch(/^\d{6}$/);
     expect(outbox.at(-1)).toMatchObject({ qq, locale: "ja" });
+  });
+
+  test("发送失败时照样返回同样的结果；失败日志里没有 QQ 号，也没有验证码", async () => {
+    const sentCodes: string[] = [];
+    const { app, logs } = setup({
+      sendCode: async (_qq, code) => {
+        sentCodes.push(code);
+        throw new Error("send_private_msg timed out");
+      },
+    });
+    const qq = randomQq();
+
+    const res = await sendCode(new Browser(app), qq);
+
+    expect(res.status).toBe(200);
+    expect(res.json).toEqual({ status: true });
+    // 发送在后台跑：等它失败、记下日志。
+    const failures = () => logs().filter((entry) => entry.event === "qq_send_failed");
+    const deadline = Date.now() + 1000;
+    while (failures().length === 0 && Date.now() < deadline) {
+      await Bun.sleep(5);
+    }
+    expect(failures()).toHaveLength(1);
+    const [code = ""] = sentCodes;
+    expect(code).toMatch(/^\d{6}$/);
+    const line = JSON.stringify(failures()[0]);
+    expect(line).not.toContain(qq);
+    expect(line).not.toContain(code);
+  });
+
+  test("发送卡住时发码接口不等它，照样马上返回同样的结果", async () => {
+    const { app } = setup({ sendCode: () => new Promise<void>(() => undefined) });
+
+    const res = await Promise.race([sendCode(new Browser(app), randomQq()), Bun.sleep(1000).then(() => null)]);
+
+    expect(res?.status).toBe(200);
+    expect(res?.json).toEqual({ status: true });
+  });
+
+  test("发给 Turnstile 的是 Cloudflare 给的原始访客 IP，IPv6 不截成 /64", async () => {
+    const seen: (string | null)[] = [];
+    const { app } = setup({
+      turnstile: async (_token, remoteIp) => {
+        seen.push(remoteIp);
+        return "ok";
+      },
+    });
+
+    await sendCode(new Browser(app, { ip: "2001:db8:1234:5678:9abc:def0:1234:5678" }), randomQq());
+
+    expect(seen).toEqual(["2001:db8:1234:5678:9abc:def0:1234:5678"]);
   });
 
   test("同一个 QQ 号一分钟内只能发一次", async () => {
@@ -114,6 +165,13 @@ describe("验证码登录", () => {
     const { qq, verified } = await signInWithQq(browser, outbox);
 
     expect(verified.json.user.name).toBe(`QQ ${maskQq(qq)}`);
+    // 打码的 QQ 号只当显示名：绑定上的"QQ 昵称"只存真的查到的，查不到就留空。
+    const bindings = await testDbHandle()
+      .db.select()
+      .from(account)
+      .where(and(eq(account.providerId, "qq"), eq(account.accountId, qq)));
+    expect(bindings).toHaveLength(1);
+    expect(bindings[0]).toMatchObject({ userId: verified.json.user.id, providerNickname: null });
   });
 
   test("已经绑定的 QQ 直接登录同一个用户", async () => {
@@ -177,6 +235,43 @@ describe("验证码登录", () => {
 
     expect(again.json.code).toBe("QQ_CODE_EXPIRED");
   });
+
+  // 审查发现的漏洞：同一个 qq_code Cookie，19 个错误码和正确码同时打过来，正确码最后发出。每个请求换一个
+  // IP：按 IP 限流挡不住这种猜法。尝试次数在比对之前原子地占用，正确码只有排进前 5 次占用才会被比对；
+  // 最后发出的它要越过 15 个先发的请求才排得进去，所以这个断言在实际中是稳定的。
+  test("并发猜码也只比对 5 次：最后发出的正确码登录不了", async () => {
+    const { app, outbox } = setup();
+    const browser = new Browser(app);
+    const qq = randomQq();
+    await sendCode(browser, qq);
+    const code = await waitForCode(outbox, qq);
+    const wrong = new Set<string>();
+    while (wrong.size < 19) {
+      const guess = String(Math.floor(Math.random() * 1_000_000)).padStart(6, "0");
+      if (guess !== code) {
+        wrong.add(guess);
+      }
+    }
+
+    const results = await Promise.all(
+      [...wrong, code].map((guess, i) => {
+        const guesser = new Browser(app, { ip: `198.51.100.${10 + i}` });
+        for (const [name, value] of browser.cookies) {
+          guesser.cookies.set(name, value);
+        }
+        return guesser.request("POST", "/api/auth/qq/verify", { body: { qq, code: guess } });
+      })
+    );
+    const summary = results.map((res) => (res.status === 200 ? "OK" : String(res.json?.code)));
+
+    expect(summary.at(-1)).not.toBe("OK");
+    expect(summary.filter((entry) => entry === "QQ_CODE_INVALID").length).toBeLessThanOrEqual(4);
+    expect(
+      summary.filter(
+        (entry) => entry !== "QQ_CODE_INVALID" && entry !== "QQ_CODE_TOO_MANY_ATTEMPTS" && entry !== "QQ_CODE_EXPIRED"
+      )
+    ).toEqual([]);
+  }, 20_000);
 });
 
 describe("绑定 QQ", () => {

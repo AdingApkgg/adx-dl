@@ -22,6 +22,8 @@ export type TestAuthOptions = {
   nicknames?: Record<string, string>;
   /** 按 QQ 号限流用的计数存储。默认是每个实例一份新的内存计数。 */
   qqLimits?: RateLimitStore;
+  /** 给了就代替默认的"记进 outbox"：测发送失败、卡住时用。 */
+  sendCode?: QqSender["sendCode"];
 };
 
 export type SentCode = { qq: string; code: string; locale: string };
@@ -39,9 +41,11 @@ export function createTestAuth(options: TestAuthOptions = {}) {
   const outbox: SentCode[] = [];
   const nicknames = options.nicknames ?? {};
   const sender: QqSender = {
-    async sendCode(qq, code, locale) {
-      outbox.push({ qq, code, locale });
-    },
+    sendCode:
+      options.sendCode ??
+      (async (qq, code, locale) => {
+        outbox.push({ qq, code, locale });
+      }),
     async lookupNickname(qq) {
       return nicknames[qq] ?? null;
     },
@@ -163,7 +167,7 @@ export async function ageSessions(userId: string, minutes: number): Promise<void
 
 // ---- QQ ----
 
-/** 随机的 10 到 11 位 QQ 号，不以 0 开头。测试之间共用测试库，所以不要用固定的号码。 */
+/** 随机的 10 位 QQ 号，不以 0 开头。测试之间共用测试库，所以不要用固定的号码。 */
 export function randomQq(): string {
   return String(1_000_000_000 + Math.floor(Math.random() * 8_999_999_999));
 }

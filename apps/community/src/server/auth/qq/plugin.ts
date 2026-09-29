@@ -1,5 +1,5 @@
 import { APIError, type BetterAuthPlugin, defineErrorCodes } from "better-auth";
-import { createAuthEndpoint, getIP, getSessionFromCtx } from "better-auth/api";
+import { createAuthEndpoint, getSessionFromCtx } from "better-auth/api";
 import { expireCookie, setSessionCookie } from "better-auth/cookies";
 import { constantTimeEqual, generateRandomString } from "better-auth/crypto";
 import { z } from "zod";
@@ -9,7 +9,7 @@ import type { Logger } from "@/shared/log";
 
 import { ACCOUNT_ERROR_CODES } from "../account-rules";
 import { isRecentLogin } from "../recent-login";
-import type { TurnstileVerifier } from "../turnstile";
+import { type TurnstileVerifier, turnstileRemoteIp } from "../turnstile";
 import type { QqCodeStore } from "./codes";
 import type { QqHasher } from "./hasher";
 import { maskQq, type QqSender } from "./sender";
@@ -56,8 +56,7 @@ export function qqLogin(deps: QqLoginDeps) {
         },
         async (ctx) => {
           const { qq, turnstileToken, locale } = ctx.body;
-          const ip = ctx.request ? getIP(ctx.request, ctx.context.options) : null;
-          const verdict = await deps.verifyTurnstile(turnstileToken, ip);
+          const verdict = await deps.verifyTurnstile(turnstileToken, turnstileRemoteIp(ctx.request));
           if (verdict === "unavailable") {
             throw APIError.from("SERVICE_UNAVAILABLE", QQ_ERROR_CODES.QQ_CAPTCHA_UNAVAILABLE);
           }
@@ -112,13 +111,18 @@ export function qqLogin(deps: QqLoginDeps) {
           if (!nonce) {
             throw APIError.from("BAD_REQUEST", QQ_ERROR_CODES.QQ_CODE_EXPIRED);
           }
-          const record = await deps.codes.get(nonce);
-          if (!record || record.qqKey !== (await deps.hasher.qqKey(qq))) {
+          // 比对之前先原子地占用一次尝试机会（见 QqCodeStore.claimAttempt）：并发的请求各拿一个次数，
+          // 超过上限的一律不比对。记录不在、或者不是发给这个 QQ 号的，不占次数。
+          const claim = await deps.codes.claimAttempt(nonce, await deps.hasher.qqKey(qq));
+          if (!claim) {
             throw APIError.from("BAD_REQUEST", QQ_ERROR_CODES.QQ_CODE_EXPIRED);
           }
-          if (!constantTimeEqual(await deps.hasher.codeHash(nonce, qq, code), record.codeHash)) {
-            const attempts = await deps.codes.incrementAttempts(nonce);
-            if (attempts === null || attempts >= MAX_ATTEMPTS) {
+          if (claim.attempts > MAX_ATTEMPTS) {
+            await deps.codes.consume(nonce);
+            throw APIError.from("BAD_REQUEST", QQ_ERROR_CODES.QQ_CODE_TOO_MANY_ATTEMPTS);
+          }
+          if (!constantTimeEqual(await deps.hasher.codeHash(nonce, qq, code), claim.codeHash)) {
+            if (claim.attempts >= MAX_ATTEMPTS) {
               await deps.codes.consume(nonce);
               throw APIError.from("BAD_REQUEST", QQ_ERROR_CODES.QQ_CODE_TOO_MANY_ATTEMPTS);
             }
@@ -153,11 +157,13 @@ export function qqLogin(deps: QqLoginDeps) {
           const isNewUser = user === null;
           if (!user) {
             // 查昵称是网络请求，放在建号的事务外面。
-            const nickname = (await deps.sender.lookupNickname(qq)) ?? `QQ ${maskQq(qq)}`;
+            const nickname = await deps.sender.lookupNickname(qq);
+            // 绑定上只存真的查到的昵称（登录方式列表把它当"QQ 昵称"显示，存打码的号会误导），查不到就是 null；
+            // 打码的 QQ 号只用作用户的显示名。
             const profile = { providerNickname: nickname };
             // createOAuthUser 在一个事务里建用户和绑定；短 id 和占位邮箱由 user.create.before 生成。
             const created = await ctx.context.internalAdapter.createOAuthUser(
-              { name: nickname, email: "pending@placeholder.invalid", emailVerified: false },
+              { name: nickname ?? `QQ ${maskQq(qq)}`, email: "pending@placeholder.invalid", emailVerified: false },
               { providerId: "qq", accountId: qq, ...profile }
             );
             user = created.user;

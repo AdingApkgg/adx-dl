@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 import { describeError } from "@/shared/describe-error";
 import type { Logger } from "@/shared/log";
 
@@ -7,6 +9,12 @@ export type TurnstileVerdict = "ok" | "failed" | "unavailable";
 export type TurnstileVerifier = (token: string, remoteIp: string | null) => Promise<TurnstileVerdict>;
 
 export const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+
+/** 发给 Turnstile 的访客 IP：Cloudflare 给的原始地址。不用 Better Auth 的 getIP：它把 IPv6 截成 /64（给限流用的）。 */
+export function turnstileRemoteIp(request: Request | undefined): string | null {
+  const ip = request?.headers.get("cf-connecting-ip")?.trim();
+  return ip && isIP(ip) !== 0 ? ip : null;
+}
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 

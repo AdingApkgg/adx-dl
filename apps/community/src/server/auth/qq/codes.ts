@@ -1,15 +1,19 @@
 import type { RateLimitStore, RedisCommandSender } from "../../middleware/rate-limit";
 
-/** 一次发码。Redis 里只放 HMAC 和尝试次数（spec 第 9.4 节）。 */
-export type QqCodeRecord = { qqKey: string; codeHash: string; attempts: number };
-
+// 一次发码一条记录，键是 nonce。Redis 里只放 HMAC 和尝试次数（spec 第 9.4 节）。
 export type QqCodeStore = {
   /** 按 QQ 号限流：每分钟 1 次、每小时 5 次（spec 第 10.2 节）。放行返回 true。 */
   allowSend(qqKey: string): Promise<boolean>;
   save(nonce: string, record: { qqKey: string; codeHash: string }, ttlSec: number): Promise<void>;
-  get(nonce: string): Promise<QqCodeRecord | null>;
-  /** 尝试次数加 1，返回加完后的次数；记录已经不在了返回 null。 */
-  incrementAttempts(nonce: string): Promise<number | null>;
+  /**
+   * 比对验证码之前先占用一次尝试机会：原子地把尝试次数加 1，返回验证码的 HMAC 和加完后的次数。
+   * 记录不在、或者不是发给这个 QQ 号的，返回 null，也不加次数。
+   *
+   * 必须先占用、再比对。"先比对、比错了才计数"在并发时挡不住暴力猜码：第 5 次错误把记录删掉之前，
+   * 同时进来的请求都读得到记录、都会被比对，比对正确的那次根本不计数。先占用的话，每个请求拿到的
+   * 次数各不相同，超过上限的一律不比对。
+   */
+  claimAttempt(nonce: string, qqKey: string): Promise<{ codeHash: string; attempts: number } | null>;
   /** 删除并返回是否真的删掉了：两个请求同时带着正确的验证码进来时，只有一个拿到 true。 */
   consume(nonce: string): Promise<boolean>;
 };
@@ -21,10 +25,13 @@ redis.call('EXPIRE', KEYS[1], ARGV[3])
 return 1
 `;
 
-// 记录已经过期时不能直接 HINCRBY：它会建一个没有过期时间的新键。
-const INCREMENT_SCRIPT = `
-if redis.call('EXISTS', KEYS[1]) == 0 then return -1 end
-return redis.call('HINCRBY', KEYS[1], 'a', 1)
+// 查记录和加次数放在同一段 Lua 里才是原子的。记录不在时直接返回：记录已经过期还 HINCRBY 的话，
+// 会建出一个没有过期时间的新键。QQ 号对不上时也不加次数，什么都不透露（和记录不在一样处理）。
+const CLAIM_SCRIPT = `
+local q = redis.call('HGET', KEYS[1], 'q')
+if not q or q ~= ARGV[1] then return nil end
+local attempts = redis.call('HINCRBY', KEYS[1], 'a', 1)
+return {redis.call('HGET', KEYS[1], 'c'), attempts}
 `;
 
 export function createRedisQqCodeStore(options: {
@@ -48,20 +55,16 @@ export function createRedisQqCodeStore(options: {
     async save(nonce, record, ttlSec) {
       await options.redis.send("EVAL", [SAVE_SCRIPT, "1", keyOf(nonce), record.qqKey, record.codeHash, String(ttlSec)]);
     },
-    async get(nonce) {
-      const reply = await options.redis.send("HMGET", [keyOf(nonce), "q", "c", "a"]);
-      if (!Array.isArray(reply)) {
+    async claimAttempt(nonce, qqKey) {
+      const reply = await options.redis.send("EVAL", [CLAIM_SCRIPT, "1", keyOf(nonce), qqKey]);
+      if (!Array.isArray(reply) || reply.length !== 2) {
         return null;
       }
-      const [qqKey, codeHash, attempts] = reply;
-      if (typeof qqKey !== "string" || typeof codeHash !== "string") {
+      const [codeHash, attempts] = reply;
+      if (typeof codeHash !== "string") {
         return null;
       }
-      return { qqKey, codeHash, attempts: Number(attempts ?? 0) };
-    },
-    async incrementAttempts(nonce) {
-      const reply = Number(await options.redis.send("EVAL", [INCREMENT_SCRIPT, "1", keyOf(nonce)]));
-      return reply < 0 ? null : reply;
+      return { codeHash, attempts: Number(attempts) };
     },
     async consume(nonce) {
       return Number(await options.redis.send("DEL", [keyOf(nonce)])) === 1;
