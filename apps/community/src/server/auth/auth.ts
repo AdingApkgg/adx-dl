@@ -14,6 +14,7 @@ import type { RateLimitStore } from "../middleware/rate-limit";
 import { withTimeout } from "../with-timeout";
 import { accountRules } from "./account-rules";
 import { accountAdditionalFields, sessionAdditionalFields, userAdditionalFields } from "./fields";
+import { passkeyPlugin } from "./passkey";
 import type { QqCodeStore } from "./qq/codes";
 import type { QqHasher } from "./qq/hasher";
 import { qqLogin } from "./qq/plugin";
@@ -271,8 +272,14 @@ export function createAuth(deps: AuthDeps) {
         prompt: "select_account",
       },
     },
+    // 顺序有要求：accountRules 要排在 passkeyPlugin 后面（见 account-rules.ts）。
     plugins: [
       bearer({ requireSignature: true }),
+      passkeyPlugin({
+        publicOrigin: deps.publicOrigin,
+        rpName: "AstroDX Community",
+        verifyTurnstile: deps.verifyTurnstile,
+      }),
       accountRules({ db }),
       qqLogin({ ...deps.qq, verifyTurnstile: deps.verifyTurnstile, log }),
     ],
