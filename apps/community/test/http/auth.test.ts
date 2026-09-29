@@ -125,7 +125,9 @@ describe("账号接口", () => {
     expect(res.status).toBe(404);
   });
 
-  test("发起 Google 登录返回授权地址，网页响应里没有会话令牌头", async () => {
+  // 只查授权地址。"网页响应里没有 set-auth-token"在这里查不出来：发起登录的响应本来就不设会话 Cookie，
+  // bearer 插件也就不会加这个头。真正的检查在 src/server/auth/auth.test.ts（登录回调、会话续期的响应）。
+  test("发起 Google 登录返回 Google 的授权地址", async () => {
     const res = await fetch(server.url("/api/auth/sign-in/social"), {
       method: "POST",
       headers: { "content-type": "application/json", origin: server.origin },
@@ -135,7 +137,6 @@ describe("账号接口", () => {
 
     expect(res.status).toBe(200);
     expect(body.url?.startsWith("https://accounts.google.com/")).toBe(true);
-    expect(res.headers.get("set-auth-token")).toBeNull();
   });
 
   test("/api/v1/login-options 给出 Turnstile 站点密钥和 QQ 状态", async () => {

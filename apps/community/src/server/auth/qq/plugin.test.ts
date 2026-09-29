@@ -332,7 +332,7 @@ describe("绑定 QQ", () => {
     expect([conflict.status, conflict.json.code]).toEqual([409, "QQ_ALREADY_LINKED"]);
   });
 
-  // Ruling R9：绑定新的登录方式也算敏感操作，和 /link-social 一样要求会话 10 分钟内创建，
+  // 绑定新的登录方式也算敏感操作，和 /link-social 一样要求会话 10 分钟内创建，
   // 否则偷来的旧会话能绑一个攻击者自己的 QQ，再用它正常登录一次，之后就有了一个"刚登录"的会话。
   test("会话超过 10 分钟时，绑定 QQ 要求重新登录，且没有消耗验证码", async () => {
     const { app, outbox } = setup({ qqLimits: UNLIMITED });

@@ -48,7 +48,8 @@ bun run test:http    # 启动构建产物，做页面和接口的 HTTP 级测试
 - `src/server`：Hono 应用、接口、数据库、Redis、任务队列。
 - `src/client`：React Router 应用。**不能引用 `src/server`**（Biome 会报错），
   例外是 `import type` 自 `@/server/api/app-type` 和 `@/server/auth/auth-type`（都只有类型）。
-- `src/shared`：两边都要用的代码，不能引用 `src/server` 和 `src/client`。
+- `src/shared`：两边都要用的代码，不能引用 `src/server` 和 `src/client`，
+  例外和 `src/client` 一样：`import type` 自 `@/server/api/app-type` 和 `@/server/auth/auth-type`（都只有类型）。
 - `src/worker`：pg-boss 的 worker 进程，和网页用同一个镜像。
 - `src/paraglide`：Paraglide 编译出的文案函数，不入库，不要手改。
 
@@ -65,7 +66,9 @@ bun run test:http    # 启动构建产物，做页面和接口的 HTTP 级测试
 
 - Better Auth 1.7.6 挂在 `/api/auth/*`，配置全在 `src/server/auth/auth.ts`。`better-auth` 和
   `@better-auth/passkey` 必须同版本、精确锁版本，一起升级。
-- 会话只存 PG，不用 Redis 缓存（原因见 1b 计划"与 spec 的偏离"第 2 条）。
+- 会话只存 PG，不给 Better Auth 配 Redis 缓存：Redis 满了会淘汰键，可能只丢掉"这个用户有哪些会话"那个键，
+  之后"退出其他设备"、删除用户就作废不了缓存里的旧会话（已经撤销的会话照样能用），而撤销必须立即生效；
+  Redis 断线时还会全站 401。代价是每个带 Cookie 的请求多查一次 PG。
 - 往 Better Auth 的表（`src/server/db/schema/auth.ts`）加列：列要可空或带默认值，并同步改
   `src/server/auth/fields.ts`（或插件的 `schema`）。Better Auth 启动时会逐列比对，对不上时所有认证请求都会失败。
 - 登录方式列表、登录设备和踢下线用我们自己的 `/api/v1/me/*`；Better Auth 自带的会话列表、改资料等接口都关掉了

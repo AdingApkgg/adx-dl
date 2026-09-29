@@ -100,7 +100,8 @@ export function qqLogin(deps: QqLoginDeps) {
           if (intent === "link" && !session) {
             throw APIError.from("UNAUTHORIZED", QQ_ERROR_CODES.QQ_LINK_REQUIRES_SESSION);
           }
-          // 绑定新的登录方式也算敏感操作：要求 10 分钟内刚登录（Ruling R9，同 /link-social）。
+          // 绑定新的登录方式也算敏感操作，和 /link-social 一样要求 10 分钟内刚登录：否则偷来的旧会话能绑一个
+          // 攻击者自己的 QQ，再用它正常登录一次，之后就有了一个"刚登录"的会话。
           if (session && !isRecentLogin(session.session.createdAt)) {
             throw APIError.from("FORBIDDEN", ACCOUNT_ERROR_CODES.REAUTH_REQUIRED);
           }
