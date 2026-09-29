@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { createLogger } from "@/shared/log";
 
 import { createAuth } from "../auth/auth";
-import { createRedisQqCodeStore } from "../auth/qq/codes";
+import { createRedisQqCodeStore, type QqCodeStore } from "../auth/qq/codes";
 import { createQqHasher } from "../auth/qq/hasher";
 import type { QqSender } from "../auth/qq/sender";
 import type { TurnstileVerifier } from "../auth/turnstile";
@@ -24,6 +24,8 @@ export type TestAuthOptions = {
   qqLimits?: RateLimitStore;
   /** 给了就代替默认的"记进 outbox"：测发送失败、卡住时用。 */
   sendCode?: QqSender["sendCode"];
+  /** 给验证码存储包一层：测试要观察存储的调用时用（比如数一数完成了几次占用）。 */
+  wrapCodes?: (store: QqCodeStore) => QqCodeStore;
 };
 
 export type SentCode = { qq: string; code: string; locale: string };
@@ -50,6 +52,12 @@ export function createTestAuth(options: TestAuthOptions = {}) {
       return nicknames[qq] ?? null;
     },
   };
+  const codes = createRedisQqCodeStore({
+    // 用到时才连：createTestAuth 保持同步。
+    redis: { send: async (command, args) => (await testRedis()).send(command, args) },
+    limits: options.qqLimits ?? createMemoryRateLimitStore(),
+    prefix: `test:${crypto.randomUUID()}:qq:`,
+  });
   const auth = createAuth({
     db: testDbHandle().db,
     log: createLogger((line) => lines.push(line)),
@@ -60,12 +68,7 @@ export function createTestAuth(options: TestAuthOptions = {}) {
     rateLimitEnabled: options.rateLimitEnabled ?? false,
     verifyTurnstile: options.turnstile ?? fakeTurnstile,
     qq: {
-      codes: createRedisQqCodeStore({
-        // 用到时才连：createTestAuth 保持同步。
-        redis: { send: async (command, args) => (await testRedis()).send(command, args) },
-        limits: options.qqLimits ?? createMemoryRateLimitStore(),
-        prefix: `test:${crypto.randomUUID()}:qq:`,
-      }),
+      codes: options.wrapCodes ? options.wrapCodes(codes) : codes,
       sender,
       hasher: createQqHasher("test-hmac-test-hmac-test-hmac-test-hmac"),
     },

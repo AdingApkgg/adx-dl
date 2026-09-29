@@ -51,6 +51,19 @@ describe("createRedisQqCodeStore", () => {
     expect(await store.claimAttempt("n4", "q")).toEqual({ codeHash: "c", attempts: 1 });
   });
 
+  // 回复的形状不对时失败关闭：次数要是 NaN，插件里"超过 5 次"的比较永远不成立，5 次的上限就没了。
+  test("Redis 回复里的尝试次数不是正整数时返回 null", async () => {
+    for (const attempts of ["x", 0, -1, 1.5]) {
+      const odd = createRedisQqCodeStore({
+        redis: { send: async () => ["h", attempts] },
+        limits: createMemoryRateLimitStore(),
+        prefix,
+      });
+
+      expect(await odd.claimAttempt("n6", "q"), String(attempts)).toBeNull();
+    }
+  });
+
   // 在比对之前占用次数就是为了这个：并发的请求各拿一个不同的次数，不会有两个请求都以为自己是第 1 次。
   test("10 个并发占用恰好拿到 1 到 10 各一次", async () => {
     await store.save("n5", { qqKey: "q", codeHash: "c" }, 300);

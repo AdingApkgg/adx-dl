@@ -93,10 +93,12 @@ describe("发码", () => {
     expect(line).not.toContain(code);
   });
 
+  // 卡住的发送器永远不返回：接口要是等它，这里就只能等到 5 秒的上限。上限不能再短：发码要经隧道查限流、
+  // 存验证码，测试库在远端时 1 秒不够稳。
   test("发送卡住时发码接口不等它，照样马上返回同样的结果", async () => {
     const { app } = setup({ sendCode: () => new Promise<void>(() => undefined) });
 
-    const res = await Promise.race([sendCode(new Browser(app), randomQq()), Bun.sleep(1000).then(() => null)]);
+    const res = await Promise.race([sendCode(new Browser(app), randomQq()), Bun.sleep(5000).then(() => null)]);
 
     expect(res?.status).toBe(200);
     expect(res?.json).toEqual({ status: true });
@@ -236,11 +238,22 @@ describe("验证码登录", () => {
     expect(again.json.code).toBe("QQ_CODE_EXPIRED");
   });
 
-  // 审查发现的漏洞：同一个 qq_code Cookie，19 个错误码和正确码同时打过来，正确码最后发出。每个请求换一个
-  // IP：按 IP 限流挡不住这种猜法。尝试次数在比对之前原子地占用，正确码只有排进前 5 次占用才会被比对；
-  // 最后发出的它要越过 15 个先发的请求才排得进去，所以这个断言在实际中是稳定的。
-  test("并发猜码也只比对 5 次：最后发出的正确码登录不了", async () => {
-    const { app, outbox } = setup();
+  // 审查发现的漏洞：同一个 qq_code Cookie，一批错误码和正确码同时打过来。每个请求换一个 IP：按 IP 限流
+  // 挡不住这种猜法。尝试次数在比对之前原子地占用，正确码只有排进前 5 次占用才会被比对。这里先并发发出
+  // 19 个错误码，数着验证码存储真正完成的占用，等到至少 5 次以后才发正确码：它一定排在第 5 次之后。
+  // 结果不取决于请求的发出顺序和到达顺序，每次都一样。
+  test("并发猜码也只比对 5 次：前 5 次占用被错误码用掉以后，正确码登录不了", async () => {
+    let claimed = 0;
+    const { app, outbox } = setup({
+      wrapCodes: (store) => ({
+        ...store,
+        async claimAttempt(nonce, qqKey) {
+          const claim = await store.claimAttempt(nonce, qqKey);
+          claimed += 1;
+          return claim;
+        },
+      }),
+    });
     const browser = new Browser(app);
     const qq = randomQq();
     await sendCode(browser, qq);
@@ -252,20 +265,32 @@ describe("验证码登录", () => {
         wrong.add(guess);
       }
     }
+    const verify = (guess: string, i: number) => {
+      const guesser = new Browser(app, { ip: `198.51.100.${10 + i}` });
+      for (const [name, value] of browser.cookies) {
+        guesser.cookies.set(name, value);
+      }
+      return guesser.request("POST", "/api/auth/qq/verify", { body: { qq, code: guess } });
+    };
 
-    const results = await Promise.all(
-      [...wrong, code].map((guess, i) => {
-        const guesser = new Browser(app, { ip: `198.51.100.${10 + i}` });
-        for (const [name, value] of browser.cookies) {
-          guesser.cookies.set(name, value);
-        }
-        return guesser.request("POST", "/api/auth/qq/verify", { body: { qq, code: guess } });
-      })
+    // 错误码一起发出去，不等它们返回。
+    const wrongRequests = [...wrong].map((guess, i) => verify(guess, i));
+    const deadline = Date.now() + 10_000;
+    while (claimed < 5) {
+      if (Date.now() > deadline) {
+        throw new Error(`only ${claimed} attempts were claimed in time`);
+      }
+      await Bun.sleep(5);
+    }
+    const right = await verify(code, wrong.size);
+    const summary = [...(await Promise.all(wrongRequests)), right].map((res) =>
+      res.status === 200 ? "OK" : String(res.json?.code)
     );
-    const summary = results.map((res) => (res.status === 200 ? "OK" : String(res.json?.code)));
 
-    expect(summary.at(-1)).not.toBe("OK");
-    expect(summary.filter((entry) => entry === "QQ_CODE_INVALID").length).toBeLessThanOrEqual(4);
+    expect(right.status).toBe(400);
+    expect(["QQ_CODE_TOO_MANY_ATTEMPTS", "QQ_CODE_EXPIRED"]).toContain(right.json.code);
+    // 第 1 到第 4 次占用比对了、比错了；第 5 次比错时作废验证码；之后的占用不比对。
+    expect(summary.filter((entry) => entry === "QQ_CODE_INVALID")).toHaveLength(4);
     expect(
       summary.filter(
         (entry) => entry !== "QQ_CODE_INVALID" && entry !== "QQ_CODE_TOO_MANY_ATTEMPTS" && entry !== "QQ_CODE_EXPIRED"

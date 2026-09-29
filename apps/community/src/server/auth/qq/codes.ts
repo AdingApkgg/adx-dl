@@ -60,11 +60,14 @@ export function createRedisQqCodeStore(options: {
       if (!Array.isArray(reply) || reply.length !== 2) {
         return null;
       }
-      const [codeHash, attempts] = reply;
-      if (typeof codeHash !== "string") {
+      const [codeHash, reported] = reply;
+      const attempts = Number(reported);
+      // 回复的形状不对就当作记录不在（失败时关闭）：次数要是 NaN 之类，插件里"超过 5 次"的比较永远不成立，
+      // 5 次的上限就形同虚设。
+      if (typeof codeHash !== "string" || !Number.isSafeInteger(attempts) || attempts <= 0) {
         return null;
       }
-      return { codeHash, attempts: Number(attempts) };
+      return { codeHash, attempts };
     },
     async consume(nonce) {
       return Number(await options.redis.send("DEL", [keyOf(nonce)])) === 1;
