@@ -11,7 +11,7 @@ import { makeQueryClient } from "@/shared/query-client";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
 import { loginHref } from "../lib/require-user";
-import SettingsAccount, { loader, meta } from "./settings-account";
+import SettingsAccount, { loader, meta, returnPath } from "./settings-account";
 
 const NOW = "2026-09-29T00:00:00.000Z";
 const USER = { id: "abc2345678", name: "阿丁", image: null, status: "active", createdAt: NOW };
@@ -145,6 +145,38 @@ describe("账号设置页 meta", () => {
 
     expect(tags).toContainEqual({ name: "robots", content: "noindex" });
     expect(tags).toContainEqual({ title: `${m.settings_account_title()} - ${m.site_name()}` });
+  });
+});
+
+// "重新登录"的链接、QQ 绑定的重新登录链接和未登录时的跳转，登录后都回到这个地址。error（Google 绑定失败的原因）
+// 和 welcome（欢迎语）是一次性的提示：带回来的话，旧的错误提示会一直显示，欢迎语也会在重新登录后再出现一次。
+// 这些链接只在点了按钮、出错之后才出现，静态标记里看不到，所以地址的构造单独测。
+describe("returnPath", () => {
+  test("去掉 error 和 welcome，其他参数原样留着", () => {
+    expect(returnPath("/settings/account", "?welcome=1&error=x&tab=2")).toBe("/settings/account?tab=2");
+    expect(returnPath("/en/settings/account", "?tab=2&error=state_mismatch")).toBe("/en/settings/account?tab=2");
+  });
+
+  test("去掉之后没有别的参数：不带问号", () => {
+    expect(returnPath("/settings/account", "?welcome=1")).toBe("/settings/account");
+    expect(returnPath("/settings/account", "?error=state_mismatch&welcome=1")).toBe("/settings/account");
+  });
+
+  test("本来就没有查询串：原样返回路径", () => {
+    expect(returnPath("/settings/account", "")).toBe("/settings/account");
+    expect(returnPath("/ja/settings/account", "?")).toBe("/ja/settings/account");
+  });
+
+  test("同名参数出现几次都去掉；其他参数的顺序不变", () => {
+    expect(returnPath("/settings/account", "?a=1&error=x&b=2&error=y&welcome=1&welcome=2&c=3")).toBe(
+      "/settings/account?a=1&b=2&c=3"
+    );
+  });
+
+  test("交给 loginHref 之后，next 里没有 error 和 welcome", () => {
+    const href = loginHref(returnPath("/settings/account", "?welcome=1&error=x&tab=2"), { reauth: "1" });
+
+    expect(href).toBe("/login?next=%2Fsettings%2Faccount%3Ftab%3D2&reauth=1");
   });
 });
 

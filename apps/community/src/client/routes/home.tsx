@@ -13,21 +13,23 @@ import { metaQuery } from "../queries/meta";
 import type { Route } from "./+types/home";
 
 // 首次打开：服务端预取进本次请求的 QueryClient，再整份交给浏览器（spec 第 8.3 节）。
-// 请求失败会抛错，页面显示根错误边界。
+// meta 请求失败会抛错，页面显示根错误边界。当前用户（me）取不到不算：429 限流、5xx 时页面照常渲染成"未登录"，
+// 没进 dehydrate 的 me，浏览器里的 useQuery 会在 hydrate 之后重试。
 export async function loader({ context }: Route.LoaderArgs) {
   const queryClient = context.get(queryClientContext);
   const api = context.get(apiContext);
-  await Promise.all([queryClient.query(metaQuery(api)), queryClient.query(meQuery(api))]);
+  await Promise.all([queryClient.query(metaQuery(api)), queryClient.query(meQuery(api)).catch(() => undefined)]);
   return { dehydratedState: dehydrate(queryClient) };
 }
 
 // 站内切换：缓存里有就直接用，哪怕已经过期（staleTime: "static"），跳转不用等请求；
 // 组件挂载后 useQuery 发现数据过期，会在后台刷新。缓存里没有才等这次请求。
+// me 和 loader 一样：取不到就渲染成"未登录"，组件挂载后 useQuery 会重试。
 export async function clientLoader() {
   const queryClient = getBrowserQueryClient();
   await Promise.all([
     queryClient.query({ ...metaQuery(getBrowserApi()), staleTime: "static" }),
-    queryClient.query({ ...meQuery(getBrowserApi()), staleTime: "static" }),
+    queryClient.query({ ...meQuery(getBrowserApi()), staleTime: "static" }).catch(() => undefined),
   ]);
   return { dehydratedState: null };
 }

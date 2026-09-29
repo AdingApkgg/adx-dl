@@ -8,7 +8,7 @@ import { expectOk } from "@/shared/api-client";
 import { htmlLang } from "@/shared/i18n/locale";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
-import { QqCodeForm } from "../components/qq-code-form";
+import { isReauthError, QqCodeForm } from "../components/qq-code-form";
 import { authClient } from "../lib/auth-client";
 import { errorCodeOf, errorMessage } from "../lib/auth-errors";
 import { getBrowserApi, getRenderApi, jsonRequest } from "../lib/browser";
@@ -47,6 +47,16 @@ export default function SettingsAccount({ loaderData }: Route.ComponentProps) {
 
 type Failure = { message: string; reauth: boolean };
 
+// "重新登录"的链接、QQ 绑定的重新登录链接和未登录时的跳转，登录后都回到这个地址（当前页）。去掉 error 和 welcome：
+// 它们是一次性的提示（Google 绑定失败的原因、欢迎语），带回来的话，旧的错误提示会一直显示，欢迎语也会在重新登录后再出现一次。
+export function returnPath(pathname: string, search: string): string {
+  const params = new URLSearchParams(search);
+  params.delete("error");
+  params.delete("welcome");
+  const rest = params.toString();
+  return rest ? `${pathname}?${rest}` : pathname;
+}
+
 // 设备名来自 User-Agent，构造出来的可以有上千个字符：每个名字最多显示 64 个字符，超出的换成省略号。
 // 按字符（码点）数截，边界上的表情符号不会被劈成半个。
 const DEVICE_NAME_MAX = 64;
@@ -68,7 +78,7 @@ function SettingsContent() {
   const [failure, setFailure] = useState<Failure | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const here = `${location.pathname}${location.search}`;
+  const here = returnPath(location.pathname, location.search);
   const callbackMessage = params.get("error") ? errorMessage(params.get("error")) : null;
 
   const locale = htmlLang(getLocale());
@@ -82,6 +92,7 @@ function SettingsContent() {
       : m.settings_device_unknown_place();
 
   // 所有按钮共用：出错时翻译成文案；未登录跳去登录页（spec 第 11.4 节）；要求刚登录的给出"重新登录"链接。
+  // 成功和出错都刷新列表：出错时那一行可能已经在别处被删掉了。
   async function run(action: () => Promise<unknown>) {
     setPending(true);
     setFailure(null);
@@ -100,9 +111,11 @@ function SettingsContent() {
         window.location.assign(loginHref(here));
         return;
       }
+      // 比如在别处已经被踢掉的会话，再点"下线"会得到 404：不刷新的话那一行一直留着。
+      void queryClient.invalidateQueries({ queryKey: ["me"] });
       const message = errorMessage(error);
       if (message) {
-        setFailure({ message, reauth: code === "REAUTH_REQUIRED" || code === "SESSION_NOT_FRESH" });
+        setFailure({ message, reauth: isReauthError(error) });
       }
     } finally {
       setPending(false);
@@ -116,6 +129,21 @@ function SettingsContent() {
     if ("revoked" in body) {
       setNotice(m.settings_revoked_others({ count: body.revoked }));
     }
+  }
+
+  // 退出登录失败（限流、5xx、断网）时留在本页并提示：会话和 Cookie 都还在，不能让用户以为已经退出、
+  // 还把他送回首页（公用电脑上这是一个用户以为已经结束的活会话）。成功时页面马上离开，不用恢复 pending。
+  async function signOut() {
+    setPending(true);
+    setFailure(null);
+    setNotice(null);
+    const { error } = await authClient.signOut();
+    if (error) {
+      setFailure({ message: errorMessage(error) ?? m.error_unknown(), reauth: false });
+      setPending(false);
+      return;
+    }
+    window.location.assign(localizeHref("/"));
   }
 
   if (!logins || !sessions || !options) {
@@ -238,13 +266,7 @@ function SettingsContent() {
       </section>
 
       <p>
-        <button
-          type="button"
-          onClick={async () => {
-            await authClient.signOut();
-            window.location.assign(localizeHref("/"));
-          }}
-        >
+        <button type="button" disabled={pending} onClick={signOut}>
           {m.settings_sign_out()}
         </button>
       </p>
