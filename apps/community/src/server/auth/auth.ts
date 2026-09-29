@@ -252,6 +252,17 @@ export function createAuth(deps: AuthDeps) {
             const country = ctx?.request?.headers.get("cf-ipcountry") ?? ctx?.headers?.get("cf-ipcountry") ?? null;
             return { data: { ...data, country } };
           },
+          // 这个浏览器原来的会话：新 Cookie 会覆盖旧的，旧会话从此没人能用，却会一直留在
+          // 登录设备列表里（本计划"与 spec 的偏离"第 12 条）。签名不对的 Cookie 取不出令牌，不会误删。
+          after: async (created, ctx) => {
+            if (!ctx) {
+              return;
+            }
+            const previous = await ctx.getSignedCookie(ctx.context.authCookies.sessionToken.name, ctx.context.secret);
+            if (previous && previous !== created.token) {
+              await ctx.context.internalAdapter.deleteSession(previous);
+            }
+          },
         },
       },
     },

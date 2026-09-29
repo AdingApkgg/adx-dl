@@ -15,6 +15,7 @@ import { csrfGuard } from "./middleware/csrf";
 import { rateLimit, type RateLimitStore } from "./middleware/rate-limit";
 import { requestLog } from "./middleware/request-log";
 import { securityHeaders } from "./middleware/security-headers";
+import type { ApiServices } from "./services/api-services";
 import { withTimeout } from "./with-timeout";
 
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -30,6 +31,8 @@ export type AppDeps = {
   publicOrigin: string;
   /** Better Auth 实例（createAuth 的返回值）。 */
   auth: Auth;
+  /** /api/v1 的接口用到的依赖。 */
+  services: ApiServices;
 };
 
 // 中间件顺序是 spec 第 8.1 节定的，改动前先对照 spec。
@@ -91,6 +94,10 @@ export function createApp(deps: AppDeps) {
 
   // spec 第 8.1 节第 9、10 步：先识别会话，再做 CSRF 校验。
   app.use("/api/v1/*", sessionContext(deps.auth));
+  app.use("/api/v1/*", async (c, next) => {
+    c.set("services", deps.services);
+    await next();
+  });
   app.use("/api/v1/*", csrfGuard({ publicOrigin: deps.publicOrigin }));
   // spec 第 10.2 节：改数据的接口按用户每分钟 60 次。读请求和未登录的请求不算。
   app.use(

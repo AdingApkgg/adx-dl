@@ -59,6 +59,7 @@ const app = createApp({
   checks: { db: () => pingDb(db), redis: () => pingRedis(redis) },
   rateLimitStore,
   auth,
+  services: { db },
 });
 
 // 生产环境里，这个模块一被 import 就会自己调用 Bun.serve。默认导出必须原样是

@@ -4,6 +4,7 @@ import type { AppDeps } from "../app";
 import { createMemoryRateLimitStore } from "../middleware/rate-limit";
 import { createTestAuth } from "./auth";
 import { TEST_PUBLIC_ORIGIN } from "./constants";
+import { testDbHandle } from "./test-db";
 
 export { TEST_PUBLIC_ORIGIN } from "./constants";
 
@@ -20,6 +21,7 @@ export function testAppDeps(overrides: Partial<AppDeps> = {}) {
     rateLimitStore: createMemoryRateLimitStore(),
     publicOrigin: TEST_PUBLIC_ORIGIN,
     auth: sharedAuth,
+    services: { db: testDbHandle().db },
     ...overrides,
   };
   return {
