@@ -108,6 +108,19 @@ describe("只用通行密钥注册", () => {
     expect(seen).toEqual(["2001:db8:1:2:3:4:5:6"]);
   }, 30_000);
 
+  // 站点前面挂着 HTTP Basic 认证时（比如预发环境），浏览器每个请求都带 Authorization: Basic。它不是我们的
+  // 登录信息：没登录的人照常能注册，不能当成"登录信息不对"拒绝。
+  test("没登录、带着 HTTP Basic 认证头：照样拿得到注册选项", async () => {
+    const browser = new Browser(newApp());
+
+    const res = await browser.request("GET", `/api/auth/passkey/generate-register-options?${signupQuery(uniqueNickname())}`, {
+      headers: { authorization: `Basic ${btoa("staging:secret")}` },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.json.challenge).toEqual(expect.any(String));
+  }, 30_000);
+
   test("没带 createSession 时拒绝，而且不建号", async () => {
     const nickname = uniqueNickname();
 

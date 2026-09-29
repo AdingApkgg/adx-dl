@@ -251,6 +251,49 @@ describe("Bearer 会话也要过账号规则", () => {
   });
 });
 
+describe("Authorization 头：Bearer 优先，别的认证方式不算", () => {
+  // 站点前面挂着 HTTP Basic 认证时，浏览器每个请求都带 Authorization: Basic。它不是 Bearer：照常按 Cookie 会话处理。
+  test("刚登录的 Cookie 会话再带一个 Basic 头：解绑照常成功", async () => {
+    const browser = new Browser(newApp());
+    await signInWithGoogle(browser, googleProfile());
+    const userId = await currentUserId(browser);
+    const [first] = await accountsOf(userId);
+    await signInWithGoogle(browser, googleProfile(), { link: true, callbackURL: "/settings/account" });
+
+    const res = await browser.request("POST", "/api/auth/unlink-account", {
+      body: { accountId: first?.id },
+      headers: { authorization: `Basic ${btoa("staging:secret")}` },
+    });
+
+    expect(res.status).toBe(200);
+    expect(await accountsOf(userId)).toHaveLength(1);
+  });
+
+  // 同时带着 Cookie 和 Bearer 令牌时，bearer 插件用令牌盖掉 Cookie 里的会话，端点操作的是 Bearer 的会话：
+  // 检查的也必须是它，不能拿 Cookie 里另一个刚登录的会话过关。
+  test("A 刚登录的 Cookie 加上 B 超过 10 分钟的 Bearer：解绑要求重新登录，B 的绑定不变", async () => {
+    const app = newApp();
+    const alice = new Browser(app);
+    await signInWithGoogle(alice, googleProfile());
+    const bob = new Browser(app);
+    await signInWithGoogle(bob, googleProfile());
+    const bobId = await currentUserId(bob);
+    await signInWithGoogle(bob, googleProfile(), { link: true, callbackURL: "/settings/account" });
+    const bobsAccounts = (await accountsOf(bobId)).map((row) => row.id).sort();
+    await ageSessions(bobId, 11);
+    const bobsToken = decodeURIComponent(bob.cookies.get(SESSION_COOKIE) ?? "");
+
+    const res = await alice.request("POST", "/api/auth/unlink-account", {
+      body: { accountId: bobsAccounts[0] },
+      headers: { authorization: `Bearer ${bobsToken}` },
+    });
+
+    expect([res.status, res.json.code]).toEqual([403, "REAUTH_REQUIRED"]);
+    expect(bobsAccounts).toHaveLength(2);
+    expect((await accountsOf(bobId)).map((row) => row.id).sort()).toEqual(bobsAccounts);
+  });
+});
+
 describe("set-auth-token 响应头", () => {
   test("刷新会话时，Cookie 请求上加个假 Authorization 头也不会泄露 set-auth-token", async () => {
     const browser = new Browser(newApp());
