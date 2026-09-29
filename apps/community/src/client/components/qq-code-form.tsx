@@ -19,7 +19,7 @@ export type QqCodeFormProps = {
 };
 
 // 绑定 QQ 时会话超过 10 分钟，接口返回 REAUTH_REQUIRED（Better Auth 自己的新鲜度检查是 SESSION_NOT_FRESH）。
-function isReauthError(error: unknown): boolean {
+export function isReauthError(error: unknown): boolean {
   const code = errorCodeOf(error);
   return code === "REAUTH_REQUIRED" || code === "SESSION_NOT_FRESH";
 }
