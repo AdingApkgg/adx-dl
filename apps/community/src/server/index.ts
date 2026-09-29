@@ -8,11 +8,19 @@ import { apiContext, queryClientContext, requestMetaContext } from "@/shared/rou
 
 import { createApp } from "./app";
 import type { AppEnv } from "./app-env";
+import { createAuth } from "./auth/auth";
+import { createRedisQqCodeStore } from "./auth/qq/codes";
+import { createQqHasher } from "./auth/qq/hasher";
+import { createConsoleSender } from "./auth/qq/sender";
+import { createTurnstileVerifier } from "./auth/turnstile";
 import { getDb, pingDb } from "./db/client";
 import { parseEnv } from "./env";
 import { createInProcessApi } from "./in-process-api";
 import { createRedisRateLimitStore } from "./middleware/rate-limit";
+import { createOneBotClient } from "./napcat/client";
+import { createNapcatSender } from "./napcat/sender";
 import { connectRedis, getRedis, pingRedis } from "./redis/client";
+import { createLoginOptions } from "./services/login-options";
 
 const env = parseEnv(process.env);
 const log = createLogger();
@@ -21,13 +29,41 @@ const { db, pool } = getDb(env.databaseUrl, {
 });
 const redis = getRedis(env.redisUrl);
 await connectRedis(redis, log);
+const rateLimitStore = createRedisRateLimitStore(redis);
+
+const verifyTurnstile = createTurnstileVerifier({ secretKey: env.turnstile.secretKey, log });
+const qqSender =
+  env.qq.sender === "napcat"
+    ? createNapcatSender(createOneBotClient({ httpUrl: env.qq.httpUrl, accessToken: env.qq.accessToken }), log)
+    : createConsoleSender();
+
+const auth = createAuth({
+  db,
+  log,
+  publicOrigin: env.publicOrigin,
+  secret: env.betterAuthSecret,
+  google: env.google,
+  rateLimitStore,
+  rateLimitEnabled: env.nodeEnv === "production",
+  verifyTurnstile,
+  qq: {
+    codes: createRedisQqCodeStore({ redis, limits: rateLimitStore }),
+    sender: qqSender,
+    hasher: createQqHasher(env.qqCodeHmacKey),
+  },
+});
 
 const app = createApp({
   log,
   isProduction: env.nodeEnv === "production",
   publicOrigin: env.publicOrigin,
   checks: { db: () => pingDb(db), redis: () => pingRedis(redis) },
-  rateLimitStore: createRedisRateLimitStore(redis),
+  rateLimitStore,
+  auth,
+  services: {
+    db,
+    loginOptions: createLoginOptions({ turnstileSiteKey: env.turnstile.siteKey, qq: env.qq, redis }),
+  },
 });
 
 // 生产环境里，这个模块一被 import 就会自己调用 Bun.serve。默认导出必须原样是
@@ -55,9 +91,17 @@ export default await createHonoServer<AppEnv>({
       nonce: c.get("secureHeadersNonce"),
       origin: env.publicOrigin,
     });
+    // 进程内请求收到的 Set-Cookie（会话续期）先收在这里，createApp 里的中间件再补到页面响应上。
+    const setCookies: string[] = [];
+    c.set("inProcessSetCookies", setCookies);
     context.set(
       apiContext,
-      createInProcessApi(app, c.req.raw, { origin: env.publicOrigin, requestId, clientIp: c.get("clientIp") })
+      createInProcessApi(
+        app,
+        c.req.raw,
+        { origin: env.publicOrigin, requestId, clientIp: c.get("clientIp") },
+        (cookie) => setCookies.push(cookie)
+      )
     );
     context.set(queryClientContext, makeQueryClient());
     return context;

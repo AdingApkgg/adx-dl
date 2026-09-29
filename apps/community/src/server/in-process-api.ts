@@ -17,7 +17,13 @@ const FORWARDED_HEADERS = ["cookie", "authorization", "accept-language", "user-a
 
 // 服务端渲染时 loader 用它调自己的 API：请求直接交给 app.request，不走网络，
 // 走的是和浏览器完全相同的接口代码和鉴权逻辑（spec 第 8.3 节）。
-export function createInProcessApi(app: InProcessApp, incoming: Request, meta: InProcessRequestMeta): ApiClient {
+// 接口响应里的 Set-Cookie（会话满一天时的续期）浏览器收不到，逐条交给 onSetCookie，由页面响应带回去。
+export function createInProcessApi(
+  app: InProcessApp,
+  incoming: Request,
+  meta: InProcessRequestMeta,
+  onSetCookie: (cookie: string) => void
+): ApiClient {
   // 请求 ID 和 IP 不从原请求头里抄：真正用的请求 ID 是中间件生成的，原请求头里
   // 至多有一个访客自己带的；IP 也用解析好的，开发环境没有 CF-Connecting-IP 时一样对得上。
   const headers: Record<string, string> = {
@@ -31,7 +37,13 @@ export function createInProcessApi(app: InProcessApp, incoming: Request, meta: I
     }
   }
   return createApiClient(meta.origin, {
-    fetch: (input: RequestInfo | URL, init?: RequestInit) => app.request(input, init),
+    fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+      const res = await app.request(input, init);
+      for (const cookie of res.headers.getSetCookie()) {
+        onSetCookie(cookie);
+      }
+      return res;
+    },
     headers,
   });
 }

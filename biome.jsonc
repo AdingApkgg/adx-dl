@@ -111,7 +111,9 @@
     },
     {
       // 前端代码不能引用服务端和 worker 的代码（spec 第 2.3 节第 1 条、第 7 节）。
-      // 唯一的例外是只有类型的 app-type。
+      // 唯一的例外是只有类型的 app-type 和 auth-type（只能 import type）。
+      // Better Auth 也一样：只有 better-auth/client 和 @better-auth/passkey/client 能进浏览器，
+      // 它的其他入口（包括子路径）都是服务端的。
       "includes": ["apps/community/src/client/**"],
       "linter": {
         "rules": {
@@ -125,7 +127,9 @@
                   "drizzle-orm": "Drizzle is server-only; share types through src/shared.",
                   "bun": "Bun APIs are server-only.",
                   "react-dom/server": "react-router-hono-server aliases this to react-dom/server.browser on Bun, which loses AsyncLocalStorage while streaming. Import react-dom/server.edge.",
-                  "react-dom/server.browser": "Loses AsyncLocalStorage while streaming, so Paraglide renders late Suspense content in the base locale. Import react-dom/server.edge."
+                  "react-dom/server.browser": "Loses AsyncLocalStorage while streaming, so Paraglide renders late Suspense content in the base locale. Import react-dom/server.edge.",
+                  "better-auth": "Server entry point. Import better-auth/client in the browser.",
+                  "@better-auth/passkey": "Server entry point. Import @better-auth/passkey/client in the browser."
                 },
                 "patterns": [
                   {
@@ -138,11 +142,16 @@
                       "@/worker/**",
                       "../**/worker",
                       "../**/worker/**",
-                      "!**/server/api/app-type"
+                      "!**/server/api/app-type",
+                      "!**/server/auth/auth-type"
                     ],
-                    "message": "src/client must not import src/server or src/worker (only `import type` from @/server/api/app-type); move shared code to src/shared."
+                    "message": "src/client must not import src/server or src/worker (only `import type` from @/server/api/app-type and @/server/auth/auth-type); move shared code to src/shared."
                   },
-                  { "group": ["drizzle-orm/**"], "message": "Drizzle is server-only." }
+                  { "group": ["drizzle-orm/**"], "message": "Drizzle is server-only." },
+                  {
+                    "group": ["better-auth/**", "@better-auth/**", "!better-auth/client", "!@better-auth/passkey/client"],
+                    "message": "Better Auth server modules must not reach the browser: only better-auth/client and @better-auth/passkey/client are browser entry points."
+                  }
                 ]
               }
             }
@@ -151,7 +160,8 @@
       }
     },
     {
-      // shared 必须两边都能用，所以既不能引用服务端、worker，也不能引用前端。
+      // shared 必须两边都能用，所以既不能引用服务端、worker，也不能引用前端；
+      // Better Auth 的限制和前端一样（只放行 better-auth/client 和 @better-auth/passkey/client）。
       "includes": ["apps/community/src/shared/**"],
       "linter": {
         "rules": {
@@ -159,6 +169,10 @@
             "noRestrictedImports": {
               "level": "error",
               "options": {
+                "paths": {
+                  "better-auth": "Server entry point. Import better-auth/client in the browser.",
+                  "@better-auth/passkey": "Server entry point. Import @better-auth/passkey/client in the browser."
+                },
                 "patterns": [
                   {
                     "group": [
@@ -174,9 +188,14 @@
                       "@/client/**",
                       "../**/client",
                       "../**/client/**",
-                      "!**/server/api/app-type"
+                      "!**/server/api/app-type",
+                      "!**/server/auth/auth-type"
                     ],
-                    "message": "src/shared must not depend on server, worker or client code (only `import type` from @/server/api/app-type)."
+                    "message": "src/shared must not depend on server, worker or client code (only `import type` from @/server/api/app-type and @/server/auth/auth-type)."
+                  },
+                  {
+                    "group": ["better-auth/**", "@better-auth/**", "!better-auth/client", "!@better-auth/passkey/client"],
+                    "message": "Better Auth server modules must not reach the browser: only better-auth/client and @better-auth/passkey/client are browser entry points."
                   }
                 ]
               }
@@ -187,7 +206,7 @@
     },
     {
       // Tests shape mock data with `any` on purpose.
-      "includes": ["**/*.test.ts", "**/*.test.tsx"],
+      "includes": ["**/*.test.ts", "**/*.test.tsx", "apps/community/src/server/testing/**"],
       "linter": {
         "rules": {
           "suspicious": { "noExplicitAny": "off" }

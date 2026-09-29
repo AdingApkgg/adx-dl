@@ -84,6 +84,25 @@ describe("createApp", () => {
     expect(await internal.json()).toEqual({ error: { code: "INTERNAL", message: "Request failed" } });
   });
 
+  // 页面由 createHonoServer 在 createApp 之后挂上的 React Router 处理：这里照样在 createApp 之后挂一个
+  // "页面"，像 getLoadContext 那样把进程内请求收到的 Set-Cookie 放进 inProcessSetCookies。
+  test("进程内请求收到的 Set-Cookie 补到页面响应上，同名的只留最后一条", async () => {
+    const app = createApp(testAppDeps().deps);
+    app.get("/test-page", (c) => {
+      c.set("inProcessSetCookies", [
+        "adxc.session_token=first; Max-Age=2592000; Path=/",
+        "other=1; Path=/",
+        "adxc.session_token=second; Max-Age=2592000; Path=/",
+      ]);
+      return c.html("<p>ok</p>");
+    });
+
+    const res = await app.request("/test-page");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.getSetCookie()).toEqual(["adxc.session_token=second; Max-Age=2592000; Path=/", "other=1; Path=/"]);
+  });
+
   test("安全响应头已经挂上", async () => {
     const res = await createApp(testAppDeps().deps).request("/healthz");
     expect(res.headers.get("content-security-policy")).toContain("'nonce-");
@@ -154,6 +173,45 @@ describe("createApp", () => {
     expect(await res.json()).toEqual({ name: "astrodx-community", apiVersion: 1 });
   });
 
+  // /api/v1/me 这类是每个用户自己的数据：接口的响应一律不让浏览器和 Cloudflare 缓存，出错的也一样。
+  test("/api 的响应都带 Cache-Control: private, no-store：正常的、未知接口的 404、未登录的 401", async () => {
+    const app = createApp(testAppDeps().deps);
+    const cases = [
+      ["/api/v1/meta", 200],
+      ["/api/nope", 404],
+      ["/api/v1/me", 401],
+    ] as const;
+
+    for (const [path, status] of cases) {
+      const res = await app.request(path);
+      expect(res.status, path).toBe(status);
+      expect(res.headers.get("cache-control"), path).toBe("private, no-store");
+    }
+  });
+
+  // 登录页用它拿 Turnstile 的站点密钥和 QQ 登录能不能用；不要求登录，所以这里不带 Cookie。
+  test("GET /api/v1/login-options：不用登录，返回 testAppDeps 里的那份配置", async () => {
+    const res = await createApp(testAppDeps().deps).request("/api/v1/login-options");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      turnstileSiteKey: "1x00000000000000000000AA",
+      qq: { available: true, botQq: "10001" },
+    });
+  });
+
+  test("GET /api/v1/login-options 返回的是服务给出的值，QQ 登录不可用时也一样", async () => {
+    const { deps } = testAppDeps();
+    const loginOptions = async () => ({ turnstileSiteKey: "site", qq: { available: false, botQq: "10001" } });
+
+    const res = await createApp({ ...deps, services: { ...deps.services, loginOptions } }).request(
+      "/api/v1/login-options"
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(await loginOptions());
+  });
+
   test("/api/v1 的写请求要过 CSRF 检查", async () => {
     const res = await createApp(testAppDeps().deps).request("/api/v1/meta", {
       method: "POST",
@@ -161,5 +219,17 @@ describe("createApp", () => {
       body: "a=1",
     });
     expect(res.status).toBe(415);
+  });
+
+  test("/api/auth/* 按 IP 每分钟 30 次，同一个 /64 里的 IPv6 地址共用计数", async () => {
+    const app = createApp(testAppDeps().deps);
+    const statuses: number[] = [];
+    for (let i = 0; i < 31; i++) {
+      const ip = i % 2 === 0 ? "2001:db8:1:2::a" : "2001:db8:1:2::b";
+      statuses.push((await app.request("/api/auth/ok", { headers: { "cf-connecting-ip": ip } })).status);
+    }
+
+    expect(statuses.slice(0, 30).every((status) => status === 200)).toBe(true);
+    expect(statuses[30]).toBe(429);
   });
 });
