@@ -13,10 +13,12 @@ import { listLogins, listSessions, revokeOtherSessions, revokeSession } from "..
 import { getMyProfile, type ProfileUpdate, updateMyProfile } from "../services/profile";
 import { UUID_PATTERN } from "../uuid";
 
-// 请求体的形状。长度上限只防超大的请求，真正的规则（昵称 1 到 24 个字符、简介最多 300 个字符）在 parseNickname、parseBio。
+// 请求体的形状，只看类型。长度规则（昵称 1 到 24 个字符、简介最多 300 个字符）在 parseNickname、parseBio：
+// 这里不设长度上限，超长的值才会走到它们，得到 NICKNAME_INVALID、BIO_TOO_LONG。请求体的总大小由 app.ts 里
+// /api/v1/* 的 bodyLimit 限制。
 const profilePatch = z.object({
-  name: z.string().max(1000).optional(),
-  bio: z.string().max(10_000).optional(),
+  name: z.string().optional(),
+  bio: z.string().optional(),
   onboarded: z.literal(true).optional(),
 });
 

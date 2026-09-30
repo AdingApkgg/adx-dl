@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
 import { requestId } from "hono/request-id";
 
@@ -19,6 +20,10 @@ import type { ApiServices } from "./services/api-services";
 import { withTimeout } from "./with-timeout";
 
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+// /api/v1/* 的请求体上限，和 /api/auth/*（auth/mount.ts）一样是 64 KiB。现有的请求体都是很小的 JSON；
+// 以后有接口要收更大的内容，要改这里：后面挂的中间件放不宽这里的上限。
+const API_BODY_LIMIT = 64 * 1024;
 
 export type HealthCheck = () => Promise<void>;
 
@@ -127,6 +132,14 @@ export function createApp(deps: AppDeps) {
     await next();
   });
   app.use("/api/v1/*", csrfGuard({ publicOrigin: deps.publicOrigin }));
+  // JSON 校验器会先把整个请求体读进内存、解析完，才轮到各接口自己的规则，所以大小要在这里先限住。
+  app.use(
+    "/api/v1/*",
+    bodyLimit({
+      maxSize: API_BODY_LIMIT,
+      onError: (c) => jsonError(c, 413, "PAYLOAD_TOO_LARGE", "Request body is too large"),
+    })
+  );
   // spec 第 10.2 节：改数据的接口按用户每分钟 60 次。读请求和未登录的请求不算。
   app.use(
     "/api/v1/*",
