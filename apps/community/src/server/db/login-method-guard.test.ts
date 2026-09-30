@@ -132,6 +132,7 @@ describe("至少一种登录方式：数据库的兜底", () => {
     expect(await loginMethodsOf(userId)).toBe(2);
 
     const locker = await pool.connect();
+    let committed = false;
     let results: { status: number }[];
     try {
       await locker.query("begin");
@@ -155,9 +156,11 @@ describe("至少一种登录方式：数据库的兜底", () => {
         await Bun.sleep(20);
       }
       await locker.query("commit");
+      committed = true;
       results = await requests;
     } finally {
-      locker.release();
+      // 没提交就出错时销毁连接，不放回连接池：否则未提交的事务连同用户行的锁会留在共用的连接池里。
+      locker.release(!committed);
     }
 
     // 失败的那个是 500：Better Auth 把数据库的错误当成服务器错误（它还会在 stderr 打一行 # SERVER_ERROR）。
