@@ -122,13 +122,14 @@ describe("首页渲染：登录入口", () => {
     expect(html).not.toContain(m.home_signed_in_as({ name: "阿丁" }));
   });
 
-  test("已登录：显示默认头像和'已登录：昵称'，链接到个人资料和账号设置，没有登录链接", async () => {
+  test("已登录：显示默认头像和'已登录：昵称'，链接到我的主页、个人资料和账号设置，没有登录链接", async () => {
     const html = await renderHome(true);
 
     expect(html).toContain('<svg width="32" height="32"');
     expect(html).toContain(">阿</text>");
     expect(html).toContain(m.home_signed_in_as({ name: "阿丁" }));
     expect(links(html)).toEqual([
+      { href: "/u/abc2345678", text: m.home_my_page() },
       { href: "/settings/profile", text: m.home_profile_settings() },
       { href: "/settings/account", text: m.home_account_settings() },
     ]);

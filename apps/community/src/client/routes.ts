@@ -9,6 +9,7 @@ export default [
     route("onboarding", "routes/onboarding.tsx"),
     route("settings/account", "routes/settings-account.tsx"),
     route("settings/profile", "routes/settings-profile.tsx"),
+    route("u/:id", "routes/user-profile.tsx"),
     route("*", "routes/not-found.tsx"),
   ]),
 ] satisfies RouteConfig;

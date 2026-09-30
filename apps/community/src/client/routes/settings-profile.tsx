@@ -56,6 +56,7 @@ function ProfileContent() {
       </p>
       <ProfileForm initialName={profile.name} initialBio={profile.bio} />
       <p>
+        <Link to={localizeHref(`/u/${me.id}`)}>{m.profile_view_page()}</Link> ·{" "}
         <Link to={localizeHref("/settings/account")}>{m.settings_account_title()}</Link>
       </p>
     </main>
