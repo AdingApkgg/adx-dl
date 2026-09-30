@@ -1,6 +1,5 @@
 import { m } from "@/paraglide/messages.js";
 import { BIO_MAX, bioLength, normalizeBio } from "@/shared/bio";
-import { NICKNAME_MAX } from "@/shared/nickname";
 
 export type ProfileFieldsProps = {
   name: string;
@@ -10,7 +9,9 @@ export type ProfileFieldsProps = {
 };
 
 // 昵称和简介两个输入框，个人资料页和首次登录引导页共用（spec 第 10.5 节的规则在 src/shared）。
-// 简介不设 maxLength：浏览器按 UTF-16 码元数，表情会被算成两个；字数按码点在旁边显示，超了提交时再提示。
+// 昵称和简介都不设 maxLength：浏览器按 UTF-16 码元数，表情会被算成两个，而规则按码点数。设了会挡住合法的昵称，
+// 预填的第三方昵称（按码点截到 24 个，最多 48 个码元）一改也会被浏览器判为超长。简介的字数按码点在旁边显示；
+// 两个字段超了都在提交时再提示。
 export function ProfileFields({ name, bio, onNameChange, onBioChange }: ProfileFieldsProps) {
   const count = bioLength(normalizeBio(bio));
   return (
@@ -22,7 +23,6 @@ export function ProfileFields({ name, bio, onNameChange, onBioChange }: ProfileF
             name="nickname"
             value={name}
             onChange={(event) => onNameChange(event.target.value)}
-            maxLength={NICKNAME_MAX}
             required
             autoComplete="nickname"
           />
