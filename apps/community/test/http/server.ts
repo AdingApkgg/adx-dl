@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 
 import { testDatabaseUrl, testRedisUrl } from "../../src/server/testing/services";
-import { resetTestDatabase } from "../../src/server/testing/test-db";
+import { prepareTestQueues } from "../../src/server/testing/test-boss";
 
 export type RunningServer = {
   origin: string;
@@ -16,8 +16,9 @@ export const HTTP_TEST_AUTH_SECRET = "http-test-secret-http-test-secret-01234567
 
 // 启动 bun run build 的产物。必须在 apps/community 下启动：静态资源的路径相对于当前目录。
 export async function startBuiltServer(): Promise<RunningServer> {
-  // 页面会读会话，表必须已经建好；单独跑 test:http 时也不依赖先跑过 bun run check。
-  await resetTestDatabase();
+  // 页面会读会话，表必须已经建好；pg-boss 的表和队列也要在（/readyz 查它们，注销要投递任务），
+  // 和部署时先跑 db:migrate 一样。单独跑 test:http 时也不依赖先跑过 bun run check。
+  await prepareTestQueues();
 
   const port = 40_000 + Math.floor(Math.random() * 10_000);
   const origin = `http://127.0.0.1:${port}`;

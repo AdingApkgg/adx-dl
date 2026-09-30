@@ -1,12 +1,13 @@
 import { parseEnv } from "@/server/env";
 import { createBoss } from "@/server/jobs/boss";
+import { ensureQueues, NAPCAT_HEALTH_QUEUE, QUEUES } from "@/server/jobs/queues";
 import { createOneBotClient } from "@/server/napcat/client";
 import { recordNapcatHealth } from "@/server/napcat/health";
 import { connectRedis, getRedis } from "@/server/redis/client";
+import { describeError } from "@/shared/describe-error";
 import { createLogger } from "@/shared/log";
 
 import { startNapcatEvents } from "./napcat-events";
-import { ensureQueues, NAPCAT_HEALTH_QUEUE, QUEUES } from "./queues";
 
 const env = parseEnv(process.env);
 const log = createLogger();
@@ -14,10 +15,12 @@ const boss = createBoss(env.databaseUrl, "worker");
 const redis = getRedis(env.redisUrl);
 
 // 必须在 start() 之前注册，否则启动阶段的错误没人接。
-boss.on("error", (error) => log.error("pgboss_error", { message: error.message }));
+// 经 describeError 记：数据库错误的 message 可能带着参数值。
+boss.on("error", (error) => log.error("pgboss_error", describeError(error)));
 
 await connectRedis(redis, log);
 await boss.start();
+// 部署时 db:migrate 已经建过；再调一次无害（幂等），开发库在加了新队列之后没重跑 db:migrate 时也能补上。
 await ensureQueues(boss);
 
 let napcatEvents: { stop(): void } | null = null;

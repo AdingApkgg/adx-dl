@@ -4,6 +4,7 @@ import type { AppDeps } from "../app";
 import { createMemoryRateLimitStore } from "../middleware/rate-limit";
 import { createTestAuth } from "./auth";
 import { TEST_PUBLIC_ORIGIN } from "./constants";
+import { testSender } from "./test-boss";
 import { testDbHandle } from "./test-db";
 
 export { TEST_PUBLIC_ORIGIN } from "./constants";
@@ -23,6 +24,8 @@ export function testAppDeps(overrides: Partial<AppDeps> = {}) {
     auth: sharedAuth,
     services: {
       db: testDbHandle().db,
+      // 用到时才启动：不投递任务的测试不会去碰 pg-boss。
+      boss: () => testSender(),
       loginOptions: async () => ({ turnstileSiteKey: "1x00000000000000000000AA", qq: { available: true, botQq: "10001" } }),
     },
     ...overrides,
