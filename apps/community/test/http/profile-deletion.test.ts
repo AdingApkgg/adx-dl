@@ -56,6 +56,9 @@ describe("个人主页", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
+    expect(html).toContain(`<link rel="canonical" href="${server.origin}/u/${id}"/>`);
+    expect(html).toContain(`<link rel="alternate" hrefLang="en" href="${server.origin}/en/u/${id}"/>`);
+    expect(html).toContain(`<link rel="alternate" hrefLang="x-default" href="${server.origin}/u/${id}"/>`);
     expect(html).toContain("<title>主页测试 - AstroDX 自制谱社区</title>");
     expect(html).toContain('<meta name="description" content="写谱的 也打歌"/>');
     expect(html).toContain(`ID：${id}`);
@@ -65,8 +68,11 @@ describe("个人主页", () => {
   test("正在注销：显示'该用户正在注销'，不收录，也不出现昵称", async () => {
     const { id } = await seedUser("要走的人", { pending: true });
 
-    const html = await (await fetch(server.url(`/u/${id}`))).text();
+    const res = await fetch(server.url(`/u/${id}`));
+    const html = await res.text();
 
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
     expect(html).toContain("该用户正在注销");
     expect(html).toContain('<meta name="robots" content="noindex"/>');
     expect(html).not.toContain("要走的人");
@@ -76,6 +82,7 @@ describe("个人主页", () => {
     for (const id of [shortId(), "NOT-AN-ID"]) {
       const res = await fetch(server.url(`/u/${id}`));
       expect(res.status, id).toBe(404);
+      expect(res.headers.get("cache-control"), id).toBe("private, no-store");
       expect(await res.text(), id).toContain("页面不存在");
     }
   });
@@ -124,7 +131,7 @@ describe("注销冷静期里的用户", () => {
     expect(html).toContain("撤销注销");
   });
 
-  test("接口：取当前用户可以，其余 403 ACCOUNT_PENDING_DELETION", async () => {
+  test("接口：白名单里的（取当前用户）可以，白名单之外一律 403 ACCOUNT_PENDING_DELETION", async () => {
     const { cookie } = await seedUser("冷静期", { pending: true });
 
     const me = await fetch(server.url("/api/v1/me"), { headers: { cookie } });

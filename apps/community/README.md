@@ -83,12 +83,16 @@ bun run test:http    # 启动构建产物，做页面和接口的 HTTP 级测试
 ## 资料和注销
 
 - 昵称在 `user.name`，简介和"引导页看过没有"在 `profiles` 表（第一次写入时才建行）。规则在 `src/shared/nickname.ts`、
-  `src/shared/bio.ts`，前后端共用。个人主页 `/u/<用户 id>` 公开、允许收录，旁边总显示用户 id（昵称可以重名）。
+  `src/shared/bio.ts`，前后端共用。个人主页 `/u/<用户 id>` 公开、允许收录，旁边总显示用户 id（昵称可以重名）；
+  注销中的账号例外：只显示"该用户正在注销"的占位页和用户 id，不公开昵称和简介，页面 `noindex`。
 - 新用户登录后先到 `/onboarding`：确认昵称、选填简介、建议再加一种登录方式。点"完成"或"以后再说"后不再显示。
 - 注销（`POST /api/v1/me/deletion`）要求 10 分钟内刚登录过，还要照着输入自己的用户 id。发起后账号立即进入
   "注销中"、所有会话失效，并投递一个 `user.purge` 任务：没有内容的账号立即清除，有内容的保留 7 天，期间重新登录
-  可以撤销（`/account-deletion`）。冷静期里除了注销提示页和退出，页面都跳到注销提示页，接口一律 403
-  `ACCOUNT_PENDING_DELETION`。
+  可以撤销（`/account-deletion`）。冷静期里除了注销提示页本身，页面都跳到注销提示页；`/api/v1/*` 只放行
+  `GET /api/v1/me`、`DELETE /api/v1/me/deletion`、`GET /api/v1/meta`、`GET /api/v1/login-options`、
+  `GET /api/v1/users/:id` 五个请求（`HEAD` 同 `GET`），其余一律 403 `ACCOUNT_PENDING_DELETION`；Better Auth 里改账号的
+  7 个接口（绑定、解绑、添加 / 改名 / 删除通行密钥、绑定 QQ，见 `src/server/auth/account-rules.ts`）也一样，登录和退出
+  不受影响。白名单在 `src/server/middleware/pending-deletion.ts`。
 - 以后的模块（谱面、论坛……）有用户数据时，在 `src/server/services/user-deletion.ts` 的 `DELETION_HANDLERS` 里加一个
   处理器：`hasContent` 决定要不要冷静期，`purge` 在清除的事务里执行，必须能重复执行。内容表指向作者的外键用
   `ON DELETE SET NULL`（spec 第 9.2 节）；`user-deletion.test.ts` 会检查所有指向 `user` 的外键都是 CASCADE 或 SET NULL。
@@ -111,4 +115,6 @@ bun run db:migrate                         # 执行 Drizzle 迁移，建好 pg-b
 ```
 
 迁移只做向后兼容的改动（spec 第 9.3 节）。队列也在 `db:migrate` 里建：部署时 web 和 worker 同时启动，
-web 投递的队列必须已经在了。已经存在的队列不会被改，改队列的选项要另写一次性的 `updateQueue`（`policy` 改不了）。
+web 投递的队列必须已经在了。worker 启动时也会调一次 `ensureQueues`，但不能代替 `db:migrate`：两个进程同时起，
+pg-boss 的表和队列还没建好时，web 的 `jobs` 就绪检查不过，`/readyz` 返回 503。已经存在的队列不会被改，
+改队列的选项要另写一次性的 `updateQueue`（`policy` 改不了）。
