@@ -153,6 +153,10 @@ export function createAuth(deps: AuthDeps) {
           return;
         }
         log.error("better_auth_error", describeError(error));
+        // 非 APIError 时 better-call 还会 console.error 原始错误（含 SQL 参数：令牌、QQ 号），改抛 APIError 就不打；已对照 Better Auth 1.7.6 的 better-call router 核实。
+        if (!isAPIError(error)) {
+          throw new APIError("INTERNAL_SERVER_ERROR", { code: "INTERNAL", message: "Internal server error" });
+        }
       },
     },
     // 只挡 HTTP 入口（返回 404），服务端的 auth.api.* 照样能调。只支持精确路径。

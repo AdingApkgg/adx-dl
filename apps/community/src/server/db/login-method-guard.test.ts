@@ -5,7 +5,7 @@ import { createApp } from "../app";
 import { shortId } from "../auth/short-id";
 import { testAppDeps } from "../testing/app-deps";
 import { createTestAuth, currentUserId, googleProfile, signInWithGoogle } from "../testing/auth";
-import { Browser } from "../testing/auth-browser";
+import { Browser, type BrowserResponse } from "../testing/auth-browser";
 import { TEST_PUBLIC_ORIGIN } from "../testing/constants";
 import { SoftAuthenticator } from "../testing/soft-authenticator";
 import { resetTestDatabase, testDbHandle } from "../testing/test-db";
@@ -117,7 +117,8 @@ describe("至少一种登录方式：数据库的兜底", () => {
   // 钩子各自数到 2 的情况：先锁住用户行，让两个请求的删除都做完、都卡在提交时的检查上，再放开。
   // 放开后先提交的那个看得到另一个还没提交的行，通过；后提交的看到两个都删了，报错回滚。
   test("并发的解绑和删通行密钥（各自都数到 2）：只有一个成功，还剩一种登录方式", async () => {
-    const app = createApp(testAppDeps({ auth: createTestAuth().auth }).deps);
+    const { auth, logs } = createTestAuth();
+    const app = createApp(testAppDeps({ auth }).deps);
     const browser = new Browser(app);
     await signInWithGoogle(browser, googleProfile());
     const userId = await currentUserId(browser);
@@ -132,8 +133,14 @@ describe("至少一种登录方式：数据库的兜底", () => {
     expect(await loginMethodsOf(userId)).toBe(2);
 
     const locker = await pool.connect();
+    // 在对象上换掉 console.error（不用 mock.module：它会泄漏到同一进程里的其他测试文件），记下有没有东西被打出来。
+    const consoleError = console.error;
+    const printed: string[] = [];
+    console.error = (...args: unknown[]) => {
+      printed.push(args.map(String).join(" "));
+    };
     let committed = false;
-    let results: { status: number }[];
+    let results: BrowserResponse[];
     try {
       await locker.query("begin");
       await locker.query(`select 1 from "user" where id = $1 for update`, [userId]);
@@ -159,13 +166,22 @@ describe("至少一种登录方式：数据库的兜底", () => {
       committed = true;
       results = await requests;
     } finally {
+      console.error = consoleError;
       // 没提交就出错时销毁连接，不放回连接池：否则未提交的事务连同用户行的锁会留在共用的连接池里。
       locker.release(!committed);
     }
 
-    // 失败的那个是 500：Better Auth 把数据库的错误当成服务器错误（它还会在 stderr 打一行 # SERVER_ERROR）。
-    // 这种撞车很少见，页面上显示通用的出错提示，刷新后看到剩下的那种登录方式。
+    // 失败的那个是 500：Better Auth 把数据库的错误当成服务器错误。这种撞车很少见，页面上显示通用的出错提示，
+    // 刷新后看到剩下的那种登录方式。
     expect(results.map((res) => res.status).sort()).toEqual([200, 500]);
     expect(await loginMethodsOf(userId)).toBe(1);
+    // better-call 对非 APIError 还会把原始错误 console.error 出来（# SERVER_ERROR），DrizzleQueryError 带着 SQL 参数
+    // （会话令牌、QQ 号）。onAPIError.onError 把它换成 APIError 之后就不再打印：响应是 { code, message }，
+    // 日志里只有一条 better_auth_error，带 SQLSTATE 和 SQL 本身，不带参数。
+    expect(printed.filter((line) => line.includes("SERVER_ERROR"))).toEqual([]);
+    expect(results.find((res) => res.status === 500)?.json).toEqual({ code: "INTERNAL", message: "Internal server error" });
+    expect(logs().filter((entry) => entry.event === "better_auth_error")).toEqual([
+      expect.objectContaining({ level: "error", code: LAST_LOGIN_METHOD_SQLSTATE }),
+    ]);
   }, 30_000);
 });
