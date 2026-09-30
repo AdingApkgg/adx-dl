@@ -11,7 +11,7 @@ import { makeQueryClient } from "@/shared/query-client";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
 import { loginHref } from "../lib/require-user";
-import SettingsAccount, { loader, meta, returnPath } from "./settings-account";
+import SettingsAccount, { DeletionStarted, loader, meta, returnPath } from "./settings-account";
 
 const NOW = "2026-09-29T00:00:00.000Z";
 const USER = { id: "abc2345678", name: "阿丁", image: null, status: "active", createdAt: NOW };
@@ -331,5 +331,29 @@ describe("账号设置页渲染：顶部提示", () => {
     expect(await renderPage({}, "?error=account_already_linked_to_different_user")).toContain(m.error_google_already_linked());
     expect(await renderPage({}, "?error=state_mismatch")).toContain(m.error_google_failed());
     expect(await renderPage({})).not.toContain(m.error_google_failed());
+  });
+});
+
+describe("账号设置页渲染：注销账号", () => {
+  // spec 第 10.6 节：说明后果；"同时删除我发布的内容"默认不勾；要输入自己的用户 id 才能点（用户决定）。
+  test("说明后果；删除内容的勾选框默认不勾；没输入用户 ID 之前按钮不能点", async () => {
+    const html = await renderPage();
+
+    expect(html).toContain(m.settings_delete_heading());
+    expect(html).toContain(m.settings_delete_explain());
+    expect(html).toContain(m.settings_delete_confirm({ id: USER.id }));
+    expect(html).toMatch(/<input type="checkbox" name="deleteContent"(?![^>]*checked)[^>]*>/);
+    expect(html).toMatch(new RegExp(`<button type="submit" disabled="">${m.settings_delete_submit()}</button>`));
+  });
+
+  test("申请成功后的提示：冷静期的显示删除时间，空账号显示几分钟内删除", () => {
+    const later = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    const scheduled = renderToStaticMarkup(createElement(DeletionStarted, { purgeAt: later }));
+    const immediate = renderToStaticMarkup(createElement(DeletionStarted, { purgeAt: new Date().toISOString() }));
+
+    expect(scheduled).toContain(m.settings_delete_done());
+    expect(scheduled).not.toContain(m.settings_delete_done_immediate());
+    expect(immediate).toContain(m.settings_delete_done_immediate());
+    expect(immediate).toContain(`href="/">${m.settings_delete_home()}</a>`);
   });
 });
