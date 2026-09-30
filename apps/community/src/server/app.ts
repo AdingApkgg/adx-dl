@@ -13,6 +13,7 @@ import { mountAuth, sessionContext } from "./auth/mount";
 import { jsonError } from "./errors";
 import { clientIp, rateLimitKeyForIp } from "./middleware/client-ip";
 import { csrfGuard } from "./middleware/csrf";
+import { pendingDeletionGuard } from "./middleware/pending-deletion";
 import { rateLimit, type RateLimitStore } from "./middleware/rate-limit";
 import { requestLog } from "./middleware/request-log";
 import { securityHeaders } from "./middleware/security-headers";
@@ -153,6 +154,8 @@ export function createApp(deps: AppDeps) {
       onStoreError: (error) => deps.log.error("rate_limit_store_error", describeError(error)),
     })
   );
+  // spec 第 10.6 节：注销冷静期里除了几个接口，一律 403 ACCOUNT_PENDING_DELETION。
+  app.use("/api/v1/*", pendingDeletionGuard());
   app.route("/", apiRoutes);
 
   // 必须是最后一个 /api 路由：没有它，未知接口会落到 React Router，拿到一个 HTML 404。
