@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { eq, inArray } from "drizzle-orm";
 
 import { shortId } from "@/server/auth/short-id";
+import type { Db } from "@/server/db/client";
 import { session, user, verification } from "@/server/db/schema";
 import { resetTestDatabase, testDbHandle } from "@/server/testing/test-db";
 import { createLogger } from "@/shared/log";
@@ -63,4 +64,23 @@ describe("每天清理过期的会话和 verification", () => {
       },
     ]);
   }, 30_000);
+
+  // 这个队列不重试，pg-boss 只把失败记在任务行里：不记进日志的话，清理一直失败也没人看得见。
+  test("清理出错：记一条 session_cleanup_failed，再把错误抛出去", async () => {
+    const lines: string[] = [];
+    // 清理只用到 db.delete：一个普通对象顶替 Db，它的 delete 直接抛错。
+    const broken = {
+      delete: () => {
+        throw new Error("db is down");
+      },
+    } as unknown as Db;
+
+    await expect(runSessionCleanup({ db: broken, log: createLogger((line) => lines.push(line)) })).rejects.toThrow(
+      "db is down"
+    );
+
+    expect(lines.map((line) => JSON.parse(line) as Record<string, unknown>)).toEqual([
+      { time: expect.any(String), level: "error", event: "session_cleanup_failed", name: "Error", message: "db is down" },
+    ]);
+  });
 });
