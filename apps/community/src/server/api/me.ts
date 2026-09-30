@@ -27,8 +27,8 @@ const profilePatch = z.object({
 const deletionRequest = z.object({
   /** 同时删除自己发布的内容；不勾时内容匿名保留（spec 第 10.6 节）。 */
   deleteContent: z.boolean(),
-  /** 用户照着输入的自己的用户 id，防手滑。 */
-  confirmId: z.string().max(100),
+  /** 用户照着输入的自己的用户 id，防手滑。不设长度上限（同 profilePatch）：超长的得到 DELETION_CONFIRM_MISMATCH。 */
+  confirmId: z.string(),
 });
 
 // /api/v1/me 下的接口都要求登录。必须链式定义：Hono RPC 从返回类型推导每个接口。
@@ -145,7 +145,8 @@ export const meRoutes = new Hono<AppEnv>()
       return c.json({ purgeAt: result.purgeAt.toISOString(), signedOut: true as const });
     }
   )
-  // 撤销注销：冷静期内、还没到清除时间才行（清除任务可能已经开始了）。
+  // 撤销注销：冷静期内、还没到清除时间才行（清除任务可能已经开始了）。账号本来就是正常状态（上一次撤销的响应丢了
+  // 重试，或者另一个标签页已经撤销）也返回 200：结果和撤销成功一样，不能对用户说"冷静期已经结束"。
   .delete("/deletion", async (c) => {
     const { user } = currentAuth(c);
     if ((await cancelDeletion(c.get("services"), user.id)) === "not_cancellable") {

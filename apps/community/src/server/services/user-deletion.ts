@@ -117,14 +117,22 @@ async function lockDeletionState(tx: DbTransaction, userId: string): Promise<Del
   return state ?? null;
 }
 
-export type CancelDeletionResult = "cancelled" | "not_cancellable";
+export type CancelDeletionResult =
+  | "cancelled"
+  /** 账号本来就是正常状态（上一次撤销的响应丢了重试，或者另一个标签页已经撤销）：撤销的目的已经达到，什么也没做。 */
+  | "not_pending"
+  /** 用户已经不存在，或者到了清除时间（清除任务可能已经在跑）。 */
+  | "not_cancellable";
 
 // 撤销注销：只有"注销中、还没到清除时间"才行。到了时间清除任务可能已经在跑：pg-boss 的 cancel 拦不住
-// 执行中的任务，所以由上面的锁和时间来裁判，取消任务只是顺手。
+// 执行中的任务，所以由上面的锁和时间来裁判，取消任务只是顺手。本来就是正常状态的算已经撤销（幂等）。
 export async function cancelDeletion(deps: Pick<DeletionDeps, "db" | "boss">, userId: string): Promise<CancelDeletionResult> {
   const boss = await deps.boss();
   return deps.db.transaction(async (tx) => {
     const state = await lockDeletionState(tx, userId);
+    if (state?.status === "active") {
+      return "not_pending";
+    }
     if (state?.status !== "pending_deletion" || !state.beforePurge) {
       return "not_cancellable";
     }

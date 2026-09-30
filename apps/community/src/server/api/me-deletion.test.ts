@@ -65,12 +65,12 @@ describe("POST /api/v1/me/deletion", () => {
     expect((await userRow(userId))?.status).toBe("active");
   });
 
-  test("输入的 id 不是自己的（别人的、大小写不对）：400 DELETION_CONFIRM_MISMATCH，账号不变", async () => {
+  test("输入的 id 不是自己的（别人的、大小写不对、空的、200 个字符）：400 DELETION_CONFIRM_MISMATCH，账号不变", async () => {
     const app = newApp();
     const { browser, userId } = await signedIn(app);
     const other = await signedIn(app);
 
-    for (const confirmId of [other.userId, userId.toUpperCase(), ""]) {
+    for (const confirmId of [other.userId, userId.toUpperCase(), "", "x".repeat(200)]) {
       const res = await requestDeletion(browser, { deleteContent: false, confirmId });
       expect([res.status, res.json.error.code], confirmId).toEqual([400, "DELETION_CONFIRM_MISMATCH"]);
     }
@@ -224,13 +224,15 @@ describe("DELETE /api/v1/me/deletion", () => {
     expect((await userRow(userId))?.status).toBe("pending_deletion");
   });
 
-  test("没在注销：409 DELETION_NOT_CANCELLABLE；未登录 401", async () => {
+  // 上一次撤销已经成功、响应丢了重试，或者另一个标签页撤销过：账号本来就是正常状态，结果和撤销成功一样，
+  // 不能对用户说"冷静期已经结束"。
+  test("没在注销：200 { status: active }，和撤销成功一样；未登录 401", async () => {
     const { browser } = await signedIn(newApp());
 
     const res = await browser.request("DELETE", "/api/v1/me/deletion", { headers: JSON_HEADERS });
     const anonymous = await new Browser(newApp()).request("DELETE", "/api/v1/me/deletion", { headers: JSON_HEADERS });
 
-    expect([res.status, res.json.error.code]).toEqual([409, "DELETION_NOT_CANCELLABLE"]);
+    expect([res.status, res.json]).toEqual([200, { status: "active" }]);
     expect(anonymous.status).toBe(401);
   });
 });

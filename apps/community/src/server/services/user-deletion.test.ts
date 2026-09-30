@@ -188,10 +188,20 @@ describe("撤销注销", () => {
     expect((await userRow(due))?.status).toBe("pending_deletion");
   }, 30_000);
 
-  test("没在注销、用户不存在：not_cancellable", async () => {
-    const id = await seedUser();
+  // 上一次撤销已经成功、响应丢了重试，或者另一个标签页撤销过：账号本来就是正常状态，撤销的目的已经达到，什么也不做。
+  test("没在注销（从没申请过，或者刚撤销过）：not_pending，什么也没变", async () => {
+    const fresh = await seedUser();
+    const retried = await seedUser();
+    await requestDeletion(deps([withContent()]), retried, { deleteContent: false });
+    await cancelDeletion(deps(), retried);
+    const before = await userRow(retried);
 
-    expect(await cancelDeletion(deps(), id)).toBe("not_cancellable");
+    expect(await cancelDeletion(deps(), fresh)).toBe("not_pending");
+    expect(await cancelDeletion(deps(), retried)).toBe("not_pending");
+    expect(await userRow(retried)).toEqual(before);
+  }, 30_000);
+
+  test("用户不存在：not_cancellable", async () => {
     expect(await cancelDeletion(deps(), shortId())).toBe("not_cancellable");
   }, 30_000);
 });
