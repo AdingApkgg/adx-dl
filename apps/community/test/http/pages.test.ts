@@ -128,9 +128,9 @@ describe("接口和健康检查", () => {
     expect(res.status).toBe(415);
   });
 
-  test("/readyz：PG 和 Redis 都可用", async () => {
+  test("/readyz：PG、Redis 和任务队列都可用", async () => {
     const res = await fetch(server.url("/readyz"));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, checks: { db: "ok", redis: "ok" } });
+    expect(await res.json()).toEqual({ ok: true, checks: { db: "ok", redis: "ok", jobs: "ok" } });
   });
 });

@@ -13,3 +13,10 @@ export function shortId(size = 10): string {
   }
   return out.join("");
 }
+
+const SHORT_ID_PATTERN = new RegExp(`^[${SHORT_ID_ALPHABET}]{10}$`);
+
+/** 网址里拿来的用户 id：先检查格式再去查库，格式不对的直接当作不存在。 */
+export function isShortId(value: string): boolean {
+  return SHORT_ID_PATTERN.test(value);
+}

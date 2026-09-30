@@ -1,21 +1,23 @@
 import { dehydrate, HydrationBoundary, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { useLocation, useSearchParams } from "react-router";
+import { type FormEvent, useState } from "react";
+import { Link, useLocation, useSearchParams } from "react-router";
 
 import { m } from "@/paraglide/messages.js";
 import { getLocale, localizeHref } from "@/paraglide/runtime.js";
-import { expectOk } from "@/shared/api-client";
+import { expectOk, okJson } from "@/shared/api-client";
 import { htmlLang } from "@/shared/i18n/locale";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
 import { isReauthError, QqCodeForm } from "../components/qq-code-form";
+import { accountErrorRedirect } from "../lib/account-errors";
 import { authClient } from "../lib/auth-client";
-import { errorCodeOf, errorMessage } from "../lib/auth-errors";
+import { errorMessage } from "../lib/auth-errors";
 import { getBrowserApi, getRenderApi, jsonRequest } from "../lib/browser";
 import { loginHref, requireUser } from "../lib/require-user";
 import { useHydrated } from "../lib/use-hydrated";
 import { loginsQuery, sessionsQuery } from "../queries/account";
 import { loginOptionsQuery } from "../queries/login-options";
+import { meQuery } from "../queries/me";
 import type { Route } from "./+types/settings-account";
 
 export async function loader({ context, url }: Route.LoaderArgs) {
@@ -47,8 +49,9 @@ export default function SettingsAccount({ loaderData }: Route.ComponentProps) {
 
 type Failure = { message: string; reauth: boolean };
 
-// "重新登录"的链接、QQ 绑定的重新登录链接和未登录时的跳转，登录后都回到这个地址（当前页）。去掉 error 和 welcome：
-// 它们是一次性的提示（Google 绑定失败的原因、欢迎语），带回来的话，旧的错误提示会一直显示，欢迎语也会在重新登录后再出现一次。
+// "重新登录"的链接、QQ 绑定的重新登录链接和未登录时的跳转，登录后都回到这个地址（当前页）。去掉 error：它是一次性的
+// 提示（Google 绑定失败的原因），带回来的话旧的错误提示会一直显示。welcome 是 1b 给新用户的欢迎语参数（1c 起新用户
+// 先去首次登录引导页），旧链接里可能还带着，一并去掉。
 export function returnPath(pathname: string, search: string): string {
   const params = new URLSearchParams(search);
   params.delete("error");
@@ -72,12 +75,15 @@ function SettingsContent() {
   const location = useLocation();
   const [params] = useSearchParams();
   const hydrated = useHydrated();
+  const { data: me } = useQuery(meQuery(api));
   const { data: logins } = useQuery(loginsQuery(api));
   const { data: sessions } = useQuery(sessionsQuery(api));
   const { data: options } = useQuery(loginOptionsQuery(api));
   const [failure, setFailure] = useState<Failure | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // 申请注销成功后的清除时间：这时已经退出登录，整页换成结果提示。
+  const [deletedAt, setDeletedAt] = useState<string | null>(null);
   const here = returnPath(location.pathname, location.search);
   const callbackMessage = params.get("error") ? errorMessage(params.get("error")) : null;
 
@@ -91,7 +97,8 @@ function SettingsContent() {
         : ""
       : m.settings_device_unknown_place();
 
-  // 所有按钮共用：出错时翻译成文案；未登录跳去登录页（spec 第 11.4 节）；要求刚登录的给出"重新登录"链接。
+  // 所有按钮共用：出错时翻译成文案；未登录跳去登录页、账号正在注销跳去注销提示页（spec 第 11.4 节）；
+  // 要求刚登录的给出"重新登录"链接。
   // 成功和出错都刷新列表：出错时那一行可能已经在别处被删掉了。
   async function run(action: () => Promise<unknown>) {
     setPending(true);
@@ -105,10 +112,9 @@ function SettingsContent() {
       }
       await queryClient.invalidateQueries({ queryKey: ["me"] });
     } catch (error) {
-      const code = errorCodeOf(error);
-      const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
-      if (code === "UNAUTHORIZED" || status === 401) {
-        window.location.assign(loginHref(here));
+      const target = accountErrorRedirect(error, here);
+      if (target) {
+        window.location.assign(target);
         return;
       }
       // 比如在别处已经被踢掉的会话，再点"下线"会得到 404：不刷新的话那一行一直留着。
@@ -146,13 +152,18 @@ function SettingsContent() {
     window.location.assign(localizeHref("/"));
   }
 
-  if (!logins || !sessions || !options) {
+  if (deletedAt) {
+    return <DeletionStarted purgeAt={deletedAt} />;
+  }
+  if (!me || !logins || !sessions || !options) {
     return null;
   }
   return (
     <main>
       <h1>{m.settings_account_title()}</h1>
-      {params.get("welcome") === "1" ? <p>{m.settings_welcome()}</p> : null}
+      <p>
+        <Link to={localizeHref("/settings/profile")}>{m.settings_profile_title()}</Link>
+      </p>
       {callbackMessage ? <p role="alert">{callbackMessage}</p> : null}
       {failure ? (
         <p role="alert">
@@ -269,6 +280,109 @@ function SettingsContent() {
         <button type="button" disabled={pending} onClick={signOut}>
           {m.settings_sign_out()}
         </button>
+      </p>
+
+      <DeleteAccountSection userId={me.id} here={here} onDeleted={setDeletedAt} />
+    </main>
+  );
+}
+
+type DeleteAccountSectionProps = {
+  userId: string;
+  /** 重新登录后回到的地址。 */
+  here: string;
+  onDeleted(purgeAt: string): void;
+};
+
+// 注销账号（spec 第 10.6 节）。"同时删除内容"默认不勾（spec 选的 B：默认匿名保留）；要照着输入自己的用户 id
+// 才能点（用户决定），服务端同样校验。
+function DeleteAccountSection({ userId, here, onDeleted }: DeleteAccountSectionProps) {
+  const [deleteContent, setDeleteContent] = useState(false);
+  const [confirmId, setConfirmId] = useState("");
+  const [pending, setPending] = useState(false);
+  const [failure, setFailure] = useState<Failure | null>(null);
+  const confirmed = confirmId.trim() === userId;
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!confirmed) {
+      setFailure({ message: m.error_deletion_confirm_mismatch(), reauth: false });
+      return;
+    }
+    setPending(true);
+    setFailure(null);
+    try {
+      const result = await okJson(
+        await getBrowserApi().api.v1.me.deletion.$post({ json: { deleteContent, confirmId: userId } })
+      );
+      onDeleted(result.purgeAt);
+    } catch (error) {
+      const target = accountErrorRedirect(error, here);
+      if (target) {
+        window.location.assign(target);
+        return;
+      }
+      setFailure({ message: errorMessage(error) ?? m.error_unknown(), reauth: isReauthError(error) });
+      setPending(false);
+    }
+  }
+
+  return (
+    <section>
+      <h2>{m.settings_delete_heading()}</h2>
+      <p>{m.settings_delete_explain()}</p>
+      <p>{m.settings_delete_content_default()}</p>
+      <form onSubmit={submit}>
+        <p>
+          <label>
+            <input
+              type="checkbox"
+              name="deleteContent"
+              checked={deleteContent}
+              onChange={(event) => setDeleteContent(event.target.checked)}
+            />{" "}
+            {m.settings_delete_content()}
+          </label>
+        </p>
+        <p>
+          <label>
+            {m.settings_delete_confirm({ id: userId })}{" "}
+            <input
+              name="confirmId"
+              value={confirmId}
+              onChange={(event) => setConfirmId(event.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </label>
+        </p>
+        {failure ? (
+          <p role="alert">
+            {failure.message}{" "}
+            {failure.reauth ? <a href={loginHref(here, { reauth: "1" })}>{m.settings_reauth()}</a> : null}
+          </p>
+        ) : null}
+        <button type="submit" disabled={pending || !confirmed}>
+          {pending ? m.login_working() : m.settings_delete_submit()}
+        </button>
+      </form>
+    </section>
+  );
+}
+
+// 申请成功：这个浏览器已经退出登录（响应清掉了会话 Cookie）。空账号的清除时间就是申请的时刻，几分钟内由 worker 删掉；
+// 有内容的账号冷静期到了才删。只在点了按钮之后渲染，日期按本地时区显示不会有 hydrate 前后不一致的问题。
+export function DeletionStarted({ purgeAt }: { purgeAt: string }) {
+  const at = new Date(purgeAt);
+  const scheduled = at.getTime() - Date.now() > 60_000;
+  const date = new Intl.DateTimeFormat(htmlLang(getLocale()), { dateStyle: "medium", timeStyle: "short" }).format(at);
+  return (
+    <main>
+      <h1>{m.settings_delete_heading()}</h1>
+      <p role="status">{m.settings_delete_done()}</p>
+      <p>{scheduled ? m.settings_delete_done_scheduled({ date }) : m.settings_delete_done_immediate()}</p>
+      <p>
+        <a href={localizeHref("/")}>{m.settings_delete_home()}</a>
       </p>
     </main>
   );

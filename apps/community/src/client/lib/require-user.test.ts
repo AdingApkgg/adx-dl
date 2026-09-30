@@ -5,12 +5,19 @@ import type { ApiClient } from "@/shared/api-client";
 import { makeQueryClient } from "@/shared/query-client";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
-import { loginHref, requireUser } from "./require-user";
+import { loginHref, onboardingHref, requireUser } from "./require-user";
 
 describe("loginHref", () => {
   test("带上 next；额外参数一并编码", () => {
     expect(loginHref("/settings/account")).toBe("/login?next=%2Fsettings%2Faccount");
     expect(loginHref("/settings/account", { reauth: "1" })).toBe("/login?next=%2Fsettings%2Faccount&reauth=1");
+  });
+});
+
+describe("onboardingHref", () => {
+  test("引导页带上看完要回去的地址", () => {
+    expect(onboardingHref("/settings/account")).toBe("/onboarding?next=%2Fsettings%2Faccount");
+    expect(onboardingHref("/")).toBe("/onboarding?next=%2F");
   });
 });
 
@@ -53,6 +60,7 @@ describe("requireUser", () => {
       image: null,
       status: "active",
       createdAt: "2026-09-29T00:00:00.000Z",
+      deletionPurgeAt: null,
     };
     const { context, queryClient } = contextWithMe(() => Response.json(user));
 

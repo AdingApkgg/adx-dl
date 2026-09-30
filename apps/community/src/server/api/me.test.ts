@@ -37,6 +37,7 @@ describe("GET /api/v1/me", () => {
       image: null,
       status: "active",
       createdAt: expect.any(String),
+      deletionPurgeAt: null,
     });
   });
 
@@ -73,6 +74,59 @@ describe("GET /api/v1/me", () => {
     expect(options.headers.getSetCookie()).toEqual([]);
     expect(me.status).toBe(401);
     expect(me.headers.getSetCookie()).toEqual([]);
+  });
+
+  // 会话满一天、这次请求要续期，而会话恰好在读出来之后被删掉（另一个标签页踢下线、同一个浏览器重新登录、注销）：
+  // Better Auth 续期失败时抛 401。当作没登录，不能变成 500；它顺带发的"清掉 Cookie"也不转发。
+  test("续期时会话被并发删掉：401 而不是 500，没有 Set-Cookie", async () => {
+    const { auth } = createTestAuth();
+    const app = createApp(testAppDeps({ auth }).deps);
+    const browser = new Browser(app);
+    await signInWithGoogle(browser, googleProfile());
+    const userId = await currentUserId(browser);
+    await testDbHandle().db.execute(
+      sql`update session set updated_at = now() - interval '2 days', expires_at = now() + interval '28 days' where user_id = ${userId}`
+    );
+    // 在对象上换掉方法（不用 mock.module：它会泄漏到同一进程里的其他测试文件），读出会话后立刻把它删掉。
+    const { internalAdapter } = await auth.$context;
+    const findSession = internalAdapter.findSession;
+    internalAdapter.findSession = async (token) => {
+      const found = await findSession(token);
+      await testDbHandle().db.delete(session).where(eq(session.token, token));
+      return found;
+    };
+    try {
+      const res = await browser.request("GET", "/api/v1/me");
+
+      expect(res.status).toBe(401);
+      expect(res.headers.getSetCookie()).toEqual([]);
+    } finally {
+      internalAdapter.findSession = findSession;
+    }
+  });
+
+  // sessionContext 只接住 401：数据库出错这类照旧往外抛，不能因为数据库抖一下就把所有人当成没登录。
+  test("读会话时数据库出错：500 INTERNAL，记下 unhandled_error，不当成没登录", async () => {
+    const { auth } = createTestAuth();
+    const { deps, logs } = testAppDeps({ auth });
+    const browser = new Browser(createApp(deps));
+    await signInWithGoogle(browser, googleProfile());
+    // 在对象上换掉方法，理由同上。
+    const { internalAdapter } = await auth.$context;
+    const findSession = internalAdapter.findSession;
+    internalAdapter.findSession = async () => {
+      throw new Error("db down");
+    };
+    try {
+      const res = await browser.request("GET", "/api/v1/me");
+
+      expect([res.status, res.json?.error?.code]).toEqual([500, "INTERNAL"]);
+      expect(logs().filter((entry) => entry.event === "unhandled_error")).toEqual([
+        expect.objectContaining({ level: "error", method: "GET", path: "/api/v1/me" }),
+      ]);
+    } finally {
+      internalAdapter.findSession = findSession;
+    }
   });
 });
 

@@ -6,7 +6,11 @@ export default [
   route(":lang?", "routes/locale.tsx", [
     index("routes/home.tsx"),
     route("login", "routes/login.tsx"),
+    route("onboarding", "routes/onboarding.tsx"),
     route("settings/account", "routes/settings-account.tsx"),
+    route("settings/profile", "routes/settings-profile.tsx"),
+    route("u/:id", "routes/user-profile.tsx"),
+    route("account-deletion", "routes/account-deletion.tsx"),
     route("*", "routes/not-found.tsx"),
   ]),
 ] satisfies RouteConfig;

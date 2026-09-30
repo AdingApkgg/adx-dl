@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { SHORT_ID_ALPHABET, shortId } from "./short-id";
+import { isShortId, SHORT_ID_ALPHABET, shortId } from "./short-id";
 
 describe("shortId", () => {
   test("默认 10 位，只用约定的字母表", () => {
@@ -28,6 +28,20 @@ describe("shortId", () => {
     for (const char of SHORT_ID_ALPHABET) {
       const count = counts.get(char) ?? 0;
       expect(Math.abs(count - expected) / expected).toBeLessThan(0.1);
+    }
+  });
+});
+
+describe("isShortId", () => {
+  test("生成的 id 都认", () => {
+    for (let i = 0; i < 50; i++) {
+      expect(isShortId(shortId())).toBe(true);
+    }
+  });
+
+  test("长度不对、有字母表以外的字符（大写、0、1、i、l、o、符号）都不认", () => {
+    for (const value of ["abc234567", "abc23456789", "ABC2345678", "abc234567o", "abc234567l", "abc234567-", "", "abc2345678\n"]) {
+      expect(isShortId(value), JSON.stringify(value)).toBe(false);
     }
   });
 });

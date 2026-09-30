@@ -12,7 +12,7 @@ import { authClient } from "../lib/auth-client";
 import { errorCodeOf, errorMessage } from "../lib/auth-errors";
 import { getRenderApi } from "../lib/browser";
 import { safeNextPath } from "../lib/next-path";
-import { loginHref, welcomeHref } from "../lib/require-user";
+import { loginHref, onboardingHref } from "../lib/require-user";
 import { canonicalLink, localeAlternates, originFrom } from "../lib/seo";
 import { useTurnstile } from "../lib/turnstile";
 import { loginOptionsQuery } from "../queries/login-options";
@@ -66,8 +66,8 @@ function LoginContent() {
   const reauth = params.get("reauth") === "1";
   const callbackError = params.get("error");
   const callbackMessage = callbackError ? errorMessage(callbackError) : null;
-  // 登录成功一律整页跳转：服务端渲染要带着新会话重新取数据。
-  const go = useCallback((isNewUser: boolean) => window.location.assign(isNewUser ? welcomeHref() : next), [next]);
+  // 登录成功一律整页跳转：服务端渲染要带着新会话重新取数据。新用户先去首次登录引导页，看完再回 next。
+  const go = useCallback((isNewUser: boolean) => window.location.assign(isNewUser ? onboardingHref(next) : next), [next]);
 
   if (!options) {
     return null;
@@ -120,7 +120,7 @@ function GoogleSignIn({ next, reauth }: { next: string; reauth: boolean }) {
     const res = await authClient.signIn.social({
       provider: "google",
       callbackURL: next,
-      newUserCallbackURL: welcomeHref(),
+      newUserCallbackURL: onboardingHref(next),
       errorCallbackURL: loginHref(next, reauth ? { reauth: "1" } : {}),
     });
     if (res.error) {

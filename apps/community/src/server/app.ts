@@ -10,8 +10,10 @@ import type { AppEnv } from "./app-env";
 import type { Auth } from "./auth/auth";
 import { mountAuth, sessionContext } from "./auth/mount";
 import { jsonError } from "./errors";
+import { bodyLimitWhenDeclared } from "./middleware/body-limit";
 import { clientIp, rateLimitKeyForIp } from "./middleware/client-ip";
 import { csrfGuard } from "./middleware/csrf";
+import { pendingDeletionGuard } from "./middleware/pending-deletion";
 import { rateLimit, type RateLimitStore } from "./middleware/rate-limit";
 import { requestLog } from "./middleware/request-log";
 import { securityHeaders } from "./middleware/security-headers";
@@ -19,6 +21,10 @@ import type { ApiServices } from "./services/api-services";
 import { withTimeout } from "./with-timeout";
 
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+// /api/v1/* 的请求体上限，和 /api/auth/*（auth/mount.ts）一样是 64 KiB。现有的请求体都是很小的 JSON；
+// 以后有接口要收更大的内容，要改这里：后面挂的中间件放不宽这里的上限。
+const API_BODY_LIMIT = 64 * 1024;
 
 export type HealthCheck = () => Promise<void>;
 
@@ -31,13 +37,14 @@ export type AppDeps = {
   publicOrigin: string;
   /** Better Auth 实例（createAuth 的返回值）。 */
   auth: Auth;
-  /** /api/v1 的接口用到的依赖。 */
-  services: ApiServices;
+  /** /api/v1 的接口用到的依赖（auth、log 由 createApp 从上面同名的两项放进去）。 */
+  services: Omit<ApiServices, "auth" | "log">;
 };
 
 // 中间件顺序是 spec 第 8.1 节定的，改动前先对照 spec。
 export function createApp(deps: AppDeps) {
   const app = new Hono<AppEnv>();
+  const services: ApiServices = { ...deps.services, auth: deps.auth, log: deps.log };
 
   app.use("*", requestId());
   app.use("*", clientIp());
@@ -123,10 +130,18 @@ export function createApp(deps: AppDeps) {
   // spec 第 8.1 节第 9、10 步：先识别会话，再做 CSRF 校验。
   app.use("/api/v1/*", sessionContext(deps.auth));
   app.use("/api/v1/*", async (c, next) => {
-    c.set("services", deps.services);
+    c.set("services", services);
     await next();
   });
   app.use("/api/v1/*", csrfGuard({ publicOrigin: deps.publicOrigin }));
+  // JSON 校验器会先把整个请求体读进内存、解析完，才轮到各接口自己的规则，所以大小要在这里先限住。
+  app.use(
+    "/api/v1/*",
+    bodyLimitWhenDeclared({
+      maxSize: API_BODY_LIMIT,
+      onError: (c) => jsonError(c, 413, "PAYLOAD_TOO_LARGE", "Request body is too large"),
+    })
+  );
   // spec 第 10.2 节：改数据的接口按用户每分钟 60 次。读请求和未登录的请求不算。
   app.use(
     "/api/v1/*",
@@ -139,6 +154,8 @@ export function createApp(deps: AppDeps) {
       onStoreError: (error) => deps.log.error("rate_limit_store_error", describeError(error)),
     })
   );
+  // spec 第 10.6 节：注销冷静期里除了几个接口，一律 403 ACCOUNT_PENDING_DELETION。
+  app.use("/api/v1/*", pendingDeletionGuard());
   app.route("/", apiRoutes);
 
   // 必须是最后一个 /api 路由：没有它，未知接口会落到 React Router，拿到一个 HTML 404。

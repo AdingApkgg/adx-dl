@@ -16,11 +16,14 @@ import { createTurnstileVerifier } from "./auth/turnstile";
 import { getDb, pingDb } from "./db/client";
 import { parseEnv } from "./env";
 import { createInProcessApi } from "./in-process-api";
+import { assertQueueExists, getSender, stopSender } from "./jobs/boss";
+import { USER_PURGE_QUEUE } from "./jobs/queues";
 import { createRedisRateLimitStore } from "./middleware/rate-limit";
 import { createOneBotClient } from "./napcat/client";
 import { createNapcatSender } from "./napcat/sender";
 import { connectRedis, getRedis, pingRedis } from "./redis/client";
 import { createLoginOptions } from "./services/login-options";
+import { DELETION_HANDLERS } from "./services/user-deletion";
 
 const env = parseEnv(process.env);
 const log = createLogger();
@@ -30,6 +33,10 @@ const { db, pool } = getDb(env.databaseUrl, {
 const redis = getRedis(env.redisUrl);
 await connectRedis(redis, log);
 const rateLimitStore = createRedisRateLimitStore(redis);
+
+// pg-boss 的发送端：用到时才启动，失败不缓存。这里先启动一次，只为让配置问题（比如迁移还没跑）尽早出现在日志里。
+const getBoss = () => getSender(env.databaseUrl, (error) => log.error("pgboss_error", describeError(error)));
+void getBoss().catch((error) => log.error("pgboss_start_failed", describeError(error)));
 
 const verifyTurnstile = createTurnstileVerifier({ secretKey: env.turnstile.secretKey, log });
 const qqSender =
@@ -57,12 +64,19 @@ const app = createApp({
   log,
   isProduction: env.nodeEnv === "production",
   publicOrigin: env.publicOrigin,
-  checks: { db: () => pingDb(db), redis: () => pingRedis(redis) },
+  checks: {
+    db: () => pingDb(db),
+    redis: () => pingRedis(redis),
+    // 部署脚本轮询 /readyz：pg-boss 的表或 user.purge 队列不在（迁移没跑），这里就是 fail。
+    jobs: async () => assertQueueExists(await getBoss(), USER_PURGE_QUEUE),
+  },
   rateLimitStore,
   auth,
   services: {
     db,
+    boss: getBoss,
     loginOptions: createLoginOptions({ turnstileSiteKey: env.turnstile.siteKey, qq: env.qq, redis }),
+    deletionHandlers: DELETION_HANDLERS,
   },
 });
 
@@ -108,6 +122,8 @@ export default await createHonoServer<AppEnv>({
   },
   onGracefulShutdown: async () => {
     redis.close();
+    // 发送端有自己的连接池，先停它，再关 Drizzle 的池。
+    await stopSender();
     await pool.end();
   },
 });

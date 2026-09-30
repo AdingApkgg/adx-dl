@@ -5,6 +5,7 @@ import { m } from "@/paraglide/messages.js";
 import { getLocale, localizeHref } from "@/paraglide/runtime.js";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
+import { Avatar } from "../components/avatar";
 import { getBrowserApi, getBrowserQueryClient, getRenderApi } from "../lib/browser";
 import { loginHref } from "../lib/require-user";
 import { canonicalLink, localeAlternates, openGraph, originFrom } from "../lib/seo";
@@ -71,7 +72,9 @@ function HomeContent() {
       <p>
         {me ? (
           <>
-            {m.home_signed_in_as({ name: me.name })} ·{" "}
+            <Avatar id={me.id} name={me.name} size={32} /> {m.home_signed_in_as({ name: me.name })} ·{" "}
+            <Link to={localizeHref(`/u/${me.id}`)}>{m.home_my_page()}</Link> ·{" "}
+            <Link to={localizeHref("/settings/profile")}>{m.home_profile_settings()}</Link> ·{" "}
             <Link to={localizeHref("/settings/account")}>{m.home_account_settings()}</Link>
           </>
         ) : (

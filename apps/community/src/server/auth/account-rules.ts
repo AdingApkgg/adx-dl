@@ -17,7 +17,23 @@ export const ACCOUNT_ERROR_CODES = defineErrorCodes({
   SIGNUP_SESSION_REQUIRED: "Passkey sign-up must create a session",
   PASSKEY_NAME_INVALID: "Invalid passkey name",
   PASSKEY_RESPONSE_INVALID: "Invalid passkey response",
+  ACCOUNT_PENDING_DELETION: "This account is scheduled for deletion",
 });
+
+// 注销冷静期里一律不许动的账号设置（spec 第 10.6 节）：绑定、解绑、添加 / 改名 / 删除通行密钥、绑定 QQ。
+// 登录不在其中：待注销的用户要能登录，才能撤销注销。/passkey/verify-registration 没登录时是在"只用通行密钥注册"，
+// 没有会话，下面的钩子自然放行；/qq/verify 只拦 intent=link。
+// 拦不到的一处：冷静期开始之前发起、之后才回来的 Google 绑定回调（/callback/google 不带会话，靠 state 里记的
+// 用户 id 完成绑定）。绑上的账号会随清除一起删掉，不另外处理。
+const ACCOUNT_CHANGE_PATHS = new Set([
+  "/link-social",
+  "/unlink-account",
+  "/passkey/generate-register-options",
+  "/passkey/verify-registration",
+  "/passkey/delete-passkey",
+  "/passkey/update-passkey",
+  "/qq/verify",
+]);
 
 // 通行密钥的名字：去掉首尾空白后 1 到 64 个码点，不含控制字符。1b 的前端从不发名字（名字来自
 // getAuthenticatorName），这条只挡手工构造的请求：改名不要求刚登录、也不用人机验证。
@@ -84,6 +100,20 @@ export function accountRules(deps: { db: Db }) {
     },
     hooks: {
       before: [
+        {
+          // 必须排第一个：待注销的用户拿到的是 ACCOUNT_PENDING_DELETION，而不是先被"要重新登录"这类检查拦下。
+          // 在插件消耗验证码尝试次数、注册挑战之前就返回，被拒的请求不留下任何状态。
+          matcher: (ctx) => ACCOUNT_CHANGE_PATHS.has(ctx.path ?? ""),
+          handler: createAuthMiddleware(async (ctx) => {
+            if (ctx.path === "/qq/verify" && (ctx.body as { intent?: unknown } | undefined)?.intent !== "link") {
+              return;
+            }
+            const current = await sessionForHook(ctx);
+            if (current?.user.status === "pending_deletion") {
+              throw APIError.from("FORBIDDEN", ACCOUNT_ERROR_CODES.ACCOUNT_PENDING_DELETION);
+            }
+          }),
+        },
         {
           // 已登录时添加通行密钥也算敏感操作（本计划"与 spec 的偏离"第 4 条）。没登录时是在注册，不管。
           matcher: (ctx) => ctx.path === "/passkey/generate-register-options",

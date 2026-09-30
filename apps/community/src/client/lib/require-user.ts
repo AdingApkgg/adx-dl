@@ -10,9 +10,9 @@ export function loginHref(next: string, extra: Record<string, string> = {}): str
   return `${localizeHref("/login")}?${new URLSearchParams({ next, ...extra })}`;
 }
 
-/** 新用户登录后去的地方：账号设置页顶部提示再加一种登录方式（1c 之前先不去首次登录引导）。 */
-export function welcomeHref(): string {
-  return `${localizeHref("/settings/account")}?welcome=1`;
+/** 新用户登录后去的地方：首次登录引导页（spec 第 10.3 节），看完回到 next。 */
+export function onboardingHref(next: string): string {
+  return `${localizeHref("/onboarding")}?${new URLSearchParams({ next })}`;
 }
 
 // 需要登录的页面在 loader 里调用（spec 第 11.4 节：未登录跳到 /login?next=<原地址>）。
