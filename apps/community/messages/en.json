@@ -112,7 +112,7 @@
   "account_deletion_due": "The grace period is over and the account is being deleted. It can no longer be cancelled.",
   "account_deletion_cancel": "Cancel deletion",
   "settings_delete_heading": "Delete account",
-  "settings_delete_explain": "Deleting your account signs you out on every device. An account that hasn't posted anything is deleted right away; otherwise it's kept for 7 days, and signing in again during that time cancels the deletion.",
+  "settings_delete_explain": "Deleting your account signs you out on every device. An account that hasn't posted anything is deleted right away; otherwise it's kept for 7 days. During that time you can sign in again and cancel the deletion; after that it's deleted.",
   "settings_delete_content_default": "What you've posted stays by default, credited to \"Deleted user\".",
   "settings_delete_content": "Also delete everything I've posted",
   "settings_delete_confirm": "Type your user ID ({id}) to confirm",
