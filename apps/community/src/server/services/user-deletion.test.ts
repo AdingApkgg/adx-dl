@@ -7,6 +7,7 @@ import { shortId } from "../auth/short-id";
 import { account, passkey, profiles, session, user } from "../db/schema";
 import { USER_PURGE_QUEUE } from "../jobs/queues";
 import { createTestAuth } from "../testing/auth";
+import { waitUntilDue } from "../testing/deletion";
 import { testSender } from "../testing/test-boss";
 import { testDbHandle } from "../testing/test-db";
 import {
@@ -176,6 +177,7 @@ describe("撤销注销", () => {
   test("到了清除时间：not_cancellable，还是注销中", async () => {
     const empty = await seedUser();
     await requestDeletion(deps(), empty, { deleteContent: false });
+    await waitUntilDue(empty);
     const due = await seedUser();
     await requestDeletion(deps([withContent()]), due, { deleteContent: false });
     await makeDue(due);
@@ -208,6 +210,7 @@ describe("最终清除", () => {
         backedUp: false,
       });
     await requestDeletion(deps(), id, { deleteContent: false });
+    await waitUntilDue(id);
 
     expect(await purgeUser(deps(), id)).toBe("purged");
     expect(await rowsLeft(id)).toEqual({ user: 0, sessions: 0, accounts: 0, passkeys: 0, profiles: 0 });
@@ -217,6 +220,7 @@ describe("最终清除", () => {
   test("两个清除同时跑：一个清除，另一个等锁之后发现用户已经不在", async () => {
     const id = await seedUser();
     await requestDeletion(deps(), id, { deleteContent: false });
+    await waitUntilDue(id);
 
     const results = await Promise.all([purgeUser(deps(), id), purgeUser(deps(), id)]);
 
@@ -285,6 +289,7 @@ describe("最终清除", () => {
     };
     const handlers = [writing, failing];
     await requestDeletion(deps(handlers), id, { deleteContent: false });
+    await waitUntilDue(id);
 
     await expect(purgeUser(deps(handlers), id)).rejects.toThrow("storage is down");
 
