@@ -123,5 +123,6 @@
   "error_account_pending_deletion": "このアカウントは退会手続き中です。",
   "error_deletion_confirm_mismatch": "入力したユーザー ID が一致しません。",
   "error_deletion_not_cancellable": "猶予期間が終わったため、退会は取り消せません。",
+  "error_deletion_conflict": "退会の処理中です。ページを再読み込みしてからもう一度お試しください。",
   "error_bio_too_long": "自己紹介は 300 文字までです。"
 }

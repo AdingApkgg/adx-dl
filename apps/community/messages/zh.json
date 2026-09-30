@@ -123,5 +123,6 @@
   "error_account_pending_deletion": "这个账号正在注销中。",
   "error_deletion_confirm_mismatch": "输入的用户 ID 不对。",
   "error_deletion_not_cancellable": "冷静期已经结束，不能再撤销注销了。",
+  "error_deletion_conflict": "注销正在处理中，请刷新页面后再试。",
   "error_bio_too_long": "简介最多 300 个字符。"
 }

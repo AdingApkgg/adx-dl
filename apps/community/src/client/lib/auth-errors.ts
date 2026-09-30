@@ -28,6 +28,7 @@ const MESSAGES: Record<string, () => string> = {
   ACCOUNT_PENDING_DELETION: m.error_account_pending_deletion,
   DELETION_CONFIRM_MISMATCH: m.error_deletion_confirm_mismatch,
   DELETION_NOT_CANCELLABLE: m.error_deletion_not_cancellable,
+  DELETION_CONFLICT: m.error_deletion_conflict,
 };
 
 // 用户自己关掉了通行密钥对话框，或者在 Google 那边点了取消：不算错误。

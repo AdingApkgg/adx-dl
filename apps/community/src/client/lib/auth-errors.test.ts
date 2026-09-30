@@ -27,6 +27,7 @@ describe("错误文案", () => {
     expect(errorMessage({ code: "ACCOUNT_PENDING_DELETION", status: 403 })).toBe(m.error_account_pending_deletion());
     expect(errorMessage(new ApiError(400, "DELETION_CONFIRM_MISMATCH", "x"))).toBe(m.error_deletion_confirm_mismatch());
     expect(errorMessage(new ApiError(409, "DELETION_NOT_CANCELLABLE", "x"))).toBe(m.error_deletion_not_cancellable());
+    expect(errorMessage(new ApiError(409, "DELETION_CONFLICT", "x"))).toBe(m.error_deletion_conflict());
   });
 
   // Better Auth 的 429 响应体没有 code（调研报告第 12 题）。
