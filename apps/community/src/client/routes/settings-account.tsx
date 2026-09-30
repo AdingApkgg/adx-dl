@@ -1,6 +1,6 @@
 import { dehydrate, HydrationBoundary, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useLocation, useSearchParams } from "react-router";
+import { Link, useLocation, useSearchParams } from "react-router";
 
 import { m } from "@/paraglide/messages.js";
 import { getLocale, localizeHref } from "@/paraglide/runtime.js";
@@ -153,6 +153,9 @@ function SettingsContent() {
   return (
     <main>
       <h1>{m.settings_account_title()}</h1>
+      <p>
+        <Link to={localizeHref("/settings/profile")}>{m.settings_profile_title()}</Link>
+      </p>
       {params.get("welcome") === "1" ? <p>{m.settings_welcome()}</p> : null}
       {callbackMessage ? <p role="alert">{callbackMessage}</p> : null}
       {failure ? (

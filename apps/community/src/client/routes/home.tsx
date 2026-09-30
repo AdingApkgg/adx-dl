@@ -73,6 +73,7 @@ function HomeContent() {
         {me ? (
           <>
             <Avatar id={me.id} name={me.name} size={32} /> {m.home_signed_in_as({ name: me.name })} ·{" "}
+            <Link to={localizeHref("/settings/profile")}>{m.home_profile_settings()}</Link> ·{" "}
             <Link to={localizeHref("/settings/account")}>{m.home_account_settings()}</Link>
           </>
         ) : (
