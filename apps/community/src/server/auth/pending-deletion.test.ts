@@ -5,6 +5,7 @@ import { createApp } from "../app";
 import { account, passkey, user } from "../db/schema";
 import { testAppDeps } from "../testing/app-deps";
 import {
+  ageSessions,
   createTestAuth,
   currentUserId,
   googleProfile,
@@ -42,16 +43,20 @@ async function pendingUser(app: ReturnType<typeof setup>["app"]) {
   await signInWithGoogle(browser, profile);
   const userId = await currentUserId(browser);
   const options = await browser.request("GET", "/api/auth/passkey/generate-register-options");
-  await browser.request("POST", "/api/auth/passkey/verify-registration", {
+  const registered = await browser.request("POST", "/api/auth/passkey/verify-registration", {
     body: { response: await new SoftAuthenticator(TEST_PUBLIC_ORIGIN, RP_ID).createCredential(options.json) },
   });
+  expect(registered.status).toBe(200);
   await testDbHandle().db.execute(
     sql`update "user" set status = 'pending_deletion', deletion_requested_at = now(), deletion_purge_at = now() + interval '7 days', deletion_delete_content = false where id = ${userId}`
   );
   const { db } = testDbHandle();
   const [google] = await db.select().from(account).where(eq(account.userId, userId));
   const [key] = await db.select().from(passkey).where(eq(passkey.userId, userId));
-  return { browser, profile, userId, accountId: google?.id ?? "", passkeyId: key?.id ?? "" };
+  if (!google || !key) {
+    throw new Error("测试用户应当有一个 Google 绑定和一个通行密钥");
+  }
+  return { browser, profile, userId, accountId: google.id, passkeyId: key.id };
 }
 
 describe("待注销的用户调 /api/v1", () => {
@@ -65,6 +70,7 @@ describe("待注销的用户调 /api/v1", () => {
       ["GET", "/api/v1/me/logins"],
       ["GET", "/api/v1/me/sessions"],
       ["POST", "/api/v1/me/sessions/revoke-others"],
+      ["DELETE", `/api/v1/me/sessions/${crypto.randomUUID()}`],
       ["POST", "/api/v1/me/deletion"],
     ] as const;
     for (const [method, path] of blocked) {
@@ -78,13 +84,26 @@ describe("待注销的用户调 /api/v1", () => {
     expect((await browser.request("GET", "/api/v1/me")).json).toMatchObject({ status: "pending_deletion" });
   });
 
+  test("HEAD 和 GET 一样：放行的接口 200，其余 403", async () => {
+    const { app } = setup();
+    const { browser, userId } = await pendingUser(app);
+
+    for (const path of ["/api/v1/me", "/api/v1/meta", "/api/v1/login-options", `/api/v1/users/${userId}`]) {
+      expect((await browser.request("HEAD", path)).status, path).toBe(200);
+    }
+    expect((await browser.request("HEAD", "/api/v1/me/logins")).status).toBe(403);
+  });
+
   test("撤销注销之后，下一个请求就恢复正常", async () => {
     const { app } = setup();
     const { browser } = await pendingUser(app);
 
+    // 撤销之前同一个请求是被拦的：测的是"从拦到放"的变化，而不是它本来就通。
+    const before = await browser.request("GET", "/api/v1/me/logins");
     const cancelled = await browser.request("DELETE", "/api/v1/me/deletion", { headers: JSON_HEADERS });
     const logins = await browser.request("GET", "/api/v1/me/logins");
 
+    expect(before.status).toBe(403);
     expect(cancelled.status).toBe(200);
     expect(logins.status).toBe(200);
   });
@@ -125,6 +144,20 @@ describe("待注销的用户改账号设置（Better Auth 的接口）", () => {
     expect(await db.$count(account, eq(account.userId, userId))).toBe(1);
     const keys = await db.select().from(passkey).where(eq(passkey.userId, userId));
     expect(keys.map((key) => [key.id, key.name])).toEqual([[passkeyId, null]]);
+  });
+
+  // 钩子必须排在 before[] 的第一个：会话超过 10 分钟的待注销用户拿到的应该是 ACCOUNT_PENDING_DELETION，
+  // 而不是先被"要重新登录"拦下（那样他会被叫去重新登录，而不是被送去注销提示页）。
+  test("会话超过 10 分钟的待注销用户：拿到 ACCOUNT_PENDING_DELETION，不是 REAUTH_REQUIRED", async () => {
+    const { app } = setup();
+    const { browser, userId, accountId } = await pendingUser(app);
+    await ageSessions(userId, 11);
+
+    const link = await browser.request("POST", "/api/auth/link-social", { body: { provider: "google", callbackURL: "/" } });
+    const unlink = await browser.request("POST", "/api/auth/unlink-account", { body: { accountId } });
+
+    expect([link.status, link.json?.code]).toEqual([403, "ACCOUNT_PENDING_DELETION"]);
+    expect([unlink.status, unlink.json?.code]).toEqual([403, "ACCOUNT_PENDING_DELETION"]);
   });
 
   test("Bearer 也一样", async () => {

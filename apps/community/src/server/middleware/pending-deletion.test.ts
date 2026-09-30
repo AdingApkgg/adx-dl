@@ -23,6 +23,7 @@ describe("isAllowedWhilePending", () => {
       ["GET", "/api/v1/me/logins"],
       ["POST", "/api/v1/me/deletion"],
       ["DELETE", "/api/v1/me"],
+      ["DELETE", "/api/v1/me/sessions/2f1c9c9e-7c2e-4f0e-9d7a-0e3f2a6b1c5d"],
       ["GET", "/api/v1/me/"],
       ["GET", "/api/v1/users/abc2345678/extra"],
       ["POST", "/api/v1/meta"],

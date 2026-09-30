@@ -104,6 +104,30 @@ describe("GET /api/v1/me", () => {
       internalAdapter.findSession = findSession;
     }
   });
+
+  // sessionContext 只接住 401：数据库出错这类照旧往外抛，不能因为数据库抖一下就把所有人当成没登录。
+  test("读会话时数据库出错：500 INTERNAL，记下 unhandled_error，不当成没登录", async () => {
+    const { auth } = createTestAuth();
+    const { deps, logs } = testAppDeps({ auth });
+    const browser = new Browser(createApp(deps));
+    await signInWithGoogle(browser, googleProfile());
+    // 在对象上换掉方法，理由同上。
+    const { internalAdapter } = await auth.$context;
+    const findSession = internalAdapter.findSession;
+    internalAdapter.findSession = async () => {
+      throw new Error("db down");
+    };
+    try {
+      const res = await browser.request("GET", "/api/v1/me");
+
+      expect([res.status, res.json?.error?.code]).toEqual([500, "INTERNAL"]);
+      expect(logs().filter((entry) => entry.event === "unhandled_error")).toEqual([
+        expect.objectContaining({ level: "error", method: "GET", path: "/api/v1/me" }),
+      ]);
+    } finally {
+      internalAdapter.findSession = findSession;
+    }
+  });
 });
 
 describe("按用户限流", () => {
