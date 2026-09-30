@@ -3,6 +3,7 @@ import { validator } from "hono/validator";
 import { z } from "zod";
 
 import { parseBio } from "@/shared/bio";
+import { describeError } from "@/shared/describe-error";
 import { parseNickname } from "@/shared/nickname";
 
 import type { AppEnv } from "../app-env";
@@ -128,10 +129,15 @@ export const meRoutes = new Hono<AppEnv>()
         return jsonError(c, 409, "DELETION_CONFLICT", "A deletion is already being processed");
       }
       // 会话已经在事务里删掉了；事务提交之后再让 Better Auth 发出清掉会话 Cookie 的 Set-Cookie（它不要求
-      // 会话还在）。万一出错也不影响结果：注销已经生效，浏览器里只剩一个服务端不认的 Cookie。
+      // 会话还在）。这一步出错不改变结果：注销已经生效，会话行也已经删光，照常返回 200，错误记进日志。
+      // 只是响应里没有清除头，浏览器会留着一个不对应任何会话的 Cookie（这次请求恰好要续期的话，是
+      // sessionContext 补上的续期头设的那个），服务端不认它。
       const signedOut = await services.auth.api
         .signOut({ headers: c.req.raw.headers, returnHeaders: true })
-        .catch(() => null);
+        .catch((error: unknown) => {
+          services.log.error("deletion_sign_out_failed", { userId: user.id, ...describeError(error) });
+          return null;
+        });
       for (const cookie of signedOut?.headers.getSetCookie() ?? []) {
         c.header("set-cookie", cookie, { append: true });
       }

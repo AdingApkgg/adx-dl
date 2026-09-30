@@ -1,5 +1,7 @@
 import type { PgBoss } from "pg-boss";
 
+import type { Logger } from "@/shared/log";
+
 import type { Auth } from "../auth/auth";
 import type { Db } from "../db/client";
 import type { LoginOptions } from "./login-options";
@@ -16,4 +18,6 @@ export type ApiServices = {
   deletionHandlers: readonly DeletionHandler[];
   /** Better Auth 实例：createApp 从 AppDeps.auth 放进来，调用方不用再传一遍。 */
   auth: Auth;
+  /** 日志：createApp 从 AppDeps.log 放进来。出了错也不影响响应的那类失败要记在这里，不能悄悄吞掉。 */
+  log: Logger;
 };

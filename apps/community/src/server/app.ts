@@ -36,14 +36,14 @@ export type AppDeps = {
   publicOrigin: string;
   /** Better Auth 实例（createAuth 的返回值）。 */
   auth: Auth;
-  /** /api/v1 的接口用到的依赖（auth 由 createApp 从上面那一项放进去）。 */
-  services: Omit<ApiServices, "auth">;
+  /** /api/v1 的接口用到的依赖（auth、log 由 createApp 从上面同名的两项放进去）。 */
+  services: Omit<ApiServices, "auth" | "log">;
 };
 
 // 中间件顺序是 spec 第 8.1 节定的，改动前先对照 spec。
 export function createApp(deps: AppDeps) {
   const app = new Hono<AppEnv>();
-  const services: ApiServices = { ...deps.services, auth: deps.auth };
+  const services: ApiServices = { ...deps.services, auth: deps.auth, log: deps.log };
 
   app.use("*", requestId());
   app.use("*", clientIp());

@@ -166,6 +166,33 @@ describe("POST /api/v1/me/deletion", () => {
     expect(((await res.json()) as { signedOut: boolean }).signedOut).toBe(true);
     expect((await app.request("/api/v1/me", { headers: { authorization } })).status).toBe(401);
   });
+
+  // 注销已经提交，只有事后让 Better Auth 发清除头的那一步出了错：响应照常 200，错误要记进日志，不能悄悄吞掉。
+  test("发清除头的 signOut 出错：仍然 200，账号在注销中、没有会话，错误记进日志", async () => {
+    const { auth } = createTestAuth();
+    const { deps, logs } = testAppDeps({ auth });
+    const { browser, userId } = await signedIn(createApp(deps));
+    // 在对象上换掉方法（不用 mock.module：它会泄漏到同一进程里的其他测试文件）。auth.api 的成员在类型上是
+    // 只读的、运行时可写：通过一个可写的视图来换。抛普通的 Error：Better Auth 自己的错误会往控制台打东西。
+    const api: { signOut: unknown } = auth.api;
+    const signOut = api.signOut;
+    api.signOut = async () => {
+      throw new Error("sign-out failed on purpose");
+    };
+    try {
+      const res = await requestDeletion(browser, { deleteContent: false, confirmId: userId });
+
+      expect(res.status).toBe(200);
+      expect(res.json).toEqual({ purgeAt: expect.any(String), signedOut: true });
+      expect((await userRow(userId))?.status).toBe("pending_deletion");
+      expect(await testDbHandle().db.$count(session, eq(session.userId, userId))).toBe(0);
+      const failures = logs().filter((entry) => entry.event === "deletion_sign_out_failed");
+      expect(failures).toHaveLength(1);
+      expect(failures[0]).toMatchObject({ level: "error", userId, name: "Error", message: "sign-out failed on purpose" });
+    } finally {
+      api.signOut = signOut;
+    }
+  });
 });
 
 describe("DELETE /api/v1/me/deletion", () => {
