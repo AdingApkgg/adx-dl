@@ -23,6 +23,11 @@ const MESSAGES: Record<string, () => string> = {
   CURRENT_SESSION: m.error_current_session,
   RATE_LIMITED: m.error_rate_limited,
   account_already_linked_to_different_user: m.error_google_already_linked,
+  NICKNAME_INVALID: m.error_nickname_invalid,
+  BIO_TOO_LONG: m.error_bio_too_long,
+  ACCOUNT_PENDING_DELETION: m.error_account_pending_deletion,
+  DELETION_CONFIRM_MISMATCH: m.error_deletion_confirm_mismatch,
+  DELETION_NOT_CANCELLABLE: m.error_deletion_not_cancellable,
 };
 
 // 用户自己关掉了通行密钥对话框，或者在 Google 那边点了取消：不算错误。

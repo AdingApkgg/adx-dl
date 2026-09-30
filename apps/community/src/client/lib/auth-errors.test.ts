@@ -21,6 +21,14 @@ describe("错误文案", () => {
     expect(errorMessage("account_already_linked_to_different_user")).toBe(m.error_google_already_linked());
   });
 
+  test("1c 的错误码：资料、注销", () => {
+    expect(errorMessage(new ApiError(400, "NICKNAME_INVALID", "x"))).toBe(m.error_nickname_invalid());
+    expect(errorMessage(new ApiError(400, "BIO_TOO_LONG", "x"))).toBe(m.error_bio_too_long());
+    expect(errorMessage({ code: "ACCOUNT_PENDING_DELETION", status: 403 })).toBe(m.error_account_pending_deletion());
+    expect(errorMessage(new ApiError(400, "DELETION_CONFIRM_MISMATCH", "x"))).toBe(m.error_deletion_confirm_mismatch());
+    expect(errorMessage(new ApiError(409, "DELETION_NOT_CANCELLABLE", "x"))).toBe(m.error_deletion_not_cancellable());
+  });
+
   // Better Auth 的 429 响应体没有 code（调研报告第 12 题）。
   test("没有错误码的 429 当作限流", () => {
     expect(errorMessage({ status: 429 })).toBe(m.error_rate_limited());

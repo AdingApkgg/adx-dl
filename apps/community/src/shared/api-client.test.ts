@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { ApiError, expectOk } from "./api-client";
+import { ApiError, expectOk, okJson } from "./api-client";
 
 function fakeResponse(status: number, body: unknown) {
   return {
@@ -28,5 +28,18 @@ describe("expectOk", () => {
   test("响应体不是约定格式时用状态码兜底", async () => {
     const error = await expectOk(fakeResponse(502, "bad gateway")).catch((e: unknown) => e);
     expect(error).toMatchObject({ status: 502, code: "HTTP_502" });
+  });
+});
+
+describe("okJson", () => {
+  test("成功的响应返回响应体", async () => {
+    expect(await okJson(fakeResponse(200, { a: 1 }))).toEqual({ a: 1 });
+  });
+
+  test("错误响应和 expectOk 一样抛 ApiError", async () => {
+    const error = await okJson(fakeResponse(409, { error: { code: "DELETION_NOT_CANCELLABLE", message: "x" } })).catch(
+      (e: unknown) => e
+    );
+    expect(error).toMatchObject({ name: "ApiError", status: 409, code: "DELETION_NOT_CANCELLABLE" });
   });
 });

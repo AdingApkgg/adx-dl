@@ -9,8 +9,9 @@ import { htmlLang } from "@/shared/i18n/locale";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
 import { isReauthError, QqCodeForm } from "../components/qq-code-form";
+import { accountErrorRedirect } from "../lib/account-errors";
 import { authClient } from "../lib/auth-client";
-import { errorCodeOf, errorMessage } from "../lib/auth-errors";
+import { errorMessage } from "../lib/auth-errors";
 import { getBrowserApi, getRenderApi, jsonRequest } from "../lib/browser";
 import { loginHref, requireUser } from "../lib/require-user";
 import { useHydrated } from "../lib/use-hydrated";
@@ -91,7 +92,8 @@ function SettingsContent() {
         : ""
       : m.settings_device_unknown_place();
 
-  // 所有按钮共用：出错时翻译成文案；未登录跳去登录页（spec 第 11.4 节）；要求刚登录的给出"重新登录"链接。
+  // 所有按钮共用：出错时翻译成文案；未登录跳去登录页、账号正在注销跳去注销提示页（spec 第 11.4 节）；
+  // 要求刚登录的给出"重新登录"链接。
   // 成功和出错都刷新列表：出错时那一行可能已经在别处被删掉了。
   async function run(action: () => Promise<unknown>) {
     setPending(true);
@@ -105,10 +107,9 @@ function SettingsContent() {
       }
       await queryClient.invalidateQueries({ queryKey: ["me"] });
     } catch (error) {
-      const code = errorCodeOf(error);
-      const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
-      if (code === "UNAUTHORIZED" || status === 401) {
-        window.location.assign(loginHref(here));
+      const target = accountErrorRedirect(error, here);
+      if (target) {
+        window.location.assign(target);
         return;
       }
       // 比如在别处已经被踢掉的会话，再点"下线"会得到 404：不刷新的话那一行一直留着。
