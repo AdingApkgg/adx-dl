@@ -12,3 +12,15 @@ export function normalizeNickname(raw: unknown): string {
     .trim();
   return Array.from(cleaned).slice(0, NICKNAME_MAX).join("").trim();
 }
+
+/**
+ * 用户自己改昵称时用：规整后 1 到 24 个字符才算合格，返回规整后的值，否则返回 null。
+ * 和 normalizeNickname 不同，超长的不替用户截断（建号时 Google 名字、QQ 昵称超长才截断）。
+ */
+export function parseNickname(raw: unknown): string | null {
+  const cleaned = String(raw ?? "")
+    .replace(FORBIDDEN, "")
+    .trim();
+  const length = Array.from(cleaned).length;
+  return length >= 1 && length <= NICKNAME_MAX ? cleaned : null;
+}
