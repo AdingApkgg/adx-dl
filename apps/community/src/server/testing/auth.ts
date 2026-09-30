@@ -118,8 +118,8 @@ export function installFakeGoogle(profile: GoogleProfile): () => void {
   };
 }
 
-/** 1b 里新用户先去账号设置页（见本计划"与 spec 的偏离"第 8 条）。 */
-export const NEW_USER_CALLBACK = "/settings/account?welcome=1";
+/** 新用户先去首次登录引导页（前端 onboardingHref("/") 的结果）。 */
+export const NEW_USER_CALLBACK = "/onboarding?next=%2F";
 
 // 走一遍 Google 登录或绑定：sign-in/social（或 link-social）→ 冒充 Google → 回调。返回回调的响应。
 export async function signInWithGoogle(

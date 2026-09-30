@@ -6,6 +6,7 @@ export default [
   route(":lang?", "routes/locale.tsx", [
     index("routes/home.tsx"),
     route("login", "routes/login.tsx"),
+    route("onboarding", "routes/onboarding.tsx"),
     route("settings/account", "routes/settings-account.tsx"),
     route("settings/profile", "routes/settings-profile.tsx"),
     route("*", "routes/not-found.tsx"),

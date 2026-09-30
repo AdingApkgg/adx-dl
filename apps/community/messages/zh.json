@@ -51,7 +51,6 @@
   "login_turnstile_failed": "人机验证加载失败，请刷新页面重试。",
   "login_working": "请稍候…",
   "settings_account_title": "账号设置",
-  "settings_welcome": "欢迎！建议再添加一种登录方式作为备用，比如绑定 QQ 或 Google，或者给这台设备添加通行密钥。",
   "settings_logins_heading": "登录方式",
   "settings_login_google": "Google：{email}",
   "settings_login_qq": "QQ：{nickname}（{number}）",

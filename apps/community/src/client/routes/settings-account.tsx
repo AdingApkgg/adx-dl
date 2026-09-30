@@ -48,8 +48,9 @@ export default function SettingsAccount({ loaderData }: Route.ComponentProps) {
 
 type Failure = { message: string; reauth: boolean };
 
-// "重新登录"的链接、QQ 绑定的重新登录链接和未登录时的跳转，登录后都回到这个地址（当前页）。去掉 error 和 welcome：
-// 它们是一次性的提示（Google 绑定失败的原因、欢迎语），带回来的话，旧的错误提示会一直显示，欢迎语也会在重新登录后再出现一次。
+// "重新登录"的链接、QQ 绑定的重新登录链接和未登录时的跳转，登录后都回到这个地址（当前页）。去掉 error：它是一次性的
+// 提示（Google 绑定失败的原因），带回来的话旧的错误提示会一直显示。welcome 是 1b 给新用户的欢迎语参数（1c 起新用户
+// 先去首次登录引导页），旧链接里可能还带着，一并去掉。
 export function returnPath(pathname: string, search: string): string {
   const params = new URLSearchParams(search);
   params.delete("error");
@@ -156,7 +157,6 @@ function SettingsContent() {
       <p>
         <Link to={localizeHref("/settings/profile")}>{m.settings_profile_title()}</Link>
       </p>
-      {params.get("welcome") === "1" ? <p>{m.settings_welcome()}</p> : null}
       {callbackMessage ? <p role="alert">{callbackMessage}</p> : null}
       {failure ? (
         <p role="alert">

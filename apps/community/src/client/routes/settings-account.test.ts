@@ -326,11 +326,6 @@ describe("账号设置页渲染：登录设备", () => {
 });
 
 describe("账号设置页渲染：顶部提示", () => {
-  test("?welcome=1 显示欢迎提示；没带时不显示", async () => {
-    expect(await renderPage({}, "?welcome=1")).toContain(m.settings_welcome());
-    expect(await renderPage({})).not.toContain(m.settings_welcome());
-  });
-
   // Google 绑定出错时 Better Auth 把用户送回 errorCallbackURL 并在后面接上 ?error=。
   test("?error= 显示 Google 绑定失败的原因", async () => {
     expect(await renderPage({}, "?error=account_already_linked_to_different_user")).toContain(m.error_google_already_linked());
