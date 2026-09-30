@@ -54,9 +54,12 @@ export const middleware: Route.MiddlewareFunction[] = [
 // 需要服务端数据的页面，跳转时的 .data 请求照样经过上面的中间件。
 export const clientMiddleware: Route.ClientMiddlewareFunction[] = [
   ({ url }, next) => {
-    const me = getBrowserQueryClient().getQueryData(meQuery(getBrowserApi()).queryKey);
-    const target = pendingDeletionRedirect(me, url.pathname);
+    const queryClient = getBrowserQueryClient();
+    const { queryKey } = meQuery(getBrowserApi());
+    const target = pendingDeletionRedirect(queryClient.getQueryData(queryKey), url.pathname);
     if (target) {
+      // 缓存里的"待注销"可能已经过时：不清掉，注销提示页按服务端的答案跳走后，这里又按缓存把用户送回去，来回没完。
+      queryClient.removeQueries({ queryKey, exact: true });
       throw redirect(target);
     }
     return next();

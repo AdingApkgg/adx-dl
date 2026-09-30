@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test";
-import { RouterContextProvider } from "react-router";
+import { afterEach, describe, expect, test } from "bun:test";
+import { createMemoryRouter, redirect, type RouteObject, RouterContextProvider } from "react-router";
 
 import type { ApiClient } from "@/shared/api-client";
 import { makeQueryClient } from "@/shared/query-client";
@@ -132,15 +132,17 @@ describe("待注销的用户跳到注销提示页", () => {
 });
 
 // 布局的 clientMiddleware：浏览器里站内跳转到只有 clientLoader 的页面（首页）时，服务端的中间件不会执行，
-// 用浏览器缓存里的当前用户再判断一次。只读缓存，一个请求也不发。
+// 用浏览器缓存里的当前用户再判断一次。只看缓存，一个请求也不发；要跳走时先把缓存里的这一项清掉。
 describe("站内跳转时待注销的用户去注销提示页", () => {
   const redirectPending = clientMiddleware[0];
   type ClientArgs = Parameters<NonNullable<typeof redirectPending>>[0];
 
+  // 缓存是浏览器里的单例：每个用例跑完清空，下一个从空的开始。
+  afterEach(() => getBrowserQueryClient().clear());
+
   // getBrowserApi 要读 window.location.origin，Paraglide 在浏览器里取当前语言要读 window.location.href：临时补一个
-  // window，跑完还原。fetch 换成会计数的，中间件发了请求就记下来。缓存是浏览器里的单例，每次先清空再放进这次要的当前用户。
-  async function runClientMiddleware(pathname: string, cachedMe: { status: string } | null | undefined) {
-    const queryClient = getBrowserQueryClient();
+  // window，跑完还原。fetch 换成会计数的，中间件发了请求就记下来。
+  async function inFakeBrowser<T>(run: (requests: () => number) => Promise<T>): Promise<T> {
     const originalFetch = globalThis.fetch;
     let requests = 0;
     try {
@@ -149,6 +151,17 @@ describe("站内跳转时待注销的用户去注销提示页", () => {
         return Promise.reject(new Error("中间件不该发请求"));
       }) as unknown as typeof fetch;
       Object.assign(globalThis, { window: { location: { origin: "https://x.test", href: "https://x.test/" } } });
+      return await run(() => requests);
+    } finally {
+      globalThis.fetch = originalFetch;
+      Reflect.deleteProperty(globalThis, "window");
+    }
+  }
+
+  // 先清空缓存再放进这次要的当前用户；跑完不清，用例要看中间件对缓存做了什么（afterEach 再清）。
+  function runClientMiddleware(pathname: string, cachedMe: { status: string } | null | undefined) {
+    return inFakeBrowser(async (requests) => {
+      const queryClient = getBrowserQueryClient();
       queryClient.clear();
       if (cachedMe !== undefined) {
         queryClient.setQueryData(["me"], cachedMe);
@@ -164,12 +177,8 @@ describe("站内跳转时待注销的用户去注销提示页", () => {
       } catch (error) {
         thrown = error;
       }
-      return { nextCalled, thrown, requests };
-    } finally {
-      queryClient.clear();
-      globalThis.fetch = originalFetch;
-      Reflect.deleteProperty(globalThis, "window");
-    }
+      return { nextCalled, thrown, requests: requests() };
+    });
   }
 
   test("缓存里的当前用户待注销：每个页面都去注销提示页，不往下执行", async () => {
@@ -197,4 +206,75 @@ describe("站内跳转时待注销的用户去注销提示页", () => {
       expect(await runClientMiddleware("/settings/account", cachedMe)).toEqual({ nextCalled: true, thrown: null, requests: 0 });
     }
   });
+
+  // 缓存里的"待注销"可能已经过时（在别的标签页撤销了注销、退出了登录，或者账号已经被清除）。跳去注销提示页之前把它清掉，
+  // 让注销提示页的 loader 向服务端确认：还在注销，就由它把当前用户重新放回缓存；已经不在了，就把用户送走，之后的跳转不再被拦。
+  test("跳去注销提示页之前，把缓存里的当前用户清掉；不跳的时候不动它", async () => {
+    await runClientMiddleware("/settings/account", { status: "pending_deletion" });
+    expect(getBrowserQueryClient().getQueryCache().find({ queryKey: ["me"] })).toBeUndefined();
+
+    for (const [pathname, cachedMe] of [
+      ["/account-deletion", { status: "pending_deletion" }],
+      ["/settings/account", { status: "active" }],
+    ] as const) {
+      await runClientMiddleware(pathname, cachedMe);
+      expect<unknown>(getBrowserQueryClient().getQueryData(["me"]), pathname).toEqual(cachedMe);
+    }
+  });
+
+  // 评审复现过的死循环：缓存里是"待注销"，服务端的答案却已经变了（在别的标签页撤销了注销、退出了登录）。注销提示页的 loader
+  // 按服务端的答案跳走，clientMiddleware 却按缓存又把用户送回去，来回没完，每一趟都是一个 .data 请求。这里用真正的路由器走一遍。
+  // 注销提示页的 loader 转了几圈还没停就自己放行：出了问题是断言失败，不会把测试挂住。
+  // [服务端的答案, 注销提示页的 loader 把用户送去的地方]：正常状态的用户回首页，没登录的去登录页。
+  for (const [answer, landing] of [
+    ["正常状态", "/"],
+    ["没登录", "/login"],
+  ] as const) {
+    test(`缓存里的待注销已经过时（服务端说${answer}）：只绕一趟注销提示页，落到 ${landing}，之后的跳转不再被拦`, () =>
+      inFakeBrowser(async (requests) => {
+        let deletionPageLoads = 0;
+        const routes: RouteObject[] = [
+          {
+            id: "layout",
+            path: "/",
+            middleware: clientMiddleware as RouteObject["middleware"],
+            children: [
+              { index: true },
+              { path: "settings" },
+              { path: "login" },
+              {
+                path: "account-deletion",
+                loader: () => {
+                  deletionPageLoads += 1;
+                  if (deletionPageLoads > 5) {
+                    return null;
+                  }
+                  throw redirect(landing);
+                },
+              },
+            ],
+          },
+        ];
+        // hydrationData：路由器一创建就是初始化好的（不然首次加载也要跑一遍中间件）。
+        const router = createMemoryRouter(routes, {
+          initialEntries: ["/settings"],
+          hydrationData: { loaderData: { layout: null } },
+        });
+        try {
+          getBrowserQueryClient().clear();
+          getBrowserQueryClient().setQueryData(["me"], { status: "pending_deletion" });
+
+          await router.navigate("/");
+          expect(deletionPageLoads).toBe(1);
+          expect(router.state.location.pathname).toBe(landing);
+
+          await router.navigate("/settings");
+          expect(deletionPageLoads).toBe(1);
+          expect(router.state.location.pathname).toBe("/settings");
+          expect(requests()).toBe(0);
+        } finally {
+          router.dispose();
+        }
+      }));
+  }
 });
