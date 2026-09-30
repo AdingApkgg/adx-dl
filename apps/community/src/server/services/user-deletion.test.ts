@@ -246,9 +246,10 @@ describe("最终清除", () => {
       name,
       hasContent: async () => true,
       purge: async (userId, { deleteContent }, tx) => {
-        // 在清除的事务里：这时用户行还在（锁在这个事务手里）。
-        const [row] = await tx.select({ id: user.id }).from(user).where(eq(user.id, userId));
-        calls.push(`${name}:${deleteContent}:${row?.id === userId}`);
+        // 传进来的必须是清除的事务本身，不能是另开的一个：nowait 的行锁只有已经拿着这一行锁的事务才拿得到，
+        // 别的连接会因为清除的事务持有这把锁而立刻报 55P03。普通的 SELECT 不等行锁，读得到还没删掉的行，证明不了这一点。
+        const locked = await tx.execute(sql`select 1 from "user" where id = ${userId} for update nowait`);
+        calls.push(`${name}:${deleteContent}:${locked.rows.length === 1}`);
       },
     });
     const handlers = [recording("charts"), recording("forum")];
@@ -261,6 +262,20 @@ describe("最终清除", () => {
 
   test("某个模块的 purge 出错：整个回滚，用户还在注销中，下次重试时从头再来", async () => {
     const id = await seedUser();
+    // 排在出错的模块前面，用清除的事务删掉 profiles 里的这一行：后面的模块出错时，这个删除必须跟着回滚。
+    // 要是各模块的 purge 各开各的事务，这一行会先提交、删掉，用户却还在注销中：删了一半的账号。
+    const deleted: number[] = [];
+    const writing: DeletionHandler = {
+      name: "writing",
+      hasContent: async () => false,
+      purge: async (userId, _options, tx) => {
+        const rows = await tx
+          .delete(profiles)
+          .where(eq(profiles.userId, userId))
+          .returning({ userId: profiles.userId });
+        deleted.push(rows.length);
+      },
+    };
     const failing: DeletionHandler = {
       name: "broken",
       hasContent: async () => false,
@@ -268,10 +283,13 @@ describe("最终清除", () => {
         throw new Error("storage is down");
       },
     };
-    await requestDeletion(deps([failing]), id, { deleteContent: false });
+    const handlers = [writing, failing];
+    await requestDeletion(deps(handlers), id, { deleteContent: false });
 
-    await expect(purgeUser(deps([failing]), id)).rejects.toThrow("storage is down");
+    await expect(purgeUser(deps(handlers), id)).rejects.toThrow("storage is down");
 
+    // 删除确实执行过（删掉了一行），但没有留下来。
+    expect(deleted).toEqual([1]);
     expect(await userRow(id)).toMatchObject({ status: "pending_deletion" });
     expect(await rowsLeft(id)).toMatchObject({ user: 1, accounts: 1, profiles: 1 });
     expect(await purgeUser(deps(), id)).toBe("purged");
