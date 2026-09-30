@@ -43,3 +43,33 @@ export async function updateMyProfile(db: Db, userId: string, update: ProfileUpd
       });
   });
 }
+
+/**
+ * 个人主页（spec 第 10.5 节）的公开资料。正在注销的用户只给出 id 和状态：主页显示"该用户正在注销"，
+ * 昵称、简介在冷静期里就不再公开。
+ */
+export type PublicProfile =
+  | { id: string; status: "active"; name: string; image: string | null; bio: string; createdAt: Date }
+  | { id: string; status: "pending_deletion" };
+
+export async function getPublicProfile(db: Db, id: string): Promise<PublicProfile | null> {
+  const [row] = await db
+    .select({
+      id: user.id,
+      status: user.status,
+      name: user.name,
+      image: user.image,
+      createdAt: user.createdAt,
+      bio: profiles.bio,
+    })
+    .from(user)
+    .leftJoin(profiles, eq(profiles.userId, user.id))
+    .where(eq(user.id, id));
+  if (!row) {
+    return null;
+  }
+  if (row.status === "pending_deletion") {
+    return { id: row.id, status: "pending_deletion" };
+  }
+  return { id: row.id, status: "active", name: row.name, image: row.image, bio: row.bio ?? "", createdAt: row.createdAt };
+}
