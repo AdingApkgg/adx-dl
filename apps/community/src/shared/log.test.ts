@@ -8,14 +8,16 @@ describe("createLogger", () => {
     const log = createLogger((line) => lines.push(line));
 
     log.info("request", { path: "/healthz", status: 200, skipped: undefined });
+    log.warn("requeued", { count: 2 });
     log.error("boom", { message: "x" });
 
-    expect(lines).toHaveLength(2);
+    expect(lines).toHaveLength(3);
     const first = JSON.parse(lines[0] ?? "{}");
     expect(first).toMatchObject({ level: "info", event: "request", path: "/healthz", status: 200 });
     expect(typeof first.time).toBe("string");
     expect("skipped" in first).toBe(false);
-    expect(JSON.parse(lines[1] ?? "{}")).toMatchObject({ level: "error", event: "boom", message: "x" });
+    expect(JSON.parse(lines[1] ?? "{}")).toMatchObject({ level: "warn", event: "requeued", count: 2 });
+    expect(JSON.parse(lines[2] ?? "{}")).toMatchObject({ level: "error", event: "boom", message: "x" });
   });
 
   test("调用方的字段不能冒充时间、级别和事件", () => {
