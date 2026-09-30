@@ -23,6 +23,7 @@ import { createOneBotClient } from "./napcat/client";
 import { createNapcatSender } from "./napcat/sender";
 import { connectRedis, getRedis, pingRedis } from "./redis/client";
 import { createLoginOptions } from "./services/login-options";
+import { DELETION_HANDLERS } from "./services/user-deletion";
 
 const env = parseEnv(process.env);
 const log = createLogger();
@@ -75,6 +76,7 @@ const app = createApp({
     db,
     boss: getBoss,
     loginOptions: createLoginOptions({ turnstileSiteKey: env.turnstile.siteKey, qq: env.qq, redis }),
+    deletionHandlers: DELETION_HANDLERS,
   },
 });
 

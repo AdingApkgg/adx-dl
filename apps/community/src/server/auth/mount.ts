@@ -1,3 +1,4 @@
+import { isAPIError } from "better-auth/api";
 import type { Context, Hono, MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
@@ -44,21 +45,41 @@ export function mountAuth(app: Hono<AppEnv>, auth: Auth): void {
   });
 }
 
+// Set-Cookie 那一行里的 Cookie 名（第一个 = 之前的部分）。
+function cookieName(line: string): string {
+  return line.slice(0, line.indexOf("="));
+}
+
 // spec 第 8.1 节第 9 步：网页读 Cookie，App 读 Authorization: Bearer，getSession 两种都认。
 export function sessionContext(auth: Auth): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
-    const { headers, response } = await auth.api.getSession({ headers: c.req.raw.headers, returnHeaders: true });
-    c.set("auth", response);
+    // 续期的时候会话恰好被删掉了（另一个标签页踢下线、同一个浏览器重新登录、注销）：getSession 抛 401
+    // FAILED_TO_GET_SESSION。当作没登录；它顺带发出的"清掉 Cookie"不转发，理由和下面没取到会话时一样。
+    // 只接住 401：数据库出错这类照旧往外抛，不能因为数据库抖一下就把所有人当成没登录。
+    const result = await auth.api
+      .getSession({ headers: c.req.raw.headers, returnHeaders: true })
+      .catch((error: unknown) => {
+        if (isAPIError(error) && error.statusCode === 401) {
+          return null;
+        }
+        throw error;
+      });
+    c.set("auth", result?.response ?? null);
     await next();
     // 会话满一天会续期：数据库里的过期时间已经延长，新的 Set-Cookie 要带回浏览器。
     // 只有取到了会话才转发。Cookie 指向的会话已经不在时（同一个浏览器重新登录，旧会话被删掉了），
     // Better Auth 会发出清掉会话 Cookie 的 Set-Cookie；还带着旧 Cookie、晚到的请求（另一个标签页、
     // 聚焦时的自动刷新）把它带回浏览器，会连刚登录的新 Cookie 一起清掉。
-    if (!response) {
+    if (!result?.response) {
       return;
     }
-    for (const cookie of headers.getSetCookie()) {
-      c.res.headers.append("set-cookie", cookie);
+    // 处理函数自己设了的同名 Cookie 优先（比如注销时清掉会话 Cookie）：续期的不再补上。续期头排在后面，
+    // 浏览器会以它为准，把刚清掉的 Cookie 又设回去，留下一个指向已删会话、30 天才过期的死 Cookie。
+    const alreadySet = new Set(c.res.headers.getSetCookie().map(cookieName));
+    for (const cookie of result.headers.getSetCookie()) {
+      if (!alreadySet.has(cookieName(cookie))) {
+        c.res.headers.append("set-cookie", cookie);
+      }
     }
   };
 }

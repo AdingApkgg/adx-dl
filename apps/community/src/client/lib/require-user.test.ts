@@ -53,6 +53,7 @@ describe("requireUser", () => {
       image: null,
       status: "active",
       createdAt: "2026-09-29T00:00:00.000Z",
+      deletionPurgeAt: null,
     };
     const { context, queryClient } = contextWithMe(() => Response.json(user));
 

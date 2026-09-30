@@ -36,13 +36,14 @@ export type AppDeps = {
   publicOrigin: string;
   /** Better Auth 实例（createAuth 的返回值）。 */
   auth: Auth;
-  /** /api/v1 的接口用到的依赖。 */
-  services: ApiServices;
+  /** /api/v1 的接口用到的依赖（auth 由 createApp 从上面那一项放进去）。 */
+  services: Omit<ApiServices, "auth">;
 };
 
 // 中间件顺序是 spec 第 8.1 节定的，改动前先对照 spec。
 export function createApp(deps: AppDeps) {
   const app = new Hono<AppEnv>();
+  const services: ApiServices = { ...deps.services, auth: deps.auth };
 
   app.use("*", requestId());
   app.use("*", clientIp());
@@ -128,7 +129,7 @@ export function createApp(deps: AppDeps) {
   // spec 第 8.1 节第 9、10 步：先识别会话，再做 CSRF 校验。
   app.use("/api/v1/*", sessionContext(deps.auth));
   app.use("/api/v1/*", async (c, next) => {
-    c.set("services", deps.services);
+    c.set("services", services);
     await next();
   });
   app.use("/api/v1/*", csrfGuard({ publicOrigin: deps.publicOrigin }));

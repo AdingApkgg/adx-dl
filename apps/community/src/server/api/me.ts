@@ -11,6 +11,7 @@ import { isRecentLogin } from "../auth/recent-login";
 import { jsonError } from "../errors";
 import { listLogins, listSessions, revokeOtherSessions, revokeSession } from "../services/account";
 import { getMyProfile, type ProfileUpdate, updateMyProfile } from "../services/profile";
+import { cancelDeletion, requestDeletion } from "../services/user-deletion";
 import { UUID_PATTERN } from "../uuid";
 
 // 请求体的形状，只看类型。长度规则（昵称 1 到 24 个字符、简介最多 300 个字符）在 parseNickname、parseBio：
@@ -20,6 +21,13 @@ const profilePatch = z.object({
   name: z.string().optional(),
   bio: z.string().optional(),
   onboarded: z.literal(true).optional(),
+});
+
+const deletionRequest = z.object({
+  /** 同时删除自己发布的内容；不勾时内容匿名保留（spec 第 10.6 节）。 */
+  deleteContent: z.boolean(),
+  /** 用户照着输入的自己的用户 id，防手滑。 */
+  confirmId: z.string().max(100),
 });
 
 // /api/v1/me 下的接口都要求登录。必须链式定义：Hono RPC 从返回类型推导每个接口。
@@ -37,6 +45,8 @@ export const meRoutes = new Hono<AppEnv>()
       image: user.image ?? null,
       status: user.status,
       createdAt: user.createdAt,
+      // 注销提示页用它算剩下几天、判断还能不能撤销；不在注销中时是 null。
+      deletionPurgeAt: user.deletionPurgeAt ?? null,
     });
   })
   .get("/profile", async (c) => {
@@ -86,6 +96,57 @@ export const meRoutes = new Hono<AppEnv>()
       return c.json(profile);
     }
   )
+  // 发起注销（spec 第 10.6 节）：敏感操作，要求 10 分钟内刚登录过；还要照着输入自己的用户 id。
+  .post(
+    "/deletion",
+    validator("json", (value, c) => {
+      const parsed = deletionRequest.safeParse(value);
+      if (!parsed.success) {
+        return jsonError(c, 400, "BAD_REQUEST", "Invalid deletion request");
+      }
+      return parsed.data;
+    }),
+    async (c) => {
+      const { user, session } = currentAuth(c);
+      if (!isRecentLogin(session.createdAt)) {
+        return jsonError(c, 403, "REAUTH_REQUIRED", "Sign in again to continue");
+      }
+      const { deleteContent, confirmId } = c.req.valid("json");
+      if (confirmId !== user.id) {
+        return jsonError(c, 400, "DELETION_CONFIRM_MISMATCH", "Type your user ID to confirm");
+      }
+      const services = c.get("services");
+      const result = await requestDeletion(
+        { db: services.db, boss: services.boss, handlers: services.deletionHandlers },
+        user.id,
+        { deleteContent }
+      );
+      if (result.status === "not_active") {
+        return jsonError(c, 403, "ACCOUNT_PENDING_DELETION", "This account is scheduled for deletion");
+      }
+      if (result.status === "conflict") {
+        return jsonError(c, 409, "DELETION_CONFLICT", "A deletion is already being processed");
+      }
+      // 会话已经在事务里删掉了；事务提交之后再让 Better Auth 发出清掉会话 Cookie 的 Set-Cookie（它不要求
+      // 会话还在）。万一出错也不影响结果：注销已经生效，浏览器里只剩一个服务端不认的 Cookie。
+      const signedOut = await services.auth.api
+        .signOut({ headers: c.req.raw.headers, returnHeaders: true })
+        .catch(() => null);
+      for (const cookie of signedOut?.headers.getSetCookie() ?? []) {
+        c.header("set-cookie", cookie, { append: true });
+      }
+      // signedOut：这个会话已经失效。App（Bearer）不认 Cookie，看到它就丢掉自己存的令牌。
+      return c.json({ purgeAt: result.purgeAt.toISOString(), signedOut: true as const });
+    }
+  )
+  // 撤销注销：冷静期内、还没到清除时间才行（清除任务可能已经开始了）。
+  .delete("/deletion", async (c) => {
+    const { user } = currentAuth(c);
+    if ((await cancelDeletion(c.get("services"), user.id)) === "not_cancellable") {
+      return jsonError(c, 409, "DELETION_NOT_CANCELLABLE", "This deletion can no longer be cancelled");
+    }
+    return c.json({ status: "active" as const });
+  })
   .get("/logins", async (c) => {
     const { user } = currentAuth(c);
     return c.json(await listLogins(c.get("services").db, user.id));
