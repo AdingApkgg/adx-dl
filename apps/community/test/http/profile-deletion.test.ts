@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { makeSignature } from "better-auth/crypto";
+import { eq } from "drizzle-orm";
 
 import { shortId } from "../../src/server/auth/short-id";
 import { profiles, session, user } from "../../src/server/db/schema";
@@ -152,5 +153,46 @@ describe("注销冷静期里的用户", () => {
 
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("/");
+  });
+});
+
+// 没有请求体的 DELETE。开发服务器里它们曾被请求体上限换成 GET，撤销注销和踢下线都不灵（middleware/body-limit.ts）；
+// 构建产物用 Bun.serve，请求体本来就是空的，不受影响，这里留作回归。
+describe("没有请求体的 DELETE", () => {
+  const jsonHeaders = (cookie: string) => ({ cookie, origin: server.origin, "content-type": "application/json" });
+
+  test("撤销注销：200，账号恢复正常", async () => {
+    const { id, cookie } = await seedUser("撤销注销", { pending: true });
+
+    const res = await fetch(server.url("/api/v1/me/deletion"), { method: "DELETE", headers: jsonHeaders(cookie) });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "active" });
+    const [row] = await testDbHandle()
+      .db.select({ status: user.status, purgeAt: user.deletionPurgeAt })
+      .from(user)
+      .where(eq(user.id, id));
+    expect(row).toEqual({ status: "active", purgeAt: null });
+  });
+
+  test("踢下线：200，指定的会话被删掉", async () => {
+    const { id, cookie } = await seedUser("踢下线");
+    const { db } = testDbHandle();
+    const otherSessionId = crypto.randomUUID();
+    await db.insert(session).values({
+      id: otherSessionId,
+      token: crypto.randomUUID().replaceAll("-", ""),
+      userId: id,
+      expiresAt: new Date(Date.now() + 30 * DAY_MS),
+    });
+
+    const res = await fetch(server.url(`/api/v1/me/sessions/${otherSessionId}`), {
+      method: "DELETE",
+      headers: jsonHeaders(cookie),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(await db.select({ id: session.id }).from(session).where(eq(session.id, otherSessionId))).toEqual([]);
   });
 });

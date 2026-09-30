@@ -1,9 +1,9 @@
 import { isAPIError } from "better-auth/api";
 import type { Context, Hono, MiddlewareHandler } from "hono";
-import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
 
 import type { AppEnv } from "../app-env";
+import { bodyLimitWhenDeclared } from "../middleware/body-limit";
 import type { Auth, AuthSession } from "./auth";
 
 // /api/auth/* 的请求体上限。这里所有接口的请求都很小（登录、验证码、通行密钥的注册响应最多几 KB），
@@ -21,12 +21,12 @@ function isGenuineBearerRequest(c: Context<AppEnv>): boolean {
 }
 
 // spec 第 8.1 节第 8 步。它前面的中间件都不能读请求体：c.req.raw 的请求体只能读一次。
-// 下面的 bodyLimit 是例外：请求没带 Content-Length（分块传输）时，它要把请求体读进内存来数大小，
+// 下面的 bodyLimitWhenDeclared 是例外：请求没带 Content-Length（分块传输）时，它要把请求体读进内存来数大小，
 // 然后换一个装着这份内容的新 c.req.raw，后面的处理函数照常读得到。
 export function mountAuth(app: Hono<AppEnv>, auth: Auth): void {
   app.use(
     "/api/auth/*",
-    bodyLimit({
+    bodyLimitWhenDeclared({
       maxSize: AUTH_BODY_LIMIT,
       // 响应体照 Better Auth 自己的错误格式：{ code, message }。
       onError: (c) => c.json({ code: "PAYLOAD_TOO_LARGE", message: "Request body is too large" }, 413),

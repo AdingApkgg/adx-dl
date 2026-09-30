@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
 import { requestId } from "hono/request-id";
 
@@ -11,6 +10,7 @@ import type { AppEnv } from "./app-env";
 import type { Auth } from "./auth/auth";
 import { mountAuth, sessionContext } from "./auth/mount";
 import { jsonError } from "./errors";
+import { bodyLimitWhenDeclared } from "./middleware/body-limit";
 import { clientIp, rateLimitKeyForIp } from "./middleware/client-ip";
 import { csrfGuard } from "./middleware/csrf";
 import { pendingDeletionGuard } from "./middleware/pending-deletion";
@@ -137,7 +137,7 @@ export function createApp(deps: AppDeps) {
   // JSON 校验器会先把整个请求体读进内存、解析完，才轮到各接口自己的规则，所以大小要在这里先限住。
   app.use(
     "/api/v1/*",
-    bodyLimit({
+    bodyLimitWhenDeclared({
       maxSize: API_BODY_LIMIT,
       onError: (c) => jsonError(c, 413, "PAYLOAD_TOO_LARGE", "Request body is too large"),
     })

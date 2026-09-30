@@ -137,18 +137,19 @@ describe("PATCH /api/v1/me/profile", () => {
 
 describe("请求体上限", () => {
   // /api/v1/* 的请求体上限是 64 KiB（app.ts）。JSON 校验器会先把整个请求体读进内存、解析完，才轮到字段自己的规则，
-  // 所以请求的大小只能在这里限。Hono 有两条路：请求头带 Content-Length 就直接比大小；没带（分块传输）就边读边数。
-  test("超过 64 KiB 的请求体返回 413，不管有没有 Content-Length；在上限内的照常交给简介自己的规则", async () => {
+  // 所以请求的大小只能在这里限。上限只管声明了请求体的请求（middleware/body-limit.ts）：真实的 HTTP/1.1 请求有请求体，
+  // 就一定带 Content-Length 或 Transfer-Encoding。带 Content-Length 的直接比大小；分块传输的边读边数。
+  test("超过 64 KiB 的请求体返回 413，Content-Length 声明的和分块传输的一样；在上限内的照常交给简介自己的规则", async () => {
     const { browser, userId } = await signedIn();
     const body = (kib: number) => ({ bio: "a".repeat(kib * 1024) });
-    const patch = (kib: number, headers?: Record<string, string>) =>
+    const patch = (kib: number, headers: Record<string, string>) =>
       browser.request("PATCH", "/api/v1/me/profile", { body: body(kib), headers });
 
-    const streamed = await patch(70);
+    const chunked = await patch(70, { "transfer-encoding": "chunked" });
     const declared = await patch(70, { "content-length": String(JSON.stringify(body(70)).length) });
-    const within = await patch(60);
+    const within = await patch(60, { "transfer-encoding": "chunked" });
 
-    expect([streamed.status, streamed.json.error.code]).toEqual([413, "PAYLOAD_TOO_LARGE"]);
+    expect([chunked.status, chunked.json.error.code]).toEqual([413, "PAYLOAD_TOO_LARGE"]);
     expect([declared.status, declared.json.error.code]).toEqual([413, "PAYLOAD_TOO_LARGE"]);
     // 60 KiB 没被 413 挡掉，走到了简介自己的规则：超过 300 个字符。
     expect([within.status, within.json.error.code]).toEqual([400, "BIO_TOO_LONG"]);

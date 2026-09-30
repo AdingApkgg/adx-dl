@@ -444,18 +444,19 @@ describe("Bearer 会话也要过通行密钥的规则", () => {
 
 describe("请求体上限", () => {
   // /api/auth/* 的请求体上限是 64 KiB（mount.ts）。凭据 id、公钥这些插件自己不检查长度的字段，
-  // 靠的就是这一条。Hono 有两条路：请求头带 Content-Length 就直接比大小；没带（分块传输）就边读边数。
-  test("超过 64 KiB 的请求体返回 413，不管有没有 Content-Length；在上限内的照常交给 Better Auth", async () => {
+  // 靠的就是这一条。上限只管声明了请求体的请求（middleware/body-limit.ts）：真实的 HTTP/1.1 请求有请求体，
+  // 就一定带 Content-Length 或 Transfer-Encoding。带 Content-Length 的直接比大小；分块传输的边读边数。
+  test("超过 64 KiB 的请求体返回 413，Content-Length 声明的和分块传输的一样；在上限内的照常交给 Better Auth", async () => {
     const browser = new Browser(newApp());
     const padded = (kib: number) => ({ response: { padding: "A".repeat(kib * 1024) } });
-    const post = (body: unknown, headers?: Record<string, string>) =>
+    const post = (body: unknown, headers: Record<string, string>) =>
       browser.request("POST", "/api/auth/passkey/verify-registration", { body, headers });
 
-    const streamed = await post(padded(70));
+    const chunked = await post(padded(70), { "transfer-encoding": "chunked" });
     const declared = await post(padded(70), { "content-length": String(JSON.stringify(padded(70)).length) });
-    const within = await post(padded(60));
+    const within = await post(padded(60), { "transfer-encoding": "chunked" });
 
-    expect([streamed.status, streamed.json.code]).toEqual([413, "PAYLOAD_TOO_LARGE"]);
+    expect([chunked.status, chunked.json.code]).toEqual([413, "PAYLOAD_TOO_LARGE"]);
     expect([declared.status, declared.json.code]).toEqual([413, "PAYLOAD_TOO_LARGE"]);
     // 没有挑战 Cookie，所以 Better Auth 自己拒绝；重点是没被 413 挡掉。
     expect([within.status, within.json.code]).toEqual([400, "CHALLENGE_NOT_FOUND"]);

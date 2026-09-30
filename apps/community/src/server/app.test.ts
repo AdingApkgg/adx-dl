@@ -4,7 +4,8 @@ import { HTTPException } from "hono/http-exception";
 
 import { createApp } from "./app";
 import { createMemoryRateLimitStore } from "./middleware/rate-limit";
-import { testAppDeps } from "./testing/app-deps";
+import { TEST_PUBLIC_ORIGIN, testAppDeps } from "./testing/app-deps";
+import { createTestAuth } from "./testing/auth";
 
 describe("createApp", () => {
   test("/healthz 返回 ok，并带上请求 ID", async () => {
@@ -231,5 +232,46 @@ describe("createApp", () => {
 
     expect(statuses.slice(0, 30).every((status) => status === 200)).toBe(true);
     expect(statuses[30]).toBe(429);
+  });
+});
+
+// 没有请求体的请求（空的请求体流，没有 Content-Length 和 Transfer-Encoding，curl -X DELETE 就是这样）不能被请求体上限读取：
+// 开发服务器里它一读，就把这个请求换成丢了方法的 GET（middleware/body-limit.ts）。这里的 Request 是原生的，方法丢不了，
+// 能看到的是：请求体流没被读过，交给处理函数的还是原来那个对象。
+describe("没有请求体的请求不被请求体上限读取", () => {
+  // Node 要求流式请求体带 duplex，Bun 不在乎；TS 的 RequestInit 里没有它，所以要断言一下。
+  function bodylessRequest(method: string, path: string) {
+    return new Request(`${TEST_PUBLIC_ORIGIN}${path}`, {
+      method,
+      headers: { origin: TEST_PUBLIC_ORIGIN, "content-type": "application/json" },
+      body: new ReadableStream({ start: (controller) => controller.close() }),
+      duplex: "half",
+    } as RequestInit);
+  }
+
+  test("/api/v1/*：撤销注销用的 DELETE", async () => {
+    const request = bodylessRequest("DELETE", "/api/v1/me/deletion");
+
+    const res = await createApp(testAppDeps().deps).request(request);
+
+    // 没登录，一路走到接口才 401：前面的中间件（包括请求体上限）都放行了。
+    expect(res.status).toBe(401);
+    expect(request.bodyUsed).toBe(false);
+  });
+
+  test("/api/auth/*：原样交给 Better Auth", async () => {
+    // 这个 auth 是本测试自己建的，换掉 handler 不用还原。
+    const { auth } = createTestAuth();
+    let received: Request | undefined;
+    auth.handler = async (request) => {
+      received = request;
+      return new Response(null, { status: 204 });
+    };
+    const request = bodylessRequest("POST", "/api/auth/sign-out");
+
+    const res = await createApp(testAppDeps({ auth }).deps).request(request);
+
+    expect(res.status).toBe(204);
+    expect(received).toBe(request);
   });
 });
