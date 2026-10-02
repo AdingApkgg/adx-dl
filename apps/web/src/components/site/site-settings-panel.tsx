@@ -11,27 +11,17 @@ import {
   GaugeIcon,
   Globe2Icon,
   LockKeyholeIcon,
-  MonitorIcon,
-  MoonStarIcon,
   Music2Icon,
   PaletteIcon,
   PlusIcon,
   SaveIcon,
   Settings2Icon,
-  SparklesIcon,
-  SunMediumIcon,
   TagsIcon,
   Trash2Icon,
 } from "lucide-react";
 
 import { storePreferredLocale } from "@/app/locale-preference";
 import { DownloadHistoryList } from "@/components/site/downloads/download-history";
-import {
-  ACCENT_COLORS,
-  useTheme,
-  type AccentColor,
-  type ThemePreference,
-} from "@astrodx/ui/theme";
 import {
   configuredDownloadSources,
   downloadSourceBadge,
@@ -47,7 +37,12 @@ import {
 import { HEADER_ACTION_CLASS } from "@/components/site/header-actions";
 import { getMusicPlayerCopy } from "@/components/site/music-player/music-player-copy";
 import { useMusicPlayerPreferences } from "@/components/site/music-player/music-player-preferences";
-import { useMotionPreference, type MotionMode } from "@astrodx/ui/motion";
+import {
+  AccentPicker,
+  choiceClass,
+  MotionPicker,
+  ThemePicker,
+} from "@astrodx/ui/components/appearance-pickers";
 import { Badge } from "@astrodx/ui/components/badge";
 import { Button } from "@astrodx/ui/components/button";
 import { Input } from "@astrodx/ui/components/input";
@@ -76,20 +71,6 @@ import {
 import { packMaidata } from "@/lib/maidata-title";
 import { cn } from "@astrodx/ui/lib/utils";
 
-const accentSwatches: Record<AccentColor, string> = {
-  blue: "bg-blue-500",
-  violet: "bg-violet-500",
-  teal: "bg-teal-500",
-  orange: "bg-orange-500",
-  rose: "bg-rose-500",
-};
-
-const themeIcons: Record<ThemePreference, React.ReactNode> = {
-  system: <MonitorIcon aria-hidden="true" />,
-  light: <SunMediumIcon aria-hidden="true" />,
-  dark: <MoonStarIcon aria-hidden="true" />,
-};
-
 /**
  * The example under the maidata toggles is a real excerpt run through the real
  * packer, so it shows exactly what a download will contain and can never drift
@@ -108,12 +89,6 @@ function maidataExample(aliases: boolean, preciseLevels: boolean): string {
     .filter((line) => !line.startsWith("&shortid="))
     .join("\n");
 }
-
-const motionIcons: Record<MotionMode, React.ReactNode> = {
-  system: <MonitorIcon aria-hidden="true" />,
-  on: <SparklesIcon aria-hidden="true" />,
-  off: <SparklesIcon aria-hidden="true" className="opacity-50" />,
-};
 
 type SiteSettingsPanelProps = {
   locale: Locale;
@@ -184,9 +159,6 @@ export function SiteSettingsContent({
 }) {
   const copy = dictionary.settings;
   const downloadsCopy = dictionary.downloads;
-  const { theme, accent, setTheme, setAccent } = useTheme();
-  const { mode: motionMode, setMode: setMotionMode } =
-    useMotionPreference();
   const selectedSourceId = useDownloadsStore(
     (state) => state.selectedSourceId
   );
@@ -286,8 +258,6 @@ export function SiteSettingsContent({
     setNewSourceError(false);
   };
 
-  const themeOptions: ThemePreference[] = ["system", "light", "dark"];
-  const motionOptions: MotionMode[] = ["system", "on", "off"];
   const sources = configuredDownloadSources(customSources);
 
   return (
@@ -346,82 +316,17 @@ export function SiteSettingsContent({
           </SettingsField>
 
           <SettingsField label={copy.themeLabel}>
-            <div className="grid grid-cols-3 gap-2">
-              {themeOptions.map((option) => {
-                const active = theme === option;
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setTheme(option)}
-                    className={choiceClass(active)}
-                  >
-                    {themeIcons[option]}
-                    <span>{dictionary.theme[option]}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <ThemePicker labels={dictionary.theme} />
           </SettingsField>
 
           <SettingsField label={copy.accentLabel}>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-              {ACCENT_COLORS.map((color) => {
-                const active = accent === color;
-                return (
-                  <button
-                    key={color}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setAccent(color)}
-                    className={cn(
-                      choiceClass(active),
-                      "justify-start sm:flex-col sm:justify-center"
-                    )}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "size-4 shrink-0 rounded-full ring-1 ring-black/10",
-                        accentSwatches[color]
-                      )}
-                    />
-                    <span>{copy.accents[color]}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <AccentPicker labels={copy.accents} />
           </SettingsField>
 
           <SettingsField label={copy.motionLabel}>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {motionOptions.map((option) => {
-                const active = motionMode === option;
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setMotionMode(option)}
-                    className={cn(
-                      choiceClass(active),
-                      "h-auto items-start py-2.5 text-left"
-                    )}
-                  >
-                    <span className="mt-0.5">{motionIcons[option]}</span>
-                    <span className="min-w-0">
-                      <span className="block font-medium">
-                        {copy.motion[option]}
-                      </span>
-                      <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                        {copy.motionHints[option]}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <MotionPicker
+              labels={{ modes: copy.motion, hints: copy.motionHints }}
+            />
           </SettingsField>
         </SettingsSection>
 
@@ -993,14 +898,5 @@ function SettingsField({
       <h3 className="mb-2 text-sm font-medium">{label}</h3>
       {children}
     </div>
-  );
-}
-
-function choiceClass(active: boolean): string {
-  return cn(
-    "flex min-h-10 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&>svg]:size-4 [&>svg]:shrink-0",
-    active
-      ? "border-primary/50 bg-primary/10 text-foreground ring-1 ring-primary/15"
-      : "border-border bg-card/40 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
   );
 }
