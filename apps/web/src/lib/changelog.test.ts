@@ -53,6 +53,22 @@ describe("buildChangelogBatches", () => {
     ]);
   });
 
+  test("dates a chart by when it was first added, not by its last content change", () => {
+    const batches = buildChangelogBatches([
+      buildEntry({
+        id: "updated",
+        added_at: "2026-09-07T03:46:00.000Z",
+        imported_at: "2026-09-27T01:34:39.000Z",
+      }),
+      buildEntry({ id: "new", imported_at: "2026-09-27T00:40:26.000Z" }),
+    ]);
+
+    expect(batches.map((batch) => [batch.date, batch.total])).toEqual([
+      ["2026-09-27", 1],
+      ["2026-09-07", 1],
+    ]);
+  });
+
   test("caps the preview and reports what it left out", () => {
     const entries = Array.from({ length: 5 }, (_, index) =>
       buildEntry({ id: `song-${index}`, short_id: String(100 + index) })

@@ -1,5 +1,5 @@
 import {
-  compareByImportedDesc,
+  compareByAddedDesc,
   compareByReleaseDesc,
   levelSortValue,
 } from "@/lib/catalog-shared";
@@ -12,6 +12,7 @@ import {
 export type SortableEntry = {
   title: string;
   bpm: number | null;
+  added_at?: string;
   imported_at?: string;
   versionid?: number;
   cabinet: string;
@@ -112,7 +113,7 @@ export function sortCatalogEntries<T extends SortableEntry>(
   const sorted = [...entries];
   switch (sort) {
     case "imported":
-      return sorted.sort(compareByImportedDesc);
+      return sorted.sort(compareByAddedDesc);
     case "level-desc":
       return sorted.sort((a, b) => compareByOptionalNumber(a, b, entryPeakLevelValue, "desc"));
     case "level-asc":

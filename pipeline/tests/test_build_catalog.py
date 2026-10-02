@@ -753,5 +753,112 @@ class EnrichedFieldFingerprintTests(unittest.TestCase):
         self.assertEqual(fresh["imported_at"], "2026-01-01T00:00:00+00:00")
 
 
+
+class AddedAtTests(unittest.TestCase):
+    """added_at records when a chart first entered the archive and is never
+    restamped, unlike imported_at, which moves whenever the content changes."""
+
+    def _entry(self, **overrides) -> dict:
+        entry = {
+            "id": "12007-irregular",
+            "short_id": "12007",
+            "title": "イレギュラーマン",
+            "difficulties": [{"slot": 4, "name": "Expert", "level": "11.0", "designer": "サファ太"}],
+            "media": {"cover_avif": "", "cover_webp": ""},
+            "imported_at": "2026-09-27T01:34:39+00:00",
+        }
+        entry.update(overrides)
+        return entry
+
+    def test_a_new_entry_is_added_at_this_build(self) -> None:
+        fresh = self._entry()
+
+        _carry_forward_timestamps([fresh], [])
+
+        self.assertEqual(fresh["added_at"], "2026-09-27T01:34:39+00:00")
+
+    def test_a_content_change_restamps_imported_at_but_not_added_at(self) -> None:
+        previous = self._entry(
+            imported_at="2026-09-08T00:00:00+00:00", added_at="2026-09-07T03:46:00+00:00"
+        )
+        fresh = self._entry(
+            difficulties=[
+                {"slot": 2, "name": "Basic", "level": "5.0", "designer": "-"},
+                {"slot": 4, "name": "Expert", "level": "11.0", "designer": "サファ太"},
+            ]
+        )
+
+        carried = _carry_forward_timestamps([fresh], [previous])
+
+        self.assertEqual(carried, 0)
+        self.assertEqual(fresh["imported_at"], "2026-09-27T01:34:39+00:00")
+        self.assertEqual(fresh["added_at"], "2026-09-07T03:46:00+00:00")
+
+    def test_an_unchanged_entry_keeps_both_timestamps(self) -> None:
+        previous = self._entry(
+            imported_at="2026-09-08T00:00:00+00:00", added_at="2026-09-07T03:46:00+00:00"
+        )
+        fresh = self._entry()
+
+        carried = _carry_forward_timestamps([fresh], [previous])
+
+        self.assertEqual(carried, 1)
+        self.assertEqual(fresh["imported_at"], "2026-09-08T00:00:00+00:00")
+        self.assertEqual(fresh["added_at"], "2026-09-07T03:46:00+00:00")
+
+    def test_a_previous_catalog_without_added_at_falls_back_to_its_imported_at(self) -> None:
+        previous = self._entry(imported_at="2026-07-13T19:24:00+00:00")
+        fresh = self._entry()
+
+        _carry_forward_timestamps([fresh], [previous])
+
+        self.assertEqual(fresh["added_at"], "2026-07-13T19:24:00+00:00")
+
+    def test_added_at_survives_a_retitle_that_changes_the_id(self) -> None:
+        previous = self._entry(id="12007-old-title", added_at="2026-09-07T03:46:00+00:00")
+        fresh = self._entry(id="12007-new-title")
+
+        carried = _carry_forward_timestamps([fresh], [previous])
+
+        self.assertEqual(carried, 0)
+        self.assertEqual(fresh["added_at"], "2026-09-07T03:46:00+00:00")
+
+    def test_added_at_does_not_change_the_fingerprint(self) -> None:
+        plain = self._entry()
+        stamped = self._entry(added_at="2026-09-07T03:46:00+00:00")
+
+        self.assertEqual(_content_fingerprint(plain), _content_fingerprint(stamped))
+
+
+class CiBuildCatalogTests(unittest.TestCase):
+    """The CI entry keeps publishing the committed catalog when the origin is
+    down, but still fails on anything that is not a network error."""
+
+    def test_falls_back_to_the_committed_catalog_when_the_origin_is_unreachable(self) -> None:
+        from urllib.error import HTTPError
+
+        from tools import ci_build_catalog
+
+        restored = []
+
+        def build(*_args, **_kwargs):
+            raise HTTPError("https://astrodx-charts-alice.saop.cc/index.json", 530, "origin", {}, None)
+
+        with patch("builtins.print") as printed:
+            status = ci_build_catalog.main(build=build, restore=lambda: restored.append(True))
+
+        self.assertEqual(status, 0)
+        self.assertEqual(restored, [True])
+        self.assertIn("Catalog origin unreachable", printed.call_args.args[0])
+
+    def test_other_errors_still_fail_the_build(self) -> None:
+        from tools import ci_build_catalog
+
+        def build(*_args, **_kwargs):
+            raise ValueError("bad maidata")
+
+        with self.assertRaises(ValueError):
+            ci_build_catalog.main(build=build, restore=lambda: None)
+
 if __name__ == "__main__":
     unittest.main()

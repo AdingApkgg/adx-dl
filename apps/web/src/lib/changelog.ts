@@ -1,4 +1,5 @@
 import {
+  entryAddedAt,
   compareByReleaseDesc,
   resolveVersionIndex,
   type CatalogEntry,
@@ -49,7 +50,8 @@ function versionName(versionId: number | null): string {
 /**
  * Group catalog entries into newest-first import batches, one per calendar day.
  *
- * Entries with no `imported_at` are skipped rather than pooled into an "unknown"
+ * Batches follow when each chart was first added (`entryAddedAt`), not when its
+ * content last changed. Entries with no timestamp are skipped rather than pooled into an "unknown"
  * batch: the page is a dated timeline, and an undated pile at the bottom would
  * be indistinguishable from the oldest real batch while carrying no information.
  */
@@ -62,7 +64,7 @@ export function buildChangelogBatches(
 
   const byDate = new Map<string, CatalogEntry[]>();
   for (const entry of entries) {
-    const date = entry.imported_at?.slice(0, 10);
+    const date = entryAddedAt(entry)?.slice(0, 10);
     if (date?.length !== 10) {
       continue;
     }

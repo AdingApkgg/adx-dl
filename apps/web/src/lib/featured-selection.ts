@@ -1,4 +1,4 @@
-import { isUtageEntry, type CatalogEntry } from "@/lib/catalog-shared";
+import { entryAddedAt, isUtageEntry, type CatalogEntry } from "@/lib/catalog-shared";
 
 /**
  * Deterministic weighted "editor's pick" selection for the homepage spotlight
@@ -66,9 +66,10 @@ function selectionWeight(
   let weight = 1;
   if (hasCover(entry)) weight *= 3;
   if (entry.assets.has_pv) weight *= 1.5;
-  // Freshly imported charts get a temporary spotlight boost.
-  if (entry.imported_at) {
-    const age = referenceMs - Date.parse(entry.imported_at);
+  // Newly added charts get a temporary spotlight boost.
+  const addedAt = entryAddedAt(entry);
+  if (addedAt) {
+    const age = referenceMs - Date.parse(addedAt);
     if (Number.isFinite(age) && age >= 0) {
       if (age <= 30 * DAY_MS) weight *= 2.5;
       else if (age <= 90 * DAY_MS) weight *= 1.5;

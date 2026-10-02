@@ -61,7 +61,9 @@ jobs:
 
       - name: Build catalog
         working-directory: pipeline
-        run: python3 -c "from pathlib import Path; from tools.build_catalog import build_catalog; print(build_catalog(Path('..').resolve(), max_workers=16))"
+        # Falls back to the committed catalog (with a warning) when the origin on
+        # alice is unreachable; other failures still fail the job.
+        run: python3 -m tools.ci_build_catalog
 
       - name: Install dependencies
         run: bun install --frozen-lockfile

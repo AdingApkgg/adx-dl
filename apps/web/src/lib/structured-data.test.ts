@@ -184,6 +184,24 @@ describe("structured data builders", () => {
     );
   });
 
+  test("chart dates: published when first added, modified when the content last changed", async () => {
+    const { buildChartDetailStructuredData } = await import("./structured-data");
+    const entry = buildEntry({
+      added_at: "2026-09-07T03:46:00.000Z",
+      imported_at: "2026-09-27T01:34:39.000Z",
+    });
+
+    const nodes = buildChartDetailStructuredData("zh", entry) as Array<Record<string, unknown>>;
+    const recording = nodes.find((node) => node["@type"] === "MusicRecording");
+    const video = nodes.find((node) => node["@type"] === "VideoObject");
+
+    expect(recording).toMatchObject({
+      datePublished: "2026-09-07T03:46:00.000Z",
+      dateModified: "2026-09-27T01:34:39.000Z",
+    });
+    expect(video).toMatchObject({ uploadDate: "2026-09-07T03:46:00.000Z" });
+  });
+
   test("buildChartDetailStructuredData emits a fixed MusicRecording and BreadcrumbList", async () => {
     const { buildChartDetailStructuredData } = await import("./structured-data");
     const { buildChartDescription } = await import("./catalog-shared");

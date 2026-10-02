@@ -1,4 +1,5 @@
 import {
+  entryAddedAt,
   buildChartDescription,
   difficultyLevelRange,
   difficultySlotLabel,
@@ -550,8 +551,9 @@ export function buildChartDetailStructuredData(
           },
         }
       : {}),
-    // When this chart was added to the archive (imported_at is clean ISO-8601).
-    ...(entry.imported_at ? { datePublished: entry.imported_at } : {}),
+    // When this chart was added to the archive, and when its content last changed.
+    ...(entryAddedAt(entry) ? { datePublished: entryAddedAt(entry) } : {}),
+    ...(entry.imported_at ? { dateModified: entry.imported_at } : {}),
     isFamilyFriendly: true,
     isAccessibleForFree: true,
     keywords,
@@ -572,7 +574,7 @@ export function buildChartDetailStructuredData(
         ...(entry.media.cover_url
           ? { thumbnailUrl: toAbsoluteUrl(entry.media.cover_url) }
           : {}),
-        ...(entry.imported_at ? { uploadDate: entry.imported_at } : {}),
+        ...(entryAddedAt(entry) ? { uploadDate: entryAddedAt(entry) } : {}),
         inLanguage: getStructuredDataLanguage(locale),
         isFamilyFriendly: true,
       }

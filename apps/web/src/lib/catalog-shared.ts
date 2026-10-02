@@ -109,7 +109,19 @@ export type CatalogEntry = {
   };
   media: CatalogEntryMedia;
   difficulties: CatalogDifficulty[];
+  /**
+   * When the entry's content last changed (new difficulty, fixed level, new
+   * PV…). Drives sitemap <lastmod> and IndexNow, which want "this page changed".
+   */
   imported_at?: string;
+  /**
+   * When the chart first entered the archive; never restamped by later content
+   * changes. Drives everything that means "newly added": the home "latest"
+   * rail, NEW badges, the changelog, the feed and the browse "recently added"
+   * sort. Read it through `entryAddedAt`, which falls back to `imported_at` for
+   * catalogs built before the field existed.
+   */
+  added_at?: string;
 };
 
 /**
@@ -139,10 +151,10 @@ export type CatalogCardEntry = Pick<
   | "aliases"
   | "bpm"
   | "assets"
-  // Carried so the browse page can offer a "newest imported" sort order. It is
-  // the one thing the release comparator cannot answer, and at ~24 bytes of
+  // Carried so the browse page can offer a "recently added" sort order. It is
+  // the one thing the release comparator cannot answer, and at ~32 bytes of
   // highly repetitive ISO text per entry it is the cheapest field in the slice.
-  | "imported_at"
+  | "added_at"
 > & {
   media: Pick<CatalogEntryMedia, "cover_url" | "cover_avif" | "cover_webp">;
   /**
@@ -182,7 +194,7 @@ export function toCatalogCardEntry(entry: CatalogEntry): CatalogCardEntry {
     short_id: entry.short_id,
     ...(entry.aliases?.length ? { aliases: entry.aliases } : {}),
     bpm: entry.bpm,
-    ...(entry.imported_at ? { imported_at: entry.imported_at } : {}),
+    ...(entryAddedAt(entry) ? { added_at: entryAddedAt(entry) } : {}),
     assets: entry.assets,
     difficulties: entry.difficulties.map((difficulty) => ({
       slot: difficulty.slot,
@@ -533,29 +545,39 @@ export function sortByReleaseDesc<T extends ReleaseOrderable>(entries: T[]): T[]
   return [...entries].sort(compareByReleaseDesc);
 }
 
-/** The import-ordering slice: when the archive got the chart, plus the fallback. */
-type ImportOrderable = ReleaseOrderable & Pick<CatalogEntry, "imported_at">;
+/** When the chart first entered the archive (`added_at`, else the legacy `imported_at`). */
+export function entryAddedAt(entry: {
+  added_at?: string;
+  imported_at?: string;
+}): string | undefined {
+  return entry.added_at ?? entry.imported_at;
+}
 
-// Newest-*import*-first comparator — "what did this archive add recently",
+/** The add-ordering slice: when the archive got the chart, plus the fallback. */
+type AddOrderable = ReleaseOrderable & { added_at?: string; imported_at?: string };
+
+// Newest-*added*-first comparator — "what did this archive add recently",
 // which is what a visitor means by "latest" and what compareByReleaseDesc
-// cannot answer (it only knows the maimai version era). imported_at is clean
-// ISO-8601, so a string compare is already chronological. Entries that never
-// got a timestamp fall back to the version-era order rather than clumping at
-// one end of the list.
-export function compareByImportedDesc(a: ImportOrderable, b: ImportOrderable): number {
-  const importedA = a.imported_at ?? "";
-  const importedB = b.imported_at ?? "";
-  if (importedA !== importedB) {
-    return importedB.localeCompare(importedA);
+// cannot answer (it only knows the maimai version era). It reads added_at, not
+// imported_at: imported_at moves whenever a chart's content changes, so filling
+// in old charts' missing difficulties used to push genuinely new charts off
+// the "latest" rail. The timestamps are clean ISO-8601 UTC, so a string compare
+// is already chronological. Entries that never got a timestamp fall back to
+// the version-era order rather than clumping at one end of the list.
+export function compareByAddedDesc(a: AddOrderable, b: AddOrderable): number {
+  const addedA = entryAddedAt(a) ?? "";
+  const addedB = entryAddedAt(b) ?? "";
+  if (addedA !== addedB) {
+    return addedB.localeCompare(addedA);
   }
   return compareByReleaseDesc(a, b);
 }
 
-export function sortByImportedDesc<T extends ImportOrderable>(entries: T[]): T[] {
-  return [...entries].sort(compareByImportedDesc);
+export function sortByAddedDesc<T extends AddOrderable>(entries: T[]): T[] {
+  return [...entries].sort(compareByAddedDesc);
 }
 
-/** How long a freshly imported chart keeps its "new" marker. */
+/** How long a newly added chart keeps its "new" marker. */
 export const NEW_CHART_WINDOW_DAYS = 14;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -569,22 +591,22 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * long as that HTML is served. Deriving it from the catalog ties the badge to
  * the same data the page was built from, and the daily rebuild retires it.
  */
-export function isRecentImport(
-  importedAt: string | undefined,
+export function isRecentlyAdded(
+  addedAt: string | undefined,
   referenceIso: string,
   windowDays: number = NEW_CHART_WINDOW_DAYS
 ): boolean {
-  if (!importedAt) {
+  if (!addedAt) {
     return false;
   }
-  const imported = Date.parse(importedAt);
+  const added = Date.parse(addedAt);
   const reference = Date.parse(referenceIso);
-  if (Number.isNaN(imported) || Number.isNaN(reference)) {
+  if (Number.isNaN(added) || Number.isNaN(reference)) {
     return false;
   }
-  // A negative age (import stamped after the build, i.e. clock skew) still
-  // counts as new — it can only mean the entry is at most brand new.
-  return reference - imported <= windowDays * DAY_MS;
+  // A negative age (stamped after the build, i.e. clock skew) still counts as
+  // new — it can only mean the entry is at most brand new.
+  return reference - added <= windowDays * DAY_MS;
 }
 
 // maimai genres, keyed by genreid (101–107). Localized names + a colored chip

@@ -4,7 +4,8 @@ import {
   formatEntrySubcategory,
   formatEntryTitle,
   genreLabel,
-  sortByImportedDesc,
+  entryAddedAt,
+  sortByAddedDesc,
   type CatalogEntry,
 } from "@/lib/catalog-shared";
 import { entrySlug } from "@/lib/route-slug";
@@ -29,7 +30,10 @@ function xmlEscape(value: string): string {
 function chartEntryXml(entry: CatalogEntry): string {
   const url = `${siteUrl}/charts/${encodeURIComponent(entrySlug(entry))}`;
   const title = formatEntryTitle(entry, "en");
-  const updated = entry.imported_at ?? "";
+  // Atom semantics: <published> is when the chart was first added, <updated>
+  // when its content last changed (e.g. a difficulty filled in later).
+  const published = entryAddedAt(entry) ?? "";
+  const updated = entry.imported_at ?? published;
   const categories = [formatEntrySubcategory(entry), entry.genre ? genreLabel(entry, "en") : ""]
     .filter(Boolean)
     .map((term) => `    <category term="${xmlEscape(term)}"/>`)
@@ -39,7 +43,7 @@ function chartEntryXml(entry: CatalogEntry): string {
     <title>${xmlEscape(title)}</title>
     <link href="${xmlEscape(url)}"/>
     <id>${xmlEscape(url)}</id>
-    ${updated ? `<updated>${updated}</updated>\n    <published>${updated}</published>` : ""}
+    ${updated ? `<updated>${updated}</updated>\n    <published>${published || updated}</published>` : ""}
     <summary>${xmlEscape(buildChartDescription(entry, "en"))}</summary>
 ${categories}
   </entry>`;
@@ -48,9 +52,12 @@ ${categories}
 export async function GET() {
   const catalog = await readCatalog();
   // Shared with the homepage's "latest charts" rail so both agree on what
-  // "newest" means; sortByImportedDesc copies before sorting.
-  const recent = sortByImportedDesc(catalog.entries).slice(0, FEED_SIZE);
-  const updated = recent[0]?.imported_at ?? catalog.generated_at;
+  // "newest" means; sortByAddedDesc copies before sorting.
+  const recent = sortByAddedDesc(catalog.entries).slice(0, FEED_SIZE);
+  const updated =
+    recent
+      .map((entry) => entry.imported_at ?? entryAddedAt(entry) ?? "")
+      .reduce((latest, stamp) => (stamp > latest ? stamp : latest), "") || catalog.generated_at;
 
   const body = `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">

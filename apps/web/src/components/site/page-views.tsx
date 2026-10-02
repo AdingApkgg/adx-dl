@@ -71,11 +71,12 @@ import {
   genreFilterQuery,
   getChartDownloadSpec,
   localChartAssetUrl,
-  isRecentImport,
+  entryAddedAt,
+  isRecentlyAdded,
   peakNoteDifficulty,
   resolveGenreId,
   resolveVersionIndex,
-  sortByImportedDesc,
+  sortByAddedDesc,
   sumChartDownloadBytes,
   UTAGE_CABINET,
   UTAGE_GENRE_ID,
@@ -159,7 +160,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
   // "Latest" means what this archive added last, not which maimai era a song
   // shipped in — sortByReleaseDesc answers the second question and left the
   // rail static between imports of older-version charts.
-  const latestEntries = sortByImportedDesc(catalog.entries).slice(0, HOME_RAIL_SIZE);
+  const latestEntries = sortByAddedDesc(catalog.entries).slice(0, HOME_RAIL_SIZE);
   const versionCount = new Set(Object.values(catalog.categories).flat()).size;
   const artistCount = new Set(
     catalog.entries.map((entry) => entry.artist.trim()).filter(Boolean)
@@ -477,7 +478,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
                 entry={entry}
                 locale={locale}
                 coverFit="contain"
-                isNew={isRecentImport(entry.imported_at, catalog.generated_at)}
+                isNew={isRecentlyAdded(entryAddedAt(entry), catalog.generated_at)}
                 sizes={CHART_CARD_SIZES}
               />
             </RevealItem>

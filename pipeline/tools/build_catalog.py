@@ -709,6 +709,7 @@ ENRICHED_DIFFICULTY_KEYS = ("notes", "duration_ms")
 def _content_fingerprint(entry: dict[str, Any]) -> str:
     clone = copy.deepcopy(entry)
     clone.pop("imported_at", None)
+    clone.pop("added_at", None)
     clone.pop("aliases", None)
     clone.pop("slug", None)
     for key in ATTRIBUTION_KEYS:
@@ -732,6 +733,13 @@ def _content_fingerprint(entry: dict[str, Any]) -> str:
 # fingerprint is unchanged and only takes the current build time when it is new
 # or genuinely changed. Without this, every rebuild restamps all 1500+ entries to
 # the same instant, which trains crawlers to ignore lastmod entirely.
+#
+# added_at is the other half: when the chart first entered the archive. It is
+# never restamped, so "latest charts", NEW badges, the changelog and the feed
+# list genuinely new charts rather than old ones whose content just changed
+# (filling in missing difficulties restamped imported_at on 15 CiRCLE PLUS
+# songs and pushed the day's 31 new MAGiCAL charts off the homepage rail). It is
+# matched by short_id first because a retitle changes `id` but not the shortid.
 def _carry_forward_timestamps(
     entries: list[dict[str, Any]], previous_entries: list[dict[str, Any]]
 ) -> int:
@@ -740,9 +748,17 @@ def _carry_forward_timestamps(
         for entry in previous_entries
         if isinstance(entry, dict) and entry.get("id")
     }
+    previous_by_short_id = {
+        str(entry["short_id"]): entry
+        for entry in previous_entries
+        if isinstance(entry, dict) and entry.get("short_id")
+    }
     carried = 0
     for entry in entries:
         previous = previous_by_id.get(entry.get("id"))
+        first_seen = previous_by_short_id.get(str(entry.get("short_id") or "")) or previous
+        prior_added_at = (first_seen or {}).get("added_at") or (first_seen or {}).get("imported_at")
+        entry["added_at"] = prior_added_at or entry["imported_at"]
         if not previous:
             continue
         prior_imported_at = previous.get("imported_at")

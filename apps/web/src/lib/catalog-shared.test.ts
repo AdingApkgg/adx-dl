@@ -26,11 +26,12 @@ import {
   getChartDownloadSpec,
   isOptionalChartAssetFile,
   isKnownVersionIndex,
-  isRecentImport,
+  entryAddedAt,
+  isRecentlyAdded,
   normalizeCabinetId,
   peakNoteDifficulty,
   resolveVersionIndex,
-  sortByImportedDesc,
+  sortByAddedDesc,
   sortByReleaseDesc,
   sumChartDownloadBytes,
   toCatalogCardEntry,
@@ -385,11 +386,14 @@ describe("catalog shared helpers", () => {
     expect("remote_dir_name" in card).toBe(false);
     // Empty optional fields are omitted entirely (payload bytes matter here).
     expect("aliases" in toCatalogCardEntry(buildEntry())).toBe(false);
-    // imported_at rides along so the browse page can offer a "newest" order.
-    expect(card.imported_at).toBe("2026-06-12T12:00:00.000Z");
-    expect("imported_at" in toCatalogCardEntry(buildEntry({ imported_at: undefined }))).toBe(
-      false
-    );
+    // added_at rides along so the browse page can offer a "recently added"
+    // order; an older catalog without it falls back to imported_at.
+    expect(card.added_at).toBe("2026-06-12T12:00:00.000Z");
+    expect(
+      toCatalogCardEntry(buildEntry({ added_at: "2026-05-01T00:00:00.000Z" })).added_at
+    ).toBe("2026-05-01T00:00:00.000Z");
+    expect("imported_at" in card).toBe(false);
+    expect("added_at" in toCatalogCardEntry(buildEntry({ imported_at: undefined }))).toBe(false);
   });
 
   test("collectChartDesigners counts charts (not difficulty rows) per charter", () => {
@@ -524,7 +528,7 @@ describe("catalog shared helpers", () => {
     });
 
     expect(
-      sortByImportedDesc([newSongImportedEarlier, oldSongJustImported]).map((e) => e.id)
+      sortByAddedDesc([newSongImportedEarlier, oldSongJustImported]).map((e) => e.id)
     ).toEqual(["old", "new"]);
     // The version-era comparator disagrees — that is exactly the difference.
     expect(
@@ -538,37 +542,65 @@ describe("catalog shared helpers", () => {
     const undated = buildEntry({ id: "undated", versionid: 26, imported_at: undefined });
 
     expect(
-      sortByImportedDesc([undated, sameDayLow, sameDayHigh]).map((e) => e.id)
+      sortByAddedDesc([undated, sameDayLow, sameDayHigh]).map((e) => e.id)
     ).toEqual(["high", "low", "undated"]);
   });
 
-  test("sortByImportedDesc leaves the input array untouched", () => {
+  test("a content update does not make an old chart look newly added", () => {
+    // 2026-09-27: filling in missing difficulties restamped imported_at on old
+    // CiRCLE PLUS charts and pushed that day's new MAGiCAL charts off the rail.
+    const updatedOldChart = buildEntry({
+      id: "updated",
+      added_at: "2026-09-07T03:46:00.000Z",
+      imported_at: "2026-09-27T01:34:39.000Z",
+    });
+    const newChart = buildEntry({
+      id: "new",
+      added_at: "2026-09-27T00:40:26.000Z",
+      imported_at: "2026-09-27T00:40:26.000Z",
+    });
+
+    expect(sortByAddedDesc([updatedOldChart, newChart]).map((e) => e.id)).toEqual([
+      "new",
+      "updated",
+    ]);
+  });
+
+  test("entryAddedAt prefers added_at and falls back to imported_at", () => {
+    expect(
+      entryAddedAt({ added_at: "2026-09-07T00:00:00Z", imported_at: "2026-09-27T00:00:00Z" })
+    ).toBe("2026-09-07T00:00:00Z");
+    expect(entryAddedAt({ imported_at: "2026-09-27T00:00:00Z" })).toBe("2026-09-27T00:00:00Z");
+    expect(entryAddedAt({})).toBeUndefined();
+  });
+
+  test("sortByAddedDesc leaves the input array untouched", () => {
     const entries = [
       buildEntry({ id: "a", imported_at: "2026-07-13T00:00:00.000Z" }),
       buildEntry({ id: "b", imported_at: "2026-08-02T00:00:00.000Z" }),
     ];
 
-    sortByImportedDesc(entries);
+    sortByAddedDesc(entries);
     expect(entries.map((entry) => entry.id)).toEqual(["a", "b"]);
   });
 
   test("recency is measured against the build's catalog, not a wall clock", () => {
     const generatedAt = "2026-08-08T14:30:00.000Z";
 
-    expect(isRecentImport("2026-08-02T00:00:00.000Z", generatedAt)).toBe(true);
-    expect(isRecentImport("2026-07-13T00:00:00.000Z", generatedAt)).toBe(false);
+    expect(isRecentlyAdded("2026-08-02T00:00:00.000Z", generatedAt)).toBe(true);
+    expect(isRecentlyAdded("2026-07-13T00:00:00.000Z", generatedAt)).toBe(false);
     // Exactly on the boundary still counts; a day past it does not.
-    expect(isRecentImport("2026-07-25T14:30:00.000Z", generatedAt)).toBe(true);
-    expect(isRecentImport("2026-07-24T14:29:00.000Z", generatedAt)).toBe(false);
+    expect(isRecentlyAdded("2026-07-25T14:30:00.000Z", generatedAt)).toBe(true);
+    expect(isRecentlyAdded("2026-07-24T14:29:00.000Z", generatedAt)).toBe(false);
   });
 
   test("recency tolerates skew ahead of the build and rejects unusable input", () => {
     const generatedAt = "2026-08-08T14:30:00.000Z";
 
-    expect(isRecentImport("2026-08-09T00:00:00.000Z", generatedAt)).toBe(true);
-    expect(isRecentImport(undefined, generatedAt)).toBe(false);
-    expect(isRecentImport("not a date", generatedAt)).toBe(false);
-    expect(isRecentImport("2026-08-08T00:00:00.000Z", "not a date")).toBe(false);
+    expect(isRecentlyAdded("2026-08-09T00:00:00.000Z", generatedAt)).toBe(true);
+    expect(isRecentlyAdded(undefined, generatedAt)).toBe(false);
+    expect(isRecentlyAdded("not a date", generatedAt)).toBe(false);
+    expect(isRecentlyAdded("2026-08-08T00:00:00.000Z", "not a date")).toBe(false);
   });
 });
 

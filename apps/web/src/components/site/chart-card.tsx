@@ -74,9 +74,9 @@ type ChartCardProps = {
   /** The alias that matched the current search, shown as a hint to explain the hit. */
   aliasHit?: string | null;
   /**
-   * Marks a chart the archive imported recently. Passed in rather than derived
-   * from `entry.imported_at`, which the card slice does carry: the window has to
-   * be measured against the catalog's `generated_at` (see `isRecentImport`) and
+   * Marks a chart the archive added recently. Passed in rather than derived
+   * from `entry.added_at`, which the card slice does carry: the window has to
+   * be measured against the catalog's `generated_at` (see `isRecentlyAdded`) and
    * never against a render-time clock, and only the server surfaces holding the
    * full catalog know that instant.
    */

@@ -10,7 +10,8 @@ import {
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { buildVersionFilterHref } from "@/lib/catalog-links";
 import {
-  isRecentImport,
+  entryAddedAt,
+  isRecentlyAdded,
   toCatalogCardEntry,
   type Catalog,
 } from "@/lib/catalog-shared";
@@ -100,7 +101,7 @@ export function ChangelogView({ catalog, locale = "zh" }: ChangelogViewProps) {
                     entry={toCatalogCardEntry(entry)}
                     locale={locale}
                     coverFit="contain"
-                    isNew={isRecentImport(entry.imported_at, catalog.generated_at)}
+                    isNew={isRecentlyAdded(entryAddedAt(entry), catalog.generated_at)}
                     sizes={CHART_CARD_SIZES}
                   />
                 </li>
