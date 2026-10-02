@@ -31,7 +31,7 @@ import {
   useTheme,
   type AccentColor,
   type ThemePreference,
-} from "@/components/site/theme-provider";
+} from "@astrodx/ui/theme";
 import {
   configuredDownloadSources,
   downloadSourceBadge,
@@ -47,10 +47,10 @@ import {
 import { HEADER_ACTION_CLASS } from "@/components/site/header-actions";
 import { getMusicPlayerCopy } from "@/components/site/music-player/music-player-copy";
 import { useMusicPlayerPreferences } from "@/components/site/music-player/music-player-preferences";
-import { useMotionPreference, type MotionMode } from "@/components/motion";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useMotionPreference, type MotionMode } from "@astrodx/ui/motion";
+import { Badge } from "@astrodx/ui/components/badge";
+import { Button } from "@astrodx/ui/components/button";
+import { Input } from "@astrodx/ui/components/input";
 import {
   Sheet,
   SheetContent,
@@ -58,7 +58,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@/components/ui/sheet";
+} from "@astrodx/ui/components/sheet";
 import { ARCHIVE_FORMATS } from "@/lib/adx-archive-shared";
 import {
   getDownloadSource,
@@ -74,7 +74,7 @@ import {
   type SiteDictionary,
 } from "@/lib/i18n";
 import { packMaidata } from "@/lib/maidata-title";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 const accentSwatches: Record<AccentColor, string> = {
   blue: "bg-blue-500",

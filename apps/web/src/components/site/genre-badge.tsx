@@ -1,6 +1,6 @@
 import { genreInfo, type CatalogEntry } from "@/lib/catalog-shared";
 import type { Locale } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 type GenreBadgeProps = {
   entry: CatalogEntry;

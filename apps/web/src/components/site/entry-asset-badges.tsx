@@ -1,6 +1,6 @@
 import { ImageIcon, Music4Icon, VideoIcon } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@astrodx/ui/components/badge";
 import type { CatalogEntry } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
 

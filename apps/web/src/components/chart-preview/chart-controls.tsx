@@ -26,20 +26,20 @@ import {
   VolumeXIcon,
 } from "lucide-react";
 import { DIFFICULTY_NAMES, type ChartDifficulty } from "@lxns-network/maimai-chart-engine";
-import { AnimatePresence, motion, springSoft } from "@/components/motion";
-import { Button } from "@/components/ui/button";
+import { AnimatePresence, motion, springSoft } from "@astrodx/ui/motion";
+import { Button } from "@astrodx/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@astrodx/ui/components/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { cn, TAP_TARGET_44 } from "@/lib/utils";
+} from "@astrodx/ui/components/tooltip";
+import { cn, TAP_TARGET_44 } from "@astrodx/ui/lib/utils";
 import { difficultyTone, DIFFICULTY_TONE_CLASS } from "@/lib/catalog-shared";
 import type { SiteDictionary } from "@/lib/i18n";
 import { useGameStore, playbackTimeRef } from "./store/game-store";

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useScroll, useTransform } from "framer-motion";
 
-import { EASE_OUT, motion, revealTransition, springSoft, useReducedMotion } from "@/components/motion";
+import { EASE_OUT, motion, revealTransition, springSoft, useReducedMotion } from "@astrodx/ui/motion";
 
 /**
  * Parallax shell for the chart detail hero's blurred cover backdrop: as the

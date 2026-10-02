@@ -9,11 +9,14 @@
   },
   "files": {
     // packages/maimai-chart-engine is vendored from upstream and kept
-    // verbatim so it can be re-synced; pipeline/ is Python.
+    // verbatim so it can be re-synced; pipeline/ is Python. The shared
+    // packages (ui, tsconfig) are ours and linted like the apps.
     "includes": [
       "apps/web/**",
       "apps/dash/**",
       "apps/community/**",
+      "packages/ui/**",
+      "packages/tsconfig/**",
       "!apps/web/public",
       "!apps/web/next-env.d.ts",
       "!apps/dash/.react-router",
@@ -107,6 +110,32 @@
       "includes": ["apps/community/**"],
       "linter": {
         "domains": { "react": "recommended" }
+      }
+    },
+    {
+      // @astrodx/ui is shared by web (Next) and the community site (React
+      // Router): no framework APIs and no app aliases (shared-ui spec 4.3).
+      "includes": ["packages/ui/**"],
+      "linter": {
+        "domains": { "react": "recommended" },
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "next": "@astrodx/ui is shared with the community site: no Next.js APIs.",
+                  "react-router": "@astrodx/ui is shared with web: no React Router APIs.",
+                  "react-router-dom": "@astrodx/ui is shared with web: no React Router APIs."
+                },
+                "patterns": [
+                  { "group": ["next/**"], "message": "@astrodx/ui is shared with the community site: no Next.js APIs." },
+                  { "group": ["@/**"], "message": "@astrodx/ui must not use an app's @/ alias; import package files by relative path." }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     {

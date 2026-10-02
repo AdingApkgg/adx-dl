@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useInView } from "framer-motion";
 
-import { AnimatePresence, EASE_OUT, motion, useReducedMotion } from "@/components/motion";
+import { AnimatePresence, EASE_OUT, motion, useReducedMotion } from "@astrodx/ui/motion";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { DifficultyPill } from "@/components/site/difficulty-pill";
 import { EntryCover } from "@/components/site/entry-cover";
@@ -26,7 +26,7 @@ import {
 } from "@/lib/catalog-shared";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 const SPOTLIGHT_LIMIT = 3;
 const AUTOPLAY_DELAY_MS = 6800;

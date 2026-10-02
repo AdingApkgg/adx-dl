@@ -1,7 +1,7 @@
 "use client";
 
-import { motion, revealTransition } from "@/components/motion";
-import { Skeleton } from "@/components/ui/skeleton";
+import { motion, revealTransition } from "@astrodx/ui/motion";
+import { Skeleton } from "@astrodx/ui/components/skeleton";
 
 /**
  * Which page shape to stand in for. A route group's `loading.tsx` covers every

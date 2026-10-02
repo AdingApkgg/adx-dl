@@ -3,6 +3,11 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Temporary until the next commit moves the design tokens into
+   @astrodx/ui/styles/theme.css, whose own @source takes over: the shared
+   components now live outside apps/web, where Tailwind does not look. */
+@source "../../../../packages/ui/src";
+
 /* Smooth cross-document (MPA) navigations via the native View Transitions API.
    We ship a pure static export (RSC nav payloads are pruned for the CF Pages
    20k-file cap), so links are full-page loads — this animates them with zero JS.

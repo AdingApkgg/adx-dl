@@ -2,8 +2,8 @@
 
 import { CheckIcon } from "lucide-react";
 
-import { motion, springSoft } from "@/components/motion";
-import { cn } from "@/lib/utils";
+import { motion, springSoft } from "@astrodx/ui/motion";
+import { cn } from "@astrodx/ui/lib/utils";
 
 /**
  * Select-mode corner badge for ChartCard. A client island so the (server)

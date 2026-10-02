@@ -2,8 +2,8 @@
 
 import { ZapIcon, ZapOffIcon } from "lucide-react";
 
-import { useMotionPreference } from "@/components/motion";
-import { Button } from "@/components/ui/button";
+import { useMotionPreference } from "../motion";
+import { Button } from "./button";
 
 type MotionToggleLabels = {
   label: string;

@@ -37,7 +37,7 @@ import {
   useSpring,
 } from "framer-motion";
 
-import { EASE_OUT, motion, springSoft, useReducedMotion } from "@/components/motion";
+import { EASE_OUT, motion, springSoft, useReducedMotion } from "@astrodx/ui/motion";
 import {
   ASTRODX_SITE_URL,
   CLOUD_DRIVE_URL,
@@ -58,16 +58,16 @@ import {
   switchLocale,
   type Locale,
 } from "@/lib/i18n";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@astrodx/ui/components/badge";
+import { Button } from "@astrodx/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+} from "@astrodx/ui/components/dropdown-menu";
+import { cn } from "@astrodx/ui/lib/utils";
 
 // External monitor page; the in-site /status route was removed in favour of a
 // direct link to the public dashboard.

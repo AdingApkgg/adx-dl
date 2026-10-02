@@ -21,17 +21,17 @@ import { Popover as PopoverPrimitive } from "radix-ui";
 import useSWR from "swr";
 import { useShallow } from "zustand/react/shallow";
 
-import { motion, useReducedMotion } from "@/components/motion";
+import { motion, useReducedMotion } from "@astrodx/ui/motion";
 import { CompatibleImage } from "@/components/site/compatible-image";
 import { useDownloadsStore } from "@/components/site/downloads/downloads-store";
-import { Button } from "@/components/ui/button";
+import { Button } from "@astrodx/ui/components/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@astrodx/ui/components/select";
 import type { VersionGroup } from "@/lib/catalog-shared";
 import type { Locale } from "@/lib/i18n";
 import {
@@ -44,7 +44,7 @@ import type {
   MusicTrack,
 } from "@/lib/music-playlists";
 import { jsonFetcher } from "@/lib/swr-fetcher";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 import { versionImageSourcesByIndex } from "@/lib/version-image";
 
 import {

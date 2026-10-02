@@ -4,8 +4,8 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Tabs as TabsPrimitive } from "radix-ui"
 
-import { motion, springSoft } from "@/components/motion"
-import { cn } from "@/lib/utils"
+import { motion, springSoft } from "../motion"
+import { cn } from "../lib/utils"
 
 // Mirrors Radix's active value so each trigger knows whether to host the
 // sliding indicator (Radix exposes it only as a data attribute).

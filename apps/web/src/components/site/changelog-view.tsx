@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRightIcon } from "lucide-react";
 
-import { Reveal } from "@/components/motion";
+import { Reveal } from "@astrodx/ui/motion";
 import {
   ChartCard,
   CHART_CARD_SIZES,

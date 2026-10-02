@@ -1,7 +1,7 @@
 import type { Viewport } from "next";
 
 import { PageTransition } from "@/app/page-transition";
-import { MotionProvider } from "@/components/motion";
+import { MotionProvider } from "@astrodx/ui/motion";
 import { SiteBanners } from "@/components/site/banners/site-banners";
 import { DownloadDock } from "@/components/site/downloads/download-dock";
 import { MusicPlayer } from "@/components/site/music-player/music-player";
@@ -11,8 +11,8 @@ import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
 import { SWRProvider } from "@/components/site/swr-provider";
 import { TapRipple } from "@/components/site/tap-ripple";
-import { ThemeProvider } from "@/components/site/theme-provider";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@astrodx/ui/theme";
+import { TooltipProvider } from "@astrodx/ui/components/tooltip";
 import { readCatalog, readVersionGroups } from "@/lib/catalog";
 import { CHART_MEDIA_ORIGIN } from "@/lib/chart-media";
 import { getDictionary, type Locale } from "@/lib/i18n";

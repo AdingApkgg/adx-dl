@@ -9,7 +9,7 @@ import {
   PlayCircleIcon,
 } from "lucide-react";
 
-import { Reveal, RevealGroup, RevealItem } from "@/components/motion";
+import { Reveal, RevealGroup, RevealItem } from "@astrodx/ui/motion";
 import { AdxDownloadButton } from "@/components/site/adx-download-button";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
@@ -45,15 +45,15 @@ import { RandomChartButton } from "@/components/site/random-chart-button";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { VersionBadge } from "@/components/site/version-badge";
 import { VersionTileCard } from "@/components/site/version-tile-card";
-import { Button } from "@/components/ui/button";
+import { Button } from "@astrodx/ui/components/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+} from "@astrodx/ui/components/card";
+import { Separator } from "@astrodx/ui/components/separator";
 import type { Catalog, CatalogEntry } from "@/lib/catalog";
 import {
   bpmBucketId,
@@ -92,7 +92,7 @@ import {
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 import { japaneseTextLang } from "@/lib/text-lang";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 import { MAIMAI_VERSIONS } from "@/lib/version-image";
 import {
   buildCatalogDatasetStructuredData,

@@ -1,6 +1,6 @@
 import type { ImgHTMLAttributes } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 export type CompatibleImageSources = {
   avif?: string;

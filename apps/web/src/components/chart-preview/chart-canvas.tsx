@@ -12,7 +12,7 @@ import { playbackLoopRef } from "./lib/playback-loop";
 import { formatChartTimeForFilename } from "./lib/format";
 import { sanitizeFilenameId, downloadBlob } from "./lib/file-download";
 import classes from "./chart-canvas.module.css";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 import type { SiteDictionary } from "@/lib/i18n";
 
 type PreviewDict = SiteDictionary["preview"];

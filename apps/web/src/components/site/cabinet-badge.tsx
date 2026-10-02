@@ -1,5 +1,5 @@
 import { CompatibleImage, type CompatibleImageSources } from "@/components/site/compatible-image";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 // Cabinet/chart-type icon. DX and SD are the regular cabinets; every other
 // prefix (宴/協/奏/… and other single-char markers) is a UTAGE (宴) chart type.

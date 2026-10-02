@@ -11,8 +11,8 @@ import {
 } from "react";
 
 import type { Note } from "@lxns-network/maimai-chart-engine";
-import { EASE_OUT, motion, useReducedMotion } from "@/components/motion";
-import { cn } from "@/lib/utils";
+import { EASE_OUT, motion, useReducedMotion } from "@astrodx/ui/motion";
+import { cn } from "@astrodx/ui/lib/utils";
 import classes from "./chart-density-timeline.module.css";
 
 type NoteCountKey = "tap" | "hold" | "slide" | "touch" | "break";

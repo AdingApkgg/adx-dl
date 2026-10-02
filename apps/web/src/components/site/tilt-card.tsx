@@ -8,8 +8,8 @@ import {
   useTransform,
 } from "framer-motion";
 
-import { motion, useReducedMotion } from "@/components/motion";
-import { cn } from "@/lib/utils";
+import { motion, useReducedMotion } from "@astrodx/ui/motion";
+import { cn } from "@astrodx/ui/lib/utils";
 
 const MAX_TILT = 5; // degrees
 

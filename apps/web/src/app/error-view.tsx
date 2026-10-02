@@ -3,8 +3,8 @@
 import Link from "next/link";
 import * as React from "react";
 
-import { RevealItem } from "@/components/motion";
-import { Button } from "@/components/ui/button";
+import { RevealItem } from "@astrodx/ui/motion";
+import { Button } from "@astrodx/ui/components/button";
 import {
   buildLocalePath,
   getDictionary,

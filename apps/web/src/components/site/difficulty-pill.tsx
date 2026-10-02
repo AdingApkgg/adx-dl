@@ -6,7 +6,7 @@ import {
   type CatalogDifficulty,
   type DifficultyTone,
 } from "@/lib/catalog-shared";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 type DifficultyPillProps = {
   difficulty: CatalogDifficulty;

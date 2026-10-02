@@ -23,14 +23,14 @@ import {
   motion,
   springSoft,
   useReducedMotion,
-} from "@/components/motion";
+} from "@astrodx/ui/motion";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@astrodx/ui/components/dropdown-menu";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 import { DownloadSourceMenu, DownloadSourceSummary } from "./download-source-selector";
 import { useWakeLock } from "@/components/chart-preview/hooks/use-wake-lock";
 import { jobPercent, useDownloadsStore } from "./downloads-store";

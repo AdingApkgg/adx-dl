@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useScroll, useSpring } from "framer-motion";
 
-import { motion, useReducedMotion } from "@/components/motion";
+import { motion, useReducedMotion } from "@astrodx/ui/motion";
 
 /**
  * Decorative scroll-progress spine for the version timeline/grid: a slim track

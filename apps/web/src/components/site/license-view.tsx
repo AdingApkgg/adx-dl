@@ -1,6 +1,6 @@
 import { ArrowUpRightIcon } from "lucide-react";
 
-import { Reveal, RevealGroup, RevealItem } from "@/components/motion";
+import { Reveal, RevealGroup, RevealItem } from "@astrodx/ui/motion";
 import { contactChannels } from "@/lib/community-links";
 import type { Locale } from "@/lib/i18n";
 

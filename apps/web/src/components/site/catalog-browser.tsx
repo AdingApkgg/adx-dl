@@ -18,7 +18,7 @@ import {
   RollingNumber,
   springSoft,
   useReducedMotion,
-} from "@/components/motion";
+} from "@astrodx/ui/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import {
@@ -78,25 +78,25 @@ import {
 import { getDictionary, type SiteDictionary } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 import { jsonFetcher } from "@/lib/swr-fetcher";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 import {
   MAIMAI_VERSIONS,
   VERSION_IMAGE_DIMENSIONS,
   versionImageSourcesByIndex,
 } from "@/lib/version-image";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { RangeSlider } from "@/components/ui/range-slider";
+import { Badge } from "@astrodx/ui/components/badge";
+import { Button } from "@astrodx/ui/components/button";
+import { Card, CardContent } from "@astrodx/ui/components/card";
+import { Input } from "@astrodx/ui/components/input";
+import { RangeSlider } from "@astrodx/ui/components/range-slider";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { tabsListVariants, tabsTriggerClassName } from "@/components/ui/tabs";
+} from "@astrodx/ui/components/select";
+import { tabsListVariants, tabsTriggerClassName } from "@astrodx/ui/components/tabs";
 
 type CatalogBrowserProps = {
   /** Card-level entries only — the heavy per-chart file payload stays off the page. */

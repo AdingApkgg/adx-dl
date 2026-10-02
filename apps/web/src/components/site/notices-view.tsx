@@ -1,9 +1,9 @@
 import Link from "next/link";
 
-import { Reveal } from "@/components/motion";
+import { Reveal } from "@astrodx/ui/motion";
 import { NoticesReadMarker } from "@/components/site/notices-read-marker";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@astrodx/ui/components/badge";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import {
   isActive,

@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDownIcon, ListOrderedIcon, LocateFixedIcon } from "lucide-react";
 import type { ChartDifficulty } from "@lxns-network/maimai-chart-engine";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 import { useGameStore, playbackTimeRef } from "./store/game-store";
 import classes from "./chart-simai-statements.module.css";
 

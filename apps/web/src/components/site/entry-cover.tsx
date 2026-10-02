@@ -8,7 +8,7 @@ import {
   type CatalogEntry,
 } from "@/lib/catalog-shared";
 import { getDictionary } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 // Cross-document View Transition morph (Chromium progressive enhancement via
 // @view-transition in globals.css): a clicked card cover pairs with the chart

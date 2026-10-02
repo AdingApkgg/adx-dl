@@ -1,27 +1,27 @@
 import { DownloadIcon, SearchIcon, StarIcon } from "lucide-react";
 
-import { Reveal } from "@/components/motion";
+import { Reveal } from "@astrodx/ui/motion";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { ChartCard, CHART_CARD_SIZES, CHART_GRID_CLASS } from "@/components/site/chart-card";
 import { DifficultyPill } from "@/components/site/difficulty-pill";
 import { EntryAssetBadges } from "@/components/site/entry-asset-badges";
 import { GenreBadge } from "@/components/site/genre-badge";
 import { VersionBadge } from "@/components/site/version-badge";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Badge } from "@astrodx/ui/components/badge";
+import { Button } from "@astrodx/ui/components/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@astrodx/ui/components/card";
+import { Input } from "@astrodx/ui/components/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+} from "@astrodx/ui/components/select";
+import { Separator } from "@astrodx/ui/components/separator";
+import { Skeleton } from "@astrodx/ui/components/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@astrodx/ui/components/tabs";
+import { Textarea } from "@astrodx/ui/components/textarea";
 import type { CatalogEntry } from "@/lib/catalog";
 import {
   DIFFICULTY_DOT_CLASS,

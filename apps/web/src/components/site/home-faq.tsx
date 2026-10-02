@@ -4,7 +4,7 @@ import * as React from "react";
 import { ChevronRightIcon } from "lucide-react";
 
 import styles from "@/components/site/home-page.module.css";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 export type HomeFaqItem = { id: string; q: string; a: string };
 
