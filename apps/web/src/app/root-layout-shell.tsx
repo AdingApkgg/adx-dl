@@ -11,7 +11,7 @@ import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
 import { SWRProvider } from "@/components/site/swr-provider";
 import { TapRipple } from "@/components/site/tap-ripple";
-import { ThemeProvider } from "@astrodx/ui/theme";
+import { ThemeProvider, themeBootScript } from "@astrodx/ui/theme";
 import { TooltipProvider } from "@astrodx/ui/components/tooltip";
 import { readCatalog, readVersionGroups } from "@/lib/catalog";
 import { CHART_MEDIA_ORIGIN } from "@/lib/chart-media";
@@ -30,12 +30,11 @@ type RootLayoutShellProps = Readonly<{
   deriveLocaleFromPath?: boolean;
 }>;
 
-// An explicit light/dark mode wins; otherwise the color mode follows the OS.
-// The inline colorScheme style tells the browser the right canvas color while
-// the render-blocking stylesheet is still loading (the CSS `color-scheme`
-// only kicks in afterwards) — without it a dark-mode reload flashes white.
-// The music-player attribute mirrors music-player-preferences.ts.
-const NO_FLASH_BOOT_SCRIPT = `(function(){var e=document.documentElement;try{var t=localStorage.getItem('theme');var m=window.matchMedia('(prefers-color-scheme: dark)').matches;var d=t==='light'?false:(t==='dark'?true:m);e.classList.toggle('dark',d);e.style.colorScheme=d?'dark':'light';}catch(x){e.classList.add('dark');e.style.colorScheme='dark';}try{var a=localStorage.getItem('astrodx-accent');var c=['blue','violet','teal','orange','rose'];e.dataset.accent=c.indexOf(a)>=0?a:'blue';}catch(x){e.dataset.accent='blue';}try{var p=localStorage.getItem('adx-reduce-motion');p=p==='1'?'off':(p==='0'?'system':p);p=p==='on'||p==='off'?p:'system';e.dataset.motion=p;e.toggleAttribute('data-reduced-motion',p==='off');}catch(x){e.dataset.motion='system';}try{var s=JSON.parse(localStorage.getItem('astrodx-music-player-prefs-v1')||'{}');e.dataset.musicPlayer=s.enabled===false?'off':(s.collapsed===false?'expanded':'collapsed');}catch(x){e.dataset.musicPlayer='collapsed';}})();`;
+// Color mode, accent and motion come from @astrodx/ui, built from the same
+// storage keys and presets as its ThemeProvider and MotionProvider. The
+// music-player attribute is web's own and mirrors music-player-preferences.ts.
+const MUSIC_PLAYER_BOOT_SCRIPT = `(function(){var e=document.documentElement;try{var s=JSON.parse(localStorage.getItem('astrodx-music-player-prefs-v1')||'{}');e.dataset.musicPlayer=s.enabled===false?'off':(s.collapsed===false?'expanded':'collapsed');}catch(x){e.dataset.musicPlayer='collapsed';}})();`;
+const NO_FLASH_BOOT_SCRIPT = themeBootScript() + MUSIC_PLAYER_BOOT_SCRIPT;
 
 /**
  * Shared by both html-owning layouts. The color-scheme meta lands early in

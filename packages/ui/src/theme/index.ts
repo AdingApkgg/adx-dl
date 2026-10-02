@@ -1,8 +1,9 @@
+export { themeBootScript } from "./boot-script";
 export {
   ACCENT_COLORS,
+  ACCENT_STORAGE_KEY,
   type AccentColor,
-  parseAccentColor,
-  ThemeProvider,
+  THEME_STORAGE_KEY,
   type ThemePreference,
-  useTheme,
-} from "./theme-provider";
+} from "./constants";
+export { parseAccentColor, ThemeProvider, useTheme } from "./theme-provider";

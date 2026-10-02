@@ -14,6 +14,8 @@ import {
   type Variants,
 } from "framer-motion";
 
+import { MOTION_MODES, MOTION_STORAGE_KEY, type MotionMode } from "./constants";
+
 export { AnimatePresence, motion };
 
 // One easing curve shared across the whole site so every reveal, hover, and
@@ -32,10 +34,9 @@ export const springSoft: Transition = {
 
 // --- Motion preference: OS setting + an in-site "reduce motion" toggle -----
 
-// localStorage key for the user's explicit site-level preference.
-const REDUCE_MOTION_STORAGE_KEY = "adx-reduce-motion";
-export const MOTION_MODES = ["system", "on", "off"] as const;
-export type MotionMode = (typeof MOTION_MODES)[number];
+// The storage key and the modes live in ./constants (no "use client"), so the
+// no-flash boot script (../theme/boot-script.ts) shares them.
+export { MOTION_MODES, type MotionMode } from "./constants";
 
 type MotionPreference = {
   mode: MotionMode;
@@ -109,7 +110,7 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
     try {
       // One-time localStorage sync after hydration.
       setModeState(
-        parseMotionMode(window.localStorage.getItem(REDUCE_MOTION_STORAGE_KEY))
+        parseMotionMode(window.localStorage.getItem(MOTION_STORAGE_KEY))
       );
     } catch {
       // Storage unavailable (private mode) — follow the OS.
@@ -130,7 +131,7 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
     const normalized = parseMotionMode(value);
     setModeState(normalized);
     try {
-      window.localStorage.setItem(REDUCE_MOTION_STORAGE_KEY, normalized);
+      window.localStorage.setItem(MOTION_STORAGE_KEY, normalized);
     } catch {
       // Storage unavailable — the preference still works for this session.
     }

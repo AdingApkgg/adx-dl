@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
+import { themeBootScript } from "@astrodx/ui/theme";
 import {
   Children,
   isValidElement,
@@ -72,9 +73,10 @@ describe("root layout language", () => {
       dangerouslySetInnerHTML?: { __html: string };
     }>;
     expect(script.props.id).toBe("theme-init");
-    expect(script.props.dangerouslySetInnerHTML?.__html).toContain(
-      "astrodx-music-player-prefs-v1"
-    );
+    // The shared color mode / accent / motion part first, then web's music player.
+    const bootScript = script.props.dangerouslySetInnerHTML?.__html ?? "";
+    expect(bootScript.startsWith(themeBootScript())).toBe(true);
+    expect(bootScript).toContain("astrodx-music-player-prefs-v1");
   });
 
   test("default and localized root layouts render locale specific html lang", async () => {
