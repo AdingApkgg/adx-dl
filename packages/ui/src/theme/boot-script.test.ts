@@ -14,12 +14,19 @@ type Html = {
 };
 
 // Runs the script against a fake <html>, localStorage and matchMedia: the only
-// browser APIs it touches.
+// browser APIs it touches. `stale` starts <html> as a previous visit left it
+// (dark class and reduced-motion attribute already set), so the script has to
+// remove them, not just avoid adding them.
 function run(
   stored: Record<string, string>,
-  { prefersDark = false, storageThrows = false } = {}
+  { prefersDark = false, storageThrows = false, stale = false } = {}
 ): Html {
-  const html: Html = { classes: new Set(), attributes: new Set(), style: {}, dataset: {} };
+  const html: Html = {
+    classes: new Set(stale ? ["dark"] : []),
+    attributes: new Set(stale ? ["data-reduced-motion"] : []),
+    style: {},
+    dataset: {},
+  };
   const documentElement = {
     classList: {
       add: (name: string) => html.classes.add(name),
@@ -58,10 +65,12 @@ describe("themeBootScript", () => {
       [undefined, false, false],
       ["solarized", false, false],
     ];
-    for (const [stored, prefersDark, dark] of cases) {
-      const html = run(stored === undefined ? {} : { [THEME_STORAGE_KEY]: stored }, { prefersDark });
-      expect(html.classes.has("dark")).toBe(dark);
-      expect(html.style.colorScheme).toBe(dark ? "dark" : "light");
+    for (const stale of [false, true]) {
+      for (const [stored, prefersDark, dark] of cases) {
+        const html = run(stored === undefined ? {} : { [THEME_STORAGE_KEY]: stored }, { prefersDark, stale });
+        expect(html.classes.has("dark")).toBe(dark);
+        expect(html.style.colorScheme).toBe(dark ? "dark" : "light");
+      }
     }
   });
 
@@ -73,11 +82,13 @@ describe("themeBootScript", () => {
   });
 
   test("applies the same motion mode as MotionProvider, legacy 1/0 values included", () => {
-    for (const stored of [undefined, "1", "0", "system", "on", "off", "unknown"]) {
-      const html = run(stored === undefined ? {} : { [MOTION_STORAGE_KEY]: stored });
-      const mode = parseMotionMode(stored ?? null);
-      expect(html.dataset.motion).toBe(mode);
-      expect(html.attributes.has("data-reduced-motion")).toBe(mode === "off");
+    for (const stale of [false, true]) {
+      for (const stored of [undefined, "1", "0", "system", "on", "off", "unknown"]) {
+        const html = run(stored === undefined ? {} : { [MOTION_STORAGE_KEY]: stored }, { stale });
+        const mode = parseMotionMode(stored ?? null);
+        expect(html.dataset.motion).toBe(mode);
+        expect(html.attributes.has("data-reduced-motion")).toBe(mode === "off");
+      }
     }
   });
 

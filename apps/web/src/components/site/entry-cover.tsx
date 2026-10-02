@@ -123,7 +123,7 @@ export function EntryCover({
     // static export, so Image was unoptimized and bought us nothing over <img>).
     const alt = cover.alt(title);
     // Hover zoom rides the site's shared ease-out curve (EASE_OUT in
-    // components/motion) — transform-only, pure CSS, no per-card JS.
+    // @astrodx/ui/motion) — transform-only, pure CSS, no per-card JS.
     const imgClassName = cn(
       "absolute inset-0 h-full w-full transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]",
       fit === "contain" ? "object-contain" : "object-cover group-hover:scale-[1.06]"

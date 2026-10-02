@@ -49,8 +49,8 @@ const SOURCE_PROBE_REFRESH_MS = 5 * 60_000;
 
 /**
  * The dock's icon buttons render outside the shared Button primitive, so they
- * inherited only globals.css's faint `*` outline — effectively invisible for
- * keyboard users. This is the same ring the primitives use.
+ * inherited only theme.css's faint `*` outline (@astrodx/ui) — effectively
+ * invisible for keyboard users. This is the same ring the primitives use.
  */
 const DOCK_ICON_BUTTON_CLASS =
   "-m-0.5 rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";

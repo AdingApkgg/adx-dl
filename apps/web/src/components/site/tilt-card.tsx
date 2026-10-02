@@ -13,8 +13,8 @@ import { cn } from "@astrodx/ui/lib/utils";
 
 const MAX_TILT = 5; // degrees
 
-// Mirrors springSoft (components/motion) — useSpring wants bare spring options,
-// not a full Transition object.
+// Mirrors springSoft (@astrodx/ui/motion) — useSpring wants bare spring
+// options, not a full Transition object.
 const TILT_SPRING = { stiffness: 320, damping: 30, mass: 0.7 };
 
 type TiltCardProps = {

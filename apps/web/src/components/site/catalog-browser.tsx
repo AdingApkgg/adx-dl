@@ -1846,8 +1846,9 @@ function ChipFilterRow({ label, children }: { label: string; children: React.Rea
 // The "all" chip that clears a whole dimension (active when nothing is picked).
 /**
  * The filter chips are bare motion.buttons, so they only ever showed the faint
- * `*` outline from globals.css. This is the same ring the shared primitives
- * use, and it has to survive the tone classes the chips layer on top.
+ * `*` outline from @astrodx/ui's theme.css. This is the same ring the shared
+ * primitives use, and it has to survive the tone classes the chips layer on
+ * top.
  */
 const CHIP_FOCUS_CLASS =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";

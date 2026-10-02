@@ -9,7 +9,7 @@
 @import "shadcn/tailwind.css";
 
 /* Tailwind only scans the app's own directory, so the package points it at
-   its components. The path is relative to this file: apps need not know where
+   its own source. The path is relative to this file: apps need not know where
    the package lives. */
 @source "../";
 

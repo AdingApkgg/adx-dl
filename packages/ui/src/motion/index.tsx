@@ -95,8 +95,9 @@ export function useReducedMotion(): boolean {
  * don't have to gate each component by hand. With `reducedMotion="user"`,
  * framer-motion drops transform/layout animations (keeping only opacity) when
  * the OS asks for reduced motion — mirroring the `@view-transition` guard in
- * globals.css. The in-site toggle escalates that to `"always"` and stamps
- * `data-reduced-motion` on <html> so the CSS guards fire too.
+ * the app's CSS (web: globals.css). The in-site toggle escalates that to
+ * `"always"` and stamps `data-reduced-motion` on <html> so the CSS guards fire
+ * too.
  *
  * The stored preference is read after mount (not during hydration), so the
  * first paint of a full page load may briefly animate — the trade for

@@ -13,8 +13,8 @@ type MotionToggleLabels = {
 /**
  * Header quick toggle for the site-level "reduce motion" preference. Pressed
  * state means animations are reduced: framer drops JS-driven transform/layout
- * animations and the CSS guards in globals.css disable view transitions and
- * marquees, leaving only plain CSS transitions.
+ * animations and the CSS guards in the app's CSS (web: globals.css) disable
+ * view transitions and marquees, leaving only plain CSS transitions.
  */
 export function MotionToggle({ labels }: { labels: MotionToggleLabels }) {
   const { userReduced, setUserReduced } = useMotionPreference();
