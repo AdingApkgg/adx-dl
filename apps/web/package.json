@@ -36,6 +36,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@astrodx/tsconfig": "workspace:*",
     "@serwist/cli": "^9.5.12",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24.19.0",
