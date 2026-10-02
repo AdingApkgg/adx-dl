@@ -33,6 +33,10 @@ COPY package.json bun.lock ./
 COPY apps/dash/package.json apps/dash/
 COPY apps/web/package.json apps/web/
 COPY packages/maimai-chart-engine/package.json packages/maimai-chart-engine/
+# web 依赖这两个工作区包（workspace:*）。锁文件里有它们，--frozen-lockfile 要求清单都在，
+# 少一个就报 "listed in bun.lock but not on disk"。dash 自己不用它们，只拷清单。
+COPY packages/ui/package.json packages/ui/
+COPY packages/tsconfig/package.json packages/tsconfig/
 COPY patches/ patches/
 RUN bun install --frozen-lockfile
 

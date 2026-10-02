@@ -75,6 +75,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # 共享界面包（@astrodx/ui）的类型检查和测试；它的 lint 由仓库根目录的 biome（web-check）负责。
+      - name: Typecheck and test the shared UI package
+        working-directory: packages/ui
+        run: bun run check
+
       - name: Lint, typecheck and test
         working-directory: apps/community
         run: bun run check

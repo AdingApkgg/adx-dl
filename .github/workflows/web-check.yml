@@ -81,6 +81,11 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      # 共享界面包（@astrodx/ui）只放源码：web 的 tsc 只检查用到的文件，包自己的测试也要跑。
+      - name: Typecheck and test the shared UI package
+        working-directory: packages/ui
+        run: bun run check
+
       - name: Typecheck and test
         working-directory: apps/web
         run: bun run check
