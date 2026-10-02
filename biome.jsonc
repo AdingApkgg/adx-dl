@@ -130,7 +130,8 @@
                 },
                 "patterns": [
                   { "group": ["next/**"], "message": "@astrodx/ui is shared with the community site: no Next.js APIs." },
-                  { "group": ["@/**"], "message": "@astrodx/ui must not use an app's @/ alias; import package files by relative path." }
+                  { "group": ["@/**"], "message": "@astrodx/ui must not use an app's @/ alias; import package files by relative path." },
+                  { "group": ["@astrodx/ui", "@astrodx/ui/**"], "message": "@astrodx/ui must not import itself by package name; import package files by relative path." }
                 ]
               }
             }
