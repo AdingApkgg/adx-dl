@@ -60,11 +60,11 @@ const sheetVariantClass: Record<SheetVariant, string> = {
 function SheetContent({
   className,
   children,
-  closeLabel = "Close",
+  closeLabel,
   variant = "side",
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
-  closeLabel?: string;
+  closeLabel: string;
   variant?: SheetVariant;
 }) {
   return (
