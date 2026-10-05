@@ -2,11 +2,14 @@ import { fileURLToPath } from "node:url";
 
 import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import { reactRouter } from "@react-router/dev/vite";
+import tailwindcss from "@tailwindcss/vite";
 import { reactRouterHonoServer } from "react-router-hono-server/dev";
 import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [
+    // CSS 入口是 src/client/app.css，类名从哪里找也写在那里。
+    tailwindcss(),
     // 选项必须和 package.json 里 i18n 脚本的参数一致：两边编译进同一个目录，
     // 哪一边少了 emitTsDeclarations，编译时就会把 .d.ts 删掉。
     // 地址只认 url（认不出就是基础语言 zh），不看 Cookie 和浏览器语言（spec 第 11.1 节）。
@@ -32,6 +35,12 @@ export default defineConfig({
     // react-router-hono-server 如果解析到另一份，React Router 用 instanceof 检查请求
     // 上下文就会失败（报 Invalid `context` value）。强制都从本应用解析，只留一份。
     dedupe: ["react", "react-dom", "react-router"],
+  },
+  ssr: {
+    // 共享界面包只放源码，服务端产物要把它打进去（spec 第 7.1 节）。Vite 只把能从 apps/community 解析到的包
+    // （社区站自己声明的依赖）留成 import；工作区链接本来就会被打包，这里写明，不依赖这条默认行为。
+    // 留成 import 的包，生产镜像里必须有：镜像只装 dependencies，test/http/build-output.test.ts 检查这一点。
+    noExternal: ["@astrodx/ui"],
   },
   server: { port: 5373 },
 });

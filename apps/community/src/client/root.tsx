@@ -19,6 +19,7 @@ import { makeQueryClient } from "@/shared/query-client";
 import { requestMetaContext } from "@/shared/router-context";
 
 import type { Route } from "./+types/root";
+import appCss from "./app.css?url";
 import { getBrowserQueryClient } from "./lib/browser";
 
 // 页面请求都在 Paraglide 的中间件里处理，之后 getLocale()、m.xxx() 用的都是这个请求的语言。
@@ -26,6 +27,9 @@ import { getBrowserQueryClient } from "./lib/browser";
 export const middleware: Route.MiddlewareFunction[] = [
   ({ request, url }, next) => paraglideMiddleware(request, () => next(), { effectiveRequestUrl: url }),
 ];
+
+// 样式表放进 <head>（spec 第 7.1 节）。?url 拿到构建后的地址：开发服务器里也是真的 <link>，不会先无样式闪一下。
+export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: appCss }];
 
 export function loader({ context }: Route.LoaderArgs) {
   const meta = context.get(requestMetaContext);
