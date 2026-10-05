@@ -154,17 +154,21 @@ describe("in the browser", () => {
   test("works from the keyboard: Space and Enter choose the focused option", async () => {
     const user = renderPickers();
     await user.tab();
+    expect(document.activeElement).toBe(button("T-system"));
     await user.tab();
-    expect(document.activeElement).toBe(button("T-light"));
-    await user.keyboard(" ");
-    expect(pressed("T-light")).toBe("true");
-    expect(html.style.colorScheme).toBe("light");
-
     await user.tab();
     expect(document.activeElement).toBe(button("T-dark"));
-    await user.keyboard("{Enter}");
+    await user.keyboard(" ");
     expect(pressed("T-dark")).toBe("true");
     expect(html.classList.contains("dark")).toBe(true);
+    expect(html.style.colorScheme).toBe("dark");
+
+    await user.tab({ shift: true });
+    expect(document.activeElement).toBe(button("T-light"));
+    await user.keyboard("{Enter}");
+    expect(pressed("T-light")).toBe("true");
+    expect(html.classList.contains("dark")).toBe(false);
+    expect(html.style.colorScheme).toBe("light");
   });
 
   test("after mounting, the saved choices are pressed", async () => {

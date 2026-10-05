@@ -6,6 +6,11 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from 
 
 // The Radix-component template: a real dialog in happy-dom, opened and closed
 // the way people do it, checking roles, names and where focus ends up.
+// No CSS is loaded here, so Radix's Presence sees no exit animation and the
+// dialog unmounts at once; where styles are loaded, await
+// waitForElementToBeRemoved instead of asserting right away. Radix hands focus
+// back in a zero-delay timeout: user-event waits for it after each action,
+// fireEvent does not, so use waitFor with fireEvent.
 function renderSheet() {
   render(
     <Sheet>
@@ -35,6 +40,8 @@ describe("Sheet in the browser", () => {
     const trigger = screen.getByRole("button", { name: "S-open" });
     await user.click(trigger);
     expect(screen.getByRole("dialog")).toBeTruthy();
+    // Opening moves focus into the dialog; closing must hand it back.
+    expect(screen.getByRole("dialog").contains(document.activeElement)).toBe(true);
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(trigger);
