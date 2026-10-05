@@ -1,4 +1,4 @@
-import { Reveal } from "@/components/motion";
+import { Reveal } from "@astrodx/ui/motion";
 import { ContentSections } from "@/components/site/content-sections";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { aboutSections } from "@/lib/about-content";

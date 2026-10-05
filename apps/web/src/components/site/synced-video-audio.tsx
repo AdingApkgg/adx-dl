@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Volume1Icon, Volume2Icon, VolumeXIcon } from "lucide-react";
 
-import { AnimatePresence, EASE_OUT, motion, springSoft } from "@/components/motion";
+import { AnimatePresence, EASE_OUT, motion, springSoft } from "@astrodx/ui/motion";
 
 type SyncedVideoAudioProps = {
   /** Silent PV (pv.mp4); ships without an audio track. */

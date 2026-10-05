@@ -12,23 +12,23 @@ import {
 import { ChartPreviewIsland } from "@/components/chart-preview/chart-preview-island";
 import { ChartComments } from "@/components/site/chart-comments";
 import { ChartMediaPlayer } from "@/components/site/chart-media-player";
-import { Button } from "@/components/ui/button";
+import { Button } from "@astrodx/ui/components/button";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet";
+} from "@astrodx/ui/components/sheet";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@astrodx/ui/components/tooltip";
 import { formatEntryTitle, localChartAssetUrl, type CatalogEntry } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
-import { cn, TAP_TARGET_44 } from "@/lib/utils";
+import { cn, TAP_TARGET_44 } from "@astrodx/ui/lib/utils";
 
 type DetailPanel = "media" | "preview" | "comments" | null;
 

@@ -3,14 +3,14 @@
 import * as React from "react";
 import { CheckIcon } from "lucide-react";
 
-import { AnimatePresence, motion, springSoft } from "@/components/motion";
+import { AnimatePresence, motion, springSoft } from "@astrodx/ui/motion";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { CompatibleImage } from "@/components/site/compatible-image";
-import { Card } from "@/components/ui/card";
+import { Card } from "@astrodx/ui/components/card";
 import { versionShortName } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { VERSION_IMAGE_DIMENSIONS, versionImageSourcesByIndex } from "@/lib/version-image";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 // versionid 13 = "maimai DX" (first DX-era version); 0–12 are classic maimai.
 const DX_ERA_MIN_INDEX = 13;

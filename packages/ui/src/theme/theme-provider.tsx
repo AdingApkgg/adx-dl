@@ -2,16 +2,15 @@
 
 import * as React from "react";
 
-export type ThemePreference = "light" | "dark" | "system";
+import {
+  ACCENT_COLORS,
+  ACCENT_STORAGE_KEY,
+  type AccentColor,
+  THEME_STORAGE_KEY,
+  type ThemePreference,
+} from "./constants";
+
 type ResolvedTheme = "light" | "dark";
-export const ACCENT_COLORS = [
-  "blue",
-  "violet",
-  "teal",
-  "orange",
-  "rose",
-] as const;
-export type AccentColor = (typeof ACCENT_COLORS)[number];
 
 type ThemeContextValue = {
   theme: ThemePreference;
@@ -23,8 +22,6 @@ type ThemeContextValue = {
 
 const ThemeContext = React.createContext<ThemeContextValue | undefined>(undefined);
 
-const storageKey = "theme";
-const accentStorageKey = "astrodx-accent";
 const themeChangeEvent = "astrodx-theme-change";
 let sessionTheme: ThemePreference | null = null;
 let sessionAccent: AccentColor | null = null;
@@ -88,7 +85,7 @@ function getThemePreferenceSnapshot(): ThemePreference {
     return sessionTheme;
   }
   try {
-    const stored = window.localStorage.getItem(storageKey);
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
     if (stored === "light" || stored === "dark" || stored === "system") {
       return stored;
     }
@@ -116,7 +113,7 @@ function getAccentSnapshot(): AccentColor {
     return sessionAccent;
   }
   try {
-    return parseAccentColor(window.localStorage.getItem(accentStorageKey));
+    return parseAccentColor(window.localStorage.getItem(ACCENT_STORAGE_KEY));
   } catch {
     return "blue";
   }
@@ -197,7 +194,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         }
         sessionTheme = nextTheme;
         try {
-          window.localStorage.setItem(storageKey, nextTheme);
+          window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
         } catch {
           // Keep the in-memory preference for this session.
         }
@@ -209,7 +206,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         }
         sessionAccent = parseAccentColor(nextAccent);
         try {
-          window.localStorage.setItem(accentStorageKey, sessionAccent);
+          window.localStorage.setItem(ACCENT_STORAGE_KEY, sessionAccent);
         } catch {
           // Keep the in-memory preference for this session.
         }

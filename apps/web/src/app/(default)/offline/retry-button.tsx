@@ -4,7 +4,7 @@
 import { RotateCwIcon } from "lucide-react";
 import * as React from "react";
 
-import { motion, springSoft, useReducedMotion } from "@/components/motion";
+import { motion, springSoft, useReducedMotion } from "@astrodx/ui/motion";
 
 // The offline page's JS chunks are precached with the app shell (see
 // serwist.config.mjs), so this hydrates and works without a network.

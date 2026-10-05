@@ -4,8 +4,9 @@
  * 936 of the catalog's titles contain kana, and the default (most-indexed) tree
  * is Chinese — so without a per-element `lang` those Japanese titles render
  * with Simplified-Chinese glyph forms for the Han characters they share, and
- * screen readers read them with a Chinese voice. The font stack in globals.css
- * keys off `:lang(ja)`, which only matches when something actually declares it.
+ * screen readers read them with a Chinese voice. The font stack in
+ * @astrodx/ui's theme.css keys off `:lang(ja)`, which only matches when
+ * something actually declares it.
  */
 
 /** Hiragana, katakana (incl. halfwidth) and the prolonged sound mark. */

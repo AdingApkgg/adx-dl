@@ -4,8 +4,8 @@ import * as React from "react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 import { CheckIcon } from "lucide-react"
 
-import { EASE_OUT, motion } from "@/components/motion"
-import { cn } from "@/lib/utils"
+import { EASE_OUT, motion } from "../motion"
+import { cn } from "../lib/utils"
 
 function DropdownMenu({
   ...props

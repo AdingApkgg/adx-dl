@@ -3,8 +3,8 @@
 import type { Variants } from "framer-motion";
 import { ArrowUpRightIcon } from "lucide-react";
 
-import { motion, springSoft } from "@/components/motion";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { motion, springSoft } from "@astrodx/ui/motion";
+import { Card, CardDescription, CardHeader, CardTitle } from "@astrodx/ui/components/card";
 
 const cardVariants: Variants = {
   rest: { y: 0 },

@@ -17,7 +17,7 @@ import {
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { japaneseTextLang } from "@/lib/text-lang";
 import { entrySlug } from "@/lib/route-slug";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 // The site-wide ramp for a grid of these cards: 2 columns on phones, 3 from md,
 // 4 from lg, 6 from xl. It lives here, next to the card, because the ramp and

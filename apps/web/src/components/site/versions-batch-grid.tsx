@@ -4,10 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import useSWR from "swr";
 
-import { AnimatePresence, motion, springSoft } from "@/components/motion";
+import { AnimatePresence, motion, springSoft } from "@astrodx/ui/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
 import { VersionTileCard } from "@/components/site/version-tile-card";
-import { Button } from "@/components/ui/button";
+import { Button } from "@astrodx/ui/components/button";
 import {
   versionFolderName,
   type ChartDownloadSpec,
@@ -16,7 +16,7 @@ import {
 import { buildVersionFilterHref } from "@/lib/catalog-links";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { jsonFetcher } from "@/lib/swr-fetcher";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 // Static (build-time) manifest: per-version chart download specs keyed by
 // version slug. Fetched only when select mode is first enabled, so the versions

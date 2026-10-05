@@ -11,9 +11,9 @@ import {
 } from "lucide-react";
 import { useSpring } from "framer-motion";
 
-import { AnimatePresence, DrawnCheck, EASE_OUT, motion, useReducedMotion } from "@/components/motion";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { AnimatePresence, DrawnCheck, EASE_OUT, motion, useReducedMotion } from "@astrodx/ui/motion";
+import { cn } from "@astrodx/ui/lib/utils";
+import { Button } from "@astrodx/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -24,7 +24,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@astrodx/ui/components/dropdown-menu";
 import { BATCH_FORMATS, type BatchArchiveFormat } from "@/lib/adx-archive-shared";
 import {
   isChartVideoFile,

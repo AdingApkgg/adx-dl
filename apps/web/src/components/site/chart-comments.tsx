@@ -3,8 +3,8 @@
 import * as React from "react";
 
 import { CommentsSkeleton } from "@/components/site/comments-skeleton";
-import { useTheme } from "@/components/site/theme-provider";
-import { Button } from "@/components/ui/button";
+import { useTheme } from "@astrodx/ui/theme";
+import { Button } from "@astrodx/ui/components/button";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 // Self-hosted Artalk comment backend. The UMD bundle served from `/dist` exposes

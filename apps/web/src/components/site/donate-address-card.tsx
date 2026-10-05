@@ -3,8 +3,8 @@
 import { ArrowUpRightIcon, CheckIcon, CopyIcon } from "lucide-react";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@astrodx/ui/components/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@astrodx/ui/components/card";
 
 type DonateAddressCardProps = {
   title: string;

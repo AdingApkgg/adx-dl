@@ -1,5 +1,5 @@
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { Skeleton } from "@astrodx/ui/components/skeleton";
+import { cn } from "@astrodx/ui/lib/utils";
 
 /**
  * Placeholder that stands in for the Artalk thread while its third-party bundle

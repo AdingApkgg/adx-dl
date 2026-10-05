@@ -1,11 +1,11 @@
 /**
  * WCAG contrast for the design tokens, computed from their oklch source.
  *
- * The palette is authored in oklch (globals.css and Tailwind's own colours),
- * but WCAG 2.x defines contrast on sRGB relative luminance — so a token cannot
- * be checked by eye or by lightness alone. These functions exist so the ratios
- * can be asserted in a unit test instead of rediscovered by a user who cannot
- * read the Expert pill.
+ * The palette is authored in oklch (@astrodx/ui's theme.css and Tailwind's own
+ * colours), but WCAG 2.x defines contrast on sRGB relative luminance — so a
+ * token cannot be checked by eye or by lightness alone. These functions exist
+ * so the ratios can be asserted in a unit test instead of rediscovered by a
+ * user who cannot read the Expert pill.
  */
 
 export type Srgb = { r: number; g: number; b: number };

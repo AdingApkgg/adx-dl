@@ -3,7 +3,7 @@
 import * as React from "react";
 import { animate, motionValue, useMotionValue, useTransform } from "framer-motion";
 
-import { EASE_OUT, motion, useReducedMotion } from "@/components/motion";
+import { EASE_OUT, motion, useReducedMotion } from "@astrodx/ui/motion";
 import { CompatibleImage } from "@/components/site/compatible-image";
 import { SyncedVideoAudio } from "@/components/site/synced-video-audio";
 import {
@@ -12,7 +12,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@astrodx/ui/components/card";
 import { formatEntryTitle, type CatalogEntry } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
 

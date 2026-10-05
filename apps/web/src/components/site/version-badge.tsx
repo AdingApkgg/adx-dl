@@ -1,6 +1,6 @@
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@astrodx/ui/components/badge";
 import { CompatibleImage } from "@/components/site/compatible-image";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 import { VERSION_IMAGE_DIMENSIONS, versionImageSources } from "@/lib/version-image";
 
 type VersionBadgeProps = {

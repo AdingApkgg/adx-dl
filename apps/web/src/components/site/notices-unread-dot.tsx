@@ -4,7 +4,7 @@ import * as React from "react";
 
 import { isStorageAvailable, NOTICES_READ_EVENT, readReadIds } from "@/lib/notice-storage";
 import { notices, todayUtc, unreadCount, type Notice } from "@/lib/notices";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 /**
  * The number the dot shows.

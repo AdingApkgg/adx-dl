@@ -5,9 +5,9 @@ import Link from "next/link";
 import * as React from "react";
 
 import { usePathLocale } from "@/app/use-path-locale";
-import { RevealItem, motion, useReducedMotion } from "@/components/motion";
+import { RevealItem, motion, useReducedMotion } from "@astrodx/ui/motion";
 import { HomeHeroSearch } from "@/components/site/home-hero-search";
-import { Button } from "@/components/ui/button";
+import { Button } from "@astrodx/ui/components/button";
 import { buildLocalePath, getDictionary } from "@/lib/i18n";
 
 const GLYPHS = ["4", "0", "4"] as const;

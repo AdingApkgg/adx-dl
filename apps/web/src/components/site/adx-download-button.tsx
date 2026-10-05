@@ -10,8 +10,8 @@ import {
   XIcon,
 } from "lucide-react";
 
-import { AnimatePresence, DrawnCheck, EASE_OUT, motion } from "@/components/motion";
-import { Button } from "@/components/ui/button";
+import { AnimatePresence, DrawnCheck, EASE_OUT, motion } from "@astrodx/ui/motion";
+import { Button } from "@astrodx/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -20,7 +20,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@astrodx/ui/components/dropdown-menu";
 import { ARCHIVE_FORMATS, type ArchiveFormat } from "@/lib/adx-archive-shared";
 import {
   isChartVideoFile,

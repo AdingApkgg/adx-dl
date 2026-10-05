@@ -9,10 +9,10 @@ import {
   Volume2Icon,
 } from "lucide-react";
 import type { MirrorMode, JudgmentLineDesign } from "@lxns-network/maimai-chart-engine";
-import { motion, springSoft } from "@/components/motion";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { motion, springSoft } from "@astrodx/ui/motion";
+import { Button } from "@astrodx/ui/components/button";
+import { Input } from "@astrodx/ui/components/input";
+import { cn } from "@astrodx/ui/lib/utils";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import {
   configuredDownloadSources,

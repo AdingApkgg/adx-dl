@@ -4,7 +4,7 @@ import * as React from "react";
 import { CheckIcon, CopyIcon } from "lucide-react";
 
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 import { downloadJobMetricsText, downloadJobStateText } from "./download-status-text";
 import { getDownloadSource } from "@/lib/download-sources";
 import type { DownloadJob } from "./downloads-store";

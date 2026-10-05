@@ -4,10 +4,10 @@ import { DicesIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@astrodx/ui/components/button";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { useOnlineStatus } from "@/lib/use-online-status";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 // The slug list is static per deploy — fetch it once per session and share it
 // across every random button on the page.

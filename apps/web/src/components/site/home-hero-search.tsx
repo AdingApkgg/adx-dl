@@ -7,10 +7,10 @@ import useSWR from "swr";
 import { SearchIcon } from "lucide-react";
 import { useMotionValue, useSpring, type Variants } from "framer-motion";
 
-import { AnimatePresence, EASE_OUT, motion, springSoft, useReducedMotion } from "@/components/motion";
+import { AnimatePresence, EASE_OUT, motion, springSoft, useReducedMotion } from "@astrodx/ui/motion";
 import styles from "@/components/site/home-hero-search.module.css";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@astrodx/ui/components/button";
+import { Input } from "@astrodx/ui/components/input";
 import {
   buildCatalogSearchWithMatches,
   type CatalogSearchIndexEntry,
@@ -19,7 +19,7 @@ import {
 import { formatEntryArtist, formatEntryTitle } from "@/lib/catalog-shared";
 import { defaultLocale, getDictionary, isSupportedLocale, type Locale } from "@/lib/i18n";
 import { jsonFetcher } from "@/lib/swr-fetcher";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 export type HeroGenreChip = {
   id: number;

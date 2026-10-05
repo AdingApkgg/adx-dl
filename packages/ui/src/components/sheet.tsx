@@ -4,7 +4,7 @@ import type * as React from "react";
 import { XIcon } from "lucide-react";
 import { Dialog as SheetPrimitive } from "radix-ui";
 
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 
 function Sheet(
   props: React.ComponentProps<typeof SheetPrimitive.Root>
@@ -60,11 +60,11 @@ const sheetVariantClass: Record<SheetVariant, string> = {
 function SheetContent({
   className,
   children,
-  closeLabel = "Close",
+  closeLabel,
   variant = "side",
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
-  closeLabel?: string;
+  closeLabel: string;
   variant?: SheetVariant;
 }) {
   return (

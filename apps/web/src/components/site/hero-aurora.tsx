@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useInView, useScroll, useTransform } from "framer-motion";
 
-import { motion, RollingNumber, useReducedMotion } from "@/components/motion";
+import { motion, RollingNumber, useReducedMotion } from "@astrodx/ui/motion";
 
 // Two-keyframe mirrored drifts (long, offset durations) so the orbs breathe
 // rather than orbit. The rest state is the identity pose the SSR HTML renders.

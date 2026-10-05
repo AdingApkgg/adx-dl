@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { Reveal } from "@/components/motion";
+import { Reveal } from "@astrodx/ui/motion";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { readCatalogEntries } from "@/lib/catalog";

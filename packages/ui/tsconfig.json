@@ -1,0 +1,8 @@
+{
+  "extends": "@astrodx/tsconfig/base.json",
+  "compilerOptions": {
+    // The community site type-checks this source with verbatimModuleSyntax on, so the package does too.
+    "verbatimModuleSyntax": true
+  },
+  "include": ["bun-test.d.ts", "src/**/*.ts", "src/**/*.tsx"]
+}

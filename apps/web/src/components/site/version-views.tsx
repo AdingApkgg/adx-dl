@@ -1,4 +1,4 @@
-import { Reveal } from "@/components/motion";
+import { Reveal } from "@astrodx/ui/motion";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { VersionScrollSpine } from "@/components/site/version-scroll-spine";
 import { VersionsBatchGrid } from "@/components/site/versions-batch-grid";

@@ -8,12 +8,12 @@ import {
   type ChartDifficulty,
   type Note,
 } from "@lxns-network/maimai-chart-engine";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 import { textFetcher } from "@/lib/swr-fetcher";
-import { AnimatePresence, EASE_OUT, motion, springSoft } from "@/components/motion";
+import { AnimatePresence, EASE_OUT, motion, springSoft } from "@astrodx/ui/motion";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@astrodx/ui/components/button";
+import { Skeleton } from "@astrodx/ui/components/skeleton";
 import { ChartCanvas } from "./chart-canvas";
 import { ChartControls, ChartDifficultyPicker } from "./chart-controls";
 import { ChartSettingsGroups } from "./chart-settings";

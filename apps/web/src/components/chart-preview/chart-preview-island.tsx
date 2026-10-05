@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 
-import { AnimatePresence, EASE_OUT, motion, revealTransition } from "@/components/motion";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AnimatePresence, EASE_OUT, motion, revealTransition } from "@astrodx/ui/motion";
+import { Skeleton } from "@astrodx/ui/components/skeleton";
 import type { ChartPreviewProps } from "./chart-preview";
 
 // The player is canvas + Web Audio + localStorage only — never server-render it.

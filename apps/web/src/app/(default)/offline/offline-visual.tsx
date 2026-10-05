@@ -3,7 +3,7 @@
 
 import { WifiOffIcon } from "lucide-react";
 
-import { motion, useReducedMotion } from "@/components/motion";
+import { motion, useReducedMotion } from "@astrodx/ui/motion";
 
 /**
  * WifiOff icon ringed by two expanding radar pulses — the loop is tied to the

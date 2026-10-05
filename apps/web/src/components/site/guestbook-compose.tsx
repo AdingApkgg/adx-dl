@@ -4,8 +4,8 @@ import { CheckIcon, ClipboardListIcon, CopyIcon, UploadIcon } from "lucide-react
 import { useSearchParams } from "next/navigation";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@astrodx/ui/components/button";
+import { Textarea } from "@astrodx/ui/components/textarea";
 import {
   buildTemplate,
   decideInsert,

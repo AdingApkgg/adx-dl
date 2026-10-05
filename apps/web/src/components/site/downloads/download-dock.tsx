@@ -23,14 +23,14 @@ import {
   motion,
   springSoft,
   useReducedMotion,
-} from "@/components/motion";
+} from "@astrodx/ui/motion";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@astrodx/ui/components/dropdown-menu";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 import { DownloadSourceMenu, DownloadSourceSummary } from "./download-source-selector";
 import { useWakeLock } from "@/components/chart-preview/hooks/use-wake-lock";
 import { jobPercent, useDownloadsStore } from "./downloads-store";
@@ -49,8 +49,8 @@ const SOURCE_PROBE_REFRESH_MS = 5 * 60_000;
 
 /**
  * The dock's icon buttons render outside the shared Button primitive, so they
- * inherited only globals.css's faint `*` outline — effectively invisible for
- * keyboard users. This is the same ring the primitives use.
+ * inherited only theme.css's faint `*` outline (@astrodx/ui) — effectively
+ * invisible for keyboard users. This is the same ring the primitives use.
  */
 const DOCK_ICON_BUTTON_CLASS =
   "-m-0.5 rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";

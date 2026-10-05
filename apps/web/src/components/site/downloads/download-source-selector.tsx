@@ -2,12 +2,12 @@
 
 import * as React from "react";
 
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@astrodx/ui/components/badge";
 import {
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-} from "@/components/ui/dropdown-menu";
+} from "@astrodx/ui/components/dropdown-menu";
 import {
   DOWNLOAD_SOURCES,
   getDownloadSource,
@@ -18,7 +18,7 @@ import {
 } from "@/lib/download-sources";
 import type { DownloadSourceProbe } from "@/lib/download-source-probe";
 import type { SiteDictionary } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 import { useDownloadsStore } from "./downloads-store";
 
 type SourcePickerCopy = SiteDictionary["downloads"]["sourcePicker"];

@@ -6,9 +6,9 @@ import { useInView } from "framer-motion";
 import useSWR from "swr";
 import { EyeIcon } from "lucide-react";
 
-import { RollingNumber } from "@/components/motion";
+import { RollingNumber } from "@astrodx/ui/motion";
 import { defaultLocale, getDictionary, isSupportedLocale, locales } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 // Self-hosted busuanzi-compatible counter. `POST /api` increments and returns
 // the totals; the visited page is identified by the `x-bsz-referer` header and

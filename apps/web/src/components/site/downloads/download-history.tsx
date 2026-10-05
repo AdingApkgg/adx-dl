@@ -3,7 +3,7 @@
 import { RotateCwIcon, Trash2Icon } from "lucide-react";
 
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 import { useDownloadsStore } from "./downloads-store";
 
 /**

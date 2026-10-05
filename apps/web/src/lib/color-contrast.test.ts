@@ -12,18 +12,19 @@ import {
 } from "./color-contrast";
 import { DIFFICULTY_TONE_CLASS, GENRES } from "./catalog-shared";
 
-const globalsCss = readFileSync(
-  new URL("../app/globals.css", import.meta.url),
+// The design tokens live in the shared UI package (@astrodx/ui), not in globals.css.
+const themeCss = readFileSync(
+  new URL(import.meta.resolve("@astrodx/ui/styles/theme.css")),
   "utf8"
 );
 
 /** First value of `--token` inside the given selector block. */
 function readToken(selector: string, token: string): string {
-  const blockStart = globalsCss.indexOf(`${selector} {`);
+  const blockStart = themeCss.indexOf(`${selector} {`);
   if (blockStart < 0) {
-    throw new Error(`Missing selector ${selector} in globals.css`);
+    throw new Error(`Missing selector ${selector} in theme.css`);
   }
-  const block = globalsCss.slice(blockStart, globalsCss.indexOf("}", blockStart));
+  const block = themeCss.slice(blockStart, themeCss.indexOf("}", blockStart));
   const match = new RegExp(`--${token}:\\s*([^;]+);`).exec(block);
   if (!match) {
     throw new Error(`Missing --${token} in ${selector}`);

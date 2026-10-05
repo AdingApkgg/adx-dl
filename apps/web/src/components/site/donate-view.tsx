@@ -1,4 +1,4 @@
-import { Reveal } from "@/components/motion";
+import { Reveal } from "@astrodx/ui/motion";
 import { DonateAddressCard } from "@/components/site/donate-address-card";
 import { FriendLinkCard } from "@/components/site/friend-link-card";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";

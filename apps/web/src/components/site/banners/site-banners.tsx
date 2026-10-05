@@ -3,7 +3,7 @@
 import { WifiOffIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 
-import { AnimatePresence, EASE_OUT, motion, useReducedMotion } from "@/components/motion";
+import { AnimatePresence, EASE_OUT, motion, useReducedMotion } from "@astrodx/ui/motion";
 import { useConnectionBanner } from "@/components/site/banners/use-connection-banner";
 import {
   storePreferredLocale,

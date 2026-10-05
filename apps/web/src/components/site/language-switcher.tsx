@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation";
 import { CheckIcon, GlobeIcon } from "lucide-react";
 
 import { storePreferredLocale } from "@/app/locale-preference";
-import { EASE_OUT, motion, springSoft } from "@/components/motion";
-import { Button } from "@/components/ui/button";
+import { EASE_OUT, motion, springSoft } from "@astrodx/ui/motion";
+import { Button } from "@astrodx/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@astrodx/ui/components/dropdown-menu";
 import {
   getDictionary,
   getHtmlLang,

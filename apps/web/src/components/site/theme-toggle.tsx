@@ -4,16 +4,16 @@ import * as React from "react";
 import { MonitorIcon, MoonStarIcon, SunMediumIcon } from "lucide-react";
 
 
-import { AnimatePresence, EASE_OUT, motion, useReducedMotion } from "@/components/motion";
-import { Button } from "@/components/ui/button";
+import { AnimatePresence, EASE_OUT, motion, useReducedMotion } from "@astrodx/ui/motion";
+import { Button } from "@astrodx/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useTheme } from "@/components/site/theme-provider";
+} from "@astrodx/ui/components/dropdown-menu";
+import { useTheme } from "@astrodx/ui/theme";
 
 type ThemeToggleLabels = {
   toggleLabel: string;

@@ -2,7 +2,7 @@
 
 import { PlayIcon } from "lucide-react";
 
-import { motion, springSoft } from "@/components/motion";
+import { motion, springSoft } from "@astrodx/ui/motion";
 import { useMusicPlayerPreferences } from "@/components/site/music-player/music-player-preferences";
 import { useMusicPlayerStore } from "@/components/site/music-player/music-player-store";
 import { VersionTileCard } from "@/components/site/version-tile-card";

@@ -1,4 +1,4 @@
-import { Reveal } from "@/components/motion";
+import { Reveal } from "@astrodx/ui/motion";
 import { MusicVersionGrid } from "@/components/site/music-version-grid";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { getDictionary, type Locale } from "@/lib/i18n";

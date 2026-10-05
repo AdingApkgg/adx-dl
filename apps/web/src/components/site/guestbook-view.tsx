@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import { Reveal } from "@/components/motion";
+import { Reveal } from "@astrodx/ui/motion";
 import { ChartComments } from "@/components/site/chart-comments";
 import { GuestbookCompose } from "@/components/site/guestbook-compose";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
