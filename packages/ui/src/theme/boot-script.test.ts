@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 
 import { parseMotionMode } from "../motion";
 import { MOTION_STORAGE_KEY } from "../motion/constants";

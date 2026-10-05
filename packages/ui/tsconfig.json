@@ -4,5 +4,5 @@
     // The community site type-checks this source with verbatimModuleSyntax on, so the package does too.
     "verbatimModuleSyntax": true
   },
-  "include": ["bun-test.d.ts", "src/**/*.ts", "src/**/*.tsx"]
+  "include": ["vitest.config.ts", "vitest.setup.ts", "src/**/*.ts", "src/**/*.tsx"]
 }

@@ -11,7 +11,8 @@
     "./styles/theme.css": "./src/styles/theme.css"
   },
   "scripts": {
-    "check": "tsc --noEmit && bun test"
+    "check": "tsc --noEmit && vitest run",
+    "test": "vitest"
   },
   "peerDependencies": {
     "react": "19.3.0",
@@ -30,10 +31,16 @@
   },
   "devDependencies": {
     "@astrodx/tsconfig": "workspace:*",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "happy-dom": "^20.14.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.3"
   }
 }
