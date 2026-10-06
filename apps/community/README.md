@@ -71,6 +71,21 @@ CI 用 24。其余测试照旧用 `bun test`：脚本只给它 `src` 和 `test/h
 - 漏翻译不会报类型错误，`src/shared/i18n/messages.test.ts` 会检查三种语言的键和参数是否一致。
 - 切换语言一律整页跳转。服务端渲染只用 `react-dom/server.edge`（原因写在 `src/client/entry.server.tsx`）。
 
+## 界面
+
+- 样式是 Tailwind 4（`@tailwindcss/vite`）加共享界面包 `@astrodx/ui`（`packages/ui`）。入口是 `src/client/app.css`：
+  先引 `tailwindcss` 和包的 `theme.css`，类名只从 `src/client` 里找（原因写在文件里）。
+- 明暗模式、强调色、减少动画和 web 是同一套（localStorage 的键也一样，两个站的域名不同，各存各的）。
+  防闪烁脚本带着本次请求的 nonce 内联在 `<head>` 里（`src/client/components/theme-boot-script.tsx`）。
+- 组件从 `@astrodx/ui/components/<名字>` 引入；toast 用同一个文件转出的 `toast`。包里不放文字，界面上的文字一律走 Paraglide。
+- 包里的类名也会进 web 的 CSS（`theme.css` 扫描整个包）。0b 加的 `Label`、`Alert` 只用了 web 已经有的类名；
+  以后加组件，web 的 CSS 会多出它的类名。
+- 加 shadcn 组件：在本目录跑 `../../packages/ui/node_modules/.bin/shadcn add <名字> --dry-run --view`，照它给出的内容
+  在 `packages/ui/src/components/` 里手写，引用改成包内相对路径（`cn` 用 `../lib/utils`）。不加 `--dry-run` 时 CLI 报
+  `lib`、`hooks` 两个别名解析不了，一个文件也不写。
+- 服务端产物里只有 `dependencies` 留给运行时 import，其余都打进产物（包括 `@astrodx/ui`）。社区站自己的某个 devDependency
+  要在服务端用到，就加进 `vite.config.ts` 的 `ssr.noExternal`；漏了的话 `test:http` 里的 `build-output.test.ts` 会报出来。
+
 ## 账号
 
 - Better Auth 1.7.6 挂在 `/api/auth/*`，配置全在 `src/server/auth/auth.ts`。`better-auth` 和

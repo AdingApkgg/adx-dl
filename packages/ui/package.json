@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./components/*": "./src/components/*.tsx",
+    "./components/*.test": null,
     "./lib/utils": "./src/lib/utils.ts",
     "./motion": "./src/motion/index.tsx",
     "./theme": "./src/theme/index.ts",
