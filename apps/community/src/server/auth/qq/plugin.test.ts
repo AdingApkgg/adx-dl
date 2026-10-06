@@ -104,18 +104,18 @@ describe("发码", () => {
     expect(res?.json).toEqual({ status: true });
   });
 
-  test("发给 Turnstile 的是 Cloudflare 给的原始访客 IP，IPv6 不截成 /64", async () => {
-    const seen: (string | null)[] = [];
+  test("发给 Turnstile 的是 Cloudflare 给的原始访客 IP（IPv6 不截成 /64），用途是发 QQ 验证码", async () => {
+    const seen: string[] = [];
     const { app } = setup({
-      turnstile: async (_token, remoteIp) => {
-        seen.push(remoteIp);
+      turnstile: async (_token, remoteIp, action) => {
+        seen.push(`${remoteIp} ${action}`);
         return "ok";
       },
     });
 
     await sendCode(new Browser(app, { ip: "2001:db8:1234:5678:9abc:def0:1234:5678" }), randomQq());
 
-    expect(seen).toEqual(["2001:db8:1234:5678:9abc:def0:1234:5678"]);
+    expect(seen).toEqual(["2001:db8:1234:5678:9abc:def0:1234:5678 qq-send-code"]);
   });
 
   test("同一个 QQ 号一分钟内只能发一次", async () => {

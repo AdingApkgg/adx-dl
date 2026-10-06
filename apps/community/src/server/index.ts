@@ -9,6 +9,7 @@ import { apiContext, queryClientContext, requestMetaContext } from "@/shared/rou
 import { createApp } from "./app";
 import type { AppEnv } from "./app-env";
 import { createAuth } from "./auth/auth";
+import { limitGoogleTokenExchange } from "./auth/google-timeout";
 import { createRedisQqCodeStore } from "./auth/qq/codes";
 import { createQqHasher } from "./auth/qq/hasher";
 import { createConsoleSender } from "./auth/qq/sender";
@@ -38,7 +39,11 @@ const rateLimitStore = createRedisRateLimitStore(redis);
 const getBoss = () => getSender(env.databaseUrl, (error) => log.error("pgboss_error", describeError(error)));
 void getBoss().catch((error) => log.error("pgboss_start_failed", describeError(error)));
 
-const verifyTurnstile = createTurnstileVerifier({ secretKey: env.turnstile.secretKey, log });
+const verifyTurnstile = createTurnstileVerifier({
+  secretKey: env.turnstile.secretKey,
+  expectedHostname: new URL(env.publicOrigin).hostname,
+  log,
+});
 const qqSender =
   env.qq.sender === "napcat"
     ? createNapcatSender(createOneBotClient({ httpUrl: env.qq.httpUrl, accessToken: env.qq.accessToken }), log)
@@ -59,6 +64,8 @@ const auth = createAuth({
     hasher: createQqHasher(env.qqCodeHmacKey),
   },
 });
+// 换 Google 令牌这一步加上超时（原因写在 google-timeout.ts）。
+await limitGoogleTokenExchange(auth);
 
 const app = createApp({
   log,

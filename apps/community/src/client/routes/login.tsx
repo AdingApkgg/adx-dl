@@ -11,6 +11,7 @@ import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
 import { NICKNAME_MAX, normalizeNickname } from "@/shared/nickname";
 import { apiContext, queryClientContext } from "@/shared/router-context";
+import { TURNSTILE_ACTIONS } from "@/shared/turnstile-actions";
 
 import { PageTitle } from "../components/page-title";
 import { QqCodeForm } from "../components/qq-code-form";
@@ -299,7 +300,7 @@ type PasskeySignUpProps = {
 
 // 单独成一个组件，只在没登录时挂载：useTurnstile 只在挂载时渲染 widget，它要和放 widget 的容器一起出现。
 function PasskeySignUp({ siteKey, pending, setPending, setError, onSignedIn, rearm }: PasskeySignUpProps) {
-  const turnstile = useTurnstile(siteKey);
+  const turnstile = useTurnstile(siteKey, TURNSTILE_ACTIONS.passkeySignUp);
   const [nickname, setNickname] = useState("");
   const nicknameId = useId();
 
