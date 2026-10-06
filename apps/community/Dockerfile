@@ -1,11 +1,15 @@
 # 构建上下文是仓库根目录（bun.lock 在根目录）：
 #   docker build -f apps/community/Dockerfile .
-# Bun ≥ 1.4 允许 --frozen-lockfile 时其他 workspace 的目录不存在，所以只复制根清单和本应用的清单。
+# Bun ≥ 1.4 允许 --frozen-lockfile 时其他 workspace 的目录不存在，所以只复制根清单、本应用的清单，以及本应用依赖的
+# 两个工作区包（@astrodx/ui、@astrodx/tsconfig）的清单：少一个就报 "listed in bun.lock but not on disk"，
+# 只装生产依赖的运行阶段也一样。
 
 FROM oven/bun:1.4.2 AS builder
 WORKDIR /repo
 COPY package.json bun.lock ./
 COPY apps/community/package.json apps/community/
+COPY packages/ui/package.json packages/ui/
+COPY packages/tsconfig/package.json packages/tsconfig/
 COPY patches/ patches/
 RUN bun install --frozen-lockfile --filter community
 # 只按白名单复制源码，不整目录复制，避免把 .env 带进镜像层。
@@ -13,16 +17,23 @@ COPY apps/community/tsconfig.json apps/community/react-router.config.ts apps/com
 COPY apps/community/project.inlang/settings.json apps/community/project.inlang/
 COPY apps/community/messages apps/community/messages
 COPY apps/community/src apps/community/src
+# tsconfig 继承 @astrodx/tsconfig；共享界面包只放源码，构建时打进产物。
+COPY packages/tsconfig/base.json packages/tsconfig/
+COPY packages/ui/tsconfig.json packages/ui/
+COPY packages/ui/src packages/ui/src
 WORKDIR /repo/apps/community
 # 构建时 Vite 插件把文案编译进 src/paraglide/，插件从 node_modules 加载，不连 CDN。
 RUN bun run build
 
-# 服务端渲染的构建产物不打包依赖（只打包了 react-router-hono-server），
-# 所以运行阶段要自己装生产依赖，不能照搬 dash 的单文件做法。
+# 服务端渲染的构建产物只把生产依赖（dependencies）留给运行时 import（test/http/build-output.test.ts 检查），
+# 其余的都打进了产物：react-router-hono-server、共享界面包和它用到的库。所以运行阶段要自己装生产依赖，
+# 不能照搬 dash 的单文件做法；devDependencies（包括 @astrodx/ui 和 shadcn CLI 那一串）不装。
 FROM oven/bun:1.4.2-slim AS runner
 WORKDIR /repo
 COPY package.json bun.lock ./
 COPY apps/community/package.json apps/community/
+COPY packages/ui/package.json packages/ui/
+COPY packages/tsconfig/package.json packages/tsconfig/
 COPY patches/ patches/
 RUN bun install --frozen-lockfile --production --filter community
 COPY --from=builder /repo/apps/community/build apps/community/build
@@ -30,6 +41,8 @@ COPY --from=builder /repo/apps/community/build apps/community/build
 # tsconfig（@/ 路径别名）。src 从构建阶段复制，因为编译好的文案 src/paraglide/
 # 只在那里有（它不入库）。
 COPY apps/community/tsconfig.json apps/community/
+# 上面的 tsconfig 继承 @astrodx/tsconfig（在 dependencies 里，bun install 链接了它），它的 base.json 也要在。
+COPY packages/tsconfig/base.json packages/tsconfig/
 COPY --from=builder /repo/apps/community/src apps/community/src
 WORKDIR /repo/apps/community
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
