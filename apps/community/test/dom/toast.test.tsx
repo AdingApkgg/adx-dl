@@ -20,6 +20,16 @@ describe("全局提示（toast）", () => {
     expect(screen.getByRole("region").getAttribute("aria-label")).toBe(`${m.toast_region()} alt+T`);
   });
 
+  test("上一个用例留下的提示，不会出现在新挂的 Toaster 里", async () => {
+    render(<AppProviders>{null}</AppProviders>);
+    // 给 Sonner 一点时间：它订阅时会把还没消失的提示重放给新的 Toaster。
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(screen.queryByText(m.profile_saved())).toBeNull();
+  });
+
   test("跟着设置里的深浅色：存的是深色就用深色", async () => {
     localStorage.setItem("theme", "dark");
     render(<AppProviders>{null}</AppProviders>);
@@ -27,6 +37,7 @@ describe("全局提示（toast）", () => {
       toast.success(m.profile_saved());
     });
     await screen.findByText(m.profile_saved());
+    expect(screen.getAllByText(m.profile_saved())).toHaveLength(1);
 
     expect(toasterTheme()).toBe("dark");
   });
