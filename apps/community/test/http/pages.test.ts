@@ -43,10 +43,15 @@ describe("页面", () => {
     const res = await fetch(server.url("/"));
     const html = await res.text();
     const nonce = /'nonce-([^']+)'/.exec(res.headers.get("content-security-policy") ?? "")?.[1];
-    const head = html.slice(0, html.indexOf("</head>"));
+    const headEnd = html.indexOf("</head>");
+    const head = html.slice(0, headEnd);
 
     expect(nonce).toBeTruthy();
+    // 没有 </head> 的话 head 是整页去掉最后一个字符，下面几条会白白通过。
+    expect(headEnd).toBeGreaterThan(0);
     expect(head).toContain(`<script id="theme-init" nonce="${nonce}">${themeBootScript()}</script>`);
+    // 在样式表之前：样式表还没加载完，主题就已经定好了。
+    expect(head.indexOf('rel="stylesheet"')).toBeGreaterThan(head.indexOf('id="theme-init"'));
   });
 
   // 样式表的 nonce 是空的：React Router 会把请求的 nonce 抄到 <link> 上，浏览器里读不到这个值，hydrate 时报属性对不上。
@@ -106,6 +111,10 @@ describe("页面", () => {
     const res = await fetch(server.url("/definitely-missing"));
     expect(res.status).toBe(404);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
+    const html = await res.text();
+    expect(html).toContain("页面不存在");
+    // 一段的地址由 :lang? 布局的中间件判成 404，落到根组件的错误边界：那里只有出错卡片，没有页头。
+    expect(html).not.toContain("<header");
   });
 
   test("英文下的未知地址也是 404，用英文显示", async () => {
