@@ -1,17 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
-import {
-  isRouteErrorResponse,
-  Links,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-  useRevalidator,
-  useRouteLoaderData,
-} from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 
-import { m } from "@/paraglide/messages.js";
 import { getLocale } from "@/paraglide/runtime.js";
 import { paraglideMiddleware } from "@/paraglide/server.js";
 import { htmlLang } from "@/shared/i18n/locale";
@@ -21,6 +11,7 @@ import { requestMetaContext } from "@/shared/router-context";
 import type { Route } from "./+types/root";
 import appCss from "./app.css?url";
 import { AppProviders } from "./components/app-providers";
+import { ErrorCard } from "./components/error-card";
 import { ThemeBootScript } from "./components/theme-boot-script";
 import { getBrowserQueryClient } from "./lib/browser";
 
@@ -70,34 +61,12 @@ export default function App() {
   );
 }
 
+// 最后一道错误边界（spec 第 7.4 节）：根组件的 loader、中间件，以及 :lang? 布局的中间件出错时到这里，包括 /foo、
+// /fr/x 这类第一段认不出语言的地址返回的 404。子页面的错误由布局的错误边界接住。这里只有出错卡片，不带页头和账号信息。
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  // 这是这次页面加载时服务端渲染那个请求的 ID。站内跳转出错时它指向的是最初那次请求，
-  // 排查时按它找到访客和时间，再看前后的日志。
-  const requestId = useRouteLoaderData<typeof loader>("root")?.requestId;
-  const revalidator = useRevalidator();
-
-  if (isRouteErrorResponse(error) && error.status === 404) {
-    return (
-      <main>
-        <h1>{m.error_not_found_title()}</h1>
-        <p>{m.error_not_found_body()}</p>
-      </main>
-    );
-  }
-
   return (
-    <main>
-      <h1>{m.error_server_title()}</h1>
-      <p>{m.error_server_body()}</p>
-      {requestId ? (
-        <p>
-          {m.error_request_id()}: <code>{requestId}</code>
-        </p>
-      ) : null}
-      {/* 站内跳转时断网也会落到这里（spec 第 11.4 节）：重新执行当前页面的 loader，成功就恢复正常页面。 */}
-      <button type="button" disabled={revalidator.state === "loading"} onClick={() => revalidator.revalidate()}>
-        {m.error_retry()}
-      </button>
-    </main>
+    <div className="px-4 py-16">
+      <ErrorCard error={error} />
+    </div>
   );
 }

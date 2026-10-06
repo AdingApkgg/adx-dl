@@ -164,5 +164,6 @@
   "appearance_motion_off_hint": "Disable nonessential animation and transitions",
   "locale_suggestion": "It looks like you prefer English. Switch to the English version?",
   "locale_suggestion_switch": "Switch to English",
-  "locale_suggestion_dismiss": "No thanks"
+  "locale_suggestion_dismiss": "No thanks",
+  "error_home": "Back to home"
 }

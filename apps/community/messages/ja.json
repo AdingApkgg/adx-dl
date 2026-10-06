@@ -164,5 +164,6 @@
   "appearance_motion_off_hint": "不要なアニメーションと切り替えを無効にします",
   "locale_suggestion": "日本語のほうが読みやすいようです。日本語版に切り替えますか？",
   "locale_suggestion_switch": "日本語に切り替える",
-  "locale_suggestion_dismiss": "このままにする"
+  "locale_suggestion_dismiss": "このままにする",
+  "error_home": "ホームに戻る"
 }

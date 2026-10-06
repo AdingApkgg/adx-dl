@@ -95,7 +95,10 @@ describe("页面", () => {
   test("英文下的未知地址也是 404，用英文显示", async () => {
     const res = await fetch(server.url("/en/definitely-missing"));
     expect(res.status).toBe(404);
-    expect(await res.text()).toContain("Page not found");
+    const html = await res.text();
+    expect(html).toContain("Page not found");
+    // 两段的地址由 :lang? 布局的错误边界接住（spec 第 7.4 节）：页头照样在。
+    expect(html).toContain("<header");
   });
 
   test("大小写不对的语言前缀也是 404", async () => {

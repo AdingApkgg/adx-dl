@@ -1,10 +1,11 @@
 import { dehydrate, HydrationBoundary, type Query } from "@tanstack/react-query";
-import { data, Outlet, redirect } from "react-router";
+import { data, Outlet, redirect, useRouteLoaderData } from "react-router";
 
 import { baseLocale, isLocale } from "@/paraglide/runtime.js";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
 import { getBrowserApi, getBrowserQueryClient } from "../lib/browser";
+import { ErrorCard } from "../components/error-card";
 import { SiteShell } from "../components/site-shell";
 import { pendingDeletionRedirect } from "../lib/pending-deletion";
 import { meQuery } from "../queries/me";
@@ -88,6 +89,19 @@ export default function LocaleLayout({ loaderData }: Route.ComponentProps) {
     <HydrationBoundary state={loaderData.dehydratedState}>
       <SiteShell>
         <Outlet />
+      </SiteShell>
+    </HydrationBoundary>
+  );
+}
+
+// 子页面出错（包括 /u/<不存在的 id>、/en/<不存在的地址>）都到这里：页头照样在，内容区换成出错卡片（spec 第 7.4 节）。
+// 布局自己的中间件抛出的 404（/foo、/fr/x 这类第一段不是语言的地址）不归这里，由根组件的错误边界接住。
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  const layout = useRouteLoaderData<typeof loader>("routes/locale");
+  return (
+    <HydrationBoundary state={layout?.dehydratedState}>
+      <SiteShell>
+        <ErrorCard error={error} />
       </SiteShell>
     </HydrationBoundary>
   );
