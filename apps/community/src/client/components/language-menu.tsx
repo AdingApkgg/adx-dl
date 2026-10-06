@@ -12,6 +12,8 @@ import { m } from "@/paraglide/messages.js";
 import { deLocalizeHref, getLocale, type Locale, locales, localizeHref } from "@/paraglide/runtime.js";
 import { htmlLang } from "@/shared/i18n/locale";
 
+import { dismissLocalePrompt } from "../lib/locale-suggestion";
+
 const LANGUAGE_NAMES: Record<Locale, () => string> = {
   zh: m.language_zh,
   en: m.language_en,
@@ -29,6 +31,7 @@ export function languageLinks(pathAndSearch: string): { locale: Locale; href: st
 }
 
 // 页头的语言切换。用普通链接整页跳转（spec 第 11.1 节）：站内路由切换时，没有重新渲染的组件会停在旧语言。
+// 点了就记下"用户自己选过语言"，以后不再提示切换（spec 第 7.2 节）。
 export function LanguageMenu() {
   const location = useLocation();
   const current = getLocale();
@@ -48,6 +51,7 @@ export function LanguageMenu() {
               hrefLang={htmlLang(locale)}
               lang={htmlLang(locale)}
               aria-current={locale === current ? "true" : undefined}
+              onClick={dismissLocalePrompt}
             >
               {languageName(locale)}
               {locale === current ? <CheckIcon aria-hidden="true" className="ml-auto" /> : null}

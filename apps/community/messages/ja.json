@@ -161,5 +161,8 @@
   "appearance_motion_off": "減らす",
   "appearance_motion_system_hint": "端末の「視差効果を減らす」設定に従います",
   "appearance_motion_on_hint": "常にインターフェースの動きを再生します",
-  "appearance_motion_off_hint": "不要なアニメーションと切り替えを無効にします"
+  "appearance_motion_off_hint": "不要なアニメーションと切り替えを無効にします",
+  "locale_suggestion": "日本語のほうが読みやすいようです。日本語版に切り替えますか？",
+  "locale_suggestion_switch": "日本語に切り替える",
+  "locale_suggestion_dismiss": "このままにする"
 }

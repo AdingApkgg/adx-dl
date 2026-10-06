@@ -161,5 +161,8 @@
   "appearance_motion_off": "减少动画",
   "appearance_motion_system_hint": "遵循设备的“减少动态效果”设置",
   "appearance_motion_on_hint": "始终播放界面动画",
-  "appearance_motion_off_hint": "关闭非必要动画和过渡"
+  "appearance_motion_off_hint": "关闭非必要动画和过渡",
+  "locale_suggestion": "看起来你更习惯中文，要切换到中文版吗？",
+  "locale_suggestion_switch": "切换到中文",
+  "locale_suggestion_dismiss": "不用了"
 }

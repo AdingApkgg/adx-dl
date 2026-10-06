@@ -161,5 +161,8 @@
   "appearance_motion_off": "Reduce motion",
   "appearance_motion_system_hint": "Follow your device’s reduced-motion preference",
   "appearance_motion_on_hint": "Always play interface motion",
-  "appearance_motion_off_hint": "Disable nonessential animation and transitions"
+  "appearance_motion_off_hint": "Disable nonessential animation and transitions",
+  "locale_suggestion": "It looks like you prefer English. Switch to the English version?",
+  "locale_suggestion_switch": "Switch to English",
+  "locale_suggestion_dismiss": "No thanks"
 }
