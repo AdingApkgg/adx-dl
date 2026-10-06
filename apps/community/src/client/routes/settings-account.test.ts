@@ -197,9 +197,9 @@ async function renderPage(fixture: Fixture = {}, search = ""): Promise<string> {
   );
 }
 
-// 页面里每个 <li> 的内容（静态标记里 <li> 没有属性）。
+// 页面里每个 <li> 的内容（<li> 带着样式的 class）。
 function listItems(html: string): string[] {
-  return [...html.matchAll(/<li>(.*?)<\/li>/gs)].map((match) => match[1] ?? "");
+  return [...html.matchAll(/<li\b[^>]*>(.*?)<\/li>/gs)].map((match) => match[1] ?? "");
 }
 
 describe("账号设置页渲染：登录方式", () => {
@@ -343,7 +343,7 @@ describe("账号设置页渲染：注销账号", () => {
     expect(html).toContain(m.settings_delete_explain());
     expect(html).toContain(m.settings_delete_confirm({ id: USER.id }));
     expect(html).toMatch(/<input type="checkbox" name="deleteContent"(?![^>]*checked)[^>]*>/);
-    expect(html).toMatch(new RegExp(`<button type="submit" disabled="">${m.settings_delete_submit()}</button>`));
+    expect(html).toMatch(new RegExp(`<button[^>]*type="submit" disabled=""[^>]*>${m.settings_delete_submit()}</button>`));
   });
 
   test("申请成功后的提示：冷静期的显示删除时间，空账号显示几分钟内删除", () => {
@@ -354,6 +354,6 @@ describe("账号设置页渲染：注销账号", () => {
     expect(scheduled).toContain(m.settings_delete_done());
     expect(scheduled).not.toContain(m.settings_delete_done_immediate());
     expect(immediate).toContain(m.settings_delete_done_immediate());
-    expect(immediate).toContain(`href="/">${m.settings_delete_home()}</a>`);
+    expect(immediate).toMatch(new RegExp(`<a[^>]*href="/"[^>]*>${m.settings_delete_home()}</a>`));
   });
 });

@@ -1,3 +1,5 @@
+import { Button } from "@astrodx/ui/components/button";
+import { Card, CardContent } from "@astrodx/ui/components/card";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
 import { data, Link } from "react-router";
 
@@ -6,6 +8,7 @@ import { getLocale, localizeHref } from "@/paraglide/runtime.js";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
 import { Avatar } from "../components/avatar";
+import { PageTitle } from "../components/page-title";
 import { getRenderApi } from "../lib/browser";
 import { canonicalLink, localeAlternates, openGraph, originFrom } from "../lib/seo";
 import { meQuery } from "../queries/me";
@@ -72,29 +75,41 @@ function UserContent({ id }: { id: string }) {
   }
   if (profile.status === "pending_deletion") {
     return (
-      <main>
-        <h1>{m.user_page_pending_title()}</h1>
-        <p>{m.user_page_pending_body()}</p>
-        <p>{m.user_page_id({ id: profile.id })}</p>
+      <main className="space-y-4">
+        <PageTitle description={m.user_page_pending_body()}>{m.user_page_pending_title()}</PageTitle>
+        <p className="text-sm text-muted-foreground">{m.user_page_id({ id: profile.id })}</p>
       </main>
     );
   }
+  // 资料头部（spec 第 7.5 节）：大头像、昵称、用户 ID、注册日期，下面是简介。
   return (
-    <main>
-      <p>
+    <main className="space-y-6">
+      <div className="flex flex-wrap items-center gap-5">
         <Avatar id={profile.id} name={profile.name} size={80} />
-      </p>
-      <h1>{profile.name}</h1>
-      {/* 昵称可以重名：用户 id 和昵称一起显示，别人冒充不了（spec 第 10.5 节）。 */}
-      <p>{m.user_page_id({ id: profile.id })}</p>
-      {profile.bio ? <p style={{ whiteSpace: "pre-line" }}>{profile.bio}</p> : <p>{m.user_page_no_bio()}</p>}
-      {/* 注册日期按 UTC 取年月日：服务端和浏览器算出来一样，hydrate 前后文字不变，搜索引擎也看得到。 */}
-      <p>{m.user_page_joined({ date: profile.createdAt.slice(0, 10) })}</p>
-      {me?.id === profile.id ? (
-        <p>
-          <Link to={localizeHref("/settings/profile")}>{m.user_page_edit()}</Link>
-        </p>
-      ) : null}
+        <div className="min-w-0 flex-1 space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight break-words">{profile.name}</h1>
+          {/* 昵称可以重名：用户 id 和昵称一起显示，别人冒充不了（spec 第 10.5 节）。 */}
+          <p className="text-sm text-muted-foreground">{m.user_page_id({ id: profile.id })}</p>
+          {/* 注册日期按 UTC 取年月日：服务端和浏览器算出来一样，hydrate 前后文字不变，搜索引擎也看得到。 */}
+          <p className="text-sm text-muted-foreground">{m.user_page_joined({ date: profile.createdAt.slice(0, 10) })}</p>
+        </div>
+        {me?.id === profile.id ? (
+          <Button asChild variant="outline" size="sm">
+            <Link to={localizeHref("/settings/profile")}>{m.user_page_edit()}</Link>
+          </Button>
+        ) : null}
+      </div>
+      <Card>
+        <CardContent>
+          {profile.bio ? (
+            <p className="break-words" style={{ whiteSpace: "pre-line" }}>
+              {profile.bio}
+            </p>
+          ) : (
+            <p className="text-muted-foreground">{m.user_page_no_bio()}</p>
+          )}
+        </CardContent>
+      </Card>
     </main>
   );
 }
