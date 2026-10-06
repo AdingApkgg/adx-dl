@@ -40,7 +40,8 @@ export default defineConfig({
     // 共享界面包只放源码，服务端产物要把它打进去（spec 第 7.1 节）。Vite 只把能从 apps/community 解析到的包
     // （社区站自己声明的依赖）留成 import；工作区链接本来就会被打包，这里写明，不依赖这条默认行为。
     // 留成 import 的包，生产镜像里必须有：镜像只装 dependencies，test/http/build-output.test.ts 检查这一点。
-    noExternal: ["@astrodx/ui"],
+    // lucide-react 是社区站自己的 devDependency（页头的图标），不写就会留成 import。
+    noExternal: ["@astrodx/ui", "lucide-react"],
   },
   server: { port: 5373 },
 });
