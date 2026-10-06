@@ -191,6 +191,32 @@ services:
       retries: 3
       start_period: 60s
 
+  # 每天的备份（ops/backup/backup.sh）：g510 上的 systemd 定时器 03:30 执行 docker compose run --rm -T backup。
+  # 不依赖 postgres 自动起来：库没在跑时这次备份就该失败，systemd 里看得到。
+  backup:
+    build:
+      context: ./ops/backup
+    image: astrodx-community-backup:latest
+    profiles: [tools]
+    restart: "no"
+    logging: *logging
+    command: ["bash", "/backup/backup.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: community
+      PGPASSWORD: ${POSTGRES_PASSWORD:?先运行 ops/fill-secrets.sh}
+      RESTIC_REPOSITORY: /restic
+      # 没设时 backup.sh 自己报错退出；这里不写成必填，免得没配备份时别的 compose 命令也跑不了。
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD:-}
+    volumes:
+      - ./ops/backup/backup.sh:/backup/backup.sh:ro
+      # restic 仓库在宿主机上的目录。目录不在就报错，不自动建：设错了路径不能悄悄备份到别处。
+      - type: bind
+        source: ${BACKUP_REPO_DIR:-/BACKUP_REPO_DIR-is-not-set}
+        target: /restic
+        bind:
+          create_host_path: false
+
 volumes:
   pgdata:
   napcat-qq:

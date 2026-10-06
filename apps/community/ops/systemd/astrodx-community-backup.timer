@@ -1,0 +1,10 @@
+# 每天东八区 03:30 跑一次备份。Persistent：那个时刻 g510 关着的话，开机后补一次。
+[Unit]
+Description=AstroDX community: daily database backup at 03:30 (Asia/Shanghai)
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 Asia/Shanghai
+Persistent=true
+
+[Install]
+WantedBy=timers.target
