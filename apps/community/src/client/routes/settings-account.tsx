@@ -348,7 +348,8 @@ type DeleteAccountSectionProps = {
 
 // 注销账号（spec 第 10.6 节）。"同时删除内容"默认不勾（spec 选的 B：默认匿名保留）；要照着输入自己的用户 id
 // 才能点（用户决定），服务端同样校验。
-function DeleteAccountSection({ userId, here, onDeleted }: DeleteAccountSectionProps) {
+export function DeleteAccountSection({ userId, here, onDeleted }: DeleteAccountSectionProps) {
+  const queryClient = useQueryClient();
   const [deleteContent, setDeleteContent] = useState(false);
   const [confirmId, setConfirmId] = useState("");
   const [pending, setPending] = useState(false);
@@ -368,6 +369,9 @@ function DeleteAccountSection({ userId, here, onDeleted }: DeleteAccountSectionP
         await getBrowserApi().api.v1.me.deletion.$post({ json: { deleteContent, confirmId: userId } })
       );
       onDeleted(result.purgeAt);
+      // 响应已经清掉了会话 Cookie：缓存里的当前用户也要忘掉。不然页头还显示头像菜单，之后在页面里跳转
+      // （首页的 clientLoader、布局的 clientMiddleware 都读这份缓存）也仍当成已登录。
+      queryClient.setQueryData(meQuery(getBrowserApi()).queryKey, null);
     } catch (error) {
       const target = accountErrorRedirect(error, here);
       if (target) {
