@@ -30,14 +30,21 @@ describe("createLoginOptions", () => {
     expect((await run(null)).qq.available).toBe(true);
   });
 
-  test("Redis 出错时也当作可用", async () => {
+  test("Redis 出错时也当作可用，错误交给 onRedisError（记日志）", async () => {
     const broken: RedisCommandSender = {
       send: async () => {
         throw new Error("Connection closed");
       },
     };
-    const options = createLoginOptions({ turnstileSiteKey: "site", qq: napcat, redis: broken });
+    const errors: unknown[] = [];
+    const options = createLoginOptions({
+      turnstileSiteKey: "site",
+      qq: napcat,
+      redis: broken,
+      onRedisError: (error) => errors.push(error),
+    });
     expect((await options()).qq.available).toBe(true);
+    expect(errors.map((error) => (error as Error).message)).toEqual(["Connection closed"]);
   });
 
   // 连接还在、命令却一直没有回应（Redis 卡住）时，登录页的配置不能跟着挂住：等到 250 毫秒的上限就放弃。

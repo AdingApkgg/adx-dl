@@ -25,6 +25,7 @@ import { createNapcatSender } from "./napcat/sender";
 import { connectRedis, getRedis, pingRedis } from "./redis/client";
 import { createLoginOptions } from "./services/login-options";
 import { DELETION_HANDLERS } from "./services/user-deletion";
+import { throttledErrorLog } from "./throttled-log";
 
 const env = parseEnv(process.env);
 const log = createLogger();
@@ -83,7 +84,12 @@ const app = createApp({
   services: {
     db,
     boss: getBoss,
-    loginOptions: createLoginOptions({ turnstileSiteKey: env.turnstile.siteKey, qq: env.qq, redis }),
+    loginOptions: createLoginOptions({
+      turnstileSiteKey: env.turnstile.siteKey,
+      qq: env.qq,
+      redis,
+      onRedisError: throttledErrorLog(log, "login_options_redis_error"),
+    }),
     deletionHandlers: DELETION_HANDLERS,
   },
 });

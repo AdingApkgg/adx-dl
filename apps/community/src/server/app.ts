@@ -10,6 +10,7 @@ import type { AppEnv } from "./app-env";
 import type { Auth } from "./auth/auth";
 import { mountAuth, sessionContext } from "./auth/mount";
 import { jsonError } from "./errors";
+import { isInProcessRequest } from "./in-process-api";
 import { bodyLimitWhenDeclared } from "./middleware/body-limit";
 import { clientIp, rateLimitKeyForIp } from "./middleware/client-ip";
 import { csrfGuard } from "./middleware/csrf";
@@ -49,6 +50,8 @@ export type AppDeps = {
 export function createApp(deps: AppDeps) {
   const app = new Hono<AppEnv>();
   const services: ApiServices = { ...deps.services, auth: deps.auth, log: deps.log };
+  // Redis 宕掉时每个请求都会在限流这一步出错：三条限流规则共用一个限了频的日志（1a 评审 R14）。
+  const onRateLimitStoreError = throttledErrorLog(deps.log, "rate_limit_store_error");
 
   app.use("*", requestId());
   app.use("*", clientIp());
@@ -112,6 +115,8 @@ export function createApp(deps: AppDeps) {
     }
   });
 
+  // 服务端渲染时 loader 经进程内 API 发的请求不算：页面请求一次就要调好几个接口，按访客的 IP 计数的话，同一个 IP 后面的
+  // 很多人（CGNAT、学校、公司）刷几下页面就会 429。页面请求本身由 Cloudflare 挡洪水。
   app.use(
     "/api/*",
     rateLimit<AppEnv>({
@@ -119,8 +124,8 @@ export function createApp(deps: AppDeps) {
       name: "api-ip",
       limit: 300,
       windowSec: 60,
-      key: (c) => rateLimitKeyForIp(c.get("clientIp")),
-      onStoreError: (error) => deps.log.error("rate_limit_store_error", describeError(error)),
+      key: (c) => (isInProcessRequest(c) ? null : rateLimitKeyForIp(c.get("clientIp"))),
+      onStoreError: onRateLimitStoreError,
     })
   );
 
@@ -133,7 +138,7 @@ export function createApp(deps: AppDeps) {
       limit: 30,
       windowSec: 60,
       key: (c) => rateLimitKeyForIp(c.get("clientIp")),
-      onStoreError: (error) => deps.log.error("rate_limit_store_error", describeError(error)),
+      onStoreError: onRateLimitStoreError,
     })
   );
 
@@ -164,7 +169,7 @@ export function createApp(deps: AppDeps) {
       limit: 60,
       windowSec: 60,
       key: (c) => (READ_METHODS.has(c.req.method) ? null : (c.get("auth")?.user.id ?? null)),
-      onStoreError: (error) => deps.log.error("rate_limit_store_error", describeError(error)),
+      onStoreError: onRateLimitStoreError,
     })
   );
   // spec 第 10.6 节：注销冷静期里除了几个接口，一律 403 ACCOUNT_PENDING_DELETION。

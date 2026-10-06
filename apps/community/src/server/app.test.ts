@@ -3,7 +3,8 @@ import { DrizzleQueryError } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 
 import { createApp } from "./app";
-import { createMemoryRateLimitStore } from "./middleware/rate-limit";
+import { createInProcessApi } from "./in-process-api";
+import { createMemoryRateLimitStore, type RateLimitStore } from "./middleware/rate-limit";
 import { TEST_PUBLIC_ORIGIN, testAppDeps } from "./testing/app-deps";
 import { createTestAuth } from "./testing/auth";
 
@@ -166,6 +167,38 @@ describe("createApp", () => {
     // 别的 IP 不受影响；页面和健康检查不走这条规则。
     expect((await app.request("/api/anything", { headers: { "cf-connecting-ip": "198.51.100.2" } })).status).toBe(404);
     expect((await app.request("/healthz", { headers })).status).toBe(200);
+  });
+
+  // 服务端渲染时 loader 经进程内 API 调 /api/v1（in-process-api.ts），一次页面请求要调好几个接口。这些调用要是也按访客的
+  // IP 计数，同一个 IP 后面的很多人（运营商的 CGNAT、学校、公司）刷几下页面，页面就因为接口 429 渲染出错。
+  test("进程内请求（服务端渲染时 loader 调接口）不占 /api 按 IP 的额度", async () => {
+    const { deps } = testAppDeps({ rateLimitStore: createMemoryRateLimitStore() });
+    const app = createApp(deps);
+    const ip = "198.51.100.3";
+    for (let i = 0; i < 300; i++) {
+      await app.request("/api/anything", { headers: { "cf-connecting-ip": ip } });
+    }
+    expect((await app.request("/api/v1/meta", { headers: { "cf-connecting-ip": ip } })).status).toBe(429);
+
+    const page = new Request(`${TEST_PUBLIC_ORIGIN}/`, { headers: { "cf-connecting-ip": ip } });
+    const api = createInProcessApi(app, page, { origin: TEST_PUBLIC_ORIGIN, requestId: "r1", clientIp: ip }, () => {});
+    expect((await api.api.v1.meta.$get()).status).toBe(200);
+  });
+
+  // Redis 整段宕掉时，每个请求都会在限流这一步出错一次：照原样记，日志会被同一行刷满（1a 评审 R14）。
+  test("限流的计数存储出错：照常放行，rate_limit_store_error 一分钟最多记一条", async () => {
+    const broken: RateLimitStore = {
+      hit: async () => {
+        throw new Error("Connection closed");
+      },
+    };
+    const { deps, logs } = testAppDeps({ rateLimitStore: broken });
+    const app = createApp(deps);
+
+    for (let i = 0; i < 5; i++) {
+      expect((await app.request("/api/v1/meta")).status).toBe(200);
+    }
+    expect(logs().filter((entry) => entry.event === "rate_limit_store_error")).toHaveLength(1);
   });
 
   test("GET /api/v1/meta", async () => {

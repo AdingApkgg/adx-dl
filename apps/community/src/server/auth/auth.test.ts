@@ -421,4 +421,19 @@ describe("限流", () => {
     }
     expect(statuses).toEqual([200, 200, 200, 429]);
   });
+
+  test("计数存储出错：照常放行，rate_limit_store_error 一分钟最多记一条", async () => {
+    const broken = {
+      hit: async () => {
+        throw new Error("Connection closed");
+      },
+    };
+    const { auth, logs } = createTestAuth({ rateLimitEnabled: true, rateLimitStore: broken });
+    const browser = new Browser(createApp(testAppDeps({ auth }).deps));
+
+    for (let i = 0; i < 3; i++) {
+      expect((await browser.request("GET", "/api/auth/get-session")).status).toBe(200);
+    }
+    expect(logs().filter((entry) => entry.event === "rate_limit_store_error")).toHaveLength(1);
+  });
 });

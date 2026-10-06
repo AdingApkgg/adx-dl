@@ -11,6 +11,7 @@ import type { Db } from "../db/client";
 import * as schema from "../db/schema";
 import type { RateLimitStore } from "../middleware/rate-limit";
 import { countryOf } from "../services/account";
+import { throttledErrorLog } from "../throttled-log";
 import { withTimeout } from "../with-timeout";
 import { accountRules } from "./account-rules";
 import { accountAdditionalFields, sessionAdditionalFields, userAdditionalFields } from "./fields";
@@ -39,8 +40,9 @@ export type AuthDeps = {
 };
 
 // Better Auth 自带限流的存储：一次原子的 consume。复用 1a 的计数存储，Redis 卡住或出错时放行，
-// 和 /api/* 的限流中间件一致。
+// 和 /api/* 的限流中间件一致；出错的日志同样限频。
 function rateLimitStorage(store: RateLimitStore, log: Logger): BetterAuthRateLimitStorage {
+  const onStoreError = throttledErrorLog(log, "rate_limit_store_error");
   return {
     async consume(key, rule) {
       try {
@@ -49,7 +51,7 @@ function rateLimitStorage(store: RateLimitStore, log: Logger): BetterAuthRateLim
           ? { allowed: true, retryAfter: null }
           : { allowed: false, retryAfter: Math.max(hit.resetSec, 1) };
       } catch (error) {
-        log.error("rate_limit_store_error", describeError(error));
+        onStoreError(error);
         return { allowed: true, retryAfter: null };
       }
     },
