@@ -1,3 +1,4 @@
+import { toast } from "@astrodx/ui/components/sonner";
 import { dehydrate, HydrationBoundary, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
@@ -80,7 +81,6 @@ function SettingsContent() {
   const { data: sessions } = useQuery(sessionsQuery(api));
   const { data: options } = useQuery(loginOptionsQuery(api));
   const [failure, setFailure] = useState<Failure | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   // 申请注销成功后的清除时间：这时已经退出登录，整页换成结果提示。
   const [deletedAt, setDeletedAt] = useState<string | null>(null);
@@ -99,11 +99,11 @@ function SettingsContent() {
 
   // 所有按钮共用：出错时翻译成文案；未登录跳去登录页、账号正在注销跳去注销提示页（spec 第 11.4 节）；
   // 要求刚登录的给出"重新登录"链接。
-  // 成功和出错都刷新列表：出错时那一行可能已经在别处被删掉了。
-  async function run(action: () => Promise<unknown>) {
+  // 成功和出错都刷新列表：出错时那一行可能已经在别处被删掉了。成功时用 toast 显示 success（spec 第 7.3 节），
+  // 出错仍然显示在页面上。
+  async function run(action: () => Promise<unknown>, success?: () => string) {
     setPending(true);
     setFailure(null);
-    setNotice(null);
     try {
       const outcome = await action();
       const error = outcome && typeof outcome === "object" && "error" in outcome ? outcome.error : null;
@@ -111,6 +111,9 @@ function SettingsContent() {
         throw error;
       }
       await queryClient.invalidateQueries({ queryKey: ["me"] });
+      if (success) {
+        toast.success(success());
+      }
     } catch (error) {
       const target = accountErrorRedirect(error, here);
       if (target) {
@@ -133,7 +136,7 @@ function SettingsContent() {
     const body = await res.json();
     // 响应类型里还有 403 的 { error }：expectOk 已经把非 2xx 都抛掉了，这里只是让类型收窄到成功的那种。
     if ("revoked" in body) {
-      setNotice(m.settings_revoked_others({ count: body.revoked }));
+      toast.success(m.settings_revoked_others({ count: body.revoked }));
     }
   }
 
@@ -142,7 +145,6 @@ function SettingsContent() {
   async function signOut() {
     setPending(true);
     setFailure(null);
-    setNotice(null);
     const { error } = await authClient.signOut();
     if (error) {
       setFailure({ message: errorMessage(error) ?? m.error_unknown(), reauth: false });
@@ -171,7 +173,6 @@ function SettingsContent() {
           {failure.reauth ? <a href={loginHref(here, { reauth: "1" })}>{m.settings_reauth()}</a> : null}
         </p>
       ) : null}
-      {notice ? <p>{notice}</p> : null}
 
       <section>
         <h2>{m.settings_logins_heading()}</h2>
@@ -188,7 +189,7 @@ function SettingsContent() {
               <button
                 type="button"
                 disabled={pending}
-                onClick={() => run(() => authClient.unlinkAccount({ accountId: item.id }))}
+                onClick={() => run(() => authClient.unlinkAccount({ accountId: item.id }), m.toast_unlinked)}
               >
                 {m.settings_unlink()}
               </button>
@@ -203,7 +204,7 @@ function SettingsContent() {
               <button
                 type="button"
                 disabled={pending}
-                onClick={() => run(() => authClient.passkey.deletePasskey({ id: item.id }))}
+                onClick={() => run(() => authClient.passkey.deletePasskey({ id: item.id }), m.toast_passkey_removed)}
               >
                 {m.settings_remove_passkey()}
               </button>
@@ -227,7 +228,11 @@ function SettingsContent() {
             {m.settings_link_google()}
           </button>{" "}
           {/* 不传 name：它会同时变成系统密码管理器里显示的账号名和存下来的标签。 */}
-          <button type="button" disabled={pending} onClick={() => run(() => authClient.passkey.addPasskey())}>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => run(() => authClient.passkey.addPasskey(), m.toast_passkey_added)}
+          >
             {m.settings_add_passkey()}
           </button>
         </p>
@@ -238,7 +243,10 @@ function SettingsContent() {
               siteKey={options.turnstileSiteKey}
               intent="link"
               reauthHref={loginHref(here, { reauth: "1" })}
-              onVerified={() => void queryClient.invalidateQueries({ queryKey: ["me"] })}
+              onVerified={() => {
+                toast.success(m.toast_qq_linked());
+                void queryClient.invalidateQueries({ queryKey: ["me"] });
+              }}
             />
           ) : (
             <p>{m.login_qq_unavailable()}</p>
@@ -260,8 +268,10 @@ function SettingsContent() {
                   type="button"
                   disabled={pending}
                   onClick={() =>
-                    run(async () =>
-                      expectOk(await getBrowserApi().api.v1.me.sessions[":id"].$delete({ param: { id: item.id } }, jsonRequest))
+                    run(
+                      async () =>
+                        expectOk(await getBrowserApi().api.v1.me.sessions[":id"].$delete({ param: { id: item.id } }, jsonRequest)),
+                      m.toast_session_revoked
                     )
                   }
                 >

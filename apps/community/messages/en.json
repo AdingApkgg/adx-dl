@@ -124,5 +124,11 @@
   "error_deletion_confirm_mismatch": "That user ID doesn't match.",
   "error_deletion_not_cancellable": "The grace period is over, so the deletion can no longer be cancelled.",
   "error_deletion_conflict": "Your account deletion is already being processed. Reload the page and try again.",
-  "error_bio_too_long": "Bios can have at most 300 characters."
+  "error_bio_too_long": "Bios can have at most 300 characters.",
+  "toast_region": "Notifications",
+  "toast_unlinked": "Unlinked.",
+  "toast_passkey_added": "Passkey added.",
+  "toast_passkey_removed": "Passkey removed.",
+  "toast_session_revoked": "That device has been signed out.",
+  "toast_qq_linked": "QQ linked."
 }

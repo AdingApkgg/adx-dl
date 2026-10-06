@@ -27,9 +27,10 @@ bun run worker                             # 另开一个终端：注销的清�
 ## 检查和测试
 
 ```bash
-bun run check        # lint、编译文案、生成路由类型、类型检查、单元与集成测试（需要 compose.dev 的服务在运行）
+bun run check        # lint、编译文案、生成路由类型、类型检查、单元与集成测试（需要 compose.dev 的服务在运行），最后是交互测试
+bun run test:dom     # 只跑交互测试（vitest）
 bun run build
-bun run test:http    # 启动构建产物，做页面和接口的 HTTP 级测试
+bun run test:http    # 启动构建产物，做页面和接口的 HTTP 级测试，并检查构建产物只 import 生产依赖
 ```
 
 集成测试默认连 `compose.dev.yaml` 起的测试库 `community_test` 和 Redis；
@@ -45,6 +46,11 @@ bun run test:http    # 启动构建产物，做页面和接口的 HTTP 级测试
 （重建会删掉整个 pgboss schema）。测试里不启动 worker，清除任务的处理函数直接调用。
 
 数据库在远端（比如经 SSH 隧道）时往返慢：`test`、`check`、`test:http` 脚本已经带了 `--timeout 30000`，单独跑某个测试文件时也加上。
+
+交互测试（页头、设置面板、语言切换、语言不一致提示、toast）在 `test/dom`，用 vitest 在 happy-dom 里点和按键，
+配置是 `vitest.config.ts`（不用 `vite.config.ts`，那里的插件不该在测试里跑）。vitest 跑在 Node 上，要 Node 22.12 以上，
+CI 用 24。其余测试照旧用 `bun test`：脚本只给它 `src` 和 `test/http` 两个路径，它扫不到 `test/dom`；
+在这个目录下直接跑不带参数的 `bun test` 会把交互测试也拉进来，跑不通。
 
 ## 目录约定
 

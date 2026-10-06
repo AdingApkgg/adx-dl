@@ -1,3 +1,4 @@
+import { toast } from "@astrodx/ui/components/sonner";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { redirect, useLocation, useSearchParams } from "react-router";
@@ -56,7 +57,6 @@ function OnboardingContent() {
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
-  const [passkeyAdded, setPasskeyAdded] = useState(false);
 
   function fail(error: unknown) {
     const target = accountErrorRedirect(error, here);
@@ -108,7 +108,8 @@ function OnboardingContent() {
       fail(res.error);
       return;
     }
-    setPasskeyAdded(true);
+    // 成功用 toast 提示，出错仍然显示在表单旁边（spec 第 7.3 节）。
+    toast.success(m.onboarding_passkey_added());
   }
 
   if (!profile) {
@@ -129,7 +130,6 @@ function OnboardingContent() {
             </button>{" "}
             <a href={localizeHref("/settings/account")}>{m.onboarding_link_accounts()}</a>
           </p>
-          {passkeyAdded ? <p role="status">{m.onboarding_passkey_added()}</p> : null}
         </section>
         {failure ? (
           <p role="alert">

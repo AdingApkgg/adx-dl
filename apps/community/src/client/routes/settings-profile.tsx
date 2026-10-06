@@ -1,3 +1,4 @@
+import { toast } from "@astrodx/ui/components/sonner";
 import { dehydrate, HydrationBoundary, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { Link, useLocation } from "react-router";
@@ -70,11 +71,9 @@ function ProfileForm({ initialName, initialBio }: { initialName: string; initial
   const [bio, setBio] = useState(initialBio);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    setSaved(false);
     // 和服务端同一套规则，先在这里挡一次，不用等请求回来。
     const nickname = parseNickname(name);
     if (nickname === null) {
@@ -94,7 +93,8 @@ function ProfileForm({ initialName, initialBio }: { initialName: string; initial
       setBio(updated.bio);
       // 昵称也显示在首页、个人主页上：["me"] 下的查询都刷新。
       await queryClient.invalidateQueries({ queryKey: ["me"] });
-      setSaved(true);
+      // 成功用 toast 提示，出错仍然显示在表单旁边（spec 第 7.3 节）。
+      toast.success(m.profile_saved());
     } catch (failure) {
       const target = accountErrorRedirect(failure, `${location.pathname}${location.search}`);
       if (target) {
@@ -109,20 +109,8 @@ function ProfileForm({ initialName, initialBio }: { initialName: string; initial
 
   return (
     <form onSubmit={save}>
-      <ProfileFields
-        name={name}
-        bio={bio}
-        onNameChange={(value) => {
-          setName(value);
-          setSaved(false);
-        }}
-        onBioChange={(value) => {
-          setBio(value);
-          setSaved(false);
-        }}
-      />
+      <ProfileFields name={name} bio={bio} onNameChange={setName} onBioChange={setBio} />
       {error ? <p role="alert">{error}</p> : null}
-      {saved ? <p role="status">{m.profile_saved()}</p> : null}
       <button type="submit" disabled={pending}>
         {pending ? m.login_working() : m.profile_save()}
       </button>

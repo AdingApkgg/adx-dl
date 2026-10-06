@@ -124,5 +124,11 @@
   "error_deletion_confirm_mismatch": "输入的用户 ID 不对。",
   "error_deletion_not_cancellable": "冷静期已经结束，不能再撤销注销了。",
   "error_deletion_conflict": "注销正在处理中，请刷新页面后再试。",
-  "error_bio_too_long": "简介最多 300 个字符。"
+  "error_bio_too_long": "简介最多 300 个字符。",
+  "toast_region": "通知",
+  "toast_unlinked": "已解绑。",
+  "toast_passkey_added": "已添加通行密钥。",
+  "toast_passkey_removed": "已删除通行密钥。",
+  "toast_session_revoked": "已让这台设备下线。",
+  "toast_qq_linked": "已绑定 QQ。"
 }
