@@ -1,3 +1,8 @@
+import { Input } from "@astrodx/ui/components/input";
+import { Label } from "@astrodx/ui/components/label";
+import { Textarea } from "@astrodx/ui/components/textarea";
+import { useId } from "react";
+
 import { m } from "@/paraglide/messages.js";
 import { BIO_MAX, bioLength, normalizeBio } from "@/shared/bio";
 
@@ -14,31 +19,29 @@ export type ProfileFieldsProps = {
 // 两个字段超了都在提交时再提示。
 export function ProfileFields({ name, bio, onNameChange, onBioChange }: ProfileFieldsProps) {
   const count = bioLength(normalizeBio(bio));
+  const nameId = useId();
+  const bioId = useId();
   return (
-    <>
-      <p>
-        <label>
-          {m.profile_nickname()}{" "}
-          <input
-            name="nickname"
-            value={name}
-            onChange={(event) => onNameChange(event.target.value)}
-            required
-            autoComplete="nickname"
-          />
-        </label>
-      </p>
-      <p>{m.profile_nickname_hint()}</p>
-      <p>
-        <label>
-          {m.profile_bio()}
-          <br />
-          <textarea name="bio" value={bio} onChange={(event) => onBioChange(event.target.value)} rows={5} cols={40} />
-        </label>
-      </p>
-      <p>
-        {m.profile_bio_hint()} <span aria-live="polite">{m.profile_bio_count({ count, max: BIO_MAX })}</span>
-      </p>
-    </>
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <Label htmlFor={nameId}>{m.profile_nickname()}</Label>
+        <Input
+          id={nameId}
+          name="nickname"
+          value={name}
+          onChange={(event) => onNameChange(event.target.value)}
+          required
+          autoComplete="nickname"
+        />
+        <p className="text-xs text-muted-foreground">{m.profile_nickname_hint()}</p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={bioId}>{m.profile_bio()}</Label>
+        <Textarea id={bioId} name="bio" value={bio} onChange={(event) => onBioChange(event.target.value)} rows={5} />
+        <p className="flex justify-between gap-2 text-xs text-muted-foreground">
+          <span>{m.profile_bio_hint()}</span> <span aria-live="polite">{m.profile_bio_count({ count, max: BIO_MAX })}</span>
+        </p>
+      </div>
+    </div>
   );
 }

@@ -1,3 +1,6 @@
+import { Alert } from "@astrodx/ui/components/alert";
+import { Button } from "@astrodx/ui/components/button";
+import { Card, CardContent, CardFooter } from "@astrodx/ui/components/card";
 import { toast } from "@astrodx/ui/components/sonner";
 import { dehydrate, HydrationBoundary, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
@@ -11,6 +14,7 @@ import { parseNickname } from "@/shared/nickname";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
 import { Avatar } from "../components/avatar";
+import { PageTitle, textLinkClass } from "../components/page-title";
 import { ProfileFields } from "../components/profile-fields";
 import { accountErrorRedirect } from "../lib/account-errors";
 import { errorMessage } from "../lib/auth-errors";
@@ -50,15 +54,21 @@ function ProfileContent() {
     return null;
   }
   return (
-    <main>
-      <h1>{m.settings_profile_title()}</h1>
-      <p>
-        <Avatar id={me.id} name={profile.name} size={64} /> {m.user_page_id({ id: me.id })}
-      </p>
+    <main className="space-y-6">
+      <PageTitle>{m.settings_profile_title()}</PageTitle>
+      <div className="flex items-center gap-4">
+        <Avatar id={me.id} name={profile.name} size={64} />
+        <p className="text-sm text-muted-foreground">{m.user_page_id({ id: me.id })}</p>
+      </div>
       <ProfileForm initialName={profile.name} initialBio={profile.bio} />
-      <p>
-        <Link to={localizeHref(`/u/${me.id}`)}>{m.profile_view_page()}</Link> ·{" "}
-        <Link to={localizeHref("/settings/account")}>{m.settings_account_title()}</Link>
+      <p className="text-sm">
+        <Link to={localizeHref(`/u/${me.id}`)} className={textLinkClass}>
+          {m.profile_view_page()}
+        </Link>{" "}
+        ·{" "}
+        <Link to={localizeHref("/settings/account")} className={textLinkClass}>
+          {m.settings_account_title()}
+        </Link>
       </p>
     </main>
   );
@@ -107,13 +117,20 @@ function ProfileForm({ initialName, initialBio }: { initialName: string; initial
     }
   }
 
+  // 表单卡片（spec 第 7.5 节）。
   return (
     <form onSubmit={save}>
-      <ProfileFields name={name} bio={bio} onNameChange={setName} onBioChange={setBio} />
-      {error ? <p role="alert">{error}</p> : null}
-      <button type="submit" disabled={pending}>
-        {pending ? m.login_working() : m.profile_save()}
-      </button>
+      <Card>
+        <CardContent className="space-y-5">
+          <ProfileFields name={name} bio={bio} onNameChange={setName} onBioChange={setBio} />
+          {error ? <Alert variant="destructive">{error}</Alert> : null}
+        </CardContent>
+        <CardFooter>
+          <Button type="submit" disabled={pending}>
+            {pending ? m.login_working() : m.profile_save()}
+          </Button>
+        </CardFooter>
+      </Card>
     </form>
   );
 }

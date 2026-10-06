@@ -1,3 +1,6 @@
+import { Alert } from "@astrodx/ui/components/alert";
+import { Button } from "@astrodx/ui/components/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@astrodx/ui/components/card";
 import { toast } from "@astrodx/ui/components/sonner";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
@@ -10,6 +13,7 @@ import { parseBio } from "@/shared/bio";
 import { parseNickname } from "@/shared/nickname";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
+import { PageTitle, textLinkClass } from "../components/page-title";
 import { ProfileFields } from "../components/profile-fields";
 import { isReauthError } from "../components/qq-code-form";
 import { accountErrorRedirect } from "../lib/account-errors";
@@ -115,36 +119,52 @@ function OnboardingContent() {
   if (!profile) {
     return null;
   }
+  // 表单卡片（spec 第 7.5 节）：昵称和简介，再加一种登录方式，最后是"完成"和"以后再说"。
   return (
-    <main>
-      <h1>{m.onboarding_title()}</h1>
-      <p>{m.onboarding_intro()}</p>
+    <main className="space-y-6">
+      <PageTitle description={m.onboarding_intro()}>{m.onboarding_title()}</PageTitle>
       <form onSubmit={done}>
-        <ProfileFields name={name} bio={bio} onNameChange={setName} onBioChange={setBio} />
-        <section>
-          <h2>{m.onboarding_backup_heading()}</h2>
-          <p>{m.onboarding_backup_hint()}</p>
-          <p>
-            <button type="button" disabled={pending} onClick={addPasskey}>
+        <Card>
+          <CardContent>
+            <ProfileFields name={name} bio={bio} onNameChange={setName} onBioChange={setBio} />
+          </CardContent>
+          <CardHeader className="border-t pt-(--card-spacing)">
+            <CardTitle asChild>
+              <h2>{m.onboarding_backup_heading()}</h2>
+            </CardTitle>
+            <CardDescription>{m.onboarding_backup_hint()}</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <Button type="button" variant="outline" disabled={pending} onClick={addPasskey}>
               {m.onboarding_add_passkey()}
-            </button>{" "}
-            <a href={localizeHref("/settings/account")}>{m.onboarding_link_accounts()}</a>
-          </p>
-        </section>
-        {failure ? (
-          <p role="alert">
-            {failure.message}{" "}
-            {failure.reauthHref ? <a href={failure.reauthHref}>{m.settings_reauth()}</a> : null}
-          </p>
-        ) : null}
-        <p>
-          <button type="submit" disabled={pending}>
-            {m.onboarding_done()}
-          </button>{" "}
-          <button type="button" disabled={pending} onClick={() => void finish({})}>
-            {m.onboarding_skip()}
-          </button>
-        </p>
+            </Button>
+            <a href={localizeHref("/settings/account")} className={textLinkClass}>
+              {m.onboarding_link_accounts()}
+            </a>
+          </CardContent>
+          {failure ? (
+            <CardContent>
+              <Alert variant="destructive">
+                <p>
+                  {failure.message}{" "}
+                  {failure.reauthHref ? (
+                    <a href={failure.reauthHref} className={textLinkClass}>
+                      {m.settings_reauth()}
+                    </a>
+                  ) : null}
+                </p>
+              </Alert>
+            </CardContent>
+          ) : null}
+          <CardFooter className="gap-2">
+            <Button type="submit" disabled={pending}>
+              {m.onboarding_done()}
+            </Button>
+            <Button type="button" variant="ghost" disabled={pending} onClick={() => void finish({})}>
+              {m.onboarding_skip()}
+            </Button>
+          </CardFooter>
+        </Card>
       </form>
     </main>
   );

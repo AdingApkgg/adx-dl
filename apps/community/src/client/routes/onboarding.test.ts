@@ -100,7 +100,8 @@ describe("首次登录引导页渲染", () => {
     expect(html).toContain('value="QQ 12****89"');
     expect(html).toContain('name="bio"');
     expect(html).toContain(m.onboarding_add_passkey());
-    expect(html).toContain(`href="/settings/account">${m.onboarding_link_accounts()}</a>`);
+    // 链接带着样式（class 写在 href 后面）。
+    expect(html).toMatch(new RegExp(`href="/settings/account"[^>]*>${m.onboarding_link_accounts()}</a>`));
     expect(html).toContain(`>${m.onboarding_done()}</button>`);
     expect(html).toContain(`>${m.onboarding_skip()}</button>`);
   });

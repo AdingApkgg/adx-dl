@@ -1,3 +1,5 @@
+import { Button } from "@astrodx/ui/components/button";
+import { Card, CardContent } from "@astrodx/ui/components/card";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 
@@ -6,6 +8,7 @@ import { getLocale, localizeHref } from "@/paraglide/runtime.js";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
 import { Avatar } from "../components/avatar";
+import { PageTitle, textLinkClass } from "../components/page-title";
 import { getBrowserApi, getBrowserQueryClient, getRenderApi } from "../lib/browser";
 import { loginHref } from "../lib/require-user";
 import { canonicalLink, localeAlternates, openGraph, originFrom } from "../lib/seo";
@@ -65,24 +68,36 @@ function HomeContent() {
   const { data } = useQuery(metaQuery(getRenderApi()));
   const { data: me } = useQuery(meQuery(getRenderApi()));
 
+  // 内容不变，只是排版（spec 第 7.5 节）。登录状态这一行和页头的账号区重复，按 spec 保留。
   return (
-    <main>
-      <h1>{m.site_name()}</h1>
-      {/* 顶栏和头像菜单跟着页面布局做（子项目 0 之后），先放一行链接。 */}
-      <p>
-        {me ? (
-          <>
-            <Avatar id={me.id} name={me.name} size={32} /> {m.home_signed_in_as({ name: me.name })} ·{" "}
-            <Link to={localizeHref(`/u/${me.id}`)}>{m.home_my_page()}</Link> ·{" "}
-            <Link to={localizeHref("/settings/profile")}>{m.home_profile_settings()}</Link> ·{" "}
-            <Link to={localizeHref("/settings/account")}>{m.home_account_settings()}</Link>
-          </>
-        ) : (
-          <Link to={loginHref(localizeHref("/"))}>{m.home_sign_in()}</Link>
-        )}
-      </p>
-      <p>{m.home_description()}</p>
-      {data ? <p>{m.home_api_version({ version: data.apiVersion })}</p> : null}
+    <main className="space-y-6">
+      <PageTitle>{m.site_name()}</PageTitle>
+      <Card size="sm">
+        <CardContent className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
+          {me ? (
+            <>
+              <Avatar id={me.id} name={me.name} size={32} /> {m.home_signed_in_as({ name: me.name })} ·{" "}
+              <Link to={localizeHref(`/u/${me.id}`)} className={textLinkClass}>
+                {m.home_my_page()}
+              </Link>{" "}
+              ·{" "}
+              <Link to={localizeHref("/settings/profile")} className={textLinkClass}>
+                {m.home_profile_settings()}
+              </Link>{" "}
+              ·{" "}
+              <Link to={localizeHref("/settings/account")} className={textLinkClass}>
+                {m.home_account_settings()}
+              </Link>
+            </>
+          ) : (
+            <Button asChild size="sm">
+              <Link to={loginHref(localizeHref("/"))}>{m.home_sign_in()}</Link>
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+      <p className="text-muted-foreground">{m.home_description()}</p>
+      {data ? <p className="text-xs text-muted-foreground">{m.home_api_version({ version: data.apiVersion })}</p> : null}
     </main>
   );
 }

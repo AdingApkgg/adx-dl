@@ -1,4 +1,8 @@
-import { type FormEvent, useState } from "react";
+import { Alert } from "@astrodx/ui/components/alert";
+import { Button } from "@astrodx/ui/components/button";
+import { Input } from "@astrodx/ui/components/input";
+import { Label } from "@astrodx/ui/components/label";
+import { type FormEvent, useId, useState } from "react";
 
 import { m } from "@/paraglide/messages.js";
 import { getLocale } from "@/paraglide/runtime.js";
@@ -6,6 +10,7 @@ import { getLocale } from "@/paraglide/runtime.js";
 import { authClient } from "../lib/auth-client";
 import { errorCodeOf, errorMessage } from "../lib/auth-errors";
 import { useTurnstile } from "../lib/turnstile";
+import { textLinkClass } from "./page-title";
 
 export type QqCodeFormProps = {
   siteKey: string;
@@ -34,6 +39,8 @@ export function QqCodeForm({ siteKey, intent, webauthnAutofill = false, reauthHr
   const [error, setError] = useState<string | null>(null);
   // 最近一次发码或验证的错误是不是"会话太旧"：是的话，提示后面再给一个重新登录的链接。
   const [reauth, setReauth] = useState(false);
+  const qqId = useId();
+  const codeId = useId();
 
   async function send(event: FormEvent) {
     event.preventDefault();
@@ -71,11 +78,12 @@ export function QqCodeForm({ siteKey, intent, webauthnAutofill = false, reauthHr
   }
 
   return (
-    <div>
-      <form onSubmit={send}>
-        <label>
-          {m.login_qq_number()}{" "}
-          <input
+    <div className="space-y-4">
+      <form onSubmit={send} className="space-y-3">
+        <div className="space-y-2">
+          <Label htmlFor={qqId}>{m.login_qq_number()}</Label>
+          <Input
+            id={qqId}
             name="qq"
             value={qq}
             onChange={(event) => setQq(event.target.value.trim())}
@@ -84,19 +92,20 @@ export function QqCodeForm({ siteKey, intent, webauthnAutofill = false, reauthHr
             required
             autoComplete={webauthnAutofill ? "username webauthn" : "off"}
           />
-        </label>
+        </div>
         <div ref={turnstile.ref} />
-        {turnstile.failed ? <p role="alert">{m.login_turnstile_failed()}</p> : null}
-        <button type="submit" disabled={pending || !turnstile.token}>
+        {turnstile.failed ? <Alert variant="destructive">{m.login_turnstile_failed()}</Alert> : null}
+        <Button type="submit" variant="secondary" disabled={pending || !turnstile.token}>
           {m.login_qq_send()}
-        </button>
+        </Button>
       </form>
       {sent ? (
-        <form onSubmit={verify}>
-          <p>{m.login_qq_sent()}</p>
-          <label>
-            {m.login_qq_code()}{" "}
-            <input
+        <form onSubmit={verify} className="space-y-3">
+          <p className="text-sm text-muted-foreground">{m.login_qq_sent()}</p>
+          <div className="space-y-2">
+            <Label htmlFor={codeId}>{m.login_qq_code()}</Label>
+            <Input
+              id={codeId}
               name="code"
               value={code}
               onChange={(event) => setCode(event.target.value.trim())}
@@ -105,22 +114,26 @@ export function QqCodeForm({ siteKey, intent, webauthnAutofill = false, reauthHr
               required
               autoComplete="one-time-code"
             />
-          </label>
-          <button type="submit" disabled={pending}>
+          </div>
+          <Button type="submit" disabled={pending}>
             {pending ? m.login_working() : m.login_qq_verify()}
-          </button>
+          </Button>
         </form>
       ) : null}
       {error ? (
-        <p role="alert">
-          {error}
-          {reauth && reauthHref ? (
-            <>
-              {" "}
-              <a href={reauthHref}>{m.settings_reauth()}</a>
-            </>
-          ) : null}
-        </p>
+        <Alert variant="destructive">
+          <p>
+            {error}
+            {reauth && reauthHref ? (
+              <>
+                {" "}
+                <a href={reauthHref} className={textLinkClass}>
+                  {m.settings_reauth()}
+                </a>
+              </>
+            ) : null}
+          </p>
+        </Alert>
       ) : null}
     </div>
   );
