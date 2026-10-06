@@ -17,7 +17,8 @@ const appRoot = fileURLToPath(new URL("../..", import.meta.url));
 export const HTTP_TEST_AUTH_SECRET = "http-test-secret-http-test-secret-0123456789";
 
 // 启动 bun run build 的产物。必须在 apps/community 下启动：静态资源的路径相对于当前目录。
-export async function startBuiltServer(): Promise<RunningServer> {
+// extraEnv 盖在默认的环境变量上（比如开统计的那组）。
+export async function startBuiltServer(extraEnv: Record<string, string> = {}): Promise<RunningServer> {
   // 页面会读会话，表必须已经建好；pg-boss 的表和队列也要在（/readyz 查它们，注销要投递任务），
   // 和部署时先跑 db:migrate 一样。单独跑 test:http 时也不依赖先跑过 bun run check。
   await prepareTestQueues();
@@ -52,6 +53,7 @@ export async function startBuiltServer(): Promise<RunningServer> {
       NAPCAT_WS_URL: "ws://127.0.0.1:9",
       NAPCAT_ACCESS_TOKEN: "http-test-napcat-token-0123456789abcdef",
       NAPCAT_BOT_QQ: "10001",
+      ...extraEnv,
     },
     stdout: "inherit",
     stderr: "inherit",

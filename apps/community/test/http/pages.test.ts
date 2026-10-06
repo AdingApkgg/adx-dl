@@ -22,6 +22,14 @@ describe("页面", () => {
     expect(await res.text()).toContain('<html lang="zh-CN"');
   });
 
+  // 网站 ID 要等 Umami 后台建好网站才有。没设的时候页面里没有统计脚本，/_s/* 是 404，站点照常运行。
+  test("没开统计：页面里没有统计脚本，/_s/script.js 是 404", async () => {
+    const html = await (await fetch(server.url("/"))).text();
+
+    expect(html).not.toContain("/_s/script.js");
+    expect((await fetch(server.url("/_s/script.js"))).status).toBe(404);
+  });
+
   // 漏掉 nonce 的内联脚本会被 CSP 拦下，页面在生产环境就 hydrate 不起来，而开发环境
   // 只报告不拦截，看不出来。
   test("每个内联脚本都带着本次响应 CSP 里的 nonce", async () => {
