@@ -99,6 +99,8 @@ describe("需要登录的页面", () => {
 
     expect(zh.status).toBe(302);
     expect(zh.headers.get("location")).toBe("/login?next=%2Fsettings%2Faccount");
+    // loader 抛出的跳转不经过 entry.server.tsx，Cache-Control 由 createApp 补上。
+    expect(zh.headers.get("cache-control")).toBe("private, no-store");
     expect(ja.headers.get("location")).toBe("/ja/login?next=%2Fja%2Fsettings%2Faccount");
   });
 

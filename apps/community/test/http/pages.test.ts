@@ -102,10 +102,17 @@ describe("页面", () => {
     expect(ja).toContain("AstroDX コミュニティ");
   });
 
-  test("/zh 前缀 301 到不带前缀的地址", async () => {
+  test("/zh 前缀 301 到不带前缀的地址，不缓存", async () => {
     const res = await fetch(server.url("/zh/foo?x=1"), { redirect: "manual" });
     expect(res.status).toBe(301);
     expect(res.headers.get("location")).toBe("/foo?x=1");
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  test("/robots.txt 是纯文本，不是 404 页", async () => {
+    const res = await fetch(server.url("/robots.txt"));
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("Disallow: /api/");
   });
 
   // Cloudflare 原样转发路径，//evil.com 这样的 Location 会把访客带到别的站。
@@ -181,5 +188,10 @@ describe("接口和健康检查", () => {
     const res = await fetch(server.url("/readyz"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, checks: { db: "ok", redis: "ok", jobs: "ok" } });
+  });
+
+  test("/readyz 不回答经 Cloudflare 来的请求", async () => {
+    const res = await fetch(server.url("/readyz"), { headers: { "cf-connecting-ip": "203.0.113.7" } });
+    expect(res.status).toBe(404);
   });
 });
