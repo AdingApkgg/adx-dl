@@ -113,7 +113,7 @@ function OnboardingContent() {
       return;
     }
     // 成功用 toast 提示，出错仍然显示在表单旁边（spec 第 7.3 节）。
-    toast.success(m.onboarding_passkey_added());
+    toast.success(m.toast_passkey_added());
   }
 
   if (!profile) {

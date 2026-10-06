@@ -93,7 +93,6 @@
   "onboarding_backup_heading": "再加一种登录方式",
   "onboarding_backup_hint": "只有一种登录方式时，它不能用了你就登录不了。建议再加一种作为备用。",
   "onboarding_add_passkey": "给这台设备添加通行密钥",
-  "onboarding_passkey_added": "已添加通行密钥。",
   "onboarding_link_accounts": "去账号设置绑定 QQ 或 Google",
   "onboarding_done": "完成",
   "onboarding_skip": "以后再说",

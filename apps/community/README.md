@@ -48,8 +48,8 @@ bun run test:http    # 启动构建产物，做页面和接口的 HTTP 级测试
 数据库在远端（比如经 SSH 隧道）时往返慢：`test`、`check`、`test:http` 脚本已经带了 `--timeout 30000`，单独跑某个测试文件时也加上。
 
 交互测试（页头、设置面板、语言切换、语言不一致提示、toast）在 `test/dom`，用 vitest 在 happy-dom 里点和按键，
-配置是 `vitest.config.ts`（不用 `vite.config.ts`，那里的插件不该在测试里跑）。vitest 跑在 Node 上，要 Node 22.12 以上，
-CI 用 24。其余测试照旧用 `bun test`：脚本只给它 `src` 和 `test/http` 两个路径，它扫不到 `test/dom`；
+配置是 `vitest.config.ts`（不用 `vite.config.ts`，那里的插件不该在测试里跑）。vitest 跑在 Node 上，用 Node 24
+（vitest 要求 ^22.12、^24 或 >=26），CI 也用 24。其余测试照旧用 `bun test`：脚本只给它 `src` 和 `test/http` 两个路径，它扫不到 `test/dom`；
 在这个目录下直接跑不带参数的 `bun test` 会把交互测试也拉进来，跑不通。
 
 ## 目录约定

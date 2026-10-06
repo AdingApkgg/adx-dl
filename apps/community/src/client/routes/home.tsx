@@ -17,8 +17,8 @@ import { metaQuery } from "../queries/meta";
 import type { Route } from "./+types/home";
 
 // 首次打开：服务端预取进本次请求的 QueryClient，再整份交给浏览器（spec 第 8.3 节）。
-// meta 请求失败会抛错，页面显示根错误边界。当前用户（me）取不到不算：429 限流、5xx 时页面照常渲染成"未登录"，
-// 没进 dehydrate 的 me，浏览器里的 useQuery 会在 hydrate 之后重试。
+// meta 请求失败会抛错，页面显示 :lang? 布局的错误边界（页头照样在）。当前用户（me）取不到不算：429 限流、
+// 5xx 时页面照常渲染成"未登录"，没进 dehydrate 的 me，浏览器里的 useQuery 会在 hydrate 之后重试。
 export async function loader({ context }: Route.LoaderArgs) {
   const queryClient = context.get(queryClientContext);
   const api = context.get(apiContext);

@@ -1,11 +1,10 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { toast } from "sonner";
 import { describe, expect, test } from "vitest";
 
 import { ThemeProvider } from "../theme/theme-provider";
 import { ThemePicker } from "./appearance-pickers";
-import { Toaster } from "./sonner";
+import { Toaster, toast } from "./sonner";
 
 const themeLabels = { system: "T-system", light: "T-light", dark: "T-dark" };
 

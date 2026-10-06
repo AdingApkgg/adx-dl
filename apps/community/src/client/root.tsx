@@ -64,8 +64,10 @@ export default function App() {
   );
 }
 
-// 最后一道错误边界（spec 第 7.4 节）：根组件的 loader、中间件，以及 :lang? 布局的中间件出错时到这里，包括 /foo、
-// /fr/x 这类第一段认不出语言的地址返回的 404。子页面的错误由布局的错误边界接住。这里只有出错卡片，不带页头和账号信息。
+// 根错误边界（spec 第 7.4 节）：接住根组件的 loader 和中间件、以及 :lang? 布局的中间件抛出的错误，包括 /foo、/fr/x
+// 这类第一段认不出语言的地址返回的 404；在浏览器里，布局的错误边界自己渲染出错往上冒的也到这里。子页面的错误由布局的
+// 错误边界接住。服务端渲染时 SiteShell 里崩溃到不了这里，最后是 React Router 的纯文本 500。这里只有出错卡片，
+// 不带页头和账号信息。
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   return (
     <div className="px-4 py-16">

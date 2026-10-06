@@ -93,7 +93,6 @@
   "onboarding_backup_heading": "Add a second way to sign in",
   "onboarding_backup_hint": "With only one way to sign in, you're locked out if it stops working. We suggest adding a backup.",
   "onboarding_add_passkey": "Add a passkey on this device",
-  "onboarding_passkey_added": "Passkey added.",
   "onboarding_link_accounts": "Link QQ or Google in account settings",
   "onboarding_done": "Done",
   "onboarding_skip": "Maybe later",

@@ -93,7 +93,6 @@
   "onboarding_backup_heading": "ログイン方法をもう 1 つ追加",
   "onboarding_backup_hint": "ログイン方法が 1 つだけだと、それが使えなくなったときにログインできません。予備をもう 1 つ追加しておくのがおすすめです。",
   "onboarding_add_passkey": "このデバイスにパスキーを追加",
-  "onboarding_passkey_added": "パスキーを追加しました。",
   "onboarding_link_accounts": "アカウント設定で QQ や Google を連携",
   "onboarding_done": "完了",
   "onboarding_skip": "あとで",

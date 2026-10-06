@@ -26,7 +26,7 @@ import { meQuery } from "../queries/me";
 import type { Route } from "./+types/login";
 
 // 当前用户（me）取不到不算出错，和首页一样：429 限流、5xx 时页面照常显示成未登录，没进 dehydrate 的 me，
-// 浏览器里的 useQuery 会在 hydrate 之后重试。登录方式取不到照旧抛错，页面显示根错误边界。
+// 浏览器里的 useQuery 会在 hydrate 之后重试。登录方式取不到照旧抛错，页面显示 :lang? 布局的错误边界（页头照样在）。
 export async function loader({ context, url }: Route.LoaderArgs) {
   const queryClient = context.get(queryClientContext);
   const api = context.get(apiContext);
