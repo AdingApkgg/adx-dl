@@ -1,0 +1,197 @@
+# g510 上的生产部署（spec 第 12 节）。在 apps/community 下操作：部署用 ./deploy.sh，其余用 docker compose …。
+# 变量来自同目录的 .env（docker compose 自己读它做插值）；每一项的含义见 .env.example 和 README 的"部署（g510）"。
+# 应用的容器不用 env_file，只拿到下面列出的变量：Umami 的密钥进不了 web，Better Auth 的密钥也进不了 Umami。
+#
+# 端口一律只绑 127.0.0.1。g510 上的 cloudflared 跑在宿主机上，经回环地址连进来；绑到 0.0.0.0 等于让局域网绕过
+# Cloudflare，还能自己带 CF-Connecting-IP 冒充访客的 IP（限流和登录设备都认这个头）。12703–12705 已于 2026-10-06
+# 在 g510 上确认空闲（dash 用 12702）。
+name: astrodx-community
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+# 网页、worker、迁移和写 NapCat 配置都用同一个镜像（spec 第 12.1 节）。只有 web 带 build：deploy.sh 先构建 web，
+# 别的服务用它打好的标签，不去镜像仓库拉。
+x-app: &app
+  image: astrodx-community:latest
+  restart: unless-stopped
+  logging: *logging
+
+# src/server/env.ts 校验的全部变量。容器网络里的地址写死在这里；QQ_SENDER 写死成 napcat：生产环境不许用控制台发送器。
+x-app-env: &app-env
+  PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?在 .env 里设成 https://adxc.saop.cc}
+  DATABASE_URL: postgres://community:${POSTGRES_PASSWORD:?先运行 ops/fill-secrets.sh}@postgres:5432/community
+  REDIS_URL: redis://redis:6379
+  BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?先运行 ops/fill-secrets.sh}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?在 .env 里填 Google OAuth 客户端}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?在 .env 里填 Google OAuth 客户端}
+  TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?在 .env 里填 Turnstile 的站点密钥}
+  TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?在 .env 里填 Turnstile 的密钥}
+  QQ_SENDER: napcat
+  QQ_CODE_HMAC_KEY: ${QQ_CODE_HMAC_KEY:?先运行 ops/fill-secrets.sh}
+  NAPCAT_HTTP_URL: http://napcat:3000
+  NAPCAT_WS_URL: ws://napcat:3001
+  NAPCAT_ACCESS_TOKEN: ${NAPCAT_ACCESS_TOKEN:?先运行 ops/fill-secrets.sh}
+  NAPCAT_BOT_QQ: ${NAPCAT_BOT_QQ:?在 .env 里填机器人的 QQ 号}
+  # 网站 ID 是统计的开关：Umami 后台里建好网站之前留空，页面不放统计脚本，/_s/* 返回 404。
+  UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
+  UMAMI_INTERNAL_URL: http://umami:3000
+  # 不走代理的主机。Turnstile 的 siteverify 直连（见 web 的 HTTPS_PROXY）；容器网络里的服务也写上：万一 Docker 往容器里
+  # 塞了 HTTP_PROXY（客户端的 ~/.docker/config.json 配了 proxies 时会这样），连它们的请求也不会被交给代理。
+  NO_PROXY: challenges.cloudflare.com,umami,napcat
+
+services:
+  web:
+    <<: *app
+    build:
+      context: ../..
+      dockerfile: apps/community/Dockerfile
+    environment:
+      <<: *app-env
+      # 服务端访问 Google（OAuth 换令牌）走 g510 上的代理：g510 在国内。.env 里的 OUTBOUND_HTTPS_PROXY 空着就不用代理。
+      # 不直接用 .env 里的 HTTPS_PROXY 这个名字：执行 docker compose 的 shell 里要是设了 HTTPS_PROXY（开着代理的机器常这样），
+      # 插值时它会盖过 .env 的值，容器拿到的是宿主机视角的地址。Bun 的 fetch 自己读这两个变量，只对 https 生效，
+      # 容器网络里的 http://umami、http://napcat 不受影响（src/server/outbound-proxy.test.ts 守着）。
+      # Turnstile 的 siteverify 直连（上面的 NO_PROXY）：它在国内连得上，也就不必跟着代理一起挂掉，QQ 登录和通行密钥注册
+      # 只靠它。
+      HTTPS_PROXY: ${OUTBOUND_HTTPS_PROXY:-}
+    extra_hosts:
+      # 容器里用 host.docker.internal 连宿主机上的代理（HTTPS_PROXY=http://host.docker.internal:20171）。
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:12703:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bun", "-e", "await fetch('http://127.0.0.1:3000/healthz').then((r) => { if (!r.ok) process.exit(1); })"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    <<: *app
+    pull_policy: never
+    command: ["bun", "src/worker/main.ts"]
+    environment: *app-env
+    # main.ts 收到 SIGTERM 后最多等 30 秒，让正在跑的任务做完（清除任务被打断会白白用掉一次重试）。
+    # 留出余量，docker 不要提前 SIGKILL。
+    stop_grace_period: 45s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # 部署时 deploy.sh 先跑它（docker compose run --rm migrate），成功了才重启 web 和 worker（spec 第 9.3 节）。
+  migrate:
+    <<: *app
+    pull_policy: never
+    restart: "no"
+    profiles: [tools]
+    command: ["bun", "src/server/db/migrate.ts"]
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: community
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?先运行 ops/fill-secrets.sh}
+      POSTGRES_DB: community
+      # 只给下面的初始化脚本用：数据目录还是空的时候（第一次启动）建 umami 的角色和库。
+      UMAMI_DB_PASSWORD: ${UMAMI_DB_PASSWORD:?先运行 ops/fill-secrets.sh}
+    volumes:
+      # PG 18 镜像的数据卷挂载点是 /var/lib/postgresql（不再是 .../data）。
+      - pgdata:/var/lib/postgresql
+      - ./ops/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "community", "-d", "community"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8
+    restart: unless-stopped
+    logging: *logging
+    # spec 第 9.4 节：可淘汰、不持久化。
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # NapCat 启动前把 OneBot 配置写进它的配置卷（src/server/napcat/write-onebot-config.ts）：令牌和机器人 QQ 只在 .env 里。
+  napcat-config:
+    <<: *app
+    pull_policy: never
+    restart: "no"
+    command: ["bun", "src/server/napcat/write-onebot-config.ts", "/napcat-config"]
+    environment:
+      NAPCAT_ACCESS_TOKEN: ${NAPCAT_ACCESS_TOKEN:?先运行 ops/fill-secrets.sh}
+      NAPCAT_BOT_QQ: ${NAPCAT_BOT_QQ:?在 .env 里填机器人的 QQ 号}
+    volumes:
+      - napcat-config:/napcat-config
+
+  # 社区站自己的机器人，和 g510 上给 astrbot 用的那个 napcat 容器（WebUI 在宿主机的 6099）互不相干：
+  # 项目名不同，容器名、网络、卷都不重叠，宿主机端口用 12705。HTTP（3000）和 WebSocket（3001）只在内部网络。
+  napcat:
+    image: mlikiowa/napcat-docker:v4.18.32
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      # 登录过一次（WebUI 扫码）以后，重启时用这个号快速登录。
+      ACCOUNT: ${NAPCAT_BOT_QQ:?在 .env 里填机器人的 QQ 号}
+      # 第一次启动时写进 webui.json 的 WebUI 登录令牌；以后在 WebUI 里改。
+      WEBUI_TOKEN: ${NAPCAT_WEBUI_TOKEN:?先运行 ops/fill-secrets.sh}
+      # QQ 不以 root 运行。
+      NAPCAT_UID: "1000"
+      NAPCAT_GID: "1000"
+    ports:
+      # WebUI 只在扫码登录时用，经 SSH 端口转发访问（spec 第 12.1 节）。
+      - "127.0.0.1:12705:6099"
+    volumes:
+      - napcat-qq:/app/.config/QQ
+      - napcat-config:/app/napcat/config
+    depends_on:
+      napcat-config:
+        condition: service_completed_successfully
+
+  umami:
+    image: ghcr.io/umami-software/umami:3.4.0
+    restart: unless-stopped
+    logging: *logging
+    init: true
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:?先运行 ops/fill-secrets.sh}@postgres:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:?先运行 ops/fill-secrets.sh}
+      DISABLE_TELEMETRY: "1"
+    ports:
+      # 只有管理后台经隧道对外（adxc-umami.saop.cc，放在 Cloudflare Access 后面）；统计脚本和上报走主站的 /_s/。
+      - "127.0.0.1:12704:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/api/heartbeat"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  pgdata:
+  napcat-qq:
+  napcat-config:
