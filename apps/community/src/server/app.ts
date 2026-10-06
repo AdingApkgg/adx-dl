@@ -17,7 +17,9 @@ import { pendingDeletionGuard } from "./middleware/pending-deletion";
 import { rateLimit, type RateLimitStore } from "./middleware/rate-limit";
 import { requestLog } from "./middleware/request-log";
 import { securityHeaders } from "./middleware/security-headers";
+import { umamiProxy } from "./middleware/umami";
 import type { ApiServices } from "./services/api-services";
+import { throttledErrorLog } from "./throttled-log";
 import { withTimeout } from "./with-timeout";
 
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -35,6 +37,8 @@ export type AppDeps = {
   rateLimitStore: RateLimitStore;
   /** 浏览器看到的站点地址，CSRF 校验拿它和 Origin 头比较。 */
   publicOrigin: string;
+  /** Umami 在容器网络里的地址，/_s/* 转发到这里；null 表示没开统计（没设 UMAMI_WEBSITE_ID）。 */
+  umamiInternalUrl: string | null;
   /** Better Auth 实例（createAuth 的返回值）。 */
   auth: Auth;
   /** /api/v1 的接口用到的依赖（auth、log 由 createApp 从上面同名的两项放进去）。 */
@@ -71,6 +75,15 @@ export function createApp(deps: AppDeps) {
   });
 
   app.all("/media/*", (c) => jsonError(c, 404, "NOT_FOUND", "Not found"));
+
+  // spec 第 8.1 节第 5 条：和 /media 一样挂在会话中间件之前。
+  app.route(
+    "/_s",
+    umamiProxy({
+      internalUrl: deps.umamiInternalUrl,
+      onError: throttledErrorLog(deps.log, "umami_forward_failed"),
+    })
+  );
 
   app.get("/healthz", (c) => c.json({ ok: true }));
 

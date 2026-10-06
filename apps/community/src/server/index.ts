@@ -64,6 +64,7 @@ const app = createApp({
   log,
   isProduction: env.nodeEnv === "production",
   publicOrigin: env.publicOrigin,
+  umamiInternalUrl: env.umami?.internalUrl ?? null,
   checks: {
     db: () => pingDb(db),
     redis: () => pingRedis(redis),
