@@ -38,7 +38,10 @@ export function Layout({ children }: { children: ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <ThemeBootScript />
         <Meta />
-        <Links />
+        {/* nonce 故意给空的：不传的话 React Router 会把这次请求的 nonce 抄到样式表的 <link> 上，浏览器里拿不到
+            这个值，hydrate 时报属性对不上。CSP 的 style-src 不用 nonce，空值没有影响；脚本照样由 <Scripts> 和
+            ThemeBootScript 带上真的 nonce。 */}
+        <Links nonce="" />
       </head>
       <body>
         {children}

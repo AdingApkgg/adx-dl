@@ -49,6 +49,22 @@ describe("页面", () => {
     expect(head).toContain(`<script id="theme-init" nonce="${nonce}">${themeBootScript()}</script>`);
   });
 
+  // 样式表的 nonce 是空的：React Router 会把请求的 nonce 抄到 <link> 上，浏览器里读不到这个值，hydrate 时报属性对不上。
+  // CSP 的 style-src 不用 nonce，空值没有影响。
+  test("样式表的 <link> 带空的 nonce，不是 CSP 里的那个", async () => {
+    const res = await fetch(server.url("/"));
+    const html = await res.text();
+    const nonce = /'nonce-([^']+)'/.exec(res.headers.get("content-security-policy") ?? "")?.[1];
+    const stylesheets = html.match(/<link\b[^>]*\brel="stylesheet"[^>]*>/g) ?? [];
+
+    expect(nonce).toBeTruthy();
+    expect(stylesheets.length).toBeGreaterThan(0);
+    for (const tag of stylesheets) {
+      expect(tag).toContain('nonce=""');
+      expect(tag).not.toContain(`nonce="${nonce}"`);
+    }
+  });
+
   test("首页经由进程内 API 拿到了数据", async () => {
     expect(await (await fetch(server.url("/"))).text()).toContain("接口版本 v1");
   });
