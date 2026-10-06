@@ -1,3 +1,4 @@
+import { themeBootScript } from "@astrodx/ui/theme";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import { type RunningServer, startBuiltServer } from "./server";
@@ -34,6 +35,18 @@ describe("页面", () => {
     for (const tag of inlineScripts) {
       expect(tag).toContain(`nonce="${nonce}"`);
     }
+  });
+
+  // spec 第 10 节（0b）：防闪烁脚本内联在 <head> 里，nonce 就是这次响应 CSP 里的那个。对不上的话，生产环境里它会被
+  // CSP 拦下，刷新时页面先按默认的深色画一帧再变。
+  test("防闪烁脚本在 <head> 里，nonce 和响应头 CSP 里的一致", async () => {
+    const res = await fetch(server.url("/"));
+    const html = await res.text();
+    const nonce = /'nonce-([^']+)'/.exec(res.headers.get("content-security-policy") ?? "")?.[1];
+    const head = html.slice(0, html.indexOf("</head>"));
+
+    expect(nonce).toBeTruthy();
+    expect(head).toContain(`<script id="theme-init" nonce="${nonce}">${themeBootScript()}</script>`);
   });
 
   test("首页经由进程内 API 拿到了数据", async () => {

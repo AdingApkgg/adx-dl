@@ -20,6 +20,8 @@ import { requestMetaContext } from "@/shared/router-context";
 
 import type { Route } from "./+types/root";
 import appCss from "./app.css?url";
+import { AppProviders } from "./components/app-providers";
+import { ThemeBootScript } from "./components/theme-boot-script";
 import { getBrowserQueryClient } from "./lib/browser";
 
 // 页面请求都在 Paraglide 的中间件里处理，之后 getLocale()、m.xxx() 用的都是这个请求的语言。
@@ -38,10 +40,12 @@ export function loader({ context }: Route.LoaderArgs) {
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
-    <html lang={htmlLang(getLocale())}>
+    // 防闪烁脚本在 hydrate 之前就改了 <html> 的 class 和属性，所以这一层不比对。
+    <html lang={htmlLang(getLocale())} className="antialiased" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <ThemeBootScript />
         <Meta />
         <Links />
       </head>
@@ -59,7 +63,9 @@ export default function App() {
   const [queryClient] = useState(() => (typeof window === "undefined" ? makeQueryClient() : getBrowserQueryClient()));
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <AppProviders>
+        <Outlet />
+      </AppProviders>
     </QueryClientProvider>
   );
 }

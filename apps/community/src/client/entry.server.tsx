@@ -9,6 +9,8 @@ import { describeError } from "@/shared/describe-error";
 import { createLogger, type Logger } from "@/shared/log";
 import { requestMetaContext } from "@/shared/router-context";
 
+import { NonceContext } from "./lib/nonce";
+
 export const streamTimeout = 5_000;
 
 const log = createLogger();
@@ -29,13 +31,15 @@ export default async function handleRequest(
   }
 
   // ServerRouter 的 nonce 会传给 <Scripts>、<ScrollRestoration>、流式数据的脚本；
-  // renderToReadableStream 的 nonce 给 React 自己插入的脚本。
+  // renderToReadableStream 的 nonce 给 React 自己插入的脚本；NonceContext 给根组件里的防闪烁脚本。
   const { nonce } = loadContext.get(requestMetaContext);
   let shellRendered = false;
   const userAgent = request.headers.get("user-agent");
 
   const body = await renderToReadableStream(
-    <ServerRouter context={routerContext} url={request.url} nonce={nonce} />,
+    <NonceContext value={nonce}>
+      <ServerRouter context={routerContext} url={request.url} nonce={nonce} />
+    </NonceContext>,
     {
       nonce,
       signal: AbortSignal.timeout(streamTimeout + 1000),
