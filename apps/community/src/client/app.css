@@ -1,0 +1,9 @@
+/* 社区站的样式入口，根组件的 links 引入它。设计变量、字体、强调色、减少动画的开关，以及共享组件用到的类名，
+   都来自 @astrodx/ui；社区站自己的样式写在最后。 */
+@import "tailwindcss" source(none);
+@import "@astrodx/ui/styles/theme.css";
+
+/* 类名只从 src/client（这个文件所在的目录）里找，不让 Tailwind 自己探测：探测靠 .gitignore 排除生成的文件，
+   Docker 的构建上下文里没有 .gitignore，它会把 build/ 里客户端构建的产物也扫进来，镜像里的 CSS 就和本机、CI 的
+   不一样。共享包的组件由 theme.css 里的 @source 负责。 */
+@source "./";

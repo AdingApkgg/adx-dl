@@ -1,3 +1,4 @@
+import { themeBootScript } from "@astrodx/ui/theme";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import { type RunningServer, startBuiltServer } from "./server";
@@ -33,6 +34,39 @@ describe("页面", () => {
     expect(inlineScripts.length).toBeGreaterThan(0);
     for (const tag of inlineScripts) {
       expect(tag).toContain(`nonce="${nonce}"`);
+    }
+  });
+
+  // spec 第 10 节（0b）：防闪烁脚本内联在 <head> 里，nonce 就是这次响应 CSP 里的那个。对不上的话，生产环境里它会被
+  // CSP 拦下，刷新时页面先按默认的深色画一帧再变。
+  test("防闪烁脚本在 <head> 里，nonce 和响应头 CSP 里的一致", async () => {
+    const res = await fetch(server.url("/"));
+    const html = await res.text();
+    const nonce = /'nonce-([^']+)'/.exec(res.headers.get("content-security-policy") ?? "")?.[1];
+    const headEnd = html.indexOf("</head>");
+    const head = html.slice(0, headEnd);
+
+    expect(nonce).toBeTruthy();
+    // 没有 </head> 的话 head 是整页去掉最后一个字符，下面几条会白白通过。
+    expect(headEnd).toBeGreaterThan(0);
+    expect(head).toContain(`<script id="theme-init" nonce="${nonce}">${themeBootScript()}</script>`);
+    // 在样式表之前：样式表还没加载完，主题就已经定好了。
+    expect(head.indexOf('rel="stylesheet"')).toBeGreaterThan(head.indexOf('id="theme-init"'));
+  });
+
+  // 样式表的 nonce 是空的：React Router 会把请求的 nonce 抄到 <link> 上，浏览器里读不到这个值，hydrate 时报属性对不上。
+  // CSP 的 style-src 不用 nonce，空值没有影响。
+  test("样式表的 <link> 带空的 nonce，不是 CSP 里的那个", async () => {
+    const res = await fetch(server.url("/"));
+    const html = await res.text();
+    const nonce = /'nonce-([^']+)'/.exec(res.headers.get("content-security-policy") ?? "")?.[1];
+    const stylesheets = html.match(/<link\b[^>]*\brel="stylesheet"[^>]*>/g) ?? [];
+
+    expect(nonce).toBeTruthy();
+    expect(stylesheets.length).toBeGreaterThan(0);
+    for (const tag of stylesheets) {
+      expect(tag).toContain('nonce=""');
+      expect(tag).not.toContain(`nonce="${nonce}"`);
     }
   });
 
@@ -77,12 +111,19 @@ describe("页面", () => {
     const res = await fetch(server.url("/definitely-missing"));
     expect(res.status).toBe(404);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
+    const html = await res.text();
+    expect(html).toContain("页面不存在");
+    // 一段的地址由 :lang? 布局的中间件判成 404，落到根组件的错误边界：那里只有出错卡片，没有页头。
+    expect(html).not.toContain("<header");
   });
 
   test("英文下的未知地址也是 404，用英文显示", async () => {
     const res = await fetch(server.url("/en/definitely-missing"));
     expect(res.status).toBe(404);
-    expect(await res.text()).toContain("Page not found");
+    const html = await res.text();
+    expect(html).toContain("Page not found");
+    // 两段的地址由 :lang? 布局的错误边界接住（spec 第 7.4 节）：页头照样在。
+    expect(html).toContain("<header");
   });
 
   test("大小写不对的语言前缀也是 404", async () => {

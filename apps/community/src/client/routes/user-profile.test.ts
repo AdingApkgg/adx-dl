@@ -94,7 +94,7 @@ describe("个人主页渲染", () => {
     const html = render(await visit(ACTIVE));
 
     expect(html).toContain('<svg width="80"');
-    expect(html).toContain("<h1>阿丁</h1>");
+    expect(html).toMatch(/<h1\b[^>]*>阿丁<\/h1>/);
     expect(html).toContain(m.user_page_id({ id: ID }));
     expect(html).toContain("white-space:pre-line");
     expect(html).toContain("写谱的\n也打歌");

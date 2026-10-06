@@ -1,3 +1,6 @@
+import { Alert } from "@astrodx/ui/components/alert";
+import { Button } from "@astrodx/ui/components/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@astrodx/ui/components/card";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { redirect, useLocation } from "react-router";
@@ -88,29 +91,38 @@ function DeletionContent() {
   }
 
   const date = new Intl.DateTimeFormat(htmlLang(getLocale()), { dateStyle: "medium", timeStyle: "short" }).format(purgeAt);
+  // "撤销注销"是主按钮，"退出登录"是次要按钮（spec 第 7.5 节）。
   return (
     <main>
-      <h1>{m.account_deletion_title()}</h1>
-      {hydrated ? (
-        due ? (
-          <p>{m.account_deletion_due()}</p>
-        ) : (
-          <>
-            <p>{m.account_deletion_scheduled({ date })}</p>
-            <p>{m.account_deletion_days_left({ days: Math.ceil(remainingMs / DAY_MS) })}</p>
-            <p>{m.account_deletion_cancel_hint()}</p>
-          </>
-        )
-      ) : null}
-      {failure ? <p role="alert">{failure}</p> : null}
-      <p>
-        <button type="button" disabled={pending || due} onClick={cancel}>
-          {m.account_deletion_cancel()}
-        </button>{" "}
-        <button type="button" disabled={pending} onClick={signOut}>
-          {m.settings_sign_out()}
-        </button>
-      </p>
+      <Card className="mx-auto max-w-lg">
+        <CardHeader>
+          <CardTitle asChild>
+            <h1 className="text-xl font-semibold">{m.account_deletion_title()}</h1>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {hydrated ? (
+            due ? (
+              <p>{m.account_deletion_due()}</p>
+            ) : (
+              <>
+                <p>{m.account_deletion_scheduled({ date })}</p>
+                <p className="font-medium">{m.account_deletion_days_left({ days: Math.ceil(remainingMs / DAY_MS) })}</p>
+                <p className="text-muted-foreground">{m.account_deletion_cancel_hint()}</p>
+              </>
+            )
+          ) : null}
+          {failure ? <Alert variant="destructive">{failure}</Alert> : null}
+        </CardContent>
+        <CardFooter className="gap-2">
+          <Button type="button" disabled={pending || due} onClick={cancel}>
+            {m.account_deletion_cancel()}
+          </Button>
+          <Button type="button" variant="outline" disabled={pending} onClick={signOut}>
+            {m.settings_sign_out()}
+          </Button>
+        </CardFooter>
+      </Card>
     </main>
   );
 }

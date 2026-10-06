@@ -12,12 +12,14 @@
     "i18n": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy url baseLocale --output-structure message-modules --emit-ts-declarations",
     "test": "bun run i18n && bun test --timeout 30000 src",
     "test:http": "bun test --timeout 30000 test/http",
-    "check": "bun run lint && bun run i18n && bun run typegen && tsc --noEmit && bun test --timeout 30000 src",
+    "test:dom": "bun run i18n && vitest run",
+    "check": "bun run lint && bun run i18n && bun run typegen && tsc --noEmit && bun test --timeout 30000 src && vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/server/db/migrate.ts",
     "worker": "bun run src/worker/main.ts"
   },
   "dependencies": {
+    "@astrodx/tsconfig": "workspace:*",
     "@better-auth/passkey": "1.7.6",
     "@tanstack/react-query": "^5.104.0",
     "better-auth": "1.7.6",
@@ -34,15 +36,24 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@astrodx/ui": "workspace:*",
     "@inlang/paraglide-js": "2.25.4",
     "@inlang/plugin-message-format": "4.4.4",
     "@react-router/dev": "8.4.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@types/bun": "^1.4.2",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "drizzle-kit": "^0.31.11",
+    "happy-dom": "^20.14.5",
+    "lucide-react": "^1.48.0",
+    "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^8.3.1"
+    "vite": "^8.3.1",
+    "vitest": "^5.0.3"
   }
 }

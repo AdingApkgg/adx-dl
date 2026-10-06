@@ -1,17 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
-import {
-  isRouteErrorResponse,
-  Links,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-  useRevalidator,
-  useRouteLoaderData,
-} from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 
-import { m } from "@/paraglide/messages.js";
 import { getLocale } from "@/paraglide/runtime.js";
 import { paraglideMiddleware } from "@/paraglide/server.js";
 import { htmlLang } from "@/shared/i18n/locale";
@@ -19,6 +9,10 @@ import { makeQueryClient } from "@/shared/query-client";
 import { requestMetaContext } from "@/shared/router-context";
 
 import type { Route } from "./+types/root";
+import appCss from "./app.css?url";
+import { AppProviders } from "./components/app-providers";
+import { ErrorCard } from "./components/error-card";
+import { ThemeBootScript } from "./components/theme-boot-script";
 import { getBrowserQueryClient } from "./lib/browser";
 
 // 页面请求都在 Paraglide 的中间件里处理，之后 getLocale()、m.xxx() 用的都是这个请求的语言。
@@ -27,6 +21,9 @@ export const middleware: Route.MiddlewareFunction[] = [
   ({ request, url }, next) => paraglideMiddleware(request, () => next(), { effectiveRequestUrl: url }),
 ];
 
+// 样式表放进 <head>（spec 第 7.1 节）。?url 拿到构建后的地址：开发服务器里也是真的 <link>，不会先无样式闪一下。
+export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: appCss }];
+
 export function loader({ context }: Route.LoaderArgs) {
   const meta = context.get(requestMetaContext);
   return { requestId: meta.requestId, origin: meta.origin };
@@ -34,12 +31,17 @@ export function loader({ context }: Route.LoaderArgs) {
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
-    <html lang={htmlLang(getLocale())}>
+    // 防闪烁脚本在 hydrate 之前就改了 <html> 的 class 和属性，所以这一层不比对。
+    <html lang={htmlLang(getLocale())} className="antialiased" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <ThemeBootScript />
         <Meta />
-        <Links />
+        {/* nonce 故意给空的：不传的话 React Router 会把这次请求的 nonce 抄到样式表的 <link> 上，浏览器里拿不到
+            这个值，hydrate 时报属性对不上。CSP 的 style-src 不用 nonce，空值没有影响；脚本照样由 <Scripts> 和
+            ThemeBootScript 带上真的 nonce。 */}
+        <Links nonce="" />
       </head>
       <body>
         {children}
@@ -55,39 +57,21 @@ export default function App() {
   const [queryClient] = useState(() => (typeof window === "undefined" ? makeQueryClient() : getBrowserQueryClient()));
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <AppProviders>
+        <Outlet />
+      </AppProviders>
     </QueryClientProvider>
   );
 }
 
+// 根错误边界（spec 第 7.4 节）：接住根组件的 loader 和中间件、以及 :lang? 布局的中间件抛出的错误，包括 /foo、/fr/x
+// 这类第一段认不出语言的地址返回的 404；在浏览器里，布局的错误边界自己渲染出错往上冒的也到这里。子页面的错误由布局的
+// 错误边界接住。服务端渲染时 SiteShell 里崩溃到不了这里，最后是 React Router 的纯文本 500。这里只有出错卡片，
+// 不带页头和账号信息。
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  // 这是这次页面加载时服务端渲染那个请求的 ID。站内跳转出错时它指向的是最初那次请求，
-  // 排查时按它找到访客和时间，再看前后的日志。
-  const requestId = useRouteLoaderData<typeof loader>("root")?.requestId;
-  const revalidator = useRevalidator();
-
-  if (isRouteErrorResponse(error) && error.status === 404) {
-    return (
-      <main>
-        <h1>{m.error_not_found_title()}</h1>
-        <p>{m.error_not_found_body()}</p>
-      </main>
-    );
-  }
-
   return (
-    <main>
-      <h1>{m.error_server_title()}</h1>
-      <p>{m.error_server_body()}</p>
-      {requestId ? (
-        <p>
-          {m.error_request_id()}: <code>{requestId}</code>
-        </p>
-      ) : null}
-      {/* 站内跳转时断网也会落到这里（spec 第 11.4 节）：重新执行当前页面的 loader，成功就恢复正常页面。 */}
-      <button type="button" disabled={revalidator.state === "loading"} onClick={() => revalidator.revalidate()}>
-        {m.error_retry()}
-      </button>
-    </main>
+    <div className="px-4 py-16">
+      <ErrorCard error={error} />
+    </div>
   );
 }

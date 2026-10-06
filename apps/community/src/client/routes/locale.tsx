@@ -1,8 +1,11 @@
-import { data, Outlet, redirect } from "react-router";
+import { dehydrate, HydrationBoundary, type Query } from "@tanstack/react-query";
+import { data, Outlet, redirect, useRouteLoaderData } from "react-router";
 
 import { baseLocale, isLocale } from "@/paraglide/runtime.js";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
+import { ErrorCard } from "../components/error-card";
+import { SiteShell } from "../components/site-shell";
 import { getBrowserApi, getBrowserQueryClient } from "../lib/browser";
 import { pendingDeletionRedirect } from "../lib/pending-deletion";
 import { meQuery } from "../queries/me";
@@ -66,10 +69,40 @@ export const clientMiddleware: Route.ClientMiddlewareFunction[] = [
   },
 ];
 
-export function loader({ params }: Route.LoaderArgs) {
-  return { locale: params.lang ?? baseLocale };
+// 只要当前用户这一个查询（["me"]），并且是取到了的：子页面的查询由各自的 loader 交给浏览器。
+function isMeQuery(query: Query): boolean {
+  return query.queryKey.length === 1 && query.queryKey[0] === "me" && query.state.status === "success";
 }
 
-export default function LocaleLayout() {
-  return <Outlet />;
+// 页头的账号区第一屏就要有头像（spec 第 7.2 节）。上面的中间件在同一个请求里已经查过当前用户，结果就在本次请求的
+// QueryClient 里，这里只把它交给浏览器，不再查一次。取不到（429、5xx）时那个查询是失败的，不带它：账号区先留空，
+// 浏览器里的 useQuery 会再取，已登录的人不会先看到"登录"。
+export function loader({ params, context }: Route.LoaderArgs) {
+  return {
+    locale: params.lang ?? baseLocale,
+    dehydratedState: dehydrate(context.get(queryClientContext), { shouldDehydrateQuery: isMeQuery }),
+  };
+}
+
+export default function LocaleLayout({ loaderData }: Route.ComponentProps) {
+  return (
+    <HydrationBoundary state={loaderData.dehydratedState}>
+      <SiteShell>
+        <Outlet />
+      </SiteShell>
+    </HydrationBoundary>
+  );
+}
+
+// 子页面出错（包括 /u/<不存在的 id>、/en/<不存在的地址>）都到这里：页头照样在，内容区换成出错卡片（spec 第 7.4 节）。
+// 布局自己的中间件抛出的 404（/foo、/fr/x 这类第一段不是语言的地址）不归这里，由根组件的错误边界接住。
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  const layout = useRouteLoaderData<typeof loader>("routes/locale");
+  return (
+    <HydrationBoundary state={layout?.dehydratedState}>
+      <SiteShell>
+        <ErrorCard error={error} />
+      </SiteShell>
+    </HydrationBoundary>
+  );
 }

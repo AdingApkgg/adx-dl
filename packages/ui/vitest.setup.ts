@@ -2,6 +2,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach } from "vitest";
 
+import { toast } from "./src/components/sonner";
 import { ThemeProvider } from "./src/theme/theme-provider";
 
 // Testing Library turns React's act environment on only when vitest runs with
@@ -13,6 +14,11 @@ import { ThemeProvider } from "./src/theme/theme-provider";
 // localStorage and to <html> (the dark class, color-scheme, data-accent,
 // data-motion, data-reduced-motion), so each test starts from a blank page.
 afterEach(() => {
+  // Sonner keeps toasts in module state, and a newly mounted Toaster replays
+  // any that are still open: dismiss them all so none leaks into the next test.
+  act(() => {
+    toast.dismiss();
+  });
   cleanup();
   // A file can opt into the node environment (// @vitest-environment node),
   // where there is no page to reset.

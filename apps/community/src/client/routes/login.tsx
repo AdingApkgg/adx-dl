@@ -1,5 +1,10 @@
+import { Alert } from "@astrodx/ui/components/alert";
+import { Button } from "@astrodx/ui/components/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@astrodx/ui/components/card";
+import { Input } from "@astrodx/ui/components/input";
+import { Label } from "@astrodx/ui/components/label";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from "react";
 import { redirect, useSearchParams } from "react-router";
 
 import { m } from "@/paraglide/messages.js";
@@ -7,6 +12,7 @@ import { localizeHref } from "@/paraglide/runtime.js";
 import { NICKNAME_MAX, normalizeNickname } from "@/shared/nickname";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
+import { PageTitle } from "../components/page-title";
 import { QqCodeForm } from "../components/qq-code-form";
 import { authClient } from "../lib/auth-client";
 import { errorCodeOf, errorMessage } from "../lib/auth-errors";
@@ -20,7 +26,7 @@ import { meQuery } from "../queries/me";
 import type { Route } from "./+types/login";
 
 // 当前用户（me）取不到不算出错，和首页一样：429 限流、5xx 时页面照常显示成未登录，没进 dehydrate 的 me，
-// 浏览器里的 useQuery 会在 hydrate 之后重试。登录方式取不到照旧抛错，页面显示根错误边界。
+// 浏览器里的 useQuery 会在 hydrate 之后重试。登录方式取不到照旧抛错，页面显示 :lang? 布局的错误边界（页头照样在）。
 export async function loader({ context, url }: Route.LoaderArgs) {
   const queryClient = context.get(queryClientContext);
   const api = context.get(apiContext);
@@ -72,30 +78,38 @@ function LoginContent() {
   if (!options) {
     return null;
   }
+  // 三种登录方式各一张卡片（spec 第 7.5 节）。
   return (
-    <main>
-      <h1>{m.login_title()}</h1>
-      {reauth ? <p>{m.login_reauth_notice()}</p> : null}
-      {callbackMessage ? <p role="alert">{callbackMessage}</p> : null}
+    <main className="mx-auto max-w-md space-y-6">
+      <PageTitle description={reauth ? m.login_reauth_notice() : undefined}>{m.login_title()}</PageTitle>
+      {callbackMessage ? <Alert variant="destructive">{callbackMessage}</Alert> : null}
 
       <GoogleSignIn next={next} reauth={reauth} />
 
-      <section>
-        <h2>{m.login_qq_heading()}</h2>
+      <Card>
+        <CardHeader>
+          <CardTitle asChild>
+            <h2>{m.login_qq_heading()}</h2>
+          </CardTitle>
+          <CardDescription>
+            {options.qq.available
+              ? options.qq.botQq
+                ? m.login_qq_add_bot({ bot: options.qq.botQq })
+                : m.login_qq_console_hint()
+              : m.login_qq_unavailable()}
+          </CardDescription>
+        </CardHeader>
         {options.qq.available ? (
-          <>
-            <p>{options.qq.botQq ? m.login_qq_add_bot({ bot: options.qq.botQq }) : m.login_qq_console_hint()}</p>
+          <CardContent>
             <QqCodeForm
               siteKey={options.turnstileSiteKey}
               intent="login"
               webauthnAutofill
               onVerified={({ isNewUser }) => go(isNewUser)}
             />
-          </>
-        ) : (
-          <p>{m.login_qq_unavailable()}</p>
-        )}
-      </section>
+          </CardContent>
+        ) : null}
+      </Card>
 
       <PasskeySection
         siteKey={options.turnstileSiteKey}
@@ -130,12 +144,14 @@ function GoogleSignIn({ next, reauth }: { next: string; reauth: boolean }) {
   }
 
   return (
-    <section>
-      <button type="button" disabled={pending} onClick={signIn}>
-        {pending ? m.login_working() : m.login_google()}
-      </button>
-      {error ? <p role="alert">{error}</p> : null}
-    </section>
+    <Card>
+      <CardContent className="space-y-3">
+        <Button type="button" variant="outline" size="lg" className="w-full" disabled={pending} onClick={signIn}>
+          {pending ? m.login_working() : m.login_google()}
+        </Button>
+        {error ? <Alert variant="destructive">{error}</Alert> : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -243,24 +259,30 @@ function PasskeySection({ siteKey, signedIn, autofill, onSignedIn }: PasskeySect
   }
 
   return (
-    <section>
-      <h2>{m.login_passkey_heading()}</h2>
-      <button type="button" disabled={pending} onClick={signIn}>
-        {m.login_passkey_sign_in()}
-      </button>
+    <Card>
+      <CardHeader>
+        <CardTitle asChild>
+          <h2>{m.login_passkey_heading()}</h2>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Button type="button" variant="outline" size="lg" className="w-full" disabled={pending} onClick={signIn}>
+          {m.login_passkey_sign_in()}
+        </Button>
 
-      {signedIn ? null : (
-        <PasskeySignUp
-          siteKey={siteKey}
-          pending={pending}
-          setPending={setPending}
-          setError={setError}
-          onSignedIn={onSignedIn}
-          rearm={rearm}
-        />
-      )}
-      {error ? <p role="alert">{error}</p> : null}
-    </section>
+        {signedIn ? null : (
+          <PasskeySignUp
+            siteKey={siteKey}
+            pending={pending}
+            setPending={setPending}
+            setError={setError}
+            onSignedIn={onSignedIn}
+            rearm={rearm}
+          />
+        )}
+        {error ? <Alert variant="destructive">{error}</Alert> : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -277,6 +299,7 @@ type PasskeySignUpProps = {
 function PasskeySignUp({ siteKey, pending, setPending, setError, onSignedIn, rearm }: PasskeySignUpProps) {
   const turnstile = useTurnstile(siteKey);
   const [nickname, setNickname] = useState("");
+  const nicknameId = useId();
 
   async function signUp(event: FormEvent) {
     event.preventDefault();
@@ -308,13 +331,16 @@ function PasskeySignUp({ siteKey, pending, setPending, setError, onSignedIn, rea
   }
 
   return (
-    <>
-      <h3>{m.login_passkey_signup_heading()}</h3>
-      <p>{m.login_passkey_signup_hint()}</p>
-      <form onSubmit={signUp}>
-        <label>
-          {m.login_nickname()}{" "}
-          <input
+    <div className="space-y-3 border-t pt-4">
+      <div className="space-y-1">
+        <h3 className="font-medium">{m.login_passkey_signup_heading()}</h3>
+        <p className="text-sm text-muted-foreground">{m.login_passkey_signup_hint()}</p>
+      </div>
+      <form onSubmit={signUp} className="space-y-3">
+        <div className="space-y-2">
+          <Label htmlFor={nicknameId}>{m.login_nickname()}</Label>
+          <Input
+            id={nicknameId}
             name="nickname"
             value={nickname}
             onChange={(event) => setNickname(event.target.value)}
@@ -322,13 +348,13 @@ function PasskeySignUp({ siteKey, pending, setPending, setError, onSignedIn, rea
             required
             autoComplete="nickname"
           />
-        </label>
+        </div>
         <div ref={turnstile.ref} />
-        {turnstile.failed ? <p role="alert">{m.login_turnstile_failed()}</p> : null}
-        <button type="submit" disabled={pending || !turnstile.token}>
+        {turnstile.failed ? <Alert variant="destructive">{m.login_turnstile_failed()}</Alert> : null}
+        <Button type="submit" disabled={pending || !turnstile.token}>
           {pending ? m.login_working() : m.login_passkey_signup()}
-        </button>
+        </Button>
       </form>
-    </>
+    </div>
   );
 }

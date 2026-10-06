@@ -1,3 +1,7 @@
+import { Alert } from "@astrodx/ui/components/alert";
+import { Button } from "@astrodx/ui/components/button";
+import { Card, CardContent, CardFooter } from "@astrodx/ui/components/card";
+import { toast } from "@astrodx/ui/components/sonner";
 import { dehydrate, HydrationBoundary, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { Link, useLocation } from "react-router";
@@ -10,6 +14,7 @@ import { parseNickname } from "@/shared/nickname";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
 import { Avatar } from "../components/avatar";
+import { PageTitle, textLinkClass } from "../components/page-title";
 import { ProfileFields } from "../components/profile-fields";
 import { accountErrorRedirect } from "../lib/account-errors";
 import { errorMessage } from "../lib/auth-errors";
@@ -49,15 +54,21 @@ function ProfileContent() {
     return null;
   }
   return (
-    <main>
-      <h1>{m.settings_profile_title()}</h1>
-      <p>
-        <Avatar id={me.id} name={profile.name} size={64} /> {m.user_page_id({ id: me.id })}
-      </p>
+    <main className="space-y-6">
+      <PageTitle>{m.settings_profile_title()}</PageTitle>
+      <div className="flex items-center gap-4">
+        <Avatar id={me.id} name={profile.name} size={64} />
+        <p className="text-sm text-muted-foreground">{m.user_page_id({ id: me.id })}</p>
+      </div>
       <ProfileForm initialName={profile.name} initialBio={profile.bio} />
-      <p>
-        <Link to={localizeHref(`/u/${me.id}`)}>{m.profile_view_page()}</Link> ·{" "}
-        <Link to={localizeHref("/settings/account")}>{m.settings_account_title()}</Link>
+      <p className="text-sm">
+        <Link to={localizeHref(`/u/${me.id}`)} className={textLinkClass}>
+          {m.profile_view_page()}
+        </Link>{" "}
+        ·{" "}
+        <Link to={localizeHref("/settings/account")} className={textLinkClass}>
+          {m.settings_account_title()}
+        </Link>
       </p>
     </main>
   );
@@ -70,11 +81,9 @@ function ProfileForm({ initialName, initialBio }: { initialName: string; initial
   const [bio, setBio] = useState(initialBio);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    setSaved(false);
     // 和服务端同一套规则，先在这里挡一次，不用等请求回来。
     const nickname = parseNickname(name);
     if (nickname === null) {
@@ -94,7 +103,8 @@ function ProfileForm({ initialName, initialBio }: { initialName: string; initial
       setBio(updated.bio);
       // 昵称也显示在首页、个人主页上：["me"] 下的查询都刷新。
       await queryClient.invalidateQueries({ queryKey: ["me"] });
-      setSaved(true);
+      // 成功用 toast 提示，出错仍然显示在表单旁边（spec 第 7.3 节）。
+      toast.success(m.profile_saved());
     } catch (failure) {
       const target = accountErrorRedirect(failure, `${location.pathname}${location.search}`);
       if (target) {
@@ -107,25 +117,20 @@ function ProfileForm({ initialName, initialBio }: { initialName: string; initial
     }
   }
 
+  // 表单卡片（spec 第 7.5 节）。
   return (
     <form onSubmit={save}>
-      <ProfileFields
-        name={name}
-        bio={bio}
-        onNameChange={(value) => {
-          setName(value);
-          setSaved(false);
-        }}
-        onBioChange={(value) => {
-          setBio(value);
-          setSaved(false);
-        }}
-      />
-      {error ? <p role="alert">{error}</p> : null}
-      {saved ? <p role="status">{m.profile_saved()}</p> : null}
-      <button type="submit" disabled={pending}>
-        {pending ? m.login_working() : m.profile_save()}
-      </button>
+      <Card>
+        <CardContent className="space-y-5">
+          <ProfileFields name={name} bio={bio} onNameChange={setName} onBioChange={setBio} />
+          {error ? <Alert variant="destructive">{error}</Alert> : null}
+        </CardContent>
+        <CardFooter>
+          <Button type="submit" disabled={pending}>
+            {pending ? m.login_working() : m.profile_save()}
+          </Button>
+        </CardFooter>
+      </Card>
     </form>
   );
 }

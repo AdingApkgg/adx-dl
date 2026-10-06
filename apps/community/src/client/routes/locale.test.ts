@@ -1,3 +1,4 @@
+import type { QueryClient } from "@tanstack/react-query";
 import { afterEach, describe, expect, test } from "bun:test";
 import { createMemoryRouter, redirect, type RouteObject, RouterContextProvider } from "react-router";
 
@@ -9,10 +10,13 @@ import { getBrowserQueryClient } from "../lib/browser";
 import { checkLocale, clientMiddleware, loader, middleware } from "./locale";
 
 function run(lang: string | undefined, url: string) {
-  // 先跑中间件里的检查（会抛出跳转或 404），再跑 loader；两者都只用到 params 和 url。
+  // 先跑中间件里的检查（会抛出跳转或 404），再跑 loader，看它给出的语言。loader 还要本次请求的 QueryClient
+  // （它把当前用户交给页头），这里给一个空的。
   const args = { params: { lang }, url: new URL(url) };
   checkLocale(args);
-  return loader(args as unknown as Parameters<typeof loader>[0]);
+  const context = new RouterContextProvider();
+  context.set(queryClientContext, makeQueryClient());
+  return loader({ ...args, context } as unknown as Parameters<typeof loader>[0]).locale;
 }
 
 function thrownBy(fn: () => unknown): unknown {
@@ -26,12 +30,12 @@ function thrownBy(fn: () => unknown): unknown {
 
 describe("语言前缀路由", () => {
   test("没有前缀是中文", () => {
-    expect(run(undefined, "https://x.test/")).toEqual({ locale: "zh" });
+    expect(run(undefined, "https://x.test/")).toBe("zh");
   });
 
   test("en、ja 前缀", () => {
-    expect(run("en", "https://x.test/en")).toEqual({ locale: "en" });
-    expect(run("ja", "https://x.test/ja/")).toEqual({ locale: "ja" });
+    expect(run("en", "https://x.test/en")).toBe("en");
+    expect(run("ja", "https://x.test/ja/")).toBe("ja");
   });
 
   test("/zh 前缀 301 到不带前缀的地址，保留查询串", () => {
@@ -129,6 +133,66 @@ describe("待注销的用户跳到注销提示页", () => {
       expect(await runMiddleware(argsFor("https://x.test/settings/account", respond))).toEqual({ nextCalled: true, thrown: null });
     }
   });
+});
+
+// 布局的 loader：页头第一屏就要有头像（spec 第 7.2 节）。中间件已经把当前用户放进本次请求的 QueryClient，
+// loader 只把它交给浏览器，不再请求一次。
+describe("布局 loader 把当前用户交给页头", () => {
+  const fetchMe = middleware[1];
+  type Args = Parameters<NonNullable<typeof fetchMe>>[0];
+  const ME = { id: "abc2345678", name: "阿丁", image: null, status: "active", createdAt: "", deletionPurgeAt: null };
+
+  // 先跑中间件（它去取当前用户），再在同一个请求上下文里跑 loader；记下 /api/v1/me 一共被请求了几次。
+  // more 在两者之间往 QueryClient 里放别的查询：子页面的 loader 和布局的 loader 是同时执行的。
+  async function visit(respond: () => Response, more?: (queryClient: QueryClient) => void) {
+    let requests = 0;
+    const queryClient = makeQueryClient();
+    const context = new RouterContextProvider();
+    context.set(queryClientContext, queryClient);
+    context.set(apiContext, {
+      api: {
+        v1: {
+          me: {
+            $get: async () => {
+              requests += 1;
+              return respond();
+            },
+          },
+        },
+      },
+    } as unknown as ApiClient);
+    const args = { context, url: new URL("https://x.test/"), params: {} } as unknown as Args;
+    await fetchMe?.(args, async () => new Response());
+    more?.(queryClient);
+    const { dehydratedState } = loader(args as unknown as Parameters<typeof loader>[0]);
+    return { requests, queries: dehydratedState.queries.map((query) => ({ key: query.queryKey, data: query.state.data })) };
+  }
+
+  test("登录了：只带当前用户这一个查询；接口只请求了一次，就是中间件那次", async () => {
+    const result = await visit(
+      () => Response.json(ME),
+      (queryClient) => {
+        queryClient.setQueryData(["me", "profile"], { name: "阿丁", bio: "", onboardedAt: null });
+        queryClient.setQueryData(["meta"], { name: "astrodx-community", apiVersion: 1 });
+      }
+    );
+
+    expect(result).toEqual({ requests: 1, queries: [{ key: ["me"], data: ME }] });
+  });
+
+  test("没登录：带上 null，页头直接显示'登录'", async () => {
+    expect(await visit(() => new Response(null, { status: 401 }))).toEqual({
+      requests: 1,
+      queries: [{ key: ["me"], data: null }],
+    });
+  });
+
+  // 500 会被查询客户端重试一次（间隔约 1 秒）才算失败，429 这类 4xx 不重试。
+  for (const status of [429, 500]) {
+    test(`取不到当前用户（${status}）：不带它，页头先留空，等浏览器再取`, async () => {
+      expect((await visit(() => new Response(null, { status }))).queries).toEqual([]);
+    });
+  }
 });
 
 // 布局的 clientMiddleware：浏览器里站内跳转到只有 clientLoader 的页面（首页）时，服务端的中间件不会执行，
