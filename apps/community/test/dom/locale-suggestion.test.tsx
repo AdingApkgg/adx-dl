@@ -7,10 +7,11 @@ import { m } from "@/paraglide/messages.js";
 import { LanguageMenu } from "@/client/components/language-menu";
 import { LocaleSuggestion } from "@/client/components/locale-suggestion";
 
-// path 同时是浏览器地址（Paraglide 按它判断当前语言）和路由的当前地址；languages 是浏览器的语言偏好。
-function renderPage(path: string, languages: string[], children = <LocaleSuggestion />) {
+// path 同时是浏览器地址（Paraglide 按它判断当前语言）和路由的当前地址；languages 是浏览器的语言偏好，
+// undefined 表示浏览器没有 navigator.languages。
+function renderPage(path: string, languages: readonly string[] | undefined, children = <LocaleSuggestion />) {
   window.history.replaceState(null, "", path);
-  vi.spyOn(navigator, "languages", "get").mockReturnValue(languages);
+  vi.spyOn(navigator, "languages", "get").mockReturnValue(languages as readonly string[]);
   const result = render(<MemoryRouter initialEntries={[path]}>{children}</MemoryRouter>);
   return { ...result, user: userEvent.setup() };
 }
@@ -38,8 +39,20 @@ describe("浏览器语言不一致提示", () => {
   });
 
   test("浏览器偏好和页面一致，或者认不出：不提示", () => {
-    renderPage("/en/u/abc2345678", ["en-GB"]);
+    const { unmount } = renderPage("/en/u/abc2345678", ["en-GB"]);
     expect(screen.queryByRole("status")).toBeNull();
+    unmount();
+
+    renderPage("/", ["fr-FR"]);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  // 有的浏览器（比如一些 WebView）没有 navigator.languages：退回 navigator.language，不能在 effect 里抛错。
+  test("没有 navigator.languages：按 navigator.language 判断", () => {
+    vi.spyOn(navigator, "language", "get").mockReturnValue("ja-JP");
+    renderPage("/", undefined);
+
+    expect(screen.getByRole("status").getAttribute("lang")).toBe("ja");
   });
 
   test("'不用了'：提示关掉，记在 localStorage 里，下次打开页面不再提示", async () => {

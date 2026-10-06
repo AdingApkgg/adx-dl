@@ -9,9 +9,10 @@ import { CheckIcon, LanguagesIcon } from "lucide-react";
 import { useLocation } from "react-router";
 
 import { m } from "@/paraglide/messages.js";
-import { deLocalizeHref, getLocale, type Locale, locales, localizeHref } from "@/paraglide/runtime.js";
+import { getLocale, type Locale, locales } from "@/paraglide/runtime.js";
 import { htmlLang } from "@/shared/i18n/locale";
 
+import { localeHref } from "../lib/locale-href";
 import { dismissLocalePrompt } from "../lib/locale-suggestion";
 
 const LANGUAGE_NAMES: Record<Locale, () => string> = {
@@ -26,8 +27,7 @@ export function languageName(locale: Locale): string {
 
 /** 同一个页面在三种语言下的地址（spec 第 7.2 节：切换后留在同一个页面，查询串照带）。 */
 export function languageLinks(pathAndSearch: string): { locale: Locale; href: string }[] {
-  const base = deLocalizeHref(pathAndSearch);
-  return locales.map((locale) => ({ locale, href: localizeHref(base, { locale }) }));
+  return locales.map((locale) => ({ locale, href: localeHref(pathAndSearch, locale) }));
 }
 
 // 页头的语言切换。用普通链接整页跳转（spec 第 11.1 节）：站内路由切换时，没有重新渲染的组件会停在旧语言。

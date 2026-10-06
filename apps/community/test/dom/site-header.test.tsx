@@ -115,5 +115,12 @@ describe("页头的语言切换", () => {
       [m.language_ja(), "/ja/u/abc2345678?tab=2", "ja"],
     ]);
     expect(items.map((item) => item.getAttribute("aria-current"))).toEqual([null, "true", null]);
+    expect(items.map((item) => item.getAttribute("lang"))).toEqual(["zh-CN", "en", "ja"]);
+    // 普通的 <a>，整页跳转（spec 第 11.1 节）：React Router 的 Link 会带 data-discover。
+    expect(items.map((item) => [item.tagName, item.hasAttribute("data-discover")])).toEqual([
+      ["A", false],
+      ["A", false],
+      ["A", false],
+    ]);
   });
 });

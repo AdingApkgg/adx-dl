@@ -4,9 +4,9 @@ import { data, Outlet, redirect, useRouteLoaderData } from "react-router";
 import { baseLocale, isLocale } from "@/paraglide/runtime.js";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
-import { getBrowserApi, getBrowserQueryClient } from "../lib/browser";
 import { ErrorCard } from "../components/error-card";
 import { SiteShell } from "../components/site-shell";
+import { getBrowserApi, getBrowserQueryClient } from "../lib/browser";
 import { pendingDeletionRedirect } from "../lib/pending-deletion";
 import { meQuery } from "../queries/me";
 import type { Route } from "./+types/locale";

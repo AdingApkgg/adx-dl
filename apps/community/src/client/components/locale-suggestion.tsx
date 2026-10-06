@@ -3,9 +3,10 @@ import { useEffect, useState } from "react";
 import { useLocation } from "react-router";
 
 import { m } from "@/paraglide/messages.js";
-import { deLocalizeHref, getLocale, type Locale, localizeHref } from "@/paraglide/runtime.js";
+import { getLocale, type Locale } from "@/paraglide/runtime.js";
 import { htmlLang } from "@/shared/i18n/locale";
 
+import { localeHref } from "../lib/locale-href";
 import { dismissLocalePrompt, localePromptDismissed, suggestedLocale } from "../lib/locale-suggestion";
 
 // 浏览器语言和当前页面的语言不一致时，在页头下面提示切换（spec 第 7.2 节）。只在浏览器里、页面加载完以后判断：
@@ -16,14 +17,16 @@ export function LocaleSuggestion() {
   const [target, setTarget] = useState<Locale | null>(null);
 
   useEffect(() => {
-    setTarget(suggestedLocale({ languages: navigator.languages, current: getLocale(), dismissed: localePromptDismissed() }));
+    // 有的浏览器（比如一些 WebView）没有 navigator.languages：退回 navigator.language，空值去掉。
+    const languages = (navigator.languages ?? [navigator.language]).filter(Boolean);
+    setTarget(suggestedLocale({ languages, current: getLocale(), dismissed: localePromptDismissed() }));
   }, []);
 
   if (target === null) {
     return null;
   }
   const lang = htmlLang(target);
-  const href = localizeHref(deLocalizeHref(`${location.pathname}${location.search}`), { locale: target });
+  const href = localeHref(`${location.pathname}${location.search}`, target);
   return (
     <div role="status" lang={lang} className="border-b bg-muted/60">
       <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2 text-sm">

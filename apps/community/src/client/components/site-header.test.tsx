@@ -83,7 +83,7 @@ describe("页头的服务端渲染", () => {
   });
 
   test("没登录、已经在登录页上：不再显示'登录'按钮", async () => {
-    for (const path of ["/login?next=%2F", "/en/login"]) {
+    for (const path of ["/login?next=%2F", "/en/login", "/login/", "/en/login/"]) {
       expect(links(await renderHeader(path, null)), path).toHaveLength(1);
     }
   });
