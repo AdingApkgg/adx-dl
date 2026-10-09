@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { HTTPException } from "hono/http-exception";
 
 import { GitHubRequestError } from "./client";
-import { statusFor } from "./status";
+import { statusFor, withGitHubErrors } from "./status";
 
 describe("statusFor", () => {
   test("404/409/422 原样透传", () => {
@@ -32,5 +33,37 @@ describe("statusFor", () => {
     expect(statusFor(new Error("boom"))).toBe(502);
     expect(statusFor("not even an error")).toBe(502);
     expect(statusFor(undefined)).toBe(502);
+  });
+});
+
+describe("withGitHubErrors", () => {
+  test("HTTPException 原样放行——它已经是一个成形的响应", async () => {
+    // 内容路由要在 withGitHubErrors 的包裹范围内抛两种已经拼好的响应：
+    // 400「校验未通过」（带 errors 数组）和 409 冲突（带 step 与
+    // conflictPaths）。再过一次 statusFor，它们会因为不是
+    // GitHubRequestError 而被压成裸 502，body 里那些字段一个都留不下。
+    const thrown = new HTTPException(400, {
+      res: Response.json({ error: "校验未通过", errors: ["a: bad"] }, { status: 400 }),
+    });
+    const error = await withGitHubErrors(async () => {
+      throw thrown;
+    }).catch((e: unknown) => e);
+
+    expect(error).toBe(thrown);
+    const res = (error as HTTPException).getResponse();
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "校验未通过", errors: ["a: bad"] });
+  });
+
+  test("其余错误照旧按 statusFor 收敛成 HTTPException", async () => {
+    // 上面那条早退不能顺手把「收敛」这件事一起短路掉——这条守的就是它。
+    const error = await withGitHubErrors(async () => {
+      throw new GitHubRequestError("run not found", 404);
+    }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(HTTPException);
+    const res = (error as HTTPException).getResponse();
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "run not found" });
   });
 });

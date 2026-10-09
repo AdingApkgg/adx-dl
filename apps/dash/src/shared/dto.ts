@@ -91,3 +91,41 @@ export type FailedStepLog = {
   /** 日志尾部，最多 200 行。 */
   lines: string[];
 };
+
+/** 一次读取到的内容文件：正文加它当前的 blob sha（乐观锁的第一层用它）。 */
+export type ContentFileBlob = {
+  path: string;
+  text: string;
+  sha: string;
+};
+
+/** GET /api/content 返回的清单条目。 */
+export type ContentFileMeta = {
+  key: string;
+  path: string;
+  title: string;
+  module: string;
+};
+
+/** GET /api/content/:key 的响应。 */
+export type ContentFileResponse = {
+  key: string;
+  path: string;
+  title: string;
+  /** 解析好的 JSON。形状由 content-schema 的注册表决定。 */
+  data: unknown;
+  /** 客户端原样带回 POST /api/content/commit。 */
+  sha: string;
+};
+
+/** POST /api/content/commit 的请求体。 */
+export type ContentCommitRequest = {
+  message: string;
+  files: { key: string; data: unknown; baseSha: string }[];
+};
+
+/** POST /api/content/commit 成功时的响应（外面还包一层 accepted: true）。 */
+export type ContentCommitResult = {
+  commitSha: string;
+  commitUrl: string;
+};

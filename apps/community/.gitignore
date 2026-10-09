@@ -1,0 +1,3 @@
+# Local deployment revision and temporary files used for atomic updates
+.deploy-revision
+.deploy-revision.*

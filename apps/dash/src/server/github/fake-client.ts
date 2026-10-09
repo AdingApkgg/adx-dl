@@ -9,8 +9,11 @@ import type {
 } from "@/shared/dto";
 
 import {
+  GitDataStepError,
   GitHubRequestError,
   type ActionsClient,
+  type CommitFilesInput,
+  type ContentClient,
   type GitHubClient,
   type RepoClient,
 } from "./client";
@@ -37,13 +40,22 @@ export type ActionsSeed = {
   failureLogs: Record<number, FailedStepLog>;
 };
 
+export type ContentSeed = {
+  /** 路径 → 正文。sha 由下面的 shaOf 算，测试不用自己编。 */
+  files: Record<string, string>;
+  /** 设为非 null 时 commitFiles 抛这个错，用来测路由的错误分支。 */
+  commitError: Error | null;
+  /** 记录每次 commitFiles 的入参，供断言。 */
+  commits: CommitFilesInput[];
+};
+
 /**
- * 两个领域种子的合并——`createFakeGitHubClient` 的种子形状，跟拆分之前的
- * `FakeSeed` 逐字段一致（只是现在由 RepoSeed/ActionsSeed 拼出来），已有
- * 测试传的 `Partial<FakeSeed>`（比如只给 `{ runs: [...] }` 或
+ * 几个领域种子的合并——`createFakeGitHubClient` 的种子形状，跟拆分之前的
+ * `FakeSeed` 逐字段一致（只是现在由 RepoSeed/ActionsSeed/ContentSeed 拼
+ * 出来），已有测试传的 `Partial<FakeSeed>`（比如只给 `{ runs: [...] }` 或
  * `{ repoError: ... }`）不需要跟着改。
  */
-export type FakeSeed = RepoSeed & ActionsSeed;
+export type FakeSeed = RepoSeed & ActionsSeed & ContentSeed;
 
 // 工厂函数而不是模块级常量：`dispatched`/`rerun`/`cancelled` 会被写操作的假
 // 实现 push 进去，如果 defaultSeed 是个单例对象，`{ ...defaultSeed, ...seed }`
@@ -140,8 +152,32 @@ function createDefaultActionsSeed(): ActionsSeed {
   };
 }
 
+/**
+ * 内容领域的默认种子。路径取的是 content-schema 注册表里真实的那三个文件
+ * （不是编出来的路径），正文是形状正确的空清单——路由测试要覆盖的是「读到
+ * 什么、提交了什么」，不是这些 JSON 的业务内容。
+ *
+ * 同样是工厂不是常量：`files` 会被 commitFiles 就地改写、`commits` 会被
+ * push，共享一个模块级对象会让一个测试的提交污染下一个测试读到的内容。
+ */
+function createDefaultContentSeed(): ContentSeed {
+  return {
+    files: {
+      "apps/web/content/community.json": '{\n  "contactChannels": [],\n  "communityChannels": []\n}\n',
+      "apps/web/content/donate.json": '{\n  "methods": []\n}\n',
+      "apps/web/content/friend-links.json": '{\n  "links": []\n}\n',
+    },
+    commitError: null,
+    commits: [],
+  };
+}
+
 function createDefaultSeed(): FakeSeed {
-  return { ...createDefaultRepoSeed(), ...createDefaultActionsSeed() };
+  return {
+    ...createDefaultRepoSeed(),
+    ...createDefaultActionsSeed(),
+    ...createDefaultContentSeed(),
+  };
 }
 
 /** 建一份闭包 `state` 的 RepoClient 方法集合——不带 `seed`，给下面几个 create* 复用。 */
@@ -197,6 +233,60 @@ function actionsMethods(state: ActionsSeed): ActionsClient {
 }
 
 /**
+ * 内存假实现里的 sha：正文的一个确定性摘要（FNV-1a）。真假不重要，稳定才
+ * 重要——「读到的 sha」和「提交时带回来的 baseSha」必须能对上，才测得了
+ * 第一层锁。
+ *
+ * 手写而不是用 `Bun.hash`：这个 app 刻意不装 `@types/bun`（见
+ * bun-test.d.ts 顶部的说明——它的全局声明会跟客户端要的 DOM lib 打架），
+ * 所以 `Bun` 这个全局在 `tsc --noEmit` 眼里根本不存在。
+ */
+function shaOf(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `sha-${hash.toString(16)}`;
+}
+
+/**
+ * 建一份闭包 `state` 的 ContentClient 方法集合。
+ *
+ * 假实现**也实现了第一层锁**（逐文件比对 blob sha）——路由测试里「冲突 →
+ * 409」那条路径必须能在不打网络的前提下走通，所以这里抛的也是真的
+ * `GitDataStepError`，带着同样的 step/status/conflictPaths。
+ */
+function contentMethods(state: ContentSeed): ContentClient {
+  return {
+    async getContentFile(path) {
+      const text = state.files[path];
+      if (text === undefined) throw new GitHubRequestError(`${path} 不存在`, 404);
+      return { path, text, sha: shaOf(text) };
+    },
+
+    async commitFiles(input) {
+      if (state.commitError) throw state.commitError;
+      const conflicts = input.files
+        .filter((file) => shaOf(state.files[file.path] ?? "") !== file.baseSha)
+        .map((file) => file.path);
+      if (conflicts.length > 0) {
+        throw new GitDataStepError(
+          "verify-blob",
+          `仓库里这些文件已被改过：${conflicts.join("、")}`,
+          409,
+          conflicts
+        );
+      }
+      state.commits.push(input);
+      for (const file of input.files) state.files[file.path] = file.content;
+      const commitSha = `commit-${state.commits.length}`;
+      return { commitSha, commitUrl: `https://github.com/fake/fake/commit/${commitSha}` };
+    },
+  };
+}
+
+/**
  * 只覆盖仓库元数据领域的假实现——给只依赖 `RepoClient` 的消费方（目前是
  * `routes/me.ts`）用，不用连带种 Actions 那一堆 workflow/run/job 数据。
  */
@@ -212,8 +302,7 @@ export function createFakeRepoClient(seed: Partial<RepoSeed> = {}): RepoClient &
 /**
  * 只覆盖 GitHub Actions 领域的假实现——给只依赖 `ActionsClient`（或它的
  * 子集，比如 run-poller.ts 的 `Pick<ActionsClient, "listRuns">`）的消费方
- * 用。以后内容编辑阶段加 Git Data API 时，照这个样子在旁边加一个
- * `createFakeContentClient`，同样不用连带种 Repo/Actions 的数据。
+ * 用。内容编辑领域按同样的样子加在下面（`createFakeContentClient`）。
  */
 export function createFakeActionsClient(
   seed: Partial<ActionsSeed> = {}
@@ -227,7 +316,22 @@ export function createFakeActionsClient(
 }
 
 /**
- * 全部能力的假实现——组合上面两个领域的方法集合，共用同一份 `state`
+ * 只覆盖内容编辑领域的假实现——给只依赖 `ContentClient` 的消费方（内容路由）
+ * 用，不用连带种 Repo/Actions 的数据。
+ */
+export function createFakeContentClient(
+  seed: Partial<ContentSeed> = {}
+): ContentClient & { seed: ContentSeed } {
+  const state: ContentSeed = { ...createDefaultContentSeed(), ...seed };
+  const client: ContentClient & { seed: ContentSeed } = {
+    seed: state,
+    ...contentMethods(state),
+  };
+  return client;
+}
+
+/**
+ * 全部能力的假实现——组合上面几个领域的方法集合，共用同一份 `state`
  * （不是分别建两份再合并：`repoMethods`/`actionsMethods` 闭包的必须是
  * 同一个对象引用，否则测试改 `client.seed.runs` 之后，`listRuns` 读到的
  * 还是另一份没被改过的状态）。给需要横跨两个领域的消费方用——目前是
@@ -241,6 +345,7 @@ export function createFakeGitHubClient(seed: Partial<FakeSeed> = {}) {
     seed: state,
     ...repoMethods(state),
     ...actionsMethods(state),
+    ...contentMethods(state),
   };
 
   return client;

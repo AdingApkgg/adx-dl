@@ -6,6 +6,7 @@ import { HTTPException } from "hono/http-exception";
 import type { GitHubClient } from "./github/client";
 import { accessJwt, type AccessConfig, type AccessVariables } from "./middleware/access-jwt";
 import { registerActionsRoutes } from "./routes/actions";
+import { registerContentRoutes } from "./routes/content";
 import { registerEventsRoute, type EventsPoller } from "./routes/events";
 import { registerMeRoute } from "./routes/me";
 
@@ -78,9 +79,32 @@ export function createApp(deps: AppDeps) {
   // 不受影响，不需要额外白名单。
   app.use("*", csrf({ origin: deps.dashPublicOrigin }));
 
+  // 找 F-1：hono/csrf 只在 content-type 是表单那三类
+  // （x-www-form-urlencoded / multipart/form-data / text/plain）**或者缺省**
+  // 时才检查，带 JSON body 的写端点（/api/content/commit、带 ref 的
+  // dispatch）因此被整个跳过——上面那段关于「不能假设 SameSite 挡得住」的
+  // 论证对它们并不成立，而 /api/content/commit 是这个后台唯一一条往 main
+  // 写的路径。这里补一道不看 content-type 的 Origin 校验兜住它们。
+  //
+  // 为什么是叠一层而不是换掉 hono/csrf：它对「没有 Origin 头的表单提交」
+  // 那类情形的处理比这里细，留着没坏处；这一层只负责补上它按 content-type
+  // 放过的那部分。
+  //
+  // 要求 Origin 严格等于 DASH_PUBLIC_ORIGIN、缺失也拒：浏览器对所有 POST
+  // 都会带 Origin，而生产环境里 rerun/cancel 走 hono/csrf 的同一比较已经
+  // 跑通过（见 2026-09-22 的真实冒烟），说明 Origin 能完整穿过 cloudflared。
+  const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+  app.use("*", async (c, next) => {
+    if (UNSAFE_METHODS.has(c.req.method) && c.req.header("origin") !== deps.dashPublicOrigin) {
+      return c.json({ error: "跨站请求被拒绝" }, 403);
+    }
+    await next();
+  });
+
   registerMeRoute(app, { github: deps.github });
   registerActionsRoutes(app, { github: deps.github });
   registerEventsRoute(app, { poller: deps.poller });
+  registerContentRoutes(app, { github: deps.github });
 
   // /api 下的未命中显式收口成 JSON 404。放在 SPA fallback 之前，
   // 否则下面的 * 会把它们当成前端路由，回一份 index.html。

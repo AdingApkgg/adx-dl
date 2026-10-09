@@ -83,6 +83,13 @@ export async function withGitHubErrors<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (error) {
+    // 已经是 HTTPException 的原样抛出去。它带着调用方定好的状态码与完整
+    // body（内容路由的 400「校验未通过」里的 errors、409 冲突里的 step 与
+    // conflictPaths）；再过一次 toHttpException，statusFor 会因为它不是
+    // GitHubRequestError 而把它压成 502，那些字段一个都留不下——实测连
+    // `error` 都是空串（`{"error":""}`），因为只带 res 构造的 HTTPException
+    // 自身的 message 就是空的。
+    if (error instanceof HTTPException) throw error;
     throw toHttpException(error);
   }
 }

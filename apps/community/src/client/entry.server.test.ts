@@ -13,7 +13,7 @@ function capture() {
 
 function contextWith(requestId: string): RouterContextProvider {
   const context = new RouterContextProvider();
-  context.set(requestMetaContext, { requestId, nonce: undefined, origin: "https://community.test" });
+  context.set(requestMetaContext, { requestId, nonce: undefined, origin: "https://community.test", umamiWebsiteId: null });
   return context;
 }
 

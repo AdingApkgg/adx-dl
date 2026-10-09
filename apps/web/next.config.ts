@@ -21,9 +21,8 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  // The vendored chart engine and the shared UI package (@astrodx/ui) ship raw
-  // TypeScript (no build step), so Next must transpile them like first-party source.
-  transpilePackages: ["@lxns-network/maimai-chart-engine", "@astrodx/ui"],
+  // These workspace packages ship raw TypeScript and share the app build.
+  transpilePackages: ["@lxns-network/maimai-chart-engine", "@astrodx/ui", "@astrodx/content-schema"],
   turbopack: {
     root: rootDir,
   },

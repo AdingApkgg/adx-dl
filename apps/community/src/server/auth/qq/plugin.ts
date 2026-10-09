@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { describeError } from "@/shared/describe-error";
 import type { Logger } from "@/shared/log";
+import { TURNSTILE_ACTIONS } from "@/shared/turnstile-actions";
 
 import { ACCOUNT_ERROR_CODES } from "../account-rules";
 import { isRecentLogin } from "../recent-login";
@@ -56,7 +57,11 @@ export function qqLogin(deps: QqLoginDeps) {
         },
         async (ctx) => {
           const { qq, turnstileToken, locale } = ctx.body;
-          const verdict = await deps.verifyTurnstile(turnstileToken, turnstileRemoteIp(ctx.request));
+          const verdict = await deps.verifyTurnstile(
+            turnstileToken,
+            turnstileRemoteIp(ctx.request),
+            TURNSTILE_ACTIONS.qqSendCode
+          );
           if (verdict === "unavailable") {
             throw APIError.from("SERVICE_UNAVAILABLE", QQ_ERROR_CODES.QQ_CAPTCHA_UNAVAILABLE);
           }

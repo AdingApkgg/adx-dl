@@ -15,6 +15,7 @@
       "apps/web/**",
       "apps/dash/**",
       "apps/community/**",
+      "packages/content-schema/**",
       "packages/ui/**",
       "packages/tsconfig/**",
       "!apps/web/public",

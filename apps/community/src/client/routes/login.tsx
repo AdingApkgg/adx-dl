@@ -11,6 +11,7 @@ import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
 import { NICKNAME_MAX, normalizeNickname } from "@/shared/nickname";
 import { apiContext, queryClientContext } from "@/shared/router-context";
+import { TURNSTILE_ACTIONS } from "@/shared/turnstile-actions";
 
 import { PageTitle } from "../components/page-title";
 import { QqCodeForm } from "../components/qq-code-form";
@@ -18,7 +19,7 @@ import { authClient } from "../lib/auth-client";
 import { errorCodeOf, errorMessage } from "../lib/auth-errors";
 import { getRenderApi } from "../lib/browser";
 import { safeNextPath } from "../lib/next-path";
-import { loginHref, onboardingHref } from "../lib/require-user";
+import { googleRedirects, signedInHref } from "../lib/require-user";
 import { canonicalLink, localeAlternates, originFrom } from "../lib/seo";
 import { useTurnstile } from "../lib/turnstile";
 import { loginOptionsQuery } from "../queries/login-options";
@@ -72,8 +73,17 @@ function LoginContent() {
   const reauth = params.get("reauth") === "1";
   const callbackError = params.get("error");
   const callbackMessage = callbackError ? errorMessage(callbackError) : null;
-  // 登录成功一律整页跳转：服务端渲染要带着新会话重新取数据。新用户先去首次登录引导页，看完再回 next。
-  const go = useCallback((isNewUser: boolean) => window.location.assign(isNewUser ? onboardingHref(next) : next), [next]);
+  // 登录成功一律整页跳转：服务端渲染要带着新会话重新取数据。新用户先去首次登录引导页，看完再回 next；
+  // 地址的 # 后面带着登录方式，新页面加载后上报统计的 login 事件（lib/analytics.ts）。
+  const goAfterQq = useCallback(
+    ({ isNewUser }: { isNewUser: boolean }) => window.location.assign(signedInHref(next, "qq", isNewUser)),
+    [next]
+  );
+  // 要用 useCallback：它是自动填充那个 effect 的依赖，每次渲染换一个会让 effect 反复重新挂起。
+  const goAfterPasskey = useCallback(
+    (isNewUser: boolean) => window.location.assign(signedInHref(next, "passkey", isNewUser)),
+    [next]
+  );
 
   if (!options) {
     return null;
@@ -105,7 +115,7 @@ function LoginContent() {
               siteKey={options.turnstileSiteKey}
               intent="login"
               webauthnAutofill
-              onVerified={({ isNewUser }) => go(isNewUser)}
+              onVerified={goAfterQq}
             />
           </CardContent>
         ) : null}
@@ -115,7 +125,7 @@ function LoginContent() {
         siteKey={options.turnstileSiteKey}
         signedIn={Boolean(me)}
         autofill={options.qq.available}
-        onSignedIn={go}
+        onSignedIn={goAfterPasskey}
       />
     </main>
   );
@@ -129,14 +139,7 @@ function GoogleSignIn({ next, reauth }: { next: string; reauth: boolean }) {
     setPending(true);
     setError(null);
     // 整页跳到 Google；回来时 Better Auth 按新老用户跳到不同的地址，出错时回到本页，并在地址后面接上 &error=。
-    // 出错回来的地址要带着 next 和 reauth：否则用户再登录会落到首页而不是原来要去的页面；"重新登录"的用户已登录，
-    // 少了 reauth=1，loader 会直接把他跳走，错误提示也就看不到了。
-    const res = await authClient.signIn.social({
-      provider: "google",
-      callbackURL: next,
-      newUserCallbackURL: onboardingHref(next),
-      errorCallbackURL: loginHref(next, reauth ? { reauth: "1" } : {}),
-    });
+    const res = await authClient.signIn.social({ provider: "google", ...googleRedirects(next, reauth) });
     if (res.error) {
       setPending(false);
       setError(errorMessage(res.error));
@@ -297,7 +300,7 @@ type PasskeySignUpProps = {
 
 // 单独成一个组件，只在没登录时挂载：useTurnstile 只在挂载时渲染 widget，它要和放 widget 的容器一起出现。
 function PasskeySignUp({ siteKey, pending, setPending, setError, onSignedIn, rearm }: PasskeySignUpProps) {
-  const turnstile = useTurnstile(siteKey);
+  const turnstile = useTurnstile(siteKey, TURNSTILE_ACTIONS.passkeySignUp);
   const [nickname, setNickname] = useState("");
   const nicknameId = useId();
 

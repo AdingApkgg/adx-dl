@@ -101,6 +101,14 @@ jobs:
         working-directory: apps/community
         run: bun run test:http
 
+      # 生产的 compose 文件只在 g510 上用。拿 .env.example 把空着的项填上占位值，确认它解析得了、它要的变量
+      # .env.example 里都有（缺了会报 required variable … is missing a value）。
+      - name: Validate the production compose file
+        working-directory: apps/community
+        run: |
+          sed -E 's/^([A-Z0-9_]+)=$/\1=ci-placeholder/' .env.example > "$RUNNER_TEMP/compose.env"
+          docker compose --env-file "$RUNNER_TEMP/compose.env" -f compose.yaml config --quiet
+
       # 构建只在部署时才跑，构建坏了就要到部署时才发现（dash 踩过的坑）。
       - name: Docker build
         run: docker build -f apps/community/Dockerfile -t community:ci .

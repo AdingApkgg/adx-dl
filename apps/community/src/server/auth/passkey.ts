@@ -3,6 +3,7 @@ import { APIError } from "better-auth";
 import { z } from "zod";
 
 import { normalizeNickname } from "@/shared/nickname";
+import { TURNSTILE_ACTIONS } from "@/shared/turnstile-actions";
 
 import { ACCOUNT_ERROR_CODES } from "./account-rules";
 import { type TurnstileVerifier, turnstileRemoteIp } from "./turnstile";
@@ -47,7 +48,11 @@ export function passkeyPlugin(deps: PasskeyDeps) {
           throw APIError.from("BAD_REQUEST", ACCOUNT_ERROR_CODES.SIGNUP_INVALID);
         }
         // 发给 Turnstile 的是 Cloudflare 给的原始访客 IP，不用 getIP：它把 IPv6 截成 /64（给限流用的）。
-        const verdict = await deps.verifyTurnstile(input.data.turnstileToken, turnstileRemoteIp(ctx.request));
+        const verdict = await deps.verifyTurnstile(
+          input.data.turnstileToken,
+          turnstileRemoteIp(ctx.request),
+          TURNSTILE_ACTIONS.passkeySignUp
+        );
         if (verdict === "unavailable") {
           throw APIError.from("SERVICE_UNAVAILABLE", ACCOUNT_ERROR_CODES.SIGNUP_CAPTCHA_UNAVAILABLE);
         }

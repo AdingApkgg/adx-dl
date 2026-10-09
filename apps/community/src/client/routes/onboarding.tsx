@@ -17,6 +17,7 @@ import { PageTitle, textLinkClass } from "../components/page-title";
 import { ProfileFields } from "../components/profile-fields";
 import { isReauthError } from "../components/qq-code-form";
 import { accountErrorRedirect } from "../lib/account-errors";
+import { trackEvent } from "../lib/analytics";
 import { authClient } from "../lib/auth-client";
 import { errorMessage } from "../lib/auth-errors";
 import { getBrowserApi, getRenderApi } from "../lib/browser";
@@ -80,6 +81,8 @@ function OnboardingContent() {
     setFailure(null);
     try {
       await okJson(await getBrowserApi().api.v1.me.profile.$patch({ json: { ...update, onboarded: true } }));
+      // 统计（spec 第 11.6 节）。tracker 的上报用 keepalive，紧接着整页跳走也会发出去。
+      trackEvent("onboarding_done");
       window.location.assign(next);
     } catch (error) {
       fail(error);

@@ -54,6 +54,7 @@
       "name": "dash",
       "version": "0.1.0",
       "dependencies": {
+        "@astrodx/content-schema": "workspace:*",
         "@react-router/node": "8.4.0",
         "hono": "^4.13.9",
         "isbot": "^5.2.2",
@@ -76,6 +77,7 @@
       "name": "web",
       "version": "0.1.0",
       "dependencies": {
+        "@astrodx/content-schema": "workspace:*",
         "@astrodx/ui": "workspace:*",
         "@lxns-network/maimai-chart-engine": "workspace:*",
         "fflate": "^0.8.3",
@@ -104,6 +106,10 @@
         "tailwindcss": "^4.3.3",
         "typescript": "7.0.2",
       },
+    },
+    "packages/content-schema": {
+      "name": "@astrodx/content-schema",
+      "version": "0.0.0",
     },
     "packages/maimai-chart-engine": {
       "name": "@lxns-network/maimai-chart-engine",
@@ -156,6 +162,8 @@
   },
   "packages": {
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "", {}, "sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw=="],
+
+    "@astrodx/content-schema": ["@astrodx/content-schema@workspace:packages/content-schema"],
 
     "@astrodx/tsconfig": ["@astrodx/tsconfig@workspace:packages/tsconfig"],
 

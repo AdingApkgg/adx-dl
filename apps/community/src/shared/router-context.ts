@@ -9,6 +9,8 @@ export type RequestMeta = {
   nonce: string | undefined;
   /** 站点对外地址（PUBLIC_ORIGIN），拼 canonical 和 hreflang 用。 */
   origin: string;
+  /** Umami 网站 ID（UMAMI_WEBSITE_ID）；没开统计时是 null，页面里不放统计脚本。 */
+  umamiWebsiteId: string | null;
 };
 
 // 服务端入口的 getLoadContext 负责给这三个上下文赋值，每个请求一份。

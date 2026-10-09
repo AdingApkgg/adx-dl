@@ -22,6 +22,14 @@ describe("页面", () => {
     expect(await res.text()).toContain('<html lang="zh-CN"');
   });
 
+  // 网站 ID 要等 Umami 后台建好网站才有。没设的时候页面里没有统计脚本，/_s/* 是 404，站点照常运行。
+  test("没开统计：页面里没有统计脚本，/_s/script.js 是 404", async () => {
+    const html = await (await fetch(server.url("/"))).text();
+
+    expect(html).not.toContain("/_s/script.js");
+    expect((await fetch(server.url("/_s/script.js"))).status).toBe(404);
+  });
+
   // 漏掉 nonce 的内联脚本会被 CSP 拦下，页面在生产环境就 hydrate 不起来，而开发环境
   // 只报告不拦截，看不出来。
   test("每个内联脚本都带着本次响应 CSP 里的 nonce", async () => {
@@ -94,10 +102,17 @@ describe("页面", () => {
     expect(ja).toContain("AstroDX コミュニティ");
   });
 
-  test("/zh 前缀 301 到不带前缀的地址", async () => {
+  test("/zh 前缀 301 到不带前缀的地址，不缓存", async () => {
     const res = await fetch(server.url("/zh/foo?x=1"), { redirect: "manual" });
     expect(res.status).toBe(301);
     expect(res.headers.get("location")).toBe("/foo?x=1");
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  test("/robots.txt 是纯文本，不是 404 页", async () => {
+    const res = await fetch(server.url("/robots.txt"));
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("Disallow: /api/");
   });
 
   // Cloudflare 原样转发路径，//evil.com 这样的 Location 会把访客带到别的站。
@@ -173,5 +188,10 @@ describe("接口和健康检查", () => {
     const res = await fetch(server.url("/readyz"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, checks: { db: "ok", redis: "ok", jobs: "ok" } });
+  });
+
+  test("/readyz 不回答经 Cloudflare 来的请求", async () => {
+    const res = await fetch(server.url("/readyz"), { headers: { "cf-connecting-ip": "203.0.113.7" } });
+    expect(res.status).toBe(404);
   });
 });

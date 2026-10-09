@@ -24,6 +24,9 @@ export default function Overview({ loaderData }: Route.ComponentProps) {
       <p>
         <Link to="/actions">查看 Actions →</Link>
       </p>
+      <p>
+        <Link to="/content">编辑站内文案 →</Link>
+      </p>
     </main>
   );
 }

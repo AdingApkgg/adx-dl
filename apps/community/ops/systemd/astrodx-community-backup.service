@@ -1,0 +1,12 @@
+# 社区站的每日备份（spec 第 12.5 节），由同名的 .timer 触发。装法见 apps/community/README.md 的"备份"：
+# 把 @COMMUNITY_DIR@ 换成 g510 上 apps/community 的绝对路径，再复制到 /etc/systemd/system/。
+[Unit]
+Description=AstroDX community: back up the databases with restic
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+# compose 从这里找 compose.yaml 和 .env。
+WorkingDirectory=@COMMUNITY_DIR@
+ExecStart=/usr/bin/docker compose run --rm -T backup

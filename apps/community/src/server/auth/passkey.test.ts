@@ -92,11 +92,11 @@ describe("只用通行密钥注册", () => {
   });
 
   // Better Auth 自己的 getIP 会把 IPv6 截成 /64（给限流用的），那样发给 Cloudflare 的就不是访客的真实地址了。
-  test("人机验证收到的是访客的原始 IP：IPv6 不截成 /64", async () => {
-    const seen: (string | null)[] = [];
+  test("人机验证收到的是访客的原始 IP（IPv6 不截成 /64），用途是通行密钥注册", async () => {
+    const seen: string[] = [];
     const app = newApp({
-      turnstile: async (token, remoteIp) => {
-        seen.push(remoteIp);
+      turnstile: async (token, remoteIp, action) => {
+        seen.push(`${remoteIp} ${action}`);
         return token === "pass" ? "ok" : "failed";
       },
     });
@@ -105,7 +105,7 @@ describe("只用通行密钥注册", () => {
     const res = await signUp(browser, new SoftAuthenticator(TEST_PUBLIC_ORIGIN, RP_ID), uniqueNickname());
 
     expect(res.status).toBe(200);
-    expect(seen).toEqual(["2001:db8:1:2:3:4:5:6"]);
+    expect(seen).toEqual(["2001:db8:1:2:3:4:5:6 passkey-sign-up"]);
   }, 30_000);
 
   // 站点前面挂着 HTTP Basic 认证时（比如预发环境），浏览器每个请求都带 Authorization: Basic。它不是我们的
