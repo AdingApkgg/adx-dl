@@ -215,3 +215,172 @@ button:disabled {
     white-space: nowrap;
   }
 }
+
+/* 发布横幅：滚动时常驻顶部，好让操作员编辑到一半也能随时看到待发布计数、
+   点发布。背景直接铺 --dash-bg（跟页面背景同色，不是新配色），盖住底下
+   滚过的表单内容；边框复用 --dash-line。文字用的是默认的 body 颜色
+   （--dash-fg on --dash-bg），跟页面其余部分同一种、早已在用的配对，
+   不是这次新增的文字/底色组合，所以不需要往 color-contrast.test.ts 补
+   断言。 */
+.dash-staging {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0 0 1.5rem;
+  padding: 0.8rem 1rem;
+  background: var(--dash-bg);
+  border: 1px solid var(--dash-line);
+  border-radius: 0.5rem;
+}
+
+.dash-staging label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.9rem;
+  max-width: 28rem;
+}
+
+.dash-staging label span {
+  color: var(--dash-muted);
+  font-size: 0.8rem;
+}
+
+.dash-staging input {
+  font: inherit;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 0.4rem;
+  background: var(--dash-bg);
+  color: var(--dash-fg);
+}
+
+.dash-staging ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.dash-staging li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.dash-content-list {
+  list-style: none;
+  margin: 1.5rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.dash-content-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 0.4rem;
+}
+
+.dash-content-list code {
+  color: var(--dash-muted);
+  font-size: 0.85rem;
+}
+
+.dash-array {
+  margin: 1.5rem 0;
+  padding: 0.2rem 1rem 1rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 0.5rem;
+}
+
+.dash-array legend {
+  padding: 0 0.4rem;
+  color: var(--dash-muted);
+  font-size: 0.85rem;
+}
+
+/* 一条 links 数组条目：LinkEntryFields 渲染的表单字段，加旁边的
+   上移/下移/删除按钮（content.$key.tsx 渲染）。行本身（.dash-entry-row）
+   才是 .dash-array 的直接子元素、背负分隔线——.dash-entry 只管字段自己的
+   排版，不然 LinkEntryFields 被套进这层包装之后，:last-of-type 会按
+   包装 div 的兄弟关系重新计算，每一条都会变成"唯一的子元素"从而各自
+   判定为 last-of-type，分隔线就会全部消失，而不是只在最后一条消失。 */
+.dash-entry-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--dash-line);
+}
+
+.dash-entry-row:last-of-type {
+  border-bottom: none;
+}
+
+.dash-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.dash-entry-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dash-entry-locales {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.dash-entry-locales legend {
+  padding: 0;
+  color: var(--dash-muted);
+  font-size: 0.8rem;
+}
+
+.dash-entry-locales label,
+.dash-entry-url {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.9rem;
+  min-width: 10rem;
+}
+
+.dash-entry-locales label span,
+.dash-entry-url span {
+  color: var(--dash-muted);
+  font-size: 0.8rem;
+}
+
+.dash-entry-locales input,
+.dash-entry-locales textarea,
+.dash-entry-url input {
+  font: inherit;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--dash-line);
+  border-radius: 0.4rem;
+  background: var(--dash-bg);
+  color: var(--dash-fg);
+}
+
+/* 文字色直接复用 --dash-bad，铺在页面默认背景 --dash-bg 之上——跟
+   color-contrast.test.ts 里「text directly on page bg」那组已经测过的
+   配对（.dash-pill--bad / .dash-failure h2）完全同一种组合，没有引入
+   新的文字/底色配对，所以不需要再往那个套件补断言。 */
+.dash-field-error {
+  margin: 0;
+  color: var(--dash-bad);
+  font-size: 0.85rem;
+}

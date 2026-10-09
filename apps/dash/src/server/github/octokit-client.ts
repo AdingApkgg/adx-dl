@@ -10,8 +10,11 @@ import type {
 } from "@/shared/dto";
 
 import {
+  GitDataStepError,
   GitHubRequestError,
   type ActionsClient,
+  type ContentClient,
+  type GitDataStep,
   type GitHubClient,
   type RepoClient,
 } from "./client";
@@ -101,6 +104,11 @@ type Octokit = InstanceType<typeof OctokitCtor>;
 
 /** 把 octokit 抛出来的任意错误收敛成我们自己的错误类型。 */
 function toRequestError(error: unknown): GitHubRequestError {
+  // 已经是我们自己的错误类型就原样返回。重新包一次会把子类降级成基类——
+  // GitDataStepError 的 step / conflictPaths 正是路由要用来分辨「创建 blob
+  // 失败」和「更新 ref 失败」这两种处境完全不同的情况的，丢了它们，界面上
+  // 这两件事会长得一模一样。
+  if (error instanceof GitHubRequestError) return error;
   if (error && typeof error === "object" && "status" in error) {
     const status = (error as { status?: unknown }).status;
     const message = error instanceof Error ? error.message : String(error);
@@ -431,8 +439,196 @@ export function createOctokitGitHubClient(
     };
   }
 
+  /**
+   * 内容文件的读写。
+   *
+   * 并发保护是两层，缺一不可（spec §10.2 的 2026-09-22 修正）：
+   *
+   * 1. **逐文件比对 blob sha**（下面的 verify-blob 步）。Git Data API 这条路上
+   *    createTree/createCommit **都不校验任何 sha**，所以「这个文件被别人改过」
+   *    这件事只能我们自己查。查不出来的后果是静默覆盖别人的改动。
+   * 2. **updateRef 的 force: false**。管的是第 1 步通过之后、提交之前那几百毫秒里
+   *    main 又动了的情况。GitHub 对非快进回 422，这里翻成 409——对调用方来说它
+   *    就是一次冲突，不是一个参数错误。
+   *
+   * commit 的 parent 用的是**这一轮重读到的 HEAD**，不是客户端打开页面时的那个：
+   * 既然第 1 步已经确认这些文件在该 HEAD 上没变，就地接上去是安全的，而且省掉一次
+   * 「别人改了别的文件」导致的无谓失败。
+   */
+  function createContentMethods(): ContentClient {
+    const repo = { owner: config.owner, repo: config.repo };
+
+    async function step<T>(
+      name: GitDataStep,
+      run: () => Promise<T>,
+      conflictPaths: string[] = []
+    ): Promise<T> {
+      try {
+        return await run();
+      } catch (error) {
+        // 已经带着步骤信息的就别再包一层——内层抛的 409 会被外层重新贴上
+        // 错误的 step。
+        if (error instanceof GitDataStepError) throw error;
+        const requestError = toRequestError(error);
+        throw new GitDataStepError(name, requestError.message, requestError.status, conflictPaths);
+      }
+    }
+
+    return {
+      async getContentFile(path) {
+        return withOctokit(async (kit) => {
+          const res = await kit.rest.repos.getContent({
+            ...repo,
+            path,
+            request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+          });
+          // getContent 对目录回数组、对 submodule/symlink 回别的 type。只有
+          // type === "file" 才有 content/sha 可用；别的形状必须显式报错，
+          // 否则会变成「读到一个空文件」然后被原样提交上去。
+          //
+          // encoding !== "base64" 覆盖的是 1MB–100MB 那一档：GitHub 照样
+          // 回 type: "file"，但 content 是空串、encoding 是 "none"。不判这
+          // 一下的话，Buffer.from("", "base64") 解出空串，而调用方会把这个
+          // 空串当成文件的真实内容——下一次提交就把文件清空了。
+          if (Array.isArray(res.data) || res.data.type !== "file" || res.data.encoding !== "base64") {
+            throw new GitHubRequestError(`${path} 不是一个可直接读取的文件`, 422);
+          }
+          return {
+            path,
+            text: Buffer.from(res.data.content, "base64").toString("utf-8"),
+            sha: res.data.sha,
+          };
+        });
+      },
+
+      async commitFiles({ branch, message, files }) {
+        return withOctokit(async (kit) => {
+          const ref = `heads/${branch}`;
+
+          const headSha = await step("read-head", async () => {
+            const res = await kit.rest.git.getRef({
+              ...repo,
+              ref,
+              request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+            });
+            return res.data.object.sha;
+          });
+
+          const baseTreeSha = await step("read-base-commit", async () => {
+            const res = await kit.rest.git.getCommit({
+              ...repo,
+              commit_sha: headSha,
+              request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+            });
+            return res.data.tree.sha;
+          });
+
+          // 第一层锁。一次把所有文件都查完再判断，好让错误消息能一次点名全部
+          // 冲突文件——逐个查、查到第一个就抛，操作员得重试 N 次才知道全貌。
+          const conflicts: string[] = [];
+          for (const file of files) {
+            const current = await step("verify-blob", async () => {
+              try {
+                const res = await kit.rest.repos.getContent({
+                  ...repo,
+                  path: file.path,
+                  ref: headSha,
+                  request: { signal: timeoutSignal(READ_TIMEOUT_MS) },
+                });
+                if (Array.isArray(res.data) || res.data.type !== "file") return null;
+                return res.data.sha;
+              } catch (error) {
+                // 文件被删了也是一种冲突，不是一次内部错误。
+                if (toRequestError(error).status === 404) return null;
+                throw error;
+              }
+            });
+            if (current !== file.baseSha) conflicts.push(file.path);
+          }
+          if (conflicts.length > 0) {
+            throw new GitDataStepError(
+              "verify-blob",
+              `仓库里这些文件已被改过：${conflicts.join("、")}`,
+              409,
+              conflicts
+            );
+          }
+
+          const blobs = await step("create-blob", () =>
+            Promise.all(
+              files.map(async (file) => {
+                // encoding: "utf-8" 让 GitHub 自己做 base64，省掉我们这边一次
+                // 编码——也就少一个能把中日文正文弄坏的地方。
+                const res = await kit.rest.git.createBlob({
+                  ...repo,
+                  content: file.content,
+                  encoding: "utf-8",
+                  request: { signal: timeoutSignal(WRITE_TIMEOUT_MS) },
+                });
+                return { path: file.path, sha: res.data.sha };
+              })
+            )
+          );
+
+          const treeSha = await step("create-tree", async () => {
+            const res = await kit.rest.git.createTree({
+              ...repo,
+              request: { signal: timeoutSignal(WRITE_TIMEOUT_MS) },
+              // base_tree 必须是 tree 对象的 sha。传 commit sha 不会报错，但会
+              // 得到一棵只含我们这几个文件的树——等于把仓库其余文件全删了。
+              base_tree: baseTreeSha,
+              tree: blobs.map((blob) => ({
+                path: blob.path,
+                mode: "100644" as const,
+                type: "blob" as const,
+                sha: blob.sha,
+              })),
+            });
+            return res.data.sha;
+          });
+
+          const commitSha = await step("create-commit", async () => {
+            const res = await kit.rest.git.createCommit({
+              ...repo,
+              message,
+              tree: treeSha,
+              parents: [headSha],
+              request: { signal: timeoutSignal(WRITE_TIMEOUT_MS) },
+            });
+            return res.data.sha;
+          });
+
+          await step("update-ref", async () => {
+            try {
+              await kit.rest.git.updateRef({
+                ...repo,
+                ref,
+                sha: commitSha,
+                force: false,
+                request: { signal: timeoutSignal(WRITE_TIMEOUT_MS) },
+              });
+            } catch (error) {
+              // 422 在这一步实际上只有一个来源：非快进。sha 是我们刚拿到的，
+              // ref 是拼出来的，参数不可能是坏的。翻成 409 让上层按「冲突」处理。
+              if (toRequestError(error).status === 422) {
+                throw new GitDataStepError("update-ref", "仓库已更新，请重新加载后再发布", 409);
+              }
+              throw error;
+            }
+          });
+
+          return {
+            commitSha,
+            commitUrl: `https://github.com/${repo.owner}/${repo.repo}/commit/${commitSha}`,
+          };
+        });
+      },
+    };
+  }
+
   return {
     ...createRepoMethods(),
     ...createActionsMethods(),
+    ...createContentMethods(),
   };
 }

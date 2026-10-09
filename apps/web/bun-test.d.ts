@@ -79,8 +79,20 @@ declare module "bun:test" {
     module: (specifier: string, factory: () => Record<string, unknown>) => void;
   }
 
+  interface TestFn {
+    (name: string, fn: () => void | Promise<void>): void;
+    /**
+     * Runs the same body once per table entry, substituting `%s`/`%d`/etc. in
+     * the name with that entry. Only the flat-array form is declared here
+     * (`test.each(list)(name, (item) => ...)`) — the tuple/row form that
+     * spreads each entry into multiple callback params is not used anywhere
+     * in this codebase yet, so it is left out rather than typed speculatively.
+     */
+    each: <T>(table: readonly T[]) => (name: string, fn: (arg: T) => void | Promise<void>) => void;
+  }
+
   export const describe: (name: string, fn: () => void | Promise<void>) => void;
-  export const test: (name: string, fn: () => void | Promise<void>) => void;
+  export const test: TestFn;
   export const expect: BunExpect;
   export const mock: BunMock;
 
