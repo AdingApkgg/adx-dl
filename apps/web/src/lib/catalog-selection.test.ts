@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   CATALOG_SELECTION_STORAGE_KEY,
+  invertCatalogSelection,
   parseCatalogSelection,
   readCatalogSelection,
   writeCatalogSelection,
@@ -25,6 +26,29 @@ function fakeStorage(initial: Record<string, string> = {}) {
 const known = new Set(["a", "b", "c"]);
 
 describe("catalog-selection", () => {
+  test("反选所有筛选结果，保留范围外的选择，不修改原集合", () => {
+    const selected = new Set(["a", "outside"]);
+    expect(invertCatalogSelection(selected, ["a", "b", "c"])).toEqual(
+      new Set(["outside", "b", "c"])
+    );
+    expect(selected).toEqual(new Set(["a", "outside"]));
+  });
+
+  test("反选包含其他分页的结果，再次反选恢复原选择", () => {
+    const resultIds = Array.from({ length: 30 }, (_, index) => `chart-${index}`);
+    const selected = new Set(["chart-0", "outside"]);
+    const inverted = invertCatalogSelection(selected, resultIds);
+    expect(inverted.has("chart-29")).toBe(true);
+    expect(inverted.size).toBe(30);
+    expect(invertCatalogSelection(inverted, resultIds)).toEqual(selected);
+  });
+
+  test("空选反选为全选，全选反选为空，空结果保留已有选择", () => {
+    expect(invertCatalogSelection(new Set(), ["a", "b"])).toEqual(new Set(["a", "b"]));
+    expect(invertCatalogSelection(new Set(["a", "b"]), ["a", "b"])).toEqual(new Set());
+    expect(invertCatalogSelection(new Set(["outside"]), [])).toEqual(new Set(["outside"]));
+  });
+
   test("丢弃当前目录里已经不存在的 id（跨部署的陈旧选择）", () => {
     expect(parseCatalogSelection({ ids: ["a", "gone", "c"] }, known)).toEqual(["a", "c"]);
   });

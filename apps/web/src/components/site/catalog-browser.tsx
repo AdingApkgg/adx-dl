@@ -65,9 +65,11 @@ import {
 } from "@/lib/catalog-shared";
 import {
   catalogSelectionStorage,
+  invertCatalogSelection,
   readCatalogSelection,
   writeCatalogSelection,
 } from "@/lib/catalog-selection";
+import { attachMouseDragScroll } from "@/lib/drag-scroll";
 import {
   CATALOG_SORT_IDS,
   type CatalogSortId,
@@ -276,6 +278,10 @@ export function CatalogBrowser({
   const [currentPage, setCurrentPage] = React.useState(1);
   const [selectMode, setSelectMode] = React.useState(false);
   const [selectedIds, setSelectedIds] = React.useState<ReadonlySet<string>>(new Set());
+  const [selectionUndo, setSelectionUndo] = React.useState<{
+    previous: ReadonlySet<string>;
+    applied: ReadonlySet<string>;
+  } | null>(null);
   // URL params are read once after mount; writes are suppressed until then so
   // the landing params aren't clobbered by the initial default state.
   const [urlReady, setUrlReady] = React.useState(false);
@@ -952,6 +958,18 @@ export function CatalogBrowser({
       return next;
     });
 
+  const invertFilteredSelection = () => {
+    const next = invertCatalogSelection(selectedIds, orderedEntries.map((entry) => entry.id));
+    setSelectionUndo({ previous: selectedIds, applied: next });
+    setSelectedIds(next);
+  };
+  // Later manual selections replace the set, invalidating this one-step undo.
+  const canUndoInversion = selectionUndo !== null && selectionUndo.applied === selectedIds;
+  const selectedFilteredCount = orderedEntries.reduce(
+    (count, entry) => count + (selectedIds.has(entry.id) ? 1 : 0),
+    0
+  );
+
   const clearSelection = () => setSelectedIds(new Set());
 
   const exitSelectMode = () => {
@@ -1626,9 +1644,33 @@ export function CatalogBrowser({
             {selectMode ? dictionary.exitSelectMode : dictionary.selectMode}
           </Button>
           {selectMode ? (
-            <Button type="button" variant="outline" size="sm" onClick={selectAllFiltered}>
-              {dictionary.selectAllFiltered(orderedEntries.length)}
-            </Button>
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={selectAllFiltered}>
+                {dictionary.selectAllFiltered(orderedEntries.length)}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={orderedEntries.length === 0}
+                onClick={invertFilteredSelection}
+              >
+                {dictionary.invertSelection}
+              </Button>
+              {canUndoInversion ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedIds(selectionUndo.previous);
+                    setSelectionUndo(null);
+                  }}
+                >
+                  {dictionary.undoInversion}
+                </Button>
+              ) : null}
+            </>
           ) : null}
           {/* The batch manifest loads lazily on entering select mode. */}
           {specsPending ? (
@@ -1651,6 +1693,7 @@ export function CatalogBrowser({
             template={dictionary.resultsSummary(visibleEntries.length)}
           />
           {totalPages > 1 ? ` · ${dictionary.pageLabel(safeCurrentPage, totalPages)}` : null}
+          {selectMode ? ` · ${dictionary.selectedFilteredCount(selectedFilteredCount, orderedEntries.length)}` : null}
         </p>
       </div>
 
@@ -1812,7 +1855,7 @@ export function CatalogBrowser({
 }
 
 // A labeled row of filter chips (one dimension). Chips never wrap — the group
-// scrolls horizontally (swipe on touch, trackpad/shift-wheel on desktop) so a
+// scrolls horizontally (swipe on touch, left drag/trackpad on desktop) so a
 // long dimension like version stays a single compact line. Scrollbar hidden.
 // A motion row so the advanced panel's open stagger cascades through it (the
 // variants are inherited from the panel — no own animate prop).
@@ -1821,6 +1864,11 @@ function ChipFilterRow({ label, children }: { label: string; children: React.Rea
   // hears six identical "全部, toggle button" rows with nothing saying which
   // dimension each belongs to.
   const labelId = React.useId();
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const element = scrollRef.current;
+    if (element) return attachMouseDragScroll(element);
+  }, []);
   return (
     <motion.div
       variants={filterRowVariants}
@@ -1836,7 +1884,10 @@ function ChipFilterRow({ label, children }: { label: string; children: React.Rea
       </span>
       {/* overflow-x also clips overflow-y, so pad vertically (and a touch right)
           to give the selected chip's ring room instead of shearing its edge. */}
-      <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto py-1.5 pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={scrollRef}
+        className="flex min-w-0 flex-1 gap-2 overflow-x-auto py-1.5 pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&_button:not(:disabled)]:cursor-[inherit]"
+      >
         {children}
       </div>
     </motion.div>

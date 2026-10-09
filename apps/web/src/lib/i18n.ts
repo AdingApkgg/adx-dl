@@ -258,6 +258,9 @@ export type SiteDictionary = {
     exitSelectMode: string;
     selectAll: string;
     selectAllFiltered: (count: number) => string;
+    invertSelection: string;
+    undoInversion: string;
+    selectedFilteredCount: (selected: number, total: number) => string;
     selectAllVersions: (count: number) => string;
     clearSelection: string;
     selectedCount: (count: number) => string;
@@ -1008,6 +1011,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       exitSelectMode: "退出多选",
       selectAll: "全选当前结果",
       selectAllFiltered: (count) => `全选 ${count} 首结果`,
+      invertSelection: "反选当前结果",
+      undoInversion: "撤销反选",
+      selectedFilteredCount: (selected, total) => `当前结果已选 ${selected} / ${total} 首`,
       selectAllVersions: (count) => `全选 ${count} 个版本`,
       clearSelection: "清空",
       selectedCount: (count) => `已选 ${count} 首`,
@@ -1747,6 +1753,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       exitSelectMode: "Done",
       selectAll: "Select all results",
       selectAllFiltered: (count) => (count === 1 ? "Select 1 result" : `Select ${count} results`),
+      invertSelection: "Invert current results",
+      undoInversion: "Undo inversion",
+      selectedFilteredCount: (selected, total) => `${selected} / ${total} results selected`,
       selectAllVersions: (count) =>
         count === 1 ? "Select 1 version" : `Select ${count} versions`,
       clearSelection: "Clear",
@@ -2510,6 +2519,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       exitSelectMode: "選択終了",
       selectAll: "現在の結果を全選択",
       selectAllFiltered: (count) => `${count} 件の結果を全選択`,
+      invertSelection: "現在の結果を反転選択",
+      undoInversion: "反転選択を元に戻す",
+      selectedFilteredCount: (selected, total) => `現在の結果 ${total} 件中 ${selected} 件選択中`,
       selectAllVersions: (count) => `${count} バージョンを全選択`,
       clearSelection: "クリア",
       selectedCount: (count) => `${count} 曲選択中`,

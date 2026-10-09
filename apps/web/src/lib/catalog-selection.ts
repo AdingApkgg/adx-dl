@@ -10,6 +10,19 @@
  */
 export const CATALOG_SELECTION_STORAGE_KEY = "astrodx-catalog-selection-v1";
 
+/** Flip only the filtered results, preserving selections outside that scope. */
+export function invertCatalogSelection(
+  selected: ReadonlySet<string>,
+  resultIds: readonly string[]
+): Set<string> {
+  const next = new Set(selected);
+  for (const id of resultIds) {
+    if (selected.has(id)) next.delete(id);
+    else next.add(id);
+  }
+  return next;
+}
+
 /**
  * Upper bound on a restored selection. The whole catalog is a legitimate
  * selection (~1900 ids), so this is only a guard against a corrupted or
