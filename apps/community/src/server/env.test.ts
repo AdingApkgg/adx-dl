@@ -17,6 +17,8 @@ const complete = {
   QQ_CODE_HMAC_KEY: SECRET,
 };
 
+const WEBSITE_ID = "11111111-2222-4333-8444-555555555555";
+
 const napcat = {
   QQ_SENDER: "napcat",
   NAPCAT_HTTP_URL: "http://napcat:3000",
@@ -43,6 +45,7 @@ describe("parseEnv", () => {
       turnstile: { siteKey: "site-key", secretKey: "turnstile-secret" },
       qqCodeHmacKey: SECRET,
       qq: { sender: "console" },
+      umami: null,
     });
   });
 
@@ -141,5 +144,33 @@ describe("parseEnv", () => {
   test("生产环境不能用控制台发送器", () => {
     expect(() => parseEnv({ ...complete, NODE_ENV: "production" })).toThrow(/QQ_SENDER/);
     expect(parseEnv({ ...complete, ...napcat, NODE_ENV: "production" }).qq.sender).toBe("napcat");
+  });
+
+  // 网站 ID 要等 Umami 后台建好网站才有：没设的时候统计整个关着（不放脚本，/_s/* 返回 404），站点照常运行。
+  test("设了 UMAMI_WEBSITE_ID 才开统计；内部地址末尾的斜杠会被去掉", () => {
+    expect(
+      parseEnv({ ...complete, UMAMI_WEBSITE_ID: WEBSITE_ID, UMAMI_INTERNAL_URL: "http://umami:3000/" }).umami
+    ).toEqual({ websiteId: WEBSITE_ID, internalUrl: "http://umami:3000" });
+    // compose 总是给出内部地址；网站 ID 还空着时统计照样关着。
+    expect(parseEnv({ ...complete, UMAMI_INTERNAL_URL: "http://umami:3000", UMAMI_WEBSITE_ID: "" }).umami).toBeNull();
+  });
+
+  test("设了 UMAMI_WEBSITE_ID 却没有内部地址时报错", () => {
+    expect(() => parseEnv({ ...complete, UMAMI_WEBSITE_ID: WEBSITE_ID })).toThrow(/UMAMI_INTERNAL_URL 未设置/);
+  });
+
+  test("网站 ID 不是 UUID、内部地址不是 http(s) 时报错", () => {
+    const umami = { UMAMI_WEBSITE_ID: WEBSITE_ID, UMAMI_INTERNAL_URL: "http://umami:3000" };
+    expect(() => parseEnv({ ...complete, ...umami, UMAMI_WEBSITE_ID: "my-site" })).toThrow(/UMAMI_WEBSITE_ID/);
+    expect(() => parseEnv({ ...complete, ...umami, UMAMI_INTERNAL_URL: "umami:3000" })).toThrow(/UMAMI_INTERNAL_URL/);
+  });
+
+  // Bun 的 fetch 直接读 HTTPS_PROXY（访问 Google 用）。写错了 Google 登录会全部失败，所以启动时就检查格式；
+  // 空着等于不用代理。
+  test("HTTPS_PROXY 可以不设；设了就必须是 http(s)://主机:端口", () => {
+    expect(() => parseEnv({ ...complete, HTTPS_PROXY: "" })).not.toThrow();
+    expect(() => parseEnv({ ...complete, HTTPS_PROXY: "http://host.docker.internal:20171" })).not.toThrow();
+    expect(() => parseEnv({ ...complete, HTTPS_PROXY: "host.docker.internal:20171" })).toThrow(/HTTPS_PROXY/);
+    expect(() => parseEnv({ ...complete, HTTPS_PROXY: "http://proxy:8080/path" })).toThrow(/HTTPS_PROXY/);
   });
 });

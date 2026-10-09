@@ -4,6 +4,9 @@ export type QqEnv =
   | { sender: "console" }
   | { sender: "napcat"; httpUrl: string; wsUrl: string; accessToken: string; botQq: string };
 
+/** Umami 统计（spec 第 11.6 节）。internalUrl 是容器网络里的地址，/_s/* 转发到这里，不带末尾的斜杠。 */
+export type UmamiEnv = { websiteId: string; internalUrl: string };
+
 export type CommunityEnv = {
   nodeEnv: "development" | "production" | "test";
   port: number;
@@ -19,6 +22,8 @@ export type CommunityEnv = {
   /** QQ 验证码只以 HMAC(这把密钥, …) 的形式存进 Redis（spec 第 10.3 节）。 */
   qqCodeHmacKey: string;
   qq: QqEnv;
+  /** 没设 UMAMI_WEBSITE_ID 时是 null：不放统计脚本，/_s/* 返回 404。 */
+  umami: UmamiEnv | null;
 };
 
 const REQUIRED = [
@@ -36,6 +41,10 @@ const REQUIRED = [
 
 // 机器人相关的四项只在 QQ_SENDER=napcat 时必填：本机开发用控制台发送器，用不到机器人。
 const NAPCAT_REQUIRED = ["NAPCAT_HTTP_URL", "NAPCAT_WS_URL", "NAPCAT_ACCESS_TOKEN", "NAPCAT_BOT_QQ"] as const;
+
+// 网站 ID 要等在 Umami 后台建好网站才有（上线手册）。它就是统计的开关：设了才要求内部地址，和上面 NapCat 的四项一样。
+// compose 总是给出 UMAMI_INTERNAL_URL，所以只看网站 ID。
+const UMAMI_REQUIRED = ["UMAMI_INTERNAL_URL"] as const;
 
 // NapCat 的访问令牌留空等于关掉它的鉴权，所以和密钥一样要求长度。
 const secretKey = z.string().min(32, "至少要 32 个字符（可以用 openssl rand -base64 32 生成）");
@@ -62,6 +71,13 @@ const schema = z.object({
   NAPCAT_WS_URL: z.string().regex(/^wss?:\/\//, "必须以 ws:// 或 wss:// 开头").optional(),
   NAPCAT_ACCESS_TOKEN: secretKey.optional(),
   NAPCAT_BOT_QQ: z.string().regex(/^[1-9]\d{4,10}$/, "必须是 5 到 11 位数字，不以 0 开头").optional(),
+  UMAMI_WEBSITE_ID: z.uuid({ error: "必须是 Umami 后台里网站的 ID（UUID）" }).optional(),
+  UMAMI_INTERNAL_URL: z.string().regex(/^https?:\/\//, "必须以 http:// 或 https:// 开头").optional(),
+  // Bun 的 fetch 自己读这个变量（服务端访问 Google 走代理），这里只检查格式：写错了 Google 登录会全部失败。
+  HTTPS_PROXY: z
+    .string()
+    .regex(/^https?:\/\/[^/\s]+\/?$/, "必须是 http://主机:端口 这样的代理地址，不带路径")
+    .optional(),
 });
 
 type ParsedEnv = z.infer<typeof schema>;
@@ -83,6 +99,17 @@ function normalize(value: string | undefined): string | undefined {
   const quoted =
     (trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"));
   return quoted ? trimmed.slice(1, -1) : trimmed;
+}
+
+function umamiEnv(env: ParsedEnv): UmamiEnv | null {
+  if (!env.UMAMI_WEBSITE_ID) {
+    return null;
+  }
+  // parseEnv 已经检查过内部地址；这里再判断一次是为了让类型收窄。
+  if (!env.UMAMI_INTERNAL_URL) {
+    throw new Error("UMAMI_INTERNAL_URL should have been checked by parseEnv");
+  }
+  return { websiteId: env.UMAMI_WEBSITE_ID, internalUrl: env.UMAMI_INTERNAL_URL.replace(/\/+$/, "") };
 }
 
 function qqEnv(env: ParsedEnv): QqEnv {
@@ -113,6 +140,13 @@ export function parseEnv(source: Record<string, string | undefined>): CommunityE
       }
     }
   }
+  if (read("UMAMI_WEBSITE_ID")) {
+    for (const key of UMAMI_REQUIRED) {
+      if (!read(key)) {
+        problems.push(`${key} 未设置（设了 UMAMI_WEBSITE_ID 时必填）`);
+      }
+    }
+  }
 
   const result = schema.safeParse({
     NODE_ENV: read("NODE_ENV"),
@@ -132,6 +166,9 @@ export function parseEnv(source: Record<string, string | undefined>): CommunityE
     NAPCAT_WS_URL: read("NAPCAT_WS_URL"),
     NAPCAT_ACCESS_TOKEN: read("NAPCAT_ACCESS_TOKEN"),
     NAPCAT_BOT_QQ: read("NAPCAT_BOT_QQ"),
+    UMAMI_WEBSITE_ID: read("UMAMI_WEBSITE_ID"),
+    UMAMI_INTERNAL_URL: read("UMAMI_INTERNAL_URL"),
+    HTTPS_PROXY: read("HTTPS_PROXY"),
   });
 
   if (!result.success) {
@@ -167,5 +204,6 @@ export function parseEnv(source: Record<string, string | undefined>): CommunityE
     turnstile: { siteKey: env.TURNSTILE_SITE_KEY, secretKey: env.TURNSTILE_SECRET_KEY },
     qqCodeHmacKey: env.QQ_CODE_HMAC_KEY,
     qq: qqEnv(env),
+    umami: umamiEnv(env),
   };
 }

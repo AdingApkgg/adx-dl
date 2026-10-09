@@ -6,6 +6,7 @@ import { type FormEvent, useId, useState } from "react";
 
 import { m } from "@/paraglide/messages.js";
 import { getLocale } from "@/paraglide/runtime.js";
+import { TURNSTILE_ACTIONS } from "@/shared/turnstile-actions";
 
 import { authClient } from "../lib/auth-client";
 import { errorCodeOf, errorMessage } from "../lib/auth-errors";
@@ -31,7 +32,7 @@ export function isReauthError(error: unknown): boolean {
 
 // spec 第 10.3 节的 QQ 流程：输入 QQ 号、过人机验证、发码，再填验证码。
 export function QqCodeForm({ siteKey, intent, webauthnAutofill = false, reauthHref, onVerified }: QqCodeFormProps) {
-  const turnstile = useTurnstile(siteKey);
+  const turnstile = useTurnstile(siteKey, TURNSTILE_ACTIONS.qqSendCode);
   const [qq, setQq] = useState("");
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);

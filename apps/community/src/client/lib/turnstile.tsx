@@ -1,9 +1,12 @@
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 
 import { getLocale } from "@/paraglide/runtime.js";
+import type { TurnstileAction } from "@/shared/turnstile-actions";
 
 type TurnstileRenderOptions = {
   sitekey: string;
+  /** 这次的用途，服务端核对 siteverify 带回的 action（src/shared/turnstile-actions.ts）。 */
+  action: TurnstileAction;
   language?: string;
   callback: (token: string) => void;
   "expired-callback": () => void;
@@ -58,7 +61,7 @@ export type Turnstile = {
   failed: boolean;
 };
 
-export function useTurnstile(siteKey: string): Turnstile {
+export function useTurnstile(siteKey: string, action: TurnstileAction): Turnstile {
   const ref = useRef<HTMLDivElement | null>(null);
   const widgetId = useRef<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -74,6 +77,7 @@ export function useTurnstile(siteKey: string): Turnstile {
         try {
           widgetId.current = api.render(ref.current, {
             sitekey: siteKey,
+            action,
             language: LANGUAGES[getLocale()],
             callback: (value) => {
               setToken(value);
@@ -105,7 +109,7 @@ export function useTurnstile(siteKey: string): Turnstile {
         widgetId.current = null;
       }
     };
-  }, [siteKey]);
+  }, [siteKey, action]);
 
   const reset = useCallback(() => {
     setToken(null);

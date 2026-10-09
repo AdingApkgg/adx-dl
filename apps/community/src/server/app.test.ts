@@ -3,7 +3,8 @@ import { DrizzleQueryError } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 
 import { createApp } from "./app";
-import { createMemoryRateLimitStore } from "./middleware/rate-limit";
+import { createInProcessApi } from "./in-process-api";
+import { createMemoryRateLimitStore, type RateLimitStore } from "./middleware/rate-limit";
 import { TEST_PUBLIC_ORIGIN, testAppDeps } from "./testing/app-deps";
 import { createTestAuth } from "./testing/auth";
 
@@ -104,6 +105,37 @@ describe("createApp", () => {
     expect(res.headers.getSetCookie()).toEqual(["adxc.session_token=second; Max-Age=2592000; Path=/", "other=1; Path=/"]);
   });
 
+  // 页面上的跳转（未登录去登录页、待注销的去注销提示页、/zh 去掉前缀……）是 React Router 的 loader 和中间件抛出来的，
+  // 不经过 entry.server.tsx，原来没有 Cache-Control；它们常带着续期的会话 Cookie。这里照样在 createApp 之后挂"页面"。
+  test("跳转一律 private, no-store；自己设了 Cache-Control 的不动；Set-Cookie 原样带着", async () => {
+    const app = createApp(testAppDeps().deps);
+    app.get("/test-redirect", (c) => {
+      c.set("inProcessSetCookies", ["adxc.session_token=renewed; Max-Age=2592000; Path=/"]);
+      return c.redirect("/login?next=%2Fsettings", 302);
+    });
+    app.get("/test-moved", () => new Response(null, { status: 301, headers: { location: "/foo" } }));
+    app.get(
+      "/test-cached-redirect",
+      () => new Response(null, { status: 302, headers: { location: "/x", "cache-control": "public, max-age=60" } })
+    );
+
+    const redirect = await app.request("/test-redirect");
+    expect(redirect.status).toBe(302);
+    expect(redirect.headers.get("cache-control")).toBe("private, no-store");
+    expect(redirect.headers.getSetCookie()).toEqual(["adxc.session_token=renewed; Max-Age=2592000; Path=/"]);
+    expect((await app.request("/test-moved")).headers.get("cache-control")).toBe("private, no-store");
+    expect((await app.request("/test-cached-redirect")).headers.get("cache-control")).toBe("public, max-age=60");
+  });
+
+  test("/robots.txt：允许收录页面，挡住接口和统计转发", async () => {
+    const res = await createApp(testAppDeps().deps).request("/robots.txt");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("text/plain; charset=UTF-8");
+    expect(res.headers.get("cache-control")).toBe("public, max-age=86400");
+    expect(await res.text()).toBe("User-agent: *\nDisallow: /api/\nDisallow: /_s/\n");
+  });
+
   test("安全响应头已经挂上", async () => {
     const res = await createApp(testAppDeps().deps).request("/healthz");
     expect(res.headers.get("content-security-policy")).toContain("'nonce-");
@@ -136,6 +168,27 @@ describe("createApp", () => {
     });
   });
 
+  // /readyz 列出依赖的名字和状态，只给本机的探针看（deploy.sh、健康检查）。经 Cloudflare 隧道来的请求一定带
+  // CF-Connecting-IP（Cloudflare 自己加，访客去不掉），本机的探针不带（1a 评审遗留 #9）。
+  test("/readyz 只回答本机的探针：带 CF-Connecting-IP 的一律 404，也不跑检查", async () => {
+    let ran = 0;
+    const { deps } = testAppDeps({
+      checks: {
+        db: async () => {
+          ran += 1;
+        },
+      },
+    });
+    const app = createApp(deps);
+
+    const outside = await app.request("/readyz", { headers: { "cf-connecting-ip": "203.0.113.7" } });
+    expect(outside.status).toBe(404);
+    expect(await outside.json()).toEqual({ error: { code: "NOT_FOUND", message: "Not found" } });
+    expect(ran).toBe(0);
+    expect((await app.request("/readyz")).status).toBe(200);
+    expect(ran).toBe(1);
+  });
+
   test("/readyz 的失败原因同样不带查询参数", async () => {
     const { deps, logs } = testAppDeps({
       checks: {
@@ -166,6 +219,38 @@ describe("createApp", () => {
     // 别的 IP 不受影响；页面和健康检查不走这条规则。
     expect((await app.request("/api/anything", { headers: { "cf-connecting-ip": "198.51.100.2" } })).status).toBe(404);
     expect((await app.request("/healthz", { headers })).status).toBe(200);
+  });
+
+  // 服务端渲染时 loader 经进程内 API 调 /api/v1（in-process-api.ts），一次页面请求要调好几个接口。这些调用要是也按访客的
+  // IP 计数，同一个 IP 后面的很多人（运营商的 CGNAT、学校、公司）刷几下页面，页面就因为接口 429 渲染出错。
+  test("进程内请求（服务端渲染时 loader 调接口）不占 /api 按 IP 的额度", async () => {
+    const { deps } = testAppDeps({ rateLimitStore: createMemoryRateLimitStore() });
+    const app = createApp(deps);
+    const ip = "198.51.100.3";
+    for (let i = 0; i < 300; i++) {
+      await app.request("/api/anything", { headers: { "cf-connecting-ip": ip } });
+    }
+    expect((await app.request("/api/v1/meta", { headers: { "cf-connecting-ip": ip } })).status).toBe(429);
+
+    const page = new Request(`${TEST_PUBLIC_ORIGIN}/`, { headers: { "cf-connecting-ip": ip } });
+    const api = createInProcessApi(app, page, { origin: TEST_PUBLIC_ORIGIN, requestId: "r1", clientIp: ip }, () => {});
+    expect((await api.api.v1.meta.$get()).status).toBe(200);
+  });
+
+  // Redis 整段宕掉时，每个请求都会在限流这一步出错一次：照原样记，日志会被同一行刷满（1a 评审 R14）。
+  test("限流的计数存储出错：照常放行，rate_limit_store_error 一分钟最多记一条", async () => {
+    const broken: RateLimitStore = {
+      hit: async () => {
+        throw new Error("Connection closed");
+      },
+    };
+    const { deps, logs } = testAppDeps({ rateLimitStore: broken });
+    const app = createApp(deps);
+
+    for (let i = 0; i < 5; i++) {
+      expect((await app.request("/api/v1/meta")).status).toBe(200);
+    }
+    expect(logs().filter((entry) => entry.event === "rate_limit_store_error")).toHaveLength(1);
   });
 
   test("GET /api/v1/meta", async () => {

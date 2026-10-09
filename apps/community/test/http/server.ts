@@ -1,6 +1,8 @@
 import { fileURLToPath } from "node:url";
 
-import { testDatabaseUrl, testRedisUrl } from "../../src/server/testing/services";
+import { RedisClient } from "bun";
+
+import { httpTestRedisUrl, testDatabaseUrl } from "../../src/server/testing/services";
 import { prepareTestQueues } from "../../src/server/testing/test-boss";
 
 export type RunningServer = {
@@ -15,10 +17,16 @@ const appRoot = fileURLToPath(new URL("../..", import.meta.url));
 export const HTTP_TEST_AUTH_SECRET = "http-test-secret-http-test-secret-0123456789";
 
 // 启动 bun run build 的产物。必须在 apps/community 下启动：静态资源的路径相对于当前目录。
-export async function startBuiltServer(): Promise<RunningServer> {
+// extraEnv 盖在默认的环境变量上（比如开统计的那组）。
+export async function startBuiltServer(extraEnv: Record<string, string> = {}): Promise<RunningServer> {
   // 页面会读会话，表必须已经建好；pg-boss 的表和队列也要在（/readyz 查它们，注销要投递任务），
   // 和部署时先跑 db:migrate 一样。单独跑 test:http 时也不依赖先跑过 bun run check。
   await prepareTestQueues();
+  // 1 号库只给 test:http 用（httpTestRedisUrl 的注释）。每次启动前清空：上一轮留下的限流计数、机器人状态不带进来。
+  const redis = new RedisClient(httpTestRedisUrl());
+  await redis.connect();
+  await redis.send("FLUSHDB", []);
+  redis.close();
 
   const port = 40_000 + Math.floor(Math.random() * 10_000);
   const origin = `http://127.0.0.1:${port}`;
@@ -31,7 +39,7 @@ export async function startBuiltServer(): Promise<RunningServer> {
       HOST: "127.0.0.1",
       PUBLIC_ORIGIN: origin,
       DATABASE_URL: testDatabaseUrl(),
-      REDIS_URL: testRedisUrl(),
+      REDIS_URL: httpTestRedisUrl(),
       BETTER_AUTH_SECRET: HTTP_TEST_AUTH_SECRET,
       GOOGLE_CLIENT_ID: "http-test-google-client",
       GOOGLE_CLIENT_SECRET: "http-test-google-secret",
@@ -45,6 +53,7 @@ export async function startBuiltServer(): Promise<RunningServer> {
       NAPCAT_WS_URL: "ws://127.0.0.1:9",
       NAPCAT_ACCESS_TOKEN: "http-test-napcat-token-0123456789abcdef",
       NAPCAT_BOT_QQ: "10001",
+      ...extraEnv,
     },
     stdout: "inherit",
     stderr: "inherit",

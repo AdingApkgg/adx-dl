@@ -17,6 +17,8 @@ export function createLoginOptions(options: {
   turnstileSiteKey: string;
   qq: QqEnv;
   redis: RedisCommandSender;
+  /** 读机器人状态出错、超时时调用。调用方传进来的应当已经限过频：Redis 宕掉时每次打开登录页都会出错一次。 */
+  onRedisError?: (error: unknown) => void;
 }): () => Promise<LoginOptions> {
   return async () => {
     if (options.qq.sender === "console") {
@@ -25,7 +27,8 @@ export function createLoginOptions(options: {
     let state: NapcatState | null = null;
     try {
       state = await withTimeout(readNapcatHealth(options.redis), 250);
-    } catch {
+    } catch (error) {
+      options.onRedisError?.(error);
       state = null;
     }
     // 没有记录（worker 刚起来还没检查，或者 worker 停了）时当作可用：宁可让用户试一次，

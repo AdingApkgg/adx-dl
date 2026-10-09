@@ -1,9 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { makeSignature } from "better-auth/crypto";
+import { RedisClient } from "bun";
 import { eq } from "drizzle-orm";
 
 import { shortId } from "../../src/server/auth/short-id";
 import { session, user } from "../../src/server/db/schema";
+import { NAPCAT_HEALTH_KEY, writeNapcatHealth } from "../../src/server/napcat/health";
+import { httpTestRedisUrl } from "../../src/server/testing/services";
 import { testDbHandle } from "../../src/server/testing/test-db";
 import { HTTP_TEST_AUTH_SECRET, type RunningServer, startBuiltServer } from "./server";
 
@@ -96,6 +99,8 @@ describe("需要登录的页面", () => {
 
     expect(zh.status).toBe(302);
     expect(zh.headers.get("location")).toBe("/login?next=%2Fsettings%2Faccount");
+    // loader 抛出的跳转不经过 entry.server.tsx，Cache-Control 由 createApp 补上。
+    expect(zh.headers.get("cache-control")).toBe("private, no-store");
     expect(ja.headers.get("location")).toBe("/ja/login?next=%2Fja%2Fsettings%2Faccount");
   });
 
@@ -146,6 +151,21 @@ describe("账号接口", () => {
       turnstileSiteKey: "1x00000000000000000000AA",
       qq: { available: true, botQq: "10001" },
     });
+  });
+
+  // napcat:health、rl:* 是固定的键名。构建产物要是和开发服务器共用 0 号库，开发时的 worker 写的机器人状态、
+  // 开发时攒下的限流计数都会串进 HTTP 测试。
+  test("机器人状态从 HTTP 测试专用的 Redis 库（1 号库）读", async () => {
+    const redis = new RedisClient(httpTestRedisUrl());
+    await redis.connect();
+    try {
+      await writeNapcatHealth(redis, "offline");
+      const res = await fetch(server.url("/api/v1/login-options"));
+      expect((await res.json()).qq).toEqual({ available: false, botQq: "10001" });
+    } finally {
+      await redis.send("DEL", [NAPCAT_HEALTH_KEY]);
+      redis.close();
+    }
   });
 });
 

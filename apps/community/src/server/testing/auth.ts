@@ -125,14 +125,14 @@ export const NEW_USER_CALLBACK = "/onboarding?next=%2F";
 export async function signInWithGoogle(
   browser: Browser,
   profile: GoogleProfile,
-  options: { link?: boolean; callbackURL?: string } = {}
+  options: { link?: boolean; callbackURL?: string; newUserCallbackURL?: string } = {}
 ) {
   const path = options.link ? "/api/auth/link-social" : "/api/auth/sign-in/social";
   const start = await browser.request("POST", path, {
     body: {
       provider: "google",
       callbackURL: options.callbackURL ?? "/",
-      newUserCallbackURL: NEW_USER_CALLBACK,
+      newUserCallbackURL: options.newUserCallbackURL ?? NEW_USER_CALLBACK,
       errorCallbackURL: "/login",
     },
   });

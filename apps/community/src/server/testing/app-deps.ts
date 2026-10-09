@@ -21,6 +21,7 @@ export function testAppDeps(overrides: Partial<AppDeps> = {}) {
     checks: {},
     rateLimitStore: createMemoryRateLimitStore(),
     publicOrigin: TEST_PUBLIC_ORIGIN,
+    umamiInternalUrl: null,
     auth: sharedAuth,
     services: {
       db: testDbHandle().db,

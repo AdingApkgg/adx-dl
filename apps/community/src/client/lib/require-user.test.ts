@@ -5,7 +5,7 @@ import type { ApiClient } from "@/shared/api-client";
 import { makeQueryClient } from "@/shared/query-client";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
-import { loginHref, onboardingHref, requireUser } from "./require-user";
+import { googleRedirects, loginHref, onboardingHref, requireUser, signedInHref } from "./require-user";
 
 describe("loginHref", () => {
   test("带上 next；额外参数一并编码", () => {
@@ -18,6 +18,26 @@ describe("onboardingHref", () => {
   test("引导页带上看完要回去的地址", () => {
     expect(onboardingHref("/settings/account")).toBe("/onboarding?next=%2Fsettings%2Faccount");
     expect(onboardingHref("/")).toBe("/onboarding?next=%2F");
+  });
+});
+
+describe("登录成功后去的地址", () => {
+  test("老用户回 next，新用户先去引导页；# 后面带上登录方式（统计的 login 事件）", () => {
+    expect(signedInHref("/settings/account", "qq", false)).toBe("/settings/account#login=qq");
+    expect(signedInHref("/settings/account", "passkey", true)).toBe(
+      "/onboarding?next=%2Fsettings%2Faccount#login=passkey"
+    );
+  });
+
+  test("Google：成功的两个回跳地址带标记，出错回登录页的不带", () => {
+    expect(googleRedirects("/u/abc2345678", false)).toEqual({
+      callbackURL: "/u/abc2345678#login=google",
+      newUserCallbackURL: "/onboarding?next=%2Fu%2Fabc2345678#login=google",
+      errorCallbackURL: "/login?next=%2Fu%2Fabc2345678",
+    });
+    expect(googleRedirects("/settings/account", true).errorCallbackURL).toBe(
+      "/login?next=%2Fsettings%2Faccount&reauth=1"
+    );
   });
 });
 

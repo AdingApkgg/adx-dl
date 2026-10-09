@@ -10,6 +10,7 @@ import type { AppEnv } from "./app-env";
 import type { Auth } from "./auth/auth";
 import { mountAuth, sessionContext } from "./auth/mount";
 import { jsonError } from "./errors";
+import { isInProcessRequest } from "./in-process-api";
 import { bodyLimitWhenDeclared } from "./middleware/body-limit";
 import { clientIp, rateLimitKeyForIp } from "./middleware/client-ip";
 import { csrfGuard } from "./middleware/csrf";
@@ -17,10 +18,16 @@ import { pendingDeletionGuard } from "./middleware/pending-deletion";
 import { rateLimit, type RateLimitStore } from "./middleware/rate-limit";
 import { requestLog } from "./middleware/request-log";
 import { securityHeaders } from "./middleware/security-headers";
+import { umamiProxy } from "./middleware/umami";
 import type { ApiServices } from "./services/api-services";
+import { throttledErrorLog } from "./throttled-log";
 import { withTimeout } from "./with-timeout";
 
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+// spec 第 11.5 节。不收录的页面靠各自的 noindex，不在这里挡：挡了，爬虫就看不到 noindex，照样可能按外链收录地址。
+// sitemap 等子项目 3、4 有了内容再加。
+const ROBOTS_TXT = "User-agent: *\nDisallow: /api/\nDisallow: /_s/\n";
 
 // /api/v1/* 的请求体上限，和 /api/auth/*（auth/mount.ts）一样是 64 KiB。现有的请求体都是很小的 JSON；
 // 以后有接口要收更大的内容，要改这里：后面挂的中间件放不宽这里的上限。
@@ -35,6 +42,8 @@ export type AppDeps = {
   rateLimitStore: RateLimitStore;
   /** 浏览器看到的站点地址，CSRF 校验拿它和 Origin 头比较。 */
   publicOrigin: string;
+  /** Umami 在容器网络里的地址，/_s/* 转发到这里；null 表示没开统计（没设 UMAMI_WEBSITE_ID）。 */
+  umamiInternalUrl: string | null;
   /** Better Auth 实例（createAuth 的返回值）。 */
   auth: Auth;
   /** /api/v1 的接口用到的依赖（auth、log 由 createApp 从上面同名的两项放进去）。 */
@@ -45,6 +54,8 @@ export type AppDeps = {
 export function createApp(deps: AppDeps) {
   const app = new Hono<AppEnv>();
   const services: ApiServices = { ...deps.services, auth: deps.auth, log: deps.log };
+  // Redis 宕掉时每个请求都会在限流这一步出错：三条限流规则共用一个限了频的日志（1a 评审 R14）。
+  const onRateLimitStoreError = throttledErrorLog(deps.log, "rate_limit_store_error");
 
   app.use("*", requestId());
   app.use("*", clientIp());
@@ -70,11 +81,35 @@ export function createApp(deps: AppDeps) {
     }
   });
 
+  // 页面上的跳转（未登录去登录页、待注销的去注销提示页、/zh 去掉前缀……）是 React Router 的 loader 和中间件抛出来的，
+  // 不经过 entry.server.tsx 的 handleRequest，响应上没有 Cache-Control，还常带着上面补的续期 Cookie：
+  // 一律不让浏览器和 Cloudflare 缓存。自己设了 Cache-Control 的跳转不动。
+  app.use("*", async (c, next) => {
+    await next();
+    if (c.res.status >= 300 && c.res.status < 400 && !c.res.headers.has("cache-control")) {
+      c.res.headers.set("Cache-Control", "private, no-store");
+    }
+  });
+
   app.all("/media/*", (c) => jsonError(c, 404, "NOT_FOUND", "Not found"));
+
+  // spec 第 8.1 节第 5 条：和 /media 一样挂在会话中间件之前。
+  app.route(
+    "/_s",
+    umamiProxy({
+      internalUrl: deps.umamiInternalUrl,
+      onError: throttledErrorLog(deps.log, "umami_forward_failed"),
+    })
+  );
 
   app.get("/healthz", (c) => c.json({ ok: true }));
 
+  // 只回答本机的探针（g510 上的 deploy.sh、容器的健康检查）：它列出依赖的名字和状态，不该对外（1a 评审遗留 #9）。
+  // 经 Cloudflare 隧道来的请求一定带 CF-Connecting-IP（Cloudflare 自己加，访客去不掉），本机的探针不带。
   app.get("/readyz", async (c) => {
+    if (c.req.header("cf-connecting-ip") !== undefined) {
+      return jsonError(c, 404, "NOT_FOUND", "Not found");
+    }
     const results = await Promise.all(
       Object.entries(deps.checks).map(async ([name, check]) => {
         try {
@@ -90,6 +125,8 @@ export function createApp(deps: AppDeps) {
     return c.json({ ok, checks: Object.fromEntries(results) }, ok ? 200 : 503);
   });
 
+  app.get("/robots.txt", (c) => c.text(ROBOTS_TXT, 200, { "Cache-Control": "public, max-age=86400" }));
+
   // /api/v1/me 这类是每个用户自己的数据：接口的响应（包括限流的 429、出错的响应）一律不让浏览器和 Cloudflare
   // 缓存。接口自己设了 Cache-Control 的（比如 Better Auth 的 get-session）照它的。
   app.use("/api/*", async (c, next) => {
@@ -99,6 +136,8 @@ export function createApp(deps: AppDeps) {
     }
   });
 
+  // 服务端渲染时 loader 经进程内 API 发的请求不算：页面请求一次就要调好几个接口，按访客的 IP 计数的话，同一个 IP 后面的
+  // 很多人（CGNAT、学校、公司）刷几下页面就会 429。页面请求本身由 Cloudflare 挡洪水。
   app.use(
     "/api/*",
     rateLimit<AppEnv>({
@@ -106,8 +145,8 @@ export function createApp(deps: AppDeps) {
       name: "api-ip",
       limit: 300,
       windowSec: 60,
-      key: (c) => rateLimitKeyForIp(c.get("clientIp")),
-      onStoreError: (error) => deps.log.error("rate_limit_store_error", describeError(error)),
+      key: (c) => (isInProcessRequest(c) ? null : rateLimitKeyForIp(c.get("clientIp"))),
+      onStoreError: onRateLimitStoreError,
     })
   );
 
@@ -120,7 +159,7 @@ export function createApp(deps: AppDeps) {
       limit: 30,
       windowSec: 60,
       key: (c) => rateLimitKeyForIp(c.get("clientIp")),
-      onStoreError: (error) => deps.log.error("rate_limit_store_error", describeError(error)),
+      onStoreError: onRateLimitStoreError,
     })
   );
 
@@ -151,7 +190,7 @@ export function createApp(deps: AppDeps) {
       limit: 60,
       windowSec: 60,
       key: (c) => (READ_METHODS.has(c.req.method) ? null : (c.get("auth")?.user.id ?? null)),
-      onStoreError: (error) => deps.log.error("rate_limit_store_error", describeError(error)),
+      onStoreError: onRateLimitStoreError,
     })
   );
   // spec 第 10.6 节：注销冷静期里除了几个接口，一律 403 ACCOUNT_PENDING_DELETION。

@@ -113,6 +113,21 @@ describe("Google 登录", () => {
     expect(attributes.has("domain")).toBe(false);
   });
 
+  // 登录统计靠回跳地址 # 后面的标记（src/client/lib/analytics.ts）：Better Auth 要原样带回。升级后丢了它，这条会失败。
+  test("回跳地址 # 后面的内容原样带回：新用户、老用户都是", async () => {
+    const app = newApp();
+    const profile = googleProfile();
+
+    const first = await signInWithGoogle(new Browser(app), profile, {
+      callbackURL: "/u/abc2345678#login=google",
+      newUserCallbackURL: "/onboarding?next=%2Fu%2Fabc2345678#login=google",
+    });
+    expect(first.headers.get("location")).toBe("/onboarding?next=%2Fu%2Fabc2345678#login=google");
+
+    const again = await signInWithGoogle(new Browser(app), profile, { callbackURL: "/u/abc2345678#login=google" });
+    expect(again.headers.get("location")).toBe("/u/abc2345678#login=google");
+  });
+
   test("同一个 Google 账号再次登录是同一个用户，令牌也不会被写回", async () => {
     const app = newApp();
     const profile = googleProfile();
@@ -405,5 +420,20 @@ describe("限流", () => {
       statuses.push(res.status);
     }
     expect(statuses).toEqual([200, 200, 200, 429]);
+  });
+
+  test("计数存储出错：照常放行，rate_limit_store_error 一分钟最多记一条", async () => {
+    const broken = {
+      hit: async () => {
+        throw new Error("Connection closed");
+      },
+    };
+    const { auth, logs } = createTestAuth({ rateLimitEnabled: true, rateLimitStore: broken });
+    const browser = new Browser(createApp(testAppDeps({ auth }).deps));
+
+    for (let i = 0; i < 3; i++) {
+      expect((await browser.request("GET", "/api/auth/get-session")).status).toBe(200);
+    }
+    expect(logs().filter((entry) => entry.event === "rate_limit_store_error")).toHaveLength(1);
   });
 });

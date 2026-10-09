@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
-import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, useRouteLoaderData } from "react-router";
 
 import { getLocale } from "@/paraglide/runtime.js";
 import { paraglideMiddleware } from "@/paraglide/server.js";
@@ -12,6 +12,7 @@ import type { Route } from "./+types/root";
 import appCss from "./app.css?url";
 import { AppProviders } from "./components/app-providers";
 import { ErrorCard } from "./components/error-card";
+import { LoginEvent } from "./components/login-event";
 import { ThemeBootScript } from "./components/theme-boot-script";
 import { getBrowserQueryClient } from "./lib/browser";
 
@@ -26,10 +27,17 @@ export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: appC
 
 export function loader({ context }: Route.LoaderArgs) {
   const meta = context.get(requestMetaContext);
-  return { requestId: meta.requestId, origin: meta.origin };
+  return {
+    requestId: meta.requestId,
+    origin: meta.origin,
+    // 统计（spec 第 11.6 节）：没设 UMAMI_WEBSITE_ID 时是 null，页面里不放脚本。
+    analytics: meta.umamiWebsiteId ? { websiteId: meta.umamiWebsiteId, domain: new URL(meta.origin).hostname } : null,
+  };
 }
 
 export function Layout({ children }: { children: ReactNode }) {
+  // 出错页面也用这个 Layout：那时可能拿不到根组件的 loader 数据。
+  const analytics = useRouteLoaderData<typeof loader>("root")?.analytics;
   return (
     // 防闪烁脚本在 hydrate 之前就改了 <html> 的 class 和属性，所以这一层不比对。
     <html lang={htmlLang(getLocale())} className="antialiased" suppressHydrationWarning>
@@ -42,6 +50,20 @@ export function Layout({ children }: { children: ReactNode }) {
             这个值，hydrate 时报属性对不上。CSP 的 style-src 不用 nonce，空值没有影响；脚本照样由 <Scripts> 和
             ThemeBootScript 带上真的 nonce。 */}
         <Links nonce="" />
+        {/* Umami 的统计脚本走本站的 /_s/（Hono 转发，CSP 的 'self' 就放行）。data-host-url 让上报发到 /_s/api/send。
+            不记查询串和 # 后面的内容（data-exclude-*），只在本站的域名上记（data-domains）。defer：排在 React Router
+            的模块脚本前面执行，hydrate 之后 window.umami 已经在了（LoginEvent 要用）。 */}
+        {analytics ? (
+          <script
+            defer
+            src="/_s/script.js"
+            data-website-id={analytics.websiteId}
+            data-host-url="/_s"
+            data-domains={analytics.domain}
+            data-exclude-search="true"
+            data-exclude-hash="true"
+          />
+        ) : null}
       </head>
       <body>
         {children}
@@ -58,6 +80,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppProviders>
+        <LoginEvent />
         <Outlet />
       </AppProviders>
     </QueryClientProvider>

@@ -9,6 +9,7 @@ import { apiContext, queryClientContext, requestMetaContext } from "@/shared/rou
 import { createApp } from "./app";
 import type { AppEnv } from "./app-env";
 import { createAuth } from "./auth/auth";
+import { limitGoogleTokenExchange } from "./auth/google-timeout";
 import { createRedisQqCodeStore } from "./auth/qq/codes";
 import { createQqHasher } from "./auth/qq/hasher";
 import { createConsoleSender } from "./auth/qq/sender";
@@ -24,6 +25,7 @@ import { createNapcatSender } from "./napcat/sender";
 import { connectRedis, getRedis, pingRedis } from "./redis/client";
 import { createLoginOptions } from "./services/login-options";
 import { DELETION_HANDLERS } from "./services/user-deletion";
+import { throttledErrorLog } from "./throttled-log";
 
 const env = parseEnv(process.env);
 const log = createLogger();
@@ -38,7 +40,11 @@ const rateLimitStore = createRedisRateLimitStore(redis);
 const getBoss = () => getSender(env.databaseUrl, (error) => log.error("pgboss_error", describeError(error)));
 void getBoss().catch((error) => log.error("pgboss_start_failed", describeError(error)));
 
-const verifyTurnstile = createTurnstileVerifier({ secretKey: env.turnstile.secretKey, log });
+const verifyTurnstile = createTurnstileVerifier({
+  secretKey: env.turnstile.secretKey,
+  expectedHostname: new URL(env.publicOrigin).hostname,
+  log,
+});
 const qqSender =
   env.qq.sender === "napcat"
     ? createNapcatSender(createOneBotClient({ httpUrl: env.qq.httpUrl, accessToken: env.qq.accessToken }), log)
@@ -59,11 +65,14 @@ const auth = createAuth({
     hasher: createQqHasher(env.qqCodeHmacKey),
   },
 });
+// 换 Google 令牌这一步加上超时（原因写在 google-timeout.ts）。
+await limitGoogleTokenExchange(auth);
 
 const app = createApp({
   log,
   isProduction: env.nodeEnv === "production",
   publicOrigin: env.publicOrigin,
+  umamiInternalUrl: env.umami?.internalUrl ?? null,
   checks: {
     db: () => pingDb(db),
     redis: () => pingRedis(redis),
@@ -75,7 +84,12 @@ const app = createApp({
   services: {
     db,
     boss: getBoss,
-    loginOptions: createLoginOptions({ turnstileSiteKey: env.turnstile.siteKey, qq: env.qq, redis }),
+    loginOptions: createLoginOptions({
+      turnstileSiteKey: env.turnstile.siteKey,
+      qq: env.qq,
+      redis,
+      onRedisError: throttledErrorLog(log, "login_options_redis_error"),
+    }),
     deletionHandlers: DELETION_HANDLERS,
   },
 });
@@ -104,6 +118,7 @@ export default await createHonoServer<AppEnv>({
       requestId,
       nonce: c.get("secureHeadersNonce"),
       origin: env.publicOrigin,
+      umamiWebsiteId: env.umami?.websiteId ?? null,
     });
     // 进程内请求收到的 Set-Cookie（会话续期）先收在这里，createApp 里的中间件再补到页面响应上。
     const setCookies: string[] = [];
