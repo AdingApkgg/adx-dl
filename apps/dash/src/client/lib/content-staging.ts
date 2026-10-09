@@ -97,3 +97,21 @@ export function unstageFile(staging: Staging, key: string): Staging {
 export function pendingKeys(staging: Staging): string[] {
   return Object.keys(staging).sort();
 }
+
+/** A successful request may finish after this tab or another tab staged more edits. */
+export function clearPublishedStaging(submitted: Staging, storage: StorageLike | null): void {
+  const current = loadStaging(storage);
+  for (const [key, published] of Object.entries(submitted)) {
+    const draft = current[key];
+    // editedAt alone is not a version: two stages can happen in the same millisecond.
+    if (
+      draft &&
+      draft.editedAt === published.editedAt &&
+      draft.baseSha === published.baseSha &&
+      JSON.stringify(draft.data) === JSON.stringify(published.data)
+    ) {
+      delete current[key];
+    }
+  }
+  saveStaging(current, storage);
+}

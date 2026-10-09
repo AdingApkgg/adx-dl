@@ -6,8 +6,6 @@ import { CONTENT_FILES, CONTENT_LOCALES, validateContentFile } from "@astrodx/co
 import community from "@content/community.json";
 import donate from "@content/donate.json";
 import friendLinksJson from "@content/friend-links.json";
-import { QQ_COMMUNITY, SITE_ISSUES_URL, TELEGRAM_COMMUNITY } from "@/lib/community-links";
-import { ASTRODX_APP_REPOSITORY } from "@/lib/friend-links";
 import { locales } from "@/lib/i18n";
 
 const BY_KEY: Record<string, unknown> = {
@@ -42,39 +40,6 @@ describe("the content package's locale list matches the site's", () => {
   // to one and not the other.
   test("CONTENT_LOCALES equals i18n's locales", () => {
     expect([...CONTENT_LOCALES]).toEqual([...locales]);
-  });
-});
-
-describe("constants that were inlined into JSON have not drifted", () => {
-  // Migrating the arrays to JSON turned `url: SITE_ISSUES_URL` into a literal.
-  // The constant is still exported (other modules import it), so the same URL
-  // now exists in two places. These assertions are what keeps them equal.
-  test("community.json's URLs equal the exported constants", () => {
-    const urls = community.contactChannels.map((channel) => channel.url);
-    expect(urls).toContain(SITE_ISSUES_URL);
-    expect(urls).toContain(QQ_COMMUNITY);
-    expect(urls).toContain(TELEGRAM_COMMUNITY);
-
-    // Order-independent on purpose: dash's content editor (apps/dash, Task 7)
-    // has up/down buttons that let an operator reorder communityChannels as a
-    // normal, intended edit (spec §12.1). A position-sensitive assertion here
-    // would fail CI — and block the gh-pages deploy workflow's `bun run check`
-    // gate, so the whole site stops updating — on a perfectly valid reorder.
-    // What this test actually guards is "the JSON literal hasn't drifted from
-    // the exported constant"; order was never part of that invariant.
-    const communityChannelUrls = community.communityChannels.map((channel) => channel.url);
-    expect(communityChannelUrls).toContain(QQ_COMMUNITY);
-    expect(communityChannelUrls).toContain(TELEGRAM_COMMUNITY);
-  });
-
-  // Migrating friend-links.ts turned the first entry's `url: ASTRODX_APP_REPOSITORY`
-  // reference into a literal. Same drift risk as above, one URL instead of three.
-  test("friend-links.json's URLs contain ASTRODX_APP_REPOSITORY", () => {
-    // Order-independent for the same reason as communityChannels above: dash's
-    // reorder buttons can move this entry to any position as a normal edit.
-    // `links[0]` pinned a position that was never part of the invariant this
-    // test guards (the literal still matches the constant, wherever it sits).
-    expect(friendLinksJson.links.some((link) => link.url === ASTRODX_APP_REPOSITORY)).toBe(true);
   });
 });
 

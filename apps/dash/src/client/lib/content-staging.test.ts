@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { loadStaging, pendingKeys, saveStaging, stageFile, unstageFile } from "./content-staging";
+import { clearPublishedStaging, loadStaging, pendingKeys, saveStaging, stageFile, unstageFile } from "./content-staging";
 
 function fakeStorage(initial: Record<string, string> = {}) {
   const map = new Map(Object.entries(initial));
@@ -97,5 +97,75 @@ describe("pendingKeys", () => {
   test("结果是排过序的，横幅的顺序不依赖编辑顺序", () => {
     const staging = stageFile(stageFile({}, "zzz", {}, "s", 1), "aaa", {}, "s", 2);
     expect(pendingKeys(staging)).toEqual(["aaa", "zzz"]);
+  });
+});
+
+describe("clearPublishedStaging", () => {
+  test("removes the submitted version after reading it back from storage", () => {
+    const storage = fakeStorage();
+    const submitted = stageFile({}, "community", { text: "submitted" }, "sha1", 1000);
+    saveStaging(submitted, storage);
+
+    clearPublishedStaging(submitted, storage);
+
+    expect(loadStaging(storage)).toEqual({});
+  });
+
+  test("keeps a different file staged while the request was pending", () => {
+    const storage = fakeStorage();
+    const submitted = stageFile({}, "community", { text: "submitted" }, "sha1", 1000);
+    saveStaging(stageFile(submitted, "donate", { text: "new draft" }, "sha2", 2000), storage);
+
+    clearPublishedStaging(submitted, storage);
+
+    expect(loadStaging(storage)).toEqual({
+      donate: { data: { text: "new draft" }, baseSha: "sha2", editedAt: 2000 },
+    });
+  });
+
+  test("keeps changed data on the same key even when editedAt is the same millisecond", () => {
+    const storage = fakeStorage();
+    const submitted = stageFile({}, "community", { text: "submitted" }, "sha1", 1000);
+    saveStaging(stageFile(submitted, "community", { text: "new draft" }, "sha1", 1000), storage);
+
+    clearPublishedStaging(submitted, storage);
+
+    expect(loadStaging(storage)).toEqual({
+      community: { data: { text: "new draft" }, baseSha: "sha1", editedAt: 1000 },
+    });
+  });
+
+  test("keeps a changed baseSha even when data and editedAt match", () => {
+    const storage = fakeStorage();
+    const submitted = stageFile({}, "community", { text: "submitted" }, "sha1", 1000);
+    saveStaging(stageFile(submitted, "community", { text: "submitted" }, "sha2", 1000), storage);
+
+    clearPublishedStaging(submitted, storage);
+
+    expect(loadStaging(storage)).toEqual({
+      community: { data: { text: "submitted" }, baseSha: "sha2", editedAt: 1000 },
+    });
+  });
+
+  test("keeps a later restage even when its data and baseSha match", () => {
+    const storage = fakeStorage();
+    const submitted = stageFile({}, "community", { text: "submitted" }, "sha1", 1000);
+    saveStaging(stageFile(submitted, "community", { text: "submitted" }, "sha1", 2000), storage);
+
+    clearPublishedStaging(submitted, storage);
+
+    expect(loadStaging(storage)).toEqual({
+      community: { data: { text: "submitted" }, baseSha: "sha1", editedAt: 2000 },
+    });
+  });
+
+  test("does not restore a submitted draft discarded while the request was pending", () => {
+    const storage = fakeStorage();
+    const submitted = stageFile({}, "community", { text: "submitted" }, "sha1", 1000);
+    saveStaging({}, storage);
+
+    clearPublishedStaging(submitted, storage);
+
+    expect(loadStaging(storage)).toEqual({});
   });
 });

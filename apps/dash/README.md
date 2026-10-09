@@ -28,12 +28,19 @@ and `apps/web`'s test suite — and they live in different workspaces, so a
 validator under `apps/web/` could not have been shared without dash depending
 on the whole Next app.
 
-**Why edits are batched.** Every commit on `main` triggers a full site deploy
-(catalog → enrich → check → build → deploy, roughly seven minutes). Editing
-five fields as five commits would be five deploys. So edits accumulate in the
-browser's `localStorage` and "publish" turns the whole batch into **one**
-commit via the Git Data API (blob → tree → commit → update ref); the
-`contents` API cannot write more than one file per call.
+**Why edits are batched.** Edits accumulate in the browser's `localStorage`,
+and submitting the batch creates **one** commit on the repository's default
+branch via the Git Data API (blob → tree → commit → update ref); the
+`contents` API cannot write more than one file per call. A successful response
+clears only submitted drafts that are still unchanged in storage, preserving
+new files and edits staged while the request was pending.
+
+**What submitting does.** Content commits trigger **Web check**
+(catalog → enrich → lint/typecheck/tests → build). They do not deploy the main
+site. After checks pass, manually run **Build and Publish gh-pages** from
+GitHub Actions or dash's Actions panel on the branch you want to publish.
+The daily scheduled deploy rebuilds the existing `pages-live` tag; it does
+not pick up unshipped commits on `main`.
 
 **Why the lock has two layers.** Nothing in the Git Data API validates a blob
 sha, so the server re-reads each staged file's sha before building the tree and
@@ -56,10 +63,10 @@ defect caught in review, not a hypothetical:
   indexes them by that exact string. The *server* prefixes each message with
   the file's title when several files are committed at once — feeding that copy
   to `errorsByPath` makes every error silently fail to render.
-- The drift guards in `apps/web/src/lib/content-json.test.ts` assert that URLs
-  in the JSON match the exported constants. They must stay order-independent:
-  dash can reorder entries, and an order-sensitive assertion turns a normal
-  edit into a red CI run that stops the site from deploying.
+- `apps/web/src/lib/content-json.test.ts` checks the shared schema, locale
+  list, editable-file registration, and canonical JSON formatting. URLs and
+  rows remain editable: changing, removing, or reordering valid entries must
+  not be rejected by CI-only requirements to preserve old URL literals.
 - A draft's `baseSha` is fixed when the draft is created and must not be
   refreshed on re-stage. A blob sha only changes when the file's content
   changes, so a mismatch *is* the concurrent-edit case the first lock exists to
@@ -83,8 +90,8 @@ bun run dev    # Vite dev server on :5273, proxies /api/* to :3000
 bun run start  # Hono server on :3000 (reads apps/dash/.env)
 ```
 
-Open `http://localhost:5273`. `bun run check` runs `tsc --noEmit` plus the
-test suite (`bun test`) and should be clean before every commit.
+Open `http://localhost:5273`. `bun run check` runs lint, route type generation,
+`tsc --noEmit`, and the test suite (`bun test`); it should pass before every commit.
 
 ## Environment variables
 
@@ -192,6 +199,15 @@ practical. If this is ever set up again on a fresh machine, replicate the
 sparse + partial + proxy setup rather than doing a plain `git clone` —
 plan for that up front, since converting a full clone into a sparse one
 after the fact is more work than starting sparse.
+
+Include **`packages/content-schema`** in the sparse paths before building:
+Dash imports its source for both the SPA and server bundle. For an existing
+sparse checkout, run `git sparse-checkout add packages/content-schema`.
+The Dockerfile's explicit manifest whitelist also needs
+`apps/community/package.json`, even though Dash does not bundle community
+sources. Keep all listed workspace manifests and `patches/` available for the
+root frozen install; do not replace the secret-excluding COPY whitelist with
+whole-workspace copies.
 
 ### Mandatory post-change smoke checklist
 
@@ -303,11 +319,7 @@ works (202, run appears) before trusting this is fully verified — if it
 message)` line, which confirms it's this check (not accessJwt, which logs
 its own distinct `[access-jwt] rejected: ...` line) rejecting the request.
 
-**Known unverified item:** the `paths-ignore: ['apps/dash/**']` rule on
-`deploy-gh-pages.yml` has never actually been demonstrated. The merge to
-`main` in step 5 above did trigger the site deploy workflow, but that
-push also touched `bun.lock`, `.github/` and `pipeline/` — all outside
-the ignore rule — so it proves nothing about whether the rule itself
-works. A real check needs a push to `main` that touches **only**
-`apps/dash/**`, followed by confirming `deploy-gh-pages.yml` did *not*
-run for that push.
+**Main-site workflow policy:** `deploy-gh-pages.yml` has only manual and
+scheduled triggers. Dashboard-only pushes and content commits do not deploy
+the site. Content commits run `web-check.yml`; publishing their public-site
+changes requires the separate manual deploy described above.

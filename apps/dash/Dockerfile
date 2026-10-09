@@ -31,7 +31,9 @@ COPY --from=realnode /usr/local/bin/node /usr/local/bin/node
 # 先只拷清单，让依赖层能被缓存住：改源码不必重装依赖。
 COPY package.json bun.lock ./
 COPY apps/dash/package.json apps/dash/
+COPY apps/community/package.json apps/community/
 COPY apps/web/package.json apps/web/
+COPY packages/content-schema/package.json packages/content-schema/
 COPY packages/maimai-chart-engine/package.json packages/maimai-chart-engine/
 # web 依赖这两个工作区包（workspace:*）。锁文件里有它们，--frozen-lockfile 要求清单都在，
 # 少一个就报 "listed in bun.lock but not on disk"。dash 自己不用它们，只拷清单。
@@ -46,6 +48,7 @@ RUN bun install --frozen-lockfile
 # 镜像里的任何一层。
 COPY apps/dash/tsconfig.json apps/dash/react-router.config.ts apps/dash/vite.config.ts apps/dash/bun-test.d.ts apps/dash/
 COPY apps/dash/src apps/dash/src
+COPY packages/content-schema/src packages/content-schema/src
 WORKDIR /repo/apps/dash
 RUN bun run build
 RUN bun run build:server

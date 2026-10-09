@@ -4,7 +4,7 @@ import { Link, Outlet, useRevalidator } from "react-router";
 import { CONTENT_FILES } from "@astrodx/content-schema";
 
 import { api, ApiError } from "../lib/api";
-import { loadStaging, pendingKeys, saveStaging, unstageFile } from "../lib/content-staging";
+import { clearPublishedStaging, loadStaging, pendingKeys, saveStaging, unstageFile } from "../lib/content-staging";
 import type { Route } from "./+types/content";
 
 function titleOf(key: string): string {
@@ -50,11 +50,15 @@ export default function ContentLayout({ loaderData }: Route.ComponentProps) {
           baseSha: staging[key].baseSha,
         })),
       });
-      // 提交成功才清暂存。清早了，一次网络抖动就等于把刚打完的文案扔了。
-      saveStaging({}, storage);
+      // 提交成功后重读存储，只清掉本次提交且仍未变动的草稿。请求期间的新改动留着。
+      clearPublishedStaging(staging, storage);
       revalidator.revalidate();
       setMessage("");
-      setResult({ ok: true, text: `已提交 ${response.commitSha.slice(0, 7)}，主站构建已触发`, conflicts: [] });
+      setResult({
+        ok: true,
+        text: `已提交 ${response.commitSha.slice(0, 7)}；Web check 会检查此提交，主站仍需在 Actions 手动部署`,
+        conflicts: [],
+      });
     } catch (error) {
       const conflicts =
         error instanceof ApiError && Array.isArray(error.detail.conflictPaths)
@@ -97,7 +101,7 @@ export default function ContentLayout({ loaderData }: Route.ComponentProps) {
 
       <section className="dash-staging" aria-live="polite">
         <p>
-          待发布改动：<strong>{pending.length}</strong>
+          待提交改动：<strong>{pending.length}</strong>
         </p>
         {pending.length > 0 ? (
           // 每个待发布文件都链到它的编辑页——这正是 Step 0b 修的那个坑会被
@@ -107,7 +111,7 @@ export default function ContentLayout({ loaderData }: Route.ComponentProps) {
           // 「丢弃」按钮直接复用 discard(key)（它自带 window.confirm）——在
           // 这之前，唯一能把一个文件从暂存区拿掉的地方是冲突横幅，而那个
           // 按钮只在服务端回了 conflictPaths 时才会出现。误暂存了一个文件
-          // 的操作员，原本要么把它一起发布出去（= 一轮 7 分钟部署），要么
+          // 的操作员，原本要么把它一起提交出去，要么
           // 手动清 localStorage。
           <ul>
             {pending.map((key) => (
@@ -127,10 +131,12 @@ export default function ContentLayout({ loaderData }: Route.ComponentProps) {
               <input value={message} placeholder={defaultMessage} onChange={(event) => setMessage(event.target.value)} />
             </label>
             <button type="button" onClick={publish} disabled={busy}>
-              {busy ? "提交中…" : `发布这 ${pending.length} 处改动`}
+              {busy ? "提交中…" : `提交这 ${pending.length} 处改动`}
             </button>
-            {/* 每次发布都会触发一轮数分钟的主站部署，所以把代价写在按钮旁边。 */}
-            <p className="dash-muted">一次发布 = 一个 commit = 一轮完整部署（数分钟）。</p>
+            {/* 提交会触发检查；主站部署由操作员另外手动触发。 */}
+            <p className="dash-muted">
+              一次提交 = 一个 commit。推送会运行 Web check；主站需在 Actions 手动触发 Build and Publish gh-pages。
+            </p>
           </>
         ) : null}
 
