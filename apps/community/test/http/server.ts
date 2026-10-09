@@ -38,6 +38,7 @@ export async function startBuiltServer(extraEnv: Record<string, string> = {}): P
       PORT: String(port),
       HOST: "127.0.0.1",
       PUBLIC_ORIGIN: origin,
+      PUBLIC_CONTACT_EMAIL: "privacy@example.test",
       DATABASE_URL: testDatabaseUrl(),
       REDIS_URL: httpTestRedisUrl(),
       BETTER_AUTH_SECRET: HTTP_TEST_AUTH_SECRET,

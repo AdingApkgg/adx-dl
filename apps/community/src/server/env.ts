@@ -13,6 +13,8 @@ export type CommunityEnv = {
   host: string;
   /** 浏览器看到的站点地址，如 https://community.example.com。CSRF 校验和 Better Auth 都用它。 */
   publicOrigin: string;
+  /** 公开展示在隐私说明中的联系邮箱，生产环境必填。 */
+  publicContactEmail: string | null;
   databaseUrl: string;
   redisUrl: string;
   /** Better Auth 签 Cookie 和令牌用的密钥。 */
@@ -58,6 +60,7 @@ const schema = z.object({
     .regex(/^https?:\/\/[^/]+$/, "必须是 scheme://host[:port]，不带路径")
     // 还得和浏览器 Origin 头的写法一字不差，即 new URL(值).origin。
     .refine(isCanonicalOrigin, "必须是规范写法：主机名小写，不写默认端口，不带查询串和用户名"),
+  PUBLIC_CONTACT_EMAIL: z.email({ error: "必须是有效的邮箱地址" }).optional(),
   DATABASE_URL: z.string().regex(/^postgres(ql)?:\/\//, "必须以 postgres:// 或 postgresql:// 开头"),
   REDIS_URL: z.string().regex(/^rediss?:\/\//, "必须以 redis:// 或 rediss:// 开头"),
   BETTER_AUTH_SECRET: secretKey,
@@ -133,6 +136,9 @@ export function parseEnv(source: Record<string, string | undefined>): CommunityE
       problems.push(`${key} 未设置`);
     }
   }
+  if (read("NODE_ENV") === "production" && !read("PUBLIC_CONTACT_EMAIL")) {
+    problems.push("PUBLIC_CONTACT_EMAIL 未设置（生产环境必填，展示在隐私说明中）");
+  }
   if (read("QQ_SENDER") === "napcat") {
     for (const key of NAPCAT_REQUIRED) {
       if (!read(key)) {
@@ -153,6 +159,7 @@ export function parseEnv(source: Record<string, string | undefined>): CommunityE
     PORT: read("PORT"),
     HOST: read("HOST"),
     PUBLIC_ORIGIN: read("PUBLIC_ORIGIN")?.replace(/\/+$/, ""),
+    PUBLIC_CONTACT_EMAIL: read("PUBLIC_CONTACT_EMAIL"),
     DATABASE_URL: read("DATABASE_URL"),
     REDIS_URL: read("REDIS_URL"),
     BETTER_AUTH_SECRET: read("BETTER_AUTH_SECRET"),
@@ -197,6 +204,7 @@ export function parseEnv(source: Record<string, string | undefined>): CommunityE
     port: env.PORT,
     host: env.HOST,
     publicOrigin: env.PUBLIC_ORIGIN,
+    publicContactEmail: env.PUBLIC_CONTACT_EMAIL ?? null,
     databaseUrl: env.DATABASE_URL,
     redisUrl: env.REDIS_URL,
     betterAuthSecret: env.BETTER_AUTH_SECRET,

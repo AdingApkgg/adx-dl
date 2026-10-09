@@ -5,7 +5,7 @@ import { Input } from "@astrodx/ui/components/input";
 import { Label } from "@astrodx/ui/components/label";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
 import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from "react";
-import { redirect, useSearchParams } from "react-router";
+import { Link, redirect, useSearchParams } from "react-router";
 
 import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
@@ -13,7 +13,7 @@ import { NICKNAME_MAX, normalizeNickname } from "@/shared/nickname";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 import { TURNSTILE_ACTIONS } from "@/shared/turnstile-actions";
 
-import { PageTitle } from "../components/page-title";
+import { PageTitle, textLinkClass } from "../components/page-title";
 import { QqCodeForm } from "../components/qq-code-form";
 import { authClient } from "../lib/auth-client";
 import { errorCodeOf, errorMessage } from "../lib/auth-errors";
@@ -127,6 +127,9 @@ function LoginContent() {
         autofill={options.qq.available}
         onSignedIn={goAfterPasskey}
       />
+      <Link to={localizeHref("/privacy")} className={textLinkClass}>
+        {m.privacy_link()}
+      </Link>
     </main>
   );
 }

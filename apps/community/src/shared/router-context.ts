@@ -11,6 +11,8 @@ export type RequestMeta = {
   origin: string;
   /** Umami 网站 ID（UMAMI_WEBSITE_ID）；没开统计时是 null，页面里不放统计脚本。 */
   umamiWebsiteId: string | null;
+  /** 隐私页的公开联系邮箱；旧测试上下文或本机开发可以不提供。 */
+  publicContactEmail?: string | null;
 };
 
 // 服务端入口的 getLoadContext 负责给这三个上下文赋值，每个请求一份。

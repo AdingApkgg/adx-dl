@@ -14,6 +14,34 @@ afterAll(() => {
 });
 
 describe("页面", () => {
+  test("隐私说明无需登录，三种语言有正文、联系邮箱与 canonical", async () => {
+    for (const [path, lang, title] of [
+      ["/privacy", "zh-CN", "隐私说明"],
+      ["/en/privacy", "en", "Privacy notice"],
+      ["/ja/privacy", "ja", "プライバシーについて"],
+    ]) {
+      const res = await fetch(server.url(path ?? ""), { redirect: "manual" });
+      const html = await res.text();
+      expect(res.status, path).toBe(200);
+      expect(html).toContain(`<html lang="${lang}"`);
+      expect(html).toContain(title ?? "");
+      expect(html).toContain('href="mailto:privacy@example.test"');
+      expect(html).toContain(`<link rel="canonical" href="${server.origin}${path}"/>`);
+      expect(html).toContain("Google");
+      expect(html).toContain("3550411407");
+      expect(html).not.toContain("GOCSPX-");
+    }
+  });
+
+  test("首页和登录页都提供当前语言的隐私入口", async () => {
+    for (const prefix of ["", "/en", "/ja"]) {
+      for (const suffix of ["/", "/login"]) {
+        const html = await (await fetch(server.url(`${prefix}${suffix}`))).text();
+        expect(html).toContain(`href="${prefix}/privacy"`);
+      }
+    }
+  });
+
   test("首页：中文，200，不缓存", async () => {
     const res = await fetch(server.url("/"));
 

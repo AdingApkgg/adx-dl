@@ -23,6 +23,7 @@ x-app: &app
 # src/server/env.ts 校验的全部变量。容器网络里的地址写死在这里；QQ_SENDER 写死成 napcat：生产环境不许用控制台发送器。
 x-app-env: &app-env
   PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?在 .env 里设成 https://adxc.saop.cc}
+  PUBLIC_CONTACT_EMAIL: ${PUBLIC_CONTACT_EMAIL:?在 .env 里填公开联系邮箱（隐私说明展示）}
   DATABASE_URL: postgres://community:${POSTGRES_PASSWORD:?先运行 ops/fill-secrets.sh}@postgres:5432/community
   REDIS_URL: redis://redis:6379
   BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?先运行 ops/fill-secrets.sh}

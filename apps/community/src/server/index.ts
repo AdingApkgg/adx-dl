@@ -119,6 +119,7 @@ export default await createHonoServer<AppEnv>({
       nonce: c.get("secureHeadersNonce"),
       origin: env.publicOrigin,
       umamiWebsiteId: env.umami?.websiteId ?? null,
+      publicContactEmail: env.publicContactEmail,
     });
     // 进程内请求收到的 Set-Cookie（会话续期）先收在这里，createApp 里的中间件再补到页面响应上。
     const setCookies: string[] = [];

@@ -24,6 +24,12 @@ bun run worker                             # 另开一个终端：注销的清�
   （它负责自动通过好友申请、每分钟检查机器人是否在线）。NapCat 的部署在 1d。
 - 浏览器一定用 `http://localhost:5373` 打开：通行密钥不认 `127.0.0.1`。
 
+## 公开隐私说明
+
+`/privacy`、`/en/privacy`、`/ja/privacy` 无需登录即可阅读，首页和登录页都提供入口，待注销用户也能访问。
+生产环境必须在 `.env` 填写 `PUBLIC_CONTACT_EMAIL`，该邮箱会公开展示在页面上；本机开发可不填。
+Google OAuth 的生产首页应介绍当前开放的功能并链接隐私说明。
+
 ## 检查和测试
 
 ```bash
@@ -122,7 +128,7 @@ bun run test:http    # 启动构建产物，做页面和接口的 HTTP 级测试
 - 新用户登录后先到 `/onboarding`：确认昵称、选填简介、建议再加一种登录方式。点"完成"或"以后再说"后不再显示。
 - 注销（`POST /api/v1/me/deletion`）要求 10 分钟内刚登录过，还要照着输入自己的用户 id。发起后账号立即进入
   "注销中"、所有会话失效，并投递一个 `user.purge` 任务：没有内容的账号立即清除，有内容的保留 7 天，期间重新登录
-  可以撤销（`/account-deletion`）。冷静期里除了注销提示页本身，页面都跳到注销提示页；`/api/v1/*` 只放行
+  可以撤销（`/account-deletion`）。冷静期里除了注销提示页和隐私说明，页面都跳到注销提示页；`/api/v1/*` 只放行
   `GET /api/v1/me`、`DELETE /api/v1/me/deletion`、`GET /api/v1/meta`、`GET /api/v1/login-options`、
   `GET /api/v1/users/:id` 五个请求（`HEAD` 同 `GET`），其余一律 403 `ACCOUNT_PENDING_DELETION`；Better Auth 里改账号的
   7 个接口（绑定、解绑、添加 / 改名 / 删除通行密钥、绑定 QQ，见 `src/server/auth/account-rules.ts`）也一样，登录和退出
@@ -179,10 +185,11 @@ pg-boss 的表和队列还没建好时，web 的 `jobs` 就绪检查不过，`/r
 | 变量 | 本机开发 | g510（`compose.yaml`） | 谁来填 |
 |---|---|---|---|
 | `PUBLIC_ORIGIN` | `http://localhost:5373` | `https://adxc.saop.cc` | 手填 |
+| `PUBLIC_CONTACT_EMAIL` | 可选 | 必填：公开展示在 `/privacy` 的联系邮箱 | 用户 |
 | `DATABASE_URL`、`REDIS_URL` | `compose.dev.yaml` 的地址 | compose 给出容器网络里的地址 | — |
 | `PORT`、`HOST` | 默认 `127.0.0.1:3000` | 镜像里是 `0.0.0.0:3000` | — |
 | `BETTER_AUTH_SECRET` | 必填 | 必填，上线后不能换（换了所有人要重新登录） | `ops/fill-secrets.sh` |
-| `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` | 开发用的客户端 | 社区站自己的 Google Cloud 项目里的生产客户端 | 用户 |
+| `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` | 开发用的客户端 | 可复用社区站已有客户端，核对生产回调地址 | 用户 |
 | `TURNSTILE_SITE_KEY`、`TURNSTILE_SECRET_KEY` | 官方测试密钥 | 真实密钥（域名 `adxc.saop.cc`） | 用户 |
 | `HTTPS_PROXY` | 可选：本机连 Google 的代理 | 不填；用 `OUTBOUND_HTTPS_PROXY` | 用户 |
 | `QQ_SENDER` | `console` | compose 定为 `napcat` | — |

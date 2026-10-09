@@ -6,6 +6,7 @@ const SECRET = "0123456789abcdef0123456789abcdef";
 
 const complete = {
   PUBLIC_ORIGIN: "https://community.example.com",
+  PUBLIC_CONTACT_EMAIL: "privacy@community.example.com",
   DATABASE_URL: "postgres://community:secret@db:5432/community",
   REDIS_URL: "redis://redis:6379",
   BETTER_AUTH_SECRET: SECRET,
@@ -38,6 +39,7 @@ describe("parseEnv", () => {
       port: 3000,
       host: "127.0.0.1",
       publicOrigin: "https://community.example.com",
+      publicContactEmail: "privacy@community.example.com",
       databaseUrl: "postgres://community:secret@db:5432/community",
       redisUrl: "redis://redis:6379",
       betterAuthSecret: SECRET,
@@ -47,6 +49,20 @@ describe("parseEnv", () => {
       qq: { sender: "console" },
       umami: null,
     });
+  });
+
+  test("公开联系邮箱：开发时可不填，填写后必须是邮箱", () => {
+    expect(parseEnv(without(complete, "PUBLIC_CONTACT_EMAIL")).publicContactEmail).toBeNull();
+    expect(parseEnv({ ...complete, PUBLIC_CONTACT_EMAIL: '"privacy@community.example.com"' }).publicContactEmail).toBe(
+      "privacy@community.example.com"
+    );
+    expect(() => parseEnv({ ...complete, PUBLIC_CONTACT_EMAIL: "not-an-email" })).toThrow(/PUBLIC_CONTACT_EMAIL/);
+  });
+
+  test("生产环境必须填写公开联系邮箱", () => {
+    expect(() => parseEnv({ ...without(complete, "PUBLIC_CONTACT_EMAIL"), ...napcat, NODE_ENV: "production" })).toThrow(
+      /PUBLIC_CONTACT_EMAIL 未设置/
+    );
   });
 
   test("缺项时一次报全", () => {

@@ -97,6 +97,9 @@ function HomeContent() {
         </CardContent>
       </Card>
       <p className="text-muted-foreground">{m.home_description()}</p>
+      <Link to={localizeHref("/privacy")} className={textLinkClass}>
+        {m.privacy_link()}
+      </Link>
       {data ? <p className="text-xs text-muted-foreground">{m.home_api_version({ version: data.apiVersion })}</p> : null}
     </main>
   );

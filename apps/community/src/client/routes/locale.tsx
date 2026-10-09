@@ -38,7 +38,7 @@ export const middleware: Route.MiddlewareFunction[] = [
     checkLocale(args);
     return next();
   },
-  // 待注销的用户只能看注销提示页（spec 第 10.6 节）。当前用户存进本次请求的 QueryClient，页面的 loader 再要时直接
+  // 待注销的用户能看注销提示页和隐私说明。当前用户存进本次请求的 QueryClient，页面的 loader 再要时直接
   // 命中缓存，不会多发请求；取不到（429、5xx）时不拦，交给页面自己处理。
   async ({ context, url }, next) => {
     const me = await context

@@ -48,6 +48,19 @@ afterAll(() => {
   server.stop();
 });
 
+describe("隐私说明的登录状态", () => {
+  test("正常和待注销用户都可阅读，待注销状态不会触发重定向", async () => {
+    for (const pending of [false, true]) {
+      const { cookie } = await seedUser("隐私说明访问", { pending });
+      for (const path of ["/privacy", "/en/privacy", "/ja/privacy"]) {
+        const response = await fetch(server.url(path), { headers: { cookie }, redirect: "manual" });
+        expect(response.status, `${pending}:${path}`).toBe(200);
+        expect(await response.text()).toContain('href="mailto:privacy@example.test"');
+      }
+    }
+  });
+});
+
 describe("个人主页", () => {
   test("允许收录：标题、描述是昵称和简介，显示用户 ID；不缓存", async () => {
     const { id } = await seedUser("主页测试", { bio: "写谱的\n也打歌" });

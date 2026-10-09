@@ -23,6 +23,13 @@ describe("pendingDeletionRedirect", () => {
     }
   });
 
+  test("待注销用户也能阅读隐私说明，三种语言和末尾斜杠均可", () => {
+    for (const pathname of ["/privacy", "/privacy/", "/en/privacy", "/en/privacy/", "/ja/privacy"]) {
+      expect(pendingDeletionRedirect(PENDING, pathname), pathname).toBeNull();
+    }
+    expect(pendingDeletionRedirect(PENDING, "/privacy/unrelated")).toBe("/account-deletion");
+  });
+
   test("没登录、正常用户：不受影响", () => {
     expect(pendingDeletionRedirect(null, "/settings/account")).toBeNull();
     expect(pendingDeletionRedirect(undefined, "/")).toBeNull();
@@ -51,7 +58,7 @@ describe("跳转保留语言", () => {
   });
 });
 
-// 规则是"除了注销提示页，每个页面都跳"（spec 第 10.6 节）：这里按路由表核对，新加的页面也逃不掉。
+// 只有注销提示页和公开隐私说明允许待注销用户访问；按路由表核对，其余页面都跳转。
 // 布局（:lang?）是路由表里唯一的顶层路由，它的中间件因此对所有页面生效，带语言前缀的未知地址（*）也一样。
 // 没有前缀的未知地址（/foo）：第一段被当成语言，第一个中间件 checkLocale 先判它 404，用不着跳。
 describe("路由表", () => {
@@ -66,15 +73,15 @@ describe("路由表", () => {
     expect(topLevelRest).toEqual([]);
     expect(layout?.path).toBe(":lang?");
     // 别让上面的遍历变成空转：这几个页面都在路由表里。
-    for (const pattern of ["", "login", "onboarding", "settings/account", "settings/profile", "u/:id", "account-deletion", "*"]) {
+    for (const pattern of ["", "login", "onboarding", "settings/account", "settings/profile", "u/:id", "account-deletion", "privacy", "*"]) {
       expect(patterns, pattern).toContain(pattern);
     }
   });
 
-  test("除了注销提示页，路由表里的每个页面都把待注销的用户送去注销提示页", () => {
+  test("除了注销提示页和隐私说明，路由表里的每个页面都把待注销的用户送去注销提示页", () => {
     for (const pattern of patterns) {
       const pathname = concrete(pattern);
-      expect(pendingDeletionRedirect(PENDING, pathname), pathname).toBe(pattern === "account-deletion" ? null : "/account-deletion");
+      expect(pendingDeletionRedirect(PENDING, pathname), pathname).toBe(["account-deletion", "privacy"].includes(pattern) ? null : "/account-deletion");
     }
   });
 
