@@ -6,9 +6,8 @@ import { createOctokitGitHubClient, noRetryOnRateLimit, type OctokitClientConfig
 
 // 这个文件测四类东西：
 //   1. withOctokit 的缓存契约——哪些失败该清缓存、哪些不该（I-4）。
-//   2. 每个方法的请求确实带上了超时 signal。
-//   3. 限流时真的不等不重试（I-1 的第二个问题）。
-//   4.「GitHub 字段名 → DTO」的映射（文件下半部分「字段映射」「outbound
+//   2. 限流时真的不等不重试（I-1 的第二个问题）。
+//   3.「GitHub 字段名 → DTO」的映射（文件下半部分「字段映射」「outbound
 //      映射」「决策」几组 describe）。这部分以前是刻意不测的（见 2026-09-21
 //      progress.md 的 Task 8 记录）——fake-client.ts 直接返回已经是
 //      camelCase 的 DTO，把 octokit-client.ts 里 snake_case→camelCase 这层
@@ -18,6 +17,10 @@ import { createOctokitGitHubClient, noRetryOnRateLimit, type OctokitClientConfig
 //      toRunSummary 和各方法体内联的映射代码是真的在跑，喂给它的是从安装
 //      的 `octokit` 包自身方法签名派生出的、结构上等价于 GitHub 真实
 //      wire 格式的 fixture（不是凭记忆造的字段名）。
+//   4. 19 个 octokit 调用点每一个都真的挂了超时 signal（文件末尾「请求
+//      超时」那一组）。它排在最后，是因为要同时用上面两套桩——`router`
+//      那根假 fetch 和 `fakeOctokit` 那套手写 rest 桩——才能把 11 个
+//      repo/actions 调用点和 8 个 content 调用点一次走完。
 
 const config: OctokitClientConfig = {
   appId: "test-app-id",
@@ -208,39 +211,6 @@ describe("createOctokitGitHubClient 的缓存契约", () => {
     await client.getRepoInfo();
 
     expect(mintCount).toBe(1);
-  });
-});
-
-describe("请求超时：每个真实调用都挂了 AbortSignal", () => {
-  test("传给 octokit 的调用参数里带了一个还没触发的 AbortSignal", async () => {
-    // 不用真的等超时触发（20s/45s，会让测试慢得没法用）——这里只证明
-    //「超时机制真的接到了这次调用上」：捕获 rest.repos.get 收到的参数，
-    // 断言 request.signal 是一个尚未 aborted 的 AbortSignal 实例。如果
-    // 有人以后把某个调用点的 `request: { signal: timeoutSignal(...) }`
-    // 删掉，这条测试会红。
-    let capturedOptions: any;
-    const mintOctokit = async () => ({
-      rest: {
-        repos: {
-          get: async (options: any) => {
-            capturedOptions = options;
-            return {
-              data: {
-                owner: { login: config.owner },
-                name: config.repo,
-                default_branch: "main",
-              },
-            };
-          },
-        },
-      },
-    });
-
-    const client = createOctokitGitHubClient(config, mintOctokit as any);
-    await client.getRepoInfo();
-
-    expect(capturedOptions.request?.signal).toBeInstanceOf(AbortSignal);
-    expect(capturedOptions.request.signal.aborted).toBe(false);
   });
 });
 
@@ -447,8 +417,24 @@ function noContentResponse(): Response {
   return new Response(null, { status: 204 });
 }
 
-type MockFetch = (url: string, init?: { method?: string; body?: unknown }) => Promise<Response>;
-type RecordedCall = { method: string; path: string; body: unknown };
+/**
+ * `init` 里专门列出 `signal`：`@octokit/request@10.0.16` 的
+ * `dist-src/fetch-wrapper.js` 把 `requestOptions.request?.signal` 原样塞进真
+ * fetch 的 init（那个文件里 `signal:` 只出现这一处），所以这根假 fetch 看得见
+ * 每一次请求实际带着的超时 signal——调用点漏了 `request: { signal: ... }`，
+ * 这里收到的就是 `undefined`。文件末尾「请求超时」那一组靠的正是这个缝隙。
+ */
+type MockFetch = (
+  url: string,
+  init?: { method?: string; body?: unknown; signal?: AbortSignal | null }
+) => Promise<Response>;
+type RecordedCall = {
+  method: string;
+  path: string;
+  body: unknown;
+  /** 这次请求实际带的超时 signal；调用点没挂时是 undefined。 */
+  signal?: AbortSignal | null;
+};
 
 /**
  * 按「HTTP 方法 + URL 路径」（不含查询串——查询串留给测试自己去 `calls`
@@ -471,7 +457,7 @@ function router(
     const method = init?.method ?? "GET";
     const rawBody = init?.body;
     const body = typeof rawBody === "string" ? JSON.parse(rawBody) : rawBody;
-    calls.push({ method, path: url.pathname + url.search, body });
+    calls.push({ method, path: url.pathname + url.search, body, signal: init?.signal });
     const respond = rules[`${method} ${url.pathname}`];
     if (!respond) throw new Error(`测试假 fetch 没有认识的路由：${method} ${url.pathname}${url.search}`);
     return await respond(url, method, body);
@@ -1446,5 +1432,210 @@ describe("createContentMethods.getContentFile", () => {
     const octokit = fakeOctokit({ fileContent: "", fileEncoding: "none", fileSha: "sha1" });
     const client = makeContentClient(octokit);
     await expect(client.getContentFile("apps/web/content/community.json")).rejects.toThrow();
+  });
+});
+
+/**
+ * 这一组以前只有一条测试、只经过 `getRepoInfo` 一个调用点，标题却写着「每个
+ * 真实调用都挂了 AbortSignal」，注释还声称「删掉任一调用点的 signal 这条测试
+ * 就会红」。2026-09-22 逐点做变异测试实测，那句话是假的：
+ *
+ *     删 getRepoInfo 的 signal  →  红（43 pass / 1 fail）
+ *     删 listBranches 的        →  全绿（44 pass / 0 fail）
+ *     删 createTree 的          →  全绿
+ *
+ * 19 个调用点里有 18 个的超时没有任何测试在守。一句声称有覆盖而实际没有的
+ * 注释比没有注释更糟——它恰好会让人在重构时放心地把某个超时删掉，而超时的
+ * 存在理由（见 octokit-client.ts 顶部 READ_TIMEOUT_MS / WRITE_TIMEOUT_MS 的
+ * 注释）是：不挂 signal 的话 `withOctokit` 里那个 await 永远不会 settle，
+ * poller 的 `tick()` 和共用同一个实例的路由 handler 一起被钉死，且没有任何
+ * 日志或界面提示。所以这里不是把标题改软，是把覆盖真的补齐到 19 个。
+ *
+ * 怎么做到「遍历全部调用点」而不手抄 19 份桩：两套桩各有一个天然收口点，
+ * 断言下在收口点上，而不是下在某一个方法上。
+ *
+ *   - repo/actions 的 11 个调用点走 `router()` 那根假 fetch。
+ *     `@octokit/request@10.0.16` 的 `dist-src/fetch-wrapper.js` 把
+ *     `requestOptions.request?.signal` 原样传给真 fetch 的 init，所以假 fetch
+ *     看得见每一次请求实际带的 signal，调用点漏了就是 `undefined`。
+ *   - content 的 8 个调用点走 `fakeOctokit()` 那套手写 rest 桩。桩是 `mock()`
+ *     造的，`.mock.calls[0][0]` 就是调用点传给 octokit 的整个 options 对象，
+ *     `request.signal` 直接可读——`restStub` 把参数声明成 `options: any` 并
+ *     真的透传，本来就是为这类断言留的缝。
+ *
+ * 这一组不断言超时的*时长*（READ 20s 还是 WRITE 45s）：`AbortSignal` 没有任何
+ * 公开方式回头问「你是多少毫秒的」，真等它触发又要 20~45 秒。所以能钉住的是
+ * 「挂了一个尚未触发的超时 signal」，钉不住「挂的是哪一档」——把
+ * `timeoutSignal(READ_TIMEOUT_MS)` 错写成 `timeoutSignal(WRITE_TIMEOUT_MS)`
+ * 这条，这里查不出来。
+ */
+describe("请求超时：19 个调用点逐个确认都挂了 AbortSignal", () => {
+  test("客户端的方法清单没变——新增方法必须同时回到下面两条遍历里补一条驱动", () => {
+    // 下面两条测试是「驱动每个公开方法，再在收口点上断言」。它们守得住既有
+    // 方法里新长出来的调用点（请求条数对不上就红），却守不住一个压根没人驱动
+    // 的新方法。这条把方法清单本身钉死：新增方法会先让这里红，而红的位置正是
+    // 「该去补驱动」的地方，不会悄悄多出一个没人看守的调用点。
+    //
+    // `mintOctokit` 给的是个空对象：客户端的铸造是惰性的（`cached ??=`），
+    // 只取方法名不会真的去调用它。
+    const client = createOctokitGitHubClient(config, async () => ({}) as any);
+
+    expect(Object.keys(client).sort()).toEqual([
+      "cancelRun",
+      "commitFiles",
+      "dispatchWorkflow",
+      "getContentFile",
+      "getFailedStepLog",
+      "getRepoInfo",
+      "getRun",
+      "listBranches",
+      "listRuns",
+      "listWorkflows",
+      "rerunRun",
+    ]);
+  });
+
+  test("createRepoMethods / createActionsMethods 的 11 个调用点：每个发出的请求都带着尚未触发的 AbortSignal", async () => {
+    // 这个 job 是 failure，getFailedStepLog 才会往下走到「下载日志」那个
+    // 调用点；同一份 jobs 响应也喂给 getRun，两个方法共用一条路由规则。
+    const failedJob = makeJobData({
+      id: 5001,
+      conclusion: "failure",
+      steps: [{ name: "Build site", status: "completed", conclusion: "failure", number: 1 }],
+    });
+    const { fetch, calls } = router({
+      [`GET ${repoPath()}`]: () => jsonResponse(makeRepoData()),
+      [`GET ${repoPath("/branches")}`]: () => jsonResponse([makeBranchData()]),
+      [`GET ${repoPath("/actions/workflows")}`]: () =>
+        jsonResponse({ total_count: 1, workflows: [makeWorkflowData()] }),
+      [`GET ${repoPath("/actions/runs")}`]: () =>
+        jsonResponse({ total_count: 1, workflow_runs: [makeRunData()] }),
+      [`GET ${repoPath("/actions/runs/1001")}`]: () => jsonResponse(makeRunData()),
+      [`GET ${repoPath("/actions/runs/1001/jobs")}`]: () =>
+        jsonResponse({ total_count: 1, jobs: [failedJob] }),
+      [`GET ${repoPath("/actions/jobs/5001/logs")}`]: () => textResponse("boom\n"),
+      [`POST ${repoPath("/actions/workflows/7/dispatches")}`]: () => noContentResponse(),
+      [`POST ${repoPath("/actions/runs/1001/rerun")}`]: () => jsonResponse({}, 201),
+      [`POST ${repoPath("/actions/runs/1001/cancel")}`]: () => jsonResponse({}, 202),
+    });
+
+    const reads = makeClient(fetch);
+    await reads.getRepoInfo();
+    await reads.listBranches();
+    await reads.listWorkflows();
+    await reads.listRuns();
+    await reads.getRun(1001);
+    await reads.getFailedStepLog(1001);
+
+    // 三个写操作各用一个独立 client：见 `makeClient` 上面那段注释——
+    // `@octokit/plugin-throttling` 的 `groups.write` 按 `throttle.id` 分组、
+    // `minTime: 1000`，三个 POST 串在同一个实例上会被强制隔开 1 秒。这不是
+    // 照搬那段注释的推论，是对照跑出来的：三个写操作共用一个 client 时本文件
+    // 4.82s → 7.03s，差 2.21s，正好是两次 minTime 等待。它们共用同一根假
+    // fetch，所以 `calls` 仍然是一条完整的流水。
+    await makeClient(fetch).dispatchWorkflow(7, "dev");
+    await makeClient(fetch).rerunRun(1001);
+    await makeClient(fetch).cancelRun(1001);
+
+    // 先钉住「这一趟到底发出了哪些请求」——多一条少一条都得回到这里改。这是
+    // 新增调用点的闸门：以后谁在 getRun 里多 await 一个端点，这里会先因为条数
+    // 对不上而红，改完之后那个新调用点就自动被下面的 signal 断言一起守住了。
+    // 比较前去掉查询串（per_page 之类不是这条测试关心的）、排序（getRun 的两
+    // 个请求是 Promise.all 并发发出的，先后顺序不保证）。
+    expect(calls.map((call) => `${call.method} ${call.path.replace(/\?.*$/, "")}`).sort()).toEqual(
+      [
+        `GET ${repoPath()}`,
+        `GET ${repoPath("/branches")}`,
+        `GET ${repoPath("/actions/workflows")}`,
+        `GET ${repoPath("/actions/runs")}`,
+        `GET ${repoPath("/actions/runs/1001")}`,
+        `GET ${repoPath("/actions/runs/1001/jobs")}`, // getRun 的
+        `GET ${repoPath("/actions/runs/1001/jobs")}`, // getFailedStepLog 的
+        `GET ${repoPath("/actions/jobs/5001/logs")}`,
+        `POST ${repoPath("/actions/workflows/7/dispatches")}`,
+        `POST ${repoPath("/actions/runs/1001/rerun")}`,
+        `POST ${repoPath("/actions/runs/1001/cancel")}`,
+      ].sort()
+    );
+
+    // 断言下在假 fetch 这个收口点上，而不是下在某一个方法上：11 次请求里任意
+    // 一次缺 signal 都会被原地点名，失败信息直接就是「哪个端点漏了」。
+    const missing = calls
+      .filter((call) => !(call.signal instanceof AbortSignal))
+      .map((call) => `${call.method} ${call.path}`);
+    expect(missing).toEqual([]);
+
+    // 还没触发：`AbortSignal.timeout()` 是一次性的，如果谁把它提到函数外面存
+    // 成共享变量（`timeoutSignal` 的注释里点名警告过的那个改法），复用到的就
+    // 会是一个已经 aborted 的 signal，请求还没发出去就直接判超时。
+    const alreadyAborted = calls
+      .filter((call) => call.signal?.aborted)
+      .map((call) => `${call.method} ${call.path}`);
+    expect(alreadyAborted).toEqual([]);
+  });
+
+  test("createContentMethods 的 8 个调用点：每个传给 octokit 的参数都带着尚未触发的 AbortSignal", async () => {
+    // 两个独立的 fakeOctokit：它的 getContent 桩一旦配了 fileContent，就会对
+    // 所有 getContent 调用回同一份文件正文，而 commitFiles 的 verify-blob 要走
+    // 的是 blobShaByPath 那条分支（见 FakeOctokitOptions 上的注释：两组测试不
+    // 会同时配这两个字段）。分开还顺带解决了一件事——repos.getContent 有两个
+    // 不同的调用点（getContentFile 一个、verify-blob 一个），落在两个桩上，各
+    // 自的 mock.calls 就是各自调用点的独立证据，不会混成一堆分不清谁是谁。
+    const readerKit = fakeOctokit({ fileContent: "{}\n", fileSha: "blobA" });
+    await makeContentClient(readerKit).getContentFile("apps/web/content/community.json");
+
+    const writerKit = fakeOctokit({
+      refSha: "head1",
+      commitTreeSha: "tree1",
+      blobShaByPath: { "data/a.json": "blobA", "data/b.json": "blobB" },
+    });
+    await makeContentClient(writerKit).commitFiles({
+      branch: "main",
+      message: "chore: 超时覆盖",
+      // 喂两个文件：verify-blob 和 create-blob 这两个调用点在实现里是按文件
+      // 循环/并发的，两个文件才能证明断言覆盖的是整个循环，而不是只碰到了第
+      // 一次迭代就收工。
+      files: [
+        { path: "data/a.json", content: "a\n", baseSha: "blobA" },
+        { path: "data/b.json", content: "b\n", baseSha: "blobB" },
+      ],
+    });
+
+    const optionsOf = (stub: { mock: { calls: unknown[][] } }): any[] =>
+      stub.mock.calls.map((call) => call[0]);
+
+    // 八个调用点，按它们在 octokit-client.ts 里出现的顺序。
+    const sites: { site: string; options: any[] }[] = [
+      { site: "getContentFile → repos.getContent", options: optionsOf(readerKit.rest.repos.getContent) },
+      { site: "commitFiles/read-head → git.getRef", options: optionsOf(writerKit.rest.git.getRef) },
+      { site: "commitFiles/read-base-commit → git.getCommit", options: optionsOf(writerKit.rest.git.getCommit) },
+      { site: "commitFiles/verify-blob → repos.getContent", options: optionsOf(writerKit.rest.repos.getContent) },
+      { site: "commitFiles/create-blob → git.createBlob", options: optionsOf(writerKit.rest.git.createBlob) },
+      { site: "commitFiles/create-tree → git.createTree", options: optionsOf(writerKit.rest.git.createTree) },
+      { site: "commitFiles/create-commit → git.createCommit", options: optionsOf(writerKit.rest.git.createCommit) },
+      { site: "commitFiles/update-ref → git.updateRef", options: optionsOf(writerKit.rest.git.updateRef) },
+    ];
+
+    // 八个调用点一个都不能是 0 次——否则「遍历了全部调用点」又成了一句空话。
+    expect(sites.filter((entry) => entry.options.length === 0).map((entry) => entry.site)).toEqual([]);
+
+    // 按文件循环的那两个调用点确实各跑了两遍，不是只碰到第一次迭代。
+    expect(optionsOf(writerKit.rest.repos.getContent)).toHaveLength(2);
+    expect(optionsOf(writerKit.rest.git.createBlob)).toHaveLength(2);
+
+    // 两处 repos.getContent 确实是两个不同的调用点：读文件那个不带 ref，
+    // verify-blob 那个带着刚读到的 head sha。
+    expect(optionsOf(readerKit.rest.repos.getContent)[0].ref).toBeUndefined();
+    expect(optionsOf(writerKit.rest.repos.getContent)[0].ref).toBe("head1");
+
+    const missing = sites.flatMap((entry) =>
+      entry.options.filter((options) => !(options.request?.signal instanceof AbortSignal)).map(() => entry.site)
+    );
+    expect(missing).toEqual([]);
+
+    const alreadyAborted = sites.flatMap((entry) =>
+      entry.options.filter((options) => options.request?.signal?.aborted).map(() => entry.site)
+    );
+    expect(alreadyAborted).toEqual([]);
   });
 });
