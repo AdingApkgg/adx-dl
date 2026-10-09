@@ -220,8 +220,11 @@ pg-boss 的表和队列还没建好时，web 的 `jobs` 就绪检查不过，`/r
   Cloudflare，还能自己带 `CF-Connecting-IP` 冒充访客的 IP（限流和登录设备都认这个头）。g510 上给 astrbot 用的 napcat
   容器（WebUI 在宿主机的 6099）和这里的 `napcat` 互不相干。
 - **部署**：在 g510 的 `apps/community` 下 `./deploy.sh`。它只在 `pre` 分支上拉代码（`git pull --ff-only`），检查 compose
-  的变量，构建，先跑迁移（失败就停，旧版本照常服务），再重启 web 和 worker，最后等 `/readyz`（最多 60 秒）。没就绪时打印
-  回滚办法：`git checkout --detach <上一个提交> && ./deploy.sh --no-pull`。NapCat 和 Umami 不由它重启，要动它们时单独
+  的变量，构建，先跑迁移（失败就停，旧版本照常服务），再重启 web 和 worker，最后等 `/readyz`（默认最多 60 秒，
+  `READY_TIMEOUT` 可设为 1–2147483647 之间的整数秒）。探针和休眠都只用剩余时间；失败后的诊断请求可额外花最多 5 秒。
+  本机的 `.deploy-revision` 原子记录最近就绪成功的提交，失败和重试都保留它；第一次运行时先以拉取前的 checkout 为基线，
+  所以已有部署第一次改用脚本时，应从当前实际运行的提交开始。不要删除该文件或同时运行多个部署。没就绪时打印
+  回滚办法：`git checkout --detach <记录的提交> && ./deploy.sh --no-pull`，回滚成功也会更新记录。NapCat 和 Umami 不由它重启，要动它们时单独
   `docker compose up -d napcat`（或 `umami`）。
 - `/readyz` 只回答本机的探针：带 `CF-Connecting-IP` 的请求（经 Cloudflare 来的）一律 404。
 - **访问 Google 的代理**：`.env` 里 `OUTBOUND_HTTPS_PROXY=http://host.docker.internal:20171`，compose 把它作为

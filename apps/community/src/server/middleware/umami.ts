@@ -48,9 +48,9 @@ export function umamiProxy(options: UmamiProxyOptions) {
         return jsonError(c, 502, "UPSTREAM_UNAVAILABLE", "Analytics is unavailable");
       }
       // 只带回内容的类型和缓存时间：上游的 Set-Cookie、CSP 之类不该落到本站的响应上。
-      return c.body(await res.arrayBuffer(), res.status as 200, {
-        "content-type": res.headers.get("content-type") ?? "text/javascript",
-        "cache-control": res.headers.get("cache-control") ?? "public, max-age=3600",
+      return c.body(res.body, res.response.status as 200, {
+        "content-type": res.response.headers.get("content-type") ?? "text/javascript",
+        "cache-control": res.response.headers.get("cache-control") ?? "public, max-age=3600",
       });
     });
 
@@ -78,8 +78,8 @@ export function umamiProxy(options: UmamiProxyOptions) {
         if (!res) {
           return jsonError(c, 502, "UPSTREAM_UNAVAILABLE", "Analytics is unavailable");
         }
-        return c.body(await res.arrayBuffer(), res.status as 200, {
-          "content-type": res.headers.get("content-type") ?? "application/json",
+        return c.body(res.body, res.response.status as 200, {
+          "content-type": res.response.headers.get("content-type") ?? "application/json",
           "cache-control": "no-store",
         });
       }
@@ -88,10 +88,12 @@ export function umamiProxy(options: UmamiProxyOptions) {
 
   app.all("*", (c) => jsonError(c, 404, "NOT_FOUND", "Not found"));
 
-  // 连不上、超时都返回 null，由调用方回 502。
-  async function forward(url: string, init: RequestInit): Promise<Response | null> {
+  // 连接和响应体传输都受同一个超时保护；任何一步失败都走限频日志，由调用方回 502。
+  async function forward(url: string, init: RequestInit): Promise<{ response: Response; body: ArrayBuffer } | null> {
     try {
-      return await send(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+      const response = await send(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+      const body = await response.arrayBuffer();
+      return { response, body };
     } catch (error) {
       options.onError(error);
       return null;

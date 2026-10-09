@@ -1,7 +1,11 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 
+import { createLogger } from "@/shared/log";
+
 import { createApp } from "../app";
 import { testAppDeps } from "../testing/app-deps";
+import { throttledErrorLog } from "../throttled-log";
+import { umamiProxy } from "./umami";
 
 type Received = { method: string; path: string; headers: Record<string, string>; body: string };
 
@@ -146,4 +150,50 @@ describe("/_s/*：转发给 Umami", () => {
 
     expect(logs().filter((entry) => entry.event === "umami_forward_failed")).toHaveLength(1);
   });
+});
+
+describe("Umami 的响应体传输失败", () => {
+  for (const [method, path] of [
+    ["GET", "/script.js"],
+    ["POST", "/api/send"],
+  ] as const) {
+    for (const failure of ["timeout", "reset"] as const) {
+      test(`${method} ${path}: ${failure} 返回 502，重复错误走限频日志`, async () => {
+        const lines: string[] = [];
+        const unhandled: unknown[] = [];
+        const app = umamiProxy({
+          internalUrl: "http://umami.test",
+          timeoutMs: 20,
+          onError: throttledErrorLog(createLogger((line) => lines.push(line)), "umami_forward_failed"),
+          fetch: async (_url, init) =>
+            new Response(
+              new ReadableStream({
+                start(controller) {
+                  controller.enqueue(new TextEncoder().encode("partial"));
+                  if (failure === "reset") {
+                    controller.error(new Error("upstream connection reset"));
+                  } else {
+                    init.signal?.addEventListener("abort", () => controller.error(init.signal?.reason), { once: true });
+                  }
+                },
+              })
+            ),
+        });
+        app.onError((error, c) => {
+          unhandled.push(error);
+          return c.json({ error: "unhandled" }, 500);
+        });
+
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const res = await app.request(path, { method, body: method === "POST" ? "{}" : undefined });
+          expect(res.status).toBe(502);
+          expect(await res.json()).toEqual({
+            error: { code: "UPSTREAM_UNAVAILABLE", message: "Analytics is unavailable" },
+          });
+        }
+        expect(unhandled).toEqual([]);
+        expect(lines.map((line) => JSON.parse(line).event)).toEqual(["umami_forward_failed"]);
+      });
+    }
+  }
 });
