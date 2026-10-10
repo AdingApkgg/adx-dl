@@ -332,6 +332,9 @@ export function DownloadDock({ locale }: { locale: Locale }) {
     visible.length > 0
       ? Math.round(visible.reduce((sum, job) => sum + jobPercent(job), 0) / visible.length)
       : 0;
+  const bottomOffset = bottomBars > 0
+    ? "calc(var(--batch-download-bar-height, 5rem) + max(1rem, env(safe-area-inset-bottom)) + var(--music-player-mobile-reserve, 0rem) + 0.75rem)"
+    : "calc(max(1rem, env(safe-area-inset-bottom)) + var(--music-player-mobile-reserve, 0rem))";
 
   return (
     <div
@@ -342,10 +345,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
         "pointer-events-none fixed right-4 z-50 flex w-full max-w-xs flex-col items-end gap-2"
       )}
       style={{
-        bottom:
-          bottomBars > 0
-            ? "calc(var(--batch-download-bar-height, 5rem) + max(1rem, env(safe-area-inset-bottom)) + var(--music-player-mobile-reserve, 0rem) + 0.75rem)"
-            : "calc(max(1rem, env(safe-area-inset-bottom)) + var(--music-player-mobile-reserve, 0rem))",
+        bottom: bottomOffset,
         // Own view-transition-name = pinned during page transitions (see
         // globals.css) instead of blinking with the root snapshot.
         viewTransitionName: "download-dock",
@@ -399,8 +399,8 @@ export function DownloadDock({ locale }: { locale: Locale }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ ...springSoft, opacity: { duration: 0.18, ease: EASE_OUT } }}
-              style={{ borderRadius: 16, scale: trayScale }}
-              className="pointer-events-auto relative isolate flex w-full flex-col gap-2 border border-border/70 bg-popover/95 p-3 shadow-lg ring-1 ring-foreground/5"
+              style={{ borderRadius: 16, scale: trayScale, maxHeight: `calc(100dvh - ${bottomOffset} - 1rem)` }}
+              className="pointer-events-auto relative isolate flex w-full flex-col gap-2 overflow-y-auto overscroll-contain border border-border/70 bg-popover/95 p-3 shadow-lg ring-1 ring-foreground/5"
             >
               <span aria-hidden="true" className="absolute inset-0 -z-10 rounded-[inherit] backdrop-blur" />
               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
