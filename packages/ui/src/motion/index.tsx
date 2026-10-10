@@ -8,7 +8,6 @@ import {
   motion,
   useMotionValue,
   useMotionValueEvent,
-  useReducedMotion as useOsReducedMotion,
   type HTMLMotionProps,
   type Transition,
   type Variants,
@@ -79,15 +78,39 @@ export function useMotionPreference(): MotionPreference {
   return React.useContext(MotionPreferenceContext);
 }
 
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function subscribeToOsMotion(onChange: () => void) {
+  if (typeof window.matchMedia !== "function") return () => {};
+  const media = window.matchMedia(REDUCED_MOTION_QUERY);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+
+function getOsMotionSnapshot() {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia(REDUCED_MOTION_QUERY).matches
+    : false;
+}
+
+const getServerMotionSnapshot = () => false;
+
 /**
- * Site-wide reduced-motion signal: the OS preference OR the in-site toggle.
+ * Site-wide reduced-motion signal, with an explicit site choice overriding OS.
  * Import this instead of framer-motion's own `useReducedMotion` so hand-gated
  * animations (parallax, marquees, springs) also honor the site toggle.
+ * The server snapshot is reused during hydration, then React reads the OS
+ * setting and subscribes to changes. Conditional decorations must render the
+ * same initial tree on the server and client, even when the OS reduces motion.
  */
 export function useReducedMotion(): boolean {
-  const os = useOsReducedMotion();
+  const os = React.useSyncExternalStore(
+    subscribeToOsMotion,
+    getOsMotionSnapshot,
+    getServerMotionSnapshot
+  );
   const { mode } = React.useContext(MotionPreferenceContext);
-  return mode === "off" || (mode === "system" && Boolean(os));
+  return mode === "off" || (mode === "system" && os);
 }
 
 /**
