@@ -1,11 +1,11 @@
 /**
- * The parts of the archive module that carry no dependency on `fflate`.
+ * The parts of the archive module that carry no dependency on archive codecs.
  *
  * Split out because the download UI needs the format list, the types and the
  * two DOM helpers on every page that renders a download button — while the
- * packers themselves (~49 KB raw / 18.5 KB gzip of zip and gzip implementation)
+ * ZIP/ADX and TAR/gzip packers themselves
  * are only needed once a user actually starts a download. Keeping these here
- * lets `adx-archive.ts`, and therefore `fflate`, stay behind a dynamic import.
+ * lets `adx-archive.ts`, and therefore the codecs, stay behind a dynamic import.
  *
  * `adx-archive.ts` re-exports everything below, so existing imports of the
  * combined surface keep working.

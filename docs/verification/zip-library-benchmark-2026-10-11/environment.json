@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-11",
+  "ramBytes": 17179869184,
+  "productionCommit": "0bbb20949bbdeb104650dafec7a653581a4e2719",
+  "apkRelease": "2.2.0.0023",
+  "apkSHA256": "314447d1196fc661b295bca428259239241782776db6e44668c3e6d3f036a6e9",
+  "unityPackage": "com.unity.sharp-zip-lib 1.3.8",
+  "unityDLLSHA256": "4c71374e318292c68372b4aa76c7705c80cb70c2c147c650b56911cfcc621e24",
+  "apkMetadataNullTerminatedSymbols": {
+    "Unity.SharpZipLib.dll": 1,
+    "UseZip64": 1,
+    "Zip64": 5,
+    "InstallLevels": 1,
+    "ZipFile": 1
+  },
+  "physicalDevice": false,
+  "fixtureBytes": 318736980,
+  "fixtureCharts": 6,
+  "fixtureFiles": 24,
+  "fixtureRepeat9Bytes": 2868632820,
+  "fixtureRepeat15Bytes": 4781054700,
+  "rssExcludes": "Node harness, compressed memory, swap and filesystem cache",
+  "packing": "STORE, zip.js workers disabled",
+  "input": "Disk-backed native File objects, no network/cache ingestion included"
+}

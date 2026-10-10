@@ -1,0 +1,56 @@
+[
+  {
+    "engine": "chromium",
+    "mode": "stream",
+    "archives": 1,
+    "mediaEntries": 18,
+    "crc": true,
+    "mediaSha256": true
+  },
+  {
+    "engine": "chromium",
+    "mode": "unsupported",
+    "archives": 3,
+    "mediaEntries": 18,
+    "crc": true,
+    "mediaSha256": true
+  },
+  {
+    "engine": "chromium",
+    "mode": "runtime-failure",
+    "archives": 3,
+    "mediaEntries": 18,
+    "crc": true,
+    "mediaSha256": true
+  },
+  {
+    "engine": "webkit",
+    "mode": "stream",
+    "archives": 1,
+    "mediaEntries": 18,
+    "crc": true,
+    "mediaSha256": true
+  },
+  {
+    "engine": "webkit",
+    "mode": "unsupported",
+    "archives": 3,
+    "mediaEntries": 18,
+    "crc": true,
+    "mediaSha256": true
+  },
+  {
+    "mode": "4.45-GiB-stream",
+    "entries": 360,
+    "crc": true,
+    "sha256": true,
+    "zip64": true
+  },
+  {
+    "engine": "webkit",
+    "mode": "runtime-failure-fixed",
+    "archives": 3,
+    "crc": true,
+    "mediaSha256": true
+  }
+]

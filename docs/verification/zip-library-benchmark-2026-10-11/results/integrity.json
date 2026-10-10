@@ -1,0 +1,143 @@
+[
+  {
+    "archive": "chromium-clientzip-1-blob-mobile.adx",
+    "bytes": 318741690,
+    "versionsNeeded": [
+      45
+    ],
+    "compressionMethods": [
+      0
+    ],
+    "zip64CentralEntries": 0,
+    "verifiedEntries": 24,
+    "zip64EOCD": false,
+    "pass": true
+  },
+  {
+    "archive": "chromium-clientzip-15-opfs-desktop-regular.adx",
+    "bytes": 4781125838,
+    "versionsNeeded": [
+      45
+    ],
+    "compressionMethods": [
+      0
+    ],
+    "zip64CentralEntries": 36,
+    "verifiedEntries": 360,
+    "zip64EOCD": true,
+    "pass": true
+  },
+  {
+    "archive": "chromium-clientzip-9-blob-mobile-regular.adx",
+    "bytes": 2868675034,
+    "versionsNeeded": [
+      45
+    ],
+    "compressionMethods": [
+      0
+    ],
+    "zip64CentralEntries": 0,
+    "verifiedEntries": 216,
+    "zip64EOCD": false,
+    "pass": true
+  },
+  {
+    "archive": "chromium-zipjs-1-blob-mobile.adx",
+    "bytes": 318741690,
+    "versionsNeeded": [
+      10
+    ],
+    "compressionMethods": [
+      0
+    ],
+    "zip64CentralEntries": 0,
+    "verifiedEntries": 24,
+    "zip64EOCD": false,
+    "pass": true
+  },
+  {
+    "archive": "chromium-zipjs-15-opfs-desktop-regular.adx",
+    "bytes": 4781125838,
+    "versionsNeeded": [
+      10,
+      45
+    ],
+    "compressionMethods": [
+      0
+    ],
+    "zip64CentralEntries": 36,
+    "verifiedEntries": 360,
+    "zip64EOCD": true,
+    "pass": true
+  },
+  {
+    "archive": "chromium-zipjs-9-blob-mobile-regular.adx",
+    "bytes": 2868675034,
+    "versionsNeeded": [
+      10
+    ],
+    "compressionMethods": [
+      0
+    ],
+    "zip64CentralEntries": 0,
+    "verifiedEntries": 216,
+    "zip64EOCD": false,
+    "pass": true
+  },
+  {
+    "archive": "webkit-clientzip-1-blob-mobile-regular.adx",
+    "bytes": 318741690,
+    "versionsNeeded": [
+      45
+    ],
+    "compressionMethods": [
+      0
+    ],
+    "zip64CentralEntries": 0,
+    "verifiedEntries": 24,
+    "zip64EOCD": false,
+    "pass": true
+  },
+  {
+    "archive": "webkit-clientzip-1-opfs-mobile-regular.adx",
+    "bytes": 318741690,
+    "versionsNeeded": [
+      45
+    ],
+    "compressionMethods": [
+      0
+    ],
+    "zip64CentralEntries": 0,
+    "verifiedEntries": 24,
+    "zip64EOCD": false,
+    "pass": true
+  },
+  {
+    "archive": "webkit-zipjs-1-blob-mobile-regular.adx",
+    "bytes": 318741690,
+    "versionsNeeded": [
+      10
+    ],
+    "compressionMethods": [
+      0
+    ],
+    "zip64CentralEntries": 0,
+    "verifiedEntries": 24,
+    "zip64EOCD": false,
+    "pass": true
+  },
+  {
+    "archive": "webkit-zipjs-1-opfs-mobile-regular.adx",
+    "bytes": 318741690,
+    "versionsNeeded": [
+      10
+    ],
+    "compressionMethods": [
+      0
+    ],
+    "zip64CentralEntries": 0,
+    "verifiedEntries": 24,
+    "zip64EOCD": false,
+    "pass": true
+  }
+]

@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { unzipSync } from "fflate";
+import { createMemoryArchiveStorage } from "@/lib/archive-storage.test-helper";
 
 import {
   setDownloadsPersistenceAdapterForTests,
@@ -292,7 +293,7 @@ describe("downloads-store", () => {
         groupDir: `Version ${index}`, genreDir: `Genre ${index}`,
         files: [...chart.files, { name: "pv.mp4", url: `https://example.test/${index}/pv.mp4`, bytes: 7 }],
       }));
-      const ids = useDownloadsStore.getState().startBatch({
+      const ids = await useDownloadsStore.getState().startBatch({
         id, title: "Both genres", charts, includeVideo: true, format: "zip", grouping: "genre",
       });
       await waitForCondition(() => firstWriteStarted && ids.every((id) => useDownloadsStore.getState().jobs.find((job) => job.id === id)?.status === "success"));
@@ -309,7 +310,7 @@ describe("downloads-store", () => {
       useDownloadsStore.getState().setPreferredBatchGrouping("version");
       useDownloadsStore.getState().setPreferredFormat("adx");
       useDownloadsStore.getState().setSelectedSourceId("g510");
-      useDownloadsStore.getState().rerunHistoryEntry(entry.key);
+      await useDownloadsStore.getState().rerunHistoryEntry(entry.key);
       const replays = useDownloadsStore.getState().jobs.filter((job) => !ids.includes(job.id));
       expect(replays).toHaveLength(2);
       expect(replays.map((job) => job.title)).toEqual(["Genre 0", "Genre 1"]);
@@ -329,7 +330,7 @@ describe("downloads-store", () => {
       globalThis.fetch = (async (input, init) => String(input).endsWith("/8/track.mp3")
         ? new Response("missing", { status: 404 }) : successfulFetch(input, init)) as typeof fetch;
       const id = newBatchJobId();
-      const ids = useDownloadsStore.getState().startBatch({
+      const ids = await useDownloadsStore.getState().startBatch({
         id, title: "Retry whole", charts: measuredCharts(17), includeVideo: false,
       });
       await waitForJob(ids[0], (job) => job.status === "ready");
@@ -370,7 +371,7 @@ describe("downloads-store", () => {
       const charts = measuredCharts(4);
       charts[0].files.push({ name: "pv.mp4", url: "https://example.test/0/pv.mp4", bytes: undefined! });
       charts[1].files[0].bytes = undefined!;
-      const ids = useDownloadsStore.getState().startBatch({
+      const ids = await useDownloadsStore.getState().startBatch({
         id: newBatchJobId(), title: "Mixed sizes", charts, includeVideo: false,
       });
       expect(ids.map((id) => useDownloadsStore.getState().jobs.find((job) => job.id === id)?.total)).toEqual([1, 1, 2]);
@@ -382,7 +383,7 @@ describe("downloads-store", () => {
   test("more than eight mobile parts make one original-selection history entry only when all finish", async () => {
     await onMobile(async () => {
       const id = newBatchJobId();
-      const ids = useDownloadsStore.getState().startBatch({
+      const ids = await useDownloadsStore.getState().startBatch({
         id, title: "Whole selection", charts: measuredCharts(72), includeVideo: false, format: "zip",
       });
       expect(ids).toHaveLength(9);
@@ -409,7 +410,7 @@ describe("downloads-store", () => {
   test("selection completion survives reload after a completed child cache was released", async () => {
     await onMobile(async () => {
       const id = newBatchJobId();
-      const ids = useDownloadsStore.getState().startBatch({
+      const ids = await useDownloadsStore.getState().startBatch({
         id, title: "Reload selection", charts: measuredCharts(17), includeVideo: false,
       });
       await waitForJob(ids[0], (job) => job.status === "ready");
@@ -439,7 +440,7 @@ describe("downloads-store", () => {
   test("dismissing an unfinished selection child clears its cohort and cannot claim full history", async () => {
     await onMobile(async () => {
       const id = newBatchJobId();
-      const ids = useDownloadsStore.getState().startBatch({
+      const ids = await useDownloadsStore.getState().startBatch({
         id, title: "Canceled selection", charts: measuredCharts(17), includeVideo: false,
       });
       await waitForJob(ids[0], (job) => job.status === "ready");
@@ -484,9 +485,9 @@ describe("downloads-store", () => {
         await memoryPersistence.deleteJob(id);
       } });
       try {
-        const ids = useDownloadsStore.getState().restartLegacyBatch(spec.id);
+        const ids = await useDownloadsStore.getState().restartLegacyBatch(spec.id);
         expect(ids).toHaveLength(2);
-        expect(useDownloadsStore.getState().restartLegacyBatch(spec.id)).toEqual([]);
+        expect(await useDownloadsStore.getState().restartLegacyBatch(spec.id)).toEqual([]);
         expect(useDownloadsStore.getState().jobs.some((job) => job.id === spec.id)).toBe(false);
         expect(useDownloadsStore.getState().jobs.every((job) => !job.mobileLegacyBatch)).toBe(true);
         await new Promise((resolve) => setTimeout(resolve, 20));
@@ -508,12 +509,175 @@ describe("downloads-store", () => {
       seedWholeFiles(spec);
       useDownloadsStore.getState().hydrateFromStorage();
       await waitForJob(spec.id, (job) => job.status === "paused");
-      const ids = useDownloadsStore.getState().restartLegacyBatch(spec.id);
+      const ids = await useDownloadsStore.getState().restartLegacyBatch(spec.id);
       await waitForJob(ids[0], (job) => job.status === "ready");
       expect(useDownloadsStore.getState().jobs.every((job) => job.sourceId === "custom:deleted" && job.sourceBaseUrl === baseUrl && job.sourceName === "Old mirror")).toBe(true);
       expect(fetchedUrls).toEqual([`${baseUrl}/25/0/track.mp3`]);
     });
   });
+
+  test("individual downloads keep one chart per file even when mobile streaming is supported", async () => {
+    await onMobile(async () => {
+      const disk = createMemoryArchiveStorage();
+      disk.storage.estimate = async () => ({ quota: 100 * 1024 ** 3, usage: 0 });
+      Object.defineProperty(navigator, "storage", { configurable: true, value: disk.storage });
+      const id = newBatchJobId();
+      const ids = await useDownloadsStore.getState().startBatch({
+        id, title: "Selection", includeVideo: true, individual: true,
+        charts: measuredCharts(2),
+      });
+      expect(ids).toHaveLength(2);
+      expect(ids.map(id => useDownloadsStore.getState().jobs.find(job => job.id === id)?.total)).toEqual([1, 1]);
+      await waitForJob(ids[0], job => job.status === "ready");
+      expect(fetchedUrls).toHaveLength(1);
+      expect(useDownloadsStore.getState().jobs.find(job => job.id === ids[0])?.title).toBe("Song 0");
+      expect(persistedSelections.get(id)?.job.individual).toBe(true);
+      useDownloadsStore.getState().saveArchive(ids[0], 0);
+      useDownloadsStore.getState().confirmSavedBatch(ids[0]);
+      await waitForJob(ids[1], job => job.status === "ready");
+      expect(fetchedUrls).toHaveLength(2);
+      useDownloadsStore.getState().saveArchive(ids[1], 0);
+      useDownloadsStore.getState().confirmSavedBatch(ids[1]);
+      await waitForCondition(() => useDownloadsStore.getState().history.length === 1);
+      const entry = useDownloadsStore.getState().history[0];
+      expect(entry.job.individual).toBe(true);
+      await useDownloadsStore.getState().rerunHistoryEntry(entry.key);
+      const replays = useDownloadsStore.getState().jobs.filter(job => !ids.includes(job.id));
+      expect(replays).toHaveLength(2);
+      expect(replays.map(job => job.total)).toEqual([1, 1]);
+    });
+  });
+
+  test("stream-capable mobile batches keep more than eight songs together by version", async () => {
+    await onMobile(async () => {
+      const disk = createMemoryArchiveStorage();
+      disk.storage.estimate = async () => ({ quota: 100 * 1024 ** 3, usage: 0 });
+      Object.defineProperty(navigator, "storage", { configurable: true, value: disk.storage });
+      const ids = await useDownloadsStore.getState().startBatch({
+        id: newBatchJobId(), title: "Versions", includeVideo: true,
+        charts: measuredCharts(10).map((chart, index) => ({ ...chart, groupDir: index < 9 ? "Version A" : "Version B",
+          files: chart.files.map(file => ({...file, bytes: 200 * 1024 ** 2})) })),
+      });
+      expect(ids).toHaveLength(2);
+      expect(ids.map(id => useDownloadsStore.getState().jobs.find(job => job.id === id)?.total)).toEqual([9, 1]);
+      await waitForJob(ids[0], job => job.status === "ready");
+      expect(useDownloadsStore.getState().jobs.find(job => job.id === ids[0])?.mobileMemoryWarning).toBeUndefined();
+      expect(fetchedUrls).toHaveLength(9);
+      useDownloadsStore.getState().saveArchive(ids[0], 0);
+      useDownloadsStore.getState().confirmSavedBatch(ids[0]);
+      await waitForJob(ids[1], job => job.status === "ready");
+    });
+  });
+
+  test("stream API with insufficient quota preserves mobile small parts before fetching", async () => {
+    await onMobile(async () => {
+      const disk = createMemoryArchiveStorage();
+      disk.storage.estimate = async () => ({ quota: 1, usage: 0 });
+      Object.defineProperty(navigator, "storage", { configurable: true, value: disk.storage });
+      const ids = await useDownloadsStore.getState().startBatch({
+        id: newBatchJobId(), title: "Low space", charts: measuredCharts(9), includeVideo: true,
+      });
+      expect(ids).toHaveLength(2);
+      await waitForJob(ids[0], job => job.status === "ready");
+      expect(fetchedUrls).toHaveLength(8);
+      expect(disk.files.size).toBe(0);
+    });
+  });
+
+  test("disk failure replans the full version into small parts without fetching completed songs again", async () => {
+    await onMobile(async () => {
+      let rewrites = 0;
+      setDownloadsPersistenceAdapterForTests({...memoryPersistence, persistFile: async (file) => {
+        if (persistedFiles.get(file.key)?.blob === file.blob) rewrites++;
+        await memoryPersistence.persistFile(file);
+      }});
+      const disk = createMemoryArchiveStorage();
+      const getRoot = disk.storage.getDirectory;
+      disk.storage.getDirectory = async () => {
+        const root = await getRoot();
+        const directory = await root.getDirectoryHandle();
+        const getHandle = directory.getFileHandle;
+        return {getDirectoryHandle: async () => ({...directory, getFileHandle: async (name: string) => {
+          const handle = await getHandle(name);
+          return {...handle, createWritable: async () => new WritableStream<Uint8Array>({
+            write(chunk) { if (chunk.length > 1) throw new DOMException("Quota exhausted", "QuotaExceededError"); },
+          })};
+        }})};
+      };
+      Object.defineProperty(navigator, "storage", { configurable: true, value: disk.storage });
+      const [parent] = await useDownloadsStore.getState().startBatch({
+        id: newBatchJobId(), title: "Runtime fallback", charts: measuredCharts(9), includeVideo: true,
+      });
+      await waitForCondition(() => useDownloadsStore.getState().jobs.some(job => job.fallbackParentId === parent));
+      const children = useDownloadsStore.getState().jobs.filter(job => job.fallbackParentId === parent);
+      expect(children).toHaveLength(2);
+      await waitForJob(children[0].id, job => job.status === "ready");
+      expect(fetchedUrls).toHaveLength(9);
+      useDownloadsStore.getState().saveArchive(children[0].id, 0);
+      useDownloadsStore.getState().confirmSavedBatch(children[0].id);
+      await waitForJob(children[1].id, job => job.status === "ready");
+      expect(fetchedUrls).toHaveLength(9);
+      await waitForCondition(() => useDownloadsStore.getState().history.length === 1);
+      expect(useDownloadsStore.getState().history[0].fileCount).toBe(9);
+      expect(rewrites).toBe(0);
+    });
+  });
+
+  test("a queued version loses disk headroom and splits before its first fetch", async () => {
+    await onMobile(async () => {
+      const disk = createMemoryArchiveStorage();
+      Object.defineProperty(navigator, "storage", { configurable: true, value: disk.storage });
+      const ids = await useDownloadsStore.getState().startBatch({
+        id: newBatchJobId(), title: "Headroom", charts: measuredCharts(10).map((chart, index) => ({...chart, groupDir: index === 0 ? "A" : "B"})), includeVideo: true,
+      });
+      expect(ids).toHaveLength(2);
+      await waitForJob(ids[0], job => job.status === "ready");
+      expect(fetchedUrls).toHaveLength(1);
+      disk.storage.estimate = async () => ({quota: 1, usage: 0});
+      useDownloadsStore.getState().saveArchive(ids[0], 0);
+      useDownloadsStore.getState().confirmSavedBatch(ids[0]);
+      await waitForCondition(() => useDownloadsStore.getState().jobs.filter(job => job.fallbackParentId === ids[1]).length === 2);
+      const children = useDownloadsStore.getState().jobs.filter(job => job.fallbackParentId === ids[1]);
+      await waitForJob(children[0].id, job => job.status === "ready");
+      expect(fetchedUrls).toHaveLength(9);
+      useDownloadsStore.getState().saveArchive(children[0].id, 0);
+      useDownloadsStore.getState().confirmSavedBatch(children[0].id);
+      await waitForJob(children[1].id, job => job.status === "ready");
+      expect(fetchedUrls).toHaveLength(10);
+      await waitForCondition(() => useDownloadsStore.getState().history.length === 1);
+      expect(useDownloadsStore.getState().history[0].fileCount).toBe(10);
+    });
+  });
+
+  test("confirmed mobile saves release the disk archive before fetching the next part", async () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    const disk = createMemoryArchiveStorage();
+    Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
+      userAgent: "Mozilla/5.0 (iPhone)", onLine: true, storage: disk.storage,
+    } });
+    try {
+      const ids = await useDownloadsStore.getState().startBatch({
+        id: newBatchJobId(), title: "Disk cleanup", includeVideo: true, format: "adx",
+        charts: Array.from({ length: 9 }, (_, index) => ({
+          groupDir: index < 8 ? "Version A" : "Version B",
+          dir: `Song ${index}`, files: [{ name: "track.mp3", url: `https://example.test/${index}/track.mp3`, bytes: 3 }],
+        })),
+      });
+      await waitForJob(ids[0], (job) => job.status === "ready");
+      expect(disk.files.size).toBe(1);
+      expect(fetchedUrls).toHaveLength(8);
+      expect(useDownloadsStore.getState().saveArchive(ids[0], 0)).toBe(true);
+      expect(useDownloadsStore.getState().confirmSavedBatch(ids[0])).toBe(true);
+      await waitForJob(ids[1], (job) => job.status === "ready");
+      expect(disk.removed.length).toBeGreaterThanOrEqual(1);
+      expect(disk.files.size).toBe(1); // Only the second part is retained.
+    } finally {
+      for (const job of useDownloadsStore.getState().jobs) useDownloadsStore.getState().dismiss(job.id);
+      if (original) Object.defineProperty(globalThis, "navigator", original);
+      else Reflect.deleteProperty(globalThis, "navigator");
+    }
+  });
+
   test("mobile batches retain save retries and fetch the next small group only after explicit dismissal", async () => {
     const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
     Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
@@ -527,7 +691,7 @@ describe("downloads-store", () => {
         dir: `Song ${index}`, groupDir: "maimai",
         files: [{ name: "track.mp3", url: `https://example.test/${index}/track.mp3`, bytes: 3 }],
       }));
-      const ids = useDownloadsStore.getState().startBatch({
+      const ids = await useDownloadsStore.getState().startBatch({
         id: newBatchJobId(), title: "Collection", charts, includeVideo: false,
       });
       expect(ids).toHaveLength(3);
@@ -603,7 +767,7 @@ describe("downloads-store", () => {
           name, url: `https://example.test/${index}/${name}`, bytes: 1,
         })),
       }));
-      const ids = useDownloadsStore.getState().startBatch({
+      const ids = await useDownloadsStore.getState().startBatch({
         id: newBatchJobId(), title: "Concurrency", charts, includeVideo: true,
       });
       await waitForJob(ids[0], (job) => job.status === "ready");
@@ -639,7 +803,7 @@ describe("downloads-store", () => {
           groupByIndex: Array.from({ length: 18 }, () => "maimai"),
         },
       }] });
-      useDownloadsStore.getState().rerunHistoryEntry("legacy-history");
+      await useDownloadsStore.getState().rerunHistoryEntry("legacy-history");
       const jobs = useDownloadsStore.getState().jobs;
       expect(jobs.map((job) => job.total)).toEqual(Array(18).fill(1));
       expect(jobs.every((job) => job.mobileMemoryWarning === "unknown-size")).toBe(true);
@@ -670,7 +834,7 @@ describe("downloads-store", () => {
           { name: "pv.mp4", url: `https://example.test/${index}/pv.mp4`, bytes: 512 * 1024 ** 2 },
         ],
       }));
-      const ids = useDownloadsStore.getState().startBatch({
+      const ids = await useDownloadsStore.getState().startBatch({
         id: newBatchJobId(), title: "Bytes", charts, includeVideo: false,
       });
       expect(ids).toHaveLength(3);
@@ -697,7 +861,7 @@ describe("downloads-store", () => {
         files: [{ name: "track.mp3", bytes: 80 * 1024 ** 2,
           url: `https://astrodx-charts.saop.cc/25/${index}/track.mp3` }],
       }));
-      useDownloadsStore.getState().startBatch({
+      await useDownloadsStore.getState().startBatch({
         id, title: "Measured history", charts, sourceId: "g510", includeVideo: false, format: "zip",
       });
       await waitForSettled(id);
@@ -707,7 +871,7 @@ describe("downloads-store", () => {
       Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
         userAgent: "Mozilla/5.0 (iPhone)", onLine: true,
       } });
-      useDownloadsStore.getState().rerunHistoryEntry(entry!.key);
+      await useDownloadsStore.getState().rerunHistoryEntry(entry!.key);
       const replays = useDownloadsStore.getState().jobs.filter((job) => job.id !== id);
       expect(replays.map((job) => job.total)).toEqual([1, 1]);
       expect(entry!.job.files.map((file) => file.bytes)).toEqual([80 * 1024 ** 2, 80 * 1024 ** 2]);
@@ -768,7 +932,7 @@ describe("downloads-store", () => {
         });
         return { dir, genreDir: "maimai", groupDir: "v1", files: [{ name: "track.mp3", url, bytes: 1 }] };
       });
-      const ids = useDownloadsStore.getState().startBatch({
+      const ids = await useDownloadsStore.getState().startBatch({
         id, title: "maimai", includeVideo: false, format: "zip", grouping: "genre", charts,
       });
       expect(ids).toEqual([id]);
@@ -1360,7 +1524,7 @@ describe("downloads-store", () => {
     await waitForSettled(singleId);
 
     const batchId = newBatchJobId();
-    useDownloadsStore.getState().startBatch({
+    await useDownloadsStore.getState().startBatch({
       id: batchId,
       title: "custom-source-batch",
       charts: [
@@ -1802,7 +1966,7 @@ describe("downloads-store", () => {
 
   test("batch jobs route every chart through the selected source", async () => {
     const id = newBatchJobId();
-    useDownloadsStore.getState().startBatch({
+    await useDownloadsStore.getState().startBatch({
       id,
       title: "G510 batch",
       charts: [
@@ -1867,7 +2031,7 @@ describe("downloads-store", () => {
   });
 
   test("cross-version batch queues one job per version", async () => {
-    const ids = useDownloadsStore.getState().startBatch({
+    const ids = await useDownloadsStore.getState().startBatch({
       id: newBatchJobId(),
       title: "AstroDX Charts",
       charts: [
@@ -1913,7 +2077,7 @@ describe("downloads-store", () => {
       });
     }) as typeof fetch;
 
-    const ids = useDownloadsStore.getState().startBatch({
+    const ids = await useDownloadsStore.getState().startBatch({
       id: newBatchJobId(),
       title: "AstroDX Charts",
       charts: [
@@ -1958,7 +2122,7 @@ describe("downloads-store", () => {
       });
     }) as typeof fetch;
 
-    const ids = useDownloadsStore.getState().startBatch({
+    const ids = await useDownloadsStore.getState().startBatch({
       id: newBatchJobId(),
       title: "AstroDX Charts",
       charts: ["25 CiRCLE", "24 PRiSM PLUS", "23 PRiSM", "22 BUDDiES PLUS"].map(
@@ -2011,7 +2175,7 @@ describe("downloads-store", () => {
       });
     }) as typeof fetch;
 
-    const ids = useDownloadsStore.getState().startBatch({
+    const ids = await useDownloadsStore.getState().startBatch({
       id: newBatchJobId(),
       title: "AstroDX Charts",
       charts: ["25 CiRCLE", "24 PRiSM PLUS", "23 PRiSM"].map((groupDir, index) => ({
@@ -2042,7 +2206,7 @@ describe("downloads-store", () => {
   });
 
   test("batch grouped by genre queues one job per genre folder", async () => {
-    const ids = useDownloadsStore.getState().startBatch({
+    const ids = await useDownloadsStore.getState().startBatch({
       id: newBatchJobId(),
       title: "AstroDX Charts",
       charts: [
@@ -2080,7 +2244,7 @@ describe("downloads-store", () => {
     }) as typeof fetch;
 
     // One genre → one job, so this exercises rerouting rather than the split.
-    const [id] = useDownloadsStore.getState().startBatch({
+    const [id] = await useDownloadsStore.getState().startBatch({
       id: newBatchJobId(),
       title: "AstroDX Charts",
       charts: ["Song A", "Song B"].map((dir, index) => ({
@@ -2135,7 +2299,7 @@ describe("downloads-store", () => {
     expect(localStorageValues.get("astrodx-download-batch-grouping")).toBe("genre");
 
     const id = newBatchJobId();
-    useDownloadsStore.getState().startBatch({
+    await useDownloadsStore.getState().startBatch({
       id,
       title: "Preferred grouping",
       charts: [
@@ -2157,7 +2321,7 @@ describe("downloads-store", () => {
 
   test("genre grouping without genreDir data falls back to a flat archive", async () => {
     const id = newBatchJobId();
-    useDownloadsStore.getState().startBatch({
+    await useDownloadsStore.getState().startBatch({
       id,
       title: "Legacy specs",
       charts: [
@@ -2182,7 +2346,7 @@ describe("downloads-store", () => {
 
   test("single-version batch stays one combined archive", async () => {
     const id = newBatchJobId();
-    useDownloadsStore.getState().startBatch({
+    await useDownloadsStore.getState().startBatch({
       id,
       title: "25 CiRCLE selection",
       charts: [
@@ -2234,7 +2398,7 @@ describe("downloads-store", () => {
         files: [{ name: "track.mp3", url }],
       };
     });
-    const ids = useDownloadsStore.getState().startBatch({
+    const ids = await useDownloadsStore.getState().startBatch({
       id,
       title: "maimai",
       charts,
@@ -2269,14 +2433,14 @@ describe("downloads-store", () => {
       dir,
       files: [{ name: "maidata.txt", url }],
     });
-    useDownloadsStore.getState().startBatch({
+    await useDownloadsStore.getState().startBatch({
       id: first,
       title: "AstroDX Charts",
       charts: [chartFor("Song A", "https://example.test/a/maidata.txt")],
       includeVideo: true,
       format: "adx",
     });
-    useDownloadsStore.getState().startBatch({
+    await useDownloadsStore.getState().startBatch({
       id: second,
       title: "AstroDX Charts",
       charts: [chartFor("Song B", "https://example.test/b/maidata.txt")],
@@ -2596,7 +2760,7 @@ describe("downloads-store", () => {
 
     savedFiles.length = 0;
     savedBlobs.length = 0;
-    useDownloadsStore.getState().rerunHistoryEntry(entry.key);
+    await useDownloadsStore.getState().rerunHistoryEntry(entry.key);
     const rerunId = useDownloadsStore
       .getState()
       .jobs.map((job) => job.id)

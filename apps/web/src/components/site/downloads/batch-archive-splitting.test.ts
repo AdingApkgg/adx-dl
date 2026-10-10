@@ -15,6 +15,12 @@ function chart(name: string, size: number, groupDir = "maimai"): NestedChart {
 }
 
 describe("batch archive size limits", () => {
+  test("streaming preserves an entire version above ZIP32 size while buffered mode keeps its boundaries", () => {
+    const charts = [chart("one", 1.5 * 1024 ** 3), chart("two", 1.5 * 1024 ** 3), chart("three", 1.5 * 1024 ** 3)];
+    expect(splitBatchArchives(charts, "Version", "adx", true)).toHaveLength(1);
+    expect(splitBatchArchives(charts, "Version", "adx")).toHaveLength(3);
+  });
+
   test("rejects an empty batch instead of completing without saving an archive", () => {
     expect(() => splitBatchArchives([], "collection")).toThrow("No charts selected");
   });

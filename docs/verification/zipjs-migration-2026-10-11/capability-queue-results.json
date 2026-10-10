@@ -1,0 +1,316 @@
+[
+  {
+    "engine": "chromium",
+    "mode": "stream",
+    "physicalDevice": false,
+    "ids": [
+      "batch:mv2uh349:1"
+    ],
+    "saves": [
+      {
+        "id": "batch:mv2uh349:1",
+        "filename": "BGA Version.adx",
+        "bytes": 318741892,
+        "failure": null
+      }
+    ],
+    "errors": [],
+    "state": {
+      "requests": 24,
+      "initialIds": [
+        "batch:mv2uh349:1"
+      ],
+      "jobs": [
+        {
+          "id": "batch:mv2uh349:1",
+          "status": "success",
+          "total": 24,
+          "error": null
+        }
+      ],
+      "historyCount": 1
+    },
+    "remainingFiles": 0,
+    "pass": true
+  },
+  {
+    "engine": "chromium",
+    "mode": "unsupported",
+    "physicalDevice": false,
+    "ids": [
+      "batch:mv2ui2tp:1#0",
+      "batch:mv2ui2tp:1#1",
+      "batch:mv2ui2tp:1#2"
+    ],
+    "saves": [
+      {
+        "id": "batch:mv2ui2tp:1#0",
+        "filename": "BGA Version (1).adx",
+        "bytes": 130368544,
+        "failure": null
+      },
+      {
+        "id": "batch:mv2ui2tp:1#1",
+        "filename": "BGA Version (2).adx",
+        "bytes": 101310282,
+        "failure": null
+      },
+      {
+        "id": "batch:mv2ui2tp:1#2",
+        "filename": "BGA Version (3).adx",
+        "bytes": 87063110,
+        "failure": null
+      }
+    ],
+    "errors": [],
+    "state": {
+      "requests": 24,
+      "initialIds": [
+        "batch:mv2ui2tp:1#0",
+        "batch:mv2ui2tp:1#1",
+        "batch:mv2ui2tp:1#2"
+      ],
+      "jobs": [
+        {
+          "id": "batch:mv2ui2tp:1#0",
+          "status": "success",
+          "total": 8,
+          "error": null
+        },
+        {
+          "id": "batch:mv2ui2tp:1#1",
+          "status": "success",
+          "total": 8,
+          "error": null
+        },
+        {
+          "id": "batch:mv2ui2tp:1#2",
+          "status": "success",
+          "total": 8,
+          "error": null
+        }
+      ],
+      "historyCount": 1
+    },
+    "remainingFiles": 0,
+    "pass": true
+  },
+  {
+    "engine": "chromium",
+    "mode": "runtime-failure",
+    "physicalDevice": false,
+    "ids": [
+      "batch:mv2uid5y:1"
+    ],
+    "saves": [
+      {
+        "id": "batch:mv2uid5y:1",
+        "filename": "BGA Version (1).adx",
+        "bytes": 130368544,
+        "failure": null
+      },
+      {
+        "id": "batch:mv2uid5y:1#small:d291df35-46f4-4917-beed-5a66e343b1da",
+        "filename": "BGA Version (2).adx",
+        "bytes": 101310282,
+        "failure": null
+      },
+      {
+        "id": "batch:mv2uid5y:1#small:2046b758-1fba-411e-a9d8-b883cf1acff9",
+        "filename": "BGA Version (3).adx",
+        "bytes": 87063110,
+        "failure": null
+      }
+    ],
+    "errors": [],
+    "state": {
+      "requests": 24,
+      "initialIds": [
+        "batch:mv2uid5y:1"
+      ],
+      "jobs": [
+        {
+          "id": "batch:mv2uid5y:1",
+          "parent": "batch:mv2uid5y:1",
+          "status": "success",
+          "total": 8,
+          "error": null
+        },
+        {
+          "id": "batch:mv2uid5y:1#small:d291df35-46f4-4917-beed-5a66e343b1da",
+          "parent": "batch:mv2uid5y:1",
+          "status": "success",
+          "total": 8,
+          "error": null
+        },
+        {
+          "id": "batch:mv2uid5y:1#small:2046b758-1fba-411e-a9d8-b883cf1acff9",
+          "parent": "batch:mv2uid5y:1",
+          "status": "success",
+          "total": 8,
+          "error": null
+        }
+      ],
+      "historyCount": 1
+    },
+    "remainingFiles": 0,
+    "pass": true
+  },
+  {
+    "engine": "webkit",
+    "mode": "stream",
+    "physicalDevice": false,
+    "ids": [
+      "batch:mv2uitb4:1"
+    ],
+    "saves": [
+      {
+        "id": "batch:mv2uitb4:1",
+        "filename": "BGA Version.adx",
+        "bytes": 318741892,
+        "failure": null
+      }
+    ],
+    "errors": [],
+    "state": {
+      "requests": 24,
+      "initialIds": [
+        "batch:mv2uitb4:1"
+      ],
+      "jobs": [
+        {
+          "id": "batch:mv2uitb4:1",
+          "status": "success",
+          "total": 24,
+          "error": null
+        }
+      ],
+      "historyCount": 1
+    },
+    "remainingFiles": 0,
+    "pass": true
+  },
+  {
+    "engine": "webkit",
+    "mode": "unsupported",
+    "physicalDevice": false,
+    "ids": [
+      "batch:mv2ujce7:1#0",
+      "batch:mv2ujce7:1#1",
+      "batch:mv2ujce7:1#2"
+    ],
+    "saves": [
+      {
+        "id": "batch:mv2ujce7:1#0",
+        "filename": "BGA Version (1).adx",
+        "bytes": 130368544,
+        "failure": null
+      },
+      {
+        "id": "batch:mv2ujce7:1#1",
+        "filename": "BGA Version (2).adx",
+        "bytes": 101310282,
+        "failure": null
+      },
+      {
+        "id": "batch:mv2ujce7:1#2",
+        "filename": "BGA Version (3).adx",
+        "bytes": 87063110,
+        "failure": null
+      }
+    ],
+    "errors": [],
+    "state": {
+      "requests": 24,
+      "initialIds": [
+        "batch:mv2ujce7:1#0",
+        "batch:mv2ujce7:1#1",
+        "batch:mv2ujce7:1#2"
+      ],
+      "jobs": [
+        {
+          "id": "batch:mv2ujce7:1#0",
+          "status": "success",
+          "total": 8,
+          "error": null
+        },
+        {
+          "id": "batch:mv2ujce7:1#1",
+          "status": "success",
+          "total": 8,
+          "error": null
+        },
+        {
+          "id": "batch:mv2ujce7:1#2",
+          "status": "success",
+          "total": 8,
+          "error": null
+        }
+      ],
+      "historyCount": 1
+    },
+    "remainingFiles": 0,
+    "pass": true
+  },
+  {
+    "engine": "webkit",
+    "mode": "runtime-failure",
+    "physicalDevice": false,
+    "ids": [
+      "batch:mv2uozar:1"
+    ],
+    "saves": [
+      {
+        "id": "batch:mv2uozar:1",
+        "filename": "BGA Version (1).adx",
+        "bytes": 130368544,
+        "failure": null
+      },
+      {
+        "id": "batch:mv2uozar:1#small:321264c9-6b90-4baa-8cc4-07037842b4d5",
+        "filename": "BGA Version (2).adx",
+        "bytes": 101310282,
+        "failure": null
+      },
+      {
+        "id": "batch:mv2uozar:1#small:60b767b6-fc47-4d69-a8ec-89a1cec38eaf",
+        "filename": "BGA Version (3).adx",
+        "bytes": 87063110,
+        "failure": null
+      }
+    ],
+    "errors": [],
+    "state": {
+      "requests": 24,
+      "initialIds": [
+        "batch:mv2uozar:1"
+      ],
+      "jobs": [
+        {
+          "id": "batch:mv2uozar:1",
+          "parent": "batch:mv2uozar:1",
+          "status": "success",
+          "total": 8,
+          "error": null
+        },
+        {
+          "id": "batch:mv2uozar:1#small:321264c9-6b90-4baa-8cc4-07037842b4d5",
+          "parent": "batch:mv2uozar:1",
+          "status": "success",
+          "total": 8,
+          "error": null
+        },
+        {
+          "id": "batch:mv2uozar:1#small:60b767b6-fc47-4d69-a8ec-89a1cec38eaf",
+          "parent": "batch:mv2uozar:1",
+          "status": "success",
+          "total": 8,
+          "error": null
+        }
+      ],
+      "historyCount": 1
+    },
+    "remainingFiles": 0,
+    "pass": true
+  }
+]

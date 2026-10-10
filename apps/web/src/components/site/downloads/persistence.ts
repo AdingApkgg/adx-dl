@@ -10,6 +10,8 @@ export type PersistedJob = {
   kind: "single" | "batch";
   title: string;
   format: string;
+  /** Original selection requested one archive per chart. */
+  individual?: boolean;
   createdAt: number;
   /** Optional for backward compatibility with jobs saved before source routing. */
   sourceId?: string;
@@ -27,6 +29,10 @@ export type PersistedJob = {
   groupByIndex?: string[];
   /** Small mobile grouping policy; absent on older checkpoints. */
   mobileBatchPolicyVersion?: 1;
+  /** Capability selected for this run; streaming is rechecked before fetching. */
+  archiveMode?: "stream" | "buffered";
+  /** Original inline queue entry whose runtime fallback produced this child. */
+  fallbackParentId?: string;
   /** Entire selection whose history entry this child contributes to. */
   batchSelectionId?: string;
 };
@@ -72,6 +78,7 @@ export type DownloadsPersistenceAdapter = {
   persistFile: (file: PersistedFile) => Promise<void>;
   loadAllJobs: () => Promise<PersistedJob[]>;
   loadFilesForJob: (jobId: string) => Promise<PersistedFile[]>;
+  loadFile?: (key: string) => Promise<PersistedFile | undefined>;
   /** Atomically updates the route spec while retaining only whole relevant files. */
   replaceJobKeepingCompletedFiles: (job: PersistedJob) => Promise<void>;
   deleteJob: (jobId: string) => Promise<void>;
@@ -432,6 +439,15 @@ async function indexedDbLoadAllJobs(): Promise<PersistedJob[]> {
   }
 }
 
+async function indexedDbLoadFile(key: string): Promise<PersistedFile | undefined> {
+  const db = await openDb();
+  if (!db) return undefined;
+  try {
+    const tx = db.transaction(FILES, "readonly");
+    return normalizePersistedFile(await promisifyRequest(tx.objectStore(FILES).get(key))) ?? undefined;
+  } catch { return undefined; }
+}
+
 async function indexedDbLoadFilesForJob(jobId: string): Promise<PersistedFile[]> {
   const db = await openDb();
   if (!db) {
@@ -509,6 +525,7 @@ const indexedDbAdapter: DownloadsPersistenceAdapter = {
   persistFile: indexedDbPersistFile,
   loadAllJobs: indexedDbLoadAllJobs,
   loadFilesForJob: indexedDbLoadFilesForJob,
+  loadFile: indexedDbLoadFile,
   replaceJobKeepingCompletedFiles: indexedDbReplaceJobKeepingCompletedFiles,
   deleteJob: indexedDbDeleteJob,
   loadHistory: indexedDbLoadHistory,
@@ -542,6 +559,11 @@ export function loadAllJobs(): Promise<PersistedJob[]> {
 
 export function loadFilesForJob(jobId: string): Promise<PersistedFile[]> {
   return activeAdapter.loadFilesForJob(jobId);
+}
+
+export async function loadCheckpointFile(jobId: string, name: string): Promise<PersistedFile | undefined> {
+  return activeAdapter.loadFile ? activeAdapter.loadFile(fileKey(jobId, name)) :
+    (await activeAdapter.loadFilesForJob(jobId)).find(file => file.name === name);
 }
 
 export function replaceJobKeepingCompletedFiles(job: PersistedJob): Promise<void> {

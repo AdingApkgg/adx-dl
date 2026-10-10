@@ -1,0 +1,11 @@
+{
+  "savedCases": 8,
+  "physicalDevice": false,
+  "actualAstroDXImportTested": false,
+  "pythonVerifiedArchives": 10,
+  "pythonVerifiedEntries": 1296,
+  "unityVerifiedArchives": 10,
+  "unityVerifiedEntries": 1296,
+  "zip64Archives": 2,
+  "productionChanged": false
+}

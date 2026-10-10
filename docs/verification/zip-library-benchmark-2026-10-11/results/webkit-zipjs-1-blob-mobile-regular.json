@@ -1,0 +1,37 @@
+{
+  "mode": "webkit",
+  "lib": "zipjs",
+  "repeats": 1,
+  "sink": "blob",
+  "mobile": true,
+  "physicalDevice": false,
+  "profile": "persistent",
+  "versions": {
+    "zipjs": "2.23.0",
+    "clientzip": "2.5.1"
+  },
+  "rssSamplingMs": 250,
+  "rssIncludesWebKitXPC": true,
+  "errors": [],
+  "storageEstimate": {
+    "quota": 20615843021,
+    "usage": 0
+  },
+  "browserVersion": "26.5",
+  "rssBeforeMiB": 417.96875,
+  "rssPeakMiB": 1409.09375,
+  "largestProcessPeakMiB": 811.671875,
+  "durationMs": 3518,
+  "inputBytes": 318736980,
+  "archiveBytes": 318741690,
+  "entryCount": 24,
+  "maxGapMs": 198,
+  "ticks": 31,
+  "opfs": false,
+  "rssReadyMiB": 1439.046875,
+  "downloadFailure": null,
+  "savedBytes": 318741690,
+  "rssReleasedMiB": 585.15625,
+  "pass": true,
+  "maximumObservedRSSMiB": 1439.046875
+}

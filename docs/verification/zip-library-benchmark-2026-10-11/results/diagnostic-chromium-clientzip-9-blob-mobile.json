@@ -1,0 +1,22 @@
+{
+  "mode": "chromium",
+  "lib": "clientzip",
+  "repeats": 9,
+  "sink": "blob",
+  "mobile": true,
+  "physicalDevice": false,
+  "versions": {
+    "zipjs": "2.23.0",
+    "clientzip": "2.5.1"
+  },
+  "rssSamplingMs": 250,
+  "errors": [
+    "undefined"
+  ],
+  "heapBeforeMiB": 2.366436004638672,
+  "rssBeforeMiB": 262.515625,
+  "rssPeakMiB": 411.84375,
+  "largestProcessPeakMiB": 207.015625,
+  "pass": false,
+  "error": "page.evaluate: Error: {\"name\":\"TypeError\",\"message\":\"Failed to fetch\",\"value\":\"TypeError: Failed to fetch\"}\n    at window.run (http://127.0.0.1:55768/bench-page.js:26:18)\n    at async <anonymous>:337:30"
+}

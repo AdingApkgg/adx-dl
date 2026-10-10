@@ -1,0 +1,20 @@
+{
+  "mode": "chromium",
+  "lib": "zipjs",
+  "repeats": 15,
+  "sink": "opfs",
+  "mobile": false,
+  "physicalDevice": false,
+  "versions": {
+    "zipjs": "2.23.0",
+    "clientzip": "2.5.1"
+  },
+  "rssSamplingMs": 250,
+  "errors": [],
+  "heapBeforeMiB": 2.317028045654297,
+  "rssBeforeMiB": 281.90625,
+  "rssPeakMiB": 675.84375,
+  "largestProcessPeakMiB": 401.4375,
+  "pass": false,
+  "error": "page.evaluate: Error: {\"name\":\"QuotaExceededError\",\"message\":\"The operation failed because it would cause the application to exceed its storage quota.\",\"code\":22,\"value\":\"QuotaExceededError: The operation failed because it would cause the application to exceed its storage quota.\"}\n    at window.run (http://127.0.0.1:55796/bench-page.js:26:18)\n    at async <anonymous>:337:30"
+}

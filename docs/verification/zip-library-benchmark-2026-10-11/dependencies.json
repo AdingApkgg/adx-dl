@@ -1,0 +1,16 @@
+[
+  {
+    "name": "@zip.js/zip.js",
+    "version": "2.23.0",
+    "tarball": "https://registry.npmjs.org/@zip.js/zip.js/-/zip.js-2.23.0.tgz",
+    "integrity": "sha512-K5obAqfrO7zhycnCupM9aaoZ9kx0SA0kv7+Z2oOUsdpWquv4s/Z4zyD7AdTqxrK3pgPM+ozaUi8kdRQbCWaIrQ==",
+    "directory": "zipjs"
+  },
+  {
+    "name": "client-zip",
+    "version": "2.5.1",
+    "tarball": "https://registry.npmjs.org/client-zip/-/client-zip-2.5.1.tgz",
+    "integrity": "sha512-yOvNSBsQX1B7wtdvIVXJEIIShrlPiX+adhli7sWvQhsx3nX1DjvpSt+AwOxaX+3DCsT/Yx0nRy5hIjRLIYfebw==",
+    "directory": "clientzip"
+  }
+]

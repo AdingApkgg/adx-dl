@@ -1,0 +1,38 @@
+[
+  {
+    "archive": "chromium-stream-0.adx",
+    "entries": 4,
+    "crc": true,
+    "media_sha256": true
+  },
+  {
+    "archive": "chromium-stream-1.adx",
+    "entries": 4,
+    "crc": true,
+    "media_sha256": true
+  },
+  {
+    "archive": "chromium-stream-2.adx",
+    "entries": 4,
+    "crc": true,
+    "media_sha256": true
+  },
+  {
+    "archive": "chromium-stream-3.adx",
+    "entries": 4,
+    "crc": true,
+    "media_sha256": true
+  },
+  {
+    "archive": "chromium-stream-4.adx",
+    "entries": 4,
+    "crc": true,
+    "media_sha256": true
+  },
+  {
+    "archive": "chromium-stream-5.adx",
+    "entries": 4,
+    "crc": true,
+    "media_sha256": true
+  }
+]

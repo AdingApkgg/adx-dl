@@ -1,0 +1,11 @@
+assets/
+profiles/
+zipjs/
+clientzip/
+unity/
+*.adx
+*.tgz
+*.log
+decoder/bin/
+decoder/obj/
+node_modules/

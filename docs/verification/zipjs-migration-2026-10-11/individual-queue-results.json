@@ -1,0 +1,106 @@
+[
+  {
+    "engine": "chromium",
+    "mode": "stream",
+    "physicalDevice": false,
+    "ids": [
+      "batch:mv2woqjp:1#0",
+      "batch:mv2woqjp:1#1",
+      "batch:mv2woqjp:1#2",
+      "batch:mv2woqjp:1#3",
+      "batch:mv2woqjp:1#4",
+      "batch:mv2woqjp:1#5"
+    ],
+    "saves": [
+      {
+        "id": "batch:mv2woqjp:1#0",
+        "filename": "011990 ZEUS.adx",
+        "bytes": 76031176,
+        "failure": null
+      },
+      {
+        "id": "batch:mv2woqjp:1#1",
+        "filename": "012059 天靈靈地靈靈.adx",
+        "bytes": 54337390,
+        "failure": null
+      },
+      {
+        "id": "batch:mv2woqjp:1#2",
+        "filename": "011820 Xaleid◆scopiX.adx",
+        "bytes": 50935510,
+        "failure": null
+      },
+      {
+        "id": "batch:mv2woqjp:1#3",
+        "filename": "011821 Ref_rain (for 7th Heaven).adx",
+        "bytes": 50374794,
+        "failure": null
+      },
+      {
+        "id": "batch:mv2woqjp:1#4",
+        "filename": "012052 推活天使ビビアンちゃん (feat.マスタード＆ビートまりお).adx",
+        "bytes": 44982761,
+        "failure": null
+      },
+      {
+        "id": "batch:mv2woqjp:1#5",
+        "filename": "011984 超ナイト・オブ・ナイツ.adx",
+        "bytes": 42080371,
+        "failure": null
+      }
+    ],
+    "errors": [],
+    "state": {
+      "requests": 24,
+      "initialIds": [
+        "batch:mv2woqjp:1#0",
+        "batch:mv2woqjp:1#1",
+        "batch:mv2woqjp:1#2",
+        "batch:mv2woqjp:1#3",
+        "batch:mv2woqjp:1#4",
+        "batch:mv2woqjp:1#5"
+      ],
+      "jobs": [
+        {
+          "id": "batch:mv2woqjp:1#0",
+          "status": "success",
+          "total": 4,
+          "error": null
+        },
+        {
+          "id": "batch:mv2woqjp:1#1",
+          "status": "success",
+          "total": 4,
+          "error": null
+        },
+        {
+          "id": "batch:mv2woqjp:1#2",
+          "status": "success",
+          "total": 4,
+          "error": null
+        },
+        {
+          "id": "batch:mv2woqjp:1#3",
+          "status": "success",
+          "total": 4,
+          "error": null
+        },
+        {
+          "id": "batch:mv2woqjp:1#4",
+          "status": "success",
+          "total": 4,
+          "error": null
+        },
+        {
+          "id": "batch:mv2woqjp:1#5",
+          "status": "success",
+          "total": 4,
+          "error": null
+        }
+      ],
+      "historyCount": 1
+    },
+    "remainingFiles": 0,
+    "pass": true
+  }
+]

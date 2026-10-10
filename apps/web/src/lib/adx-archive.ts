@@ -1,11 +1,13 @@
 /**
- * The archive packers. This module pulls in `fflate`, so it must only ever be
+ * The archive packers. This module loads zip.js (ZIP/ADX) and fflate (TAR/gzip), so it must only ever be
  * reached through a dynamic `import()` from the download path — never from a
  * component that renders on page load. Constants, types and the DOM helpers
  * live in `adx-archive-shared.ts` for exactly that reason, and are re-exported
  * here so the combined surface stays importable in tests and scripts.
  */
-import { Gzip, Zip, ZipPassThrough } from "fflate";
+import { Gzip } from "fflate";
+import { BlobReader, BlobWriter, ZipWriter } from "@zip.js/zip.js";
+import { createArchiveDiskSink, throwIfArchiveAborted, ArchiveStorageUnavailableError, type ArchiveBuildOptions } from "./adx-archive-storage";
 import { assertZip32Limits, nestedArchiveFiles, withRootDirectory } from "./adx-archive-layout";
 
 import type {
@@ -18,9 +20,8 @@ import type {
 
 export * from "./adx-archive-shared";
 
-// Gzip output coalesces small chunks. STORE ZIP payloads instead reuse their
-// source Blobs: copying each streamed media chunk into a second output Blob
-// kept a full extra batch of bytes alive on mobile browsers.
+// The legacy TAR/gzip writer coalesces small output chunks. ZIP/ADX uses
+// zip.js with a disk sink when available, and a bounded-batch Blob fallback.
 const OUTPUT_FLUSH_BYTES = 4 * 1024 * 1024;
 /** CRC/gzip work shares the UI thread; promise-only Blob reads do not yield to taps. */
 const ARCHIVE_WORK_SLICE_MS = 16;
@@ -29,7 +30,6 @@ const ARCHIVE_STREAM_CHUNK_BYTES = 64 * 1024;
 
 type BlobSink = {
   push: (chunk: Uint8Array) => void;
-  pushBlob: (source: Blob) => void;
   finish: (type: string) => Blob;
 };
 
@@ -98,10 +98,6 @@ function createBlobSink(): BlobSink {
         flush();
       }
     },
-    pushBlob(source) {
-      flush();
-      blob = new Blob([blob, source]);
-    },
     finish(type) {
       return new Blob([blob, ...(pending as BlobPart[])], { type });
     },
@@ -109,17 +105,19 @@ function createBlobSink(): BlobSink {
 }
 
 /** Reads a Blob to the end in chunks, never materialising the whole thing in RAM. */
-async function streamBlob(blob: Blob, onChunk: (chunk: Uint8Array) => void): Promise<void> {
+async function streamBlob(blob: Blob, onChunk: (chunk: Uint8Array) => void, signal?: AbortSignal): Promise<void> {
   const reader = blob.stream().getReader();
   let lastYieldAt = Date.now();
   let bytesSinceYield = 0;
   try {
     for (;;) {
+      throwIfArchiveAborted(signal);
       const { done, value } = await reader.read();
       if (done) break;
       // A browser may deliver a whole in-memory Blob as one reader chunk.
       // Subarray views bound one synchronous CRC/gzip step without copying.
       for (let offset = 0; offset < value.length; offset += ARCHIVE_STREAM_CHUNK_BYTES) {
+        throwIfArchiveAborted(signal);
         const chunk = value.subarray(offset, offset + ARCHIVE_STREAM_CHUNK_BYTES);
         onChunk(chunk);
         bytesSinceYield += chunk.length;
@@ -131,22 +129,13 @@ async function streamBlob(blob: Blob, onChunk: (chunk: Uint8Array) => void): Pro
       }
     }
   } finally {
+    if (signal?.aborted) await reader.cancel().catch(() => {});
     reader.releaseLock();
   }
 }
 
-// The whole archive shares one timestamp, read off the clock when packing
-// starts. Left to itself fflate re-reads the clock per entry, so a batch that
-// takes minutes to pack would smear its file dates across that entire run.
-// Capturing once also makes the output a pure function of its inputs, which is
-// what lets the tests assert adx and zip are the same archive without racing
-// DOS time's 2-second granularity — they pass an explicit stamp; nothing else does.
-//
-// Out-of-range dates are clamped rather than passed through: fflate rejects
-// anything outside the DOS range outright (`err(10)`), so a badly skewed device
-// clock would fail the download instead of merely mis-stamping it. It reads the
-// date back through local getters (getFullYear/getHours/...), so the bounds are
-// local-time too, and noon dodges any midnight DST skip.
+// Capture one local-time DOS timestamp for the entire archive. Clamp skewed
+// device clocks to the compatible date range shared by our readers.
 const DOS_MIN = new Date(1980, 0, 1, 12);
 const DOS_MAX = new Date(2099, 11, 31, 12);
 
@@ -161,70 +150,74 @@ function archiveTimestamp(mtime?: Date): Date {
 /**
  * Streams every entry's bytes into a STORE (uncompressed) zip. The payloads are
  * already-compressed media (mp3/mp4/png), so deflate would burn CPU for ~0 gain;
- * STORE also lets fflate pass bytes straight through with negligible buffering.
+ * Supported browsers stream the output into origin-private disk storage.
  * `.adx` and `.zip` are byte-for-byte the same archive; only the extension differs.
  */
 async function packZip(
   files: AdxArchiveInput[],
   type: string,
   mtime: Date,
-  onProgress?: ArchiveProgressCallback
+  onProgress?: ArchiveProgressCallback,
+  options: ArchiveBuildOptions = {}
 ): Promise<Blob> {
-  assertZip32Limits(files);
-  const sink = createBlobSink();
-  const progress = createProgressReporter(files, onProgress);
-  progress.emit();
-  let zipError: Error | null = null;
-  let payloadChunk: Uint8Array | null = null;
-  let payloadBlob: Blob | null = null;
-  let payloadAppended = false;
-  const zip = new Zip((err, data) => {
-    if (err) {
-      zipError = err;
-      return;
-    }
-    // ZipPassThrough emits each input chunk by identity. Keep its header and
-    // descriptor, but substitute one original Blob for all payload chunks.
-    // fflate still reads every chunk to calculate the exact CRC and sizes.
-    if (data === payloadChunk) {
-      if (!payloadAppended && payloadBlob) {
-        sink.pushBlob(payloadBlob);
-        payloadAppended = true;
-      }
-    } else {
-      sink.push(data);
-    }
-  });
-
-  for (const file of files) {
-    if (zipError) {
-      break;
-    }
-    const entry = new ZipPassThrough(file.name);
-    entry.mtime = mtime;
-    zip.add(entry);
-    payloadBlob = file.blob;
-    payloadAppended = false;
-    progress.startFile(file.name);
-    await streamBlob(file.blob, (chunk) => {
-      payloadChunk = chunk;
-      entry.push(chunk);
-      payloadChunk = null;
-      progress.addBytes(chunk.length);
+  // Streaming output may use ZIP64 automatically. Buffered fallback stays ZIP32.
+  throwIfArchiveAborted(options.signal);
+  const disk = options.useDisk === false ? null : await createArchiveDiskSink(
+    files.reduce((sum, file) => sum + file.blob.size, 0) + files.length * 1024 + 22,
+    options.signal
+  );
+  if (!disk && options.requireDisk) throw new ArchiveStorageUnavailableError();
+  const write = async (toDisk: boolean): Promise<Blob> => {
+    if (!toDisk) assertZip32Limits(files);
+    const output = toDisk ? undefined : new BlobWriter(type);
+    const writer = new ZipWriter(toDisk ? disk!.writable : output!, {
+      level: 0, zip64: toDisk ? undefined : false, useWebWorkers: false, bufferedWrite: false,
+      extendedTimestamp: false, ntfsTimestamp: false, lastModDate: mtime,
     });
-    payloadChunk = new Uint8Array(0);
-    entry.push(payloadChunk, true);
-    payloadChunk = null;
-    payloadBlob = null;
-    progress.finishFile(file.name);
+    const progress = createProgressReporter(files, onProgress);
+    progress.emit();
+    let lastYieldAt = Date.now();
+    let bytesSinceYield = 0;
+    for (const file of files) {
+      throwIfArchiveAborted(options.signal);
+      progress.startFile(file.name);
+      let previousBytes = 0;
+      await writer.add(file.name, new BlobReader(file.blob), {
+        signal: options.signal,
+        async onprogress(bytes) {
+          const delta = bytes - previousBytes;
+          previousBytes = bytes;
+          progress.addBytes(delta);
+          bytesSinceYield += delta;
+          if (bytesSinceYield >= ARCHIVE_WORK_SLICE_BYTES || Date.now() - lastYieldAt >= ARCHIVE_WORK_SLICE_MS) {
+            await new Promise<void>((resolve) => setTimeout(resolve, 0));
+            lastYieldAt = Date.now();
+            bytesSinceYield = 0;
+          }
+          throwIfArchiveAborted(options.signal);
+        },
+      });
+      progress.finishFile(file.name);
+    }
+    throwIfArchiveAborted(options.signal);
+    const result = await writer.close();
+    throwIfArchiveAborted(options.signal);
+    const blob = toDisk ? await disk!.finish(type) : result as Blob;
+    progress.finish();
+    return blob;
+  };
+  if (disk) {
+    try { return await write(true); }
+    catch (error) {
+      await disk.discard();
+      throwIfArchiveAborted(options.signal);
+      // Only output-storage failures justify rebuilding the same bounded part.
+      // Input/codec errors must still surface rather than silently retrying.
+      if (!disk.failed()) throw error;
+      if (options.requireDisk) throw new ArchiveStorageUnavailableError();
+    }
   }
-
-  zip.end();
-  if (zipError) {
-    throw zipError;
-  }
-  progress.finish();
-  return sink.finish(type);
+  return write(false);
 }
 
 /** Builds a USTAR tar header block (512 bytes) for one file. No owner recorded. */
@@ -283,8 +276,10 @@ async function packTarGz(
   files: AdxArchiveInput[],
   type: string,
   mtime: Date,
-  onProgress?: ArchiveProgressCallback
+  onProgress?: ArchiveProgressCallback,
+  options: ArchiveBuildOptions = {}
 ): Promise<Blob> {
+  throwIfArchiveAborted(options.signal);
   const sink = createBlobSink();
   const progress = createProgressReporter(files, onProgress);
   progress.emit();
@@ -297,7 +292,7 @@ async function packTarGz(
     await streamBlob(file.blob, (chunk) => {
       gzip.push(chunk, false);
       progress.addBytes(chunk.length);
-    });
+    }, options.signal);
     const remainder = size % 512;
     if (remainder !== 0) {
       gzip.push(new Uint8Array(512 - remainder), false); // pad data to a 512-byte boundary
@@ -305,6 +300,7 @@ async function packTarGz(
     progress.finishFile(file.name);
   }
 
+  throwIfArchiveAborted(options.signal);
   gzip.push(new Uint8Array(1024), true); // two zero blocks mark end of archive + final flush
   progress.finish();
   return sink.finish(type);
@@ -315,7 +311,8 @@ export async function buildArchiveBlob(
   format: ArchiveFormat = "adx",
   directoryName?: string,
   onProgress?: ArchiveProgressCallback,
-  mtime?: Date
+  mtime?: Date,
+  options: ArchiveBuildOptions = {}
 ): Promise<Blob> {
   if (files.length === 0) {
     throw new Error("Directory is empty");
@@ -328,8 +325,8 @@ export async function buildArchiveBlob(
   const stamp = archiveTimestamp(mtime);
   const entries = withRootDirectory(files, directoryName);
   return format === "tar.gz"
-    ? packTarGz(entries, type, stamp, onProgress)
-    : packZip(entries, type, stamp, onProgress);
+    ? packTarGz(entries, type, stamp, onProgress, options)
+    : packZip(entries, type, stamp, onProgress, options);
 }
 
 /**
@@ -343,7 +340,8 @@ export async function buildNestedArchiveBlob(
   format: BatchArchiveFormat = "adx",
   directoryName?: string,
   onProgress?: ArchiveProgressCallback,
-  mtime?: Date
+  mtime?: Date,
+  options: ArchiveBuildOptions = {}
 ): Promise<Blob> {
   if (charts.length === 0) {
     throw new Error("No charts selected");
@@ -353,6 +351,6 @@ export async function buildNestedArchiveBlob(
   const stamp = archiveTimestamp(mtime);
   const rootedEntries = nestedArchiveFiles(charts, directoryName);
   return format === "tar.gz"
-    ? packTarGz(rootedEntries, type, stamp, onProgress)
-    : packZip(rootedEntries, type, stamp, onProgress);
+    ? packTarGz(rootedEntries, type, stamp, onProgress, options)
+    : packZip(rootedEntries, type, stamp, onProgress, options);
 }

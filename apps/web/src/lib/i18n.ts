@@ -470,6 +470,10 @@ export type SiteDictionary = {
     groupingLabel: string;
     groupingVersion: string;
     groupingGenre: string;
+    downloadIndividual: string;
+    downloadIndividualAction: string;
+    downloadIndividualHint: string;
+    browserCompatibilityHint: string;
     batchVideoSummary: (count: number) => string;
     batchNoVideoSummary: string;
     batchVideoLargeHint: string;
@@ -1221,9 +1225,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       confirmSavedBatch: "已确认保存，继续下载",
       releaseSavedBatch: "确认保存并释放缓存",
       confirmSavedBatchHint: "先在浏览器下载记录中确认本批每个文件已下载完成，再确认释放并继续。释放后不能再次保存，导入引导仍会保留；仍需重试保存时请勿确认。",
-      mobileBatchHint: "手机会分批下载。先保存本批，在浏览器下载记录中确认完成，再释放缓存继续下一批；最后一批也请确认释放。下载期间保持页面打开。",
-      mobileLegacyBatchHint: "继续旧任务会保留已下载进度。按手机分批重新下载会替换旧任务、清除其缓存，并从头分批下载。",
-      mobileRestartBatch: "按手机分批重新下载",
+      mobileBatchHint: "浏览器支持写盘且空间充足时，按版本保存大包；不支持或空间不足时自动分包。先确认文件已保存，再释放缓存继续下一包。下载期间保持页面打开。",
+      mobileLegacyBatchHint: "继续旧任务会保留已下载进度。重新规划会替换旧任务、清除其缓存，并根据浏览器能力和可用空间重新下载。",
+      mobileRestartBatch: "重新规划并下载",
       mobileLargeChartHint: "这首谱面资源较大，建议关闭 BGA 视频减少体积；仍然过大时请改用电脑下载。",
       mobileUnknownSizeHint: "部分资源大小未知，手机会保守地按单首分批；实际文件仍可能较大。",
       importGuide: {
@@ -1255,9 +1259,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         `跨版本选择，将拆成 ${archives} 个下载任务加入队列，按版本分别打包`,
       batchSplitSummaryGenre: (archives) =>
         `跨曲风选择，将拆成 ${archives} 个下载任务加入队列，按曲风分别打包`,
-      groupingLabel: "分类路径",
+      groupingLabel: "下载方式",
       groupingVersion: "按版本分文件夹",
       groupingGenre: "按曲风分文件夹",
+      downloadIndividual: "每首谱面单独下载（不合并）",
+      downloadIndividualAction: "逐首下载",
+      downloadIndividualHint: "每首谱面单独保存为一个可导入文件，不合并成版本大包。移动端请逐个确认文件已保存，下载期间保持页面打开。",
+      browserCompatibilityHint: "大包下载取决于浏览器写盘能力和可用空间，不支持或空间不足时自动分包。若保存失败或浏览器闪退，可在下载菜单选择“每首谱面单独下载”。手机需逐包确认保存；超过 4 GiB 的文件需要导入工具支持 ZIP64。",
       batchVideoSummary: (count) => `包含 ${count} 个 BGA 视频文件`,
       batchNoVideoSummary: "不包含 BGA 视频，下载会更轻",
       batchVideoLargeHint: "包含 BGA 会显著增大体积，网络慢或手机流量下建议关闭。",
@@ -2019,9 +2027,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       confirmSavedBatch: "Files saved — continue downloading",
       releaseSavedBatch: "Confirm saved and release cache",
       confirmSavedBatchHint: "Check your browser's downloads to confirm every file in this batch has finished, then release its cache and continue. Save again will be unavailable after release, but import instructions remain. Do not confirm if you still need to retry saving.",
-      mobileBatchHint: "Phones download in small batches. Save this batch, confirm completion in your browser's downloads, then release its cache to continue. Confirm release for the final batch too. Keep this page open while downloading.",
-      mobileLegacyBatchHint: "Continuing keeps this older job's downloaded progress. Restarting in small batches replaces the old job, clears its cache, and downloads the selection again.",
-      mobileRestartBatch: "Restart in small batches",
+      mobileBatchHint: "Browsers with disk writing and enough space save whole version packages; otherwise downloads split into smaller parts. Confirm each file is saved, then release its cache to continue. Keep this page open while downloading.",
+      mobileLegacyBatchHint: "Continuing keeps this older job's downloaded progress. Replanning replaces the old job, clears its cache, and downloads again based on browser capabilities and available storage.",
+      mobileRestartBatch: "Replan and download",
       mobileLargeChartHint: "This chart has large assets. Turn off BGA video to reduce the size; if it is still too large, download on a computer.",
       mobileUnknownSizeHint: "Some asset sizes are unknown, so phones use one chart per batch as a precaution. The actual files may still be large.",
       importGuide: {
@@ -2056,9 +2064,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         `Spans multiple versions — queued as ${archives} downloads, packed separately by version`,
       batchSplitSummaryGenre: (archives) =>
         `Spans multiple genres — queued as ${archives} downloads, packed separately by genre`,
-      groupingLabel: "Folder layout",
+      groupingLabel: "Download layout",
       groupingVersion: "Group by version",
       groupingGenre: "Group by genre",
+      downloadIndividual: "Download each chart separately",
+      downloadIndividualAction: "Download separately",
+      downloadIndividualHint: "Save each chart as a separate importable file. On mobile, confirm each file is saved and keep this page open while downloading.",
+      browserCompatibilityHint: "Large packages require browser disk writing and enough free space; otherwise they split automatically. If saving fails or the browser crashes, select “Download each chart separately” in the download menu. On mobile, confirm each save. Files above 4 GiB require ZIP64 support in the importer.",
       batchVideoSummary: (count) =>
         count === 1 ? "Includes 1 BGA video file" : `Includes ${count} BGA video files`,
       batchNoVideoSummary: "BGA video excluded for a lighter download",
@@ -2836,9 +2848,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       confirmSavedBatch: "保存を確認してダウンロードを続行",
       releaseSavedBatch: "保存を確認してキャッシュを解放",
       confirmSavedBatchHint: "ブラウザーのダウンロード履歴で今回の全ファイルの保存完了を確認し、キャッシュを解放して続行します。解放後は再保存できませんが、インポート手順は表示されます。再保存が必要な場合はまだ確認しないでください。",
-      mobileBatchHint: "スマートフォンでは小分けにダウンロードします。今回のファイルを保存し、ブラウザーの履歴で完了を確認してからキャッシュを解放し、次へ進みます。最後のバッチも解放を確認してください。ダウンロード中はページを開いたままにします。",
-      mobileLegacyBatchHint: "旧タスクを続行すると取得済みデータは保持されます。小分けでの再取得は旧タスクを置き換え、そのキャッシュを削除し、最初からダウンロードし直します。",
-      mobileRestartBatch: "スマートフォン向けの小分けで再取得",
+      mobileBatchHint: "ディスク書き込みに対応し空き容量が十分なブラウザーでは、バージョン単位でまとめて保存します。非対応や容量不足の場合は小分けにします。保存完了を確認してからキャッシュを解放し、次へ進みます。ダウンロード中はページを開いたままにしてください。",
+      mobileLegacyBatchHint: "旧タスクの続行では取得済みデータを保持します。再計画では旧タスクとキャッシュを削除し、ブラウザーの対応状況と空き容量に応じて再取得します。",
+      mobileRestartBatch: "再計画してダウンロード",
       mobileLargeChartHint: "この譜面のリソースは大きいため、BGA 動画をオフにして容量を減らしてください。それでも大きい場合はパソコンでのダウンロードをお勧めします。",
       mobileUnknownSizeHint: "容量が不明なリソースがあるため、スマートフォンでは安全を見て 1 曲ずつ取得します。実際のファイルは大きい場合があります。",
       importGuide: {
@@ -2870,9 +2882,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         `複数バージョンのため、${archives} 件のダウンロードに分けてキューに追加し、バージョン別にまとめます`,
       batchSplitSummaryGenre: (archives) =>
         `複数ジャンルのため、${archives} 件のダウンロードに分けてキューに追加し、ジャンル別にまとめます`,
-      groupingLabel: "フォルダ分け",
+      groupingLabel: "ダウンロード方式",
       groupingVersion: "バージョン別",
       groupingGenre: "ジャンル別",
+      downloadIndividual: "譜面ごとにダウンロード（結合なし）",
+      downloadIndividualAction: "個別ダウンロード",
+      downloadIndividualHint: "各譜面を個別のインポート可能なファイルとして保存します。モバイルでは保存を一つずつ確認し、ダウンロード中はページを開いたままにしてください。",
+      browserCompatibilityHint: "大容量パックにはブラウザーのディスク書き込み機能と十分な空き容量が必要です。非対応や容量不足の場合は自動で小分けにします。保存に失敗したりブラウザーが終了したりする場合は、メニューで譜面ごとのダウンロードを選んでください。モバイルでは保存を確認してください。4 GiB を超えるファイルのインポートには ZIP64 対応が必要です。",
       batchVideoSummary: (count) => `${count} 件の BGA 動画を含みます`,
       batchNoVideoSummary: "BGA 動画なしで軽めにダウンロードします",
       batchVideoLargeHint:

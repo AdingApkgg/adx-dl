@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings></PropertyGroup><ItemGroup><Reference Include="Unity.SharpZipLib"><HintPath>../unity/package/Runtime/Unity.SharpZipLib.dll</HintPath></Reference></ItemGroup></Project>

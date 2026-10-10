@@ -24,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@astrodx/ui/components/dropdown-menu";
-import { BATCH_FORMATS, requiresManualArchiveSave, type BatchArchiveFormat } from "@/lib/adx-archive-shared";
+import { BATCH_FORMATS, type BatchArchiveFormat } from "@/lib/adx-archive-shared";
 import { MAX_BATCH_ZIP_BYTES } from "@/lib/adx-archive-layout";
 import {
   isChartVideoFile,
@@ -100,9 +100,8 @@ export function BatchDownloadBar({
   const detail = dictionary.detail;
   const browser = dictionary.catalogBrowser;
   const tray = dictionary.downloads;
+  const [individual, setIndividual] = React.useState(false);
   const [includeVideo, setIncludeVideo] = React.useState(false);
-  const [mobileBatchMode, setMobileBatchMode] = React.useState(false);
-  React.useEffect(() => setMobileBatchMode(requiresManualArchiveSave()), []);
   const [confirmDiscard, setConfirmDiscard] = React.useState(false);
   // Format chosen from the menu while a large selection awaits confirmation.
   const [pendingFormat, setPendingFormat] = React.useState<BatchArchiveFormat | null>(null);
@@ -119,13 +118,12 @@ export function BatchDownloadBar({
   // the floating tray instead of being adopted by (and conflicting with) this
   // bar's own selection and controls. A selection spanning several versions or
   // genres queues one job per group, so this is a set, not a single job.
+  const [planning, setPlanning] = React.useState(false);
   const [jobIds, setJobIds] = React.useState<readonly string[]>([]);
   const allJobs = useDownloadsStore((state) => state.jobs);
   const jobs = React.useMemo(
     () =>
-      jobIds
-        .map((id) => allJobs.find((entry) => entry.id === id))
-        .filter((entry): entry is (typeof allJobs)[number] => entry !== undefined),
+      allJobs.filter(entry => jobIds.includes(entry.id) || Boolean(entry.fallbackParentId && jobIds.includes(entry.fallbackParentId))),
     [allJobs, jobIds]
   );
   const startBatch = useDownloadsStore((state) => state.startBatch);
@@ -196,7 +194,7 @@ export function BatchDownloadBar({
   );
   const summary = React.useMemo(() => summarizeDownloadJobs(jobs), [jobs]);
   const status = summary.status;
-  const isBusy = status === "packing" || status === "archiving" || status === "queued";
+  const isBusy = planning || status === "packing" || status === "archiving" || status === "queued";
   const isResumable = status === "paused" || status === "error";
   const progress = React.useMemo(
     () =>
@@ -289,7 +287,7 @@ export function BatchDownloadBar({
     return () => window.clearTimeout(timer);
   }, [confirmDiscard]);
 
-  function beginBatch(format: BatchArchiveFormat) {
+  async function beginBatch(format: BatchArchiveFormat) {
     if (!canDownload) return;
     // Finished runs from this bar are done communicating — clear them instead
     // of letting them pop into the tray as stale success rows.
@@ -298,17 +296,16 @@ export function BatchDownloadBar({
         dismiss(entry.id);
       }
     }
-    setJobIds(
-      startBatch({
-        id: newBatchJobId(),
-        title: collectionName,
-        charts,
-        includeVideo,
-        format,
-        sourceId: selectedSourceId,
-        grouping,
-      })
-    );
+    setPlanning(true);
+    try {
+      const ids = await startBatch({
+        id: newBatchJobId(), title: collectionName, charts, includeVideo, format,
+        sourceId: selectedSourceId, grouping, individual,
+      });
+      setJobIds(ids);
+    } finally {
+      setPlanning(false);
+    }
   }
 
   function handleSelect(format: BatchArchiveFormat) {
@@ -453,7 +450,7 @@ export function BatchDownloadBar({
                       ? detail.downloadPacking(progress.completed, progress.total)
                       : status === "ready"
                         ? tray.readyToSave
-                        : browser.batchDownload}
+                        : individual ? tray.downloadIndividualAction : browser.batchDownload}
                   {canDownload ? (
                     <span className="font-mono text-[11px] opacity-75">
                       .{preferredFormat}
@@ -502,10 +499,11 @@ export function BatchDownloadBar({
                     <DropdownMenuSeparator />
                     <DropdownMenuLabel>{tray.groupingLabel}</DropdownMenuLabel>
                     <DropdownMenuRadioGroup
-                      value={grouping}
-                      onValueChange={(value) =>
-                        setGrouping(value === "genre" ? "genre" : "version")
-                      }
+                      value={individual ? "individual" : grouping}
+                      onValueChange={(value) => {
+                        setIndividual(value === "individual");
+                        if (value !== "individual") setGrouping(value === "genre" ? "genre" : "version");
+                      }}
                     >
                       <DropdownMenuRadioItem
                         value="version"
@@ -518,6 +516,9 @@ export function BatchDownloadBar({
                         onSelect={(event) => event.preventDefault()}
                       >
                         {tray.groupingGenre}
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="individual" onSelect={(event) => event.preventDefault()}>
+                        {tray.downloadIndividual}
                       </DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
                   </DropdownMenuContent>
@@ -548,8 +549,8 @@ export function BatchDownloadBar({
             disabled={isBusy}
           />
         ) : null}
-        {mobileBatchMode && jobs.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{tray.mobileBatchHint}</p>
+        {jobs.length === 0 ? (
+          <p className="text-xs text-muted-foreground">{individual ? tray.downloadIndividualHint : tray.browserCompatibilityHint}</p>
         ) : null}
 
         <DownloadStorageNotice locale={locale} />
@@ -576,7 +577,7 @@ export function BatchDownloadBar({
                 ? tray.batchVideoSummary(fileStats.videoFiles)
                 : tray.batchNoVideoSummary}
             </span>
-            {groupCount > 1 ? (
+            {individual ? <span>{tray.downloadIndividual}</span> : groupCount > 1 ? (
               <>
                 <span aria-hidden="true">·</span>
                 <span>

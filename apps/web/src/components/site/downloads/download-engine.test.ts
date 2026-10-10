@@ -34,6 +34,16 @@ async function bytesOf(blob: Blob): Promise<Uint8Array> {
 }
 
 describe("runMultiFileDownload", () => {
+  test("uses the durable checkpoint Blob after completion instead of retaining fetched bytes", async () => {
+    stubFetch(() => new Response(FULL));
+    const checkpoint = new Blob([FULL]);
+    const [result] = await runMultiFileDownload([{name: "BGA", url: "https://x/BGA", completedBlob: null}], {
+      onFileComplete: async () => checkpoint,
+    });
+    expect(result.blob).toBe(checkpoint);
+    expect(await bytesOf(result.blob)).toEqual(FULL);
+  });
+
   test("fetches every unfinished file from byte zero without Range headers", async () => {
     const calls = stubFetch(
       () => new Response(FULL, { status: 200, headers: { "content-length": "10" } })

@@ -77,32 +77,21 @@ describe("adx archive", () => {
     }
   });
 
-  test("STORE archives reuse payload Blobs without copying streamed payload chunks into output", async () => {
+  test("buffered fallback processes oversized stream chunks in bounded steps and preserves bytes", async () => {
     const payload = new Uint8Array(5 * 1024 * 1024 + 17);
     for (let index = 0; index < payload.length; index += 1) payload[index] = index % 251;
-    const originalBlob = globalThis.Blob;
-    const input = new originalBlob([payload]);
-    let copiedArrayBytes = 0;
-    let reusedPayload = false;
-    globalThis.Blob = class extends originalBlob {
-      constructor(parts: BlobPart[] = [], options?: BlobPropertyBag) {
-        super(parts, options);
-        for (const part of parts) {
-          if (part === input) reusedPayload = true;
-          if (ArrayBuffer.isView(part)) copiedArrayBytes += part.byteLength;
-        }
-      }
-    } as typeof Blob;
-    let archive: Blob;
-    try {
-      archive = await buildArchiveBlob([{ name: "track.mp3", blob: input }], "zip");
-    } finally {
-      globalThis.Blob = originalBlob;
-    }
-    // ZIP metadata may be copied; the media payload must remain a Blob reference.
-    expect(copiedArrayBytes).toBeLessThan(1024);
-    expect(reusedPayload).toBe(true);
-    expect(unzipSync(await bytes(archive!))["track.mp3"]).toEqual(payload);
+    const input = new Blob([payload]);
+    input.arrayBuffer = () => { throw new Error("Must not materialize the whole input"); };
+    input.stream = () => new ReadableStream({
+      start(controller) { controller.enqueue(payload); controller.close(); },
+    });
+    const steps: number[] = [];
+    let previous = 0;
+    const archive = await buildArchiveBlob([{ name: "track.mp3", blob: input }], "zip", undefined,
+      ({ writtenBytes }) => { steps.push(writtenBytes - previous); previous = writtenBytes; });
+    expect(steps.filter((size) => size > 0).length).toBeGreaterThan(5);
+    expect(Math.max(...steps)).toBeLessThanOrEqual(1024 * 1024);
+    expect(unzipSync(await bytes(archive))["track.mp3"]).toEqual(payload);
   });
 
   test("rejects ZIP32 overflow before reading any payload", async () => {

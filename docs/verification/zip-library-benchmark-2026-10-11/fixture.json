@@ -1,0 +1,236 @@
+[
+  {
+    "dir": "011990 ZEUS",
+    "files": [
+      {
+        "name": "maidata.txt",
+        "url": "/adxcs/11990/maidata.txt",
+        "bytes": 11182,
+        "actualBytes": 11182,
+        "sha256": "c3c1120621cf7ace75a0f169dc7ce5fb5421b1602bf75c32448ba2dd6191dd21",
+        "local": "0-maidata.txt"
+      },
+      {
+        "name": "track.mp3",
+        "url": "https://astrodx-charts.saop.cc/26/11990/track.mp3",
+        "bytes": 5633897,
+        "actualBytes": 5633897,
+        "sha256": "e5892b994f4ee287ff707e6945808d9696e251d0584ffa86fe215d83fccb917c",
+        "local": "0-track.mp3"
+      },
+      {
+        "name": "bg.png",
+        "url": "https://astrodx-charts.saop.cc/26/11990/bg.png",
+        "bytes": 309151,
+        "actualBytes": 309151,
+        "sha256": "c3e8346f9264874e34144ee36c78b1c55bea399e6d4037ddfdafda8d2f79dab8",
+        "local": "0-bg.png"
+      },
+      {
+        "name": "pv.mp4",
+        "url": "https://astrodx-charts.saop.cc/26/11990/pv.mp4",
+        "bytes": 70076307,
+        "actualBytes": 70076307,
+        "sha256": "61dd9e68036099478402f554f0376a67ea1cd5b4a1e3b1b672d471e70a57ecc0",
+        "local": "0-pv.mp4"
+      }
+    ],
+    "groupDir": "26 CiRCLE PLUS",
+    "genreDir": "ゲーム＆バラエティ"
+  },
+  {
+    "dir": "012059 天靈靈地靈靈",
+    "files": [
+      {
+        "name": "maidata.txt",
+        "url": "/adxcs/12059/maidata.txt",
+        "bytes": 6549,
+        "actualBytes": 6549,
+        "sha256": "7019b75d1b7e7afdd1c94f370e8f38b6f75200100bc341d44b30a505860fea53",
+        "local": "1-maidata.txt"
+      },
+      {
+        "name": "track.mp3",
+        "url": "https://astrodx-charts.saop.cc/27/12059/track.mp3",
+        "bytes": 5004102,
+        "actualBytes": 5004102,
+        "sha256": "53839534d2bdfa06cf2fb995225521cbd4c90ba83369b8249492dc12a4f5627c",
+        "local": "1-track.mp3"
+      },
+      {
+        "name": "bg.png",
+        "url": "https://astrodx-charts.saop.cc/27/12059/bg.png",
+        "bytes": 245361,
+        "actualBytes": 245361,
+        "sha256": "343d19b7541f5efdd59e7cded989c85c189ea9ee7aac1a988fffd9334dbb6040",
+        "local": "1-bg.png"
+      },
+      {
+        "name": "pv.mp4",
+        "url": "https://astrodx-charts.saop.cc/27/12059/pv.mp4",
+        "bytes": 49080624,
+        "actualBytes": 49080624,
+        "sha256": "62b083c69f957ddd2b2273d7ab70ea166794c3d8fc6b552a35da81c2dd14ee38",
+        "local": "1-pv.mp4"
+      }
+    ],
+    "groupDir": "27 MAGiCAL",
+    "genreDir": "ゲーム＆バラエティ"
+  },
+  {
+    "dir": "011820 Xaleid◆scopiX",
+    "files": [
+      {
+        "name": "maidata.txt",
+        "url": "/adxcs/11820/maidata.txt",
+        "bytes": 29948,
+        "actualBytes": 29948,
+        "sha256": "b991790e37f09a111d48d32df51f3bb4906ffd1445fa6fdb95d0347f82d349b2",
+        "local": "2-maidata.txt"
+      },
+      {
+        "name": "track.mp3",
+        "url": "https://astrodx-charts.saop.cc/24/11820/track.mp3",
+        "bytes": 8379664,
+        "actualBytes": 8379664,
+        "sha256": "bd41fee14120ad123e72c2c512ae55dd48416d5cdf3d26aee19364a160234733",
+        "local": "2-track.mp3"
+      },
+      {
+        "name": "bg.png",
+        "url": "https://astrodx-charts.saop.cc/24/11820/bg.png",
+        "bytes": 392328,
+        "actualBytes": 392328,
+        "sha256": "f3de7935fb5145c5c95f45e8cda52a214d3eb1ddf31e1ece0c74e005dcda6e72",
+        "local": "2-bg.png"
+      },
+      {
+        "name": "pv.mp4",
+        "url": "https://astrodx-charts.saop.cc/24/11820/pv.mp4",
+        "bytes": 42132843,
+        "actualBytes": 42132843,
+        "sha256": "7cfa8f68f31c9f84ca6814fb3a90744d58e676b4a741572e44f2d1b11bfa124d",
+        "local": "2-pv.mp4"
+      }
+    ],
+    "groupDir": "24 PRiSM PLUS",
+    "genreDir": "maimai"
+  },
+  {
+    "dir": "011821 Ref:rain (for 7th Heaven)",
+    "files": [
+      {
+        "name": "maidata.txt",
+        "url": "/adxcs/11821/maidata.txt",
+        "bytes": 15434,
+        "actualBytes": 15434,
+        "sha256": "7b281521e736a12d0dda87ac394d1871558056ab48462174620755ec5b0751e8",
+        "local": "3-maidata.txt"
+      },
+      {
+        "name": "track.mp3",
+        "url": "https://astrodx-charts.saop.cc/24/11821/track.mp3",
+        "bytes": 7865459,
+        "actualBytes": 7865459,
+        "sha256": "e35eaf54be9523500db453e009518b38ebbb3e93664b8fbdef52353a6adb8c31",
+        "local": "3-track.mp3"
+      },
+      {
+        "name": "bg.png",
+        "url": "https://astrodx-charts.saop.cc/24/11821/bg.png",
+        "bytes": 403805,
+        "actualBytes": 403805,
+        "sha256": "e4a9e335a2ba48af778fa65e260f4999991378cbeffd00a40359101dd75351f6",
+        "local": "3-bg.png"
+      },
+      {
+        "name": "pv.mp4",
+        "url": "https://astrodx-charts.saop.cc/24/11821/pv.mp4",
+        "bytes": 42089290,
+        "actualBytes": 42089290,
+        "sha256": "84030e113fe0a47425776e046a10818313d3ff861c19aa1f570c21ac558340a4",
+        "local": "3-pv.mp4"
+      }
+    ],
+    "groupDir": "24 PRiSM PLUS",
+    "genreDir": "maimai"
+  },
+  {
+    "dir": "012052 推活天使ビビアンちゃん (feat.マスタード＆ビートまりお)",
+    "files": [
+      {
+        "name": "maidata.txt",
+        "url": "/adxcs/12052/maidata.txt",
+        "bytes": 11479,
+        "actualBytes": 11479,
+        "sha256": "9b2df2f2af6faaec6e40da84bb13c20cca79ef6df72a51a29558d923363a8031",
+        "local": "4-maidata.txt"
+      },
+      {
+        "name": "track.mp3",
+        "url": "https://astrodx-charts.saop.cc/27/12052/track.mp3",
+        "bytes": 5769876,
+        "actualBytes": 5769876,
+        "sha256": "8adcc41aa4f2929cb7655ca141f159f62014e4f3a4372a8a0bb420fb60ecf9c2",
+        "local": "4-track.mp3"
+      },
+      {
+        "name": "bg.png",
+        "url": "https://astrodx-charts.saop.cc/27/12052/bg.png",
+        "bytes": 318259,
+        "actualBytes": 318259,
+        "sha256": "eed0eb652bc39412edfe34c23bb0ae82986d949b296b6531e394ec4629a80bc4",
+        "local": "4-bg.png"
+      },
+      {
+        "name": "pv.mp4",
+        "url": "https://astrodx-charts.saop.cc/27/12052/pv.mp4",
+        "bytes": 38881923,
+        "actualBytes": 38881923,
+        "sha256": "e2658e8f8f1f303aeb78a3ee706e9e22f43591ddf6d482d18a6a6bb61793a6dd",
+        "local": "4-pv.mp4"
+      }
+    ],
+    "groupDir": "27 MAGiCAL",
+    "genreDir": "POPS＆アニメ"
+  },
+  {
+    "dir": "011984 超ナイト・オブ・ナイツ",
+    "files": [
+      {
+        "name": "maidata.txt",
+        "url": "/adxcs/11984/maidata.txt",
+        "bytes": 8663,
+        "actualBytes": 8663,
+        "sha256": "40b9f1df9b2fb4add19e8299e3a68d87472362ee663440d8f48a59014dcdf8a0",
+        "local": "5-maidata.txt"
+      },
+      {
+        "name": "track.mp3",
+        "url": "https://astrodx-charts.saop.cc/26/11984/track.mp3",
+        "bytes": 4568689,
+        "actualBytes": 4568689,
+        "sha256": "30fd18b287d8448c51bbc04bf6ed3089a6b0aeeb98b92337b7a940a7a8308edf",
+        "local": "5-track.mp3"
+      },
+      {
+        "name": "bg.png",
+        "url": "https://astrodx-charts.saop.cc/26/11984/bg.png",
+        "bytes": 338319,
+        "actualBytes": 338319,
+        "sha256": "fa52b03d607a8c2ec25608e388f3dbc0abeed00be698b3f815f929108b34a4ff",
+        "local": "5-bg.png"
+      },
+      {
+        "name": "pv.mp4",
+        "url": "https://astrodx-charts.saop.cc/26/11984/pv.mp4",
+        "bytes": 37163828,
+        "actualBytes": 37163828,
+        "sha256": "b2d248708dca45baac3f7672347e0f1b2b809dcd045b32b0601c3a2aad472871",
+        "local": "5-pv.mp4"
+      }
+    ],
+    "groupDir": "26 CiRCLE PLUS",
+    "genreDir": "東方Project"
+  }
+]

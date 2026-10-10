@@ -1,0 +1,16 @@
+[
+  {
+    "engine": "chromium",
+    "mode": "disk",
+    "physicalDevice": false,
+    "diskBacked": true,
+    "size": 4781125838,
+    "type": "application/octet-stream",
+    "filename": "\u8c31\u9762-BGA.adx",
+    "failure": null,
+    "savedBytes": 4781125838,
+    "remainingFiles": 0,
+    "errors": [],
+    "pass": true
+  }
+]

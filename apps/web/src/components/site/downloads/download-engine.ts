@@ -50,7 +50,7 @@ export type EngineCallbacks = {
     file: CompletedDownloadFile,
     completed: number,
     total: number
-  ) => void | Promise<void>;
+  ) => void | Blob | Promise<void> | Promise<Blob | undefined>;
   /**
    * Throttled byte totals across all files (for an aggregate %). `estimated`
    * marks a total that extrapolated the still-unmeasured files, so the UI can
@@ -627,7 +627,13 @@ export async function runMultiFileDownload(
       // A skipped file still advances the counter (the job really is that much
       // closer to done) but has no bytes to checkpoint.
       if (completedFile !== null) {
-        await callbacks.onFileComplete?.(completedFile, completed, total);
+        const checkpoint = await callbacks.onFileComplete?.(completedFile, completed, total);
+        if (checkpoint instanceof Blob) {
+          if (checkpoint.size !== file.blob.size) throw new Error("Checkpoint size differs from downloaded file");
+          // Browser IndexedDB returns a disk-backed Blob. Drop the original
+          // network buffers as soon as this file has a durable replacement.
+          file.blob = checkpoint;
+        }
       }
       if (runSignal.aborted) {
         throw abortReason(runSignal);
