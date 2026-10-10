@@ -375,5 +375,6 @@ describe("page views locale-driven content", () => {
     // that never fires on touch.
     expect(html).toContain(detail.chartPreview);
     expect(html).toContain(detail.chartPreviewDescription);
+    expect(html).toContain('href="/preview/song-1"');
   });
 });

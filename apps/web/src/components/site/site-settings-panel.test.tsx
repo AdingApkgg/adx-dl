@@ -21,6 +21,13 @@ afterEach(() => {
 });
 
 describe("SiteSettingsContent", () => {
+  test("offers a simple compatibility mode and browser diagnostics", () => {
+    const html = renderToStaticMarkup(
+      <SiteSettingsContent locale="zh" pathname="/charts" dictionary={getDictionary("zh")} />
+    );
+    expect(html).toContain("简化兼容模式");
+    expect(html).toContain("检查浏览器兼容性");
+  });
   test("renders appearance, format, immutable built-ins, and custom-route controls", () => {
     const html = renderToStaticMarkup(
       <SiteSettingsContent

@@ -26,7 +26,7 @@ export function themeBootScript(): string {
   const motionModes = JSON.stringify(MOTION_MODES);
   return [
     "(function(){var e=document.documentElement;",
-    `try{var t=localStorage.getItem(${themeKey});var m=window.matchMedia('(prefers-color-scheme: dark)').matches;var d=t==='light'?false:(t==='dark'?true:m);e.classList.toggle('dark',d);e.style.colorScheme=d?'dark':'light';}catch(x){e.classList.add('dark');e.style.colorScheme='dark';}`,
+    `try{var t=localStorage.getItem(${themeKey});var m=typeof window.matchMedia==='function'?window.matchMedia('(prefers-color-scheme: dark)').matches:true;var d=t==='light'?false:(t==='dark'?true:m);e.classList.toggle('dark',d);e.style.colorScheme=t==='light'?'only light':(d?'dark':'light');}catch(x){e.classList.add('dark');e.style.colorScheme='dark';}`,
     `try{var a=localStorage.getItem(${accentKey});var c=${accents};e.dataset.accent=c.indexOf(a)>=0?a:'blue';}catch(x){e.dataset.accent='blue';}`,
     `try{var p=localStorage.getItem(${motionKey});p=p==='1'?'off':(p==='0'?'system':p);p=${motionModes}.indexOf(p)>=0?p:'system';e.dataset.motion=p;e.toggleAttribute('data-reduced-motion',p==='off');}catch(x){e.dataset.motion='system';}`,
     "})();",

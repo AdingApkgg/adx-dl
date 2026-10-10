@@ -175,7 +175,7 @@ export function DownloadSourceSummary({
       data-download-source={source.id}
       aria-label={ariaLabel}
       className={cn(
-        "inline-flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground",
+        "inline-flex min-w-0 max-w-full flex-wrap items-center gap-1.5 text-xs text-muted-foreground",
         className
       )}
     >

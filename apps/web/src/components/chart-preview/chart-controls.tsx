@@ -148,9 +148,9 @@ export function ChartControls({
   const [canShareFrames] = useState(canShareFrameFiles);
   const copyTimeUrl = async () => {
     // Deep link back into this preview at the current beat (upstream parity):
-    // ?preview=1 reopens the overlay, ?beat= is consumed by chart-preview.
+    // The independent preview route consumes ?beat= and ?diff=.
     const url = new URL(window.location.href);
-    url.searchParams.set("preview", "1");
+    url.searchParams.delete("preview");
     // Read the live position off the shared ref at click time — subscribing
     // via useLiveBeats would re-render the whole control strip every frame.
     url.searchParams.set(

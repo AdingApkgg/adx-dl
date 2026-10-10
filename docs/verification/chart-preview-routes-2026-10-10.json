@@ -1,0 +1,85 @@
+{
+  "date": "2026-10-10",
+  "scope": "Independent chart preview routes, local development only",
+  "preview": "http://localhost:3012/preview/11805",
+  "checks": {
+    "web_tests": {
+      "passed": 673,
+      "failed": 0
+    },
+    "typescript": "passed as part of web check",
+    "lint": {
+      "files": 697,
+      "result": "passed"
+    }
+  },
+  "browsers": {
+    "chromium": [
+      {
+        "name": "detail link opens independent playable preview",
+        "pass": true
+      },
+      {
+        "name": "canonical metadata and crawlable return/difficulty links",
+        "pass": true
+      },
+      {
+        "name": "same-route difficulty link changes player",
+        "pass": true
+      },
+      {
+        "name": "external difficulty restores selection after internal switch",
+        "pass": true
+      },
+      {
+        "name": "legacy English link preserves difficulty/beat and shares new route",
+        "pass": true,
+        "share": "http://localhost:3012/en/preview/11805?diff=4&beat=2.50"
+      },
+      {
+        "name": "Japanese preview has static indexable content without JavaScript",
+        "pass": true
+      },
+      {
+        "name": "no page errors",
+        "pass": true
+      }
+    ],
+    "webkit": [
+      {
+        "name": "detail link opens independent playable preview",
+        "pass": true
+      },
+      {
+        "name": "canonical metadata and crawlable return/difficulty links",
+        "pass": true
+      },
+      {
+        "name": "same-route difficulty link changes player",
+        "pass": true
+      },
+      {
+        "name": "external difficulty restores selection after internal switch",
+        "pass": true
+      },
+      {
+        "name": "legacy English link preserves difficulty/beat and shares new route",
+        "pass": true,
+        "share": "http://localhost:3012/en/preview/11805?diff=4&beat=2.50"
+      },
+      {
+        "name": "Japanese preview has static indexable content without JavaScript",
+        "pass": true
+      },
+      {
+        "name": "no page errors",
+        "pass": true
+      }
+    ]
+  },
+  "fixtures": "Real local maidata for chart 11805; remote audio/video requests replaced with local media fixtures; clipboard captured in browser test.",
+  "limitations": [
+    "No production build or deployment performed.",
+    "WebKit automation is not physical iOS device validation."
+  ]
+}

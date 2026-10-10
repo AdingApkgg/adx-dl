@@ -1,0 +1,342 @@
+{
+  "baseCommit": "2f9edc646307ac887df366424721968f5c7ba42d",
+  "target": "local preview plus uncommitted OpenHarmony fix",
+  "productionDeployed": false,
+  "physicalDevicesAvailable": false,
+  "profiles": [
+    {
+      "profile": "iphone",
+      "engine": "webkit",
+      "pass": true,
+      "navigator": null,
+      "pageErrors": [],
+      "phases": [
+        {
+          "name": "Local BGA label touch toggle and nine charts start in 8+1 groups",
+          "pass": true,
+          "durationMs": 14248
+        },
+        {
+          "name": "Local first manual save, video-first links and release preserve guide",
+          "pass": true,
+          "durationMs": 1592
+        },
+        {
+          "name": "Local final manual save and release preserve latest inline import guide",
+          "pass": true,
+          "durationMs": 1191
+        },
+        {
+          "name": "Local refresh exposes history-only pill for one complete nine-chart selection",
+          "pass": true,
+          "durationMs": 6731
+        }
+      ],
+      "storageMessages": [
+        "浏览器存储写入失败，本次下载不再支持刷新后续传；请保持页面打开直到完成。",
+        ""
+      ],
+      "savedArchiveEntries": [
+        24,
+        3
+      ],
+      "crcVerified": true,
+      "historyChartCount": 9,
+      "cacheFilesAfterRelease": 0
+    },
+    {
+      "profile": "ipad",
+      "engine": "webkit",
+      "pass": true,
+      "navigator": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Version/26.1 Safari/605.1.15",
+        "platform": "MacIntel",
+        "maxTouchPoints": 5
+      },
+      "pageErrors": [],
+      "phases": [
+        {
+          "name": "Local BGA label touch toggle and nine charts start in 8+1 groups",
+          "pass": true,
+          "durationMs": 7842
+        },
+        {
+          "name": "Local first manual save, video-first links and release preserve guide",
+          "pass": true,
+          "durationMs": 930
+        },
+        {
+          "name": "Local final manual save and release preserve latest inline import guide",
+          "pass": true,
+          "durationMs": 753
+        },
+        {
+          "name": "Local refresh exposes history-only pill for one complete nine-chart selection",
+          "pass": true,
+          "durationMs": 2533
+        }
+      ],
+      "storageMessages": [
+        "浏览器存储写入失败，本次下载不再支持刷新后续传；请保持页面打开直到完成。",
+        ""
+      ],
+      "savedArchiveEntries": [
+        24,
+        3
+      ],
+      "crcVerified": true,
+      "historyChartCount": 9,
+      "cacheFilesAfterRelease": 0
+    },
+    {
+      "profile": "harmony",
+      "engine": "chromium",
+      "pass": true,
+      "navigator": null,
+      "pageErrors": [],
+      "phases": [
+        {
+          "name": "Local BGA label touch toggle and nine charts start in 8+1 groups",
+          "pass": true,
+          "durationMs": 15185
+        },
+        {
+          "name": "Local first manual save, video-first links and release preserve guide",
+          "pass": true,
+          "durationMs": 2449
+        },
+        {
+          "name": "Local final manual save and release preserve latest inline import guide",
+          "pass": true,
+          "durationMs": 1948
+        },
+        {
+          "name": "Local refresh exposes history-only pill for one complete nine-chart selection",
+          "pass": true,
+          "durationMs": 9540
+        }
+      ],
+      "storageMessages": [
+        ""
+      ],
+      "savedArchiveEntries": [
+        24,
+        3
+      ],
+      "crcVerified": true,
+      "historyChartCount": 9,
+      "cacheFilesAfterRelease": 0
+    },
+    {
+      "profile": "quota",
+      "engine": "chromium",
+      "pass": true,
+      "navigator": null,
+      "pageErrors": [],
+      "phases": [
+        {
+          "name": "Local BGA label touch toggle and nine charts start in 8+1 groups",
+          "pass": true,
+          "durationMs": 11189
+        },
+        {
+          "name": "Local first manual save, video-first links and release preserve guide",
+          "pass": true,
+          "durationMs": 1982
+        },
+        {
+          "name": "Local final manual save and release preserve latest inline import guide",
+          "pass": true,
+          "durationMs": 1252
+        },
+        {
+          "name": "Local refresh exposes history-only pill for one complete nine-chart selection",
+          "pass": true,
+          "durationMs": 4492
+        }
+      ],
+      "storageMessages": [
+        "浏览器存储写入失败，本次下载不再支持刷新后续传；请保持页面打开直到完成。",
+        ""
+      ],
+      "savedArchiveEntries": [
+        24,
+        3
+      ],
+      "crcVerified": true,
+      "historyChartCount": 9,
+      "cacheFilesAfterRelease": 0
+    },
+    {
+      "profile": "lowram",
+      "engine": "chromium",
+      "pass": true,
+      "navigator": {
+        "userAgent": "Mozilla/5.0 (Linux; Android 10; HUAWEI MAR-AL00) AppleWebKit/537.36 Chrome/114.0.0.0 Mobile Safari/537.36",
+        "platform": "MacIntel",
+        "maxTouchPoints": 1,
+        "deviceMemory": 2
+      },
+      "pageErrors": [],
+      "phases": [
+        {
+          "name": "Local BGA label touch toggle and nine charts start in 8+1 groups",
+          "pass": true,
+          "durationMs": 6015
+        },
+        {
+          "name": "Local first manual save, video-first links and release preserve guide",
+          "pass": true,
+          "durationMs": 1168
+        },
+        {
+          "name": "Local final manual save and release preserve latest inline import guide",
+          "pass": true,
+          "durationMs": 1376
+        },
+        {
+          "name": "Local refresh exposes history-only pill for one complete nine-chart selection",
+          "pass": true,
+          "durationMs": 4467
+        }
+      ],
+      "storageMessages": [
+        ""
+      ],
+      "savedArchiveEntries": [
+        24,
+        3
+      ],
+      "crcVerified": true,
+      "historyChartCount": 9,
+      "cacheFilesAfterRelease": 0
+    }
+  ],
+  "pressure": {
+    "date": "2026-10-10T13:30:16.231Z",
+    "inputMiB": 128,
+    "v8HeapLimitMiB": 128,
+    "physicalDevice": false,
+    "limitations": [
+      "A V8 heap limit is not a 2GB physical RAM limit. Native Blob backing and browser processes have separate memory.",
+      "This tests the real archive builder and save helper; the download scheduler is checked separately."
+    ],
+    "runs": [
+      {
+        "format": "adx",
+        "durationMs": 1421,
+        "bytes": 134219918,
+        "ticks": 18,
+        "maxGapMs": 47.10000002384186,
+        "progressCalls": 2090,
+        "rendererPeakMiB": 191.359375,
+        "heapBeforeMiB": 1.6849708557128906,
+        "heapPackedMiB": 1.3907661437988281,
+        "heapReleasedMiB": 1.8461227416992188,
+        "criticalPressureSent": true,
+        "downloadFailure": null,
+        "errors": []
+      },
+      {
+        "format": "zip",
+        "durationMs": 918,
+        "bytes": 134219918,
+        "ticks": 15,
+        "maxGapMs": 53.5,
+        "progressCalls": 2090,
+        "rendererPeakMiB": 163.0625,
+        "heapBeforeMiB": 1.6901016235351562,
+        "heapPackedMiB": 1.4881401062011719,
+        "heapReleasedMiB": 1.8460273742675781,
+        "criticalPressureSent": true,
+        "downloadFailure": null,
+        "errors": []
+      },
+      {
+        "format": "tar.gz",
+        "durationMs": 7020,
+        "bytes": 134372531,
+        "ticks": 252,
+        "maxGapMs": 62.800000071525574,
+        "progressCalls": 2090,
+        "rendererPeakMiB": 188.484375,
+        "heapBeforeMiB": 1.6901016235351562,
+        "heapPackedMiB": 3.0062904357910156,
+        "heapReleasedMiB": 1.9451332092285156,
+        "criticalPressureSent": true,
+        "downloadFailure": null,
+        "errors": []
+      }
+    ]
+  },
+  "integrity": [
+    {
+      "format": "adx",
+      "entries": 16,
+      "sha256VerifiedTracks": 8,
+      "bytes": 134219918
+    },
+    {
+      "format": "zip",
+      "entries": 16,
+      "sha256VerifiedTracks": 8,
+      "bytes": 134219918
+    },
+    {
+      "format": "tar.gz",
+      "entries": 16,
+      "sha256VerifiedTracks": 8,
+      "bytes": 134372531
+    }
+  ],
+  "webkitLarge": {
+    "engine": "Playwright WebKit, iPhone profile",
+    "physicalDevice": false,
+    "inputMiB": 128,
+    "bytes": 134219918,
+    "ticks": 27,
+    "durationMs": 3313,
+    "errors": [],
+    "downloadFailure": null,
+    "integrity": {
+      "entries": 16,
+      "sha256VerifiedTracks": 8
+    }
+  },
+  "webkitRawBlobs": [
+    {
+      "mib": 1,
+      "bytes": 1048576,
+      "type": "application/octet-stream",
+      "consoleErrors": [],
+      "failures": [],
+      "download": true,
+      "failure": null
+    },
+    {
+      "mib": 16,
+      "bytes": 16777216,
+      "type": "application/octet-stream",
+      "consoleErrors": [],
+      "failures": [],
+      "download": true,
+      "failure": null
+    },
+    {
+      "mib": 128,
+      "bytes": 134217728,
+      "type": "application/octet-stream",
+      "consoleErrors": [],
+      "failures": [],
+      "download": true,
+      "failure": null
+    }
+  ],
+  "unitTests": {
+    "pass": 660,
+    "fail": 0,
+    "files": 73
+  },
+  "lintFiles": 683,
+  "reviewFindings": []
+}

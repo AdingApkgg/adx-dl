@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { Reveal, RevealGroup, RevealItem } from "@astrodx/ui/motion";
+import { buildPreviewHref } from "@/lib/chart-preview-route";
 import { AdxDownloadButton } from "@/components/site/adx-download-button";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
@@ -691,7 +692,7 @@ export function ChartDetailPageView({
           )}
         </DetailHeroBackdrop>
 
-        <div className="grid gap-6 p-6 md:p-8 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 p-6 md:p-8 lg:grid-cols-[260px_minmax(0,1fr)]">
           <div className="mx-auto w-full max-w-[260px] lg:mx-0">
             <DetailHeroCover>
               <EntryCover
@@ -737,7 +738,7 @@ export function ChartDetailPageView({
                   hasChartPreview ? (
                     <PreviewDifficultyTrigger
                       key={`${entry.id}-${difficulty.slot}`}
-                      slot={difficulty.slot}
+                      href={buildPreviewHref(entry, locale, difficulty.slot)}
                       label={detail.chartPreviewAt(difficultySlotLabel(difficulty))}
                     >
                       <DifficultyPill difficulty={difficulty} showConstant />
@@ -928,7 +929,7 @@ export function ChartDetailPageView({
                           <td className="py-2 pr-4">
                             {hasChartPreview ? (
                               <PreviewDifficultyTrigger
-                                slot={difficulty.slot}
+                                href={buildPreviewHref(entry, locale, difficulty.slot)}
                                 label={detail.chartPreviewAt(difficultySlotLabel(difficulty))}
                               >
                                 <DifficultyPill difficulty={difficulty} showConstant />

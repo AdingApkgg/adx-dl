@@ -288,3 +288,31 @@ describe("default zh routes", () => {
     expect(html).toContain('dateTime="2026-09-23"');
   });
 });
+
+
+test("preview routes render crawlable content and link back to chart details", async () => {
+  const route = await import("./(default)/preview/[slug]/page");
+  const html = renderToStaticMarkup(await route.default({ params: Promise.resolve({ slug: "song-1" }) }));
+  expect(html).toContain("曲目 1");
+  expect(html).toContain("谱面预览");
+  expect(html).toContain('href="/charts/song-1"');
+  expect(html).toContain('href="/preview/song-1?diff=1"');
+  expect(await route.generateStaticParams()).toContainEqual({ slug: "song-1" });
+  await expect(route.default({ params: Promise.resolve({ slug: "missing" }) })).rejects.toThrow("NEXT_NOT_FOUND");
+});
+
+
+test("preview routes omit charts without maidata and provide localized pages", async () => {
+  const route = await import("./(default)/preview/[slug]/page");
+  const localized = await import("./[locale]/preview/[slug]/page");
+  const saved = entries[0].files.maidata;
+  entries[0].files.maidata = "";
+  try {
+    expect(await route.generateStaticParams()).not.toContainEqual({ slug: "song-1" });
+    await expect(route.default({ params: Promise.resolve({ slug: "song-1" }) })).rejects.toThrow("NEXT_NOT_FOUND");
+  } finally { entries[0].files.maidata = saved; }
+  const html = renderToStaticMarkup(await localized.default({ params: Promise.resolve({ locale: "en", slug: "song-1" }) }));
+  expect(html).toContain("Chart preview");
+  expect(html).toContain('href="/en/charts/song-1"');
+  expect(html).toContain('href="/en/preview/song-1?diff=1"');
+});

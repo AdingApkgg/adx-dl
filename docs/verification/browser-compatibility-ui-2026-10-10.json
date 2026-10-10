@@ -1,0 +1,456 @@
+{
+  "scope": "Local browser compatibility UI and chart detail progress overflow; not deployed",
+  "automated": {
+    "web": 667,
+    "ui": 38,
+    "typescript": "passed for web and ui",
+    "lint": "690 files passed"
+  },
+  "browserFeatures": {
+    "chromium": {
+      "engine": "chromium",
+      "results": [
+        {
+          "name": "mode toggle persisted and reduced motion",
+          "pass": true
+        },
+        {
+          "name": "actual Blob storage probe and selectable report",
+          "pass": true,
+          "report": {
+            "version": 1,
+            "collectedAt": "2026-10-10T14:04:48.543Z",
+            "browser": {
+              "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Mobile/15E148 Safari/604.1",
+              "platform": "MacIntel",
+              "maxTouchPoints": 1
+            },
+            "viewport": {
+              "width": 390,
+              "height": 664,
+              "scale": 1,
+              "rootFontSize": "16px"
+            },
+            "preferences": {
+              "forcedColors": false,
+              "reducedMotion": false,
+              "compatibility": "simple"
+            },
+            "capabilities": {
+              "secureContext": true,
+              "blobSaveApi": true,
+              "clipboardApi": true
+            },
+            "storage": {
+              "downloadBlobRoundTrip": "ok",
+              "preferencesWrite": true,
+              "downloadCheckpointFailureObserved": false
+            },
+            "job": null
+          }
+        },
+        {
+          "name": "reload persistence and blocked clipboard fallback",
+          "pass": true
+        },
+        {
+          "name": "restore normal mode without page errors",
+          "pass": true
+        },
+        {
+          "name": "JavaScript-disabled static help",
+          "pass": true
+        }
+      ],
+      "errors": []
+    },
+    "webkit": {
+      "engine": "webkit",
+      "results": [
+        {
+          "name": "mode toggle persisted and reduced motion",
+          "pass": true
+        },
+        {
+          "name": "actual Blob storage probe and selectable report",
+          "pass": true,
+          "report": {
+            "version": 1,
+            "collectedAt": "2026-10-10T14:05:18.133Z",
+            "browser": {
+              "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Mobile/15E148 Safari/604.1",
+              "platform": "MacIntel",
+              "maxTouchPoints": 0
+            },
+            "viewport": {
+              "width": 390,
+              "height": 664,
+              "scale": 1,
+              "rootFontSize": "16px"
+            },
+            "preferences": {
+              "forcedColors": false,
+              "reducedMotion": false,
+              "compatibility": "simple"
+            },
+            "capabilities": {
+              "secureContext": true,
+              "blobSaveApi": true,
+              "clipboardApi": true
+            },
+            "storage": {
+              "downloadBlobRoundTrip": "error",
+              "preferencesWrite": true,
+              "downloadCheckpointFailureObserved": false
+            },
+            "job": null
+          }
+        },
+        {
+          "name": "reload persistence and blocked clipboard fallback",
+          "pass": true
+        },
+        {
+          "name": "restore normal mode without page errors",
+          "pass": true
+        },
+        {
+          "name": "JavaScript-disabled static help",
+          "pass": true
+        }
+      ],
+      "errors": []
+    }
+  },
+  "faultInjection": [
+    {
+      "fault": "quota",
+      "pass": true,
+      "report": {
+        "version": 1,
+        "collectedAt": "2026-10-10T14:10:07.015Z",
+        "browser": {
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+          "platform": "MacIntel",
+          "maxTouchPoints": 0
+        },
+        "viewport": {
+          "width": 390,
+          "height": 844,
+          "scale": 1,
+          "rootFontSize": "16px"
+        },
+        "preferences": {
+          "forcedColors": true,
+          "reducedMotion": false,
+          "compatibility": "simple"
+        },
+        "capabilities": {
+          "secureContext": true,
+          "blobSaveApi": true,
+          "clipboardApi": true
+        },
+        "storage": {
+          "downloadBlobRoundTrip": "quota",
+          "preferencesWrite": true,
+          "downloadCheckpointFailureObserved": false
+        },
+        "job": null
+      },
+      "selected": {
+        "outline": "solid",
+        "background": "rgba(255, 255, 255, 0.1)"
+      }
+    },
+    {
+      "fault": "storage",
+      "pass": true,
+      "report": {
+        "version": 1,
+        "collectedAt": "2026-10-10T14:10:13.616Z",
+        "browser": {
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+          "platform": "MacIntel",
+          "maxTouchPoints": 0
+        },
+        "viewport": {
+          "width": 390,
+          "height": 844,
+          "scale": 1,
+          "rootFontSize": "16px"
+        },
+        "preferences": {
+          "forcedColors": true,
+          "reducedMotion": false,
+          "compatibility": "simple"
+        },
+        "capabilities": {
+          "secureContext": true,
+          "blobSaveApi": true,
+          "clipboardApi": true
+        },
+        "storage": {
+          "downloadBlobRoundTrip": "ok",
+          "preferencesWrite": false,
+          "downloadCheckpointFailureObserved": false
+        },
+        "job": null
+      },
+      "selected": {
+        "outline": "solid",
+        "background": "rgba(255, 255, 255, 0.1)"
+      }
+    }
+  ],
+  "largeFontLayout": {
+    "webkit": [
+      {
+        "width": 320,
+        "viewport": 320,
+        "documentWidth": 320,
+        "bar": {
+          "tag": "DIV",
+          "className": "relative h-1.5 w-full max-w-full overflow-hidden rounded-full bg-muted",
+          "width": 158,
+          "left": 81,
+          "right": 239,
+          "scrollWidth": 158
+        },
+        "ancestors": [
+          {
+            "tag": "DIV",
+            "className": "flex min-w-0 max-w-full flex-col gap-2",
+            "width": 158,
+            "left": 81,
+            "right": 239,
+            "scrollWidth": 158
+          },
+          {
+            "tag": "DIV",
+            "className": "flex flex-wrap gap-2",
+            "width": 158,
+            "left": 81,
+            "right": 239,
+            "scrollWidth": 192
+          },
+          {
+            "tag": "DIV",
+            "className": "flex flex-col gap-4",
+            "width": 158,
+            "left": 81,
+            "right": 239,
+            "scrollWidth": 192
+          }
+        ],
+        "overflow": []
+      },
+      {
+        "width": 390,
+        "viewport": 390,
+        "documentWidth": 390,
+        "bar": {
+          "tag": "DIV",
+          "className": "relative h-1.5 w-full max-w-full overflow-hidden rounded-full bg-muted",
+          "width": 228,
+          "left": 81,
+          "right": 309,
+          "scrollWidth": 228
+        },
+        "ancestors": [
+          {
+            "tag": "DIV",
+            "className": "flex min-w-0 max-w-full flex-col gap-2",
+            "width": 228,
+            "left": 81,
+            "right": 309,
+            "scrollWidth": 228
+          },
+          {
+            "tag": "DIV",
+            "className": "flex flex-wrap gap-2",
+            "width": 228,
+            "left": 81,
+            "right": 309,
+            "scrollWidth": 228
+          },
+          {
+            "tag": "DIV",
+            "className": "flex flex-col gap-4",
+            "width": 228,
+            "left": 81,
+            "right": 309,
+            "scrollWidth": 228
+          }
+        ],
+        "overflow": []
+      },
+      {
+        "width": 1024,
+        "viewport": 1024,
+        "documentWidth": 1024,
+        "bar": {
+          "tag": "DIV",
+          "className": "relative h-1.5 w-full max-w-full overflow-hidden rounded-full bg-muted",
+          "width": 490,
+          "left": 421,
+          "right": 911,
+          "scrollWidth": 490
+        },
+        "ancestors": [
+          {
+            "tag": "DIV",
+            "className": "flex min-w-0 max-w-full flex-col gap-2",
+            "width": 490,
+            "left": 421,
+            "right": 911,
+            "scrollWidth": 490
+          },
+          {
+            "tag": "DIV",
+            "className": "flex flex-wrap gap-2",
+            "width": 490,
+            "left": 421,
+            "right": 911,
+            "scrollWidth": 490
+          },
+          {
+            "tag": "DIV",
+            "className": "flex flex-col gap-4",
+            "width": 490,
+            "left": 421,
+            "right": 911,
+            "scrollWidth": 490
+          }
+        ],
+        "overflow": []
+      }
+    ],
+    "chromium": [
+      {
+        "width": 320,
+        "viewport": 320,
+        "documentWidth": 320,
+        "bar": {
+          "tag": "DIV",
+          "className": "relative h-1.5 w-full max-w-full overflow-hidden rounded-full bg-muted",
+          "width": 158,
+          "left": 81,
+          "right": 239,
+          "scrollWidth": 158
+        },
+        "ancestors": [
+          {
+            "tag": "DIV",
+            "className": "flex min-w-0 max-w-full flex-col gap-2",
+            "width": 158,
+            "left": 81,
+            "right": 239,
+            "scrollWidth": 158
+          },
+          {
+            "tag": "DIV",
+            "className": "flex flex-wrap gap-2",
+            "width": 158,
+            "left": 81,
+            "right": 239,
+            "scrollWidth": 188
+          },
+          {
+            "tag": "DIV",
+            "className": "flex flex-col gap-4",
+            "width": 158,
+            "left": 81,
+            "right": 239,
+            "scrollWidth": 188
+          }
+        ],
+        "overflow": []
+      },
+      {
+        "width": 390,
+        "viewport": 390,
+        "documentWidth": 390,
+        "bar": {
+          "tag": "DIV",
+          "className": "relative h-1.5 w-full max-w-full overflow-hidden rounded-full bg-muted",
+          "width": 228,
+          "left": 81,
+          "right": 309,
+          "scrollWidth": 228
+        },
+        "ancestors": [
+          {
+            "tag": "DIV",
+            "className": "flex min-w-0 max-w-full flex-col gap-2",
+            "width": 228,
+            "left": 81,
+            "right": 309,
+            "scrollWidth": 228
+          },
+          {
+            "tag": "DIV",
+            "className": "flex flex-wrap gap-2",
+            "width": 228,
+            "left": 81,
+            "right": 309,
+            "scrollWidth": 228
+          },
+          {
+            "tag": "DIV",
+            "className": "flex flex-col gap-4",
+            "width": 228,
+            "left": 81,
+            "right": 309,
+            "scrollWidth": 228
+          }
+        ],
+        "overflow": []
+      },
+      {
+        "width": 1024,
+        "viewport": 1024,
+        "documentWidth": 1024,
+        "bar": {
+          "tag": "DIV",
+          "className": "relative h-1.5 w-full max-w-full overflow-hidden rounded-full bg-muted",
+          "width": 490,
+          "left": 421,
+          "right": 911,
+          "scrollWidth": 490
+        },
+        "ancestors": [
+          {
+            "tag": "DIV",
+            "className": "flex min-w-0 max-w-full flex-col gap-2",
+            "width": 490,
+            "left": 421,
+            "right": 911,
+            "scrollWidth": 490
+          },
+          {
+            "tag": "DIV",
+            "className": "flex flex-wrap gap-2",
+            "width": 490,
+            "left": 421,
+            "right": 911,
+            "scrollWidth": 490
+          },
+          {
+            "tag": "DIV",
+            "className": "flex flex-col gap-4",
+            "width": 490,
+            "left": 421,
+            "right": 911,
+            "scrollWidth": 490
+          }
+        ],
+        "overflow": []
+      }
+    ]
+  },
+  "limitations": [
+    "Playwright engine checks do not replace physical iOS, Huawei or low-memory device testing",
+    "WebKit in this environment reports Blob IndexedDB round trip error; fallback message is verified",
+    "No local production build or production deployment performed"
+  ]
+}

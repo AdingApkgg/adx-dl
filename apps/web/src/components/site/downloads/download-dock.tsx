@@ -105,7 +105,7 @@ export function DownloadProgressBar({
       aria-valuemax={100}
       aria-valuenow={percent ?? undefined}
       aria-label={label}
-      className="relative h-1.5 overflow-hidden rounded-full bg-muted"
+      className="relative h-1.5 w-full max-w-full overflow-hidden rounded-full bg-muted"
     >
       <motion.div
         className={cn("h-full w-full origin-left rounded-full", fillClassName ?? "bg-primary")}

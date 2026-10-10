@@ -65,7 +65,7 @@ describe("ThemeProvider in the browser", () => {
     act(() => {
       screen.getByRole("button", { name: "T-choose" }).click();
     });
-    expect(html.style.colorScheme).toBe("light");
+    expect(html.style.colorScheme).toBe("only light");
 
     // This tab remembers "light" in memory; another tab then saves "dark".
     localStorage.setItem("theme", "dark");
@@ -114,6 +114,6 @@ describe("ThemeProvider in the browser", () => {
     expect(listeners.size).toBeGreaterThan(0);
     flipSystem(true);
     expect(html.classList.contains("dark")).toBe(false);
-    expect(html.style.colorScheme).toBe("light");
+    expect(html.style.colorScheme).toBe("only light");
   });
 });

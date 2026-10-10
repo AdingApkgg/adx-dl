@@ -19,7 +19,7 @@ type Html = {
 // remove them, not just avoid adding them.
 function run(
   stored: Record<string, string>,
-  { prefersDark = false, storageThrows = false, stale = false } = {}
+  { prefersDark = false, storageThrows = false, stale = false, missingMedia = false } = {}
 ): Html {
   const html: Html = {
     classes: new Set(stale ? ["dark"] : []),
@@ -43,7 +43,7 @@ function run(
       return stored[key] ?? null;
     },
   };
-  const window = { matchMedia: () => ({ matches: prefersDark }) };
+  const window = { matchMedia: missingMedia ? undefined : () => ({ matches: prefersDark }) };
   new Function("document", "localStorage", "window", themeBootScript())({ documentElement }, localStorage, window);
   return html;
 }
@@ -69,9 +69,15 @@ describe("themeBootScript", () => {
       for (const [stored, prefersDark, dark] of cases) {
         const html = run(stored === undefined ? {} : { [THEME_STORAGE_KEY]: stored }, { prefersDark, stale });
         expect(html.classes.has("dark")).toBe(dark);
-        expect(html.style.colorScheme).toBe(dark ? "dark" : "light");
+        expect(html.style.colorScheme).toBe(stored === "light" ? "only light" : dark ? "dark" : "light");
       }
     }
+  });
+
+  test("uses the runtime dark fallback when matchMedia is missing", () => {
+    expect(run({}, { missingMedia: true }).style.colorScheme).toBe("dark");
+    expect(run({ [THEME_STORAGE_KEY]: "system" }, { missingMedia: true }).classes.has("dark")).toBe(true);
+    expect(run({ [THEME_STORAGE_KEY]: "light" }, { missingMedia: true }).style.colorScheme).toBe("only light");
   });
 
   test("applies the same accent as ThemeProvider", () => {

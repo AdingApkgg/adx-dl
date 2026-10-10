@@ -26,7 +26,7 @@ const themeChangeEvent = "astrodx-theme-change";
 let sessionTheme: ThemePreference | null = null;
 let sessionAccent: AccentColor | null = null;
 
-function applyResolvedTheme(theme: ResolvedTheme) {
+function applyResolvedTheme(theme: ResolvedTheme, preference: ThemePreference) {
   if (typeof document === "undefined") {
     return;
   }
@@ -35,7 +35,7 @@ function applyResolvedTheme(theme: ResolvedTheme) {
   // in the persisted mode. Inline beats the stylesheet's `.dark`/`:root`
   // color-scheme, so runtime switches must keep it in step.
   document.documentElement.style.colorScheme =
-    theme === "dark" ? "dark" : "light";
+    preference === "light" ? "only light" : theme === "dark" ? "dark" : "light";
 }
 
 function applyAccent(accent: AccentColor) {
@@ -124,7 +124,7 @@ function getAccentServerSnapshot(): AccentColor {
 }
 
 function subscribeSystemTheme(callback: () => void) {
-  if (typeof window === "undefined") {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
     return () => {};
   }
 
@@ -141,7 +141,7 @@ function subscribeSystemTheme(callback: () => void) {
 }
 
 function getSystemThemeSnapshot(): ResolvedTheme {
-  if (typeof window === "undefined") {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
     return "dark";
   }
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -176,7 +176,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    applyResolvedTheme(resolvedTheme);
+    applyResolvedTheme(resolvedTheme, theme);
   }, [resolvedTheme, theme]);
 
   React.useEffect(() => {

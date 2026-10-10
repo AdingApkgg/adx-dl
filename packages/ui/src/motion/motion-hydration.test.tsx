@@ -50,6 +50,14 @@ afterEach(() => {
 });
 
 describe("motion preferences during hydration", () => {
+  test("a compatibility override reduces motion without replacing the saved choice", () => {
+    const { rerender } = render(<MotionProvider {...{ forceReducedMotion: true }}><MotionControls /></MotionProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Always animate" }));
+    expect(screen.getByLabelText("motion").textContent).toBe("reduced");
+    expect(screen.getByLabelText("mode").textContent).toBe("on");
+    rerender(<MotionProvider {...{ forceReducedMotion: false }}><MotionControls /></MotionProvider>);
+    expect(screen.getByLabelText("motion").textContent).toBe("full");
+  });
   test("hydrates server decorations without a mismatch when the browser reduces motion", async () => {
     const content = <MotionProvider><MotionControls /></MotionProvider>;
     const container = document.createElement("div");

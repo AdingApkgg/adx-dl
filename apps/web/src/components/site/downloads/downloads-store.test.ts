@@ -858,6 +858,24 @@ describe("downloads-store", () => {
     restoreGlobals();
   });
 
+  test("denied localStorage property access preserves hydration and preference changes", () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      get: () => { throw new DOMException("Denied", "SecurityError"); },
+    });
+    try {
+      expect(() => useDownloadsStore.getState().hydrateFromStorage()).not.toThrow();
+      expect(() => useDownloadsStore.getState().setPreferredFormat("zip")).not.toThrow();
+      expect(() => useDownloadsStore.getState().setPreferredBatchGrouping("genre")).not.toThrow();
+      expect(() => useDownloadsStore.getState().setMaidataAliases(true)).not.toThrow();
+      expect(useDownloadsStore.getState()).toMatchObject({ preferredFormat: "zip", preferredBatchGrouping: "genre", maidataAliases: true });
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, "localStorage", descriptor);
+      else delete (globalThis as Record<string, unknown>).localStorage;
+    }
+  });
+
   test("summarizeDownloadJobs rolls a queue up into one headline state", () => {
     const job = (patch: Partial<DownloadJob>): DownloadJob => ({
       id: patch.id ?? "j",

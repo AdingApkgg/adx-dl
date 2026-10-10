@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { storePreferredLocale } from "@/app/locale-preference";
+import { BrowserCompatibilitySettings } from "./browser-compatibility-settings";
 import { DownloadHistoryList } from "@/components/site/downloads/download-history";
 import {
   configuredDownloadSources,
@@ -328,6 +329,7 @@ export function SiteSettingsContent({
               labels={{ modes: copy.motion, hints: copy.motionHints }}
             />
           </SettingsField>
+          <BrowserCompatibilitySettings locale={locale} />
         </SettingsSection>
 
         <SettingsSection

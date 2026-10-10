@@ -248,13 +248,13 @@ describe("route metadata", () => {
     const zhDescription = buildChartDescription(entry3, "zh");
     const enDescription = buildChartDescription(entry3, "en");
 
-    expect(zhMetadata?.title).toBe("曲目 3 AstroDX 谱面预览与下载 | ADX 谱面资源");
+    expect(zhMetadata?.title).toBe("曲目 3 AstroDX 谱面资料与下载 | ADX 谱面资源");
     expect(zhMetadata?.description).toBe(zhDescription);
     expectLocalizedAlternates(
       zhMetadata ?? {},
       `/charts/${song3Slug}`,
       {
-        title: "曲目 3 AstroDX 谱面预览与下载",
+        title: "曲目 3 AstroDX 谱面资料与下载",
         description: zhDescription,
         keywords: ["AstroDX", "ADX 谱面资源", "曲目 3", "歌手 3", "舞萌DX 2025", "Anime", "maimai"],
       },
@@ -262,14 +262,14 @@ describe("route metadata", () => {
     );
 
     expect(enMetadata?.title).toBe(
-      "Song 3 AstroDX Chart Preview and Download | ADX Chart Archive"
+      "Song 3 AstroDX Chart Details and Download | ADX Chart Archive"
     );
     expect(enMetadata?.description).toBe(enDescription);
     expectLocalizedAlternates(
       enMetadata ?? {},
       `/en/charts/${song3Slug}`,
       {
-        title: "Song 3 AstroDX Chart Preview and Download",
+        title: "Song 3 AstroDX Chart Details and Download",
         description: enDescription,
         keywords: ["AstroDX", "ADX Chart Archive", "Song 3", "Artist 3", "舞萌DX 2025", "Anime", "maimai"],
       },
@@ -304,21 +304,21 @@ describe("route metadata", () => {
     const enDescription = buildChartDescription(entry5, "en");
 
     // Remote branch label (version / cabinet) must appear in the synthesized prose.
-    expect(zhMetadata?.title).toBe("远端曲目 5 AstroDX 谱面预览与下载 | ADX 谱面资源");
+    expect(zhMetadata?.title).toBe("远端曲目 5 AstroDX 谱面资料与下载 | ADX 谱面资源");
     expect(zhMetadata?.description).toBe(zhDescription);
     expect(zhDescription).toContain("maimai DX PRiSM / DX");
     expect(enMetadata?.title).toBe(
-      "Remote Song 5 AstroDX Chart Preview and Download | ADX Chart Archive"
+      "Remote Song 5 AstroDX Chart Details and Download | ADX Chart Archive"
     );
     expect(enMetadata?.description).toBe(enDescription);
     expect(zhMetadata?.openGraph).toMatchObject({
-      title: "远端曲目 5 AstroDX 谱面预览与下载 | ADX 谱面资源",
+      title: "远端曲目 5 AstroDX 谱面资料与下载 | ADX 谱面资源",
       description: zhDescription,
       url: `https://adxdls.saop.cc/charts/remote-song-5`,
       siteName: "ADX 谱面资源",
     });
     expect(enMetadata?.twitter).toMatchObject({
-      title: "Remote Song 5 AstroDX Chart Preview and Download | ADX Chart Archive",
+      title: "Remote Song 5 AstroDX Chart Details and Download | ADX Chart Archive",
       description: enDescription,
     });
   });
@@ -401,4 +401,20 @@ describe("metadata files", () => {
     );
     expect(agents).toContain("GPTBot");
   });
+});
+
+
+test("preview pages have independent canonicals and localized search metadata", async () => {
+  const route = await import("./(default)/preview/[slug]/page");
+  const localized = await import("./[locale]/preview/[slug]/page");
+  const zh = await route.generateMetadata({ params: Promise.resolve({ slug: "song-1" }) });
+  const en = await localized.generateMetadata({ params: Promise.resolve({ locale: "en", slug: "song-1" }) });
+  expect(zh.title).toContain("谱面预览");
+  expect(en.title).toContain("Chart Preview");
+  expect(zh.alternates?.canonical).toBe("https://adxdls.saop.cc/preview/song-1");
+  expect(en.alternates?.canonical).toBe("https://adxdls.saop.cc/en/preview/song-1");
+  expect(zh.alternates?.languages?.en).toBe("/en/preview/song-1");
+  const { buildAllSitemapEntries } = await import("@/lib/sitemap");
+  const sitemap = await buildAllSitemapEntries();
+  expect(sitemap.some((item) => item.url === "https://adxdls.saop.cc/preview/song-1")).toBe(true);
 });

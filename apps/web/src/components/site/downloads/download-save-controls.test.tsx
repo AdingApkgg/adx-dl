@@ -23,7 +23,8 @@ test("a finished mobile batch exposes each pending archive and retry action", ()
   expect(html).toContain("打包完成，等待保存文件");
   expect(html).toContain("maimai (1).zip");
   expect(html).toContain("maimai (2).zip");
-  expect(html.match(/<button /g)).toHaveLength(2);
+  expect(html.match(/<button /g)).toHaveLength(3);
+  expect(html).toContain("浏览器诊断与兼容帮助");
   expect(html).toContain("再次保存");
   expect(html).toContain("保存文件");
   expect(html).toContain("保存未能发起");

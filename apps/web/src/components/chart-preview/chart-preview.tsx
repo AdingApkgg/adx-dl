@@ -42,6 +42,7 @@ export type ChartPreviewProps = {
   coverUrl?: string;
   chartName?: string;
   defaultDifficulty?: number;
+  onDifficultyChange?: (difficulty: number) => void;
   /** Difficulty slot (2–6) → level string, from the catalog. */
   levels?: Record<number, string>;
   locale?: Locale;
@@ -105,6 +106,7 @@ export function ChartPreview({
   coverUrl,
   chartName = "chart",
   defaultDifficulty,
+  onDifficultyChange,
   levels,
   locale = "zh",
 }: ChartPreviewProps) {
@@ -235,6 +237,16 @@ export function ChartPreview({
     if (audioUrl) setMusicUrl(audioUrl);
     return () => reset();
   }, [maidataUrl, audioUrl]);
+
+  // Route hosts keep internal selections and shareable query state in sync.
+  useEffect(() => {
+    if (!onDifficultyChange) return;
+    return useGameStore.subscribe((state, previous) => {
+      if (state.selectedDifficulty !== null && state.selectedDifficulty !== previous.selectedDifficulty) {
+        onDifficultyChange(state.selectedDifficulty);
+      }
+    });
+  }, [onDifficultyChange]);
 
   // Parse + pick a difficulty once the chart text is available (re-applies when
   // the requested difficulty changes, without refetching the cached text).

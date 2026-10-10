@@ -38,6 +38,7 @@ export const springSoft: Transition = {
 export { MOTION_MODES, type MotionMode } from "./constants";
 
 type MotionPreference = {
+  forceReducedMotion: boolean;
   mode: MotionMode;
   setMode: (mode: MotionMode) => void;
   /** Compatibility handle for the former binary header toggle. */
@@ -46,6 +47,7 @@ type MotionPreference = {
 };
 
 const MotionPreferenceContext = React.createContext<MotionPreference>({
+  forceReducedMotion: false,
   mode: "system",
   setMode: () => {},
   userReduced: false,
@@ -109,8 +111,8 @@ export function useReducedMotion(): boolean {
     getOsMotionSnapshot,
     getServerMotionSnapshot
   );
-  const { mode } = React.useContext(MotionPreferenceContext);
-  return mode === "off" || (mode === "system" && os);
+  const { mode, forceReducedMotion } = React.useContext(MotionPreferenceContext);
+  return forceReducedMotion || mode === "off" || (mode === "system" && os);
 }
 
 /**
@@ -126,7 +128,11 @@ export function useReducedMotion(): boolean {
  * first paint of a full page load may briefly animate — the trade for
  * mismatch-free hydration. Client-side navigations see the settled value.
  */
-export function MotionProvider({ children }: { children: React.ReactNode }) {
+export function MotionProvider({ children, forceReducedMotion = false }: {
+  children: React.ReactNode;
+  /** Temporary compatibility override; does not change the saved motion mode. */
+  forceReducedMotion?: boolean;
+}) {
   const [mode, setModeState] = React.useState<MotionMode>("system");
   const [preferenceReady, setPreferenceReady] = React.useState(false);
 
@@ -148,8 +154,8 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     document.documentElement.dataset.motion = mode;
-    document.documentElement.toggleAttribute("data-reduced-motion", mode === "off");
-  }, [mode, preferenceReady]);
+    document.documentElement.toggleAttribute("data-reduced-motion", forceReducedMotion || mode === "off");
+  }, [mode, preferenceReady, forceReducedMotion]);
 
   const setMode = React.useCallback((value: MotionMode) => {
     const normalized = parseMotionMode(value);
@@ -167,17 +173,18 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
 
   const preference = React.useMemo(
     () => ({
+      forceReducedMotion,
       mode,
       setMode,
       userReduced: mode === "off",
       setUserReduced,
     }),
-    [mode, setMode, setUserReduced]
+    [mode, setMode, setUserReduced, forceReducedMotion]
   );
 
   return (
     <MotionPreferenceContext.Provider value={preference}>
-      <MotionConfig reducedMotion={motionConfigPreference(mode)}>
+      <MotionConfig reducedMotion={motionConfigPreference(forceReducedMotion ? "off" : mode)}>
         {children}
       </MotionConfig>
     </MotionPreferenceContext.Provider>

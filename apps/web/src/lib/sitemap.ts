@@ -100,7 +100,13 @@ export async function buildAllSitemapEntries(): Promise<MetadataRoute.Sitemap> {
     );
   });
 
-  return [...staticRoutes, ...detailRoutes];
+  const previewRoutes = catalog.entries.filter((entry) => Boolean(entry.files.maidata)).flatMap((entry) =>
+    locales.map((locale) => buildSitemapEntry(`/preview/${encodeURIComponent(entrySlug(entry))}`, locale, {
+      lastModified: toIsoDate(entry.imported_at) ?? siteLastModified,
+      ...(entry.media.cover_url ? { images: [toAbsoluteAsset(entry.media.cover_url)] } : {}),
+    }))
+  );
+  return [...staticRoutes, ...detailRoutes, ...previewRoutes];
 }
 
 // How many shards the current catalog needs (at least 1).

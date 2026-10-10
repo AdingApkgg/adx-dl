@@ -366,7 +366,11 @@ function MusicPlayerSurface({
         muted: state.muted,
         currentTime: time,
       };
-      writeMusicPlayerSnapshot(window.localStorage, snapshot);
+      try {
+        writeMusicPlayerSnapshot(window.localStorage, snapshot);
+      } catch {
+        // Accessing localStorage itself can throw before the writer runs.
+      }
       lastCheckpointRef.current = Date.now();
     },
     [hydrated, restorePending]
@@ -376,10 +380,14 @@ function MusicPlayerSurface({
     if (hydrated) {
       return;
     }
-    const persisted =
-      typeof window === "undefined"
-        ? null
-        : readMusicPlayerSnapshot(window.localStorage);
+    let persisted: StoredMusicPlayerSnapshot | null = null;
+    try {
+      if (typeof window !== "undefined") {
+        persisted = readMusicPlayerSnapshot(window.localStorage);
+      }
+    } catch {
+      // Continue without a saved playback position when storage is denied.
+    }
     bootstrap(initialVersionId, initialTracks, persisted);
     if (persisted?.trackId && persisted.currentTime) {
       pendingSeekRef.current = {

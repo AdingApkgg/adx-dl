@@ -10,6 +10,8 @@ import { getDownloadSource } from "@/lib/download-sources";
 import { useDownloadsStore, type DownloadJob } from "./downloads-store";
 import { formatBytes } from "./format-bytes";
 import { DownloadImportGuide } from "./download-import-guide";
+import { BrowserDiagnostics } from "../browser-diagnostics";
+import { getBrowserCompatibilityCopy } from "@/lib/browser-compatibility-copy";
 
 type Dictionary = ReturnType<typeof getDictionary>;
 
@@ -51,16 +53,16 @@ export function DownloadJobStatusLine({
   return (
     <p
       className={cn(
-        "text-xs",
+        "min-w-0 max-w-full text-xs [overflow-wrap:anywhere]",
         job.status === "error" ? "text-destructive" : "text-muted-foreground",
         className
       )}
     >
-      <span role="status" className="truncate">
+      <span role="status">
         {state}
       </span>
       {metrics ? (
-        <span aria-hidden="true" className="truncate tabular-nums">
+        <span aria-hidden="true" className="tabular-nums">
           {` · ${metrics}`}
         </span>
       ) : null}
@@ -131,6 +133,7 @@ export function DownloadJobNotes({
     state.jobs.some((entry) => entry.status === "queued")
   );
   const hasArchives = Boolean(job.archives?.length);
+  const showDiagnostics = job.status === "error" || job.archives?.some((archive) => archive.error);
   const hasRequestedSave = job.archives?.some((archive) => archive.requested);
   const savedArchiveInfo = job.savedArchiveInfo;
   const showImportGuide = Boolean(hasRequestedSave || savedArchiveInfo);
@@ -140,7 +143,7 @@ export function DownloadJobNotes({
   const showSwitchNotice =
     job.autoSwitchedTo !== null && job.status !== "success";
 
-  if (!hasSkipped && !showSwitchNotice && !job.errorDetail && !hasArchives && !showImportGuide && !showMemoryWarning && !showLegacyWarning) {
+  if (!hasSkipped && !showSwitchNotice && !job.errorDetail && !hasArchives && !showImportGuide && !showMemoryWarning && !showLegacyWarning && !showDiagnostics) {
     return null;
   }
 
@@ -152,7 +155,7 @@ export function DownloadJobNotes({
         tray.sourcePicker.options[getDownloadSource(job.autoSwitchedTo).copyKey].name;
 
   return (
-    <div className="flex flex-col gap-1.5 text-[11px] leading-snug">
+    <div className="flex min-w-0 max-w-full flex-col gap-1.5 text-[11px] leading-snug">
       {showMemoryWarning ? (
         <p className="rounded-md bg-amber-500/10 px-2 py-1.5 text-amber-800 dark:text-amber-300">
           {job.mobileMemoryWarning === "unknown-size" ? tray.mobileUnknownSizeHint : tray.mobileLargeChartHint}
@@ -178,10 +181,10 @@ export function DownloadJobNotes({
                 <button
                   type="button"
                   onClick={() => saveArchive(job.id, index)}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border/70 px-2 py-1.5 text-left text-xs text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  className="inline-flex min-h-11 flex-wrap items-center gap-2 rounded-md border border-border/70 px-2 py-1.5 text-left text-xs text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   <DownloadIcon className="size-3.5 shrink-0" aria-hidden="true" />
-                  <span className="min-w-0 flex-1 break-all">{archive.fileName}</span>
+                  <span className="min-w-0 flex-[1_1_8rem] break-all">{archive.fileName}</span>
                   <span className="shrink-0 text-muted-foreground">{formatBytes(archive.bytes)}</span>
                   <span className="shrink-0">{archive.requested ? tray.saveAgain : tray.saveArchive}</span>
                 </button>
@@ -243,6 +246,12 @@ export function DownloadJobNotes({
               copiedLabel={tray.copiedDetail}
             />
           </div>
+        </details>
+      ) : null}
+      {showDiagnostics ? (
+        <details className="min-w-0 text-muted-foreground">
+          <summary className="min-h-11 cursor-pointer py-3">{getBrowserCompatibilityCopy(locale).errorDiagnostics}</summary>
+          <BrowserDiagnostics locale={locale} job={job} />
         </details>
       ) : null}
     </div>

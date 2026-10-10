@@ -9,7 +9,10 @@ import {
   Share2Icon,
 } from "lucide-react";
 
-import { ChartPreviewIsland } from "@/components/chart-preview/chart-preview-island";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { buildPreviewHref, legacyPreviewHref } from "@/lib/chart-preview-route";
+export { getChartPreviewAssets } from "@/lib/chart-preview-route";
 import { ChartComments } from "@/components/site/chart-comments";
 import { ChartMediaPlayer } from "@/components/site/chart-media-player";
 import { Button } from "@astrodx/ui/components/button";
@@ -25,48 +28,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@astrodx/ui/components/tooltip";
-import { formatEntryTitle, localChartAssetUrl, type CatalogEntry } from "@/lib/catalog-shared";
+import { formatEntryTitle, type CatalogEntry } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
 import { cn, TAP_TARGET_44 } from "@astrodx/ui/lib/utils";
 
-type DetailPanel = "media" | "preview" | "comments" | null;
-
-/**
- * Asks the (client) actions block to open the preview on a specific difficulty.
- *
- * The difficulty table lives in the server-rendered page body, so a shared
- * window event is what connects the two without pulling the whole table into a
- * client component or forcing a full page navigation through `?diff=`.
- */
-export const OPEN_CHART_PREVIEW_EVENT = "astrodx-open-chart-preview";
-
-export type OpenChartPreviewDetail = { slot?: number };
-
-/** Reads `?diff=` — the difficulty half of a shared preview deep link. */
-function readDifficultyParam(params: URLSearchParams): number | null {
-  // Empty (`?diff=`) must stay "unset": Number("") is 0, which is a real slot.
-  const raw = params.get("diff")?.trim();
-  const value = raw ? Number(raw) : Number.NaN;
-  return Number.isInteger(value) && value >= 0 ? value : null;
-}
+type DetailPanel = "media" | "comments" | null;
 
 type ChartDetailActionsProps = {
   entry: CatalogEntry;
   locale: Locale;
 };
-
-export function getChartPreviewAssets(entry: CatalogEntry) {
-  return {
-    maidataUrl: localChartAssetUrl(entry, "maidata.txt"),
-    coverUrl:
-      entry.assets.has_background || entry.media.cover_url
-        ? entry.media.cover_url || undefined
-        : undefined,
-    audioUrl: entry.media.audio_url || undefined,
-    videoUrl: entry.media.pv_url || undefined,
-  };
-}
 
 export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
   const [activePanel, setActivePanel] = React.useState<DetailPanel>(null);
@@ -76,83 +48,18 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
   const closeLabel = dictionary.downloads.dismiss;
   const title = formatEntryTitle(entry, locale);
   const mediaLabel = entry.assets.has_pv ? detail.pvLabel : detail.audioLabel;
-  const previewAssets = getChartPreviewAssets(entry);
+  const router = useRouter();
   const hasMedia =
     (entry.assets.has_pv && Boolean(entry.media.pv_url)) ||
     (entry.assets.has_audio && Boolean(entry.media.audio_url));
   const hasChartPreview = Boolean(entry.files.maidata);
 
-  // Which difficulty the preview opens on. Null = the chart's highest, which is
-  // what a bare link means. A `?diff=` link (or a click on a difficulty row)
-  // pins a specific slot: without it, a link copied on EXPERT reopened on
-  // MASTER at the same beat — a completely different chart at that timestamp.
-  const [previewDifficulty, setPreviewDifficulty] = React.useState<number | null>(null);
-  const highestDifficulty =
-    entry.difficulties.length > 0
-      ? Math.max(...entry.difficulties.map((difficulty) => difficulty.slot))
-      : undefined;
-
-  React.useEffect(() => {
-    if (!hasChartPreview) return;
-    const openPreview = (event: Event) => {
-      const detail = (event as CustomEvent<OpenChartPreviewDetail>).detail;
-      if (typeof detail?.slot === "number") {
-        setPreviewDifficulty(detail.slot);
-      }
-      setActivePanel("preview");
-    };
-    window.addEventListener(OPEN_CHART_PREVIEW_EVENT, openPreview);
-    return () => window.removeEventListener(OPEN_CHART_PREVIEW_EVENT, openPreview);
-  }, [hasChartPreview]);
-
-  // ?preview=1&diff= deep link + URL sync, in ONE effect so ordering stays
-  // right. The deep link applies after hydration — the server always renders
-  // the closed state, and deciding from location during the hydration render
-  // mismatches the trees. On that first pass the URL is left untouched
-  // (?beat= must survive until the preview mounts and consumes it); after
-  // that, replaceState (no history spam) mirrors the toggle so a refresh
-  // restores an open preview, and closing clears the flag plus a stale beat.
-  const previewFlagInitializedRef = React.useRef(false);
   React.useEffect(() => {
     const url = new URL(window.location.href);
-    const flagged = url.searchParams.get("preview") === "1";
-    if (!previewFlagInitializedRef.current) {
-      previewFlagInitializedRef.current = true;
-      if (flagged && hasChartPreview) {
-        const requested = readDifficultyParam(url.searchParams);
-        // One-time URL-derived initial state, applied post-hydration on purpose.
-        if (requested !== null) {
-          setPreviewDifficulty(requested);
-        }
-        setActivePanel("preview");
-        return;
-      }
+    if (hasChartPreview && url.searchParams.get("preview") === "1") {
+      router.replace(legacyPreviewHref(url, entry, locale));
     }
-    if (activePanel === "preview") {
-      const slot = previewDifficulty;
-      const diffParam = slot === null ? null : String(slot);
-      if (flagged && url.searchParams.get("diff") === diffParam) {
-        return;
-      }
-      url.searchParams.set("preview", "1");
-      if (diffParam === null) {
-        url.searchParams.delete("diff");
-      } else {
-        url.searchParams.set("diff", diffParam);
-      }
-    } else if (
-      flagged ||
-      url.searchParams.has("beat") ||
-      url.searchParams.has("diff")
-    ) {
-      url.searchParams.delete("preview");
-      url.searchParams.delete("beat");
-      url.searchParams.delete("diff");
-    } else {
-      return;
-    }
-    window.history.replaceState(window.history.state, "", url);
-  }, [activePanel, hasChartPreview, previewDifficulty]);
+  }, [entry, hasChartPreview, locale, router]);
 
   const [shareCopied, setShareCopied] = React.useState(false);
   const shareResetTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -227,27 +134,6 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
           />
         </div>
       </DetailPanel>
-    ) : activePanel === "preview" ? (
-      <DetailPanel
-        title={detail.chartPreview}
-        closeLabel={closeLabel}
-        variant="fullscreen"
-        onClose={closePanel}
-      >
-        <div className="mx-auto w-full max-w-7xl px-4 pb-6 pt-4 md:px-6">
-          <ChartPreviewIsland
-            maidataUrl={previewAssets.maidataUrl}
-            audioUrl={previewAssets.audioUrl}
-            videoUrl={previewAssets.videoUrl}
-            coverUrl={previewAssets.coverUrl}
-            chartName={`${entry.short_id || entry.id}-${title}`}
-            locale={locale}
-            deferUntilNearViewport={false}
-            levels={Object.fromEntries(entry.difficulties.map((d) => [d.slot, d.level]))}
-            defaultDifficulty={previewDifficulty ?? highestDifficulty}
-          />
-        </div>
-      </DetailPanel>
     ) : null;
 
   return (
@@ -260,13 +146,11 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
                 cover", behind a Radix tooltip that bails out on touch
                 pointers — i.e. an unlabelled square on every phone. */}
             {hasChartPreview ? (
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setActivePanel("preview")}
-              >
-                <PlayCircleIcon data-icon="inline-start" aria-hidden="true" />
-                {detail.chartPreview}
+              <Button variant="secondary" asChild>
+                <Link href={buildPreviewHref(entry, locale)}>
+                  <PlayCircleIcon data-icon="inline-start" aria-hidden="true" />
+                  {detail.chartPreview}
+                </Link>
               </Button>
             ) : null}
             {hasMedia ? (
@@ -346,42 +230,11 @@ function ActionIconButton({
   );
 }
 
-/**
- * A difficulty row that opens the preview already switched to that difficulty.
- * Rendered inside the (server) difficulty table, so it only carries the click →
- * event hop; all preview state stays in ChartDetailActions.
- */
-export function PreviewDifficultyTrigger({
-  slot,
-  label,
-  className,
-  children,
-}: {
-  slot: number;
-  label: string;
-  className?: string;
-  children: React.ReactNode;
+/** A crawlable link directly to the requested preview difficulty. */
+export function PreviewDifficultyTrigger({ href, label, className, children }: {
+  href: string; label: string; className?: string; children: React.ReactNode;
 }) {
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      className={cn(
-        "rounded-md transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-        className
-      )}
-      onClick={() =>
-        window.dispatchEvent(
-          new CustomEvent<OpenChartPreviewDetail>(OPEN_CHART_PREVIEW_EVENT, {
-            detail: { slot },
-          })
-        )
-      }
-    >
-      {children}
-    </button>
-  );
+  return <Link href={href} title={label} aria-label={label} className={cn("rounded-md transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", className)}>{children}</Link>;
 }
 
 /**

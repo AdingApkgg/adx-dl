@@ -504,10 +504,10 @@ function completedCheckpointProgress(job: DownloadJob): Pick<
 }
 
 function saveSourcePreference(sourceId: DownloadSourceId): void {
-  if (typeof localStorage === "undefined") {
-    return;
-  }
   try {
+    if (typeof localStorage === "undefined") {
+      return;
+    }
     localStorage.setItem(SOURCE_PREFERENCE_KEY, sourceId);
   } catch {
     // A blocked/private localStorage should not prevent downloads.
@@ -515,10 +515,10 @@ function saveSourcePreference(sourceId: DownloadSourceId): void {
 }
 
 function saveCustomSources(customSources: readonly CustomDownloadSourceConfig[]): void {
-  if (typeof localStorage === "undefined") {
-    return;
-  }
   try {
+    if (typeof localStorage === "undefined") {
+      return;
+    }
     localStorage.setItem(
       CUSTOM_SOURCES_KEY,
       JSON.stringify({ version: 1, sources: customSources })
@@ -598,10 +598,10 @@ export function parseStoredCustomSources(
 }
 
 function loadCustomSources(): CustomDownloadSourceConfig[] {
-  if (typeof localStorage === "undefined") {
-    return [];
-  }
   try {
+    if (typeof localStorage === "undefined") {
+      return [];
+    }
     return parseStoredCustomSources(
       localStorage.getItem(CUSTOM_SOURCES_KEY),
       localStorage.getItem(CUSTOM_SOURCE_URL_KEY)
@@ -630,10 +630,10 @@ function configuredDownloadSource(
 function loadSourcePreference(
   customSources: readonly CustomDownloadSourceConfig[]
 ): DownloadSourceId {
-  if (typeof localStorage === "undefined") {
-    return DEFAULT_DOWNLOAD_SOURCE_ID;
-  }
   try {
+    if (typeof localStorage === "undefined") {
+      return DEFAULT_DOWNLOAD_SOURCE_ID;
+    }
     return configuredDownloadSource(
       localStorage.getItem(SOURCE_PREFERENCE_KEY),
       customSources
@@ -648,10 +648,10 @@ function isArchiveFormat(value: string | null | undefined): value is ArchiveForm
 }
 
 function savePreferredFormat(format: ArchiveFormat): void {
-  if (typeof localStorage === "undefined") {
-    return;
-  }
   try {
+    if (typeof localStorage === "undefined") {
+      return;
+    }
     localStorage.setItem(FORMAT_PREFERENCE_KEY, format);
   } catch {
     // A blocked/private localStorage should not prevent downloads.
@@ -659,10 +659,10 @@ function savePreferredFormat(format: ArchiveFormat): void {
 }
 
 function loadPreferredFormat(): ArchiveFormat {
-  if (typeof localStorage === "undefined") {
-    return "adx";
-  }
   try {
+    if (typeof localStorage === "undefined") {
+      return "adx";
+    }
     const stored = localStorage.getItem(FORMAT_PREFERENCE_KEY);
     return isArchiveFormat(stored) ? stored : "adx";
   } catch {
@@ -675,10 +675,10 @@ function isBatchGrouping(value: string | null | undefined): value is BatchGroupi
 }
 
 function savePreferredBatchGrouping(grouping: BatchGrouping): void {
-  if (typeof localStorage === "undefined") {
-    return;
-  }
   try {
+    if (typeof localStorage === "undefined") {
+      return;
+    }
     localStorage.setItem(BATCH_GROUPING_PREFERENCE_KEY, grouping);
   } catch {
     // A blocked/private localStorage should not prevent downloads.
@@ -686,10 +686,10 @@ function savePreferredBatchGrouping(grouping: BatchGrouping): void {
 }
 
 function loadPreferredBatchGrouping(): BatchGrouping {
-  if (typeof localStorage === "undefined") {
-    return "version";
-  }
   try {
+    if (typeof localStorage === "undefined") {
+      return "version";
+    }
     const stored = localStorage.getItem(BATCH_GROUPING_PREFERENCE_KEY);
     return isBatchGrouping(stored) ? stored : "version";
   } catch {
@@ -698,10 +698,10 @@ function loadPreferredBatchGrouping(): BatchGrouping {
 }
 
 function saveBooleanPreference(key: string, value: boolean): void {
-  if (typeof localStorage === "undefined") {
-    return;
-  }
   try {
+    if (typeof localStorage === "undefined") {
+      return;
+    }
     localStorage.setItem(key, value ? "1" : "0");
   } catch {
     // A blocked/private localStorage should not prevent downloads.
@@ -709,10 +709,10 @@ function saveBooleanPreference(key: string, value: boolean): void {
 }
 
 function loadBooleanPreference(key: string, fallback: boolean): boolean {
-  if (typeof localStorage === "undefined") {
-    return fallback;
-  }
   try {
+    if (typeof localStorage === "undefined") {
+      return fallback;
+    }
     const stored = localStorage.getItem(key);
     return stored === "1" ? true : stored === "0" ? false : fallback;
   } catch {

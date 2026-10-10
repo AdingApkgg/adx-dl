@@ -89,6 +89,9 @@ export function saveBlobAsFile(blob: Blob, fileName: string): () => void {
 /** Mobile browsers need a fresh user gesture after an asynchronous pack. */
 export function requiresManualArchiveSave(): boolean {
   if (typeof navigator === "undefined") return false;
+  // ArkWeb identifies Harmony phones/tablets as OpenHarmony, without Android.
+  // Its compatibility "Mobile" suffix is also present on PCs.
+  if (/\((?:Phone|Tablet);\s*OpenHarmony\b/i.test(navigator.userAgent)) return true;
   return /Android|iPhone|iPad|iPod|HarmonyOS/i.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }

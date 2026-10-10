@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { chartPreviewDescription, chartPreviewSeoTitle } from "./chart-preview-copy";
 
 import {
   buildChartDescription,
@@ -133,12 +134,12 @@ function buildChartDetailSeoTitle(locale: Locale, entry: CatalogEntry): string {
   const title = formatEntryTitle(entry, locale);
 
   if (locale === "zh") {
-    return `${title} AstroDX 谱面预览与下载`;
+    return `${title} AstroDX 谱面资料与下载`;
   }
   if (locale === "ja") {
-    return `${title} AstroDX 譜面プレビューとダウンロード`;
+    return `${title} AstroDX 譜面情報とダウンロード`;
   }
-  return `${title} AstroDX Chart Preview and Download`;
+  return `${title} AstroDX Chart Details and Download`;
 }
 
 function buildGuestbookSeoTitle(locale: Locale): string {
@@ -523,5 +524,18 @@ export function buildLicensePageMetadata(locale: Locale): Metadata {
       "许可说明",
       "maimai",
     ],
+  });
+}
+
+
+export function buildChartPreviewMetadata(locale: Locale, entry: CatalogEntry): Metadata {
+  return buildPageMetadata({
+    locale,
+    pathname: `/preview/${encodeURIComponent(entrySlug(entry))}`,
+    title: chartPreviewSeoTitle(entry, locale),
+    description: chartPreviewDescription(entry, locale),
+    keywords: [...buildDetailKeywords(locale, entry), "Chart Preview", getDictionary(locale).detail.chartPreview],
+    image: entry.media.cover_url || openGraphImageUrl,
+    imageAlt: formatEntryTitle(entry, locale),
   });
 }

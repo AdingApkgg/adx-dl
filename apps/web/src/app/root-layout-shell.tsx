@@ -1,7 +1,7 @@
 import type { Viewport } from "next";
 
 import { PageTransition } from "@/app/page-transition";
-import { MotionProvider } from "@astrodx/ui/motion";
+import { BrowserCompatibilityProvider } from "@/components/site/browser-compatibility-provider";
 import { SiteBanners } from "@/components/site/banners/site-banners";
 import { DownloadDock } from "@/components/site/downloads/download-dock";
 import { MusicPlayer } from "@/components/site/music-player/music-player";
@@ -17,6 +17,9 @@ import { readCatalog, readVersionGroups } from "@/lib/catalog";
 import { CHART_MEDIA_ORIGIN } from "@/lib/chart-media";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { musicTracksForVersion } from "@/lib/music-playlists";
+import { compatibilityBootScript } from "@/lib/browser-compatibility-preference";
+import { getBrowserCompatibilityCopy } from "@/lib/browser-compatibility-copy";
+import { buildLocalePath } from "@/lib/i18n";
 
 type RootLayoutShellProps = Readonly<{
   children: React.ReactNode;
@@ -34,7 +37,7 @@ type RootLayoutShellProps = Readonly<{
 // storage keys and presets as its ThemeProvider and MotionProvider. The
 // music-player attribute is web's own and mirrors music-player-preferences.ts.
 const MUSIC_PLAYER_BOOT_SCRIPT = `(function(){var e=document.documentElement;try{var s=JSON.parse(localStorage.getItem('astrodx-music-player-prefs-v1')||'{}');e.dataset.musicPlayer=s.enabled===false?'off':(s.collapsed===false?'expanded':'collapsed');}catch(x){e.dataset.musicPlayer='collapsed';}})();`;
-const NO_FLASH_BOOT_SCRIPT = themeBootScript() + MUSIC_PLAYER_BOOT_SCRIPT;
+const NO_FLASH_BOOT_SCRIPT = themeBootScript() + MUSIC_PLAYER_BOOT_SCRIPT + compatibilityBootScript();
 
 /**
  * Shared by both html-owning layouts. The color-scheme meta lands early in
@@ -110,6 +113,14 @@ export async function RootLayoutShell({
           content={`${dictionary.siteName} — https://adxdls.saop.cc`}
         />
         <ServiceWorkerRegistrar />
+        <noscript>
+          <div data-no-script-notice className="mx-auto max-w-5xl border border-border bg-background p-4 text-sm leading-relaxed">
+            <p>{getBrowserCompatibilityCopy(locale).noScript}</p>
+            <a className="inline-flex min-h-11 items-center text-primary underline" href={`${buildLocalePath("/guide", locale)}#troubleshooting`}>
+              {getBrowserCompatibilityCopy(locale).guide}
+            </a>
+          </div>
+        </noscript>
         <a
           href="#main-content"
           className="sr-only rounded-md bg-primary px-4 py-2 text-primary-foreground focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50"
@@ -117,7 +128,7 @@ export async function RootLayoutShell({
           {dictionary.nav.skipToContent}
         </a>
         <ThemeProvider>
-          <MotionProvider>
+          <BrowserCompatibilityProvider>
           <TooltipProvider>
             <SWRProvider>
             <PageViewsProvider>
@@ -141,7 +152,7 @@ export async function RootLayoutShell({
             </PageViewsProvider>
             </SWRProvider>
           </TooltipProvider>
-          </MotionProvider>
+          </BrowserCompatibilityProvider>
         </ThemeProvider>
       </body>
     </html>

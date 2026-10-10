@@ -293,7 +293,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
       <div
         data-motion-sensitive=""
         className={cn(
-          "mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 md:px-6",
+          "mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-4 md:px-6",
           "transition-[padding] duration-300",
           compact ? "py-1.5" : "py-3"
         )}
@@ -417,7 +417,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             </DropdownMenuContent>
           </DropdownMenu>
         </nav>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex min-w-0 max-w-full shrink-0 flex-wrap items-center gap-2">
           {/* Search and random sit with the trailing controls rather than in the
               nav, and stay reachable at every width — so neither is repeated in
               the mobile menu below. */}

@@ -168,7 +168,7 @@ describe("in the browser", () => {
     await user.keyboard("{Enter}");
     expect(pressed("T-light")).toBe("true");
     expect(html.classList.contains("dark")).toBe(false);
-    expect(html.style.colorScheme).toBe("light");
+    expect(html.style.colorScheme).toBe("only light");
   });
 
   test("after mounting, the saved choices are pressed", async () => {

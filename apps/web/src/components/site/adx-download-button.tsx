@@ -170,7 +170,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
             : detailDictionary.onsitePending;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div data-download-inline className="flex min-w-0 max-w-full flex-col gap-2">
       {isResumable ? (
         <div className="flex flex-wrap items-center gap-2">
           <MotionButton type="button" whileTap={{ scale: 0.97 }} onClick={() => resume(jobId)}>
@@ -256,13 +256,13 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <div data-slot="button-group" className="inline-flex">
+          <div data-slot="button-group" className="inline-flex min-w-0 max-w-full">
             <Button
               ref={triggerRef}
               type="button"
               disabled={!canDownload || isBusy || status === "ready"}
               onClick={() => handleSelect(preferredFormat)}
-              className="rounded-r-none"
+              className="h-auto min-h-11 min-w-0 shrink whitespace-normal rounded-r-none py-2"
             >
               <motion.span
                 className="inline-flex"
@@ -290,7 +290,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
                   disabled={!canDownload || isBusy || status === "ready"}
                   aria-label={detailDictionary.downloadFormatLabel}
                   title={detailDictionary.downloadFormatLabel}
-                  className="-ml-px rounded-l-none border-l border-primary-foreground/25 px-0"
+                  className="-ml-px h-auto min-h-11 w-11 self-stretch rounded-l-none border-l border-primary-foreground/25 px-0"
                 >
                   <ChevronDownIcon className="opacity-80" />
                 </Button>
@@ -395,7 +395,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2, ease: EASE_OUT }}
-            className="flex flex-col gap-2 overflow-hidden"
+            className="flex min-w-0 max-w-full flex-col gap-2 overflow-hidden"
           >
             {fileProgress.map((file) => {
               const percent =
@@ -410,7 +410,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
               return (
                 <li key={file.name} className="flex flex-col gap-1">
                   <div className="flex items-center justify-between gap-3 text-xs">
-                    <span className="truncate font-mono text-muted-foreground">
+                    <span className="min-w-0 flex-1 break-all font-mono text-muted-foreground">
                       {file.name}
                     </span>
                     <span
