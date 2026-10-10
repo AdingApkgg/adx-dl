@@ -258,53 +258,12 @@ pg-boss 的表和队列还没建好时，web 的 `jobs` 就绪检查不过，`/r
 
 ## 备份和恢复
 
-每天东八区 03:30，systemd 定时器（`ops/systemd/`）执行 `docker compose run --rm -T backup`：两个库各 `pg_dump -Fc` 一份，
-交给 restic 存进 `BACKUP_REPO_DIR`，再 `restic forget --prune`（保留 7 份每日、4 份每周、6 份每月）。快照的主机名固定为
-`astrodx-community`、标签 `community-db`。哪一步失败，这次备份就是 failed（`systemctl status astrodx-community-backup`）。
+完整快照使用 `community-full` 标签，包含社区与 Umami 两份独立 PostgreSQL 自定义格式备份、经过逐字节 SHA256/大小验证的私有原件，以及记录存储策略、配方和版本的 manifest。临时分片、派生头像均不进入快照。既有 `community-db` 数据库快照继续保留，但不能用来恢复文件。
 
-装一次（`RESTIC_PASSWORD`、`BACKUP_REPO_DIR` 先在 `.env` 里填好，目录先建好）：
+沿用东八区 03:30 的 `ops/systemd/astrodx-community-backup.timer`，不安装第二个定时器。完整快照按 restic 的 7 daily / 4 weekly / 6 monthly 时间桶保留；失败不会执行保留清理或写完成标记。加密的最小删除/撤回日志保留七个月，并维护认证链锚点。用户浏览器或设备已经保存的副本无法由服务端删除。
 
-```bash
-cd <g510 上的 apps/community>
-docker compose --profile tools build backup
-docker compose run --rm -T --entrypoint restic backup init
-for unit in astrodx-community-backup.service astrodx-community-backup.timer; do
-  sed "s|@COMMUNITY_DIR@|$PWD|" "ops/systemd/$unit" | sudo tee "/etc/systemd/system/$unit" > /dev/null
-done
-sudo systemctl daemon-reload
-sudo systemctl enable --now astrodx-community-backup.timer
-sudo systemctl start astrodx-community-backup.service      # 马上跑一次
-journalctl -u astrodx-community-backup.service -n 50
-docker compose run --rm -T --entrypoint restic backup snapshots
-```
+当前 Task10 实现了导出/恢复协议及新卷演练，但部署接线仍由 Task11 完成：全部 web/media/control 进程的真实 owner-bound 排空协调、持久私有日志与外部恢复闭锁挂载、首次安装初始化和受限恢复进程的生命周期。`backup.sh` 的未接线入口明确失败 `STORAGE_DRAIN_UNAVAILABLE`；正常入口缺少恢复状态或状态关闭时拒绝启动。完成这些接线和 Task12 真实生产边缘验收之前，不启用新镜像或替换现有运行部署。
 
-**恢复演练**（上线前做一次，之后定期做）：把最新的快照恢复到临时库 `community_restore_drill`，和线上的库比一比用户数，再删掉：
+恢复必须先关闭外部闭锁并确认正常进程/IO 已停止，再验证所选完整快照和**快照之外**的认证最新日志。旧签名 head 或快照内副本不能证明日志是最新的。恢复原件、重放删除与撤回事实、取消暂存上传并重算配额、按同一固定原生配方重建缺失头像之后，只运行同一应用镜像的受限恢复入口：公开入口只返回无数据的 404/no-store，内部入口执行真实认证 drain。原有两次清理、两次间隔至少 5 秒的匿名 canonical 404/non-HIT 探测和最终代次检查成功，并停止受限入口、验证不变量后，才原子打开闭锁。
 
-```bash
-docker compose run --rm -T --entrypoint bash backup -c '
-  set -euo pipefail
-  restic restore latest --host astrodx-community --tag community-db --target /tmp/restore
-  ls -l /tmp/restore/dumps
-  createdb community_restore_drill
-  pg_restore --no-owner --dbname=community_restore_drill /tmp/restore/dumps/community.dump
-  echo "restored users: $(psql -d community_restore_drill -Atc "select count(*) from \"user\"")"
-  echo "live users:     $(psql -d community -Atc "select count(*) from \"user\"")"
-  dropdb community_restore_drill
-'
-```
-
-两个数应当一样（备份之后新注册的用户除外）。`umami.dump` 同样可以这样恢复到临时库检查。
-
-**真正的恢复**（库坏了、误删了数据）：先停 web 和 worker，用指定的快照（`restic snapshots` 里的 ID）重建库，再部署一次：
-
-```bash
-docker compose stop web worker
-docker compose run --rm -T --entrypoint bash backup -c '
-  set -euo pipefail
-  restic restore <快照 ID> --target /tmp/restore
-  dropdb --force community
-  createdb community
-  pg_restore --no-owner --dbname=community /tmp/restore/dumps/community.dump
-'
-./deploy.sh --no-pull
-```
+完整操作约束、失败锁处理、权限及容量要求见 [备份恢复运行说明](ops/backup/README.md)。禁止沿用旧的“直接 pg_restore 后启动正常网页”步骤，它会绕过删除日志与公开媒体恢复屏障。

@@ -5,13 +5,16 @@ import { StorageError } from "./errors";
 
 export const STORAGE_LOCK_KEY = 714102026;
 /** Admission is serialized with gate-close even when the lease is currently null. */
-export async function lockStorageMutation(tx: DbTransaction): Promise<void> {
+export async function lockStorageAdmission(tx: DbTransaction): Promise<void> {
   await tx.execute(sql`set local lock_timeout = '2s'`);
   await tx.execute(sql`set local statement_timeout = '5s'`);
   await tx.execute(sql`select pg_advisory_xact_lock_shared(${STORAGE_LOCK_KEY})`);
   const row = await tx.execute(sql`select id from storage_maintenance where id='global' for share`);
   if (row.rows.length !== 1)
     throw new StorageError(503, "STORAGE_MAINTENANCE", "STORAGE_MAINTENANCE", 5);
+}
+export async function lockStorageMutation(tx: DbTransaction): Promise<void> {
+  await lockStorageAdmission(tx);
   const lease = await tx.execute(
     sql`select 1 from storage_maintenance where id='global' and lease_until > clock_timestamp()`,
   );

@@ -11,6 +11,7 @@ import {
   derivedObjects,
   mediaPublications,
   mediaPurgeRequests,
+  storageTombstones,
   user,
   userAvatars,
 } from "../db/schema";
@@ -161,6 +162,17 @@ export async function setAvatar(
       avatarRevision: revision + (same ? 0 : 1),
     };
     if (!same) {
+      // Individual withdrawal remains durable even when another account keeps this hash public.
+      if (current?.fileId && oldOutput)
+        await tx
+          .insert(storageTombstones)
+          .values({
+            kind: "media_revoked",
+            userId,
+            fileId: current.fileId,
+            sha256: oldOutput.outputSha256,
+            generation: result.avatarRevision,
+          });
       if (current?.fileId)
         await tx
           .update(files)
@@ -207,6 +219,9 @@ export async function setAvatar(
             .insert(mediaPurgeRequests)
             .values({ outputSha256: oldOutput.outputSha256, generation })
             .onConflictDoNothing();
+          await tx
+            .insert(storageTombstones)
+            .values({ kind: "media_revoked", sha256: oldOutput.outputSha256, generation });
           await boss.send(
             MEDIA_PURGE_QUEUE,
             { hash: oldOutput.outputSha256, generation } satisfies MediaPurgeJobData,
@@ -215,16 +230,14 @@ export async function setAvatar(
         }
       }
     }
-    await tx
-      .insert(avatarMutations)
-      .values({
-        userId,
-        idempotencyKey,
-        requestDigest: digest,
-        resultImage: result.image,
-        resultRevision: result.avatarRevision,
-        createdAt: now,
-      });
+    await tx.insert(avatarMutations).values({
+      userId,
+      idempotencyKey,
+      requestDigest: digest,
+      resultImage: result.image,
+      resultRevision: result.avatarRevision,
+      createdAt: now,
+    });
     return result;
   });
   if (result.image) await notifyPublicMedia(ctx, result.image.slice(7, -4));

@@ -45,6 +45,7 @@ COPY apps/community/tsconfig.json apps/community/
 # 上面的 tsconfig 继承 @astrodx/tsconfig（在 dependencies 里，bun install 链接了它），它的 base.json 也要在。
 COPY packages/tsconfig/base.json packages/tsconfig/
 COPY --from=builder /repo/apps/community/src apps/community/src
+COPY apps/community/ops/backup/export.ts apps/community/ops/backup/restore.ts apps/community/ops/backup/journal.ts apps/community/ops/backup/
 WORKDIR /repo/apps/community
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
 EXPOSE 3000

@@ -1,3 +1,4 @@
+import { assertNormalStorageStartup } from "../../ops/backup/restore";
 import { createDb } from "@/server/db/client";
 import { parseEnv } from "@/server/env";
 import { createBoss } from "@/server/jobs/boss";
@@ -28,6 +29,7 @@ import { createUserPurgeHandler } from "./purge";
 import { PURGE_SWEEP_CRON, PURGE_SWEEP_TZ, runPurgeSweep } from "./purge-sweep";
 import { runSessionCleanup, SESSION_CLEANUP_CRON, SESSION_CLEANUP_TZ } from "./session-cleanup";
 
+await assertNormalStorageStartup();
 const env = parseEnv(process.env);
 const log = createLogger();
 const boss = createBoss(env.databaseUrl, "worker");

@@ -11,9 +11,10 @@ import type { StorageContext } from "./contracts";
 import { StorageError, StorageUnavailableError } from "./errors";
 import { temporaryKey } from "./keys";
 import { STORAGE_LIMITS } from "./rules";
-import { withStorageTransaction } from "./transactions";
+import { lockStorageAdmission, withStorageTransaction } from "./transactions";
 import { checkStorageDisk, lockUploadAccounting, storageTime } from "./usage";
 import { ownedUpload, requireReceiving, SHA256_PATTERN, UUID_PATTERN } from "./uploads";
+import { assertStorageNamespace } from "../../worker/storage-delete";
 
 export function isUploadPartRequest(method: string, path: string): boolean {
   if (method !== "PUT") return false;
@@ -165,7 +166,8 @@ export async function putUploadPart(
     sha256,
   });
   try {
-    await withStorageTransaction(ctx.db, async (tx) => {
+    await ctx.db.transaction(async (tx) => {
+      await lockStorageAdmission(tx);
       const { budget } = await lockUploadAccounting(tx, userId);
       const row = await ownedUpload(tx, userId, id);
       const now = await storageTime(tx);
@@ -184,12 +186,23 @@ export async function putUploadPart(
         !part ||
         part.attemptId !== claim.id ||
         part.state !== "writing" ||
+        part.sha256 !== claim.sha256 ||
+        part.size !== claim.size ||
         part.leaseUntil <= now ||
         row.generation !== claim.generation ||
         !attempt ||
-        attempt.state !== "writing"
+        attempt.state !== "writing" ||
+        attempt.uploadId !== claim.uploadId ||
+        attempt.index !== claim.index ||
+        attempt.sha256 !== claim.sha256 ||
+        attempt.size !== claim.size ||
+        attempt.tempKey !== claim.tempKey ||
+        attempt.policyId !== claim.policyId ||
+        attempt.generation !== claim.generation ||
+        attempt.leaseUntil <= now
       )
         throw new StorageError(409, "PART_BUSY", "PART_BUSY", 1);
+      await assertStorageNamespace(tx, ctx, attempt.policyId, "original");
       await tx
         .update(uploadParts)
         .set({ state: "ready" })

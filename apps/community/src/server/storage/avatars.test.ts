@@ -10,6 +10,7 @@ import {
   storageUsage,
   blobBlocks,
   storageMaintenance,
+  storageTombstones,
 } from "../db/schema";
 import { resetTestDatabase } from "../testing/test-db";
 import { readyContext, readyOwner, readyFile } from "../../../test/storage/ready-file";
@@ -93,6 +94,11 @@ test("shared physical output remains public until the last active reference then
         .where(eq(mediaPublications.outputSha256, a.derived.outputSha256))
     )[0].state,
   ).toBe("public");
+  const facts = await ctx.db
+    .select()
+    .from(storageTombstones)
+    .where(eq(storageTombstones.sha256, a.derived.outputSha256));
+  expect(facts.map((r) => [r.userId, r.fileId, r.generation])).toEqual([[one, a.file.id, 2]]);
   await setAvatar(ctx, two, { fileId: null, expectedRevision: 1 }, crypto.randomUUID());
   const [pub] = await ctx.db
     .select()
@@ -104,6 +110,18 @@ test("shared physical output remains public until the last active reference then
     .from(mediaPurgeRequests)
     .where(eq(mediaPurgeRequests.outputSha256, a.derived.outputSha256));
   expect(out.generation).toBe(pub.generation);
+  const allFacts = await ctx.db
+    .select()
+    .from(storageTombstones)
+    .where(eq(storageTombstones.sha256, a.derived.outputSha256));
+  expect(
+    allFacts.filter((r) => r.userId === two && r.fileId === b.file.id && r.generation === 2),
+  ).toHaveLength(1);
+  expect(
+    allFacts.filter(
+      (r) => r.userId === null && r.fileId === null && r.generation === pub.generation,
+    ),
+  ).toHaveLength(1);
   const jobs = await ctx.db.execute(
     sql`select id from pgboss.job where name='media.purge' and data->>'hash'=${a.derived.outputSha256} and (data->>'generation')::bigint=${pub.generation}`,
   );

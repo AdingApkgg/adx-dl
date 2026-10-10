@@ -1,3 +1,4 @@
+import { assertNormalStorageStartup } from "../../ops/backup/restore";
 import { RouterContextProvider } from "react-router";
 import { createHonoServer } from "react-router-hono-server/bun";
 
@@ -27,6 +28,7 @@ import { createLoginOptions } from "./services/login-options";
 import { DELETION_HANDLERS } from "./services/user-deletion";
 import { throttledErrorLog } from "./throttled-log";
 
+await assertNormalStorageStartup();
 const env = parseEnv(process.env);
 const log = createLogger();
 const { db, pool } = getDb(env.databaseUrl, {

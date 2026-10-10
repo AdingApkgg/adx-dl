@@ -1,3 +1,7 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { initializeRestoreState } from "../../ops/backup/restore";
 import { fileURLToPath } from "node:url";
 
 import { RedisClient } from "bun";
@@ -28,6 +32,8 @@ export async function startBuiltServer(extraEnv: Record<string, string> = {}): P
   await redis.send("FLUSHDB", []);
   redis.close();
 
+  const restoreStateDirectory = await mkdtemp(join(tmpdir(), "community-http-restore-state-"));
+  await initializeRestoreState(restoreStateDirectory);
   const port = 40_000 + Math.floor(Math.random() * 10_000);
   const origin = `http://127.0.0.1:${port}`;
   const proc = Bun.spawn(["bun", "./build/server/index.js"], {
@@ -42,6 +48,7 @@ export async function startBuiltServer(extraEnv: Record<string, string> = {}): P
       DATABASE_URL: testDatabaseUrl(),
       REDIS_URL: httpTestRedisUrl(),
       BETTER_AUTH_SECRET: HTTP_TEST_AUTH_SECRET,
+      STORAGE_RESTORE_STATE_DIR: restoreStateDirectory,
       GOOGLE_CLIENT_ID: "http-test-google-client",
       GOOGLE_CLIENT_SECRET: "http-test-google-secret",
       TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
@@ -63,11 +70,12 @@ export async function startBuiltServer(extraEnv: Record<string, string> = {}): P
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     if (proc.exitCode !== null) {
+      await rm(restoreStateDirectory, { recursive: true, force: true });
       throw new Error(`server exited early with code ${proc.exitCode}`);
     }
     try {
       if ((await fetch(`${origin}/healthz`)).ok) {
-        return { origin, url: (path) => `${origin}${path}`, stop: () => proc.kill() };
+        return { origin, url: (path) => `${origin}${path}`, stop: () => { proc.kill(); void proc.exited.then(() => rm(restoreStateDirectory, { recursive: true, force: true })); } };
       }
     } catch {
       // 还没起来。
@@ -75,5 +83,7 @@ export async function startBuiltServer(extraEnv: Record<string, string> = {}): P
     await Bun.sleep(200);
   }
   proc.kill();
+  await proc.exited;
+  await rm(restoreStateDirectory, { recursive: true, force: true });
   throw new Error("server did not become healthy within 20s");
 }
