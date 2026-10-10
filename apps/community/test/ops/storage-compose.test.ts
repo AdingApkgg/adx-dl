@@ -7,13 +7,10 @@ test("role services publish only existing web port and never share peer S3 or pu
   ) as any;
   expect(c.services.seaweedfs).toBeDefined();
   expect(c.services.seaweedfs.ports).toBeUndefined();
-  expect(c.services.seaweedfs.command).toEqual([
-    "mini",
-    "-dir=/data",
-    "-s3.port=8333",
-    "-bucket=blobs,derived",
-    "-s3.config=/config/s3.json",
-  ]);
+  expect(c.services.seaweedfs.entrypoint).toEqual(["/opt/community-seaweed/entrypoint.sh"]);
+  expect(c.services.seaweedfs.command).toBeUndefined();
+  expect(c.services.seaweedfs.pids_limit).toBe(256);
+  expect(c.services.seaweedfs.volumes).toContain("./ops/seaweed:/opt/community-seaweed:ro");
   expect(c.services.seaweedfs.depends_on["storage-config"].condition).toBe(
     "service_completed_successfully",
   );

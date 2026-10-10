@@ -22,5 +22,7 @@ mini_pid=$!
 nc -l -k -s 0.0.0.0 -p 8333 -e /opt/community-seaweed/forward-s3.sh &
 relay_pid=$!
 # Either child exiting is a service failure, even with exit status zero.
-wait -n "$mini_pid" "$relay_pid" || true
+# BusyBox ash treats explicit PID arguments as wait-all even with -n.
+# There are exactly two direct children here; wait for either without arguments.
+wait -n || true
 exit 1
