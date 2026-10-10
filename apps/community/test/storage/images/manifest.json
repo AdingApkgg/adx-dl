@@ -1,0 +1,74 @@
+{
+  "safe.webp": {
+    "bytes": 158,
+    "sha256": "8bdcdf41aeb411aae7cd553b412530302ac26d79c40e803d33fcb58b07861935"
+  },
+  "pixel-excess.png": {
+    "bytes": 230823,
+    "sha256": "d80731416f96b815cd44360606af402c85d2287659687c7a06daf42930bcc942"
+  },
+  "iptc.jpeg": {
+    "bytes": 553,
+    "sha256": "85da528013ccfcb2284b79f6ee27440537b47575ca75c05d6c5f2fe62216c647"
+  },
+  "truncated.jpg": {
+    "bytes": 249,
+    "sha256": "e35a5f133e909064c04400d3412432755a21f64909b538e60911d1f132c40695"
+  },
+  "colors-animated-8bpc.avif": {
+    "bytes": 1235,
+    "sha256": "2f8683d21725261f37f86e115f0c212cc52d0fefd3a2ddfcc4fa648c1859906d"
+  },
+  "safe.png": {
+    "bytes": 505,
+    "sha256": "cc5baad3c686a83b5385cf008af6ec8686bfe0aa32de477eeef87da3165a0ab5"
+  },
+  "own-solid-rgb32.heic": {
+    "bytes": 448,
+    "sha256": "3fe411a8cc255a350ad3732a06b1f1208f22cad97a600a68262a82ce2a752b0e"
+  },
+  "own-cmyk.jpg": {
+    "bytes": 384,
+    "sha256": "0df663f681daf104bc133026a20a2d845f1fcdb71f0699be782505e8016df2ec"
+  },
+  "own-gps-orientation6.jpg": {
+    "bytes": 1534,
+    "sha256": "28cf70f7e6239dbf49fc45dfb815138e2c8203c07a0062c545269d4985a9f03c"
+  },
+  "safe.jpeg": {
+    "bytes": 499,
+    "sha256": "776480c82ce54e82e9f94d4a1b797ef0cb52f985775583e9a781719d97594ceb"
+  },
+  "animated.gif": {
+    "bytes": 147,
+    "sha256": "dbffc3ae6fb92e91f4c19f0053782f1195c984ab7ec1291c519ca7e9e4266366"
+  },
+  "safe.avif": {
+    "bytes": 626,
+    "sha256": "26a3e9ef348fff8212f32ca46ffa15739c95ea9b760da665898dc09424ddf152"
+  },
+  "animated-own.apng": {
+    "bytes": 247,
+    "sha256": "e5f0fc0c537910e0879fc1fc357bd83454a8204a178cb0ab68ef5f20c7ae771a"
+  },
+  "corrupt.jpg": {
+    "bytes": 10,
+    "sha256": "397513b9f07cb214e17673320abaa0a26056d328918b7738005c6db0a8ee5946"
+  },
+  "side-excess.png": {
+    "bytes": 214,
+    "sha256": "6ec1e74dd7d2df287004fe9254296ff2451725abf6ceed52c8faf060fa7f9232"
+  },
+  "transparent.png": {
+    "bytes": 292,
+    "sha256": "a6260eef01cb8f5426554b2a7c3a8fe20082882f80d3001dffcba1c937aebbd6"
+  },
+  "animated.webp": {
+    "bytes": 140,
+    "sha256": "37b44025ccfffa9304df1e10ea339803fa20cbf203da04122ce8e7c6ba0aa1c3"
+  },
+  "oriented.jpg": {
+    "bytes": 1326,
+    "sha256": "ee16285605547999fa84eb5ffaffadb40dbbe0bd0eff89159cc3c282120c3ef2"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "detect-libc": {
+    "version": "2.1.2",
+    "manifestSHA256": "ee88e5b954fdf3a8480b1d01ef767d68d8ca2c6da269f58c5cf1c5550e9aa2a7"
+  },
+  "semver": {
+    "version": "7.8.5",
+    "manifestSHA256": "7c94cb7f2a53c27b20d76386ec144c062894dbcc909cfabd0f728c37874b1776"
+  },
+  "sharp": {
+    "version": "0.35.5",
+    "manifestSHA256": "ad4a2535d72eb638053a38867b1abf43c328cd1c1dbae5cf4172d498365a8b97"
+  },
+  "@img/colour": {
+    "version": "1.1.0",
+    "manifestSHA256": "bc38c5097693ed53b91c32f35fb0a52569736c7854ba2eb6d080f3252071f75c"
+  },
+  "@img/sharp-libvips-linux-x64": {
+    "version": "1.3.4",
+    "manifestSHA256": "2c5f6f9abf74c1492622d5dc4e4da056ab0712fd71de61e03a687c88b8cdab4e"
+  },
+  "@img/sharp-libvips-linuxmusl-x64": {
+    "version": "1.3.4",
+    "manifestSHA256": "9d93c5ff1a47f5c79286f6c832e0ab9001feff6db50b9085f578b20a663b580e"
+  },
+  "@img/sharp-linux-x64": {
+    "version": "0.35.5",
+    "manifestSHA256": "181c58413d16ac3ce035f39c94c614031e03c023d88315712a81ed210c9fa04c"
+  },
+  "@img/sharp-linuxmusl-x64": {
+    "version": "0.35.5",
+    "manifestSHA256": "1d41eb946e8c574f27606680c8a674adce6936ef3fc05b754be38a3e3fd3857e"
+  }
+}

@@ -46,6 +46,8 @@ export async function cleanupStorageFixture(
     user,
     files,
     blobs,
+    blobDerivatives,
+    derivedObjects,
     blobBlocks,
     uploadSessions,
     uploadAttempts,
@@ -64,6 +66,9 @@ export async function cleanupStorageFixture(
     originalAccounting && policies.length
       ? await db.select().from(blobs).where(inArray(blobs.policyId, policies))
       : [];
+  const derivatives = originalAccounting && policies.length
+    ? await db.select().from(derivedObjects).where(inArray(derivedObjects.policyId, policies)) : [];
+  if (driver) for (const output of derivatives) await driver.delete({bucket:"derived",key:output.key});
   if (driver)
     for (const original of originals)
       await driver.delete({ bucket: "original", key: original.key });
@@ -82,6 +87,8 @@ export async function cleanupStorageFixture(
     await tx.delete(uploadSessions).where(inArray(uploadSessions.ownerId, owners));
     await tx.delete(files).where(inArray(files.ownerId, owners));
     if (ids.length) await tx.delete(uploadAttempts).where(inArray(uploadAttempts.uploadId, ids));
+    if (originals.length) await tx.delete(blobDerivatives).where(inArray(blobDerivatives.sourceBlobId,originals.map(b=>b.id)));
+    if (derivatives.length) await tx.delete(derivedObjects).where(inArray(derivedObjects.id,derivatives.map(b=>b.id)));
     if (ownFiles.length) {
       await tx.delete(blobBlocks).where(
         inArray(
@@ -111,6 +118,8 @@ export async function cleanupStorageFixture(
     await tx
       .update(storageBudget)
       .set({
+        derivedReserved: sql`${storageBudget.derivedReserved}-${derivatives.filter(b=>b.state === "pending" && b.leaseUntil !== null).reduce((n,b)=>n+b.size,0)}`,
+        derivedWritten: sql`${storageBudget.derivedWritten}-${derivatives.filter(b=>b.state === "ready").reduce((n,b)=>n+b.size,0)}`,
         temporaryReserved: sql`${storageBudget.temporaryReserved}-${reserved}`,
         originalReserved: sql`${storageBudget.originalReserved}-${originals.filter((b) => b.state === "pending" && b.leaseUntil !== null).reduce((n, b) => n + b.size, 0)}`,
         originalWritten: sql`${storageBudget.originalWritten}-${originals.filter((b) => b.state === "ready").reduce((n, b) => n + b.size, 0)}`,

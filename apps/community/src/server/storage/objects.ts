@@ -1,6 +1,8 @@
 import { and, eq } from "drizzle-orm";
 import {
   blobs,
+  blobDerivatives,
+  derivedObjects,
   blobBlocks,
   files,
   storageBudget,
@@ -217,4 +219,249 @@ export async function publishOriginal(
     },
   );
   return result === true;
+}
+
+export type RecipeClaim = {
+  blob: BlobRow;
+  recipe: typeof blobDerivatives.$inferSelect;
+};
+const busy = () => new StorageError(503, "STORAGE_BUSY", "STORAGE_BUSY", 30);
+/** Locks follow original -> recipe -> derived; all IO happens after this transaction. */
+export async function claimAvatarRecipe(
+  ctx: StorageContext,
+  data: StorageJobData,
+): Promise<RecipeClaim | null> {
+  return withProcessingUpload(ctx, data, async ({ tx, session, file, now }) => {
+    if (session.expiresAt <= now) throw new StorageError(410, "UPLOAD_EXPIRED");
+    if (session.purpose !== "avatar")
+      throw new StorageError(400, "PURPOSE_NOT_AVAILABLE");
+    if (
+      (
+        await tx
+          .select()
+          .from(blobBlocks)
+          .where(eq(blobBlocks.sha256, session.expectedSha256))
+      ).length
+    )
+      throw new StorageError(400, "HASH_BLOCKED");
+    const [blob] = await tx
+      .select()
+      .from(blobs)
+      .where(eq(blobs.id, file.blobId))
+      .for("update");
+    if (blob.state !== "ready") throw busy();
+    await tx
+      .insert(blobDerivatives)
+      .values({
+        sourceBlobId: blob.id,
+        recipe: "avatar-v1",
+        recipeBuild: ctx.config.recipeBuild,
+      })
+      .onConflictDoNothing();
+    const [recipe] = await tx
+      .select()
+      .from(blobDerivatives)
+      .where(
+        and(
+          eq(blobDerivatives.sourceBlobId, blob.id),
+          eq(blobDerivatives.recipe, "avatar-v1"),
+          eq(blobDerivatives.recipeBuild, ctx.config.recipeBuild),
+        ),
+      )
+      .for("update");
+    if (recipe.state === "ready") return { blob, recipe };
+    if (recipe.state === "rejected")
+      throw new StorageError(400, recipe.errorCode ?? "IMAGE_INVALID");
+    if (
+      recipe.state === "retired" ||
+      (recipe.leaseUntil && recipe.leaseUntil > now)
+    )
+      throw busy();
+    const [claimed] = await tx
+      .update(blobDerivatives)
+      .set({
+        generation: recipe.generation + 1,
+        leaseUntil: new Date(now.getTime() + 120000),
+      })
+      .where(eq(blobDerivatives.id, recipe.id))
+      .returning();
+    return { blob, recipe: claimed };
+  });
+}
+export type DerivedClaim = {
+  kind: "ready" | "writer";
+  object: typeof derivedObjects.$inferSelect;
+};
+/** Never replaces an uncertain charge; source/recipe and physical generations are independent. */
+export async function claimAvatarOutput(
+  ctx: StorageContext,
+  data: StorageJobData,
+  source: RecipeClaim,
+  output: { hash: string; size: number },
+): Promise<DerivedClaim | null> {
+  return withProcessingUpload(
+    ctx,
+    data,
+    async ({ tx, session, file, accounting: { budget }, now }) => {
+      if (session.expiresAt <= now)
+        throw new StorageError(410, "UPLOAD_EXPIRED");
+      if (
+        (
+          await tx
+            .select()
+            .from(blobBlocks)
+            .where(eq(blobBlocks.sha256, session.expectedSha256))
+        ).length
+      )
+        throw new StorageError(400, "HASH_BLOCKED");
+      const [blob] = await tx
+        .select()
+        .from(blobs)
+        .where(eq(blobs.id, file.blobId))
+        .for("update");
+      if (blob.id !== source.blob.id || blob.state !== "ready") throw busy();
+      const [recipe] = await tx
+        .select()
+        .from(blobDerivatives)
+        .where(eq(blobDerivatives.id, source.recipe.id))
+        .for("update");
+      if (
+        recipe.state !== "pending" ||
+        recipe.generation !== source.recipe.generation ||
+        !recipe.leaseUntil ||
+        recipe.leaseUntil <= now
+      )
+        throw busy();
+      await tx
+        .insert(derivedObjects)
+        .values({
+          outputSha256: output.hash,
+          size: output.size,
+          mime: "image/jpeg",
+          policyId: blob.policyId,
+          key: objectKey(output.hash),
+        })
+        .onConflictDoNothing();
+      const [object] = await tx
+        .select()
+        .from(derivedObjects)
+        .where(eq(derivedObjects.outputSha256, output.hash))
+        .for("update");
+      if (
+        object.size !== output.size ||
+        object.mime !== "image/jpeg" ||
+        object.policyId !== blob.policyId
+      )
+        throw new StorageError(503, "STORAGE_INCONSISTENT");
+      if (object.state === "blocked")
+        throw new StorageError(400, "HASH_BLOCKED");
+      if (
+        object.state === "deleting" ||
+        (object.leaseUntil && object.leaseUntil > now)
+      )
+        throw busy();
+      if (object.state === "ready") {
+        await tx
+          .update(blobDerivatives)
+          .set({ state: "ready", derivedObjectId: object.id, leaseUntil: null })
+          .where(eq(blobDerivatives.id, recipe.id));
+        return { kind: "ready" as const, object };
+      }
+      if (object.state === "deleted" || !object.leaseUntil) {
+        if (
+          budget.derivedReserved + budget.derivedWritten + object.size >
+          ctx.config.limits.derivedBudget
+        )
+          throw new StorageError(503, "STORAGE_BUDGET_EXCEEDED");
+        await tx
+          .update(storageBudget)
+          .set({ derivedReserved: budget.derivedReserved + object.size })
+          .where(eq(storageBudget.id, "global"));
+      }
+      const [claimed] = await tx
+        .update(derivedObjects)
+        .set({
+          state: "pending",
+          generation: object.generation + 1,
+          leaseUntil: new Date(now.getTime() + 120000),
+          orphanedAt: null,
+        })
+        .where(eq(derivedObjects.id, object.id))
+        .returning();
+      await tx
+        .update(blobDerivatives)
+        .set({ derivedObjectId: object.id })
+        .where(eq(blobDerivatives.id, recipe.id));
+      return { kind: "writer" as const, object: claimed };
+    },
+  );
+}
+export async function publishAvatarOutput(
+  ctx: StorageContext,
+  data: StorageJobData,
+  source: RecipeClaim,
+  claim: DerivedClaim,
+): Promise<boolean> {
+  return (
+    (await withProcessingUpload(
+      ctx,
+      data,
+      async ({ tx, session, file, accounting: { budget }, now }) => {
+        if (session.expiresAt <= now) return false;
+        if (
+          (
+            await tx
+              .select()
+              .from(blobBlocks)
+              .where(eq(blobBlocks.sha256, session.expectedSha256))
+          ).length
+        )
+          return false;
+        const [blob] = await tx
+          .select()
+          .from(blobs)
+          .where(eq(blobs.id, file.blobId))
+          .for("update");
+        const [recipe] = await tx
+          .select()
+          .from(blobDerivatives)
+          .where(eq(blobDerivatives.id, source.recipe.id))
+          .for("update");
+        const [object] = await tx
+          .select()
+          .from(derivedObjects)
+          .where(eq(derivedObjects.id, claim.object.id))
+          .for("update");
+        if (
+          blob.id !== source.blob.id ||
+          blob.state !== "ready" ||
+          recipe.state !== "pending" ||
+          recipe.generation !== source.recipe.generation ||
+          !recipe.leaseUntil ||
+          recipe.leaseUntil <= now ||
+          object.state !== "pending" ||
+          object.generation !== claim.object.generation ||
+          !object.leaseUntil ||
+          object.leaseUntil <= now
+        )
+          return false;
+        await tx
+          .update(derivedObjects)
+          .set({ state: "ready", leaseUntil: null })
+          .where(eq(derivedObjects.id, object.id));
+        await tx
+          .update(blobDerivatives)
+          .set({ state: "ready", derivedObjectId: object.id, leaseUntil: null })
+          .where(eq(blobDerivatives.id, recipe.id));
+        await tx
+          .update(storageBudget)
+          .set({
+            derivedReserved: budget.derivedReserved - object.size,
+            derivedWritten: budget.derivedWritten + object.size,
+          })
+          .where(eq(storageBudget.id, "global"));
+        return true;
+      },
+    )) === true
+  );
 }
