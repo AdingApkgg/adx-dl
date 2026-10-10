@@ -254,6 +254,7 @@ export type BackupOptions = {
   databaseUrl: string;
   umamiDatabaseUrl: string;
   stagingDirectory: string;
+  /** Caller-owned unique private directory for this run; frozen exclusively until restic and job completion. */
   bundleDirectory: string;
   repositoryDirectory: string;
   journal: JournalConfig;

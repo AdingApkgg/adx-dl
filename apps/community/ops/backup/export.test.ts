@@ -442,7 +442,7 @@ test.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)(
     const blocking = await pool.connect();
     const dir = await mkdtemp(join(tmpdir(), "preflight-deadline-"));
     const config = await storageFixtureConfig("backup");
-    const app = "task10-preflight-" + crypto.randomUUID();
+    const app = `task10-preflight-${crypto.randomUUID()}`;
     const url = new URL(process.env.TEST_DATABASE_URL!);
     url.searchParams.set("application_name", app);
     let resumed = false,
@@ -557,7 +557,7 @@ test("aborted late EOF cannot publish verified staging after the maintenance dea
   };
   const entry: OriginalEntry = {
     id: crypto.randomUUID(),
-    key: "sha256/" + sha256,
+    key: `sha256/${sha256}`,
     sha256,
     size: bytes.length,
     mime: "image/png",

@@ -24,6 +24,7 @@ export async function processAvatar(
   inputPath: string,
   outputPath: string,
   signal?: AbortSignal,
+  onChildState?: (state: "started" | "reaped") => void,
 ): Promise<{
   hash: string;
   size: number;
@@ -52,6 +53,7 @@ export async function processAvatar(
       stdout: "ignore",
       stderr: "ignore",
     });
+    onChildState?.("started");
     timer = setTimeout(() => {
       timedOut = true;
       kill();
@@ -59,6 +61,7 @@ export async function processAvatar(
     signal?.addEventListener("abort", kill, { once: true });
     if (signal?.aborted) kill();
     const code = await child.exited;
+    onChildState?.("reaped");
     signal?.throwIfAborted();
     if (timedOut) throw new StorageError(503, "PROCESSING_FAILED");
     if (code !== 0)

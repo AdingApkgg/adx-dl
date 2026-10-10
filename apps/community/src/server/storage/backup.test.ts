@@ -112,8 +112,68 @@ test.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)(
     try {
       await cleanup.delete({ bucket: "derived", key: out.key });
       expect(await requestMissingDerivedRebuild(ctx, { id: out.id, generation: 0 })).toBe(true);
-      const [intent] = await readDerivedRebuildIntents(ctx);
+      let [intent] = await readDerivedRebuildIntents(ctx);
+      const row = async () => (await db.select().from(derivedObjects).where(eq(derivedObjects.id, out.id)))[0];
+      const drained = () => import("../../../ops/backup/export").then(({ assertStorageDrained }) => assertStorageDrained(testDbHandle().pool));
+      // No output IO or child exists when temporary-directory creation fails.
+      await expect(rebuildDerivedIntent({ ...ctx, config: { ...config, tempDir: join(dir, "absent") } }, intent)).rejects.toThrow();
+      expect((await row()).leaseUntil).toBeNull();
+      expect((await row()).properties.rebuild).not.toHaveProperty("leaseOwner");
+      await drained();
+      [intent] = await readDerivedRebuildIntents(ctx);
+      const failGet = { ...driver, get: async () => { throw new Error("original GET failed before output IO"); } };
+      await expect(rebuildDerivedIntent({ ...ctx, driver: failGet }, intent)).rejects.toThrow("original GET failed");
+      expect((await row()).leaseUntil).toBeNull();
+      await drained();
+      // The actual invalid-image child exits before error classification; its owned process is reaped.
+      const invalid = Buffer.from("invalid native input"), invalidHash = createHash("sha256").update(invalid).digest("hex");
+      await driver.put({ bucket: "original", key: objectKey(invalidHash), body: new Blob([invalid]).stream(), size: invalid.length, mime: "image/png", sha256: invalidHash });
+      await db.update(blobs).set({ sha256: invalidHash, key: objectKey(invalidHash), size: invalid.length }).where(eq(blobs.id, source.id));
+      [intent] = await readDerivedRebuildIntents(ctx);
+      await expect(rebuildDerivedIntent(ctx, intent)).rejects.toThrow("TYPE_NOT_ALLOWED");
+      expect((await row()).leaseUntil).toBeNull();
+      await drained();
+      await cleanup.delete({ bucket: "original", key: objectKey(invalidHash) });
+      await db.update(blobs).set({ sha256: sourceHash, key: source.key, size: bytes.length }).where(eq(blobs.id, source.id));
+      // A late pre-output failure must not clear a replacement owner's or newer generation's claim.
+      for (const replace of ["owner", "generation"] as const) {
+        [intent] = await readDerivedRebuildIntents(ctx);
+        const hostile = { ...driver, get: async () => {
+          const current = await row();
+          await db.update(derivedObjects).set(replace === "owner"
+            ? { properties: { ...current.properties, rebuild: { ...(current.properties.rebuild as object), leaseOwner: "replacement-owner" } } }
+            : { generation: current.generation + 1 }).where(eq(derivedObjects.id, out.id));
+          throw new Error("stale attempt failed");
+        } };
+        await expect(rebuildDerivedIntent({ ...ctx, driver: hostile }, intent)).rejects.toThrow("stale attempt failed");
+        const current = await row();
+        expect(current.leaseUntil).not.toBeNull();
+        // Fixture-only cleanup: this intercepted GET never issued output IO or started a child.
+        const marker = current.properties.rebuild as Record<string, unknown>;
+        const { leaseOwner: _owner, ...pending } = marker;
+        await db.update(derivedObjects).set({ leaseUntil: null, properties: { rebuild: { ...pending, generation: current.generation } } }).where(eq(derivedObjects.id, out.id));
+      }
+      [intent] = await readDerivedRebuildIntents(ctx);
+      let puts = 0;
+      const uncertain = { ...driver, put: async (input: Parameters<typeof driver.put>[0]) => {
+        puts++; await driver.put(input); throw new Error("generic wrapper lost output PUT acknowledgement");
+      } };
+      await expect(rebuildDerivedIntent({ ...ctx, driver: uncertain }, intent)).rejects.toThrow("generic wrapper lost");
+      expect(puts).toBe(1);
+      expect((await row()).leaseUntil).not.toBeNull();
+      await expect(drained()).rejects.toThrow("STORAGE_IO_UNCERTAIN");
+      const retained = await row();
+      await db.update(derivedObjects).set({ leaseUntil: new Date(0) }).where(eq(derivedObjects.id, out.id));
+      await cleanup.delete({ bucket: "derived", key: out.key });
+      const heldMarker = retained.properties.rebuild as Record<string, unknown>;
+      const { leaseOwner: _owner, ...heldIntent } = heldMarker;
+      expect(await rebuildDerivedIntent({ ...ctx, driver: uncertain }, { ...heldIntent, id: out.id } as typeof intent)).toBe(false);
+      expect(puts).toBe(1);
+      // Actual driver PUT has settled and owned key DELETE has completed; only this test resets its private fixture claim.
+      await db.update(derivedObjects).set({ leaseUntil: null, properties: { rebuild: heldIntent } }).where(eq(derivedObjects.id, out.id));
+      [intent] = await readDerivedRebuildIntents(ctx);
       expect(await rebuildDerivedIntent(ctx, intent)).toBe(true);
+      await drained();
       const readable = await driver.get({ bucket: "derived", key: out.key });
       expect(
         createHash("sha256")
@@ -171,7 +231,7 @@ test.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)(
         .values({
           sourceBlobId: source.id,
           recipe: "avatar-v1",
-          recipeBuild: RECIPE_BUILD + "-prior-shared",
+          recipeBuild: `${RECIPE_BUILD}-prior-shared`,
           derivedObjectId: old.id,
           state: "ready",
         })
@@ -182,7 +242,7 @@ test.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)(
         await db.insert(user).values({
           id,
           name: "drift-shared-proof",
-          email: id + "@placeholder.invalid",
+          email: `${id}@placeholder.invalid`,
           image: `/media/${oldHash}.jpg`,
         });
         await db.insert(storageUsage).values({ userId: id, usedBytes: bytes.length });
@@ -325,6 +385,7 @@ test.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)(
           .where(eq(mediaPublications.outputSha256, o.outputSha256));
       }
       await cleanup.delete({ bucket: "original", key: source.key });
+      await cleanup.delete({ bucket: "original", key: objectKey(createHash("sha256").update("invalid native input").digest("hex")) });
       await db.delete(blobDerivatives).where(eq(blobDerivatives.sourceBlobId, source.id));
       await db.delete(derivedObjects).where(eq(derivedObjects.policyId, p.id));
       await db.delete(blobs).where(eq(blobs.id, source.id));

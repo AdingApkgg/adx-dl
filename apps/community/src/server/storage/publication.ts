@@ -178,7 +178,7 @@ export async function recordMediaPurge(
       .where(eq(mediaPurgeRequests.id, rows.out.id));
   });
 }
-function complete(e: MediaPurgeEvidence | null, generation: number) {
+export function completeMediaPurgeEvidence(e: MediaPurgeEvidence | null, generation: number) {
   if (
     !e?.drain ||
     e.drain.generation !== generation ||
@@ -216,7 +216,7 @@ export async function finishMediaPurge(
     if (!fenced(rows, data)) throw new MediaPurgeError("MEDIA_ATTEMPT_STALE");
     if (await hasPublicRepresentation(tx, data.hash))
       throw new MediaPurgeError("MEDIA_PUBLIC_REFERENCE");
-    if (!complete(rows.out.evidence, data.generation))
+    if (!completeMediaPurgeEvidence(rows.out.evidence, data.generation))
       throw new MediaPurgeError("MEDIA_EVIDENCE_INCOMPLETE");
     budget.check();
     const now = ctx.now?.() ?? new Date();

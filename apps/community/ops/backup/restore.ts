@@ -1,6 +1,10 @@
 import { lstat, mkdir, readFile, readdir, open, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { Client } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
+import * as schema from "../../src/server/db/schema";
+import { completeMediaPurgeEvidence } from "../../src/server/storage/publication";
+import { hasPublicRepresentation } from "../../src/server/storage/references";
 import type { StorageContext } from "../../src/server/storage/contracts";
 import {
   durableFile,
@@ -382,6 +386,42 @@ export async function replayJournal(c: Client, records: JournalRecord[], head: J
     throw e;
   }
 }
+/** Include revocations created by native drift and restored current outboxes; ordinary queue consumers remain stopped. */
+async function currentRestoreRevocations(c: Client) {
+  const rows = await c.query(`select p.output_sha256 as hash,p.generation from media_publications p
+    left join media_purge_requests r on r.output_sha256=p.output_sha256 and r.generation=p.generation
+    where p.state in ('revoking','blocked') or r.state<>'done' order by p.output_sha256`);
+  return rows.rows.map((row) => ({ hash: String(row.hash), generation: Number(row.generation) }));
+}
+/** The coordinator itself gates OPEN on current terminal state and the existing strict protocol evidence. */
+async function assertRestoreRevocations(c: Client, targets: { hash: string; generation: number }[]) {
+  await c.query("begin");
+  try {
+    await c.query("select pg_advisory_xact_lock($1::bigint)", [714102026]);
+    const db = drizzle({ client: c, schema, casing: "snake_case" });
+    const hashes = targets.map((data) => data.hash);
+    // Lock each whole class in its stable order, before moving to the next class.
+    await c.query("select id from derived_objects where output_sha256=any($1::text[]) order by id for update", [hashes]);
+    const publications = (await c.query("select * from media_publications where output_sha256=any($1::text[]) order by output_sha256 for update", [hashes])).rows;
+    const outboxes = (await c.query("select * from media_purge_requests where output_sha256=any($1::text[]) order by output_sha256,generation for update", [hashes])).rows;
+    for (const data of targets) {
+      const pub = publications.find((row) => row.output_sha256 === data.hash);
+      const out = outboxes.find((row) => row.output_sha256 === data.hash && Number(row.generation) === data.generation);
+      if (Number(pub?.generation) !== data.generation || !["private", "blocked"].includes(pub.state) ||
+        out?.state !== "done" || !completeMediaPurgeEvidence(out.evidence, data.generation) ||
+        await hasPublicRepresentation(db, data.hash)) throw fail();
+    }
+    const pending = await c.query(`select 1 from media_publications p left join media_purge_requests r
+      on r.output_sha256=p.output_sha256 and r.generation=p.generation
+      where p.state='revoking' or r.state<>'done' limit 1`);
+    if (pending.rowCount || (await currentRestoreRevocations(c)).some((row) =>
+      !targets.some((target) => target.hash === row.hash && target.generation === row.generation))) throw fail();
+    await c.query("commit");
+  } catch (error) {
+    await c.query("rollback").catch(() => {});
+    throw error;
+  }
+}
 export type RestoreOptions = {
   stateDirectory: string;
   bundleDirectory: string;
@@ -422,19 +462,20 @@ export async function restoreOriginals(options: RestoreOptions) {
     await options.restoreOriginals(manifest.originals, options.bundleDirectory);
     const c = new Client({ connectionString: options.databaseUrl, connectionTimeoutMillis: 5000 });
     await c.connect();
-    let affected: { hash: string; generation: number }[];
     try {
-      affected = await replayJournal(c, latest.records, latest.head);
+      await replayJournal(c, latest.records, latest.head);
+      await options.rebuild();
+      const targets = await currentRestoreRevocations(c);
+      const recovery = await options.startRecovery();
+      try {
+        for (const data of targets) await options.revoke(data);
+        await options.verifyInvariants();
+      } finally {
+        await recovery.stopAndConfirm();
+      }
+      await assertRestoreRevocations(c, targets);
     } finally {
       await c.end();
-    }
-    await options.rebuild();
-    const recovery = await options.startRecovery();
-    try {
-      for (const data of affected) await options.revoke(data);
-      await options.verifyInvariants();
-    } finally {
-      await recovery.stopAndConfirm();
     }
     // Re-read live external latest head: a concurrent source deletion invalidates this restoration, even if earlier head was signed.
     const current = await verifyLatestJournal(options.journal, manifest.journal);

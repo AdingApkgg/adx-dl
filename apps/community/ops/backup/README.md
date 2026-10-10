@@ -17,6 +17,8 @@
 
 日志发布用短 READ COMMITTED exclusive storage barrier 等待所有 shared tombstone writers 完成，随后另一个语句读取 committed records，避免 sequence 分配顺序被误当成提交顺序。认证 immutable segment 和 head durable 发布后才推进 DB checkpoint；回滚空洞允许，缺段/分叉/认证失败拒绝。日志保留七个日历月，以认证 anchor 保留支持六个月时间桶恢复所需的链。
 
+每次导出调用必须由调用方分配唯一、私有的 bundleDirectory；该 run 在 restic 读取及完成清理之前独占其冻结目录。维护锁在 restic 前释放，不能防止另一个调用复用同一路径而覆盖文件。Task11 的一次性 CLI/runtime 接线必须逐次分配目录；允许共享按 hash 验证的暂存缓存，不允许共享当前冻结 bundle。
+
 专用 PG session 先取得 exclusive advisory lock，再建立 REPEATABLE READ 快照；社区 pg_dump 复用 exported snapshot，Umami 独立导出。所有原件流式验证后原子冻结，生成 versioned manifest。exclusive 与匹配 gate 释放后立即 owner-scoped resume，再执行 restic `community-full` backup。维护/角色暂停总上限五分钟，整次工作三十分钟，含有限清理预留。失败不执行 forget/prune 或完成标记；成功仅对 `community-full` 采用 7 daily / 4 weekly / 6 monthly，旧 `community-db` 快照仍有引用而保留。
 
 ## 恢复顺序与失败处理
@@ -25,7 +27,7 @@
 2. durable 写 closed，确认正常 web/media/control 与其 owned IO 实际停止。校验 bundle 的双 dump 和所有原件。最新 head 必须来自 live 外部日志或可信强制源 flush；旧签名快照 head 仅是认证链起点。
 3. 在停止状态恢复两库与私有原件，重放最新 user/file/block/media_revoked 事实，取消所有暂存会话/分片并重算配额；旧头像撤回只失效旧 generation 的公开关联/投影，保留私有文件和确实较新的合法共享引用，blocked 状态继续 blocked。
 4. 缺失派生头像由 sessionless durable intent 驱动，实际调用同一个原生配方；已有不确定 PUT/DELETE、旧代次或 namespace 不一致不能覆盖。相同输出不再计费；输出变化创建新 hash/key 并按现有引用/撤回协议更新当前投影。
-5. 同一应用镜像独立启动 recovery-web，只公开 canonical 404/no-store、health 和真实认证 drain，不导入正常 auth/SSR/API/private bootstrap，不领普通任务。直接调用既有严格 revokeMedia 完成 restore-owned outbox：60-second attempt、每请求 10-second、两次 purge 与两次 anonymous canonical 404/non-HIT probes 分别间隔至少五秒、最终锁内代次与引用检查。
+5. 同一应用镜像独立启动 recovery-web，只公开 canonical 404/no-store、health 和真实认证 drain，不导入正常 auth/SSR/API/private bootstrap，不领普通任务。重建后重新收集当代撤回（含 drift 新建与快照已有 outbox），直接调用既有严格 revokeMedia 完成：60-second attempt、每请求 10-second、两次 purge 与两次 anonymous canonical 404/non-HIT probes 分别间隔至少五秒、最终锁内代次与引用检查。恢复协调器随后内建核对当代 outbox done、publication private/blocked、完整证据及无合法公开引用；不把 verifyInvariants 的空成功当作完成。
 6. 停止并确认 recovery-web，检查删除账号不可访问、原件 SHA/ACL、暂存/配额、头像可重建与撤回证据，再确认 live latest head 未变化，只有全部成功才原子 open。失败路径永不在 finally 中打开。
 
 正常成功释放自己的锁。停止正常进程成功之后的纯本地 manifest/latest 验证失败，可在明确未启动恢复 IO 时释放自己的锁并保持 closed。停止进程失败或任何 DB/S3/rebuild/recovery 回调开始后的任何失败，连同 generic backend error，均保留 closed + `.restore.lock`；即使错误已返回也不能证明远端 PUT/DELETE 已结束。崩溃保留锁。Task11 操作员清锁步骤必须先取得旧进程与所有 owned child/remote IO 已结束的明确证据；只查 PID、HEAD missing、重复 DELETE204 或等待 TTL 不够。确认之前不能开始下一次恢复。

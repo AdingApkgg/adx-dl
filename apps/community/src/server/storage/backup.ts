@@ -218,6 +218,32 @@ async function settleSameHash(ctx: StorageContext, claim: RebuildClaim): Promise
     return true;
   });
 }
+/** No output IO and no unreaped owned child: remove only this exact claim, preserving its charge and retry generation. */
+async function releaseUnwrittenRebuild(ctx: StorageContext, claim: RebuildClaim) {
+  await ctx.db.transaction(async (tx) => {
+    await lockStorageAdmission(tx);
+    await tx.select().from(storageBudget).where(eq(storageBudget.id, "global")).for("update");
+    const [blob] = await tx.select().from(blobs).where(eq(blobs.id, claim.blob.id)).for("update");
+    const [recipe] = await tx.select().from(blobDerivatives).where(eq(blobDerivatives.id, claim.intent.recipeId)).for("update");
+    const [output] = await tx.select().from(derivedObjects).where(eq(derivedObjects.id, claim.output.id)).for("update");
+    const [pub] = await tx.select().from(mediaPublications).where(eq(mediaPublications.outputSha256, claim.output.outputSha256)).for("update");
+    const { id: _id, ...marker } = claim.intent;
+    if (blob?.state !== "ready" || blob.generation !== claim.sourceGeneration ||
+      blob.sha256 !== claim.blob.sha256 || blob.key !== claim.blob.key || blob.policyId !== claim.blob.policyId ||
+      recipe?.state !== "ready" || recipe.generation !== claim.recipeGeneration ||
+      recipe.recipe !== "avatar-v1" || recipe.recipeBuild !== claim.intent.recipeBuild ||
+      recipe.sourceBlobId !== blob.id || recipe.derivedObjectId !== claim.output.id ||
+      output?.state !== "ready" || output.generation !== claim.output.generation ||
+      output.outputSha256 !== claim.output.outputSha256 || output.key !== claim.output.key || output.policyId !== claim.output.policyId ||
+      output.leaseUntil?.getTime() !== claim.leaseUntil.getTime() ||
+      !sameIntent(output.properties.rebuild, { ...marker, leaseOwner: claim.leaseOwner }) ||
+      (pub?.generation ?? null) !== (claim.publication?.generation ?? null) ||
+      (pub?.state ?? null) !== (claim.publication?.state ?? null)) return;
+    await assertStorageNamespace(tx, ctx, blob.policyId, "original");
+    await assertStorageNamespace(tx, ctx, output.policyId, "derived");
+    await tx.update(derivedObjects).set({ leaseUntil: null, properties: { ...output.properties, rebuild: marker } }).where(eq(derivedObjects.id, output.id));
+  });
+}
 /** Independent of upload_sessions. Only current verified source/recipe/physical identities can repair bytes. */
 export async function rebuildDerivedIntent(
   ctx: StorageContext,
@@ -245,9 +271,11 @@ export async function rebuildDerivedIntent(
     return false;
   const claim = await claimRebuild(ctx, intent);
   if (!claim) return false;
-  const directory = await mkdtemp(join(ctx.config.tempDir, "rebuild-"));
+  let directory: string | undefined;
+  let childUnreaped = false, outputClaimStarted = false;
   const signal = AbortSignal.timeout(120000);
   try {
+    directory = await mkdtemp(join(ctx.config.tempDir, "rebuild-"));
     const original = await stageOriginal(
       ctx,
       {
@@ -269,9 +297,14 @@ export async function rebuildDerivedIntent(
       signal,
     );
     const outputPath = join(directory, "output.jpg"),
-      result = await processAvatar(original.path, outputPath, signal);
-    if (result.hash !== claim.output.outputSha256)
+      result = await processAvatar(original.path, outputPath, signal, (state) => {
+        childUnreaped = state === "started";
+      });
+    if (result.hash !== claim.output.outputSha256) {
+      // Drift allocates another physical claim; failures after this boundary remain conservatively owned.
+      outputClaimStarted = true;
       return await rebuildDrift(ctx, claim, result, outputPath, signal);
+    }
     if (result.size !== claim.output.size) throw fail();
     // Recheck under the same owned physical claim before IO; no expired writer takeover.
     const valid = await withStorageTransaction(ctx.db, async (tx) => {
@@ -290,7 +323,8 @@ export async function rebuildDerivedIntent(
         digest.update(bytes);
       }
       if (count !== result.size || digest.digest("hex") !== result.hash) throw fail();
-    } else
+    } else {
+      outputClaimStarted = true;
       await ctx.driver.put({
         bucket: "derived",
         key: claim.output.key,
@@ -300,6 +334,7 @@ export async function rebuildDerivedIntent(
         sha256: result.hash,
         signal,
       });
+    }
     const head = await ctx.driver.head({ bucket: "derived", key: claim.output.key, signal });
     if (
       !head ||
@@ -310,7 +345,11 @@ export async function rebuildDerivedIntent(
       throw fail();
     return settleSameHash(ctx, claim);
   } finally {
-    await rm(directory, { recursive: true, force: true });
+    try {
+      if (directory && !childUnreaped) await rm(directory, { recursive: true, force: true });
+    } finally {
+      if (!childUnreaped && !outputClaimStarted) await releaseUnwrittenRebuild(ctx, claim);
+    }
   }
 }
 async function rebuildDrift(
