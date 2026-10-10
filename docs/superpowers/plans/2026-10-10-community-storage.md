@@ -160,25 +160,25 @@ Every commit stages explicit owned files only. Run from `apps/community` with `P
 
 ### Task 7: Durable bounded Cloudflare revocation
 
-**Files:** create worker/media-purge.ts + tests and storage/publication helpers as needed; modify worker/main.ts and queue readiness only for control integration.
+**Files:** create worker/media-purge.ts + tests and storage/publication helpers as needed; modify worker/main.ts and queue readiness only for control integration. Add minimal typed durable attempt evidence to the existing purge outbox schema with an additive migration/snapshot and behavioral tests; do not rely on process memory or logs.
 
 **Interfaces:** produce `revokeMedia(ctx,{hash,generation},deps:{fetch,sleep,now,drainUrl}):Promise<void>` and outbox repair. Secret read only from control config; canonical URL derives from validated public origin/hash.
 
 - [ ] Write timeline tests using injected clock/fetch and real PG: ACK currentgeneration, two successfulpurges times≥5s, two canonicalanonymousGET404/nonHIT times≥5s, final lockedgeneration/referencecheck →private/done. Inspect requests: no Cookie/Auth/range/conditions/query/cachebuster on probes, max64KiB body; non404 immediatelycancel. Any ACK/purge/probe timeout/failure/200/HIT/generationchange keepsrevoking; ≤60s total and ≤2purges/2probes. Shared new reference cannot be erased by stale completion.
-- [ ] Run to FAIL; implement fixed sequence with individual10s cancellation and whole60sdeadline, durable evidence/errorcodes and safe logs. Failed/dead outboxes stay visible and hourlyrepair requeues; old-generation requests no-op without overriding current publication. Do not call real Cloudflare for unit tests.
+- [ ] Run to FAIL; implement fixed sequence with individual10s cancellation and whole60sdeadline, durable evidence/errorcodes and safe logs. Failed/dead outboxes stay visible and hourlyrepair requeues; old-generation requests no-op without overriding current publication. Do not call real Cloudflare for unit tests. Fence evidence/final/error writes by current attempt as well as generation; reset evidence on a fresh claim. Request/body timeouts consume the remaining monotonic whole-attempt budget, including DB work and the two5s delays; deadline failure staysrevoking.
 - [ ] Run scoped tests to PASS including origin permission/drain fill race from Task6. Live production edge test is deferred to Task12 and must use owned acceptance media rather than another user's image.
 - [ ] Commit `feat(community): revoke public media through durable purge outbox`.
 
 ### Task 8: Dead-letter convergence, GC and account deletion hooks
 
-**Files:** create worker/storage-sweep.ts, storage-delete.ts, storage-journal.ts, storage/deletion.ts and tests; modify services/user-deletion.ts, worker/main.ts and user-deletion tests.
+**Files:** create worker/storage-sweep.ts, storage-delete.ts, storage-journal.ts, storage/deletion.ts and tests; modify services/user-deletion.ts, api/me.ts cancellation-handler mapping, worker/main.ts and user-deletion tests.
 
 **Interfaces:** produce `sweepStorage(ctx):Promise<SweepResult>`, `deleteStorageObject(ctx,{kind:"blob"|"derived",id,generation}):Promise<void>`, `createStorageDeletionHandler(ctx):DeletionHandler` and prepare/restore hooks. Extend DeletionHandler optional `prepare(userId,tx)`/`restore(userId,tx)`; cancelDeletion consumes handlers. Tombstone writing stays in business tx; journal exporter handles external encryption outside tx.
 
 - [ ] Write PG tests: dead parent plus blocked descendants reject session/release once/cancelremainingjobs;15minstrandedprocessingrepair;24hexpiry;hourlylimits100/batch1000/10min;tempterminal1h/unknown48h;unattached24h/tombstone30d;seven-dayorphans. Each boundary test asserts state/budget/object identity, using injected clock rather than slow sleeps.
 - [ ] Write concurrency tests for original/derivedGC versus new references and oldDELETE/newPUT: one generation winner, no deleted valid avatar, sharedoutput stays until allsource/associationleases gone. DB tombstones remain until external delete succeeds;404delete isidempotent. Budget recalibration exposesdrift; missing readyobject isstoragefailure, never silentlyrefundquota.
 - [ ] Write account tests: avataronlyhasContentfalse;requestdeletiontransaction cancelsuploads/revokesimage/enqueuesoutbox evenafterusergone;cancelrestoreseligibleoldavatarbutnevercancelledsession;finalpurge alwayssoftdeletesavatars regardlessdeleteContentfalse;anonymousfuturefixtureFKprotectsfiles;noexternalIOinsidepurgeUsertx. Assertworker cannotpublishafterrequestdeletionrace.
-- [ ] Run to FAIL; implement locks/physicalgenerationrules, maintenance participation, prepare/restore/purge hooks and control worker schedules `missed:'once'`, tombstones/minute journal export, explicit registry test. Keep NapCat handlers/connection unchanged.
+- [ ] Run to FAIL; implement locks/physicalgenerationrules, maintenance participation, prepare/restore/purge hooks and control worker schedules `missed:'once'`, tombstones/minute journal export, explicit registry test. Acquire storage admission at each outer request/cancel/purge transaction boundary before its existing user lock; hooks use that same transaction, not a new connection. Map deletionHandlers to handlers explicitly for cancellation. Keep NapCat handlers/connection unchanged.
 - [ ] Run scoped tests to PASS with real pg-boss drain/sweep retries and realS3GC fixtures.
 - [ ] Commit `feat(community): converge storage cleanup and account deletion`.
 
@@ -208,7 +208,7 @@ Every commit stages explicit owned files only. Run from `apps/community` with `P
 
 ### Task 11: Pinned production services, role credentials and deploy checks
 
-**Files:** create ops/seaweed/write-config.ts/tests and storagehealth command; modify compose.yaml/compose.dev.yaml, Dockerfile, .env.example, fill-secrets.sh/tests, deploy.sh/tests, package scripts/README, CI service wiring where required. Preserve NapCat overlay production workflow.
+**Files:** create ops/seaweed/write-config.ts/tests and storagehealth command; modify compose.yaml/compose.dev.yaml, Dockerfile, .env.example, fill-secrets.sh/tests, deploy.sh/tests, package scripts/README, CI service wiring where required. Wire server/index.ts, worker/main.ts and media-worker/main.ts to their separate role contexts/readiness/lifecycles, with backup runtime integration established in Task10. Preserve NapCat overlay production workflow.
 
 **Interfaces:** SeaweedFS pin is `chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d` (official registry verified via proxy, amd64 manifest `sha256:aba492e2a4e4c90bff795745e8e660affa1f09e7650f5981bd7bccd1a06cd931`). The image entrypoint supplies `weed`, so compose command begins `mini -dir=/data -s3.port=8333 -bucket=blobs,derived -s3.config=/config/s3.json`. Use0600roleconfigurationinitvolume; web/media/control/backup receiveonlytheirrolekeys; mediaworker sameappimage separatecommand and healthheartbeat; internalweb:3001unpublished.
 
