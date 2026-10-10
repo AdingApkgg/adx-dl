@@ -16,7 +16,6 @@ import { cn } from "@astrodx/ui/lib/utils";
 import { Button } from "@astrodx/ui/components/button";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -25,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@astrodx/ui/components/dropdown-menu";
-import { BATCH_FORMATS, type BatchArchiveFormat } from "@/lib/adx-archive-shared";
+import { BATCH_FORMATS, requiresManualArchiveSave, type BatchArchiveFormat } from "@/lib/adx-archive-shared";
 import { MAX_BATCH_ZIP_BYTES } from "@/lib/adx-archive-layout";
 import {
   isChartVideoFile,
@@ -47,7 +46,8 @@ import {
   downloadJobMetricsText,
   downloadJobStateText,
 } from "./downloads/download-status-text";
-import { DownloadJobNotes } from "./downloads/download-job-notes";
+import { DownloadJobNotes, DownloadStorageNotice } from "./downloads/download-job-notes";
+import { DownloadVideoOption } from "./downloads/download-video-option";
 import {
   chartGroupingDir,
   newBatchJobId,
@@ -101,6 +101,8 @@ export function BatchDownloadBar({
   const browser = dictionary.catalogBrowser;
   const tray = dictionary.downloads;
   const [includeVideo, setIncludeVideo] = React.useState(false);
+  const [mobileBatchMode, setMobileBatchMode] = React.useState(false);
+  React.useEffect(() => setMobileBatchMode(requiresManualArchiveSave()), []);
   const [confirmDiscard, setConfirmDiscard] = React.useState(false);
   // Format chosen from the menu while a large selection awaits confirmation.
   const [pendingFormat, setPendingFormat] = React.useState<BatchArchiveFormat | null>(null);
@@ -228,7 +230,13 @@ export function BatchDownloadBar({
         : "";
   const statusText = metricsText ? `${stateText} · ${metricsText}` : stateText;
   const failedJob = jobs.find((entry) => entry.status === "error");
-  const canDownload = count > 0 && !isBusy && !isResumable && status !== "ready";
+  const hasRetainedMobileArchives = jobs.some((job) => job.mobileBatch && job.archives?.length);
+  const releasedGuideJob = jobs.findLast((entry) => entry.savedArchiveInfo);
+  const hasCurrentSavedArchive = jobs.some((entry) => entry.archives?.some((archive) => archive.requested));
+  const noteJobs = jobs.filter((entry) => entry.archives?.length || entry.id === failedJob?.id ||
+    (entry === releasedGuideJob && !hasCurrentSavedArchive) ||
+    (entry.mobileMemoryWarning && entry.status !== "queued" && !entry.savedArchiveInfo));
+  const canDownload = count > 0 && !isBusy && !isResumable && status !== "ready" && !hasRetainedMobileArchives;
 
   // Hide these jobs from the floating tray while the bar itself is on screen.
   // Keyed by a joined string so the effect doesn't re-run on array identity.
@@ -282,10 +290,11 @@ export function BatchDownloadBar({
   }, [confirmDiscard]);
 
   function beginBatch(format: BatchArchiveFormat) {
+    if (!canDownload) return;
     // Finished runs from this bar are done communicating — clear them instead
     // of letting them pop into the tray as stale success rows.
     for (const entry of jobs) {
-      if (entry.status === "success") {
+      if (entry.status === "success" && !(entry.mobileBatch && entry.archives?.length)) {
         dismiss(entry.id);
       }
     }
@@ -365,7 +374,7 @@ export function BatchDownloadBar({
     >
       <div
         ref={barRef}
-        className="flex w-full max-w-xl flex-col gap-2 rounded-2xl border border-border/70 bg-popover/95 p-3 shadow-lg ring-1 ring-foreground/5 backdrop-blur"
+        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col gap-2 overflow-y-auto overscroll-contain rounded-2xl border border-border/70 bg-popover/95 p-3 shadow-lg ring-1 ring-foreground/5 backdrop-blur"
       >
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium tabular-nums">
@@ -511,18 +520,6 @@ export function BatchDownloadBar({
                         {tray.groupingGenre}
                       </DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
-                    {hasVideoFiles ? (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuCheckboxItem
-                          checked={includeVideo}
-                          onCheckedChange={(value) => setIncludeVideo(value === true)}
-                          onSelect={(event) => event.preventDefault()}
-                        >
-                          {detail.downloadIncludeVideo}
-                        </DropdownMenuCheckboxItem>
-                      </>
-                    ) : null}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -542,6 +539,20 @@ export function BatchDownloadBar({
           )}
         </div>
 
+        {hasVideoFiles && !isResumable && status !== "ready" && status !== "success" ? (
+          <DownloadVideoOption
+            locale={locale}
+            checked={includeVideo}
+            onChange={setIncludeVideo}
+            videoBytes={selectionBytes.videoBytes}
+            disabled={isBusy}
+          />
+        ) : null}
+        {mobileBatchMode && jobs.length === 0 ? (
+          <p className="text-xs text-muted-foreground">{tray.mobileBatchHint}</p>
+        ) : null}
+
+        <DownloadStorageNotice locale={locale} />
         <DownloadSourceSummary
           sourceId={jobs[0]?.sourceId ?? selectedSourceId}
           sourceBaseUrl={jobs[0]?.sourceBaseUrl}
@@ -718,7 +729,7 @@ export function BatchDownloadBar({
           {stateText}
         </p>
         <div className="flex max-h-60 flex-col gap-2 overflow-y-auto overscroll-contain">
-          {jobs.filter((entry) => entry.archives?.length || entry.id === failedJob?.id).map((entry) => (
+          {noteJobs.map((entry) => (
             <DownloadJobNotes key={entry.id} job={entry} locale={locale} />
           ))}
         </div>

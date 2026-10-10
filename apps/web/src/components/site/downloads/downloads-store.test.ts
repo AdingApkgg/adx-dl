@@ -7,6 +7,7 @@ import {
   type DownloadsPersistenceAdapter,
   type PersistedFile,
   type PersistedJob,
+  type PersistedBatchSelection,
 } from "./persistence";
 
 import {
@@ -38,6 +39,7 @@ const fetchedUrls: string[] = [];
 const persistedJobs = new Map<string, PersistedJob>();
 const persistedFiles = new Map<string, PersistedFile>();
 const persistedHistory = new Map<string, DownloadHistoryEntry>();
+const persistedSelections = new Map<string, PersistedBatchSelection>();
 const localStorageValues = new Map<string, string>();
 
 const memoryPersistence: DownloadsPersistenceAdapter = {
@@ -74,6 +76,11 @@ const memoryPersistence: DownloadsPersistenceAdapter = {
   clearHistory: async () => {
     persistedHistory.clear();
   },
+  persistBatchSelection: async (selection) => {
+    persistedSelections.set(selection.id, structuredClone(selection));
+  },
+  loadBatchSelections: async () => [...persistedSelections.values()],
+  deleteBatchSelection: async (id) => { persistedSelections.delete(id); },
 };
 
 // What these globals were before this file touched them. bun has no `document`
@@ -226,7 +233,492 @@ async function waitForCondition(predicate: () => boolean, timeoutMs = 2000): Pro
   }
 }
 
+async function onMobile(task: () => Promise<void>): Promise<void> {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
+    userAgent: "Mozilla/5.0 (iPhone)", onLine: true,
+  } });
+  try { await task(); }
+  finally {
+    for (const job of useDownloadsStore.getState().jobs) useDownloadsStore.getState().dismiss(job.id);
+    if (original) Object.defineProperty(globalThis, "navigator", original);
+    else delete (globalThis as Record<string, unknown>).navigator;
+  }
+}
+
+function measuredCharts(count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    dir: `Song ${index}`, groupDir: "maimai",
+    files: [{ name: "track.mp3", url: `https://example.test/${index}/track.mp3`, bytes: 3 }],
+  }));
+}
+
+function legacyBatch(id: string): PersistedJob {
+  return {
+    id, kind: "batch", title: "Legacy", format: "zip", createdAt: 1,
+    files: [0, 1].map((index) => ({
+      name: `${index}/track.mp3`, url: `https://example.test/${index}/track.mp3`, bytes: 80 * 1024 ** 2,
+    })),
+    dirByIndex: ["Song 0", "Song 1"], groupByIndex: ["maimai", "maimai"],
+  };
+}
+
+function seedWholeFiles(spec: PersistedJob): void {
+  persistedJobs.set(spec.id, structuredClone(spec));
+  for (const file of spec.files) {
+    const blob = new Blob([new Uint8Array([1, 2, 3])]);
+    const key = `${spec.id}::${file.name}`;
+    persistedFiles.set(key, { ...file, key, jobId: spec.id, complete: true, size: blob.size, blob });
+  }
+}
+
 describe("downloads-store", () => {
+  test("concurrent desktop groups serialize cohort progress and replay the original layout, BGA and format", async () => {
+    const updates: string[][] = [];
+    let release!: () => void;
+    let firstWriteStarted = false;
+    const firstWrite = new Promise<void>((resolve) => { release = resolve; });
+    setDownloadsPersistenceAdapterForTests({ ...memoryPersistence, persistBatchSelection: async (selection) => {
+      updates.push([...selection.completedJobIds]);
+      if (selection.completedJobIds.length === 1) {
+        firstWriteStarted = true;
+        await firstWrite;
+      }
+      await memoryPersistence.persistBatchSelection(selection);
+    } });
+    try {
+      const id = newBatchJobId();
+      const charts = measuredCharts(2).map((chart, index) => ({ ...chart,
+        groupDir: `Version ${index}`, genreDir: `Genre ${index}`,
+        files: [...chart.files, { name: "pv.mp4", url: `https://example.test/${index}/pv.mp4`, bytes: 7 }],
+      }));
+      const ids = useDownloadsStore.getState().startBatch({
+        id, title: "Both genres", charts, includeVideo: true, format: "zip", grouping: "genre",
+      });
+      await waitForCondition(() => firstWriteStarted && ids.every((id) => useDownloadsStore.getState().jobs.find((job) => job.id === id)?.status === "success"));
+      expect(useDownloadsStore.getState().history).toEqual([]);
+      expect(updates.map((ids) => ids.length)).toEqual([0, 1]);
+      release();
+      await waitForCondition(() => useDownloadsStore.getState().history.length === 1 && persistedSelections.size === 0);
+      expect(updates.map((ids) => ids.length)).toEqual([0, 1, 2]);
+      expect(new Set(updates[2])).toEqual(new Set(ids));
+      const [entry] = useDownloadsStore.getState().history;
+      expect(entry.job.groupByIndex).toEqual(["Genre 0", "Genre 1"]);
+      expect(entry.job.files.map((file) => file.bytes)).toEqual([3, 7, 3, 7]);
+      expect(entry.job.format).toBe("zip");
+      useDownloadsStore.getState().setPreferredBatchGrouping("version");
+      useDownloadsStore.getState().setPreferredFormat("adx");
+      useDownloadsStore.getState().setSelectedSourceId("g510");
+      useDownloadsStore.getState().rerunHistoryEntry(entry.key);
+      const replays = useDownloadsStore.getState().jobs.filter((job) => !ids.includes(job.id));
+      expect(replays).toHaveLength(2);
+      expect(replays.map((job) => job.title)).toEqual(["Genre 0", "Genre 1"]);
+      expect(replays.every((job) => job.format === "zip" && job.total === 2 && job.sourceId === "g510")).toBe(true);
+      for (const job of replays) await waitForJob(job.id, (job) => job.status === "success");
+      await waitForCondition(() => useDownloadsStore.getState().history.length === 2 && persistedSelections.size === 0);
+      expect(await savedArchives()).toEqual({
+        "Genre 0.zip": ["Genre 0/Song 0/pv.mp4", "Genre 0/Song 0/track.mp3"],
+        "Genre 1.zip": ["Genre 1/Song 1/pv.mp4", "Genre 1/Song 1/track.mp3"],
+      });
+    } finally { release(); }
+  });
+
+  test("a failed child stays incomplete until retry succeeds and never records partial-selection history", async () => {
+    await onMobile(async () => {
+      const successfulFetch = globalThis.fetch;
+      globalThis.fetch = (async (input, init) => String(input).endsWith("/8/track.mp3")
+        ? new Response("missing", { status: 404 }) : successfulFetch(input, init)) as typeof fetch;
+      const id = newBatchJobId();
+      const ids = useDownloadsStore.getState().startBatch({
+        id, title: "Retry whole", charts: measuredCharts(17), includeVideo: false,
+      });
+      await waitForJob(ids[0], (job) => job.status === "ready");
+      useDownloadsStore.getState().saveArchive(ids[0], 0);
+      useDownloadsStore.getState().confirmSavedBatch(ids[0]);
+      await waitForJob(ids[1], (job) => job.status === "error");
+      await waitForJob(ids[2], (job) => job.status === "ready");
+      expect(useDownloadsStore.getState().history).toEqual([]);
+      expect(persistedSelections.get(id)?.completedJobIds).not.toContain(ids[1]);
+      useDownloadsStore.getState().saveArchive(ids[2], 0);
+      useDownloadsStore.getState().confirmSavedBatch(ids[2]);
+      globalThis.fetch = successfulFetch;
+      useDownloadsStore.getState().resume(ids[1]);
+      await waitForJob(ids[1], (job) => job.status === "ready");
+      await waitForCondition(() => useDownloadsStore.getState().history.length === 1 && persistedSelections.size === 0);
+      expect(useDownloadsStore.getState().history[0].fileCount).toBe(17);
+    });
+  });
+
+  test("hydrate repairs an all-completed cohort once after a crash before history cleanup", async () => {
+    const job = legacyBatch("completed-selection");
+    const selection = { id: job.id, job, jobIds: ["released-part0", "released-part1"], completedJobIds: ["released-part0", "released-part1"] };
+    persistedSelections.set(selection.id, selection);
+    persistedHistory.set(`selection:${selection.id}`, { key: `selection:${selection.id}`, job, finishedAt: 1, fileCount: job.files.length });
+    useDownloadsStore.getState().hydrateFromStorage();
+    await waitForCondition(() => useDownloadsStore.getState().history.length === 1 && persistedSelections.size === 0);
+    expect(useDownloadsStore.getState().history[0].key).toBe(`selection:${selection.id}`);
+    expect(persistedHistory.size).toBe(1);
+    resetDownloadQueueForTests();
+    useDownloadsStore.setState({ jobs: [], history: [] });
+    useDownloadsStore.getState().hydrateFromStorage();
+    await waitForCondition(() => useDownloadsStore.getState().history.length === 1);
+    expect(persistedHistory.size).toBe(1);
+  });
+
+  test("unknown mobile chart sizes get standalone groups without counting excluded BGA", async () => {
+    await onMobile(async () => {
+      const charts = measuredCharts(4);
+      charts[0].files.push({ name: "pv.mp4", url: "https://example.test/0/pv.mp4", bytes: undefined! });
+      charts[1].files[0].bytes = undefined!;
+      const ids = useDownloadsStore.getState().startBatch({
+        id: newBatchJobId(), title: "Mixed sizes", charts, includeVideo: false,
+      });
+      expect(ids.map((id) => useDownloadsStore.getState().jobs.find((job) => job.id === id)?.total)).toEqual([1, 1, 2]);
+      expect(ids.map((id) => useDownloadsStore.getState().jobs.find((job) => job.id === id)?.mobileMemoryWarning)).toEqual([undefined, "unknown-size", undefined]);
+      expect(useDownloadsStore.getState().jobs.every((job) => !job.mobileLegacyBatch)).toBe(true);
+    });
+  });
+
+  test("more than eight mobile parts make one original-selection history entry only when all finish", async () => {
+    await onMobile(async () => {
+      const id = newBatchJobId();
+      const ids = useDownloadsStore.getState().startBatch({
+        id, title: "Whole selection", charts: measuredCharts(72), includeVideo: false, format: "zip",
+      });
+      expect(ids).toHaveLength(9);
+      for (const [index, childId] of ids.entries()) {
+        await waitForJob(childId, (job) => job.status === "ready");
+        if (index < ids.length - 1) expect(useDownloadsStore.getState().history).toEqual([]);
+        expect(useDownloadsStore.getState().saveArchive(childId, 0)).toBe(true);
+        expect(useDownloadsStore.getState().confirmSavedBatch(childId)).toBe(true);
+      }
+      await waitForCondition(() => useDownloadsStore.getState().history.length === 1 && persistedSelections.size === 0 && persistedJobs.size === 0);
+      const [entry] = useDownloadsStore.getState().history;
+      expect(entry.job.id).toBe(id);
+      expect(entry.job.title).toBe("Whole selection");
+      expect(entry.fileCount).toBe(72);
+      expect(entry.job.files).toHaveLength(72);
+      expect(entry.job.files.every((file) => file.bytes === 3)).toBe(true);
+      expect(entry.job.dirByIndex).toEqual(measuredCharts(72).map((chart) => chart.dir));
+      expect(entry.job.groupByIndex).toEqual(Array(72).fill("maimai"));
+      expect(entry.job.batchSelectionId).toBeUndefined();
+      expect(useDownloadsStore.getState().jobs.every((job) => job.savedArchiveInfo?.archiveCount === 1 && !job.archives)).toBe(true);
+    });
+  });
+
+  test("selection completion survives reload after a completed child cache was released", async () => {
+    await onMobile(async () => {
+      const id = newBatchJobId();
+      const ids = useDownloadsStore.getState().startBatch({
+        id, title: "Reload selection", charts: measuredCharts(17), includeVideo: false,
+      });
+      await waitForJob(ids[0], (job) => job.status === "ready");
+      useDownloadsStore.getState().pause(ids[1]);
+      useDownloadsStore.getState().pause(ids[2]);
+      useDownloadsStore.getState().saveArchive(ids[0], 0);
+      useDownloadsStore.getState().confirmSavedBatch(ids[0]);
+      await waitForCondition(() => !persistedJobs.has(ids[0]) && persistedSelections.get(id)?.completedJobIds.includes(ids[0]) === true);
+      resetDownloadQueueForTests();
+      useDownloadsStore.setState({ jobs: [], history: [] });
+      useDownloadsStore.getState().hydrateFromStorage();
+      await waitForCondition(() => useDownloadsStore.getState().jobs.length === 2);
+      expect(useDownloadsStore.getState().jobs.every((job) => !job.mobileLegacyBatch)).toBe(true);
+      expect(useDownloadsStore.getState().history).toEqual([]);
+      for (const childId of ids.slice(1)) {
+        useDownloadsStore.getState().resume(childId);
+        await waitForJob(childId, (job) => job.status === "ready");
+        useDownloadsStore.getState().saveArchive(childId, 0);
+        useDownloadsStore.getState().confirmSavedBatch(childId);
+      }
+      await waitForCondition(() => useDownloadsStore.getState().history.length === 1 && persistedSelections.size === 0);
+      expect(useDownloadsStore.getState().history[0].fileCount).toBe(17);
+      expect(fetchedUrls).toHaveLength(17);
+    });
+  });
+
+  test("dismissing an unfinished selection child clears its cohort and cannot claim full history", async () => {
+    await onMobile(async () => {
+      const id = newBatchJobId();
+      const ids = useDownloadsStore.getState().startBatch({
+        id, title: "Canceled selection", charts: measuredCharts(17), includeVideo: false,
+      });
+      await waitForJob(ids[0], (job) => job.status === "ready");
+      useDownloadsStore.getState().dismiss(ids[1]);
+      useDownloadsStore.getState().saveArchive(ids[0], 0);
+      useDownloadsStore.getState().confirmSavedBatch(ids[0]);
+      await waitForJob(ids[2], (job) => job.status === "ready");
+      useDownloadsStore.getState().saveArchive(ids[2], 0);
+      useDownloadsStore.getState().confirmSavedBatch(ids[2]);
+      await waitForCondition(() => persistedSelections.size === 0 && persistedJobs.size === 0);
+      expect(useDownloadsStore.getState().history).toEqual([]);
+      expect(persistedHistory.size).toBe(0);
+    });
+  });
+
+  test("resuming an old mobile batch keeps its full layout and completed checkpoints", async () => {
+    await onMobile(async () => {
+      const spec = legacyBatch("legacy-resume");
+      seedWholeFiles(spec);
+      useDownloadsStore.getState().hydrateFromStorage();
+      await waitForJob(spec.id, (job) => job.status === "paused");
+      expect(useDownloadsStore.getState().jobs[0].mobileLegacyBatch).toBe(true);
+      useDownloadsStore.getState().resume(spec.id);
+      await waitForJob(spec.id, (job) => job.status === "ready");
+      expect(useDownloadsStore.getState().jobs).toHaveLength(1);
+      expect(fetchedUrls).toEqual([]);
+      expect(persistedJobs.get(spec.id)).toMatchObject({ id: spec.id, files: spec.files });
+      expect([...persistedFiles.values()]).toHaveLength(2);
+    });
+  });
+
+  test("explicit legacy restart replaces once and waits for old cache cleanup before fetching", async () => {
+    await onMobile(async () => {
+      const spec = legacyBatch("legacy-restart");
+      seedWholeFiles(spec);
+      useDownloadsStore.getState().hydrateFromStorage();
+      await waitForJob(spec.id, (job) => job.status === "paused");
+      let release!: () => void;
+      const cleanup = new Promise<void>((resolve) => { release = resolve; });
+      setDownloadsPersistenceAdapterForTests({ ...memoryPersistence, deleteJob: async (id) => {
+        if (id === spec.id) await cleanup;
+        await memoryPersistence.deleteJob(id);
+      } });
+      try {
+        const ids = useDownloadsStore.getState().restartLegacyBatch(spec.id);
+        expect(ids).toHaveLength(2);
+        expect(useDownloadsStore.getState().restartLegacyBatch(spec.id)).toEqual([]);
+        expect(useDownloadsStore.getState().jobs.some((job) => job.id === spec.id)).toBe(false);
+        expect(useDownloadsStore.getState().jobs.every((job) => !job.mobileLegacyBatch)).toBe(true);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(fetchedUrls).toEqual([]);
+        release();
+        await waitForJob(ids[0], (job) => job.status === "ready");
+        expect(fetchedUrls).toHaveLength(1);
+        expect(persistedJobs.has(spec.id)).toBe(false);
+        expect([...persistedFiles.values()].some((file) => file.jobId === spec.id)).toBe(false);
+      } finally { release(); }
+    });
+  });
+
+  test("explicit legacy restart preserves a deleted custom route snapshot", async () => {
+    await onMobile(async () => {
+      const baseUrl = "https://deleted.example.test/charts";
+      const spec: PersistedJob = { ...legacyBatch("legacy-custom-restart"), sourceId: "custom:deleted", sourceName: "Old mirror", sourceBaseUrl: baseUrl,
+        files: legacyBatch("unused").files.map((file, index) => ({ ...file, url: `${baseUrl}/25/${index}/track.mp3` })) };
+      seedWholeFiles(spec);
+      useDownloadsStore.getState().hydrateFromStorage();
+      await waitForJob(spec.id, (job) => job.status === "paused");
+      const ids = useDownloadsStore.getState().restartLegacyBatch(spec.id);
+      await waitForJob(ids[0], (job) => job.status === "ready");
+      expect(useDownloadsStore.getState().jobs.every((job) => job.sourceId === "custom:deleted" && job.sourceBaseUrl === baseUrl && job.sourceName === "Old mirror")).toBe(true);
+      expect(fetchedUrls).toEqual([`${baseUrl}/25/0/track.mp3`]);
+    });
+  });
+  test("mobile batches retain save retries and fetch the next small group only after explicit dismissal", async () => {
+    const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
+      userAgent: "Mozilla/5.0 (iPhone)", onLine: true,
+    } });
+    let releaseCleanup: (() => void) | undefined;
+    try {
+      const revokedUrls: string[] = [];
+      URL.revokeObjectURL = (url) => { revokedUrls.push(url); };
+      const charts = Array.from({ length: 18 }, (_, index) => ({
+        dir: `Song ${index}`, groupDir: "maimai",
+        files: [{ name: "track.mp3", url: `https://example.test/${index}/track.mp3`, bytes: 3 }],
+      }));
+      const ids = useDownloadsStore.getState().startBatch({
+        id: newBatchJobId(), title: "Collection", charts, includeVideo: false,
+      });
+      expect(ids).toHaveLength(3);
+      await waitForJob(ids[0], (job) => job.status === "ready");
+      expect(fetchedUrls).toHaveLength(8);
+      expect(useDownloadsStore.getState().confirmSavedBatch(ids[0])).toBe(false);
+      expect(useDownloadsStore.getState().jobs.find((job) => job.id === ids[1])?.status).toBe("queued");
+      expect(useDownloadsStore.getState().saveArchive(ids[0], 0)).toBe(true);
+      expect(useDownloadsStore.getState().saveArchive(ids[0], 0)).toBe(true);
+      expect(revokedUrls).toHaveLength(0);
+      expect(fetchedUrls).toHaveLength(8);
+      expect(useDownloadsStore.getState().jobs.find((job) => job.id === ids[1])?.status).toBe("queued");
+      const cleanupPending = new Promise<void>((resolve) => { releaseCleanup = resolve; });
+      setDownloadsPersistenceAdapterForTests({
+        ...memoryPersistence,
+        deleteJob: async (id) => {
+          if (id === ids[0]) await cleanupPending;
+          await memoryPersistence.deleteJob(id);
+        },
+      });
+      expect(useDownloadsStore.getState().confirmSavedBatch(ids[0])).toBe(true);
+      expect(revokedUrls).toHaveLength(2);
+      expect(useDownloadsStore.getState().jobs.find((job) => job.id === ids[0])?.status).toBe("success");
+      expect(useDownloadsStore.getState().jobs.find((job) => job.id === ids[0])?.archives).toBeUndefined();
+      expect(useDownloadsStore.getState().jobs.find((job) => job.id === ids[0])?.savedArchiveInfo).toEqual({
+        fileNames: ["Collection (1).adx"], archiveCount: 1, format: "adx",
+      });
+      expect(useDownloadsStore.getState().jobs.find((job) => job.id === ids[0])?.completed).toBe(8);
+      await new Promise<void>((resolve) => setTimeout(resolve, 20));
+      expect(fetchedUrls).toHaveLength(8);
+      releaseCleanup?.();
+      await waitForJob(ids[1], (job) => job.status === "ready");
+      expect(fetchedUrls).toHaveLength(16);
+      expect([...persistedFiles.values()].filter((file) => file.jobId === ids[0])).toHaveLength(0);
+      expect(useDownloadsStore.getState().saveArchive(ids[1], 0)).toBe(true);
+      expect(useDownloadsStore.getState().confirmSavedBatch(ids[1])).toBe(true);
+      await waitForJob(ids[2], (job) => job.status === "ready");
+      expect(fetchedUrls).toHaveLength(18);
+      expect(useDownloadsStore.getState().saveArchive(ids[2], 0)).toBe(true);
+      expect(useDownloadsStore.getState().saveArchive(ids[2], 0)).toBe(true);
+      expect(fetchedUrls).toHaveLength(18);
+      const archives = await savedArchives();
+      expect(Object.keys(archives)).toEqual(["Collection (1).adx", "Collection (2).adx", "Collection (3).adx"]);
+      expect(Object.values(archives).flat()).toHaveLength(18);
+      expect(Object.values(archives).flat()).toContain("maimai/Song 17/track.mp3");
+    } finally {
+      releaseCleanup?.();
+      for (const job of useDownloadsStore.getState().jobs) useDownloadsStore.getState().dismiss(job.id);
+      if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator);
+      else delete (globalThis as Record<string, unknown>).navigator;
+    }
+  });
+
+  test("mobile downloads have one active job and at most two file requests", async () => {
+    const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
+      userAgent: "Mozilla/5.0 (Android)", onLine: true,
+    } });
+    let active = 0;
+    let peak = 0;
+    globalThis.fetch = (async (input) => {
+      fetchedUrls.push(String(input));
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise<void>((resolve) => setTimeout(resolve, 5));
+      active -= 1;
+      return new Response(new Uint8Array([1]), { headers: { "content-length": "1" } });
+    }) as typeof fetch;
+    try {
+      const charts = Array.from({ length: 4 }, (_, index) => ({
+        dir: `Song ${index}`, groupDir: index < 2 ? "one" : "two",
+        files: ["track.mp3", "bg.png", "pv.mp4"].map((name) => ({
+          name, url: `https://example.test/${index}/${name}`, bytes: 1,
+        })),
+      }));
+      const ids = useDownloadsStore.getState().startBatch({
+        id: newBatchJobId(), title: "Concurrency", charts, includeVideo: true,
+      });
+      await waitForJob(ids[0], (job) => job.status === "ready");
+      expect(peak).toBe(2);
+      expect(fetchedUrls).toHaveLength(6);
+      expect(useDownloadsStore.getState().jobs.find((job) => job.id === ids[1])?.status).toBe("queued");
+      useDownloadsStore.getState().saveArchive(ids[0], 0);
+      useDownloadsStore.getState().confirmSavedBatch(ids[0]);
+      await waitForJob(ids[1], (job) => job.status === "ready");
+      expect(peak).toBe(2);
+      expect(fetchedUrls).toHaveLength(12);
+    } finally {
+      for (const job of useDownloadsStore.getState().jobs) useDownloadsStore.getState().dismiss(job.id);
+      if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator);
+      else delete (globalThis as Record<string, unknown>).navigator;
+    }
+  });
+
+  test("rerunning a legacy large batch from mobile history uses the same small-group policy", async () => {
+    const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
+      userAgent: "Mozilla/5.0 (iPhone)", onLine: true,
+    } });
+    try {
+      useDownloadsStore.setState({ history: [{
+        key: "legacy-history", finishedAt: 1, fileCount: 18,
+        job: {
+          id: "old-large-batch", kind: "batch", title: "Old collection", format: "zip", createdAt: 1,
+          files: Array.from({ length: 18 }, (_, index) => ({
+            name: `${index}/track.mp3`, url: `https://example.test/${index}/track.mp3`,
+          })),
+          dirByIndex: Array.from({ length: 18 }, (_, index) => `Song ${index}`),
+          groupByIndex: Array.from({ length: 18 }, () => "maimai"),
+        },
+      }] });
+      useDownloadsStore.getState().rerunHistoryEntry("legacy-history");
+      const jobs = useDownloadsStore.getState().jobs;
+      expect(jobs.map((job) => job.total)).toEqual(Array(18).fill(1));
+      expect(jobs.every((job) => job.mobileMemoryWarning === "unknown-size")).toBe(true);
+      expect(jobs.every((job) => job.id !== "old-large-batch" && job.mobileBatch)).toBe(true);
+      await waitForJob(jobs[0].id, (job) => job.status === "ready");
+      useDownloadsStore.getState().saveArchive(jobs[0].id, 0);
+      const archives = await savedArchives();
+      expect(Object.keys(archives)).toEqual(["Old collection (1).zip"]);
+      expect(archives["Old collection (1).zip"]).toEqual(["maimai/Song 0/track.mp3"]);
+      expect(fetchedUrls).toHaveLength(1);
+    } finally {
+      for (const job of useDownloadsStore.getState().jobs) useDownloadsStore.getState().dismiss(job.id);
+      if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator);
+      else delete (globalThis as Record<string, unknown>).navigator;
+    }
+  });
+
+  test("mobile grouping uses measured bytes excluding BGA and keeps oversized single charts whole", async () => {
+    const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
+      userAgent: "Mozilla/5.0 (Android)", onLine: true,
+    } });
+    try {
+      const charts = [80, 40, 160, 1].map((mib, index) => ({
+        dir: `Song ${index}`, groupDir: "maimai",
+        files: [
+          { name: "track.mp3", url: `https://example.test/${index}/track.mp3`, bytes: mib * 1024 ** 2 },
+          { name: "pv.mp4", url: `https://example.test/${index}/pv.mp4`, bytes: 512 * 1024 ** 2 },
+        ],
+      }));
+      const ids = useDownloadsStore.getState().startBatch({
+        id: newBatchJobId(), title: "Bytes", charts, includeVideo: false,
+      });
+      expect(ids).toHaveLength(3);
+      expect(ids.map((id) => persistedJobs.get(id)?.files.length ??
+        useDownloadsStore.getState().jobs.find((job) => job.id === id)?.total)).toEqual([2, 1, 1]);
+      expect(useDownloadsStore.getState().jobs.every((job) => job.mobileBatch)).toBe(true);
+      expect(useDownloadsStore.getState().jobs.find((job) => job.id === ids[1])?.mobileMemoryWarning).toBe("oversized-chart");
+    } finally {
+      for (const job of useDownloadsStore.getState().jobs) useDownloadsStore.getState().dismiss(job.id);
+      if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator);
+      else delete (globalThis as Record<string, unknown>).navigator;
+    }
+  });
+
+  test("completed history preserves measured bytes while canonicalizing mirrors for mobile replay", async () => {
+    const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
+      userAgent: "Mozilla/5.0 (Macintosh)", onLine: true,
+    } });
+    try {
+      const id = newBatchJobId();
+      const charts = [0, 1].map((index) => ({
+        dir: `Song ${index}`, groupDir: "maimai",
+        files: [{ name: "track.mp3", bytes: 80 * 1024 ** 2,
+          url: `https://astrodx-charts.saop.cc/25/${index}/track.mp3` }],
+      }));
+      useDownloadsStore.getState().startBatch({
+        id, title: "Measured history", charts, sourceId: "g510", includeVideo: false, format: "zip",
+      });
+      await waitForSettled(id);
+      await waitForCondition(() => useDownloadsStore.getState().history.length > 0);
+      const [entry] = useDownloadsStore.getState().history;
+      expect(entry!.job.files.map((file) => file.url)).toEqual(charts.map((chart) => chart.files[0].url));
+      Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
+        userAgent: "Mozilla/5.0 (iPhone)", onLine: true,
+      } });
+      useDownloadsStore.getState().rerunHistoryEntry(entry!.key);
+      const replays = useDownloadsStore.getState().jobs.filter((job) => job.id !== id);
+      expect(replays.map((job) => job.total)).toEqual([1, 1]);
+      expect(entry!.job.files.map((file) => file.bytes)).toEqual([80 * 1024 ** 2, 80 * 1024 ** 2]);
+      expect(replays.map((job) => job.title)).toEqual(["Measured history (1)", "Measured history (2)"]);
+    } finally {
+      for (const job of useDownloadsStore.getState().jobs) useDownloadsStore.getState().dismiss(job.id);
+      if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator);
+      else delete (globalThis as Record<string, unknown>).navigator;
+    }
+  });
+
   test("a mobile archive can be rebuilt after reload without fetching its completed files again", async () => {
     const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
     Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
@@ -274,7 +766,7 @@ describe("downloads-store", () => {
         persistedFiles.set(`${id}::${name}`, {
           key: `${id}::${name}`, jobId: id, name, url, blob, size: blob.size, complete: true,
         });
-        return { dir, genreDir: "maimai", groupDir: "v1", files: [{ name: "track.mp3", url }] };
+        return { dir, genreDir: "maimai", groupDir: "v1", files: [{ name: "track.mp3", url, bytes: 1 }] };
       });
       const ids = useDownloadsStore.getState().startBatch({
         id, title: "maimai", includeVideo: false, format: "zip", grouping: "genre", charts,
@@ -327,12 +819,14 @@ describe("downloads-store", () => {
     persistedJobs.clear();
     persistedFiles.clear();
     persistedHistory.clear();
+    persistedSelections.clear();
     setDownloadsPersistenceAdapterForTests(memoryPersistence);
     setDownloadRetryBaseDelayForTests(1);
     resetDownloadQueueForTests();
     resetPackableAliasIndexForTests();
     useDownloadsStore.setState({
       jobs: [],
+      history: [],
       presented: {},
       selectedSourceId: "r2",
       customSources: [],

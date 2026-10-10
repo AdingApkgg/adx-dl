@@ -57,7 +57,7 @@ export function getArchiveDownloadFileName(
   return `${trimmed}.${format}`;
 }
 
-export function saveBlobAsFile(blob: Blob, fileName: string): void {
+export function saveBlobAsFile(blob: Blob, fileName: string): () => void {
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
 
@@ -67,9 +67,12 @@ export function saveBlobAsFile(blob: Blob, fileName: string): void {
   document.body.appendChild(anchor);
   // Some mobile download managers resolve the URL after the click task has
   // returned. Revoking in a microtask races that handoff, especially for blobs.
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const cleanup = (): void => {
     anchor.remove();
     URL.revokeObjectURL(objectUrl);
+    if (timer !== undefined) clearTimeout(timer);
+    timer = undefined;
   };
   try {
     anchor.click();
@@ -77,9 +80,10 @@ export function saveBlobAsFile(blob: Blob, fileName: string): void {
     cleanup();
     throw error;
   }
-  const timer = setTimeout(cleanup, 60_000);
+  timer = setTimeout(cleanup, 60_000);
   // Node/Bun test runners must not stay alive just for browser URL cleanup.
   if (typeof timer === "object" && "unref" in timer) timer.unref();
+  return cleanup;
 }
 
 /** Mobile browsers need a fresh user gesture after an asynchronous pack. */

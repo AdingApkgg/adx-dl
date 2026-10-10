@@ -18,13 +18,25 @@ export type PersistedJob = {
   /** Custom route label snapshot, retained after the configured route is renamed/deleted. */
   sourceName?: string;
   /** The flat fetch list. For batch, `name` carries the `${index}/...` prefix. */
-  files: { name: string; url: string }[];
+  files: { name: string; url: string; bytes?: number }[];
   /** Single-chart jobs: optional version folder above the chart folder. */
   groupDir?: string;
   /** Batch only: maps the numeric index prefix back to a chart directory name. */
   dirByIndex?: string[];
   /** Batch only: optional grouping folder for each chart, e.g. a version name. */
   groupByIndex?: string[];
+  /** Small mobile grouping policy; absent on older checkpoints. */
+  mobileBatchPolicyVersion?: 1;
+  /** Entire selection whose history entry this child contributes to. */
+  batchSelectionId?: string;
+};
+
+/** Metadata only: completed children may have already released their Blob checkpoints. */
+export type PersistedBatchSelection = {
+  id: string;
+  job: PersistedJob;
+  jobIds: string[];
+  completedJobIds: string[];
 };
 
 export type PersistedFile = {
@@ -67,14 +79,18 @@ export type DownloadsPersistenceAdapter = {
   /** Appends one completion and trims the store back to MAX_DOWNLOAD_HISTORY. */
   recordHistory: (entry: DownloadHistoryEntry) => Promise<void>;
   clearHistory: () => Promise<void>;
+  persistBatchSelection: (selection: PersistedBatchSelection) => Promise<void>;
+  loadBatchSelections: () => Promise<PersistedBatchSelection[]>;
+  deleteBatchSelection: (id: string) => Promise<void>;
 };
 
 const DB_NAME = "astrodx-downloads";
-// v2 adds the completed-download history store.
-const DB_VERSION = 2;
+// v3 adds whole-selection progress without duplicating any file Blobs.
+const DB_VERSION = 3;
 const JOBS = "jobs";
 const FILES = "files";
 const HISTORY = "history";
+const SELECTIONS = "selections";
 
 /**
  * Newest-first cap. The list exists to repeat "the batch I just did", not to be
@@ -83,7 +99,8 @@ const HISTORY = "history";
  */
 export const MAX_DOWNLOAD_HISTORY = 8;
 
-type CheckpointFailureListener = (kind: "quota" | "unknown") => void;
+export type CheckpointFailureKind = "quota" | "unknown" | "blocked";
+type CheckpointFailureListener = (kind: CheckpointFailureKind) => void;
 const checkpointFailureListeners = new Set<CheckpointFailureListener>();
 
 /**
@@ -107,48 +124,80 @@ export function classifyStorageError(error: unknown): "quota" | "unknown" {
   return name === "QuotaExceededError" || /quota/i.test(message) ? "quota" : "unknown";
 }
 
-function reportCheckpointFailure(error: unknown): void {
-  const kind = classifyStorageError(error);
+function reportCheckpointFailure(error: unknown, kind: CheckpointFailureKind = classifyStorageError(error)): void {
   for (const listener of [...checkpointFailureListeners]) {
     listener(kind);
   }
 }
 
-let dbPromise: Promise<IDBDatabase | null> | null = null;
-
-function openDb(): Promise<IDBDatabase | null> {
-  if (typeof indexedDB === "undefined") {
-    return Promise.resolve(null);
-  }
-  if (dbPromise) {
-    return dbPromise;
-  }
-  dbPromise = new Promise((resolve) => {
-    let request: IDBOpenDBRequest;
-    try {
-      request = indexedDB.open(DB_NAME, DB_VERSION);
-    } catch {
-      resolve(null);
-      return;
-    }
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(JOBS)) {
-        db.createObjectStore(JOBS, { keyPath: "id" });
+/** Narrow factory seam keeps connection lifecycle tests independent of browser globals. */
+export function createDownloadsDatabaseOpener(
+  getFactory: () => Pick<IDBFactory, "open"> | null
+): () => Promise<IDBDatabase | null> {
+  let dbPromise: Promise<IDBDatabase | null> | null = null;
+  return function openDb(): Promise<IDBDatabase | null> {
+    const factory = getFactory();
+    if (!factory) return Promise.resolve(null);
+    if (dbPromise) return dbPromise;
+    const pending = new Promise<IDBDatabase | null>((resolve) => {
+      let request: IDBOpenDBRequest;
+      let settled = false;
+      try {
+        request = factory.open(DB_NAME, DB_VERSION);
+      } catch {
+        resolve(null);
+        return;
       }
-      if (!db.objectStoreNames.contains(FILES)) {
-        const store = db.createObjectStore(FILES, { keyPath: "key" });
-        store.createIndex("jobId", "jobId", { unique: false });
-      }
-      if (!db.objectStoreNames.contains(HISTORY)) {
-        db.createObjectStore(HISTORY, { keyPath: "key" });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => resolve(null);
-  });
-  return dbPromise;
+      request.onblocked = () => {
+        if (settled) return;
+        settled = true;
+        // An older tab can block indefinitely. Downloads in this page must
+        // continue without checkpoints rather than waiting for that tab.
+        resolve(null);
+        reportCheckpointFailure(null, "blocked");
+      };
+      request.onupgradeneeded = () => {
+        if (settled) {
+          request.transaction?.abort();
+          return;
+        }
+        const db = request.result;
+        if (!db.objectStoreNames.contains(JOBS)) db.createObjectStore(JOBS, { keyPath: "id" });
+        if (!db.objectStoreNames.contains(FILES)) {
+          const store = db.createObjectStore(FILES, { keyPath: "key" });
+          store.createIndex("jobId", "jobId", { unique: false });
+        }
+        if (!db.objectStoreNames.contains(HISTORY)) db.createObjectStore(HISTORY, { keyPath: "key" });
+        if (!db.objectStoreNames.contains(SELECTIONS)) db.createObjectStore(SELECTIONS, { keyPath: "id" });
+      };
+      request.onsuccess = () => {
+        const connection = request.result;
+        if (settled) {
+          // Closing the older tab may complete this request much later. Keep
+          // this page's null result consistent and avoid leaking a connection.
+          connection.close();
+          return;
+        }
+        settled = true;
+        connection.onversionchange = () => {
+          connection.close();
+          if (dbPromise === pending) dbPromise = null;
+        };
+        resolve(connection);
+      };
+      request.onerror = () => {
+        settled = true;
+        resolve(null);
+      };
+    });
+    // A blocked request retains null for this page's lifetime. Only a normal
+    // connection's versionchange clears the cache to allow a fresh open.
+    dbPromise = pending;
+    return pending;
+  };
 }
+
+const openDb = createDownloadsDatabaseOpener(() => typeof indexedDB === "undefined" ? null : indexedDB);
 
 function promisifyTx(tx: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -217,6 +266,69 @@ export function normalizePersistedFile(value: unknown): PersistedFile | null {
     size: blob.size,
     blob,
   };
+}
+
+/** Reject incomplete/corrupt cohort metadata and keep only lightweight spec fields. */
+export function normalizePersistedBatchSelection(value: unknown): PersistedBatchSelection | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const raw = record.job as Record<string, unknown> | undefined;
+  const jobIds = record.jobIds;
+  const completedJobIds = record.completedJobIds;
+  const strings = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === "string");
+  if (typeof record.id !== "string" || !raw || typeof raw !== "object" ||
+    raw.id !== record.id || raw.kind !== "batch" || typeof raw.title !== "string" ||
+    typeof raw.format !== "string" || typeof raw.createdAt !== "number" ||
+    !Number.isFinite(raw.createdAt) || !Array.isArray(raw.files) || raw.files.length === 0 ||
+    !strings(jobIds) || jobIds.length === 0 || !strings(completedJobIds) ||
+    completedJobIds.some((id) => !jobIds.includes(id)) ||
+    (raw.dirByIndex !== undefined && !strings(raw.dirByIndex)) ||
+    (raw.groupByIndex !== undefined && !strings(raw.groupByIndex))) return null;
+  const files: PersistedJob["files"] = [];
+  for (const value of raw.files) {
+    if (!value || typeof value !== "object" || typeof value.name !== "string" || typeof value.url !== "string" ||
+      (value.bytes !== undefined && (typeof value.bytes !== "number" || !Number.isFinite(value.bytes) || value.bytes < 0))) return null;
+    files.push({ name: value.name, url: value.url, ...(value.bytes !== undefined ? { bytes: value.bytes } : {}) });
+  }
+  const job: PersistedJob = {
+    id: record.id, kind: "batch", title: raw.title, format: raw.format, createdAt: raw.createdAt, files,
+    ...(typeof raw.sourceId === "string" ? { sourceId: raw.sourceId } : {}),
+    ...(typeof raw.sourceBaseUrl === "string" ? { sourceBaseUrl: raw.sourceBaseUrl } : {}),
+    ...(typeof raw.sourceName === "string" ? { sourceName: raw.sourceName } : {}),
+    ...(strings(raw.dirByIndex) ? { dirByIndex: [...raw.dirByIndex] } : {}),
+    ...(strings(raw.groupByIndex) ? { groupByIndex: [...raw.groupByIndex] } : {}),
+  };
+  return { id: record.id, job, jobIds: [...new Set(jobIds)], completedJobIds: [...new Set(completedJobIds)] };
+}
+
+async function indexedDbPersistBatchSelection(selection: PersistedBatchSelection): Promise<void> {
+  const db = await openDb();
+  if (!db) return;
+  try {
+    const tx = db.transaction(SELECTIONS, "readwrite");
+    tx.objectStore(SELECTIONS).put(selection);
+    await promisifyTx(tx);
+  } catch (error) { reportCheckpointFailure(error); }
+}
+
+async function indexedDbLoadBatchSelections(): Promise<PersistedBatchSelection[]> {
+  const db = await openDb();
+  if (!db) return [];
+  try {
+    const tx = db.transaction(SELECTIONS, "readonly");
+    const values = await promisifyRequest(tx.objectStore(SELECTIONS).getAll());
+    return values.map(normalizePersistedBatchSelection).filter((selection): selection is PersistedBatchSelection => selection !== null);
+  } catch { return []; }
+}
+
+async function indexedDbDeleteBatchSelection(id: string): Promise<void> {
+  const db = await openDb();
+  if (!db) return;
+  try {
+    const tx = db.transaction(SELECTIONS, "readwrite");
+    tx.objectStore(SELECTIONS).delete(id);
+    await promisifyTx(tx);
+  } catch { /* A missing record cannot make an unfinished selection complete. */ }
 }
 
 async function indexedDbPersistJob(job: PersistedJob): Promise<void> {
@@ -402,6 +514,9 @@ const indexedDbAdapter: DownloadsPersistenceAdapter = {
   loadHistory: indexedDbLoadHistory,
   recordHistory: indexedDbRecordHistory,
   clearHistory: indexedDbClearHistory,
+  persistBatchSelection: indexedDbPersistBatchSelection,
+  loadBatchSelections: indexedDbLoadBatchSelections,
+  deleteBatchSelection: indexedDbDeleteBatchSelection,
 };
 
 let activeAdapter = indexedDbAdapter;
@@ -447,6 +562,18 @@ export function recordHistory(entry: DownloadHistoryEntry): Promise<void> {
 
 export function clearHistory(): Promise<void> {
   return activeAdapter.clearHistory();
+}
+
+export function persistBatchSelection(selection: PersistedBatchSelection): Promise<void> {
+  return activeAdapter.persistBatchSelection(selection);
+}
+
+export function loadBatchSelections(): Promise<PersistedBatchSelection[]> {
+  return activeAdapter.loadBatchSelections();
+}
+
+export function deleteBatchSelection(id: string): Promise<void> {
+  return activeAdapter.deleteBatchSelection(id);
 }
 
 export function fileKey(jobId: string, name: string): string {

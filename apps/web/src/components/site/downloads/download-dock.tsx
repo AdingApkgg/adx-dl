@@ -34,7 +34,7 @@ import { cn } from "@astrodx/ui/lib/utils";
 import { DownloadSourceMenu, DownloadSourceSummary } from "./download-source-selector";
 import { useWakeLock } from "@/components/chart-preview/hooks/use-wake-lock";
 import { jobPercent, useDownloadsStore } from "./downloads-store";
-import { DownloadJobNotes, DownloadJobStatusLine } from "./download-job-notes";
+import { DownloadJobNotes, DownloadJobStatusLine, DownloadStorageNotice } from "./download-job-notes";
 import { DownloadHistoryList } from "./download-history";
 
 /**
@@ -226,9 +226,6 @@ export function DownloadDock({ locale }: { locale: Locale }) {
   const refreshSourceProbes = useDownloadsStore((state) => state.refreshSourceProbes);
   const resumeInterrupted = useDownloadsStore((state) => state.resumeInterrupted);
   const history = useDownloadsStore((state) => state.history);
-  const checkpointsUnavailable = useDownloadsStore(
-    (state) => state.checkpointsUnavailable
-  );
   const [collapsed, setCollapsed] = React.useState(false);
   const [historyOpen, setHistoryOpen] = React.useState(false);
 
@@ -358,8 +355,8 @@ export function DownloadDock({ locale }: { locale: Locale }) {
           incoming one measures its final box and the shared layoutId can morph
           cleanly between the two shapes. */}
       <AnimatePresence initial={false} mode="popLayout">
-        {visible.length > 0 ? (
-          collapsed ? (
+        {visible.length > 0 || history.length > 0 ? (
+          collapsed || (visible.length === 0 && !historyOpen) ? (
             <motion.button
               key="tray-collapsed"
               layoutId="download-tray"
@@ -371,14 +368,20 @@ export function DownloadDock({ locale }: { locale: Locale }) {
               // borderRadius lives in style so the pill↔panel morph animates it.
               style={{ borderRadius: 20, scale: trayScale }}
               whileTap={{ scale: 0.92 }}
-              onClick={() => setCollapsed(false)}
-              aria-label={tray.expand}
+              onClick={() => {
+                setCollapsed(false);
+                if (visible.length === 0) setHistoryOpen(true);
+              }}
+              aria-label={visible.length > 0 ? tray.expand : tray.historyTitle}
               className="pointer-events-auto relative isolate flex items-center gap-2 border border-border/70 bg-popover/95 px-3 py-2 text-xs font-medium shadow-lg ring-1 ring-foreground/5"
             >
               {/* Blur on a child, not the morphing element, so it doesn't smear mid-morph. */}
               <span aria-hidden="true" className="absolute inset-0 -z-10 rounded-[inherit] backdrop-blur" />
-              <DownloadIcon className="size-3.5" />
-              <RollingNumber value={visible.length} format={tray.jobsCount} />
+              {visible.length > 0 ? (
+                <><DownloadIcon className="size-3.5" /><RollingNumber value={visible.length} format={tray.jobsCount} /></>
+              ) : (
+                <><HistoryIcon className="size-3.5" />{tray.historyTitle}</>
+              )}
               {activeCount > 0 ? (
                 <RollingNumber
                   value={aggregatePercent}
@@ -426,11 +429,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                   {tray.autoResumed(resumedCount)}
                 </p>
               ) : null}
-              {checkpointsUnavailable ? (
-                <p className="rounded-md bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-800 dark:text-amber-300">
-                  {tray.checkpointsUnavailable}
-                </p>
-              ) : null}
+              <DownloadStorageNotice locale={locale} />
               {/* overscroll-contain keeps a flick at either end inside the tray
                   instead of scrolling the page underneath it. */}
               <ul className="relative flex max-h-[50vh] touch-pan-y flex-col gap-2 overflow-y-auto overscroll-contain">
@@ -441,6 +440,8 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                     // A queued job can be pulled out of the queue with the same
                     // pause control, before it ever opens a connection.
                     const active = job.status === "packing" || job.status === "queued";
+                    const canDismissImmediately = job.status === "success" &&
+                      !(job.mobileBatch && job.archives?.length);
 
                     return (
                       <motion.li
@@ -452,13 +453,13 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                         transition={{ ...springSoft, opacity: { duration: 0.2, ease: EASE_OUT } }}
                         // Completed rows can also be swiped away; the X button
                         // stays as the accessible path.
-                        drag={job.status === "success" ? "x" : false}
+                        drag={canDismissImmediately ? "x" : false}
                         dragDirectionLock
                         dragConstraints={{ left: 0, right: 0 }}
                         dragElastic={{ left: 0.08, right: 0.7 }}
                         onDragEnd={(_, info) => {
                           if (
-                            job.status === "success" &&
+                            canDismissImmediately &&
                             (info.offset.x > 72 || info.velocity.x > 600)
                           ) {
                             dismiss(job.id);
@@ -559,7 +560,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                                   <PauseIcon className="size-3.5" />
                                 </motion.button>
                               ) : null}
-                              {job.status === "success" ? (
+                              {canDismissImmediately ? (
                                 <motion.button
                                   type="button"
                                   whileTap={{ scale: 0.92 }}
@@ -610,7 +611,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                     type="button"
                     onClick={() => setHistoryOpen((open) => !open)}
                     aria-expanded={historyOpen}
-                    className="inline-flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    className="inline-flex min-h-11 w-full items-center gap-1.5 rounded-md px-1 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   >
                     <HistoryIcon className="size-3" aria-hidden="true" />
                     {tray.historyTitle}

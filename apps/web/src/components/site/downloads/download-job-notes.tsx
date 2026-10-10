@@ -9,8 +9,21 @@ import { downloadJobMetricsText, downloadJobStateText } from "./download-status-
 import { getDownloadSource } from "@/lib/download-sources";
 import { useDownloadsStore, type DownloadJob } from "./downloads-store";
 import { formatBytes } from "./format-bytes";
+import { DownloadImportGuide } from "./download-import-guide";
 
 type Dictionary = ReturnType<typeof getDictionary>;
+
+export function DownloadStorageNotice({ locale }: { locale: Locale }) {
+  const unavailable = useDownloadsStore((state) => state.checkpointsUnavailable);
+  const blocked = useDownloadsStore((state) => state.checkpointsBlocked);
+  if (!unavailable && !blocked) return null;
+  const tray = getDictionary(locale).downloads;
+  return (
+    <p role="alert" className="rounded-md bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-800 dark:text-amber-300">
+      {blocked ? tray.checkpointsBlocked : tray.checkpointsUnavailable}
+    </p>
+  );
+}
 
 /**
  * The one live region per job.
@@ -112,12 +125,22 @@ export function DownloadJobNotes({
   const dictionary: Dictionary = getDictionary(locale);
   const tray = dictionary.downloads;
   const saveArchive = useDownloadsStore((state) => state.saveArchive);
+  const confirmSavedBatch = useDownloadsStore((state) => state.confirmSavedBatch);
+  const restartLegacyBatch = useDownloadsStore((state) => state.restartLegacyBatch);
+  const hasNextJob = useDownloadsStore((state) =>
+    state.jobs.some((entry) => entry.status === "queued")
+  );
   const hasArchives = Boolean(job.archives?.length);
+  const hasRequestedSave = job.archives?.some((archive) => archive.requested);
+  const savedArchiveInfo = job.savedArchiveInfo;
+  const showImportGuide = Boolean(hasRequestedSave || savedArchiveInfo);
+  const showMemoryWarning = job.mobileMemoryWarning && job.status !== "queued" && !savedArchiveInfo;
+  const showLegacyWarning = job.mobileLegacyBatch && (job.status === "paused" || job.status === "error");
   const hasSkipped = job.skippedFiles.length > 0;
   const showSwitchNotice =
     job.autoSwitchedTo !== null && job.status !== "success";
 
-  if (!hasSkipped && !showSwitchNotice && !job.errorDetail && !hasArchives) {
+  if (!hasSkipped && !showSwitchNotice && !job.errorDetail && !hasArchives && !showImportGuide && !showMemoryWarning && !showLegacyWarning) {
     return null;
   }
 
@@ -130,6 +153,23 @@ export function DownloadJobNotes({
 
   return (
     <div className="flex flex-col gap-1.5 text-[11px] leading-snug">
+      {showMemoryWarning ? (
+        <p className="rounded-md bg-amber-500/10 px-2 py-1.5 text-amber-800 dark:text-amber-300">
+          {job.mobileMemoryWarning === "unknown-size" ? tray.mobileUnknownSizeHint : tray.mobileLargeChartHint}
+        </p>
+      ) : null}
+      {showLegacyWarning ? (
+        <div className="flex flex-col gap-1.5 rounded-md bg-amber-500/10 px-2 py-1.5 text-amber-800 dark:text-amber-300">
+          <p>{tray.mobileLegacyBatchHint}</p>
+          <button
+            type="button"
+            onClick={() => restartLegacyBatch(job.id)}
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-current px-2 py-1.5 font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            {tray.mobileRestartBatch}
+          </button>
+        </div>
+      ) : null}
       {hasArchives ? (
         <>
           <ul className="flex max-h-40 flex-col gap-1 overflow-y-auto overscroll-contain">
@@ -150,7 +190,27 @@ export function DownloadJobNotes({
             ))}
           </ul>
           <p className="text-muted-foreground">{tray.saveHint}</p>
+          {job.mobileBatch && job.status === "success" ? (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-muted-foreground">{tray.confirmSavedBatchHint}</p>
+              <button
+                type="button"
+                onClick={() => confirmSavedBatch(job.id)}
+                className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                {hasNextJob ? tray.confirmSavedBatch : tray.releaseSavedBatch}
+              </button>
+            </div>
+          ) : null}
         </>
+      ) : null}
+      {showImportGuide ? (
+        <DownloadImportGuide
+          locale={locale}
+          format={savedArchiveInfo?.format ?? job.format}
+          split={(savedArchiveInfo?.archiveCount ?? job.archives?.length ?? 0) > 1}
+          cacheReleased={Boolean(savedArchiveInfo)}
+        />
       ) : null}
       {showSwitchNotice ? (
         <p className="text-muted-foreground">{tray.autoSwitched(switchedName)}</p>

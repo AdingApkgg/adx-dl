@@ -52,13 +52,16 @@ import {
 } from "./download-engine";
 import {
   clearHistory,
+  deleteBatchSelection,
   deleteJob,
   fileKey,
   loadAllJobs,
+  loadBatchSelections,
   loadFilesForJob,
   loadHistory,
   MAX_DOWNLOAD_HISTORY,
   persistFile,
+  persistBatchSelection,
   persistJob,
   recordHistory,
   replaceJobKeepingCompletedFiles,
@@ -66,6 +69,7 @@ import {
   type DownloadHistoryEntry,
   type PersistedFile,
   type PersistedJob,
+  type PersistedBatchSelection,
 } from "./persistence";
 import { requestPersistentStorage } from "./storage-estimate";
 
@@ -79,6 +83,13 @@ import { requestPersistentStorage } from "./storage-estimate";
 export type DownloadJob = {
   id: string;
   kind: "single" | "batch";
+  /** Small mobile batches retain only one pending group until explicitly released. */
+  mobileBatch?: boolean;
+  /** Import instructions remain available after explicitly releasing large archive Blobs. */
+  savedArchiveInfo?: { fileNames: string[]; format: ArchiveFormat; archiveCount: number };
+  mobileMemoryWarning?: "unknown-size" | "oversized-chart";
+  /** Resume keeps old checkpoints; only an explicit restart adopts small mobile groups. */
+  mobileLegacyBatch?: boolean;
   /** Display name — the chart directory name or the batch collection name. */
   title: string;
   /** Route chosen when the job started; remains stable across pause/resume. */
@@ -162,6 +173,9 @@ type StartBatchParams = {
   includeVideo: boolean;
   format?: BatchArchiveFormat;
   sourceId?: DownloadSourceId;
+  /** Internal restart snapshot: an older custom route may no longer be configured. */
+  sourceBaseUrl?: string;
+  sourceName?: string;
   /** Folder grouping inside the archive; defaults to the stored preference. */
   grouping?: BatchGrouping;
 };
@@ -200,6 +214,8 @@ type DownloadsState = {
    * to stop making it.
    */
   checkpointsUnavailable: boolean;
+  /** An older tab prevents opening the current download cache schema. */
+  checkpointsBlocked: boolean;
   startSingle: (params: StartSingleParams) => void;
   /** Returns the queued job ids — one per version/genre group in the selection. */
   startBatch: (params: StartBatchParams) => string[];
@@ -222,6 +238,7 @@ type DownloadsState = {
   /** Keeps completed files and restarts unfinished files on another route. */
   restartWithSource: (id: string, sourceId: DownloadSourceId) => void;
   resume: (id: string) => void;
+  restartLegacyBatch: (id: string) => string[];
   /**
    * Restarts every job a lost connection left stranded. Called when the tab
    * comes back to the foreground online — a phone that backgrounded mid-batch
@@ -232,6 +249,8 @@ type DownloadsState = {
   pause: (id: string) => void;
   /** Synchronous so the download starts within the button's user gesture. */
   saveArchive: (id: string, index: number) => boolean;
+  /** User has verified every file is saved; releases this mobile batch and its URLs. */
+  confirmSavedBatch: (id: string) => boolean;
   dismiss: (id: string) => void;
   /** Queues a finished download again under a fresh job id. */
   rerunHistoryEntry: (key: string) => void;
@@ -264,13 +283,43 @@ const MIN_ETA_SPEED_BPS = 16 * 1024;
  * backoff or waiting for connectivity would otherwise stall the whole queue.
  */
 const MAX_ACTIVE_JOBS = 2;
+const MOBILE_BATCH_CHARTS = 8;
+const MOBILE_BATCH_BYTES = 128 * 1024 * 1024;
+
+function isKnownDownloadSize(bytes: number | undefined): bytes is number {
+  return typeof bytes === "number" && Number.isFinite(bytes) && bytes >= 0;
+}
+
+function mobileJobMetadata(spec: PersistedJob): Pick<DownloadJob, "mobileBatch" | "mobileLegacyBatch" | "mobileMemoryWarning"> {
+  if (spec.kind !== "batch" || !requiresManualArchiveSave()) return {};
+  if (spec.mobileBatchPolicyVersion !== 1) return { mobileBatch: true, mobileLegacyBatch: true };
+  const knownBytes = spec.files.reduce((sum, file) => sum + (isKnownDownloadSize(file.bytes) ? file.bytes : 0), 0);
+  return {
+    mobileBatch: true,
+    ...(knownBytes > MOBILE_BATCH_BYTES ? { mobileMemoryWarning: "oversized-chart" as const }
+      : spec.files.some((file) => !isKnownDownloadSize(file.bytes)) ? { mobileMemoryWarning: "unknown-size" as const } : {}),
+  };
+}
 const activeJobIds = new Set<string>();
 type SlotWaiter = { grant: () => void; cancel: () => void };
 /** FIFO, so jobs start in the order the user added them. */
 const slotWaiters: SlotWaiter[] = [];
+/** Keep the next mobile group off disk until the confirmed group's checkpoints are gone. */
+const mobileCleanupIds = new Set<string>();
+
+function activeJobLimit(): number {
+  return requiresManualArchiveSave() ? 1 : MAX_ACTIVE_JOBS;
+}
+
+function hasRetainedMobileBatch(): boolean {
+  return requiresManualArchiveSave() && (mobileCleanupIds.size > 0 || useDownloadsStore.getState().jobs.some((job) =>
+    job.mobileBatch && (job.status === "ready" || job.status === "success") &&
+    (job.archives?.length ?? 0) > 0
+  ));
+}
 
 function pumpJobQueue(): void {
-  while (activeJobIds.size < MAX_ACTIVE_JOBS && slotWaiters.length > 0) {
+  while (activeJobIds.size < activeJobLimit() && !hasRetainedMobileBatch() && slotWaiters.length > 0) {
     slotWaiters.shift()?.grant();
   }
 }
@@ -282,7 +331,7 @@ function acquireJobSlot(id: string, signal: AbortSignal): Promise<void> {
   if (signal.aborted) {
     return Promise.reject(abortReason());
   }
-  if (activeJobIds.size < MAX_ACTIVE_JOBS) {
+  if (activeJobIds.size < activeJobLimit() && !hasRetainedMobileBatch()) {
     activeJobIds.add(id);
     return Promise.resolve();
   }
@@ -323,16 +372,26 @@ export function resetDownloadQueueForTests(): void {
   }
   slotWaiters.length = 0;
   activeJobIds.clear();
+  mobileCleanupIds.clear();
   preparedArchives.clear();
+  for (const cleanups of archiveSaveCleanups.values()) for (const cleanup of cleanups) cleanup();
+  archiveSaveCleanups.clear();
+  batchSelections.clear();
+  batchSelectionWrites.clear();
   hydrated = false;
 }
 
 // Module-level (outside the store value) so they survive store updates but stay
 // out of React's snapshot: the durable job spec and any in-flight abort handle.
 const jobSpecs = new Map<string, PersistedJob>();
+const batchSelections = new Map<string, PersistedBatchSelection>();
+/** Desktop groups can finish together; every cohort write must retain both updates. */
+const batchSelectionWrites = new Map<string, Promise<void>>();
 // Large blobs live outside React snapshots. Retain until the user dismisses
 // the job; an anchor click cannot tell us whether the browser saved anything.
 const preparedArchives = new Map<string, Blob[]>();
+/** Explicit confirmation may release mobile download URLs before their 60s fallback. */
+const archiveSaveCleanups = new Map<string, Set<() => void>>();
 const abortControllers = new Map<string, AbortController>();
 /** Includes worker shutdown and any durable file callback already in flight. */
 const activeRunPromises = new Map<string, Promise<void>>();
@@ -858,7 +917,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
     patchJob(id, {
       // Surface the wait as its own state instead of a job that looks started
       // but never moves.
-      status: activeJobIds.size < MAX_ACTIVE_JOBS ? "packing" : "queued",
+      status: activeJobIds.size < activeJobLimit() && !hasRetainedMobileBatch() ? "packing" : "queued",
       error: null,
       errorKind: null,
       errorDetail: null,
@@ -938,7 +997,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       });
 
       const archiveInputs = await runMultiFileDownload(inputs, {
-        concurrency: spec.kind === "batch" ? 6 : 4,
+        concurrency: requiresManualArchiveSave() ? 2 : spec.kind === "batch" ? 6 : 4,
         signal: controller.signal,
         ...(engineRetryBaseDelayMs !== undefined
           ? { retryBaseDelayMs: engineRetryBaseDelayMs }
@@ -1243,13 +1302,13 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
    * it months later must honour the route selected *then*, not the dead mirror
    * the original run happened to use.
    */
-  const rememberCompletedJob = async (spec: PersistedJob): Promise<void> => {
+  const rememberHistory = async (spec: PersistedJob, key: string): Promise<void> => {
     const entry: DownloadHistoryEntry = {
-      key: `${spec.id}@${Date.now().toString(36)}`,
+      key,
       job: {
         ...spec,
         files: spec.files.map((file) => ({
-          name: file.name,
+          ...file,
           url: canonicalDownloadResourceUrl(file.url, [spec.sourceBaseUrl ?? ""]),
         })),
       },
@@ -1263,6 +1322,54 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         MAX_DOWNLOAD_HISTORY
       ),
     }));
+  };
+
+  const enqueueSelectionWrite = (id: string, task: () => Promise<void>): Promise<void> => {
+    const previous = batchSelectionWrites.get(id) ?? Promise.resolve();
+    const next = previous.catch(() => {}).then(task);
+    batchSelectionWrites.set(id, next);
+    void next.finally(() => {
+      if (batchSelectionWrites.get(id) === next) batchSelectionWrites.delete(id);
+    }).catch(() => {});
+    return next;
+  };
+
+  const persistSelectionProgress = (selection: PersistedBatchSelection): Promise<void> =>
+    enqueueSelectionWrite(selection.id, async () => {
+      // Dismissing an unfinished child abandons whole-selection history; a
+      // queued write must not resurrect it after cancellation.
+      if (!batchSelections.has(selection.id)) return;
+      try { await persistBatchSelection(selection); }
+      catch { set({ checkpointsUnavailable: true }); }
+      if (selection.completedJobIds.length !== selection.jobIds.length || !batchSelections.has(selection.id)) return;
+      // Stable key recovers the crash between history write and cohort deletion
+      // without producing duplicate entries on the next page load.
+      await rememberHistory(selection.job, `selection:${selection.id}`);
+      batchSelections.delete(selection.id);
+      await deleteBatchSelection(selection.id);
+    });
+
+  const abandonSelection = (spec: PersistedJob | undefined): void => {
+    if (!spec?.batchSelectionId) return;
+    const selection = batchSelections.get(spec.batchSelectionId);
+    if (!selection || selection.completedJobIds.includes(spec.id)) return;
+    batchSelections.delete(selection.id);
+    void enqueueSelectionWrite(selection.id, () => deleteBatchSelection(selection.id));
+  };
+
+  const rememberCompletedJob = async (spec: PersistedJob): Promise<void> => {
+    if (!spec.batchSelectionId) {
+      await rememberHistory(spec, `${spec.id}@${Date.now().toString(36)}`);
+      return;
+    }
+    const selection = batchSelections.get(spec.batchSelectionId);
+    // A canceled cohort must never fall back to recording partial children.
+    if (!selection || selection.completedJobIds.includes(spec.id)) return;
+    const next = { ...selection, completedJobIds: [...selection.completedJobIds, spec.id] };
+    // Update synchronously before yielding, so simultaneous desktop finishes
+    // and an immediate save/release both see the completed child's contribution.
+    batchSelections.set(selection.id, next);
+    await persistSelectionProgress(next);
   };
 
   /**
@@ -1465,6 +1572,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
     upsertJob({
       id: sourcedSpec.id,
       kind: sourcedSpec.kind,
+      ...mobileJobMetadata(sourcedSpec),
       title: sourcedSpec.title,
       sourceId,
       sourceBaseUrl: source.baseUrl,
@@ -1513,6 +1621,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
     bottomBars: 0,
     history: [],
     checkpointsUnavailable: false,
+    checkpointsBlocked: false,
 
     startSingle: ({
       id,
@@ -1559,73 +1668,89 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       includeVideo,
       format,
       sourceId,
+      sourceBaseUrl,
+      sourceName,
       grouping,
     }) => {
-      const selectedSource = configuredDownloadSource(
+      const existingSelection = batchSelections.get(id);
+      if (existingSelection) return [...existingSelection.jobIds];
+      const selectedSource = sourceBaseUrl ? getSelectableDownloadSource(sourceId ?? get().selectedSourceId, sourceBaseUrl, sourceName) : configuredDownloadSource(
         sourceId ?? get().selectedSourceId,
         get().customSources
       );
       const batchGrouping = grouping ?? get().preferredBatchGrouping;
-
-      // A selection spanning several versions/genres becomes one queued job per
-      // group rather than a single job that only saves anything at the very end.
-      // Each job then pauses, resumes, retries and reroutes on its own, and its
-      // archive lands as soon as that group finishes.
+      const mobile = requiresManualArchiveSave();
+      const selectedCharts = routeChartDownloadSpecs(charts, selectedSource.id, selectedSource.baseUrl)
+        .map((chart) => ({ ...chart, files: chart.files.filter((file) => includeVideo || !isChartVideoFile(file.name)) }))
+        .filter((chart) => chart.files.length > 0);
       const groups = new Map<string, ChartDownloadSpec[]>();
-      for (const chart of routeChartDownloadSpecs(
-        charts,
-        selectedSource.id,
-        selectedSource.baseUrl
-      )) {
+      for (const chart of selectedCharts) {
         const groupDir = chartGroupingDir(chart, batchGrouping);
-        const bucket = groups.get(groupDir);
-        if (bucket) {
-          bucket.push(chart);
-        } else {
-          groups.set(groupDir, [chart]);
-        }
+        const bucket = groups.get(groupDir) ?? [];
+        bucket.push(chart);
+        groups.set(groupDir, bucket);
       }
-
-      const startedIds: string[] = [];
-      for (const [groupDir, groupCharts] of groups) {
-        // Download flat (one fetch per file), tagging each by chart index so
-        // results can be regrouped — an opaque numeric prefix avoids clashing
-        // with chart names that contain "/".
-        const dirByIndex: string[] = [];
-        const groupByIndex: string[] = [];
-        const files: { name: string; url: string }[] = [];
-        groupCharts.forEach((chart, index) => {
-          dirByIndex[index] = chart.dir;
-          groupByIndex[index] = groupDir;
-          for (const file of chart.files) {
-            if (includeVideo || !isChartVideoFile(file.name)) {
-              files.push({ name: `${index}/${file.name}`, url: file.url });
-            }
+      const batches = [...groups].flatMap(([groupDir, groupCharts]) => {
+        if (!mobile) return [{ groupDir, charts: groupCharts, part: 0, parts: 1 }];
+        const parts: ChartDownloadSpec[][] = [];
+        let current: ChartDownloadSpec[] = [];
+        let currentBytes = 0;
+        const flush = (): void => {
+          if (current.length) parts.push(current);
+          current = [];
+          currentBytes = 0;
+        };
+        for (const chart of groupCharts) {
+          // Treat missing metadata conservatively: eight unknown songs are not
+          // a real byte budget. A whole unknown/oversized chart remains intact.
+          if (chart.files.some((file) => !isKnownDownloadSize(file.bytes))) {
+            flush();
+            parts.push([chart]);
+            continue;
           }
-        });
-        if (files.length === 0) {
-          continue;
+          const bytes = chart.files.reduce((sum, file) => sum + file.bytes!, 0);
+          if (current.length && (current.length >= MOBILE_BATCH_CHARTS || currentBytes + bytes > MOBILE_BATCH_BYTES)) flush();
+          current.push(chart);
+          currentBytes += bytes;
         }
-        // A single-group selection keeps the caller's id and collection name, so
-        // its archive is named exactly as before this split existed.
-        const single = groups.size === 1;
-        const jobId = single ? id : `${id}#${startedIds.length}`;
-        beginJob({
-          id: jobId,
-          kind: "batch",
-          title: single ? title : groupDir || title,
-          format: format ?? get().preferredFormat,
-          createdAt: Date.now(),
-          sourceId: selectedSource.id,
-          sourceBaseUrl: selectedSource.baseUrl,
+        flush();
+        return parts.map((charts, part) => ({ groupDir, charts, part, parts: parts.length }));
+      });
+      if (!batches.length) return [];
+      const createdAt = Date.now();
+      const makeSpec = (jobId: string, jobTitle: string, jobCharts: ChartDownloadSpec[]): PersistedJob => {
+        const groupByIndex = jobCharts.map((chart) => chartGroupingDir(chart, batchGrouping));
+        return {
+          id: jobId, kind: "batch", title: jobTitle,
+          format: format ?? get().preferredFormat, createdAt,
+          sourceId: selectedSource.id, sourceBaseUrl: selectedSource.baseUrl,
           ...(selectedSource.name ? { sourceName: selectedSource.name } : {}),
-          files,
-          dirByIndex,
-          ...(groupDir ? { groupByIndex } : {}),
-        });
-        startedIds.push(jobId);
-      }
-      return startedIds;
+          files: jobCharts.flatMap((chart, index) => chart.files.map((file) => ({
+            name: `${index}/${file.name}`, url: file.url,
+            ...(file.bytes !== undefined ? { bytes: file.bytes } : {}),
+          }))),
+          dirByIndex: jobCharts.map((chart) => chart.dir),
+          ...(groupByIndex.some(Boolean) ? { groupByIndex } : {}),
+        };
+      };
+      const specs = batches.map(({ groupDir, charts: groupCharts, part, parts }, index) => {
+        const groupTitle = groups.size === 1 ? title : groupDir || title;
+        return {
+          ...makeSpec(batches.length === 1 ? id : `${id}#${index}`, parts === 1 ? groupTitle : `${groupTitle} (${part + 1})`, groupCharts),
+          batchSelectionId: id,
+          ...(mobile ? { mobileBatchPolicyVersion: 1 as const } : {}),
+        };
+      });
+      // One original selection occupies one history entry even when a phone
+      // needs dozens of parts. Its pure progress survives releasing child caches.
+      const selection: PersistedBatchSelection = {
+        id, job: makeSpec(id, title, selectedCharts),
+        jobIds: specs.map((spec) => spec.id), completedJobIds: [],
+      };
+      batchSelections.set(id, selection);
+      void persistSelectionProgress(selection);
+      for (const spec of specs) beginJob(spec);
+      return [...selection.jobIds];
     },
 
     setSelectedSourceId: (sourceId) => {
@@ -1874,6 +1999,23 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
 
     restartWithSource: (id, sourceId) => restartJobWithSource(id, sourceId, true),
 
+    restartLegacyBatch: (id) => {
+      const job = get().jobs.find((entry) => entry.id === id);
+      const spec = jobSpecs.get(id);
+      if (!job?.mobileLegacyBatch || !spec || (job.status !== "paused" && job.status !== "error")) return [];
+      const charts = batchChartsFromSpec(spec);
+      if (!charts) return [];
+      // Explicit replacement only. Remove synchronously to prevent a second
+      // gesture scheduling a duplicate, and gate new fetches on old cleanup.
+      mobileCleanupIds.add(id);
+      get().dismiss(id);
+      return get().startBatch({
+        id: newBatchJobId(), title: spec.title, charts, includeVideo: true,
+        format: spec.format as BatchArchiveFormat, sourceId: job.sourceId,
+        sourceBaseUrl: job.sourceBaseUrl, sourceName: job.sourceName,
+      });
+    },
+
     resume: (id) => {
       const job = get().jobs.find((entry) => entry.id === id);
       if (
@@ -1947,7 +2089,10 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       if (!job || !archive || !blob) return false;
       let requested = false;
       try {
-        saveBlobAsFile(blob, archive.fileName);
+        const cleanup = saveBlobAsFile(blob, archive.fileName);
+        const cleanups = archiveSaveCleanups.get(id) ?? new Set<() => void>();
+        cleanups.add(cleanup);
+        archiveSaveCleanups.set(id, cleanups);
         requested = true;
       } catch {
         // Saving is separate from fetching; switching mirrors cannot help.
@@ -1963,19 +2108,59 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       return requested;
     },
 
+    confirmSavedBatch: (id) => {
+      const job = get().jobs.find((entry) => entry.id === id);
+      if (!job?.mobileBatch || job.status !== "success" || !job.archives?.length ||
+        job.archives.some((archive) => !archive.requested || archive.error)) return false;
+      for (const cleanup of archiveSaveCleanups.get(id) ?? []) cleanup();
+      archiveSaveCleanups.delete(id);
+      mobileCleanupIds.add(id);
+      preparedArchives.delete(id);
+      patchJob(id, {
+        archives: undefined,
+        savedArchiveInfo: {
+          fileNames: job.archives.map((archive) => archive.fileName),
+          archiveCount: job.archives.length, format: job.format,
+        },
+      });
+      // Keep the lightweight success/count metadata so a multi-part selection
+      // does not lose completed progress every time the user releases a part.
+      void enqueueLifecycle(id, async () => {
+        try {
+          await deleteJob(id);
+        } finally {
+          mobileCleanupIds.delete(id);
+          pumpJobQueue();
+        }
+      });
+      return true;
+    },
+
     dismiss: (id) => {
+      const job = get().jobs.find((entry) => entry.id === id);
+      abandonSelection(jobSpecs.get(id));
+      if (job?.mobileBatch && job.archives?.length) mobileCleanupIds.add(id);
       abortControllers.get(id)?.abort();
       abortControllers.delete(id);
       speedSamples.delete(id);
       jobSpecs.delete(id);
       preparedArchives.delete(id);
+      // Ordinary dismissal preserves the URL's timed browser handoff. Only an
+      // explicit confirmation that files are on disk may revoke them early.
+      archiveSaveCleanups.delete(id);
       jobTriedSources.delete(id);
       jobAutoSwitchCounts.delete(id);
       set((state) => ({ jobs: state.jobs.filter((job) => job.id !== id) }));
+      pumpJobQueue();
       void enqueueLifecycle(id, async () => {
         // A checkpoint callback that began just before dismiss must finish
         // before cleanup, otherwise it could recreate an orphaned file record.
-        await deleteJob(id);
+        try {
+          await deleteJob(id);
+        } finally {
+          mobileCleanupIds.delete(id);
+          pumpJobQueue();
+        }
       });
     },
 
@@ -1994,8 +2179,20 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         entry.job.kind === "batch"
           ? newBatchJobId()
           : `${entry.job.id}#again:${Date.now().toString(36)}`;
+      if (entry.job.kind === "batch") {
+        const charts = batchChartsFromSpec(entry.job);
+        if (charts) {
+          get().startBatch({
+            id, title: entry.job.title, charts, includeVideo: true,
+            format: entry.job.format as BatchArchiveFormat,
+            sourceId: source.id,
+          });
+          return;
+        }
+      }
       beginJob({
         ...entry.job,
+        batchSelectionId: undefined,
         id,
         createdAt: Date.now(),
         sourceId: source.id,
@@ -2029,18 +2226,31 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         sourceProbes: createInitialDownloadSourceProbes(customSources),
       });
       saveCustomSources(customSources);
-      subscribeToCheckpointFailures(() => {
-        set({ checkpointsUnavailable: true });
+      subscribeToCheckpointFailures((kind) => {
+        set({ checkpointsUnavailable: true, ...(kind === "blocked" ? { checkpointsBlocked: true } : {}) });
       });
       // Best-effort: without it, checkpoints for a big batch are the first
       // thing a browser evicts under storage pressure, silently turning
       // "resume after a reload" into "start over".
       void requestPersistentStorage();
       void loadHistory().then((history) => {
-        set({ history: history.slice(0, MAX_DOWNLOAD_HISTORY) });
+        set((state) => ({ history: [...new Map([...history, ...state.history].map((entry) => [entry.key, entry])).values()]
+          .sort((left, right) => right.finishedAt - left.finishedAt).slice(0, MAX_DOWNLOAD_HISTORY) }));
       });
       void (async () => {
-        const stored = await loadAllJobs();
+        const [stored, selections] = await Promise.all([loadAllJobs(), loadBatchSelections()]);
+        const storedIds = new Set(stored.map((job) => job.id));
+        for (const selection of selections) {
+          if (batchSelections.has(selection.id)) continue;
+          // A crash/dismissal cannot turn a missing unfinished child into a
+          // completed selection. Finished children may legitimately be absent.
+          if (selection.jobIds.some((id) => !storedIds.has(id) && !selection.completedJobIds.includes(id))) {
+            void enqueueSelectionWrite(selection.id, () => deleteBatchSelection(selection.id));
+            continue;
+          }
+          batchSelections.set(selection.id, selection);
+          if (selection.completedJobIds.length === selection.jobIds.length) void persistSelectionProgress(selection);
+        }
         for (const storedSpec of stored) {
           if (get().jobs.some((job) => job.id === storedSpec.id)) {
             continue;
@@ -2123,6 +2333,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
           upsertJob({
             id: spec.id,
             kind: spec.kind,
+            ...mobileJobMetadata(spec),
             title: spec.title,
             sourceId,
             sourceBaseUrl: source.baseUrl,
@@ -2177,6 +2388,23 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
     },
   };
 });
+
+/** Regroups the flat `${index}/name` download results back into per-chart folders. */
+function batchChartsFromSpec(spec: PersistedJob): ChartDownloadSpec[] | null {
+  const grouped = new Map<number, ChartDownloadSpec>();
+  for (const file of spec.files) {
+    const match = /^(\d+)\/(.+)$/.exec(file.name);
+    if (!match) return null;
+    const index = Number(match[1]);
+    const dir = spec.dirByIndex?.[index];
+    if (!dir) return null;
+    const groupDir = spec.groupByIndex?.[index];
+    const chart = grouped.get(index) ?? { dir, groupDir, genreDir: groupDir, files: [] };
+    chart.files.push({ ...file, name: match[2]! });
+    grouped.set(index, chart);
+  }
+  return [...grouped].sort(([a], [b]) => a - b).map(([, chart]) => chart);
+}
 
 /** Regroups the flat `${index}/name` download results back into per-chart folders. */
 function regroupBatch(

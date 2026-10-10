@@ -18,14 +18,18 @@ import type {
 
 export * from "./adx-archive-shared";
 
-// Output accumulates into a growing Blob rather than one big buffer, so the
-// browser can spill it to disk and peak memory stays a small constant regardless
-// of how large the archive gets. ~4 MB of streamed chunks per merge keeps the
-// Blob's part list short without holding much in RAM.
+// Gzip output coalesces small chunks. STORE ZIP payloads instead reuse their
+// source Blobs: copying each streamed media chunk into a second output Blob
+// kept a full extra batch of bytes alive on mobile browsers.
 const OUTPUT_FLUSH_BYTES = 4 * 1024 * 1024;
+/** CRC/gzip work shares the UI thread; promise-only Blob reads do not yield to taps. */
+const ARCHIVE_WORK_SLICE_MS = 16;
+const ARCHIVE_WORK_SLICE_BYTES = 4 * 1024 * 1024;
+const ARCHIVE_STREAM_CHUNK_BYTES = 64 * 1024;
 
 type BlobSink = {
   push: (chunk: Uint8Array) => void;
+  pushBlob: (source: Blob) => void;
   finish: (type: string) => Blob;
 };
 
@@ -77,6 +81,12 @@ function createBlobSink(): BlobSink {
   let blob = new Blob([]);
   let pending: Uint8Array[] = [];
   let pendingBytes = 0;
+  const flush = (): void => {
+    if (pendingBytes === 0) return;
+    blob = new Blob([blob, ...(pending as BlobPart[])]);
+    pending = [];
+    pendingBytes = 0;
+  };
   return {
     push(chunk) {
       if (chunk.length === 0) {
@@ -85,10 +95,12 @@ function createBlobSink(): BlobSink {
       pending.push(chunk);
       pendingBytes += chunk.length;
       if (pendingBytes >= OUTPUT_FLUSH_BYTES) {
-        blob = new Blob([blob, ...(pending as BlobPart[])]);
-        pending = [];
-        pendingBytes = 0;
+        flush();
       }
+    },
+    pushBlob(source) {
+      flush();
+      blob = new Blob([blob, source]);
     },
     finish(type) {
       return new Blob([blob, ...(pending as BlobPart[])], { type });
@@ -99,12 +111,27 @@ function createBlobSink(): BlobSink {
 /** Reads a Blob to the end in chunks, never materialising the whole thing in RAM. */
 async function streamBlob(blob: Blob, onChunk: (chunk: Uint8Array) => void): Promise<void> {
   const reader = blob.stream().getReader();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
+  let lastYieldAt = Date.now();
+  let bytesSinceYield = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      // A browser may deliver a whole in-memory Blob as one reader chunk.
+      // Subarray views bound one synchronous CRC/gzip step without copying.
+      for (let offset = 0; offset < value.length; offset += ARCHIVE_STREAM_CHUNK_BYTES) {
+        const chunk = value.subarray(offset, offset + ARCHIVE_STREAM_CHUNK_BYTES);
+        onChunk(chunk);
+        bytesSinceYield += chunk.length;
+        if (bytesSinceYield >= ARCHIVE_WORK_SLICE_BYTES || Date.now() - lastYieldAt >= ARCHIVE_WORK_SLICE_MS) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+          lastYieldAt = Date.now();
+          bytesSinceYield = 0;
+        }
+      }
     }
-    onChunk(value);
+  } finally {
+    reader.releaseLock();
   }
 }
 
@@ -148,12 +175,25 @@ async function packZip(
   const progress = createProgressReporter(files, onProgress);
   progress.emit();
   let zipError: Error | null = null;
+  let payloadChunk: Uint8Array | null = null;
+  let payloadBlob: Blob | null = null;
+  let payloadAppended = false;
   const zip = new Zip((err, data) => {
     if (err) {
       zipError = err;
       return;
     }
-    sink.push(data);
+    // ZipPassThrough emits each input chunk by identity. Keep its header and
+    // descriptor, but substitute one original Blob for all payload chunks.
+    // fflate still reads every chunk to calculate the exact CRC and sizes.
+    if (data === payloadChunk) {
+      if (!payloadAppended && payloadBlob) {
+        sink.pushBlob(payloadBlob);
+        payloadAppended = true;
+      }
+    } else {
+      sink.push(data);
+    }
   });
 
   for (const file of files) {
@@ -163,12 +203,19 @@ async function packZip(
     const entry = new ZipPassThrough(file.name);
     entry.mtime = mtime;
     zip.add(entry);
+    payloadBlob = file.blob;
+    payloadAppended = false;
     progress.startFile(file.name);
     await streamBlob(file.blob, (chunk) => {
+      payloadChunk = chunk;
       entry.push(chunk);
+      payloadChunk = null;
       progress.addBytes(chunk.length);
     });
-    entry.push(new Uint8Array(0), true);
+    payloadChunk = new Uint8Array(0);
+    entry.push(payloadChunk, true);
+    payloadChunk = null;
+    payloadBlob = null;
     progress.finishFile(file.name);
   }
 

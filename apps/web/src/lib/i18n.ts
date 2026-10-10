@@ -425,6 +425,32 @@ export type SiteDictionary = {
     saveHint: string;
     saveError: string;
     importHint: string;
+    videoOptionHint: string;
+    videoOffSavings: (size: string) => string;
+    confirmSavedBatch: string;
+    releaseSavedBatch: string;
+    confirmSavedBatchHint: string;
+    mobileBatchHint: string;
+    mobileLegacyBatchHint: string;
+    mobileRestartBatch: string;
+    mobileLargeChartHint: string;
+    mobileUnknownSizeHint: string;
+    importGuide: {
+      title: string;
+      platformLabel: string;
+      platforms: { ios: string; android: string; desktop: string };
+      findFile: string;
+      steps: { ios: readonly string[]; android: readonly string[]; desktop: readonly string[] };
+      zipHint: string;
+      tarHint: string;
+      splitHint: string;
+      helpLabel: string;
+      helpBody: string;
+      helpBodyReleased: string;
+      videoLink: string;
+      guideLink: string;
+      troubleshootingLink: string;
+    };
     confirmDiscard: string;
     errorOffline: string;
     errorNetwork: string;
@@ -454,6 +480,7 @@ export type SiteDictionary = {
     autoResumed: (count: number) => string;
     /** Shown once a checkpoint write failed: resume-after-reload is gone. */
     checkpointsUnavailable: string;
+    checkpointsBlocked: string;
     storageTight: (available: string) => string;
     storageInsufficient: (available: string, required: string) => string;
     historyTitle: string;
@@ -1168,9 +1195,39 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       readyToSave: "打包完成，等待保存文件",
       saveArchive: "保存文件",
       saveAgain: "再次保存",
-      saveHint: "逐个点击保存。若下载列表没有文件，可再次保存，无需重新下载。确认保存后移除任务可释放空间；刷新后可从已下载数据重新打包。",
+      saveHint: "逐个点击保存。尚未释放缓存或移除任务时，可再次保存；刷新后可用保留的已下载数据重新打包。释放后需重新下载：整组完成后可从「最近下载」开始，未完成时先继续剩余批次，或重新选曲。",
       saveError: "保存未能发起，请重试或更换浏览器。",
       importHint: "将文件导入 AstroDX 即可游玩（.adx 可直接导入）。",
+      videoOptionHint: "只影响背景动画，不影响谱面游玩。",
+      videoOffSavings: (size) => `不含 BGA 可减少约 ${size}`,
+      confirmSavedBatch: "已确认保存，继续下载",
+      releaseSavedBatch: "确认保存并释放缓存",
+      confirmSavedBatchHint: "先在浏览器下载记录中确认本批每个文件已下载完成，再确认释放并继续。释放后不能再次保存，导入引导仍会保留；仍需重试保存时请勿确认。",
+      mobileBatchHint: "手机会分批下载。先保存本批，在浏览器下载记录中确认完成，再释放缓存继续下一批；最后一批也请确认释放。下载期间保持页面打开。",
+      mobileLegacyBatchHint: "继续旧任务会保留已下载进度。按手机分批重新下载会替换旧任务、清除其缓存，并从头分批下载。",
+      mobileRestartBatch: "按手机分批重新下载",
+      mobileLargeChartHint: "这首谱面资源较大，建议关闭 BGA 视频减少体积；仍然过大时请改用电脑下载。",
+      mobileUnknownSizeHint: "部分资源大小未知，手机会保守地按单首分批；实际文件仍可能较大。",
+      importGuide: {
+        title: "保存后，导入到 AstroDX",
+        platformLabel: "选择导入设备",
+        platforms: { ios: "iPhone / iPad", android: "Android", desktop: "电脑" },
+        findFile: "在浏览器的下载记录中确认文件已下载完成，再到「文件」App 或文件管理器中找到它。",
+        steps: {
+          ios: ["先安装并打开一次 AstroDX。在「文件」App 中，把 .adx 移到带 AstroDX 应用图标的 AstroDX 文件夹本身。", "重新打开 AstroDX，等待导入完成。不要把压缩包放进 levels 或 collections。"],
+          android: ["先安装并打开一次 AstroDX。在文件管理器打开 .adx，选择用 AstroDX 打开。", "列表中没有 AstroDX 时，长按文件选「分享」，再选择 AstroDX，等待导入完成。"],
+          desktop: ["把 .adx 原样传到手机：Mac 可用 AirDrop，其他电脑可用 LocalSend 或数据线。", "切换上方的设备选项，按手机系统的步骤导入，无需在电脑上解压。"],
+        },
+        zipHint: "下载的是 .zip：先改为 .adx 再导入；无法改扩展名时，可改名为「文件名.adx.zip」。",
+        tarHint: ".tar.gz 用于归档，不能仅改后缀直接导入。要导入 AstroDX，请重新选择 .adx 格式下载。",
+        splitHint: "每个分包都是独立文件，请逐个保存并导入。",
+        helpLabel: "找不到文件或分享菜单没有 AstroDX？",
+        helpBody: "文件不在浏览器下载记录中时，点「再次保存」。若文件变成 .bin，先重试保存或改用 .zip，勿直接改成 .adx。分享没有 AstroDX 时，确认游戏已安装并启动过；Android 可换用 ZArchiver 等文件管理器。",
+        helpBodyReleased: "本批缓存已释放，不能再次保存。若本地找不到文件，整组下载完成后可从下载托盘的「最近下载」重新下载；整组未完成时，先完成剩余批次，或重新选曲下载。.bin、改名或分享问题请查看完整排障说明。",
+        videoLink: "视频导入教程",
+        guideLink: "完整导入教程",
+        troubleshootingLink: "查看排障说明",
+      },
       confirmDiscard: "再点一次将放弃已下载的数据",
       errorOffline: "网络已断开；已完成文件会保留，联网后点「继续」下载剩余文件",
       errorNetwork: "下载失败；已完成文件会保留，可点「继续」重试剩余文件",
@@ -1204,6 +1261,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       autoResumed: (count) => `网络恢复，已自动继续 ${count} 个下载任务`,
       checkpointsUnavailable:
         "浏览器存储写入失败，本次下载不再支持刷新后续传；请保持页面打开直到完成。",
+      checkpointsBlocked:
+        "旧页面阻止了下载缓存更新。本次仍可下载和保存，但刷新后无法恢复进度或保留新记录。保存好当前文件后，关闭本站其他标签页，再刷新此页面。",
       storageTight: (available) => `设备可用存储仅剩约 ${available}，大批量下载可能中途失败。`,
       storageInsufficient: (available, required) =>
         `设备可用存储约 ${available}，不足以完成约 ${required} 的下载，请先清理空间或减少选择。`,
@@ -1925,9 +1984,39 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       readyToSave: "Archive ready — save the files below",
       saveArchive: "Save file",
       saveAgain: "Save again",
-      saveHint: "Save each file separately. If it is missing from Downloads, save again without fetching it again. Remove the job after saving to free storage; after a reload, you can repack the downloaded files.",
+      saveHint: "Save each file separately. Before removing the job or releasing its cache, you can save again or repack retained downloads after a reload. After release, download again: use Recent downloads once the whole selection is complete, or finish the remaining batches or select the charts again.",
       saveError: "Could not start saving. Try again or use another browser.",
       importHint: "Import the file into AstroDX to play (.adx imports directly).",
+      videoOptionHint: "Changes the background animation only, not the chart gameplay.",
+      videoOffSavings: (size) => `About ${size} less without BGA`,
+      confirmSavedBatch: "Files saved — continue downloading",
+      releaseSavedBatch: "Confirm saved and release cache",
+      confirmSavedBatchHint: "Check your browser's downloads to confirm every file in this batch has finished, then release its cache and continue. Save again will be unavailable after release, but import instructions remain. Do not confirm if you still need to retry saving.",
+      mobileBatchHint: "Phones download in small batches. Save this batch, confirm completion in your browser's downloads, then release its cache to continue. Confirm release for the final batch too. Keep this page open while downloading.",
+      mobileLegacyBatchHint: "Continuing keeps this older job's downloaded progress. Restarting in small batches replaces the old job, clears its cache, and downloads the selection again.",
+      mobileRestartBatch: "Restart in small batches",
+      mobileLargeChartHint: "This chart has large assets. Turn off BGA video to reduce the size; if it is still too large, download on a computer.",
+      mobileUnknownSizeHint: "Some asset sizes are unknown, so phones use one chart per batch as a precaution. The actual files may still be large.",
+      importGuide: {
+        title: "After saving, import into AstroDX",
+        platformLabel: "Choose the import device",
+        platforms: { ios: "iPhone / iPad", android: "Android", desktop: "Computer" },
+        findFile: "Confirm the file has finished downloading in your browser's downloads, then find it in Files or your file manager.",
+        steps: {
+          ios: ["Install and launch AstroDX once. In Files, move the .adx into the AstroDX folder with the app's icon.", "Open AstroDX again and wait for import to finish. Do not put the archive in levels or collections."],
+          android: ["Install and launch AstroDX once. Open the .adx in your file manager and choose AstroDX.", "If AstroDX is missing, long-press the file, choose Share, then AstroDX, and wait for import to finish."],
+          desktop: ["Send the .adx unchanged to your phone: use AirDrop on Mac, or LocalSend or a cable on other computers.", "Select your phone's system above and follow its steps. There is no need to extract the archive on your computer."],
+        },
+        zipHint: "For .zip, rename it to .adx before importing. If the extension cannot be changed, use filename.adx.zip.",
+        tarHint: ".tar.gz is for archiving; renaming its extension does not make it importable. Download .adx to import into AstroDX.",
+        splitHint: "Each part is an independent archive. Save and import every part separately.",
+        helpLabel: "Missing file or AstroDX missing from Share?",
+        helpBody: "If the file is absent from your browser's downloads, choose Save again. For an unexpected .bin file, retry saving or use .zip; do not simply rename it to .adx. Make sure AstroDX is installed and has been launched. On Android, try another file manager such as ZArchiver.",
+        helpBodyReleased: "This batch's cache was released, so Save again is unavailable. If the file is missing locally, download it again from Recent downloads in the tray once the whole selection is complete. Until then, finish the remaining batches or select the charts again. See the full troubleshooting guide for .bin, renaming or sharing issues.",
+        videoLink: "Video import tutorial",
+        guideLink: "Full import guide",
+        troubleshootingLink: "Troubleshooting",
+      },
       confirmDiscard: "Click again to discard the downloaded data",
       errorOffline: "You're offline — completed files are kept; Resume downloads the rest",
       errorNetwork: "Download failed — completed files are kept; Resume retries the rest",
@@ -1972,6 +2061,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         `Back online — resumed ${count} download${count === 1 ? "" : "s"} automatically`,
       checkpointsUnavailable:
         "Browser storage writes are failing, so this download can no longer resume after a reload. Keep the page open until it finishes.",
+      checkpointsBlocked:
+        "An older tab is blocking the download cache update. You can still download and save, but new progress and history will not survive a reload. Save your current files, close other tabs for this site, then reload this page.",
       storageTight: (available) =>
         `Only about ${available} of device storage is free; a large batch may fail partway.`,
       storageInsufficient: (available, required) =>
@@ -2701,9 +2792,39 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       readyToSave: "アーカイブ作成完了 — ファイルを保存してください",
       saveArchive: "ファイルを保存",
       saveAgain: "もう一度保存",
-      saveHint: "ファイルを一つずつ保存してください。ダウンロード一覧にない場合、再ダウンロードせずにもう一度保存できます。保存後にタスクを削除すると容量を解放できます。ページを再読み込みした後も、取得済みファイルから再作成できます。",
+      saveHint: "各ファイルを保存してください。タスク削除・キャッシュ解放前は再保存でき、ページ再読み込み後も保持された取得済みデータから再作成できます。解放後は再取得が必要です。選択した全曲の完了後は「最近のダウンロード」を使い、未完了の場合は残りのバッチを完了するか曲を選び直してください。",
       saveError: "保存を開始できませんでした。再試行するか別のブラウザをお試しください。",
       importHint: "ファイルを AstroDX にインポートするとプレイできます（.adx はそのままインポート可）。",
+      videoOptionHint: "背景動画のみが変わり、譜面のプレイには影響しません。",
+      videoOffSavings: (size) => `BGA なしで約 ${size} 削減`,
+      confirmSavedBatch: "保存を確認してダウンロードを続行",
+      releaseSavedBatch: "保存を確認してキャッシュを解放",
+      confirmSavedBatchHint: "ブラウザーのダウンロード履歴で今回の全ファイルの保存完了を確認し、キャッシュを解放して続行します。解放後は再保存できませんが、インポート手順は表示されます。再保存が必要な場合はまだ確認しないでください。",
+      mobileBatchHint: "スマートフォンでは小分けにダウンロードします。今回のファイルを保存し、ブラウザーの履歴で完了を確認してからキャッシュを解放し、次へ進みます。最後のバッチも解放を確認してください。ダウンロード中はページを開いたままにします。",
+      mobileLegacyBatchHint: "旧タスクを続行すると取得済みデータは保持されます。小分けでの再取得は旧タスクを置き換え、そのキャッシュを削除し、最初からダウンロードし直します。",
+      mobileRestartBatch: "スマートフォン向けの小分けで再取得",
+      mobileLargeChartHint: "この譜面のリソースは大きいため、BGA 動画をオフにして容量を減らしてください。それでも大きい場合はパソコンでのダウンロードをお勧めします。",
+      mobileUnknownSizeHint: "容量が不明なリソースがあるため、スマートフォンでは安全を見て 1 曲ずつ取得します。実際のファイルは大きい場合があります。",
+      importGuide: {
+        title: "保存後、AstroDX にインポート",
+        platformLabel: "インポートする端末を選択",
+        platforms: { ios: "iPhone / iPad", android: "Android", desktop: "パソコン" },
+        findFile: "ブラウザーのダウンロード履歴で保存完了を確認し、「ファイル」App またはファイルマネージャーで探してください。",
+        steps: {
+          ios: ["AstroDX をインストールして一度起動します。「ファイル」App で .adx をアプリのアイコンが付いた AstroDX フォルダー自体に移動します。", "AstroDX を開き直し、インポート完了を待ちます。圧縮ファイルを levels や collections に置かないでください。"],
+          android: ["AstroDX をインストールして一度起動します。ファイルマネージャーで .adx を開き、AstroDX を選択します。", "一覧に AstroDX がない場合は、ファイルを長押しして「共有」から AstroDX を選び、インポート完了を待ちます。"],
+          desktop: [".adx を解凍せずスマートフォンへ転送します。Mac は AirDrop、それ以外は LocalSend やケーブルを使えます。", "上の端末選択でスマートフォンの OS を選び、その手順に従ってください。パソコンでの解凍は不要です。"],
+        },
+        zipHint: ".zip は .adx に変更してからインポートしてください。拡張子を変更できない場合は「ファイル名.adx.zip」にします。",
+        tarHint: ".tar.gz は保管用で、拡張子を変えるだけでは取り込めません。AstroDX 用は .adx 形式でダウンロードしてください。",
+        splitHint: "各分割ファイルは独立しています。すべて個別に保存してインポートしてください。",
+        helpLabel: "ファイルがない、共有に AstroDX がない？",
+        helpBody: "ダウンロード履歴にない場合は「もう一度保存」を押してください。.bin になった場合は保存を再試行するか .zip を使い、そのまま .adx に変更しないでください。AstroDX がインストールされ、一度起動済みか確認します。Android は ZArchiver など別のファイルマネージャーも試せます。",
+        helpBodyReleased: "今回のキャッシュは解放済みのため、再保存できません。端末にファイルがない場合、選択した全曲の完了後にトレイの「最近のダウンロード」から再取得できます。未完了の場合は残りのバッチを完了するか、曲を選び直してください。.bin・名前変更・共有の問題は詳しいトラブルシューティングを参照してください。",
+        videoLink: "動画で見るインポート手順",
+        guideLink: "詳しいインポート手順",
+        troubleshootingLink: "トラブルシューティング",
+      },
       confirmDiscard: "もう一度クリックするとダウンロード済みデータを破棄します",
       errorOffline: "オフラインです — 完了済みファイルは保持され、接続後に残りを再開できます",
       errorNetwork: "ダウンロードに失敗しました — 完了済みファイルを保持して残りを再試行できます",
@@ -2741,6 +2862,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       autoResumed: (count) => `通信が回復したため、${count} 件のダウンロードを自動で再開しました`,
       checkpointsUnavailable:
         "ブラウザーのストレージに書き込めないため、再読み込み後の再開ができません。完了までこのページを開いたままにしてください。",
+      checkpointsBlocked:
+        "古いページがダウンロードキャッシュの更新を妨げています。取得と保存は続けられますが、新しい進捗や履歴は再読み込み後に残りません。現在のファイルを保存し、このサイトの他のタブを閉じてから、このページを再読み込みしてください。",
       storageTight: (available) =>
         `端末の空き容量は約 ${available} です。大量のダウンロードは途中で失敗する可能性があります。`,
       storageInsufficient: (available, required) =>

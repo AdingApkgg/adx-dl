@@ -14,7 +14,6 @@ import { AnimatePresence, DrawnCheck, EASE_OUT, motion } from "@astrodx/ui/motio
 import { Button } from "@astrodx/ui/components/button";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -40,8 +39,10 @@ import {
 import {
   DownloadJobNotes,
   DownloadJobStatusLine,
+  DownloadStorageNotice,
 } from "./downloads/download-job-notes";
 import { formatBytes } from "./downloads/format-bytes";
+import { DownloadVideoOption } from "./downloads/download-video-option";
 import { jobPercent, singleJobId, useDownloadsStore } from "./downloads/downloads-store";
 
 // framer-motion 12 removed the motion(Component) call form.
@@ -78,7 +79,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
   const dismiss = useDownloadsStore((state) => state.dismiss);
 
   const status = job?.status ?? "idle";
-  const isBusy = status === "packing" || status === "archiving";
+  const isBusy = status === "packing" || status === "archiving" || status === "queued";
   // After a full reload an interrupted job comes back as `paused`; an in-session
   // failure is `error`. Both keep completed loose files and retry unfinished ones.
   const isResumable = status === "paused" || status === "error";
@@ -156,7 +157,9 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
   }
 
   const label =
-    status === "archiving"
+    status === "queued"
+      ? downloadsDictionary.queued
+      : status === "archiving"
       ? downloadsDictionary.archiving
       : status === "packing"
         ? detailDictionary.downloadPacking(progress.completed, progress.total)
@@ -252,7 +255,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
           </MotionButton>
         </div>
       ) : (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div data-slot="button-group" className="inline-flex">
             <Button
               ref={triggerRef}
@@ -317,18 +320,6 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
                     ) : null}
                   </DropdownMenuItem>
                 ))}
-                {hasVideo ? (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuCheckboxItem
-                      checked={includeVideo}
-                      onCheckedChange={(value) => setIncludeVideo(value === true)}
-                      onSelect={(event) => event.preventDefault()}
-                    >
-                      {detailDictionary.downloadIncludeVideo}
-                    </DropdownMenuCheckboxItem>
-                  </>
-                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -336,7 +327,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
             <span className="text-xs tabular-nums text-muted-foreground">{sizeHint}</span>
           ) : null}
           <AnimatePresence initial={false} mode="wait">
-            {status === "packing" ? (
+            {status === "packing" || status === "queued" ? (
               <MotionButton
                 key="pause"
                 type="button"
@@ -357,6 +348,16 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
           </AnimatePresence>
         </div>
       )}
+      {hasVideo && !isResumable && status !== "ready" && status !== "success" ? (
+        <DownloadVideoOption
+          locale={locale}
+          checked={includeVideo}
+          onChange={setIncludeVideo}
+          videoBytes={downloadBytes.videoBytes}
+          disabled={isBusy}
+        />
+      ) : null}
+      <DownloadStorageNotice locale={locale} />
       {canDownload || job ? (
         <DownloadSourceSummary
           sourceId={job?.sourceId ?? selectedSourceId}
@@ -461,7 +462,6 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
               </span>
               {status === "ready" ? downloadsDictionary.readyToSave : downloadsDictionary.completed}
             </p>
-            <p className="text-xs">{downloadsDictionary.importHint}</p>
           </motion.div>
         ) : null}
       </AnimatePresence>

@@ -95,14 +95,26 @@ export const guideSections: Record<Locale, ContentSection[]> = {
         {
           type: "list",
           items: [
-            ".adx —— AstroDX 的导入格式，在手机上点开就能直接导入，推荐优先选它。",
+            ".adx —— 推荐的 AstroDX 导入格式。Android 用「打开方式 / 分享」交给 AstroDX；iOS 移到 AstroDX 文件夹本身，再重新打开游戏。无需解压。",
             ".zip —— 通用压缩包，任何系统都能解压，适合先在电脑上整理再传到手机。",
-            ".tar.gz —— 同样是通用压缩包，体积通常更小，适合命令行环境或批量归档。",
+            ".tar.gz —— 适合命令行环境或归档，不能仅改成 .adx 后直接导入。要导入游戏，请重新选择 .adx 格式下载。",
           ],
         },
         {
           type: "p",
-          text: "带 BGA 的谱面会额外打包一段背景动画视频（pv.mp4）。它只影响游玩时的背景演出，不影响判定，但体积往往是谱面本身的好几倍；批量下载时可以关掉「包含背景视频」来省流量。",
+          text: "带 BGA 的谱面会额外打包一段背景动画视频（pv.mp4）。它只影响背景演出，不影响判定；关闭「包含 BGA 视频」可以减少下载体积。手机上单首资源仍然很大时，建议关闭 BGA 或改用电脑下载。",
+        },
+        {
+          type: "steps",
+          items: [
+            "手机批量下载会拆成独立的小批次。保持页面打开，等待本批打包完成后，逐个点击「保存文件」。",
+            "在浏览器的下载记录中确认本批每个文件已下载完成；若没有文件或还需重试，先点「再次保存」，不要确认释放。",
+            "确认保存后，点「已确认保存，继续下载」释放本批缓存并开始下一批；最后一批点「确认保存并释放缓存」。每个分包都要分别保存和导入，释放后仍可按保留的导入引导操作。",
+          ],
+        },
+        {
+          type: "p",
+          text: "只有尚未移除任务或释放缓存时，刷新页面后才能从保留的已下载数据重新打包。释放后不能再次保存同一份缓存；整组选曲下载完成后，可从下载托盘的「最近下载」重新下载。整组未完成时，先完成剩余批次，或重新选曲下载。",
         },
         {
           type: "p",
@@ -160,8 +172,16 @@ export const guideSections: Record<Locale, ContentSection[]> = {
               a: "多半是当前下载线路到你所在网络的链路不通畅。打开右上角设置面板，在「下载」里重新测速并切换到延迟更低的线路，然后重新开始任务。下载中断的任务可以在下载托盘里点重试，已完成的文件不会重复下载。",
             },
             {
+              q: "手机批量下载停在保存阶段，下一批不开始？",
+              a: "这是等待你确认本批保存的阶段。先逐个保存，在浏览器下载记录中确认文件已下载完成，再点「已确认保存，继续下载」；最后一批点「确认保存并释放缓存」。释放后不能直接再次保存；整组完成后可从下载托盘的「最近下载」重新下载，未完成时先完成剩余批次，或重新选曲。下载期间保持页面打开。",
+            },
+            {
+              q: "显示已发起保存，但手机里找不到文件 / 下载成 .bin？",
+              a: "「已发起保存」只表示浏览器收到保存请求，不代表文件已经落盘。先检查浏览器下载记录，完成后再到「文件」App 或文件管理器查找。缓存尚未释放时可点「再次保存」；若变成 .bin，先重试保存或改用 .zip 下载，再按导入步骤改名，勿直接把 .bin 改成 .adx。缓存已释放时，整组完成后从下载托盘的「最近下载」重新下载；未完成时先完成剩余批次，或重新选曲。",
+            },
+            {
               q: "压缩包打不开 / 提示文件损坏？",
-              a: "先确认文件是否下载完整——中途断线得到的半截文件无法解压，删掉重下即可。iOS 自带的解压功能对部分 .tar.gz 支持不佳，建议改下 .zip，或者用支持该格式的解压工具。",
+              a: "先在浏览器下载记录中确认保存是否完成。缓存尚未释放时，优先点「再次保存」；仍然损坏或缓存已释放，再重新下载。.adx 无需手动解压；.zip 可改成 .adx 或「文件名.adx.zip」再导入；.tar.gz 不能仅改后缀直接导入，要玩谱面请重新下载 .adx，要解压归档请用支持 TAR.GZ 的工具。",
             },
             {
               q: "导入后 AstroDX 里看不到这首谱面？",
@@ -250,14 +270,26 @@ export const guideSections: Record<Locale, ContentSection[]> = {
         {
           type: "list",
           items: [
-            ".adx — AstroDX's own import format. Tap it on your phone and it imports straight away; prefer this one.",
+            ".adx — the recommended AstroDX import format. On Android, open or share it with AstroDX. On iOS, move it into the AstroDX folder itself, then reopen the game. No extraction is needed.",
             ".zip — a plain archive any system can open. Good when you want to sort things out on a computer first.",
-            ".tar.gz — also a plain archive, usually a bit smaller. Handy on the command line or for bulk storage.",
+            ".tar.gz — for command-line use or archiving. Renaming it to .adx does not make it importable; download the .adx format to import into the game.",
           ],
         },
         {
           type: "p",
-          text: "Charts that ship a BGA include an extra background-animation video (pv.mp4). It only changes what plays behind the notes — never the judgement — but it is often several times the size of the chart itself, so batch downloads let you turn “include background video” off to save bandwidth.",
+          text: "Charts with a BGA include a background-animation video (pv.mp4). It changes the background only, never the judgement. Turn off “Include BGA video” to reduce the download size. If one chart is still large on a phone, omit the BGA or download it on a computer.",
+        },
+        {
+          type: "steps",
+          items: [
+            "Phones split bulk downloads into independent small batches. Keep the page open, wait for the current batch to finish packing, then select Save file for each archive.",
+            "Check your browser's downloads to confirm every file in this batch has finished downloading. If a file is missing or needs another attempt, select Save again before confirming release.",
+            "Select Files saved — continue downloading to release this batch's cache and start the next. For the final batch, select Confirm saved and release cache. Save and import each archive separately; the import instructions remain available after release.",
+          ],
+        },
+        {
+          type: "p",
+          text: "After a page reload, downloaded data can be repacked only while its job and cache have not been removed. Releasing the cache removes Save again for that data. Once the whole selection is complete, use Recent downloads in the download tray to download it again. Until then, finish the remaining batches or select the charts again.",
         },
         {
           type: "p",
@@ -315,8 +347,16 @@ export const guideSections: Record<Locale, ContentSection[]> = {
               a: "That usually means the current mirror routes badly to your network. Open the settings panel, re-measure latency under Downloads, switch to a faster mirror and restart the job. Interrupted jobs can be retried from the download tray; files that already finished are not fetched again.",
             },
             {
+              q: "My phone's bulk download is waiting at the save step. Why doesn't the next batch start?",
+              a: "It is waiting for you to confirm this batch was saved. Save every file, confirm they have finished downloading in your browser, then select Files saved — continue downloading. For the final batch, select Confirm saved and release cache. After release, Save again is unavailable. Once the whole selection is complete, use Recent downloads in the tray to download again; until then, finish the remaining batches or select the charts again. Keep the page open while downloading.",
+            },
+            {
+              q: "Save was requested, but I cannot find the file, or it downloaded as .bin.",
+              a: "Save requested means the browser received the request, not that the file is already on disk. Check the browser's downloads, then find the completed file in Files or your file manager. Before releasing the cache, select Save again. For an unexpected .bin, retry saving or download .zip and follow the import rename steps; do not simply rename .bin to .adx. After release, use Recent downloads in the tray once the whole selection is complete; until then, finish the remaining batches or select the charts again.",
+            },
+            {
               q: "The archive won't open, or reports corrupt files.",
-              a: "First check that the download actually finished — a truncated file cannot be extracted, so delete it and fetch it again. iOS's built-in extractor handles some .tar.gz archives poorly; download the .zip instead, or use a tool that supports the format.",
+              a: "Check your browser's downloads to confirm saving finished. Try Save again while the cache is still available; download again if the file is still corrupt or the cache was released. Do not extract .adx manually. Rename .zip to .adx or filename.adx.zip to import it. Renaming .tar.gz does not make it importable: download .adx for the game, or use a TAR.GZ-compatible tool to extract an archive.",
             },
             {
               q: "The chart doesn't show up in AstroDX after importing.",
@@ -405,14 +445,26 @@ export const guideSections: Record<Locale, ContentSection[]> = {
         {
           type: "list",
           items: [
-            ".adx —— AstroDX 専用のインポート形式。スマホでタップするだけで取り込めるので、基本はこれを選んでください。",
+            ".adx —— 推奨の AstroDX インポート形式。Android は「アプリで開く / 共有」で AstroDX に渡します。iOS は AstroDX フォルダ自体へ移動してからゲームを起動し直します。解凍は不要です。",
             ".zip —— 汎用の書庫。どの OS でも展開できるので、まず PC で整理したいときに向いています。",
-            ".tar.gz —— 同じく汎用の書庫で、容量は少し小さめ。コマンドラインでの作業やまとめて保管する用途に。",
+            ".tar.gz —— コマンドラインでの作業や保管用です。.adx に名前を変えるだけでは取り込めません。ゲームに取り込む場合は .adx 形式でダウンロードしてください。",
           ],
         },
         {
           type: "p",
-          text: "BGA 付きの譜面には背景アニメーション動画（pv.mp4）が同梱されます。プレイ中の背景演出が変わるだけで判定には影響しませんが、譜面本体の数倍の容量になることも多いため、一括ダウンロードでは「背景動画を含める」をオフにできます。",
+          text: "BGA 付きの譜面には背景動画（pv.mp4）が同梱されます。背景演出だけが変わり、判定には影響しません。「BGA 動画を含める」をオフにすると容量を減らせます。スマートフォンで 1 曲の容量が大きい場合は、BGA を外すかパソコンでダウンロードしてください。",
+        },
+        {
+          type: "steps",
+          items: [
+            "スマートフォンの一括ダウンロードは独立した小さなバッチに分かれます。ページを開いたまま、今回の作成完了を待ち、各ファイルの「ファイルを保存」を押してください。",
+            "ブラウザーのダウンロード履歴で今回の全ファイルの保存完了を確認します。見つからない、または再試行が必要な場合は、解放を確認する前に「もう一度保存」を押してください。",
+            "「保存を確認してダウンロードを続行」で今回のキャッシュを解放し、次のバッチを開始します。最後は「保存を確認してキャッシュを解放」を押します。各ファイルを個別に保存・インポートしてください。解放後もインポート手順は表示されます。",
+          ],
+        },
+        {
+          type: "p",
+          text: "ページ再読み込み後に取得済みデータから再作成できるのは、タスクやキャッシュをまだ削除していない場合だけです。解放後は同じデータをもう一度保存できません。選択した全曲の完了後は、トレイの「最近のダウンロード」から再取得できます。未完了の場合は残りのバッチを完了するか、曲を選び直してください。",
         },
         {
           type: "p",
@@ -470,8 +522,16 @@ export const guideSections: Record<Locale, ContentSection[]> = {
               a: "多くの場合、いま使っている回線とお使いのネットワークの相性の問題です。設定パネルの「ダウンロード」で速度を測り直し、遅延の小さい回線に切り替えてからやり直してください。中断したタスクはダウンロードトレイから再試行でき、完了済みのファイルは取り直しません。",
             },
             {
+              q: "スマートフォンの一括ダウンロードが保存待ちで止まり、次のバッチが始まらない",
+              a: "今回の保存確認を待っています。全ファイルを保存し、ブラウザーのダウンロード履歴で完了を確認してから「保存を確認してダウンロードを続行」を押します。最後は「保存を確認してキャッシュを解放」を押してください。解放後は再保存できません。選択した全曲の完了後はトレイの「最近のダウンロード」から再取得でき、未完了の場合は残りを完了するか曲を選び直してください。ダウンロード中はページを開いたままにします。",
+            },
+            {
+              q: "保存を開始したのにファイルが見つからない、または .bin になった",
+              a: "保存開始の表示はブラウザーへの依頼を表し、端末への保存完了を保証するものではありません。ブラウザーのダウンロード履歴で完了を確認し、「ファイル」App やファイルマネージャーで探します。キャッシュ解放前は「もう一度保存」を使えます。.bin になった場合は保存を再試行するか .zip で取得し、インポート手順に従って変更してください。.bin をそのまま .adx に変更しないでください。解放後は全曲の完了後にトレイの「最近のダウンロード」から再取得し、未完了の場合は残りを完了するか曲を選び直します。",
+            },
+            {
               q: "書庫が開けない・ファイルが壊れていると出る",
-              a: "まずダウンロードが最後まで終わっているか確認してください。途中で切れたファイルは展開できないので、削除して取り直します。iOS 標準の展開機能は一部の .tar.gz を正しく扱えないため、.zip を選ぶか、対応した解凍アプリをお使いください。",
+              a: "ブラウザーのダウンロード履歴で保存完了を確認してください。キャッシュ解放前は「もう一度保存」を優先し、それでも壊れている、または解放済みの場合は再取得します。.adx は手動解凍不要です。.zip は .adx または「ファイル名.adx.zip」に変更して取り込めます。.tar.gz は拡張子を変えるだけでは取り込めません。ゲーム用は .adx で取得し、保管用の解凍には TAR.GZ 対応ツールを使ってください。",
             },
             {
               q: "取り込んだのに AstroDX に譜面が出てこない",
