@@ -425,7 +425,9 @@ test("real PG: injected elapsed request time and DB time consume the whole budge
     clock = timeline(data.generation),
     normal = clock.deps.fetch;
   clock.deps.fetch = async (url, init) => {
-    clock.advance(9999);
+    // Reach the 59s work deadline while preserving the promised 1s DB settlement window.
+    // 9999ms per request left only 5ms, an invalid assumption under real PG scheduling.
+    clock.advance(9800);
     return normal(url, init);
   };
   const { revokeMedia } = await import("./media-purge");

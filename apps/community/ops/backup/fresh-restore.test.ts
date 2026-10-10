@@ -53,6 +53,7 @@ import {
 import { createRecoveryWeb } from "../../src/server/storage/recovery-web";
 import { withStorageTransaction } from "../../src/server/storage/transactions";
 import { createStorageIOTracker } from "../../src/server/storage/maintenance";
+import { createBackupCoordinator } from "../../src/server/storage/runtime-role";
 
 test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
   "actual Linux PG/restic/S3/native full snapshot, post-snapshot deletion, fresh-volume fail-closed restore",
@@ -155,20 +156,109 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
     const backupConfig = { ...(await storageFixtureConfig("backup")), recipeBuild: RECIPE_BUILD };
     const backupCtx = { ...sourceWeb, config: backupConfig, driver: createS3Driver(backupConfig) };
     const tracker = createStorageIOTracker();
-    console.log("proof: source prepared; actual full backup");
-    const manifest = await backupOriginals(backupCtx, {
-      databaseUrl: journal.databaseUrl,
-      umamiDatabaseUrl: umamiUrl.href,
-      stagingDirectory: join(root, "stage"),
-      bundleDirectory: join(root, "bundle"),
-      repositoryDirectory: join(root, "repository"),
-      journal,
-      dumpBounds: { community: 16 * 1024 * 1024, umami: 16 * 1024 * 1024 },
-      coordinator: () => ({
-        drain: (_lease, signal) => tracker.pauseAndDrain(signal),
-        resume: async () => tracker.resume(),
-      }),
-    });
+    const roleProcesses: ReturnType<typeof Bun.spawn>[] = [];
+    let manifest: Awaited<ReturnType<typeof backupOriginals>>;
+    try {
+      if (process.env.STORAGE_TEST_REAL_ROLES) {
+        // All reset-capable setup above is complete before actual normal entrypoints start.
+        for (const role of ["web", "control", "media"] as const) {
+          const config = await storageFixtureConfig(role);
+          const prefix = `STORAGE_${role.toUpperCase()}`;
+          roleProcesses.push(
+            Bun.spawn(
+              [
+                "bun",
+                role === "web"
+                  ? "./build/server/index.js"
+                  : role === "media"
+                    ? "./src/media-worker/main.ts"
+                    : "./src/worker/main.ts",
+              ],
+              {
+                env: {
+                  PATH: process.env.PATH,
+                  NODE_ENV: role === "web" ? "production" : "test",
+                  HOST: "127.0.0.1",
+                  PORT: "44112",
+                  PUBLIC_ORIGIN: "http://127.0.0.1:44112",
+                  PUBLIC_CONTACT_EMAIL: "fixture@example.test",
+                  DATABASE_URL: journal.databaseUrl,
+                  REDIS_URL: process.env.TEST_REDIS_URL + "/1",
+                  BETTER_AUTH_SECRET: "fresh-restore-fixture-secret-0123456789",
+                  GOOGLE_CLIENT_ID: "fixture",
+                  GOOGLE_CLIENT_SECRET: "fixture",
+                  TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+                  TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
+                  QQ_SENDER: role === "web" ? "napcat" : "console",
+                  QQ_CODE_HMAC_KEY: "fresh-restore-fixture-hmac-0123456789",
+                  NAPCAT_HTTP_URL: "http://127.0.0.1:9",
+                  NAPCAT_WS_URL: "ws://127.0.0.1:9",
+                  NAPCAT_ACCESS_TOKEN: "fresh-restore-fixture-token-0123456789abcdef",
+                  NAPCAT_BOT_QQ: "10001",
+                  STORAGE_S3_ENDPOINT: config.endpoint,
+                  STORAGE_RECIPE_BUILD: RECIPE_BUILD,
+                  STORAGE_TEMP_DIR: "/media-tmp",
+                  STORAGE_CAPACITY_DIR: "/storage-capacity",
+                  STORAGE_RESTORE_STATE_DIR: stateDirectory,
+                  STORAGE_JOURNAL_DIR: journal.directory,
+                  STORAGE_JOURNAL_KEY_FILE: journal.keyFile,
+                  STORAGE_INTERNAL_PORT: "54112",
+                  ...(role !== "media"
+                    ? { STORAGE_INTERNAL_MEDIA_SECRET: "fresh-restore-internal-secret-0123456789" }
+                    : {}),
+                  ...(role === "control"
+                    ? {
+                        STORAGE_INTERNAL_MEDIA_URL: "http://127.0.0.1:54112",
+                        CLOUDFLARE_ZONE_ID: "0".repeat(32),
+                        CLOUDFLARE_PURGE_TOKEN: "isolated-fixture",
+                      }
+                    : {}),
+                  [prefix + "_ACCESS_KEY_ID"]: config.accessKeyId,
+                  [prefix + "_SECRET_ACCESS_KEY"]: config.secretAccessKey,
+                  NO_PROXY: "localhost,127.0.0.1,host.docker.internal",
+                },
+                stdout: "inherit",
+                stderr: "inherit",
+              },
+            ),
+          );
+        }
+        let ready = false;
+        for (let i = 0; i < 300; i++) {
+          try {
+            if ((await fetch("http://127.0.0.1:44112/readyz")).status === 200) {
+              ready = true;
+              break;
+            }
+          } catch {}
+          if (roleProcesses.some((p) => p.exitCode !== null)) break;
+          await Bun.sleep(200);
+        }
+        expect(ready).toBe(true);
+        console.log("proof: three actual normal entrypoints ready; real coordinator enabled");
+      }
+      console.log("proof: source prepared; actual full backup");
+      manifest = await backupOriginals(backupCtx, {
+        databaseUrl: journal.databaseUrl,
+        umamiDatabaseUrl: umamiUrl.href,
+        stagingDirectory: join(root, "stage"),
+        bundleDirectory: join(root, "bundle"),
+        repositoryDirectory: join(root, "repository"),
+        journal,
+        dumpBounds: { community: 16 * 1024 * 1024, umami: 16 * 1024 * 1024 },
+        coordinator: process.env.STORAGE_TEST_REAL_ROLES
+          ? createBackupCoordinator(journal.databaseUrl)
+          : () => ({
+              drain: (_lease, signal) => tracker.pauseAndDrain(signal),
+              resume: async () => tracker.resume(),
+            }),
+      });
+    } finally {
+      for (const child of roleProcesses) if (child.exitCode === null) child.kill("SIGTERM");
+      for (const child of roleProcesses) await child.exited;
+    }
+    if (roleProcesses.length)
+      console.log("proof: actual coordinated snapshot complete; normal roles stopped and reaped");
     expect(manifest.originals).toHaveLength(4);
     expect(manifest.dumps.community.size).toBeGreaterThan(1000);
     expect(manifest.dumps.umami.size).toBeGreaterThan(1000);
