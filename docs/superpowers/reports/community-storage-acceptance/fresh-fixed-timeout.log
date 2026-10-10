@@ -1,0 +1,34 @@
+WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
+ Container community-storage-task12-restore-seaweedfs-1 Stopping
+ Container community-storage-task12-restore-postgres-1 Stopping
+ Container community-storage-task12-restore-postgres-1 Stopped
+ Container community-storage-task12-restore-postgres-1 Removing
+ Container community-storage-task12-restore-postgres-1 Removed
+ Container community-storage-task12-restore-seaweedfs-1 Stopped
+ Container community-storage-task12-restore-seaweedfs-1 Removing
+ Container community-storage-task12-restore-seaweedfs-1 Removed
+ Network community-storage-task12-restore_default Removing
+ Volume community-storage-task12-restore-pgdata Removing
+ Network community-storage-task12-restore_default Removed
+ Volume community-storage-task12-restore-pgdata Removed
+ Volume community-storage-task12-restore-s3data Removing
+ Volume community-storage-task12-restore-s3data Removed
+ Network community-storage-task12-restore_default Creating
+ Network community-storage-task12-restore_default Created
+ Volume community-storage-task12-restore-pgdata Creating
+ Volume community-storage-task12-restore-pgdata Created
+ Volume community-storage-task12-restore-s3data Creating
+ Volume community-storage-task12-restore-s3data Created
+ Container community-storage-task12-restore-postgres-1 Creating
+ Container community-storage-task12-restore-seaweedfs-1 Creating
+ Container community-storage-task12-restore-postgres-1 Created
+ Container community-storage-task12-restore-seaweedfs-1 Created
+ Container community-storage-task12-restore-postgres-1 Starting
+ Container community-storage-task12-restore-seaweedfs-1 Starting
+ Container community-storage-task12-restore-postgres-1 Started
+ Container community-storage-task12-restore-seaweedfs-1 Started
+bun test v1.4.2 (744846f84)
+
+ops/backup/fresh-restore.test.ts:
+
+OUTER_EXIT=124 WALL_SECONDS=238.42

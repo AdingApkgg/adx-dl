@@ -1,0 +1,771 @@
+$ bun run lint && bun run i18n && bun run typegen && tsc --noEmit && bun test --timeout 30000 src test/ops && vitest run
+$ biome lint
+src/server/storage/settlement.test.ts:279:48 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    277 │           await f.ctx.db
+    278 │             .insert(uploadAttempts)
+  > 279 │             .values({ ...attempt, id, tempKey: attempt.tempKey + "-replacement" });
+        │                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    280 │           await f.ctx.db
+    281 │             .update(storageBudget)
+
+  i Unsafe fix: Use a template literal.
+
+    277 277 │             await f.ctx.db
+    278 278 │               .insert(uploadAttempts)
+    279     │ - ············.values({·...attempt,·id,·tempKey:·attempt.tempKey·+·"-replacement"·});
+        279 │ + ············.values({·...attempt,·id,·tempKey:·`${attempt.tempKey}-replacement`·});
+    280 280 │             await f.ctx.db
+    281 281 │               .update(storageBudget)
+
+
+test/storage/images/generators/generate-baseline.mjs:15:207 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    13 │ async function reject(path,expected){try{await recipe(path,join(outputs,'unexpected.jpg'));throw Error('Unexpected accepted')}catch(e){if(!e.message.includes(expected))throw e;return e.message;}}
+    14 │ const colors=Buffer.alloc(160*80*3);for(let y=0;y<80;y++)for(let x=0;x<160;x++){const o=(y*160+x)*3;colors[o]=x<40||x>=120?255:0;colors[o+1]=x>=40&&x<120?255:0;}
+  > 15 │ for(const ext of ['jpeg','png','webp','avif']){let s=sharp(colors,{raw:{width:160,height:80,channels:3}});if(ext==='avif')s=s.avif({effort:0,quality:80});else s=s.toFormat(ext);await s.toFile(join(fixtures,'safe.'+ext));}
+       │                                                                                                                                                                                                               ^^^^^^^^^^^
+    16 │ const rgba=Buffer.alloc(80*160*4);for(let y=0;y<160;y++)for(let x=0;x<80;x++){const o=(y*80+x)*4;rgba[o+(y<80?0:2)]=255;rgba[o+3]=255;}
+    17 │ const xmp='<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/" dc:description="nonpersonal fixture"/></rdf:RDF></x:xmpmeta>';
+
+  i Unsafe fix: Use a template literal.
+
+    13 13 │   async function reject(path,expected){try{await recipe(path,join(outputs,'unexpected.jpg'));throw Error('Unexpected accepted')}catch(e){if(!e.message.includes(expected))throw e;return e.message;}}
+    14 14 │   const colors=Buffer.alloc(160*80*3);for(let y=0;y<80;y++)for(let x=0;x<160;x++){const o=(y*160+x)*3;colors[o]=x<40||x>=120?255:0;colors[o+1]=x>=40&&x<120?255:0;}
+    15    │ - for(const·ext·of·['jpeg','png','webp','avif']){let·s=sharp(colors,{raw:{width:160,height:80,channels:3}});if(ext==='avif')s=s.avif({effort:0,quality:80});else·s=s.toFormat(ext);await·s.toFile(join(fixtures,'safe.'+ext));}
+       15 │ + for(const·ext·of·['jpeg','png','webp','avif']){let·s=sharp(colors,{raw:{width:160,height:80,channels:3}});if(ext==='avif')s=s.avif({effort:0,quality:80});else·s=s.toFormat(ext);await·s.toFile(join(fixtures,`safe.${ext}`));}
+    16 16 │   const rgba=Buffer.alloc(80*160*4);for(let y=0;y<160;y++)for(let x=0;x<80;x++){const o=(y*80+x)*4;rgba[o+(y<80?0:2)]=255;rgba[o+3]=255;}
+    17 17 │   const xmp='<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/" dc:description="nonpersonal fixture"/></rdf:RDF></x:xmpmeta>';
+
+
+test/storage/images/generators/generate-baseline.mjs:28:58 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    26 │ const jpeg=await readFile(join(fixtures,'safe.jpeg'));await writeFile(join(fixtures,'truncated.jpg'),jpeg.subarray(0,Math.floor(jpeg.length/2)));
+    27 │ const iptc=Buffer.concat([Buffer.from([0x1c,2,5,0,19]),Buffer.from('nonpersonal fixture')]);const si...
+  > 28 │ for(const ext of ['jpeg','png','webp','avif'])await test('safe '+ext+' decode recipe',async()=>({input:metaFields(await classify(join(fixtures,'safe.'+ext))),output:await recipe(join(fixtures,'safe.'+ext),join(outputs,'safe-'+ext+'.jpg'))}));
+       │                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    29 │ await test('center cover crops outer red margins',async()=>{const {data,info}=await sharp(join(outputs,'safe-png.jpg')).raw().toBuffer({resolveWithObject:true});for(const [x,y]of [[10,10],[256,256],[500,500]]){const o=(y*info.width+x)*info.channels;if(data[o]>10||data[o+1]<245||data[o+2]>10)throw Error('center cover color mismatch');}return 'three sample pixels green';});
+    30 │ await test('orientation6 and metadata stripping',async()=>{const path=join(fixtures,'oriented.jpg');...
+
+  i Unsafe fix: Use a template literal.
+
+    26 26 │   const jpeg=await readFile(join(fixtures,'safe.jpeg'));await writeFile(join(fixtures,'truncated.jpg'),jpeg.subarray(0,Math.floor(jpeg.length/2)));
+    27 27 │   ....from([255,237]),appLen,app13,jpeg.subarray(2)]));
+    28    │ - for(const·ext·of·['jpeg','png','webp','avif'])await·test('safe·'+ext+'·decode·recipe',async()=>({input:metaFields(await·classify(join(fixtures,'safe.'+ext))),output:await·recipe(join(fixtures,'safe.'+ext),join(outputs,'safe-'+ext+'.jpg'))}));
+       28 │ + for(const·ext·of·['jpeg','png','webp','avif'])await·test(`safe·${ext}·decode·recipe`,async()=>({input:metaFields(await·classify(join(fixtures,'safe.'+ext))),output:await·recipe(join(fixtures,'safe.'+ext),join(outputs,'safe-'+ext+'.jpg'))}));
+    29 29 │   await test('center cover crops outer red margins',async()=>{const {data,info}=await sharp(join(outputs,'safe-png.jpg')).raw().toBuffer({resolveWithObject:true});for(const [x,y]of [[10,10],[256,256],[500,500]]){const o=(y*info.width+x)*info.channels;if(data[o]>10||data[o+1]<245||data[o+2]>10)throw Error('center cover color mismatch');}return 'three sample pixels green';});
+    30 30 │   ...xels:'left blue/right red after orientation6'};});
+
+
+test/storage/images/generators/generate-baseline.mjs:28:144 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    26 │ const jpeg=await readFile(join(fixtures,'safe.jpeg'));await writeFile(join(fixtures,'truncated.jpg'),jpeg.subarray(0,Math.floor(jpeg.length/2)));
+    27 │ const iptc=Buffer.concat([Buffer.from([0x1c,2,5,0,19]),Buffer.from('nonpersonal fixture')]);const si...
+  > 28 │ for(const ext of ['jpeg','png','webp','avif'])await test('safe '+ext+' decode recipe',async()=>({input:metaFields(await classify(join(fixtures,'safe.'+ext))),output:await recipe(join(fixtures,'safe.'+ext),join(outputs,'safe-'+ext+'.jpg'))}));
+       │                                                                                                                                                ^^^^^^^^^^^
+    29 │ await test('center cover crops outer red margins',async()=>{const {data,info}=await sharp(join(outputs,'safe-png.jpg')).raw().toBuffer({resolveWithObject:true});for(const [x,y]of [[10,10],[256,256],[500,500]]){const o=(y*info.width+x)*info.channels;if(data[o]>10||data[o+1]<245||data[o+2]>10)throw Error('center cover color mismatch');}return 'three sample pixels green';});
+    30 │ await test('orientation6 and metadata stripping',async()=>{const path=join(fixtures,'oriented.jpg');...
+
+  i Unsafe fix: Use a template literal.
+
+    26 26 │   const jpeg=await readFile(join(fixtures,'safe.jpeg'));await writeFile(join(fixtures,'truncated.jpg'),jpeg.subarray(0,Math.floor(jpeg.length/2)));
+    27 27 │   ....from([255,237]),appLen,app13,jpeg.subarray(2)]));
+    28    │ - for(const·ext·of·['jpeg','png','webp','avif'])await·test('safe·'+ext+'·decode·recipe',async()=>({input:metaFields(await·classify(join(fixtures,'safe.'+ext))),output:await·recipe(join(fixtures,'safe.'+ext),join(outputs,'safe-'+ext+'.jpg'))}));
+       28 │ + for(const·ext·of·['jpeg','png','webp','avif'])await·test('safe·'+ext+'·decode·recipe',async()=>({input:metaFields(await·classify(join(fixtures,`safe.${ext}`))),output:await·recipe(join(fixtures,'safe.'+ext),join(outputs,'safe-'+ext+'.jpg'))}));
+    29 29 │   await test('center cover crops outer red margins',async()=>{const {data,info}=await sharp(join(outputs,'safe-png.jpg')).raw().toBuffer({resolveWithObject:true});for(const [x,y]of [[10,10],[256,256],[500,500]]){const o=(y*info.width+x)*info.channels;if(data[o]>10||data[o+1]<245||data[o+2]>10)throw Error('center cover color mismatch');}return 'three sample pixels green';});
+    30 30 │   ...xels:'left blue/right red after orientation6'};});
+
+
+test/storage/images/generators/generate-baseline.mjs:28:193 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    26 │ const jpeg=await readFile(join(fixtures,'safe.jpeg'));await writeFile(join(fixtures,'truncated.jpg'),jpeg.subarray(0,Math.floor(jpeg.length/2)));
+    27 │ const iptc=Buffer.concat([Buffer.from([0x1c,2,5,0,19]),Buffer.from('nonpersonal fixture')]);const si...
+  > 28 │ for(const ext of ['jpeg','png','webp','avif'])await test('safe '+ext+' decode recipe',async()=>({input:metaFields(await classify(join(fixtures,'safe.'+ext))),output:await recipe(join(fixtures,'safe.'+ext),join(outputs,'safe-'+ext+'.jpg'))}));
+       │                                                                                                                                                                                                 ^^^^^^^^^^^
+    29 │ await test('center cover crops outer red margins',async()=>{const {data,info}=await sharp(join(outputs,'safe-png.jpg')).raw().toBuffer({resolveWithObject:true});for(const [x,y]of [[10,10],[256,256],[500,500]]){const o=(y*info.width+x)*info.channels;if(data[o]>10||data[o+1]<245||data[o+2]>10)throw Error('center cover color mismatch');}return 'three sample pixels green';});
+    30 │ await test('orientation6 and metadata stripping',async()=>{const path=join(fixtures,'oriented.jpg');...
+
+  i Unsafe fix: Use a template literal.
+
+    26 26 │   const jpeg=await readFile(join(fixtures,'safe.jpeg'));await writeFile(join(fixtures,'truncated.jpg'),jpeg.subarray(0,Math.floor(jpeg.length/2)));
+    27 27 │   ....from([255,237]),appLen,app13,jpeg.subarray(2)]));
+    28    │ - for(const·ext·of·['jpeg','png','webp','avif'])await·test('safe·'+ext+'·decode·recipe',async()=>({input:metaFields(await·classify(join(fixtures,'safe.'+ext))),output:await·recipe(join(fixtures,'safe.'+ext),join(outputs,'safe-'+ext+'.jpg'))}));
+       28 │ + for(const·ext·of·['jpeg','png','webp','avif'])await·test('safe·'+ext+'·decode·recipe',async()=>({input:metaFields(await·classify(join(fixtures,'safe.'+ext))),output:await·recipe(join(fixtures,`safe.${ext}`),join(outputs,'safe-'+ext+'.jpg'))}));
+    29 29 │   await test('center cover crops outer red margins',async()=>{const {data,info}=await sharp(join(outputs,'safe-png.jpg')).raw().toBuffer({resolveWithObject:true});for(const [x,y]of [[10,10],[256,256],[500,500]]){const o=(y*info.width+x)*info.channels;if(data[o]>10||data[o+1]<245||data[o+2]>10)throw Error('center cover color mismatch');}return 'three sample pixels green';});
+    30 30 │   ...xels:'left blue/right red after orientation6'};});
+
+
+test/storage/images/generators/generate-baseline.mjs:28:219 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    26 │ const jpeg=await readFile(join(fixtures,'safe.jpeg'));await writeFile(join(fixtures,'truncated.jpg'),jpeg.subarray(0,Math.floor(jpeg.length/2)));
+    27 │ const iptc=Buffer.concat([Buffer.from([0x1c,2,5,0,19]),Buffer.from('nonpersonal fixture')]);const si...
+  > 28 │ for(const ext of ['jpeg','png','webp','avif'])await test('safe '+ext+' decode recipe',async()=>({input:metaFields(await classify(join(fixtures,'safe.'+ext))),output:await recipe(join(fixtures,'safe.'+ext),join(outputs,'safe-'+ext+'.jpg'))}));
+       │                                                                                                                                                                                                                           ^^^^^^^^^^^^^^^^^^
+    29 │ await test('center cover crops outer red margins',async()=>{const {data,info}=await sharp(join(outputs,'safe-png.jpg')).raw().toBuffer({resolveWithObject:true});for(const [x,y]of [[10,10],[256,256],[500,500]]){const o=(y*info.width+x)*info.channels;if(data[o]>10||data[o+1]<245||data[o+2]>10)throw Error('center cover color mismatch');}return 'three sample pixels green';});
+    30 │ await test('orientation6 and metadata stripping',async()=>{const path=join(fixtures,'oriented.jpg');...
+
+  i Unsafe fix: Use a template literal.
+
+    26 26 │   const jpeg=await readFile(join(fixtures,'safe.jpeg'));await writeFile(join(fixtures,'truncated.jpg'),jpeg.subarray(0,Math.floor(jpeg.length/2)));
+    27 27 │   ....from([255,237]),appLen,app13,jpeg.subarray(2)]));
+    28    │ - for(const·ext·of·['jpeg','png','webp','avif'])await·test('safe·'+ext+'·decode·recipe',async()=>({input:metaFields(await·classify(join(fixtures,'safe.'+ext))),output:await·recipe(join(fixtures,'safe.'+ext),join(outputs,'safe-'+ext+'.jpg'))}));
+       28 │ + for(const·ext·of·['jpeg','png','webp','avif'])await·test('safe·'+ext+'·decode·recipe',async()=>({input:metaFields(await·classify(join(fixtures,'safe.'+ext))),output:await·recipe(join(fixtures,'safe.'+ext),join(outputs,`safe-${ext}.jpg`))}));
+    29 29 │   await test('center cover crops outer red margins',async()=>{const {data,info}=await sharp(join(outputs,'safe-png.jpg')).raw().toBuffer({resolveWithObject:true});for(const [x,y]of [[10,10],[256,256],[500,500]]){const o=(y*info.width+x)*info.channels;if(data[o]>10||data[o+1]<245||data[o+2]>10)throw Error('center cover color mismatch');}return 'three sample pixels green';});
+    30 30 │   ...xels:'left blue/right red after orientation6'};});
+
+
+test/storage/images/generators/generate-baseline.mjs:42:54 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    40 │ let totalFixtureBytes=0;for(const name of await readdir(fixtures))totalFixtureBytes+=(await stat(join(fixtures,name))).size;
+    41 │ const result={platform:process.platform,arch:process.arch,runtime:process.versions.bun,sharpVersions...
+  > 42 │ ...(root,'linux-sharp-result.json'),JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify({pla...
+       │                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    43 │
+
+  i Unsafe fix: Use a template literal.
+
+    40 40 │   let totalFixtureBytes=0;for(const name of await readdir(fixtures))totalFixtureBytes+=(await stat(join(fixtures,name))).size;
+    41 41 │   ...s,notes,failures:results.filter(x=>!x.ok).length};
+    42    │ - ...sharp-result.json'),JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify({platform:result....
+       42 │ + ...·writeFile(join(root,'linux-sharp-result.json'),`${JSON.stringify(result,null,2)}\n`);console.log(JS...
+    43 43 │
+
+
+test/storage/images/generators/generate-sharp.mjs:8:117 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+     6 │ const rgba=Buffer.alloc(80*160*3);for(let y=0;y<160;y++)for(let x=0;x<80;x++)rgba[(y*80+x)*3+(y<80?0:2)]=255;
+     7 │ const raw={width:80,height:160,channels:3};
+   > 8 │ await sharp(rgba,{raw}).toColourspace('cmyk').jpeg({quality:90,chromaSubsampling:'4:4:4',progressive:false}).toFile(root+'/own-cmyk.jpg');
+       │                                                                                                                     ^^^^^^^^^^^^^^^^^^^^
+     9 │ const xmp='<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/" dc:description="Own synthetic storage fixture"/></rdf:RDF></x:xmpmeta>';
+    10 │ await sharp(rgba,{raw}).withMetadata({orientation:6}).withExifMerge({IFD0:{Artist:'Own synthetic storage fixture'},IFD3:{GPSLatitudeRef:'N',GPSLatitude:'0/1 0/1 0/1',GPSLongitudeRef:'E',GPSLongitude:'0/1 0/1 0/1'}}).withXmp(xmp).jpeg({quality:90,chromaSubsampling:'4:4:4',progressive:false}).toFile(root+'/own-gps-orientation6.jpg');
+
+  i Unsafe fix: Use a template literal.
+
+     6  6 │   const rgba=Buffer.alloc(80*160*3);for(let y=0;y<160;y++)for(let x=0;x<80;x++)rgba[(y*80+x)*3+(y<80?0:2)]=255;
+     7  7 │   const raw={width:80,height:160,channels:3};
+     8    │ - await·sharp(rgba,{raw}).toColourspace('cmyk').jpeg({quality:90,chromaSubsampling:'4:4:4',progressive:false}).toFile(root+'/own-cmyk.jpg');
+        8 │ + await·sharp(rgba,{raw}).toColourspace('cmyk').jpeg({quality:90,chromaSubsampling:'4:4:4',progressive:false}).toFile(`${root}/own-cmyk.jpg`);
+     9  9 │   const xmp='<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/" dc:description="Own synthetic storage fixture"/></rdf:RDF></x:xmpmeta>';
+    10 10 │   await sharp(rgba,{raw}).withMetadata({orientation:6}).withExifMerge({IFD0:{Artist:'Own synthetic storage fixture'},IFD3:{GPSLatitudeRef:'N',GPSLatitude:'0/1 0/1 0/1',GPSLongitudeRef:'E',GPSLongitude:'0/1 0/1 0/1'}}).withXmp(xmp).jpeg({quality:90,chromaSubsampling:'4:4:4',progressive:false}).toFile(root+'/own-gps-orientation6.jpg');
+
+
+test/storage/images/generators/generate-sharp.mjs:10:300 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+     8 │ await sharp(rgba,{raw}).toColourspace('cmyk').jpeg({quality:90,chromaSubsampling:'4:4:4',progressive:false}).toFile(root+'/own-cmyk.jpg');
+     9 │ const xmp='<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/" dc:description="Own synthetic storage fixture"/></rdf:RDF></x:xmpmeta>';
+  > 10 │ await sharp(rgba,{raw}).withMetadata({orientation:6}).withExifMerge({IFD0:{Artist:'Own synthetic storage fixture'},IFD3:{GPSLatitudeRef:'N',GPSLatitude:'0/1 0/1 0/1',GPSLongitudeRef:'E',GPSLongitude:'0/1 0/1 0/1'}}).withXmp(xmp).jpeg({quality:90,chromaSubsampling:'4:4:4',progressive:false}).toFile(root+'/own-gps-orientation6.jpg');
+       │                                                                                                                                                                                                                                                                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    11 │ function exifValues(exif){
+    12 │  if(exif.toString('ascii',0,6)!=='Exif\0\0')throw Error('EXIF header absent');
+
+  i Unsafe fix: Use a template literal.
+
+     8  8 │   await sharp(rgba,{raw}).toColourspace('cmyk').jpeg({quality:90,chromaSubsampling:'4:4:4',progressive:false}).toFile(root+'/own-cmyk.jpg');
+     9  9 │   const xmp='<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/" dc:description="Own synthetic storage fixture"/></rdf:RDF></x:xmpmeta>';
+    10    │ - await·sharp(rgba,{raw}).withMetadata({orientation:6}).withExifMerge({IFD0:{Artist:'Own·synthetic·storage·fixture'},IFD3:{GPSLatitudeRef:'N',GPSLatitude:'0/1·0/1·0/1',GPSLongitudeRef:'E',GPSLongitude:'0/1·0/1·0/1'}}).withXmp(xmp).jpeg({quality:90,chromaSubsampling:'4:4:4',progressive:false}).toFile(root+'/own-gps-orientation6.jpg');
+       10 │ + await·sharp(rgba,{raw}).withMetadata({orientation:6}).withExifMerge({IFD0:{Artist:'Own·synthetic·storage·fixture'},IFD3:{GPSLatitudeRef:'N',GPSLatitude:'0/1·0/1·0/1',GPSLongitudeRef:'E',GPSLongitude:'0/1·0/1·0/1'}}).withXmp(xmp).jpeg({quality:90,chromaSubsampling:'4:4:4',progressive:false}).toFile(`${root}/own-gps-orientation6.jpg`);
+    11 11 │   function exifValues(exif){
+    12 12 │    if(exif.toString('ascii',0,6)!=='Exif\0\0')throw Error('EXIF header absent');
+
+
+test/storage/images/generators/generate-sharp.mjs:23:13 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    21 │ async function hash(path){return {bytes:(await stat(path)).size,sha256:createHash('sha256').update(await readFile(path)).digest('hex')};}
+    22 │ for(const name of ['own-cmyk.jpg','own-gps-orientation6.jpg']){
+  > 23 │  const path=root+'/'+name,m=await sharp(path,{failOn:'warning',limitInputPixels:16000000}).metadata();results.inputs[name]={...fields(m),...await hash(path)};
+       │             ^^^^^^^^^^^^^
+    24 │  if(name==='own-cmyk.jpg'&&(m.space!=='cmyk'||m.channels!==4))throw Error('Native input not CMYK');
+    25 │  if(name==='own-gps-orientation6.jpg'){const tags=exifValues(m.exif);if(tags.orientation!==6||tags.gps[1]!=='N'||tags.gps[3]!=='E'||JSON.stringify(tags.gps[2])!=='[[0,1],[0,1],[0,1]]'||JSON.stringify(tags.gps[4])!=='[[0,1],[0,1],[0,1]]')throw Error('Synthetic GPS/orientation missing');results.inputs[name].parsedExif=tags;}
+
+  i Unsafe fix: Use a template literal.
+
+    21 21 │   async function hash(path){return {bytes:(await stat(path)).size,sha256:createHash('sha256').update(await readFile(path)).digest('hex')};}
+    22 22 │   for(const name of ['own-cmyk.jpg','own-gps-orientation6.jpg']){
+    23    │ - ·const·path=root+'/'+name,m=await·sharp(path,{failOn:'warning',limitInputPixels:16000000}).metadata();results.inputs[name]={...fields(m),...await·hash(path)};
+       23 │ + ·const·path=`${root}/${name}`,m=await·sharp(path,{failOn:'warning',limitInputPixels:16000000}).metadata();results.inputs[name]={...fields(m),...await·hash(path)};
+    24 24 │    if(name==='own-cmyk.jpg'&&(m.space!=='cmyk'||m.channels!==4))throw Error('Native input not CMYK');
+    25 25 │    if(name==='own-gps-orientation6.jpg'){const tags=exifValues(m.exif);if(tags.orientation!==6||tags.gps[1]!=='N'||tags.gps[3]!=='E'||JSON.stringify(tags.gps[2])!=='[[0,1],[0,1],[0,1]]'||JSON.stringify(tags.gps[4])!=='[[0,1],[0,1],[0,1]]')throw Error('Synthetic GPS/orientation missing');results.inputs[name].parsedExif=tags;}
+
+
+test/storage/images/generators/generate-sharp.mjs:26:12 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    24 │  if(name==='own-cmyk.jpg'&&(m.space!=='cmyk'||m.channels!==4))throw Error('Native input not CMYK');
+    25 │  if(name==='own-gps-orientation6.jpg'){const tags=exifValues(m.exif);if(tags.orientation!==6||tags.gps[1]!=='N'||tags.gps[3]!=='E'||JSON.stringify(tags.gps[2])!=='[[0,1],[0,1],[0,1]]'||JSON.stringify(tags.gps[4])!=='[[0,1],[0,1],[0,1]]')throw Error('Synthetic GPS/orientation missing');results.inputs[name].parsedExif=tags;}
+  > 26 │  const out=root+'/'+name.replace('.jpg','.recipe.jpg');await sharp(path,{failOn:'warning',limitInputPixels:16000000}).rotate().toColourspace('srgb').resize(512,512,{fit:'cover',position:'centre'}).flatten({background:'#ffffff'}).jpeg({quality:85,progressive:false}).toFile(out);
+       │            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    27 │  const om=await sharp(out).metadata(),oh=await hash(out);if(om.format!=='jpeg'||om.width!==512||om.height!==512||om.space!=='srgb'||oh.bytes>524288||om.exif||om.icc||om.xmp||om.iptc||om.isProgressive)throw Error('Recipe invalid');
+    28 │  const {data,info}=await sharp(out).raw().toBuffer({resolveWithObject:true});const pixels=name==='ow...
+
+  i Unsafe fix: Use a template literal.
+
+    24 24 │    if(name==='own-cmyk.jpg'&&(m.space!=='cmyk'||m.channels!==4))throw Error('Native input not CMYK');
+    25 25 │    if(name==='own-gps-orientation6.jpg'){const tags=exifValues(m.exif);if(tags.orientation!==6||tags.gps[1]!=='N'||tags.gps[3]!=='E'||JSON.stringify(tags.gps[2])!=='[[0,1],[0,1],[0,1]]'||JSON.stringify(tags.gps[4])!=='[[0,1],[0,1],[0,1]]')throw Error('Synthetic GPS/orientation missing');results.inputs[name].parsedExif=tags;}
+    26    │ - ·const·out=root+'/'+name.replace('.jpg','.recipe.jpg');await·sharp(path,{failOn:'warning',limitInputPixels:16000000}).rotate().toColourspace('srgb').resize(512,512,{fit:'cover',position:'centre'}).flatten({background:'#ffffff'}).jpeg({quality:85,progressive:false}).toFile(out);
+       26 │ + ·const·out=`${root}/${name.replace('.jpg','.recipe.jpg')}`;await·sharp(path,{failOn:'warning',limitInputPixels:16000000}).rotate().toColourspace('srgb').resize(512,512,{fit:'cover',position:'centre'}).flatten({background:'#ffffff'}).jpeg({quality:85,progressive:false}).toFile(out);
+    27 27 │    const om=await sharp(out).metadata(),oh=await hash(out);if(om.format!=='jpeg'||om.width!==512||om.height!==512||om.space!=='srgb'||oh.bytes>524288||om.exif||om.icc||om.xmp||om.iptc||om.isProgressive)throw Error('Recipe invalid');
+    28 28 │   ...utputs[name]={...fields(om),...oh,pixels,sampled};
+
+
+test/storage/images/generators/generate-sharp.mjs:30:24 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    28 │  const {data,info}=await sharp(out).raw().toBuffer({resolveWithObject:true});const pixels=name==='ow...
+    29 │ }
+  > 30 │ const heic=await sharp(root+'/own-solid-rgb32.heic').metadata();if(heic.format!=='heif'||heic.compression!=='hevc'||heic.width!==32||heic.height!==32||(heic.pages??1)!==1)throw Error('Own HEIC native metadata incorrect');results.inputs['own-solid-rgb32.heic']={...fields(heic),...await hash(root+'/own-solid-rgb32.heic'),policyExpected:'UNSUPPORTED_FORMAT'};
+       │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    31 │ const decoded=await sharp(root+'/own-solid-rgb32.decoded.png').raw().toBuffer({resolveWithObject:true});if(decoded.info.width!==32||decoded.info.height!==32)throw Error('Independent HEVC decode size');results.heicDecode={...decoded.info,firstPixel:[...decoded.data.subarray(0,3)]};
+    32 │ results.resourceUsage=process.resourceUsage();await writeFile(root+'/own-sharp-result.json',JSON.stringify(results,null,2)+'\n');console.log(JSON.stringify(results,null,2));
+
+  i Unsafe fix: Use a template literal.
+
+    28 28 │   ...utputs[name]={...fields(om),...oh,pixels,sampled};
+    29 29 │   }
+    30    │ - const·heic=await·sharp(root+'/own-solid-rgb32.heic').metadata();if(heic.format!=='heif'||heic.compression!=='hevc'||heic.width!==32||heic.height!==32||(heic.pages??1)!==1)throw·Error('Own·HEIC·native·metadata·incorrect');results.inputs['own-solid-rgb32.heic']={...fields(heic),...await·hash(root+'/own-solid-rgb32.heic'),policyExpected:'UNSUPPORTED_FORMAT'};
+       30 │ + const·heic=await·sharp(`${root}/own-solid-rgb32.heic`).metadata();if(heic.format!=='heif'||heic.compression!=='hevc'||heic.width!==32||heic.height!==32||(heic.pages??1)!==1)throw·Error('Own·HEIC·native·metadata·incorrect');results.inputs['own-solid-rgb32.heic']={...fields(heic),...await·hash(root+'/own-solid-rgb32.heic'),policyExpected:'UNSUPPORTED_FORMAT'};
+    31 31 │   const decoded=await sharp(root+'/own-solid-rgb32.decoded.png').raw().toBuffer({resolveWithObject:true});if(decoded.info.width!==32||decoded.info.height!==32)throw Error('Independent HEVC decode size');results.heicDecode={...decoded.info,firstPixel:[...decoded.data.subarray(0,3)]};
+    32 32 │   results.resourceUsage=process.resourceUsage();await writeFile(root+'/own-sharp-result.json',JSON.stringify(results,null,2)+'\n');console.log(JSON.stringify(results,null,2));
+
+
+test/storage/images/generators/generate-sharp.mjs:30:292 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    28 │  const {data,info}=await sharp(out).raw().toBuffer({resolveWithObject:true});const pixels=name==='ow...
+    29 │ }
+  > 30 │ const heic=await sharp(root+'/own-solid-rgb32.heic').metadata();if(heic.format!=='heif'||heic.compression!=='hevc'||heic.width!==32||heic.height!==32||(heic.pages??1)!==1)throw Error('Own HEIC native metadata incorrect');results.inputs['own-solid-rgb32.heic']={...fields(heic),...await hash(root+'/own-solid-rgb32.heic'),policyExpected:'UNSUPPORTED_FORMAT'};
+       │                                                                                                                                                                                                                                                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    31 │ const decoded=await sharp(root+'/own-solid-rgb32.decoded.png').raw().toBuffer({resolveWithObject:true});if(decoded.info.width!==32||decoded.info.height!==32)throw Error('Independent HEVC decode size');results.heicDecode={...decoded.info,firstPixel:[...decoded.data.subarray(0,3)]};
+    32 │ results.resourceUsage=process.resourceUsage();await writeFile(root+'/own-sharp-result.json',JSON.stringify(results,null,2)+'\n');console.log(JSON.stringify(results,null,2));
+
+  i Unsafe fix: Use a template literal.
+
+    28 28 │   ...utputs[name]={...fields(om),...oh,pixels,sampled};
+    29 29 │   }
+    30    │ - const·heic=await·sharp(root+'/own-solid-rgb32.heic').metadata();if(heic.format!=='heif'||heic.compression!=='hevc'||heic.width!==32||heic.height!==32||(heic.pages??1)!==1)throw·Error('Own·HEIC·native·metadata·incorrect');results.inputs['own-solid-rgb32.heic']={...fields(heic),...await·hash(root+'/own-solid-rgb32.heic'),policyExpected:'UNSUPPORTED_FORMAT'};
+       30 │ + const·heic=await·sharp(root+'/own-solid-rgb32.heic').metadata();if(heic.format!=='heif'||heic.compression!=='hevc'||heic.width!==32||heic.height!==32||(heic.pages??1)!==1)throw·Error('Own·HEIC·native·metadata·incorrect');results.inputs['own-solid-rgb32.heic']={...fields(heic),...await·hash(`${root}/own-solid-rgb32.heic`),policyExpected:'UNSUPPORTED_FORMAT'};
+    31 31 │   const decoded=await sharp(root+'/own-solid-rgb32.decoded.png').raw().toBuffer({resolveWithObject:true});if(decoded.info.width!==32||decoded.info.height!==32)throw Error('Independent HEVC decode size');results.heicDecode={...decoded.info,firstPixel:[...decoded.data.subarray(0,3)]};
+    32 32 │   results.resourceUsage=process.resourceUsage();await writeFile(root+'/own-sharp-result.json',JSON.stringify(results,null,2)+'\n');console.log(JSON.stringify(results,null,2));
+
+
+test/storage/images/generators/generate-sharp.mjs:31:27 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    29 │ }
+    30 │ const heic=await sharp(root+'/own-solid-rgb32.heic').metadata();if(heic.format!=='heif'||heic.compression!=='hevc'||heic.width!==32||heic.height!==32||(heic.pages??1)!==1)throw Error('Own HEIC native metadata incorrect');results.inputs['own-solid-rgb32.heic']={...fields(heic),...await hash(root+'/own-solid-rgb32.heic'),policyExpected:'UNSUPPORTED_FORMAT'};
+  > 31 │ const decoded=await sharp(root+'/own-solid-rgb32.decoded.png').raw().toBuffer({resolveWithObject:true});if(decoded.info.width!==32||decoded.info.height!==32)throw Error('Independent HEVC decode size');results.heicDecode={...decoded.info,firstPixel:[...decoded.data.subarray(0,3)]};
+       │                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    32 │ results.resourceUsage=process.resourceUsage();await writeFile(root+'/own-sharp-result.json',JSON.stringify(results,null,2)+'\n');console.log(JSON.stringify(results,null,2));
+    33 │
+
+  i Unsafe fix: Use a template literal.
+
+    29 29 │   }
+    30 30 │   const heic=await sharp(root+'/own-solid-rgb32.heic').metadata();if(heic.format!=='heif'||heic.compression!=='hevc'||heic.width!==32||heic.height!==32||(heic.pages??1)!==1)throw Error('Own HEIC native metadata incorrect');results.inputs['own-solid-rgb32.heic']={...fields(heic),...await hash(root+'/own-solid-rgb32.heic'),policyExpected:'UNSUPPORTED_FORMAT'};
+    31    │ - const·decoded=await·sharp(root+'/own-solid-rgb32.decoded.png').raw().toBuffer({resolveWithObject:true});if(decoded.info.width!==32||decoded.info.height!==32)throw·Error('Independent·HEVC·decode·size');results.heicDecode={...decoded.info,firstPixel:[...decoded.data.subarray(0,3)]};
+       31 │ + const·decoded=await·sharp(`${root}/own-solid-rgb32.decoded.png`).raw().toBuffer({resolveWithObject:true});if(decoded.info.width!==32||decoded.info.height!==32)throw·Error('Independent·HEVC·decode·size');results.heicDecode={...decoded.info,firstPixel:[...decoded.data.subarray(0,3)]};
+    32 32 │   results.resourceUsage=process.resourceUsage();await writeFile(root+'/own-sharp-result.json',JSON.stringify(results,null,2)+'\n');console.log(JSON.stringify(results,null,2));
+    33 33 │
+
+
+test/storage/images/generators/generate-sharp.mjs:32:63 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    30 │ const heic=await sharp(root+'/own-solid-rgb32.heic').metadata();if(heic.format!=='heif'||heic.compression!=='hevc'||heic.width!==32||heic.height!==32||(heic.pages??1)!==1)throw Error('Own HEIC native metadata incorrect');results.inputs['own-solid-rgb32.heic']={...fields(heic),...await hash(root+'/own-solid-rgb32.heic'),policyExpected:'UNSUPPORTED_FORMAT'};
+    31 │ const decoded=await sharp(root+'/own-solid-rgb32.decoded.png').raw().toBuffer({resolveWithObject:true});if(decoded.info.width!==32||decoded.info.height!==32)throw Error('Independent HEVC decode size');results.heicDecode={...decoded.info,firstPixel:[...decoded.data.subarray(0,3)]};
+  > 32 │ results.resourceUsage=process.resourceUsage();await writeFile(root+'/own-sharp-result.json',JSON.stringify(results,null,2)+'\n');console.log(JSON.stringify(results,null,2));
+       │                                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    33 │
+
+  i Unsafe fix: Use a template literal.
+
+    30 30 │   const heic=await sharp(root+'/own-solid-rgb32.heic').metadata();if(heic.format!=='heif'||heic.compression!=='hevc'||heic.width!==32||heic.height!==32||(heic.pages??1)!==1)throw Error('Own HEIC native metadata incorrect');results.inputs['own-solid-rgb32.heic']={...fields(heic),...await hash(root+'/own-solid-rgb32.heic'),policyExpected:'UNSUPPORTED_FORMAT'};
+    31 31 │   const decoded=await sharp(root+'/own-solid-rgb32.decoded.png').raw().toBuffer({resolveWithObject:true});if(decoded.info.width!==32||decoded.info.height!==32)throw Error('Independent HEVC decode size');results.heicDecode={...decoded.info,firstPixel:[...decoded.data.subarray(0,3)]};
+    32    │ - results.resourceUsage=process.resourceUsage();await·writeFile(root+'/own-sharp-result.json',JSON.stringify(results,null,2)+'\n');console.log(JSON.stringify(results,null,2));
+       32 │ + results.resourceUsage=process.resourceUsage();await·writeFile(`${root}/own-sharp-result.json`,JSON.stringify(results,null,2)+'\n');console.log(JSON.stringify(results,null,2));
+    33 33 │
+
+
+test/storage/images/generators/generate-sharp.mjs:32:93 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    30 │ const heic=await sharp(root+'/own-solid-rgb32.heic').metadata();if(heic.format!=='heif'||heic.compression!=='hevc'||heic.width!==32||heic.height!==32||(heic.pages??1)!==1)throw Error('Own HEIC native metadata incorrect');results.inputs['own-solid-rgb32.heic']={...fields(heic),...await hash(root+'/own-solid-rgb32.heic'),policyExpected:'UNSUPPORTED_FORMAT'};
+    31 │ const decoded=await sharp(root+'/own-solid-rgb32.decoded.png').raw().toBuffer({resolveWithObject:true});if(decoded.info.width!==32||decoded.info.height!==32)throw Error('Independent HEVC decode size');results.heicDecode={...decoded.info,firstPixel:[...decoded.data.subarray(0,3)]};
+  > 32 │ results.resourceUsage=process.resourceUsage();await writeFile(root+'/own-sharp-result.json',JSON.stringify(results,null,2)+'\n');console.log(JSON.stringify(results,null,2));
+       │                                                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    33 │
+
+  i Unsafe fix: Use a template literal.
+
+    30 30 │   const heic=await sharp(root+'/own-solid-rgb32.heic').metadata();if(heic.format!=='heif'||heic.compression!=='hevc'||heic.width!==32||heic.height!==32||(heic.pages??1)!==1)throw Error('Own HEIC native metadata incorrect');results.inputs['own-solid-rgb32.heic']={...fields(heic),...await hash(root+'/own-solid-rgb32.heic'),policyExpected:'UNSUPPORTED_FORMAT'};
+    31 31 │   const decoded=await sharp(root+'/own-solid-rgb32.decoded.png').raw().toBuffer({resolveWithObject:true});if(decoded.info.width!==32||decoded.info.height!==32)throw Error('Independent HEVC decode size');results.heicDecode={...decoded.info,firstPixel:[...decoded.data.subarray(0,3)]};
+    32    │ - results.resourceUsage=process.resourceUsage();await·writeFile(root+'/own-sharp-result.json',JSON.stringify(results,null,2)+'\n');console.log(JSON.stringify(results,null,2));
+       32 │ + results.resourceUsage=process.resourceUsage();await·writeFile(root+'/own-sharp-result.json',`${JSON.stringify(results,null,2)}\n`);console.log(JSON.stringify(results,null,2));
+    33 33 │
+
+
+Checked 368 files in 457ms. No fixes applied.
+Found 16 infos.
+$ paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy url baseLocale --output-structure message-modules --emit-ts-declarations
+ℹ [paraglide-js] Compiling inlang project ...
+✔ [paraglide-js] Successfully compiled inlang project.
+$ react-router typegen
+ℹ [paraglide-js] Compilation skipped — inputs unchanged (message-modules)
+bun test v1.4.2 (744846f84)
+
+src/server/app.test.ts:
+(pass) createApp > /healthz 返回 ok，并带上请求 ID [36.02ms]
+(pass) createApp > 未知的 /api 路径返回 JSON 404，不落到页面渲染 [4.29ms]
+(pass) createApp > /media 目前返回 404，并且不带 Set-Cookie [1.53ms]
+(pass) createApp > 未处理的异常返回通用 500，细节只进日志 [2.40ms]
+(pass) createApp > 数据库查询出错时，日志里有 SQL，没有查询参数 [2.46ms]
+(pass) createApp > HTTPException 按状态码给出错误码，message 原样返回 [1.66ms]
+(pass) createApp > 进程内请求收到的 Set-Cookie 补到页面响应上，同名的只留最后一条 [1.40ms]
+(pass) createApp > 跳转一律 private, no-store；自己设了 Cache-Control 的不动；Set-Cookie 原样带着 [1.34ms]
+(pass) createApp > /robots.txt：允许收录页面，挡住接口和统计转发 [2.14ms]
+(pass) createApp > 安全响应头已经挂上 [1.61ms]
+(pass) createApp > /readyz 在所有检查通过时返回 200 [2.73ms]
+(pass) createApp > /readyz 有一项失败时返回 503，原因写进日志 [2.60ms]
+(pass) createApp > /readyz 只回答本机的探针：带 CF-Connecting-IP 的一律 404，也不跑检查 [2.27ms]
+(pass) createApp > /readyz 的失败原因同样不带查询参数 [3.11ms]
+(pass) createApp > /api 按 IP 限流，每分钟 300 次 [18.27ms]
+(pass) createApp > 进程内请求（服务端渲染时 loader 调接口）不占 /api 按 IP 的额度 [27.03ms]
+(pass) createApp > 限流的计数存储出错：照常放行，rate_limit_store_error 一分钟最多记一条 [3.61ms]
+(pass) createApp > GET /api/v1/meta [1.41ms]
+(pass) createApp > /api 的响应都带 Cache-Control: private, no-store：正常的、未知接口的 404、未登录的 401 [2.38ms]
+(pass) createApp > GET /api/v1/login-options：不用登录，返回 testAppDeps 里的那份配置 [1.81ms]
+(pass) createApp > GET /api/v1/login-options 返回的是服务给出的值，QQ 登录不可用时也一样 [1.91ms]
+(pass) createApp > /api/v1 的写请求要过 CSRF 检查 [2.35ms]
+(pass) createApp > /api/auth/* 按 IP 每分钟 30 次，同一个 /64 里的 IPv6 地址共用计数 [38.84ms]
+(pass) 没有请求体的请求不被请求体上限读取 > /api/v1/*：撤销注销用的 DELETE [3.40ms]
+(pass) 没有请求体的请求不被请求体上限读取 > /api/auth/*：原样交给 Better Auth [3.12ms]
+
+src/server/outbound-proxy.test.ts:
+(pass) Bun 的 fetch 和 HTTPS_PROXY / NO_PROXY（compose.yaml 里 web 的设置） > https 的 Google 走代理；NO_PROXY 里的主机和 http 的内部服务不走 [69.83ms]
+(pass) Bun 的 fetch 和 HTTPS_PROXY / NO_PROXY（compose.yaml 里 web 的设置） > 容器里多出 HTTP_PROXY 时：NO_PROXY 里的内部服务照样直连，别的 http 地址才走代理 [32.26ms]
+(pass) Bun 的 fetch 和 HTTPS_PROXY / NO_PROXY（compose.yaml 里 web 的设置） > HTTPS_PROXY 是空字符串：不用代理 [62.14ms]
+
+src/server/env.test.ts:
+(pass) parseEnv > 解析完整配置，并填上默认值 [4.38ms]
+(pass) parseEnv > 公开联系邮箱：开发时可不填，填写后必须是邮箱 [0.91ms]
+(pass) parseEnv > 生产环境必须填写公开联系邮箱 [0.23ms]
+(pass) parseEnv > 缺项时一次报全 [0.72ms]
+(pass) parseEnv > PUBLIC_ORIGIN 末尾的斜杠会被去掉 [0.15ms]
+(pass) parseEnv > PUBLIC_ORIGIN 缺 scheme 或带路径时报错 [0.43ms]
+(pass) parseEnv > PUBLIC_ORIGIN 必须是规范写法：主机名小写、不写默认端口、不带查询串 [0.83ms]
+(pass) parseEnv > 数据库和 Redis 地址必须是对应的协议 [0.28ms]
+(pass) parseEnv > 端口可以覆盖，不是整数时报错 [0.45ms]
+(pass) parseEnv > 去掉 compose env_file 可能保留的引号 [0.08ms]
+(pass) parseEnv > 密钥少于 32 个字符时报错 [0.31ms]
+(pass) parseEnv > QQ_SENDER 只能是 napcat 或 console [0.12ms]
+(pass) parseEnv > QQ_SENDER=napcat 时解析机器人配置 [0.11ms]
+(pass) parseEnv > QQ_SENDER=napcat 时机器人配置缺一项就报错 [0.20ms]
+(pass) parseEnv > NapCat 访问令牌太短、机器人 QQ 号格式不对时报错 [0.28ms]
+(pass) parseEnv > 生产环境不能用控制台发送器 [0.15ms]
+(pass) parseEnv > 设了 UMAMI_WEBSITE_ID 才开统计；内部地址末尾的斜杠会被去掉 [0.22ms]
+(pass) parseEnv > 设了 UMAMI_WEBSITE_ID 却没有内部地址时报错 [0.09ms]
+(pass) parseEnv > 网站 ID 不是 UUID、内部地址不是 http(s) 时报错 [0.24ms]
+(pass) parseEnv > HTTPS_PROXY 可以不设；设了就必须是 http(s)://主机:端口 [0.44ms]
+
+src/server/with-timeout.test.ts:
+(pass) withTimeout > 按时完成时原样返回结果 [0.10ms]
+(pass) withTimeout > 原来的 promise 失败时照样失败 [0.09ms]
+(pass) withTimeout > 到时没有结束就失败，不再等下去 [21.26ms]
+
+src/server/throttled-log.test.ts:
+(pass) throttledErrorLog > 一段时间里只记第一条，压下去的次数记在下一条里 [0.36ms]
+
+src/server/in-process-api.test.ts:
+(pass) createInProcessApi > 在进程内调用自己的 /api/v1，不走网络 [2.00ms]
+(pass) createInProcessApi > 沿用本次请求的 ID 和访客 IP，转发 Cookie，不转发别的头 [0.39ms]
+(pass) createInProcessApi > 接口响应里的每条 Set-Cookie 都交给 onSetCookie [0.24ms]
+
+src/shared/api-client.test.ts:
+(pass) expectOk > 成功的响应原样返回 [0.10ms]
+(pass) expectOk > 错误响应抛出带 code 的 ApiError [0.17ms]
+(pass) expectOk > 响应体不是约定格式时用状态码兜底 [0.08ms]
+(pass) okJson > 成功的响应返回响应体 [0.09ms]
+(pass) okJson > 错误响应和 expectOk 一样抛 ApiError [0.21ms]
+
+src/shared/nickname.test.ts:
+(pass) normalizeNickname > 去掉首尾空白 [0.17ms]
+(pass) normalizeNickname > 去掉控制字符和双向文字控制符 [0.04ms]
+(pass) normalizeNickname > 最多 24 个字符，截断后再去一次尾部空白 [0.07ms]
+(pass) normalizeNickname > 空值和非字符串变成空串 [0.04ms]
+(pass) normalizeNickname > 保留零宽连接符 [0.02ms]
+(pass) parseNickname > 规整后 1 到 24 个字符：返回规整后的值 [0.09ms]
+(pass) parseNickname > 超过 24 个字符、空白、只有控制字符：返回 null [0.06ms]
+
+src/shared/log.test.ts:
+(pass) createLogger > 每条日志是一行 JSON，带时间、级别、事件和字段 [0.18ms]
+(pass) createLogger > 调用方的字段不能冒充时间、级别和事件 [0.08ms]
+
+src/shared/bio.test.ts:
+(pass) normalizeBio > 统一换行，去掉首尾空白；Tab 换成空格 [0.13ms]
+(pass) normalizeBio > 去掉换行以外的控制字符、双向文字控制符、零宽空格和 BOM [0.02ms]
+(pass) normalizeBio > 连续的空行最多留一个 [0.02ms]
+(pass) normalizeBio > 保留零宽连接符 [0.01ms]
+(pass) normalizeBio > 空值和非字符串变成空串 [0.05ms]
+(pass) parseBio > 最多 300 个字符，按码点数：300 个表情可以，301 个不行 [0.13ms]
+(pass) parseBio > 长度按规整之后算 [0.04ms]
+(pass) parseBio > 空简介是合法的（等于清空） [0.01ms]
+(pass) parseBio > bioLength 按码点数 [0.02ms]
+
+src/shared/query-client.test.ts:
+(pass) shouldRetry > 4xx 不重试：再请求一次结果也一样 [0.07ms]
+(pass) shouldRetry > 其他错误重试 1 次 [0.14ms]
+(pass) makeQueryClient > 默认 30 秒内视为新鲜，改数据的操作不重试 [0.35ms]
+
+src/shared/describe-error.test.ts:
+(pass) describeError > Drizzle 查询错误：只记 SQL 和 Postgres 的错误码、约束名，不记参数 [0.14ms]
+(pass) describeError > Drizzle 查询错误的原因不是 Postgres 错误时，也不记原因的 message [0.04ms]
+(pass) describeError > Postgres 错误：只记错误码、约束名这类字段，不记 message 和 detail [0.52ms]
+(pass) describeError > 有 SQLSTATE 和 severity 的错误按 Postgres 错误处理 [0.06ms]
+(pass) describeError > 系统错误的 code 不算 SQLSTATE，按普通错误处理 [0.03ms]
+(pass) describeError > 其他错误：记 name 和 message [0.03ms]
+
+src/shared/avatar.test.ts:
+(pass) avatarInitial > 昵称的第一个字符；英文字母大写 [0.20ms]
+(pass) avatarInitial > 表情算一个字符 [0.04ms]
+(pass) avatarInitial > 空昵称用问号 [0.02ms]
+(pass) avatarColor > 同一个 id 永远是同一个颜色，颜色都在调色板里 [0.08ms]
+(pass) avatarColor > 不同的 id 分散到不同的颜色上 [0.58ms]
+
+src/media-worker/ingest.test.ts:
+(pass) original magic accepts normal and extended AVIF ftyp while rejecting HEIC and oversized boxes [0.75ms]
+(pass) verified original ingestion > completion races create one file and one flow; missing/writing parts cannot complete [519.24ms]
+(pass) verified original ingestion > real S3 ordered multipart ingest verifies hash and original once across two sessions [1757.80ms]
+(pass) verified original ingestion > full hash mismatch terminalizes once and releases logical quota [189.52ms]
+(pass) verified original ingestion > business completion rolls back when flow insertion throws after inserting real jobs [96.03ms]
+(pass) verified original ingestion > part bytes, actual length and purpose magic are untrusted; transient GET errors retry [699.12ms]
+(pass) verified original ingestion > eligible init creates the same flow once with no parts, and ready sources still pass purpose validation [250.05ms]
+(pass) verified original ingestion > PUT success followed by lost PG commit recovers from the stored original with one physical charge [222.34ms]
+(pass) verified original ingestion > rejected original PUT keeps uncertain bytes charged without delete; stale lease cannot publish [211.39ms]
+(pass) verified original ingestion > deleting generation waits for confirmed deletion and independent new physical generation [309.33ms]
+(pass) verified original ingestion > cancellation and account deletion during original PUT prevent ready publication and leave physical accounting [385.16ms]
+(pass) verified original ingestion > original IO holds no user, usage, budget, session, file or original locks [248.56ms]
+(pass) verified original ingestion > ready-original fast path applies allowed-purpose magic to the actual source bytes [259.29ms]
+(pass) verified original ingestion > ambiguous successful ready COMMIT retries without a second write or charge [203.51ms]
+(pass) verified original ingestion > rejected false-size claimant cannot pin a known image hash against another user's verified bytes [364.28ms]
+(pass) verified original ingestion > competing different pending declarations cannot replace a verified size or reserve their unverified size [885.87ms]
+(pass) verified original ingestion > size correction never changes leased or uncertain pending accounting [338.35ms]
+
+src/media-worker/image-child.test.ts:
+(pass) bounded recipe accepts safe.jpeg [145.03ms]
+(pass) bounded recipe accepts safe.png [147.82ms]
+(pass) bounded recipe accepts safe.webp [123.58ms]
+(pass) bounded recipe accepts safe.avif [147.26ms]
+(pass) bounded recipe accepts own-cmyk.jpg [197.50ms]
+(pass) bounded recipe accepts own-gps-orientation6.jpg [150.46ms]
+(pass) bounded recipe accepts transparent.png [123.65ms]
+(pass) bounded recipe accepts oriented.jpg [152.17ms]
+(pass) bounded recipe accepts iptc.jpeg [227.72ms]
+(pass) reject actual animation animated-own.apng [126.86ms]
+(pass) reject actual animation animated.webp [124.04ms]
+(pass) reject actual animation colors-animated-8bpc.avif [122.84ms]
+(pass) reject own-solid-rgb32.heic with TYPE_NOT_ALLOWED [121.09ms]
+(pass) reject corrupt.jpg with IMAGE_INVALID [116.21ms]
+(pass) reject truncated.jpg with IMAGE_INVALID [105.25ms]
+(pass) reject pixel-excess.png with IMAGE_TOO_LARGE [111.12ms]
+(pass) reject side-excess.png with IMAGE_TOO_LARGE [100.28ms]
+(pass) reject animated.gif with TYPE_NOT_ALLOWED [99.72ms]
+(pass) disguised SVG rejects by real bytes [127.35ms]
+(pass) recipe strips actual EXIF/ICC/XMP/IPTC, rotates, crops, and flattens white [606.30ms]
+(pass) BMFF normal and extended boxes are bounded and inspect every compatible brand [8.70ms]
+(pass) PNG chunk traversal fails closed on malformed, missing and excessive headers [18.66ms]
+(pass) actual native process cancellation kills blocked output and releases capacity [435.12ms]
+(pass) actual native process hard timeout is 30 seconds and releases capacity [30778.56ms]
+(pass) actual recipe build is accepted by production media env validation [2.65ms]
+(pass) a child spawn failure releases worker capacity for the next actual process [268.86ms]
+(pass) native CMYK conversion and synthetic GPS rotation strip all metadata [749.98ms]
+(pass) output filesystem failure is retryable and releases capacity without classifying valid pixels as invalid [399.81ms]
+(pass) valid large ancillary payload cannot hide APNG control beyond physical byte4096 [292.87ms]
+
+src/media-worker/avatar-races.test.ts:
+(pass) avatar lease and finalize races on real PG/S3 > competing independent recipe claims elect one physical writer; expiry fences old writer and converges [1105.58ms]
+(pass) avatar lease and finalize races on real PG/S3 > real PUT failure after remote settlement retries by hashing existing bytes without recharging [1451.30ms]
+(pass) avatar lease and finalize races on real PG/S3 > cancel or delete owner during processing never produces ready file or logical used charge [1366.59ms]
+(pass) avatar lease and finalize races on real PG/S3 > cancel during derived PUT fences physical promotion and keeps uncertain budget [877.40ms]
+(pass) avatar lease and finalize races on real PG/S3 > all derived IO occurs outside business row locks [1395.14ms]
+(pass) avatar lease and finalize races on real PG/S3 > ready settlement rollback and ambiguous commit remain atomic and replay safe [5597.73ms]
+(pass) avatar lease and finalize races on real PG/S3 > two physical connections serialize recipe promotion against physical downgrade [2014.88ms]
+
+src/media-worker/avatar.test.ts:
+(pass) shared avatar outputs on real PG and S3 > distinct originals share output, one physical charge and atomic replay-safe private finalize [3176.39ms]
+118 |               .where(eq(uploadSessions.id, upload.dto.id))
+119 |           )[0];
+120 |           if (session.state === "ready") break;
+121 |           await Bun.sleep(100);
+122 |         } while (Date.now() < deadline);
+123 |         expect(session?.state).toBe("ready");
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: "ready"
+Received: "processing"
+
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/src/media-worker/avatar.test.ts:123:32)
+(fail) shared avatar outputs on real PG and S3 > real worker Navigator executes ingest avatar finalize without NapCat [28760.10ms]
+
+src/worker/storage-journal.test.ts:
+(pass) missing encrypted journal consumer fails closed and never advances exported checkpoint [1241.64ms]
+
+src/worker/storage-reconcile.test.ts:
+(fail) unknown canonical originals quarantine then independently recheck after48h before delete/refund [30091.24ms]
+  ^ this test timed out after 30000ms.
+40 |     res = resolve
+41 |     rej = reject
+42 |   }).catch((err) => {
+43 |     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+44 |     // application that created the query
+45 |     Error.captureStackTrace(err)
+               ^
+error: Connection terminated due to connection timeout
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg-pool@3.14.0+00a0136bc273dfed/node_modules/pg-pool/index.js:45:11)
+
+199 |     })
+200 |
+201 |     this._attachListeners(con)
+202 |
+203 |     con.once('end', () => {
+204 |       const error = this._ending ? new Error('Connection terminated') : new Error('Connection terminated unexpectedly')
+                                                                                  ^
+error: Connection terminated unexpectedly
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg@8.23.0+00a0136bc273dfed/node_modules/pg/lib/client.js:204:77)
+      at emit (node:events:97:22)
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg@8.23.0+00a0136bc273dfed/node_modules/pg/lib/connection.js:64:12)
+      at emit (node:events:100:22)
+      at <anonymous> (node:net:2308:20)
+(fail) appearing authoritative identity prevents quarantine DELETE and conservatively retains observed charge [5492.25ms]
+40 |     res = resolve
+41 |     rej = reject
+42 |   }).catch((err) => {
+43 |     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+44 |     // application that created the query
+45 |     Error.captureStackTrace(err)
+               ^
+error: Connection terminated due to connection timeout
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg-pool@3.14.0+00a0136bc273dfed/node_modules/pg-pool/index.js:45:11)
+
+199 |     })
+200 |
+201 |     this._attachListeners(con)
+202 |
+203 |     con.once('end', () => {
+204 |       const error = this._ending ? new Error('Connection terminated') : new Error('Connection terminated unexpectedly')
+                                                                                  ^
+error: Connection terminated unexpectedly
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg@8.23.0+00a0136bc273dfed/node_modules/pg/lib/client.js:204:77)
+      at emit (node:events:97:22)
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg@8.23.0+00a0136bc273dfed/node_modules/pg/lib/connection.js:64:12)
+      at emit (node:events:100:22)
+      at <anonymous> (node:net:2308:20)
+(fail) quarantine DELETE failure retains charge and prevents a new canonical writer after absence/retry [6300.30ms]
+(fail) owned real S3 unknown original uses LIST/HEAD identity and is removed only after48h [30454.64ms]
+  ^ this test timed out after 30000ms.
+40 |     res = resolve
+41 |     rej = reject
+42 |   }).catch((err) => {
+43 |     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+44 |     // application that created the query
+45 |     Error.captureStackTrace(err)
+               ^
+error: Connection terminated due to connection timeout
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg-pool@3.14.0+00a0136bc273dfed/node_modules/pg-pool/index.js:45:11)
+
+199 |     })
+200 |
+201 |     this._attachListeners(con)
+202 |
+203 |     con.once('end', () => {
+204 |       const error = this._ending ? new Error('Connection terminated') : new Error('Connection terminated unexpectedly')
+                                                                                  ^
+error: Connection terminated unexpectedly
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg@8.23.0+00a0136bc273dfed/node_modules/pg/lib/client.js:204:77)
+      at emit (node:events:97:22)
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg@8.23.0+00a0136bc273dfed/node_modules/pg/lib/connection.js:64:12)
+      at emit (node:events:100:22)
+      at <anonymous> (node:net:2308:20)
+(fail) durable nightly continuation crosses>1000 canonical originals across process contexts [5521.09ms]
+{
+  message: "Connection terminated due to connection timeout",
+  stack: "Error: Connection terminated due to connection timeout\n    at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg-pool@3.14.0+00a0136bc273dfed/node_modules/pg-pool/index.js:45:11)\n    at processTicksAndRejections (native:7:39)",
+}
+36 |   async queryWithCache(queryString, params, query) {
+37 |     if (this.cache === void 0 || is(this.cache, NoopCache) || this.queryMetadata === void 0) {
+38 |       try {
+39 |         return await query();
+40 |       } catch (e) {
+41 |         throw new DrizzleQueryError(queryString, params, e);
+                   ^
+error: Failed query: insert into "blobs" ("id", "sha256", "policy_id", "key", "size", "detected_mime", "state", "properties", "verified_at", "orphaned_at", "generation", "lease_until", "created_at") values (default, $1, $2, $3, $4, $5, $6, default, $7, default, default, default, default) returning "id", "sha256", "policy_id", "key", "size", "detected_mime", "state", "properties", "verified_at", "orphaned_at", "generation", "lease_until", "created_at"
+params: 25f073aec975e37a30a58d3905f119c66bef6b721da4a081ab0bfb71c42ba5cc,01a126de-8e2d-7247-8a97-ca07c78774eb,sha256/25f073aec975e37a30a58d3905f119c66bef6b721da4a081ab0bfb71c42ba5cc,36,image/png,ready,2026-10-10T17:32:47.482Z
+  query: "insert into \"blobs\" (\"id\", \"sha256\", \"policy_id\", \"key\", \"size\", \"detected_mime\", \"state\", \"properties\", \"verified_at\", \"orphaned_at\", \"generation\", \"lease_until\", \"created_at\") values (default, $1, $2, $3, $4, $5, $6, default, $7, default, default, default, default) returning \"id\", \"sha256\", \"policy_id\", \"key\", \"size\", \"detected_mime\", \"state\", \"properties\", \"verified_at\", \"orphaned_at\", \"generation\", \"lease_until\", \"created_at\"",
+ params: [
+  "25f073aec975e37a30a58d3905f119c66bef6b721da4a081ab0bfb71c42ba5cc", "01a126de-8e2d-7247-8a97-ca07c78774eb",
+  "sha256/25f073aec975e37a30a58d3905f119c66bef6b721da4a081ab0bfb71c42ba5cc", 36, "image/png",
+  "ready", "2026-10-10T17:32:47.482Z"
+],
+
+      at queryWithCache (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/drizzle-orm@0.45.3+888bfaee68f299c3/node_modules/drizzle-orm/pg-core/session.js:41:15)
+      at async <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/drizzle-orm@0.45.3+888bfaee68f299c3/node_modules/drizzle-orm/node-postgres/session.js:117:35)
+
+40 |     res = resolve
+41 |     rej = reject
+42 |   }).catch((err) => {
+43 |     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+44 |     // application that created the query
+45 |     Error.captureStackTrace(err)
+               ^
+error: Connection terminated due to connection timeout
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg-pool@3.14.0+00a0136bc273dfed/node_modules/pg-pool/index.js:45:11)
+
+199 |     })
+200 |
+201 |     this._attachListeners(con)
+202 |
+203 |     con.once('end', () => {
+204 |       const error = this._ending ? new Error('Connection terminated') : new Error('Connection terminated unexpectedly')
+                                                                                  ^
+error: Connection terminated unexpectedly
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg@8.23.0+00a0136bc273dfed/node_modules/pg/lib/client.js:204:77)
+      at emit (node:events:97:22)
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg@8.23.0+00a0136bc273dfed/node_modules/pg/lib/connection.js:64:12)
+      at emit (node:events:100:22)
+      at <anonymous> (node:net:2308:20)
+(fail) missing derived bytes produce a durable fixed-recipe intent without changing quota/publication; stale generation never repairs [19507.57ms]
+
+# Unhandled error between tests
+-------------------------------
+26 |   if ((error as { name?: string }).name === "NoSuchBucket") return undefined;
+27 |   const metadata = (error as { $metadata?: { httpStatusCode?: number } }).$metadata;
+28 |   return metadata?.httpStatusCode;
+29 | }
+30 | export function publicStorageError(error: unknown): ObjectMissingError | StorageUnavailableError {
+31 |   return storageStatus(error) === 404 ? new ObjectMissingError() : new StorageUnavailableError();
+                                                                        ^
+StorageUnavailableError: STORAGE_UNAVAILABLE
+     status: 503,
+ retryAfter: undefined,
+       code: "STORAGE_UNAVAILABLE"
+
+      at publicStorageError (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/src/server/storage/gate.ts:31:68)
+      at run (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/src/server/storage/gate.ts:105:13)
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/src/worker/storage-reconcile.test.ts:304:15)
+-------------------------------
+
+
+# Unhandled error between tests
+-------------------------------
+36 |   async queryWithCache(queryString, params, query) {
+37 |     if (this.cache === void 0 || is(this.cache, NoopCache) || this.queryMetadata === void 0) {
+38 |       try {
+39 |         return await query();
+40 |       } catch (e) {
+41 |         throw new DrizzleQueryError(queryString, params, e);
+                   ^
+error: Failed query: select "id", "sha256", "policy_id", "key", "size", "detected_mime", "state", "properties", "verified_at", "orphaned_at", "generation", "lease_until", "created_at" from "blobs" where "blobs"."sha256" = $1
+params: 1111111111111111111111111111111111111111111111111111111111111111
+  query: "select \"id\", \"sha256\", \"policy_id\", \"key\", \"size\", \"detected_mime\", \"state\", \"properties\", \"verified_at\", \"orphaned_at\", \"generation\", \"lease_until\", \"created_at\" from \"blobs\" where \"blobs\".\"sha256\" = $1",
+ params: [
+  "1111111111111111111111111111111111111111111111111111111111111111"
+],
+
+      at queryWithCache (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/drizzle-orm@0.45.3+888bfaee68f299c3/node_modules/drizzle-orm/pg-core/session.js:41:15)
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/src/worker/storage-reconcile.test.ts:304:15)
+
+689 |         result = new this._Promise((resolve, reject) => {
+690 |           query.callback = (err, res) => (err ? reject(err) : resolve(res))
+691 |         }).catch((err) => {
+692 |           // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+693 |           // application that created the query
+694 |           Error.captureStackTrace(err)
+                      ^
+error: canceling statement due to statement timeout
+     length: 109,
+   severity: "ERROR",
+     detail: undefined,
+       hint: undefined,
+   position: undefined,
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "postgres.c",
+    routine: "ProcessInterrupts",
+       code: "57014"
+
+      at /Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg@8.23.0+00a0136bc273dfed/node_modules/pg/lib/client.js:694:17
+      at processTicksAndRejections (native:7:39)
+      at toMatchObject (unknown:1:1)
+      at /Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/src/worker/storage-reconcile.test.ts:304:15
+      at processTicksAndRejections (native:7:39)
+-------------------------------
+
+299 |       Promise.resolve(
+300 |         ctx.db
+301 |           .insert(storageQuarantine)
+302 |           .values({ ...base, ...patch } as typeof storageQuarantine.$inferInsert),
+303 |       ),
+304 |     ).rejects.toMatchObject({ cause: { code: "23514" } });
+                    ^
+error: expect(received).toMatchObject(expected)
+
+- {
+-   "cause": {
+-     "code": "23514",
+-   },
+- }
++ [DrizzleQueryError: Failed query: insert into "storage_quarantine" ("id", "policy_id", "sha256", "key", "size", "observed_etag", "state", "generation", "first_seen_at", "last_observed_at", "delete_started_at", "delete_uncertain") values (default, $1, $2, $3, $4, $5, default, default, default, default, default, default)
++ params: 01a126de-8e2d-7247-8a97-ca07c78774eb,INVALID,sha256/55/55/5555555555555555555555555555555555555555555555555555555555555555,1,v1]
+
+- Expected  - 5
++ Received  + 2
+
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/src/worker/storage-reconcile.test.ts:304:15)
+(fail) quarantine and inventory migrations reject invalid identities and preserve restrictive policy FK [12671.48ms]
+(pass) review: 101 quarantined keys advance past first100 HEAD failures without identity ACK or refund [29409.58ms]
+(fail) review: nightly inventory stops at100 empty continuation pages and resumes durable cursor [30000.79ms]
+  ^ this test timed out after 30000ms.
+
+src/worker/purge.test.ts:
+(pass) user.purge 的处理函数 > 同一个任务跑两遍：第一遍清除，第二遍什么也不做，都不报错 [2201.01ms]
+(pass) user.purge 的处理函数 > 清除出错：抛出去，记一条 user_purge_failed；用户还在，下次重试照常清除 [540.05ms]
+(pass) user.purge 的处理函数 > 任务里没有 userId：直接失败 [1.04ms]
+
+src/worker/storage-lifecycle.test.ts:
+(pass) control storage jobs freeze admission and active journal completion gates drain [14.82ms]
+
+src/worker/media-purge.test.ts:
+(pass) real PG: ordered durable drain/two purges/two anonymous probes converge private/done [8622.29ms]
+/bin/bash: line 1: 64353 Terminated: 15          bun test --timeout 30000 src test/ops
+error: script "check" exited with code 143

@@ -1,0 +1,47 @@
+{
+  "image": "community-storage-task12:app",
+  "fixtureSha256": "cc5baad3c686a83b5385cf008af6ec8686bfe0aa32de477eeef87da3165a0ab5",
+  "outputSha256": "77f1ebe790240c4c8750f81b9ba96239671593259387d1b0057a0c202807577b",
+  "upload": 201,
+  "part": 204,
+  "complete": 202,
+  "ready": true,
+  "privatePreview": 200,
+  "anonymousPreview": 401,
+  "beforeSave": 404,
+  "explicitSave": 200,
+  "public": 200,
+  "query": 404,
+  "remove": 200,
+  "afterRemove": 404,
+  "drain": true,
+  "purges": 2,
+  "probes": [
+    {
+      "at": "2026-10-10T17:59:24.418Z",
+      "status": 404,
+      "elapsedMs": 5105.348791,
+      "bodyLength": 52,
+      "bodySha256": "25f169010390e1601e36cbf51501ebd84b050cd8c0c27cb3a6c92c286326a5c7",
+      "cacheStatus": null
+    },
+    {
+      "at": "2026-10-10T17:59:29.473Z",
+      "status": 404,
+      "elapsedMs": 10160.869290999999,
+      "bodyLength": 52,
+      "bodySha256": "25f169010390e1601e36cbf51501ebd84b050cd8c0c27cb3a6c92c286326a5c7",
+      "cacheStatus": null
+    }
+  ],
+  "purgeState": "done",
+  "fileDelete": 204,
+  "gcOriginals": true,
+  "gcDerived": true,
+  "retentionClockDays": [
+    2,
+    10,
+    18
+  ],
+  "ssr": 200
+}

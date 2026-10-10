@@ -1,0 +1,76 @@
+import assert from 'node:assert/strict';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {makeSignature} from '../../../../apps/community/node_modules/better-auth/dist/crypto/index.mjs';
+import {eq} from '../../../../apps/community/node_modules/drizzle-orm/index.js';
+import {resetTestDatabase,testDbHandle} from '../../../../apps/community/src/server/testing/test-db';
+import {testSender} from '../../../../apps/community/src/server/testing/test-boss';
+import {user,session,profiles,mediaPublications,mediaPurgeRequests,blobs,derivedObjects} from '../../../../apps/community/src/server/db/schema';
+import {storageFixtureConfig} from '../../../../apps/community/test/storage/fixture';
+import {createS3Driver} from '../../../../apps/community/src/server/storage/s3';
+import {createLogger} from '../../../../apps/community/src/shared/log';
+import {revokeMedia} from '../../../../apps/community/src/worker/media-purge';
+import {sweepStorage} from '../../../../apps/community/src/worker/storage-sweep';
+import {deleteStorageObject} from '../../../../apps/community/src/worker/storage-delete';
+const root='/Users/i/.codex/worktrees/community-storage-design/AstroDX';
+const evidence=root+'/.superpowers/sdd/2026-10-10-community-storage';
+const base='/private/tmp/community-storage-task11-7af3ebc3-4374-4c1f-85b1-24d4999d18b3';
+const state=base+'/runtime-task12-http4';
+await mkdir(state,{mode:0o700});
+for(const role of ['web','media','control','backup']){
+ let value=await readFile(base+'/runtime-final/'+role+'.env','utf8');
+ value=value.split('\n').map(line=>/^(DATABASE_URL|REDIS_URL|STORAGE_S3_ENDPOINT|STORAGE_INTERNAL_MEDIA_URL|NO_PROXY|no_proxy)=/.test(line)?line.replaceAll('127.0.0.1','host.docker.internal'):line).join('\n').replace(/^HOST=.*$/m,'HOST=0.0.0.0');
+ await writeFile(state+'/'+role+'.env',value,{mode:0o600});
+}
+const origin='http://127.0.0.1:44111';
+const env=Object.fromEntries((await readFile(state+'/web.env','utf8')).trim().split('\n').map(l=>{const i=l.indexOf('=');return [l.slice(0,i),l.slice(i+1)]}));
+let step=0;
+async function docker(args:string[],allow=false){const p=Bun.spawn(['docker',...args],{stdout:'pipe',stderr:'pipe'});const [out,err,code]=await Promise.all([new Response(p.stdout).text(),new Response(p.stderr).text(),p.exited]);await writeFile(evidence+`/task12-runtime-http4-docker-${++step}.log`,out+err);if(!allow)assert.equal(code,0,`Docker ${step}`);return out;}
+const mounts=['--mount',`type=bind,src=${state},dst=/proof`,'--mount',`type=bind,src=${base}/mount,dst=/media-tmp`,'--mount','type=volume,src=community-storage-test-data,dst=/storage-capacity,volume-subpath=.capacity,readonly'];
+let proxy:ReturnType<typeof Bun.serve>|undefined;
+const roles=['web','media'] as const;
+async function cleanup(){proxy?.stop(true);for(const role of [...roles].reverse()){await docker(['logs','community-storage-task12-'+role],true);await docker(['stop','-t','15','community-storage-task12-'+role],true);await docker(['rm','community-storage-task12-'+role],true);}await (await testSender()).stop({graceful:false});await testDbHandle().pool.end();}
+try {
+ await resetTestDatabase();await testSender();
+ await docker(['run','--rm','--platform','linux/amd64','--env-file',state+'/backup.env',...mounts,'community-storage-task12:backup','bun','ops/backup/initialize.ts']);
+ const {db}=testDbHandle();
+ const id=crypto.randomUUID(),token=crypto.randomUUID();
+ await db.insert(user).values({id,name:'Avatar acceptance fixture',email:`${id}@placeholder.invalid`});
+ await db.insert(profiles).values({userId:id,bio:'Synthetic final acceptance account',onboardedAt:new Date()});
+ await db.insert(session).values({userId:id,token,expiresAt:new Date(Date.now()+86400000)});
+ const cookie=`adxc.session_token=${encodeURIComponent(`${token}.${await makeSignature(token,env.BETTER_AUTH_SECRET)}`)}`;
+ for(const role of roles)await docker(['run','-d','--name','community-storage-task12-'+role,'--platform','linux/amd64','--env-file',state+'/'+role+'.env',...(role==='web'?['-p','127.0.0.1:44111:44111','-p','127.0.0.1:54111:54111']:['--memory','512m','--cpus','1','--pids-limit','128']),...mounts,'community-storage-task12:app','bun',role==='web'?'./build/server/index.js':'./src/media-worker/main.ts']);
+ let ready=false;for(let i=0;i<300;i++){try{if((await fetch(origin+'/readyz')).status===200){ready=true;break}}catch{}await Bun.sleep(200)}assert.ok(ready,'runtime ready');
+ async function request(path:string,init:RequestInit={},status=200){const h=new Headers(init.headers);if(init.method&&!h.has('content-type'))h.set('content-type','application/json');h.set('cookie',cookie);h.set('origin',origin);const r=await fetch(origin+path,{...init,headers:h});assert.equal(r.status,status,`${path}: ${r.status} ${r.status===status?'':await r.text()}`);return r;}
+ const data=new Uint8Array(await readFile(root+'/apps/community/test/storage/images/safe.png'));
+ const hash=createHash('sha256').update(data).digest('hex');
+ const upload=await (await request('/api/v1/uploads',{method:'POST',headers:{'content-type':'application/json','idempotency-key':crypto.randomUUID()},body:JSON.stringify({purpose:'avatar',name:'safe.png',size:data.length,sha256:hash})},201)).json();
+ await request(`/api/v1/uploads/${upload.id}/parts/0`,{method:'PUT',headers:{'content-type':'application/octet-stream','x-part-sha256':hash},body:data},204);
+ await request(`/api/v1/uploads/${upload.id}/complete`,{method:'POST'},202);
+ let current:any;for(let i=0;i<300;i++){current=await(await request(`/api/v1/uploads/${upload.id}`)).json();if(current.state==='ready')break;if(current.state==='rejected')throw Error(JSON.stringify(current));await Bun.sleep(250)}assert.equal(current.state,'ready');
+ const preview=await request(`/api/v1/files/${current.fileId}/preview`);assert.equal(preview.headers.get('cache-control'),'private, no-store');const bytes=await preview.bytes();const outputHash=createHash('sha256').update(bytes).digest('hex');
+ assert.equal((await fetch(origin+`/api/v1/files/${current.fileId}/preview`)).status,401);
+ assert.equal((await fetch(origin+`/media/${outputHash}.jpg`)).status,404);
+ const saved=await(await request('/api/v1/me/avatar',{method:'PUT',headers:{'content-type':'application/json','idempotency-key':crypto.randomUUID()},body:JSON.stringify({fileId:current.fileId,expectedRevision:0})})).json();
+ const publicBytes=await fetch(origin+saved.image);assert.equal(publicBytes.status,200);assert.equal(publicBytes.headers.get('content-type'),'image/jpeg');assert.equal(createHash('sha256').update(await publicBytes.bytes()).digest('hex'),outputHash);
+ assert.equal((await fetch(origin+saved.image+'?bypass=1')).status,404);
+ await request('/api/v1/me/avatar',{method:'DELETE',headers:{'content-type':'application/json','idempotency-key':crypto.randomUUID()},body:JSON.stringify({expectedRevision:1})});
+ assert.equal((await fetch(origin+saved.image)).status,404);
+ const config=await storageFixtureConfig('control');Object.assign(config,{publicOrigin:origin,internalMediaUrl:'http://127.0.0.1:54111',internalMediaSecret:env.STORAGE_INTERNAL_MEDIA_SECRET,recipeBuild:env.STORAGE_RECIPE_BUILD});
+ const ctx={db,boss:testSender,config,driver:createS3Driver(config),log:createLogger(()=>{})};
+ const [pub]=await db.select().from(mediaPublications).where(eq(mediaPublications.outputSha256,outputHash));
+ const purges:number[]=[];
+ await revokeMedia(ctx,{hash:outputHash,generation:pub.generation},{fetch:async(url,init)=>{if(String(url).startsWith('https://api.cloudflare.com/')){purges.push(performance.now());return Response.json({success:true,errors:[]})}return fetch(url,init)},sleep:ms=>Bun.sleep(ms+25),now:()=>performance.now(),drainUrl:'http://127.0.0.1:54111/internal/media/drain'});
+ const [out]=await db.select().from(mediaPurgeRequests).where(eq(mediaPurgeRequests.outputSha256,outputHash));assert.equal(out.state,'done');assert.equal(purges.length,2);assert.ok(purges[1]-purges[0]>=5000);assert.equal(out.evidence?.probes.length,2);
+ await request(`/api/v1/files/${current.fileId}`,{method:'DELETE'},204);
+ const gcScript=`import assert from 'node:assert/strict';import {eq} from 'drizzle-orm';import {createDb} from './src/server/db/client';import {createStorageContext} from './src/server/storage/runtime';import {createBoss} from './src/server/jobs/boss';import {sweepStorage} from './src/worker/storage-sweep';import {deleteStorageObject} from './src/worker/storage-delete';import {blobs,derivedObjects} from './src/server/db/schema';
+ const {db,pool}=createDb(process.env.DATABASE_URL);const boss=createBoss(process.env.DATABASE_URL,'sender');await boss.start();const ctx=createStorageContext({db,boss:async()=>boss,role:'control',log:{info:()=>{},error:()=>{},warn:()=>{},debug:()=>{}}});
+ for(const days of [2,10,18]){const gc={...ctx,now:()=>new Date(Date.now()+days*86400000)};await sweepStorage(gc);for(const [kind,table] of [['blob',blobs],['derived',derivedObjects]])for(const row of await db.select().from(table).where(eq(table.state,'deleting')))await deleteStorageObject(gc,{kind,id:row.id,generation:row.generation});}
+ assert.equal(await ctx.driver.head({bucket:'derived',key:'sha256/${outputHash.slice(0,2)}/${outputHash.slice(2,4)}/${outputHash}'}),null);assert.ok((await db.select().from(blobs)).every(b=>b.state==='deleted'));assert.ok((await db.select().from(derivedObjects)).every(b=>b.state==='deleted'));await boss.stop({graceful:false});await pool.end();console.log('ACTUAL GC PASS');`;
+ await docker(['run','--rm','--platform','linux/amd64','--env-file',state+'/control.env',...mounts,'community-storage-task12:app','bun','-e',gcScript]);
+ const ssr=await request('/settings/profile');assert.equal(ssr.status,200);await ssr.arrayBuffer();
+ await writeFile(evidence+'/task12-http-result.json',JSON.stringify({image:'community-storage-task12:app',fixtureSha256:hash,outputSha256:outputHash,upload:201,part:204,complete:202,ready:true,privatePreview:200,anonymousPreview:401,beforeSave:404,explicitSave:200,public:200,query:404,remove:200,afterRemove:404,drain:true,purges:2,probes:out.evidence?.probes,purgeState:out.state,fileDelete:204,gcOriginals:true,gcDerived:true,retentionClockDays:[2,10,18],ssr:200},null,2));
+ proxy=Bun.serve({hostname:'127.0.0.1',port:41909,async fetch(r){const u=new URL(r.url);if(u.pathname==='/__task12/login')return new Response(null,{status:303,headers:{'set-cookie':cookie+'; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400',location:'/settings/profile','cache-control':'private, no-store'}});const h=new Headers(r.headers);h.set('origin',origin);return fetch(new Request(origin+u.pathname+u.search,{method:r.method,headers:h,body:r.body,duplex:'half'} as RequestInit),{redirect:'manual'})}});
+ console.log('HTTP PASS; BROWSER READY http://127.0.0.1:41909/__task12/login ; DB STABLE; stop with SIGTERM after root acceptance');
+ await new Promise<void>(resolve=>{for(const s of ['SIGINT','SIGTERM'] as const)process.on(s,()=>resolve())});
+}finally{await cleanup()}

@@ -1,0 +1,65 @@
+apps/community/ops/backup/fresh-restore.test.ts:186:30 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    184 │                   PUBLIC_CONTACT_EMAIL: "fixture@example.test",
+    185 │                   DATABASE_URL: journal.databaseUrl,
+  > 186 │                   REDIS_URL: process.env.TEST_REDIS_URL + "/1",
+        │                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    187 │                   BETTER_AUTH_SECRET: "fresh-restore-fixture-secret-0123456789",
+    188 │                   GOOGLE_CLIENT_ID: "fixture",
+
+  i Unsafe fix: Use a template literal.
+
+    184 184 │                     PUBLIC_CONTACT_EMAIL: "fixture@example.test",
+    185 185 │                     DATABASE_URL: journal.databaseUrl,
+    186     │ - ··················REDIS_URL:·process.env.TEST_REDIS_URL·+·"/1",
+        186 │ + ··················REDIS_URL:·`${process.env.TEST_REDIS_URL}/1`,
+    187 187 │                     BETTER_AUTH_SECRET: "fresh-restore-fixture-secret-0123456789",
+    188 188 │                     GOOGLE_CLIENT_ID: "fixture",
+
+
+apps/community/ops/backup/fresh-restore.test.ts:216:20 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    214 │                       }
+    215 │                     : {}),
+  > 216 │                   [prefix + "_ACCESS_KEY_ID"]: config.accessKeyId,
+        │                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+    217 │                   [prefix + "_SECRET_ACCESS_KEY"]: config.secretAccessKey,
+    218 │                   NO_PROXY: "localhost,127.0.0.1,host.docker.internal",
+
+  i Unsafe fix: Use a template literal.
+
+    214 214 │                         }
+    215 215 │                       : {}),
+    216     │ - ··················[prefix·+·"_ACCESS_KEY_ID"]:·config.accessKeyId,
+        216 │ + ··················[`${prefix}_ACCESS_KEY_ID`]:·config.accessKeyId,
+    217 217 │                     [prefix + "_SECRET_ACCESS_KEY"]: config.secretAccessKey,
+    218 218 │                     NO_PROXY: "localhost,127.0.0.1,host.docker.internal",
+
+
+apps/community/ops/backup/fresh-restore.test.ts:217:20 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    215 │                     : {}),
+    216 │                   [prefix + "_ACCESS_KEY_ID"]: config.accessKeyId,
+  > 217 │                   [prefix + "_SECRET_ACCESS_KEY"]: config.secretAccessKey,
+        │                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    218 │                   NO_PROXY: "localhost,127.0.0.1,host.docker.internal",
+    219 │                 },
+
+  i Unsafe fix: Use a template literal.
+
+    215 215 │                       : {}),
+    216 216 │                     [prefix + "_ACCESS_KEY_ID"]: config.accessKeyId,
+    217     │ - ··················[prefix·+·"_SECRET_ACCESS_KEY"]:·config.secretAccessKey,
+        217 │ + ··················[`${prefix}_SECRET_ACCESS_KEY`]:·config.secretAccessKey,
+    218 218 │                     NO_PROXY: "localhost,127.0.0.1,host.docker.internal",
+    219 219 │                   },
+
+
+Checked 4 files in 29ms. No fixes applied.
+Found 3 infos.

@@ -1,0 +1,226 @@
+ops/backup/fresh-restore.test.ts:171:24 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    169 │             HOST: "127.0.0.1", PORT: "44112", PUBLIC_ORIGIN: "http://127.0.0.1:44112",
+    170 │             PUBLIC_CONTACT_EMAIL: "fixture@example.test", DATABASE_URL: journal.databaseUrl,
+  > 171 │             REDIS_URL: process.env.TEST_REDIS_URL + "/1", BETTER_AUTH_SECRET: "fresh-restore-fixture-secret-0123456789",
+        │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    172 │             GOOGLE_CLIENT_ID: "fixture", GOOGLE_CLIENT_SECRET: "fixture",
+    173 │             TURNSTILE_SITE_KEY: "1x00000000000000000000AA", TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
+
+  i Unsafe fix: Use a template literal.
+
+    169 169 │               HOST: "127.0.0.1", PORT: "44112", PUBLIC_ORIGIN: "http://127.0.0.1:44112",
+    170 170 │               PUBLIC_CONTACT_EMAIL: "fixture@example.test", DATABASE_URL: journal.databaseUrl,
+    171     │ - ············REDIS_URL:·process.env.TEST_REDIS_URL·+·"/1",·BETTER_AUTH_SECRET:·"fresh-restore-fixture-secret-0123456789",
+        171 │ + ············REDIS_URL:·`${process.env.TEST_REDIS_URL}/1`,·BETTER_AUTH_SECRET:·"fresh-restore-fixture-secret-0123456789",
+    172 172 │               GOOGLE_CLIENT_ID: "fixture", GOOGLE_CLIENT_SECRET: "fixture",
+    173 173 │               TURNSTILE_SITE_KEY: "1x00000000000000000000AA", TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
+
+
+ops/backup/fresh-restore.test.ts:184:14 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    182 │             ...role === "control" ? { STORAGE_INTERNAL_MEDIA_URL: "http://127.0.0.1:54112",
+    183 │               CLOUDFLARE_ZONE_ID: "0".repeat(32), CLOUDFLARE_PURGE_TOKEN: "isolated-fixture" } : {},
+  > 184 │             [prefix + "_ACCESS_KEY_ID"]: config.accessKeyId,
+        │              ^^^^^^^^^^^^^^^^^^^^^^^^^
+    185 │             [prefix + "_SECRET_ACCESS_KEY"]: config.secretAccessKey,
+    186 │             NO_PROXY: "localhost,127.0.0.1,host.docker.internal",
+
+  i Unsafe fix: Use a template literal.
+
+    182 182 │               ...role === "control" ? { STORAGE_INTERNAL_MEDIA_URL: "http://127.0.0.1:54112",
+    183 183 │                 CLOUDFLARE_ZONE_ID: "0".repeat(32), CLOUDFLARE_PURGE_TOKEN: "isolated-fixture" } : {},
+    184     │ - ············[prefix·+·"_ACCESS_KEY_ID"]:·config.accessKeyId,
+        184 │ + ············[`${prefix}_ACCESS_KEY_ID`]:·config.accessKeyId,
+    185 185 │               [prefix + "_SECRET_ACCESS_KEY"]: config.secretAccessKey,
+    186 186 │               NO_PROXY: "localhost,127.0.0.1,host.docker.internal",
+
+
+ops/backup/fresh-restore.test.ts:185:14 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    183 │               CLOUDFLARE_ZONE_ID: "0".repeat(32), CLOUDFLARE_PURGE_TOKEN: "isolated-fixture" } : {},
+    184 │             [prefix + "_ACCESS_KEY_ID"]: config.accessKeyId,
+  > 185 │             [prefix + "_SECRET_ACCESS_KEY"]: config.secretAccessKey,
+        │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    186 │             NO_PROXY: "localhost,127.0.0.1,host.docker.internal",
+    187 │           }, stdout: "inherit", stderr: "inherit",
+
+  i Unsafe fix: Use a template literal.
+
+    183 183 │                 CLOUDFLARE_ZONE_ID: "0".repeat(32), CLOUDFLARE_PURGE_TOKEN: "isolated-fixture" } : {},
+    184 184 │               [prefix + "_ACCESS_KEY_ID"]: config.accessKeyId,
+    185     │ - ············[prefix·+·"_SECRET_ACCESS_KEY"]:·config.secretAccessKey,
+        185 │ + ············[`${prefix}_SECRET_ACCESS_KEY`]:·config.secretAccessKey,
+    186 186 │               NO_PROXY: "localhost,127.0.0.1,host.docker.internal",
+    187 187 │             }, stdout: "inherit", stderr: "inherit",
+
+
+Checked 1 file in 62ms. No fixes applied.
+Found 3 infos.
+bun test v1.4.2 (744846f84)
+
+src/media-worker/avatar.test.ts:
+(pass) shared avatar outputs on real PG and S3 > distinct originals share output, one physical charge and atomic replay-safe private finalize [567.28ms]
+(pass) shared avatar outputs on real PG and S3 > real worker Navigator executes ingest avatar finalize without NapCat [16131.46ms]
+
+src/worker/storage-reconcile.test.ts:
+(pass) unknown canonical originals quarantine then independently recheck after48h before delete/refund [63.37ms]
+(pass) appearing authoritative identity prevents quarantine DELETE and conservatively retains observed charge [49.05ms]
+(pass) quarantine DELETE failure retains charge and prevents a new canonical writer after absence/retry [55.84ms]
+(pass) owned real S3 unknown original uses LIST/HEAD identity and is removed only after48h [109.53ms]
+(pass) durable nightly continuation crosses>1000 canonical originals across process contexts [17392.55ms]
+(pass) missing derived bytes produce a durable fixed-recipe intent without changing quota/publication; stale generation never repairs [80.60ms]
+(pass) quarantine and inventory migrations reject invalid identities and preserve restrictive policy FK [85.22ms]
+(pass) review: 101 quarantined keys advance past first100 HEAD failures without identity ACK or refund [954.59ms]
+(pass) review: nightly inventory stops at100 empty continuation pages and resumes durable cursor [2345.77ms]
+
+src/worker/media-purge.test.ts:
+(pass) real PG: ordered durable drain/two purges/two anonymous probes converge private/done [210.78ms]
+(pass) real PG: non-404 cancels old body and durably fails without downloading pixels [134.84ms]
+(pass) real PG: stale ACK leaves revoking with durable safe error [88.12ms]
+(pass) real PG: coerced ACK leaves revoking with durable safe error [88.70ms]
+(pass) real PG: extra ACK fields leaves revoking with durable safe error [89.86ms]
+(pass) real PG: malformed drain JSON leaves revoking with durable safe error [103.11ms]
+(pass) real PG: oversize drain JSON leaves revoking with durable safe error [165.72ms]
+(pass) real PG: drain denial leaves revoking with durable safe error [85.78ms]
+(pass) real PG: API false does not retry or probe [96.68ms]
+(pass) real PG: API error envelope does not retry or probe [113.36ms]
+(pass) real PG: API invalid JSON does not retry or probe [120.16ms]
+(pass) real PG: API oversize does not retry or probe [84.44ms]
+(pass) real PG: API 429 does not retry or probe [81.93ms]
+(pass) real PG: probe 206 immediately cancels body [105.22ms]
+(pass) real PG: probe 304 immediately cancels body [114.54ms]
+(pass) real PG: probe 301 immediately cancels body [127.97ms]
+(pass) real PG: probe 503 immediately cancels body [109.49ms]
+(pass) real PG: 404 HIT cancels without body; CF status missing is recorded null [163.95ms]
+(pass) real PG: undeclared/chunked 404 body 65536 bytes [146.15ms]
+(pass) real PG: undeclared/chunked 404 body 65537 bytes [114.74ms]
+(pass) real PG: transport errors never log/persist upstream body/message or credentials [79.08ms]
+(pass) real PG: old generation no-op and a generation change after drain cannot publish private [106.43ms]
+(pass) real PG: a new shared reference at drain cannot be erased [151.30ms]
+(pass) real PG: a new shared reference at final cannot be erased [215.06ms]
+(pass) real PG: overlapping same-generation attempts clear evidence and fence old evidence/error/final writes [131.14ms]
+432 |   await expect(revokeMedia(ctx, data, clock.deps)).rejects.toMatchObject({
+433 |     code: "MEDIA_ATTEMPT_DEADLINE",
+434 |   });
+435 |   expect(clock.calls.length).toBeLessThanOrEqual(5);
+436 |   expect((await publication(data.hash)).state).toBe("revoking");
+437 |   expect((await outbox(data.hash)).lastErrorCode).toBe("MEDIA_ATTEMPT_DEADLINE");
+                                                        ^
+error: expect(received).toBe(expected)
+
+Expected: "MEDIA_ATTEMPT_DEADLINE"
+Received: "MEDIA_ATTEMPT_INCOMPLETE"
+
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/src/worker/media-purge.test.ts:437:51)
+(fail) real PG: injected elapsed request time and DB time consume the whole budget [178.36ms]
+(pass) real PG: stalled bounded drain body is cancelled at the individual 10s deadline [10147.69ms]
+(pass) real PG: final transaction rejects incomplete durable evidence atomically [117.19ms]
+(pass) real PG: row lock deadline destroys active connection and rolls back writes [157.85ms]
+(pass) real PG: stalled COMMIT transport phase cannot continue after timeout [225.82ms]
+(pass) real PG: pool acquisition is bounded and a late acquired client is discarded [76.73ms]
+(pass) real PG: maintenance denial refuses claim and does not contact edge [98.58ms]
+(pass) real PG: old dead observation preserves fresh attempt; repair enqueues due pending/failed/stale-running only [362.80ms]
+(pass) real PG: lost ACK after accepted COMMIT reconciles done and sends no extra Cloudflare requests [265.39ms]
+(pass) real PG: due outbox repair caps each batch at100 and excludes obsolete generations [186.02ms]
+(pass) real PG: blacklisted shared public output remains blocked after successful revocation [144.76ms]
+(pass) real PG: blacklisted shared public output remains blocked after failed revocation [92.32ms]
+(pass) malformed jobs fail before any network request [77.38ms]
+
+src/worker/storage-sweep.test.ts:
+(pass) unattached expiration respects 24h, suspended association pins files and objects [1630.02ms]
+(pass) original and shared output each get independent seven-day grace, one source never deletes shared bytes [908.20ms]
+(pass) absolute 24h upload expiry releases logical quota once and cancels descendants [1019.83ms]
+(pass) cancel during revoking defers restoration until convergence and changed selection fences old intent [1127.39ms]
+(pass) budget recalibration reports drift and ready S3 absence is failure without refund [575.87ms]
+(pass) real pg-boss dead parent records original identity, rejects once and cancels blocked descendants [127.83ms]
+(pass) 15min stranded repair increments generation, preserves reservation and ignores delayed old dead delivery [1042.98ms]
+(pass) terminal temporary objects wait 1h and unknown attempts wait 48h; writing ambiguity is never refunded [19083.74ms]
+(pass) file tombstone cannot be removed before day30 [4816.28ms]
+(pass) remaining sweep deadline aborts actual pending driver read and forbids late continuation [580.26ms]
+(fail) physical scans rotate beyond batch100 and failed resume batches cannot starve later generations [30679.44ms]
+  ^ this test timed out after 30000ms.
+40 |     res = resolve
+41 |     rej = reject
+42 |   }).catch((err) => {
+43 |     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+44 |     // application that created the query
+45 |     Error.captureStackTrace(err)
+               ^
+error: Connection terminated due to connection timeout
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg-pool@3.14.0+00a0136bc273dfed/node_modules/pg-pool/index.js:45:11)
+
+199 |     })
+200 |
+201 |     this._attachListeners(con)
+202 |
+203 |     con.once('end', () => {
+204 |       const error = this._ending ? new Error('Connection terminated') : new Error('Connection terminated unexpectedly')
+                                                                                  ^
+error: Connection terminated unexpectedly
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg@8.23.0+00a0136bc273dfed/node_modules/pg/lib/client.js:204:77)
+      at emit (node:events:97:22)
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg@8.23.0+00a0136bc273dfed/node_modules/pg/lib/connection.js:64:12)
+      at emit (node:events:100:22)
+      at <anonymous> (node:net:2308:20)
+(fail) unknown physical temporary prefix waits48h and accounts once before deletion [11101.15ms]
+
+# Unhandled error between tests
+-------------------------------
+36 |   async queryWithCache(queryString, params, query) {
+37 |     if (this.cache === void 0 || is(this.cache, NoopCache) || this.queryMetadata === void 0) {
+38 |       try {
+39 |         return await query();
+40 |       } catch (e) {
+41 |         throw new DrizzleQueryError(queryString, params, e);
+                   ^
+error: Failed query: select "id", "sha256", "policy_id", "key", "size", "detected_mime", "state", "properties", "verified_at", "orphaned_at", "generation", "lease_until", "created_at" from "blobs" where "blobs"."id" = $1
+params: 01a126eb-49b0-732f-a810-831a114ff1fd
+  query: "select \"id\", \"sha256\", \"policy_id\", \"key\", \"size\", \"detected_mime\", \"state\", \"properties\", \"verified_at\", \"orphaned_at\", \"generation\", \"lease_until\", \"created_at\" from \"blobs\" where \"blobs\".\"id\" = $1",
+ params: [
+  "01a126eb-49b0-732f-a810-831a114ff1fd"
+],
+
+      at queryWithCache (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/drizzle-orm@0.45.3+888bfaee68f299c3/node_modules/drizzle-orm/pg-core/session.js:41:15)
+      at async <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/drizzle-orm@0.45.3+888bfaee68f299c3/node_modules/drizzle-orm/node-postgres/session.js:117:35)
+
+689 |         result = new this._Promise((resolve, reject) => {
+690 |           query.callback = (err, res) => (err ? reject(err) : resolve(res))
+691 |         }).catch((err) => {
+692 |           // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+693 |           // application that created the query
+694 |           Error.captureStackTrace(err)
+                      ^
+error: canceling statement due to statement timeout
+     length: 109,
+   severity: "ERROR",
+     detail: undefined,
+       hint: undefined,
+   position: undefined,
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: undefined,
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "postgres.c",
+    routine: "ProcessInterrupts",
+       code: "57014"
+
+      at /Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg@8.23.0+00a0136bc273dfed/node_modules/pg/lib/client.js:694:17
+      at processTicksAndRejections (native:7:39)
+-------------------------------
+
+(fail) 51 deferred avatars rotate past still-revoking first50 with a nonadvancing clock [30000.66ms]
+  ^ this test timed out after 30000ms.
+../../.superpowers/sdd/2026-10-10-community-storage/task12-continue-gate.sh: line 5: 67171 Terminated: 15          bun test --timeout 30000 src/client/entry.server.test.ts src/client/lib/account-errors.test.ts src/client/lib/analytics.test.ts src/client/lib/auth-client.test.ts src/client/lib/auth-errors.test.ts src/client/lib/file-upload.test.ts src/client/lib/locale-href.test.ts src/client/lib/locale-suggestion.test.ts src/client/lib/next-path.test.ts src/client/lib/pending-deletion.test.ts src/client/lib/require-user.test.ts src/client/lib/seo.test.ts src/client/queries/profile.test.ts src/client/queries/storage.test.ts src/client/queries/user.test.ts src/client/routes/account-deletion.test.ts src/client/routes/home.test.ts src/client/routes/locale.test.ts src/client/routes/login.test.ts src/client/routes/onboarding.test.ts src/client/routes/settings-account.test.ts src/client/routes/settings-profile.test.ts src/client/routes/user-profile.test.ts src/media-worker/avatar.test.ts src/server/api/me-account.test.ts src/server/api/me-deletion.test.ts src/server/api/me-profile.test.ts src/server/api/me.test.ts src/server/api/uploads.test.ts src/server/api/users.test.ts src/server/auth/auth.test.ts src/server/auth/google-timeout.test.ts src/server/auth/passkey.test.ts src/server/auth/pending-deletion.test.ts src/server/auth/qq/codes.test.ts src/server/auth/qq/hasher.test.ts src/server/auth/qq/plugin.test.ts src/server/auth/qq/sender.test.ts src/server/auth/recent-login.test.ts src/server/auth/short-id.test.ts src/server/auth/turnstile.test.ts src/server/db/client.test.ts src/server/db/login-method-guard.test.ts src/server/db/storage-schema.test.ts src/server/jobs/boss.test.ts src/server/jobs/queues.test.ts src/server/middleware/body-limit.test.ts src/server/middleware/client-ip.test.ts src/server/middleware/csrf.test.ts src/server/middleware/pending-deletion.test.ts src/server/middleware/rate-limit.redis.test.ts src/server/middleware/rate-limit.test.ts src/server/middleware/request-log.test.ts src/server/middleware/security-headers.test.ts src/server/middleware/umami.test.ts src/server/napcat/client.test.ts src/server/napcat/health.test.ts src/server/napcat/onebot-config.test.ts src/server/napcat/sender.test.ts src/server/redis/client.test.ts src/server/services/login-options.test.ts src/server/services/user-deletion.test.ts src/server/storage/avatars.test.ts src/server/storage/backup.test.ts src/server/storage/deletion.test.ts src/server/storage/disk.test.ts src/server/storage/drain-lifecycle.test.ts src/server/storage/env.test.ts src/server/storage/flow.test.ts src/server/storage/gate.test.ts src/server/storage/keys.test.ts src/server/storage/maintenance.test.ts src/server/storage/public-media.test.ts src/server/storage/range.test.ts src/server/storage/references.test.ts src/server/storage/rules.test.ts src/server/storage/runtime-publication.test.ts src/server/storage/runtime-role.test.ts src/server/storage/runtime.test.ts src/server/storage/s3.test.ts src/server/storage/settlement.test.ts src/server/storage/transactions.test.ts src/server/storage/uploads.test.ts src/server/testing/test-db.test.ts src/shared/i18n/locale.test.ts src/shared/i18n/messages.test.ts src/worker/media-purge.test.ts src/worker/napcat-events.test.ts src/worker/purge-sweep.test.ts src/worker/session-cleanup.test.ts src/worker/storage-delete.test.ts src/worker/storage-reconcile.test.ts src/worker/storage-sweep.test.ts test/ops/backup.test.ts test/ops/deploy.test.ts test/ops/env-example.test.ts test/ops/fill-secrets.test.ts test/ops/postgres-init.test.ts test/ops/storage-compose.test.ts
+real 179.49
+user 28.03
+sys 7.52
