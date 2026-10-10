@@ -5,6 +5,7 @@ import { mediaPublications } from "../db/schema";
 import { hasPublicRepresentation } from "./references";
 import { STORAGE_LIMITS } from "./rules";
 import { StorageUnavailableError } from "./errors";
+import { withStorageTransaction } from "./transactions";
 const hashPattern = /^[0-9a-f]{64}$/;
 const denied = () =>
   Response.json(
@@ -48,21 +49,27 @@ export function createMediaDrain({ db, secret }: { db: Db; secret: string }): Me
     async drain(hash, generation) {
       if (!hashPattern.test(hash) || !Number.isSafeInteger(generation) || generation < 0)
         throw new Error("Invalid drain generation");
-      // Delayed old-generation drains must never close a newly public generation.
-      const [pub] = await db
-        .select()
-        .from(mediaPublications)
-        .where(eq(mediaPublications.outputSha256, hash));
-      if (
-        !pub ||
-        pub.generation !== generation ||
-        !(pub.state === "revoking" || pub.state === "blocked")
-      )
-        throw new Error("Stale drain");
-      latches.set(hash, Math.max(generation, latches.get(hash) ?? 0));
-      epochs.set(hash, (epochs.get(hash) ?? 0) + 1);
-      for (const controller of [...(active.get(hash) ?? [])]) controller.abort();
-      return { generation, drained: true };
+      return withStorageTransaction(db, async (tx) => {
+        // Publication transitions and this local admission boundary serialize
+        // on the same row. A delayed SELECT cannot latch a newer generation.
+        const [pub] = await tx
+          .select()
+          .from(mediaPublications)
+          .where(eq(mediaPublications.outputSha256, hash))
+          .for("update");
+        if (
+          !pub ||
+          pub.generation !== generation ||
+          !(pub.state === "revoking" || pub.state === "blocked")
+        )
+          throw new Error("Stale drain");
+        latches.set(hash, Math.max(generation, latches.get(hash) ?? 0));
+        epochs.set(hash, (epochs.get(hash) ?? 0) + 1);
+        // Abort dispatch is synchronous; never await stream/network cancellation
+        // while holding the publication row or maintenance admission locks.
+        for (const controller of [...(active.get(hash) ?? [])]) controller.abort();
+        return { generation, drained: true as const };
+      });
     },
     async resume(hash, generation) {
       const epoch = epochs.get(hash) ?? 0;

@@ -582,3 +582,121 @@ test("media registrations cap permissions/streams at32 and saturation is503 with
   expect(final).not.toBeNull();
   final!.release();
 });
+
+test("unconfigured storage denies canonical and invalid media with no-store before sessions", async () => {
+  const { deps } = testAppDeps();
+  const app = createApp(deps);
+  const hash = "a".repeat(64);
+  for (const target of [
+    `/media/${hash}.jpg`,
+    `/media/${hash}.jpg?`,
+    `/media/${hash}.jpg?x=1`,
+    `/media/%61${hash.slice(1)}.jpg`,
+    `/me%64ia/${hash}.jpg`,
+    `/media%2f${hash}.jpg`,
+    "/media",
+  ]) {
+    const response = await app.request(target, { headers: { cookie: "session=invalid" } });
+    expect(response.status).toBe(404);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(response.headers.get("vary")).toBeNull();
+  }
+});
+
+real("an old drain result cannot latch or abort a newer resumed public generation", async () => {
+  const { ctx, policy } = fixture;
+  const { app, browser, drain, secret } = setup();
+  const { id } = await login(browser);
+  const f = await readyFile(ctx, policy.id, id);
+  const hash = f.derived.outputSha256;
+  await setAvatar(ctx, id, { fileId: f.file.id, expectedRevision: 0 }, crypto.randomUUID());
+  await setAvatar(ctx, id, { fileId: null, expectedRevision: 1 }, crypto.randomUUID());
+  const old = await publication(hash);
+  const pool = testDbHandle().pool;
+  // This client will be next from the idle pool. Hold the actual SELECT result,
+  // for both pool-query (unlocked implementation) and transaction-client paths.
+  const client = await pool.connect();
+  const query = client.query;
+  let release!: () => void, reached!: () => void;
+  const barrier = new Promise<void>((r) => (release = r));
+  const hit = new Promise<void>((r) => (reached = r));
+  let held = false;
+  client.query = ((...args: unknown[]) => {
+    const text =
+      typeof args[0] === "object" ? String((args[0] as { text?: string }).text) : String(args[0]);
+    if (!held && text.includes('from "media_publications" where')) {
+      held = true;
+      const last = args.at(-1);
+      if (typeof last === "function") {
+        args[args.length - 1] = async (error: unknown, value: unknown) => {
+          if (!error) {
+            reached();
+            await barrier;
+          }
+          last(error, value);
+        };
+        return Reflect.apply(query, client, args);
+      }
+      return Promise.resolve(Reflect.apply(query, client, args)).then(async (value) => {
+        reached();
+        await barrier;
+        return value;
+      });
+    }
+    return Reflect.apply(query, client, args);
+  }) as typeof client.query;
+  client.release();
+  let stopWatch = false;
+  const pending = internal(drain, secret, "drain", hash, old.generation);
+  let republished: Promise<Response> | undefined;
+  try {
+    await hit;
+    republished = (async () => {
+      // Task7 convergence followed by the real API publication/resume path.
+      await ctx.db
+        .update(mediaPublications)
+        .set({ state: "private" })
+        .where(eq(mediaPublications.outputSha256, hash));
+      const saved = await browser.request("PUT", "/api/v1/me/avatar", {
+        body: { fileId: f.file.id, expectedRevision: 2 },
+        headers: { "idempotency-key": crypto.randomUUID() },
+      });
+      expect(saved.status).toBe(200);
+      return app.request(`/media/${hash}.jpg`);
+    })();
+    const blocked = (async () => {
+      for (let i = 0; i < 100 && !stopWatch; i++) {
+        const result = await ctx.db.execute(sql`
+          select exists(select 1 from pg_stat_activity
+            where datname=current_database() and wait_event_type='Lock'
+            and query like 'update "media_publications"%') as waiting`);
+        if (result.rows[0]?.waiting) return "blocked" as const;
+        await Bun.sleep(5);
+      }
+      if (!stopWatch) throw new Error("Publication neither completed nor waited on PG lock");
+      return "stopped" as const;
+    })();
+    const phase = await Promise.race([republished.then(() => "published" as const), blocked]);
+    stopWatch = true;
+    release();
+    const ack = await pending;
+    // Unlocked obsolete snapshots must be denied. Locked validation may ACK
+    // first, before the higher-generation transition is allowed to complete.
+    expect(ack.status).toBe(phase === "published" ? 404 : 200);
+    const response = await republished;
+    expect(response.status).toBe(200);
+    expect(digest(new Uint8Array(await response.arrayBuffer()))).toBe(hash);
+    const after = await app.request(`/media/${hash}.jpg`);
+    expect(after.status).toBe(200);
+    await after.arrayBuffer();
+    expect((await publication(hash)).generation).toBeGreaterThan(old.generation);
+  } finally {
+    stopWatch = true;
+    release();
+    client.query = query;
+    await pending;
+    const unfinished = await republished;
+    if (unfinished && !unfinished.bodyUsed) await unfinished.body?.cancel();
+  }
+});

@@ -8,6 +8,7 @@ import type { Logger } from "@/shared/log";
 
 import { createMediaDrain, type MediaDrain } from "./storage/drain";
 import { createPublicMediaHandler, isMediaRequest } from "./storage/public-media";
+import { mediaDenial } from "./storage/files";
 import { isUploadPartRequest } from "./storage/parts";
 import { StorageError } from "./storage/errors";
 import { apiRoutes } from "./api/v1";
@@ -90,8 +91,7 @@ export function createApp(deps: AppDeps) {
     // Node adapter exposes the exact request-target before URL dot-segment normalization.
     const rawTarget = (c.env as { incoming?: { url?: string } } | undefined)?.incoming?.url;
     if (!isMediaRequest(c.req.raw, rawTarget)) return next();
-    if (!media) return jsonError(c, 404, "NOT_FOUND", "Not found");
-    const response = await media(c.req.raw, rawTarget);
+    const response = media ? await media(c.req.raw, rawTarget) : mediaDenial();
     response.headers.set("X-Request-Id", c.get("requestId"));
     return response;
   });
