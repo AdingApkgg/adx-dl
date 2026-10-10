@@ -373,7 +373,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                 if (visible.length === 0) setHistoryOpen(true);
               }}
               aria-label={visible.length > 0 ? tray.expand : tray.historyTitle}
-              className="pointer-events-auto relative isolate flex items-center gap-2 border border-border/70 bg-popover/95 px-3 py-2 text-xs font-medium shadow-lg ring-1 ring-foreground/5"
+              className="pointer-events-auto relative isolate flex min-h-11 items-center gap-2 border border-border/70 bg-popover/95 px-3 py-2 text-xs font-medium shadow-lg ring-1 ring-foreground/5"
             >
               {/* Blur on a child, not the morphing element, so it doesn't smear mid-morph. */}
               <span aria-hidden="true" className="absolute inset-0 -z-10 rounded-[inherit] backdrop-blur" />
