@@ -6,6 +6,7 @@
  * here so the combined surface stays importable in tests and scripts.
  */
 import { Gzip, Zip, ZipPassThrough } from "fflate";
+import { assertZip32Limits, nestedArchiveFiles, withRootDirectory } from "./adx-archive-layout";
 
 import type {
   AdxArchiveInput,
@@ -16,22 +17,6 @@ import type {
 } from "./adx-archive-shared";
 
 export * from "./adx-archive-shared";
-
-function archivePathSegment(value: string): string {
-  const cleaned = value.trim().replace(/[\\/]+/g, "_").replace(/^\.+/, "");
-  return cleaned.length > 0 && cleaned !== "." ? cleaned : "chart";
-}
-
-function withRootDirectory(
-  files: AdxArchiveInput[],
-  directoryName?: string
-): AdxArchiveInput[] {
-  if (!directoryName) {
-    return files;
-  }
-  const root = archivePathSegment(directoryName);
-  return files.map((file) => ({ ...file, name: `${root}/${file.name}` }));
-}
 
 // Output accumulates into a growing Blob rather than one big buffer, so the
 // browser can spill it to disk and peak memory stays a small constant regardless
@@ -158,6 +143,7 @@ async function packZip(
   mtime: Date,
   onProgress?: ArchiveProgressCallback
 ): Promise<Blob> {
+  assertZip32Limits(files);
   const sink = createBlobSink();
   const progress = createProgressReporter(files, onProgress);
   progress.emit();
@@ -316,40 +302,9 @@ export async function buildNestedArchiveBlob(
     throw new Error("No charts selected");
   }
 
-  const usedByGroup = new Map<string, Set<string>>();
-  const entries: AdxArchiveInput[] = [];
-  for (const chart of charts) {
-    if (chart.files.length === 0) {
-      throw new Error(`Chart has no files: ${chart.name}`);
-    }
-
-    const safeGroupName = chart.groupDir ? archivePathSegment(chart.groupDir) : "";
-    const usedKey = safeGroupName || ".";
-    const used = usedByGroup.get(usedKey) ?? new Set<string>();
-    usedByGroup.set(usedKey, used);
-
-    // Fallback disambiguation for two charts sharing a directory name in the
-    // same group. Catalog specs prefix every dir with the unique shortid, so
-    // this only fires for stale cached specs or custom sources — and it CANNOT
-    // help across separate downloads: AstroDX flattens all archives into one
-    // levels/ folder, where same-named folders overwrite each other. Uniqueness
-    // has to come from the name itself (see chartDownloadDirName).
-    const safeChartName = archivePathSegment(chart.name);
-    let directoryName = safeChartName;
-    for (let copy = 2; used.has(directoryName); copy += 1) {
-      directoryName = `${safeChartName} (${copy})`;
-    }
-    used.add(directoryName);
-
-    const chartEntries = withRootDirectory(chart.files, directoryName);
-    entries.push(
-      ...(safeGroupName ? withRootDirectory(chartEntries, safeGroupName) : chartEntries)
-    );
-  }
-
   const type = "application/octet-stream";
   const stamp = archiveTimestamp(mtime);
-  const rootedEntries = withRootDirectory(entries, directoryName);
+  const rootedEntries = nestedArchiveFiles(charts, directoryName);
   return format === "tar.gz"
     ? packTarGz(rootedEntries, type, stamp, onProgress)
     : packZip(rootedEntries, type, stamp, onProgress);

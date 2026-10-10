@@ -1,0 +1,486 @@
+[
+  {
+    "id": "1",
+    "name": "初段",
+    "charts": [
+      {
+        "songId": "10256",
+        "slot": 2
+      },
+      {
+        "songId": "11052",
+        "slot": 2
+      },
+      {
+        "songId": "10319",
+        "slot": 2
+      },
+      {
+        "songId": "617",
+        "slot": 2
+      }
+    ]
+  },
+  {
+    "id": "2",
+    "name": "二段",
+    "charts": [
+      {
+        "songId": "11764",
+        "slot": 3
+      },
+      {
+        "songId": "11136",
+        "slot": 3
+      },
+      {
+        "songId": "11265",
+        "slot": 3
+      },
+      {
+        "songId": "11697",
+        "slot": 3
+      }
+    ]
+  },
+  {
+    "id": "3",
+    "name": "三段",
+    "charts": [
+      {
+        "songId": "11701",
+        "slot": 3
+      },
+      {
+        "songId": "11411",
+        "slot": 3
+      },
+      {
+        "songId": "11491",
+        "slot": 3
+      },
+      {
+        "songId": "11638",
+        "slot": 3
+      }
+    ]
+  },
+  {
+    "id": "4",
+    "name": "四段",
+    "charts": [
+      {
+        "songId": "11698",
+        "slot": 4
+      },
+      {
+        "songId": "11276",
+        "slot": 4
+      },
+      {
+        "songId": "10535",
+        "slot": 4
+      },
+      {
+        "songId": "417",
+        "slot": 4
+      }
+    ]
+  },
+  {
+    "id": "5",
+    "name": "五段",
+    "charts": [
+      {
+        "songId": "579",
+        "slot": 4
+      },
+      {
+        "songId": "11003",
+        "slot": 4
+      },
+      {
+        "songId": "11333",
+        "slot": 4
+      },
+      {
+        "songId": "11770",
+        "slot": 4
+      }
+    ]
+  },
+  {
+    "id": "6",
+    "name": "六段",
+    "charts": [
+      {
+        "songId": "439",
+        "slot": 4
+      },
+      {
+        "songId": "11405",
+        "slot": 4
+      },
+      {
+        "songId": "432",
+        "slot": 4
+      },
+      {
+        "songId": "11272",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "7",
+    "name": "七段",
+    "charts": [
+      {
+        "songId": "11271",
+        "slot": 5
+      },
+      {
+        "songId": "634",
+        "slot": 5
+      },
+      {
+        "songId": "11580",
+        "slot": 5
+      },
+      {
+        "songId": "11767",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "8",
+    "name": "八段",
+    "charts": [
+      {
+        "songId": "11017",
+        "slot": 5
+      },
+      {
+        "songId": "11048",
+        "slot": 5
+      },
+      {
+        "songId": "11615",
+        "slot": 5
+      },
+      {
+        "songId": "11512",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "9",
+    "name": "九段",
+    "charts": [
+      {
+        "songId": "11699",
+        "slot": 5
+      },
+      {
+        "songId": "11141",
+        "slot": 5
+      },
+      {
+        "songId": "798",
+        "slot": 5
+      },
+      {
+        "songId": "11496",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "10",
+    "name": "十段",
+    "charts": [
+      {
+        "songId": "840",
+        "slot": 5
+      },
+      {
+        "songId": "11207",
+        "slot": 5
+      },
+      {
+        "songId": "11412",
+        "slot": 5
+      },
+      {
+        "songId": "227",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "11",
+    "name": "真初段",
+    "charts": [
+      {
+        "songId": "11010",
+        "slot": 5
+      },
+      {
+        "songId": "11133",
+        "slot": 5
+      },
+      {
+        "songId": "759",
+        "slot": 5
+      },
+      {
+        "songId": "136",
+        "slot": 4
+      }
+    ]
+  },
+  {
+    "id": "12",
+    "name": "真二段",
+    "charts": [
+      {
+        "songId": "791",
+        "slot": 5
+      },
+      {
+        "songId": "11350",
+        "slot": 5
+      },
+      {
+        "songId": "191",
+        "slot": 4
+      },
+      {
+        "songId": "11532",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "13",
+    "name": "真三段",
+    "charts": [
+      {
+        "songId": "11599",
+        "slot": 5
+      },
+      {
+        "songId": "794",
+        "slot": 5
+      },
+      {
+        "songId": "239",
+        "slot": 4
+      },
+      {
+        "songId": "709",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "14",
+    "name": "真四段",
+    "charts": [
+      {
+        "songId": "11715",
+        "slot": 5
+      },
+      {
+        "songId": "581",
+        "slot": 4
+      },
+      {
+        "songId": "204",
+        "slot": 5
+      },
+      {
+        "songId": "453",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "15",
+    "name": "真五段",
+    "charts": [
+      {
+        "songId": "11583",
+        "slot": 5
+      },
+      {
+        "songId": "11653",
+        "slot": 5
+      },
+      {
+        "songId": "448",
+        "slot": 5
+      },
+      {
+        "songId": "673",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "16",
+    "name": "真六段",
+    "charts": [
+      {
+        "songId": "11316",
+        "slot": 5
+      },
+      {
+        "songId": "11710",
+        "slot": 5
+      },
+      {
+        "songId": "11177",
+        "slot": 6
+      },
+      {
+        "songId": "700",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "17",
+    "name": "真七段",
+    "charts": [
+      {
+        "songId": "11460",
+        "slot": 5
+      },
+      {
+        "songId": "11208",
+        "slot": 5
+      },
+      {
+        "songId": "451",
+        "slot": 5
+      },
+      {
+        "songId": "11413",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "18",
+    "name": "真八段",
+    "charts": [
+      {
+        "songId": "766",
+        "slot": 5
+      },
+      {
+        "songId": "11213",
+        "slot": 5
+      },
+      {
+        "songId": "24",
+        "slot": 6
+      },
+      {
+        "songId": "556",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "19",
+    "name": "真九段",
+    "charts": [
+      {
+        "songId": "11675",
+        "slot": 5
+      },
+      {
+        "songId": "11618",
+        "slot": 5
+      },
+      {
+        "songId": "589",
+        "slot": 6
+      },
+      {
+        "songId": "11687",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "20",
+    "name": "真十段",
+    "charts": [
+      {
+        "songId": "11295",
+        "slot": 5
+      },
+      {
+        "songId": "11026",
+        "slot": 5
+      },
+      {
+        "songId": "11470",
+        "slot": 5
+      },
+      {
+        "songId": "11619",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "21",
+    "name": "真皆传",
+    "charts": [
+      {
+        "songId": "11223",
+        "slot": 5
+      },
+      {
+        "songId": "11745",
+        "slot": 5
+      },
+      {
+        "songId": "11311",
+        "slot": 5
+      },
+      {
+        "songId": "11753",
+        "slot": 5
+      }
+    ]
+  },
+  {
+    "id": "22",
+    "name": "里皆传",
+    "charts": [
+      {
+        "songId": "834",
+        "slot": 6
+      },
+      {
+        "songId": "11612",
+        "slot": 5
+      },
+      {
+        "songId": "11662",
+        "slot": 5
+      },
+      {
+        "songId": "11663",
+        "slot": 6
+      }
+    ]
+  }
+]

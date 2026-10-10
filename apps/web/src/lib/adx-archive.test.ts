@@ -9,11 +9,6 @@ import {
   type ArchiveProgress,
 } from "./adx-archive";
 
-async function flushAsyncWork(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
-}
-
 function entry(name: string, bytes: Uint8Array | string) {
   const data = typeof bytes === "string" ? new TextEncoder().encode(bytes) : bytes;
   return { name, blob: new Blob([data as BlobPart]) };
@@ -62,6 +57,27 @@ function tarEntries(tar: Uint8Array): Record<string, Uint8Array> {
 }
 
 describe("adx archive", () => {
+  test("rejects ZIP32 overflow before reading any payload", async () => {
+    const blob = new Blob(["x"]);
+    Object.defineProperty(blob, "size", { value: 2 ** 32 });
+    blob.stream = () => {
+      throw new Error("Payload must not be read");
+    };
+    for (const format of ["adx", "zip"] as const) {
+      await expect(buildArchiveBlob([{ name: "huge.bin", blob }], format))
+        .rejects.toThrow("ZIP32");
+    }
+    await expect(buildNestedArchiveBlob([
+      { name: "huge", files: [{ name: "huge.bin", blob }] },
+    ])).rejects.toThrow("ZIP32");
+  });
+
+  test("rejects the ZIP32 entry-count sentinel before packing", async () => {
+    const blob = new Blob();
+    const files = Array.from({ length: 0xffff }, (_, index) => ({ name: `${index}`, blob }));
+    await expect(buildArchiveBlob(files)).rejects.toThrow("ZIP32");
+  });
+
   test("appends the chosen format extension to the directory name", () => {
     expect(getArchiveDownloadFileName("39")).toBe("39.adx");
     expect(getArchiveDownloadFileName("39", "zip")).toBe("39.zip");
@@ -354,24 +370,35 @@ describe("adx archive", () => {
     expect(field(1024 + 345, 155)).toBe(longDir); // directory in the USTAR prefix field
   });
 
-  test("creates an object url, clicks a download anchor, and revokes it", async () => {
+  test("keeps the attached download URL alive beyond the click and microtasks", async () => {
     const originalDocument = globalThis.document;
     const originalUrl = globalThis.URL;
     const clicked: string[] = [];
     const created: string[] = [];
     const revoked: string[] = [];
+    const originalSetTimeout = globalThis.setTimeout;
+    const cleanup: (() => void)[] = [];
+    let attached = false;
 
     const anchor = {
       href: "",
       download: "",
+      style: { display: "" },
+      remove: () => { attached = false; },
       click: () => {
+        expect(attached).toBe(true);
         clicked.push(`${anchor.download}:${anchor.href}`);
       },
     };
 
     globalThis.document = {
       createElement: () => anchor,
+      body: { appendChild: () => { attached = true; } },
     } as unknown as Document;
+    globalThis.setTimeout = ((callback: () => void) => {
+      cleanup.push(callback);
+      return { unref() {} };
+    }) as unknown as typeof setTimeout;
 
     globalThis.URL = {
       ...originalUrl,
@@ -384,14 +411,21 @@ describe("adx archive", () => {
       },
     } as unknown as typeof URL;
 
-    saveBlobAsFile(new Blob(["archive"]), "39.adx");
-    await flushAsyncWork();
-
-    expect(created).toEqual(["blob:adx-download"]);
-    expect(clicked).toEqual(["39.adx:blob:adx-download"]);
-    expect(revoked).toEqual(["blob:adx-download"]);
-
-    globalThis.document = originalDocument;
-    globalThis.URL = originalUrl;
+    try {
+      saveBlobAsFile(new Blob(["archive"]), "39.adx");
+      await Promise.resolve();
+      expect(created).toEqual(["blob:adx-download"]);
+      expect(clicked).toEqual(["39.adx:blob:adx-download"]);
+      expect(revoked).toEqual([]);
+      expect(attached).toBe(true);
+      expect(cleanup).toHaveLength(1);
+      cleanup[0]();
+      expect(revoked).toEqual(["blob:adx-download"]);
+      expect(attached).toBe(false);
+    } finally {
+      globalThis.document = originalDocument;
+      globalThis.URL = originalUrl;
+      globalThis.setTimeout = originalSetTimeout;
+    }
   });
 });

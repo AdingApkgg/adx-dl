@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@astrodx/ui/components/dropdown-menu";
 import { BATCH_FORMATS, type BatchArchiveFormat } from "@/lib/adx-archive-shared";
+import { MAX_BATCH_ZIP_BYTES } from "@/lib/adx-archive-layout";
 import {
   isChartVideoFile,
   sumChartDownloadBytes,
@@ -186,7 +187,7 @@ export function BatchDownloadBar({
         : tray.storageTight(formatBytes(headroom.availableBytes));
 
   // A selection spanning multiple grouping folders (versions or genres) saves
-  // one archive per folder (see splitBatchArchives) — tell the user up front.
+  // separate archives per folder; large ZIP/ADX groups split further by size.
   const groupCount = React.useMemo(
     () => new Set(charts.map((chart) => chartGroupingDir(chart, grouping))).size,
     [charts, grouping]
@@ -216,6 +217,8 @@ export function BatchDownloadBar({
         ? downloadJobStateText(jobs[0], detail, tray)
         : status === "success"
           ? tray.completed
+          : status === "ready"
+            ? tray.readyToSave
           : tray.queueSummary(summary.done, summary.total);
   const metricsText =
     jobs.length === 1
@@ -225,7 +228,7 @@ export function BatchDownloadBar({
         : "";
   const statusText = metricsText ? `${stateText} · ${metricsText}` : stateText;
   const failedJob = jobs.find((entry) => entry.status === "error");
-  const canDownload = count > 0 && !isBusy && !isResumable;
+  const canDownload = count > 0 && !isBusy && !isResumable && status !== "ready";
 
   // Hide these jobs from the floating tray while the bar itself is on screen.
   // Keyed by a joined string so the effect doesn't re-run on array identity.
@@ -439,7 +442,9 @@ export function BatchDownloadBar({
                     ? `${tray.archiving} · ${percent}%`
                     : isBusy
                       ? detail.downloadPacking(progress.completed, progress.total)
-                      : browser.batchDownload}
+                      : status === "ready"
+                        ? tray.readyToSave
+                        : browser.batchDownload}
                   {canDownload ? (
                     <span className="font-mono text-[11px] opacity-75">
                       .{preferredFormat}
@@ -545,7 +550,7 @@ export function BatchDownloadBar({
           className="w-fit"
         />
 
-        {!isBusy && !isResumable && status !== "success" ? (
+        {!isBusy && !isResumable && status !== "success" && status !== "ready" ? (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             <span>{tray.batchSummary(count, selectedFileCount)}</span>
             {sizeHint ? (
@@ -573,6 +578,11 @@ export function BatchDownloadBar({
           </div>
         ) : null}
 
+        {!isBusy && !isResumable && status !== "success" && status !== "ready" && pendingFormat === null &&
+        preferredFormat !== "tar.gz" && quotedBytes > MAX_BATCH_ZIP_BYTES ? (
+          <p className="text-xs text-muted-foreground">{tray.batchSizeSplitHint}</p>
+        ) : null}
+
         <AnimatePresence mode="wait">
           {pendingFormat !== null && !isBusy ? (
             <motion.div
@@ -590,6 +600,9 @@ export function BatchDownloadBar({
                 </p>
                 {includeVideo && hasVideoFiles ? (
                   <p className="mt-0.5">{tray.batchVideoLargeHint}</p>
+                ) : null}
+                {pendingFormat !== "tar.gz" ? (
+                  <p className="mt-0.5">{tray.batchSizeSplitHint}</p>
                 ) : null}
                 {storageWarning ? (
                   <p
@@ -670,7 +683,7 @@ export function BatchDownloadBar({
                 {statusText}
               </p>
             </motion.div>
-          ) : status === "success" ? (
+          ) : status === "success" || status === "ready" ? (
             <motion.div
               key="success"
               aria-hidden="true"
@@ -682,7 +695,7 @@ export function BatchDownloadBar({
             >
               {/* Self-drawing check — the payoff moment for a finished batch. */}
               <DrawnCheck size={14} className="shrink-0 text-primary" />
-              <span>{tray.completed}</span>
+              <span>{stateText}</span>
             </motion.div>
           ) : status === "error" ? (
             <motion.p
@@ -704,9 +717,11 @@ export function BatchDownloadBar({
         <p role="status" className="sr-only">
           {stateText}
         </p>
-        {failedJob ? (
-          <DownloadJobNotes job={failedJob} locale={locale} />
-        ) : null}
+        <div className="flex max-h-60 flex-col gap-2 overflow-y-auto overscroll-contain">
+          {jobs.filter((entry) => entry.archives?.length || entry.id === failedJob?.id).map((entry) => (
+            <DownloadJobNotes key={entry.id} job={entry} locale={locale} />
+          ))}
+        </div>
       </div>
     </motion.div>
   );

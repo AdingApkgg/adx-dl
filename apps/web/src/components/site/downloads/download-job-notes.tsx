@@ -1,13 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, DownloadIcon } from "lucide-react";
 
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { cn } from "@astrodx/ui/lib/utils";
 import { downloadJobMetricsText, downloadJobStateText } from "./download-status-text";
 import { getDownloadSource } from "@/lib/download-sources";
-import type { DownloadJob } from "./downloads-store";
+import { useDownloadsStore, type DownloadJob } from "./downloads-store";
+import { formatBytes } from "./format-bytes";
 
 type Dictionary = ReturnType<typeof getDictionary>;
 
@@ -110,11 +111,13 @@ export function DownloadJobNotes({
 }) {
   const dictionary: Dictionary = getDictionary(locale);
   const tray = dictionary.downloads;
+  const saveArchive = useDownloadsStore((state) => state.saveArchive);
+  const hasArchives = Boolean(job.archives?.length);
   const hasSkipped = job.skippedFiles.length > 0;
   const showSwitchNotice =
     job.autoSwitchedTo !== null && job.status !== "success";
 
-  if (!hasSkipped && !showSwitchNotice && !job.errorDetail) {
+  if (!hasSkipped && !showSwitchNotice && !job.errorDetail && !hasArchives) {
     return null;
   }
 
@@ -127,6 +130,28 @@ export function DownloadJobNotes({
 
   return (
     <div className="flex flex-col gap-1.5 text-[11px] leading-snug">
+      {hasArchives ? (
+        <>
+          <ul className="flex max-h-40 flex-col gap-1 overflow-y-auto overscroll-contain">
+            {job.archives!.map((archive, index) => (
+              <li key={archive.fileName} className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={() => saveArchive(job.id, index)}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border/70 px-2 py-1.5 text-left text-xs text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  <DownloadIcon className="size-3.5 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 flex-1 break-all">{archive.fileName}</span>
+                  <span className="shrink-0 text-muted-foreground">{formatBytes(archive.bytes)}</span>
+                  <span className="shrink-0">{archive.requested ? tray.saveAgain : tray.saveArchive}</span>
+                </button>
+                {archive.error ? <p role="alert" className="text-destructive">{tray.saveError}</p> : null}
+              </li>
+            ))}
+          </ul>
+          <p className="text-muted-foreground">{tray.saveHint}</p>
+        </>
+      ) : null}
       {showSwitchNotice ? (
         <p className="text-muted-foreground">{tray.autoSwitched(switchedName)}</p>
       ) : null}

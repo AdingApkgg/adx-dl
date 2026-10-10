@@ -21,6 +21,7 @@ import {
 } from "@astrodx/ui/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
+import { DanCourseSummary } from "@/components/site/dan-course-summary";
 import {
   ChartCard,
   CHART_CARD_SIZES,
@@ -70,6 +71,7 @@ import {
   writeCatalogSelection,
 } from "@/lib/catalog-selection";
 import { attachMouseDragScroll } from "@/lib/drag-scroll";
+import { DAN_COURSES, getEntryDanIds, orderCatalogByDan, parseDanIds } from "@/lib/maimai-dan";
 import {
   CATALOG_SORT_IDS,
   type CatalogSortId,
@@ -123,6 +125,7 @@ const STICKY_TOOLBAR_TOP_PX = 72;
 const VERSION_NAME_BY_INDEX = new Map(
   MAIMAI_VERSIONS.map((version) => [version.index, version.name] as const)
 );
+const DAN_FILTER_COURSES = [...DAN_COURSES].reverse();
 
 type VersionIdentityEntry = Pick<CatalogCardEntry, "versionid" | "version">;
 
@@ -258,6 +261,7 @@ export function CatalogBrowser({
   // Categorical dimensions are multi-select chip rows: an empty set means "all",
   // and selections are OR within a dimension, AND across dimensions.
   const [versionSet, setVersionSet] = React.useState<ReadonlySet<string>>(new Set());
+  const [danSet, setDanSet] = React.useState<ReadonlySet<string>>(new Set());
   const [genreIds, setGenreIds] = React.useState<ReadonlySet<string>>(new Set());
   const [cabinetSet, setCabinetSet] = React.useState<ReadonlySet<string>>(new Set());
   const [assetSet, setAssetSet] = React.useState<ReadonlySet<string>>(new Set());
@@ -331,6 +335,15 @@ export function CatalogBrowser({
     [designerFacets]
   );
 
+  const danIdsByEntry = React.useMemo(
+    () => new Map(entries.map((entry) => [entry.id, getEntryDanIds(entry)])),
+    [entries]
+  );
+  const selectedDanCourses = React.useMemo(
+    () => DAN_FILTER_COURSES.filter((course) => danSet.has(course.id)),
+    [danSet]
+  );
+
   const isComposingRef = React.useRef(false);
   const debounceRef = React.useRef<number | null>(null);
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -393,6 +406,8 @@ export function CatalogBrowser({
         )
       : null;
     if (versionIds && versionIds.size > 0) setVersionSet(versionIds);
+    const danIds = parseDanIds(params.get("dan"));
+    if (danIds.size > 0) setDanSet(danIds);
     // Level and BPM are ranges now; both readers still accept the chip-list form
     // they replaced (`level=13,14+`, `bpm=1,2`), collapsing a list to its span.
     const level = params.get("level");
@@ -418,6 +433,7 @@ export function CatalogBrowser({
     // user can see and adjust them.
     if (
       (versionIds && versionIds.size > 0) ||
+      danIds.size > 0 ||
       level ||
       genreSet ||
       cabinet ||
@@ -610,6 +626,10 @@ export function CatalogBrowser({
         versionSet.size > 0
           ? (entry: CatalogCardEntry) => versionSet.has(catalogVersionFilterId(entry))
           : null,
+      dan:
+        danSet.size > 0
+          ? (entry: CatalogCardEntry) => (danIdsByEntry.get(entry.id) ?? []).some((id) => danSet.has(id))
+          : null,
       level: levelSpan
         ? (entry: CatalogCardEntry) => entryHasLevelInRange(entry, levelSpan[0], levelSpan[1])
         : null,
@@ -640,6 +660,8 @@ export function CatalogBrowser({
     };
   }, [
     versionSet,
+    danSet,
+    danIdsByEntry,
     levelRange,
     levelScale,
     levelBounds,
@@ -700,6 +722,7 @@ export function CatalogBrowser({
     };
     const bases = {
       version: withoutDimension("version"),
+      dan: withoutDimension("dan"),
       genre: withoutDimension("genre"),
       cabinet: withoutDimension("cabinet"),
       asset: withoutDimension("asset"),
@@ -710,6 +733,7 @@ export function CatalogBrowser({
     return {
       options: {
         version: tally(bases.version, (entry) => [catalogVersionFilterId(entry)]),
+        dan: tally(bases.dan, (entry) => danIdsByEntry.get(entry.id) ?? []),
         genre: tally(bases.genre, (entry) => [String(resolveGenreId(entry))]),
         cabinet: tally(bases.cabinet, (entry) => [cabinetBucket(entry.cabinet)]),
         asset: new Map<string, number>([
@@ -727,6 +751,7 @@ export function CatalogBrowser({
        */
       withoutDimension: {
         version: bases.version.length,
+        dan: bases.dan.length,
         genre: bases.genre.length,
         cabinet: bases.cabinet.length,
         asset: bases.asset.length,
@@ -735,7 +760,7 @@ export function CatalogBrowser({
         bpm: bases.bpm.length,
       },
     };
-  }, [scopedEntries, dimensionTests]);
+  }, [scopedEntries, dimensionTests, danIdsByEntry]);
 
   /** A chip is a dead end when nothing would survive picking it — unless it is
    *  already picked, in which case it has to stay clickable to be undone. */
@@ -758,10 +783,12 @@ export function CatalogBrowser({
   // explicitly picked ordering overrides both.
   const orderedEntries = React.useMemo(
     () =>
-      sort === DEFAULT_CATALOG_SORT && hasDeferredQuery
-        ? visibleEntries
-        : sortCatalogEntries(visibleEntries, sort, collator),
-    [sort, hasDeferredQuery, visibleEntries, collator]
+      sort === DEFAULT_CATALOG_SORT && selectedDanCourses.length > 0
+        ? orderCatalogByDan(visibleEntries, selectedDanCourses)
+        : sort === DEFAULT_CATALOG_SORT && hasDeferredQuery
+          ? visibleEntries
+          : sortCatalogEntries(visibleEntries, sort, collator),
+    [sort, hasDeferredQuery, visibleEntries, collator, selectedDanCourses]
   );
   const totalPages = Math.max(1, Math.ceil(visibleEntries.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -779,6 +806,7 @@ export function CatalogBrowser({
   const bpmFiltered = dimensionTests.bpm !== null;
   const dimensionFilterCount =
     versionSet.size +
+    danSet.size +
     genreIds.size +
     cabinetSet.size +
     assetSet.size +
@@ -807,6 +835,7 @@ export function CatalogBrowser({
     setCurrentPage(1);
   };
   const toggleVersion = toggleIn(setVersionSet);
+  const toggleDan = toggleIn(setDanSet);
   const toggleGenre = toggleIn(setGenreIds);
   const toggleCabinet = toggleIn(setCabinetSet);
   const toggleDesigner = toggleIn(setDesignerSet);
@@ -835,6 +864,7 @@ export function CatalogBrowser({
     setInputValue("");
     setQuery("");
     setVersionSet(new Set());
+    setDanSet(new Set());
     setGenreIds(new Set());
     setCabinetSet(new Set());
     setAssetSet(new Set());
@@ -865,6 +895,7 @@ export function CatalogBrowser({
     };
     apply("q", hasQuery ? query : null);
     apply("version", joinSet(versionSet));
+    apply("dan", joinSet(danSet));
     // Levels go out as labels ("8-13+") rather than indices, so a shared link
     // survives the scale growing a level.
     apply(
@@ -893,6 +924,7 @@ export function CatalogBrowser({
     hasQuery,
     query,
     versionSet,
+    danSet,
     levelRange,
     levelScale,
     genreIds,
@@ -926,8 +958,9 @@ export function CatalogBrowser({
 
   // Selection persists by id across pagination and filters, so a batch can span pages.
   const selectedCharts = React.useMemo(() => {
-    return buildSelectedCatalogCharts(entries, chartSpecs, selectedIds);
-  }, [chartSpecs, entries, selectedIds]);
+    const ordered = selectedDanCourses.length > 0 ? orderCatalogByDan(entries, selectedDanCourses) : entries;
+    return buildSelectedCatalogCharts(ordered, chartSpecs, selectedIds);
+  }, [chartSpecs, entries, selectedIds, selectedDanCourses]);
 
   // …and across navigations, by mirroring it into localStorage. Gated on
   // `urlReady` so the initial empty state can't wipe a stored selection before
@@ -1021,6 +1054,12 @@ export function CatalogBrowser({
               count: chipCounts.withoutDimension.version,
             },
             {
+              key: "dan",
+              label: dictionary.filterDan,
+              active: dimensionTests.dan !== null,
+              count: chipCounts.withoutDimension.dan,
+            },
+            {
               key: "level",
               label: dictionary.filterLevel,
               active: levelFiltered,
@@ -1073,6 +1112,8 @@ export function CatalogBrowser({
     switch (key) {
       case "version":
         return clearSet(setVersionSet)();
+      case "dan":
+        return clearSet(setDanSet)();
       case "genre":
         return clearSet(setGenreIds)();
       case "cabinet":
@@ -1273,6 +1314,28 @@ export function CatalogBrowser({
           </ChipFilterRow>
         ) : null}
 
+        <ChipFilterRow label={dictionary.filterDan}>
+          <AllChip active={danSet.size === 0} onClick={clearSet(setDanSet)}>
+            {dictionary.filterAll}
+          </AllChip>
+          {DAN_FILTER_COURSES.map((course) => {
+            const label = dictionary.danCourseName(course.id, course.name);
+            const active = danSet.has(course.id);
+            return (
+              <ToggleChip
+                key={course.id}
+                active={active}
+                disabled={isChipDisabled("dan", course.id, active)}
+                onClick={() => toggleDan(course.id)}
+                count={chipCount("dan", course.id)}
+                ariaLabel={dictionary.chipCountLabel(label, chipCount("dan", course.id))}
+              >
+                {label}
+              </ToggleChip>
+            );
+          })}
+        </ChipFilterRow>
+
         {levelScale.length > 1 ? (
           <RangeFilterRow
             label={dictionary.filterLevel}
@@ -1423,6 +1486,15 @@ export function CatalogBrowser({
         ) : null}
       </AnimatePresence>
 
+      {selectedDanCourses.length > 0 ? (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">{dictionary.danHint}</p>
+          {selectedDanCourses.map((course) => (
+            <DanCourseSummary key={course.id} course={course} entries={entries} locale={locale} />
+          ))}
+        </div>
+      ) : null}
+
       {hasActiveFilters ? (
         // A single place to see every applied condition and drop any one of
         // them — the fast path for narrowing by several criteria at once.
@@ -1444,6 +1516,14 @@ export function CatalogBrowser({
               {query}
             </FilterChip>
           ) : null}
+          {selectedDanCourses.map((course) => {
+            const label = dictionary.danCourseName(course.id, course.name);
+            return (
+              <FilterChip key={`dan-${course.id}`} onRemove={() => toggleDan(course.id)} removeLabel={dictionary.removeFilter(label)}>
+                {label}
+              </FilterChip>
+            );
+          })}
           {[...versionSet].map((id) => {
             const option = versionOptionById.get(id);
             const numericId = Number(id);

@@ -1,5 +1,5 @@
 /**
- * Device-local checkpoints for unfinished archive jobs. Only whole loose files
+ * Device-local checkpoints for archive jobs kept until explicit dismissal. Only whole loose files
  * are durable: an interrupted file is discarded and fetched from byte zero on
  * the next run. Everything degrades to a no-op when IndexedDB is unavailable
  * (SSR/private mode), so callers never have to guard browser storage access.
@@ -44,8 +44,8 @@ export type PersistedFile = {
 
 /**
  * A finished job kept so the same selection can be downloaded again without
- * rebuilding it by hand. Only the spec is retained — never the blobs, which are
- * deleted the moment the archive is saved.
+ * rebuilding it by hand. History retains only the spec; the separate job
+ * checkpoints retain blobs until the user explicitly dismisses the job.
  */
 export type DownloadHistoryEntry = {
   /** Unique per completion; a job id repeats every time the same chart is fetched. */

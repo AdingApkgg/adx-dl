@@ -1,9 +1,11 @@
 import { create } from "zustand";
+import { splitNestedZipCharts } from "@/lib/adx-archive-layout";
 
 import {
   ARCHIVE_FORMATS,
   getArchiveDownloadFileName,
   saveBlobAsFile,
+  requiresManualArchiveSave,
   type AdxArchiveInput,
   type ArchiveProgress,
   type ArchiveFormat,
@@ -91,8 +93,12 @@ export type DownloadJob = {
    * files; `archiving` = all bytes on hand, building the archive blob (can take
    * a while for big batches — distinct so the UI doesn't look frozen at 100%).
    * `paused` = interrupted (reload or manual pause), awaiting manual resume.
+   * `ready` = packed, awaiting a user-initiated save; `success` means save
+   * requests were sent, not that the browser confirmed a file on disk.
    */
-  status: "queued" | "packing" | "archiving" | "success" | "error" | "paused";
+  status: "queued" | "packing" | "archiving" | "ready" | "success" | "error" | "paused";
+  /** Built archives stay available for a user-initiated save or retry. */
+  archives?: { fileName: string; bytes: number; requested: boolean; error: boolean }[];
   /** Files finished downloading so far / total files to fetch. */
   completed: number;
   total: number;
@@ -224,6 +230,8 @@ type DownloadsState = {
   resumeInterrupted: () => number;
   /** Aborts in-flight files but keeps its spec and whole-file checkpoints. */
   pause: (id: string) => void;
+  /** Synchronous so the download starts within the button's user gesture. */
+  saveArchive: (id: string, index: number) => boolean;
   dismiss: (id: string) => void;
   /** Queues a finished download again under a fresh job id. */
   rerunHistoryEntry: (key: string) => void;
@@ -234,9 +242,6 @@ type DownloadsState = {
   presentBottomBar: () => void;
   unpresentBottomBar: () => void;
 };
-
-/** How long a finished (success) job lingers before the tray auto-clears it. */
-const AUTO_DISMISS_MS = 30000;
 
 /**
  * Cap on automatic route switches per job. Two is enough to escape one bad
@@ -318,11 +323,16 @@ export function resetDownloadQueueForTests(): void {
   }
   slotWaiters.length = 0;
   activeJobIds.clear();
+  preparedArchives.clear();
+  hydrated = false;
 }
 
 // Module-level (outside the store value) so they survive store updates but stay
 // out of React's snapshot: the durable job spec and any in-flight abort handle.
 const jobSpecs = new Map<string, PersistedJob>();
+// Large blobs live outside React snapshots. Retain until the user dismisses
+// the job; an anchor click cannot tell us whether the browser saved anything.
+const preparedArchives = new Map<string, Blob[]>();
 const abortControllers = new Map<string, AbortController>();
 /** Includes worker shutdown and any durable file callback already in flight. */
 const activeRunPromises = new Map<string, Promise<void>>();
@@ -705,6 +715,8 @@ export function summarizeDownloadJobs(
     status = "error";
   } else if (jobs.some((job) => job.status === "paused")) {
     status = "paused";
+  } else if (jobs.some((job) => job.status === "ready")) {
+    status = "ready";
   } else {
     status = "success";
   }
@@ -810,19 +822,21 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
     });
   };
 
-  const scheduleAutoDismiss = (id: string, startedAt: number): void => {
-    setTimeout(() => {
-      const job = get().jobs.find((entry) => entry.id === id);
-      if (job && job.status === "success" && job.startedAt === startedAt) {
-        get().dismiss(id);
-      }
-    }, AUTO_DISMISS_MS);
+  const prepareArchive = (id: string, blob: Blob, fileName: string): void => {
+    const blobs = preparedArchives.get(id) ?? [];
+    const index = blobs.length;
+    blobs.push(blob);
+    preparedArchives.set(id, blobs);
+    const job = get().jobs.find((entry) => entry.id === id);
+    patchJob(id, { archives: [...(job?.archives ?? []), {
+      fileName, bytes: blob.size, requested: false, error: false,
+    }] });
+    if (!requiresManualArchiveSave()) get().saveArchive(id, index);
   };
 
   /** Runs (or resumes) a job whose durable spec already lives in `jobSpecs`. */
   const runJob = async (id: string): Promise<void> => {
     const spec = jobSpecs.get(id);
-    const startedAt = get().jobs.find((job) => job.id === id)?.startedAt ?? Date.now();
     if (!spec) {
       return;
     }
@@ -1049,8 +1063,10 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       // All bytes are on hand; building the archive can take a while for big
       // batches, so surface it as its own phase instead of a full, frozen bar.
       const archiveTotalBytes = packedInputs.reduce((sum, input) => sum + input.blob.size, 0);
+      preparedArchives.delete(id);
       patchCurrentJob({
         status: "archiving",
+        archives: [],
         completed: 0,
         total: archiveInputs.length,
         receivedBytes: 0,
@@ -1106,11 +1122,10 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         if (!isCurrentRun()) {
           return;
         }
-        // A cross-version selection saves one archive per version instead of
-        // merging every version folder into a single giant archive. Archives
-        // build sequentially with cumulative progress across the whole set.
+        // Save each group separately and split large ZIP/ADX groups by size.
+        // Archives build sequentially with cumulative progress across the set.
         const charts = regroupBatch(packedInputs, dirByIndex, spec.groupByIndex ?? []);
-        const groups = splitBatchArchives(charts, spec.title);
+        const groups = splitBatchArchives(charts, spec.title, format);
         let fileOffset = 0;
         let byteOffset = 0;
         for (const [groupIndex, group] of groups.entries()) {
@@ -1135,7 +1150,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
           if (!isCurrentRun()) {
             return;
           }
-          saveBlobAsFile(blob, getArchiveDownloadFileName(group.name, format));
+          prepareArchive(id, blob, getArchiveDownloadFileName(group.name, format));
           fileOffset += groupFiles;
           byteOffset += groupBytes;
           // Space out the save clicks so browsers don't drop back-to-back
@@ -1163,28 +1178,22 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         if (!isCurrentRun()) {
           return;
         }
-        saveBlobAsFile(archiveBlob, getArchiveDownloadFileName(dirName, format));
+        prepareArchive(id, archiveBlob, getArchiveDownloadFileName(dirName, format));
       }
 
       if (!isCurrentRun()) {
         return;
       }
-      jobSpecs.delete(id);
-      // Keep successful cleanup inside the same-id lifecycle barrier. A new
-      // start must not persist its spec while this generation is still being
-      // deleted.
-      await deleteJob(id);
-      if (!isCurrentRun()) {
-        return;
-      }
-      patchJob(id, { status: "success", etaMs: null });
-      // The job's own record is gone by design (its checkpoints were the only
-      // reason to keep it). The history entry is a separate, blob-free copy so
-      // "download that version again" survives the cleanup.
+      const archives = get().jobs.find((entry) => entry.id === id)?.archives ?? [];
+      patchJob(id, {
+        status: archives.some((archive) => !archive.requested) ? "ready" : "success",
+        etaMs: null,
+      });
+      // Keep loose-file checkpoints too: a reload can rebuild these archives
+      // without fetching everything again. Explicit dismiss owns cleanup.
       await rememberCompletedJob(spec);
       jobTriedSources.delete(id);
       jobAutoSwitchCounts.delete(id);
-      scheduleAutoDismiss(id, startedAt);
     } catch (error) {
       // An abort comes from pause() (which already kept whole-file checkpoints),
       // dismiss(), or a newer run for this same id.
@@ -1451,6 +1460,7 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       sourceName: source.name,
     };
     jobSpecs.set(sourcedSpec.id, sourcedSpec);
+    preparedArchives.delete(sourcedSpec.id);
     const startedAt = Date.now();
     upsertJob({
       id: sourcedSpec.id,
@@ -1930,11 +1940,35 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
       });
     },
 
+    saveArchive: (id, index) => {
+      const job = get().jobs.find((entry) => entry.id === id);
+      const archive = job?.archives?.[index];
+      const blob = preparedArchives.get(id)?.[index];
+      if (!job || !archive || !blob) return false;
+      let requested = false;
+      try {
+        saveBlobAsFile(blob, archive.fileName);
+        requested = true;
+      } catch {
+        // Saving is separate from fetching; switching mirrors cannot help.
+      }
+      const archives = job.archives!.map((entry, current) => current === index
+        ? { ...entry, requested, error: !requested } : entry);
+      patchJob(id, {
+        archives,
+        ...(job.status === "ready" || job.status === "success" ? {
+          status: archives.every((entry) => entry.requested) ? "success" as const : "ready" as const,
+        } : {}),
+      });
+      return requested;
+    },
+
     dismiss: (id) => {
       abortControllers.get(id)?.abort();
       abortControllers.delete(id);
       speedSamples.delete(id);
       jobSpecs.delete(id);
+      preparedArchives.delete(id);
       jobTriedSources.delete(id);
       jobAutoSwitchCounts.delete(id);
       set((state) => ({ jobs: state.jobs.filter((job) => job.id !== id) }));
@@ -2172,14 +2206,18 @@ function regroupBatch(
  * Splits a regrouped batch into the archives to save: one per grouping folder
  * (version or genre, whichever layout the job was started with) when the
  * selection spans multiple folders — each named by that folder, e.g.
- * "25 CiRCLE" or "東方Project" — otherwise a single archive named by the
- * collection title. Charts without a grouping folder fall back to the
- * collection title too.
+ * "25 CiRCLE" or "東方Project" — otherwise use the collection title.
+ * Large ZIP/ADX groups split further into numbered independent archives,
+ * keeping whole charts together. TAR.GZ retains one archive per group.
  */
 export function splitBatchArchives(
   charts: NestedChart[],
-  collectionTitle: string
+  collectionTitle: string,
+  format: ArchiveFormat = "adx"
 ): { name: string; charts: NestedChart[] }[] {
+  if (charts.length === 0) {
+    throw new Error("No charts selected");
+  }
   const grouped = new Map<string, NestedChart[]>();
   for (const chart of charts) {
     const key = chart.groupDir ?? "";
@@ -2187,13 +2225,14 @@ export function splitBatchArchives(
     bucket.push(chart);
     grouped.set(key, bucket);
   }
-  if (grouped.size <= 1) {
-    return [{ name: collectionTitle, charts }];
-  }
-  return [...grouped.entries()].map(([groupDir, groupedCharts]) => ({
-    name: groupDir || collectionTitle,
-    charts: groupedCharts,
-  }));
+  return [...grouped.entries()].flatMap(([groupDir, groupedCharts]) => {
+    const name = grouped.size === 1 ? collectionTitle : groupDir || collectionTitle;
+    const parts = format === "tar.gz" ? [groupedCharts] : splitNestedZipCharts(groupedCharts);
+    return parts.map((part, index) => ({
+      name: parts.length === 1 ? name : `${name} (${index + 1})`,
+      charts: part,
+    }));
+  });
 }
 
 /** Stable job id for a single-chart download, keyed by its archive base name. */

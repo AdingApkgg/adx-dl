@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-09-27T01:40:45.371237+00:00",
+  "generated_at": "2026-10-10T06:46:08.097090+00:00",
   "source": "https://adxdls.saop.cc",
   "license": "CC-BY-4.0",
   "license_url": "https://adxdls.saop.cc/license",
   "attribution": "Catalog data from ADX 谱面资源 (https://adxdls.saop.cc), licensed CC BY 4.0. Reuse freely with attribution and a link back to the source.",
-  "total_entries": 1932,
+  "total_entries": 1933,
   "categories": {
     "Remote": [
       "maimai",
@@ -4592,6 +4592,7 @@
         "越走越快",
         "当当哈压库",
         "慢慢变快",
+        "逐渐变快",
         "だんだん早くなる",
         "渐渐加速",
         "末白",
@@ -4612,7 +4613,6 @@
         "哈压库",
         "动力小子",
         "走路歌",
-        "逐渐变快",
         "别急8",
         "走路人"
       ],
@@ -6424,6 +6424,7 @@
         "fd",
         "自由坠机↓↓↓",
         "2310",
+        "自由下落",
         "freedom dive (tpz overcute remix)",
         "大陆首杀",
         "丛雨",
@@ -10984,6 +10985,7 @@
       "short_id": "10303",
       "aliases": [
         "endless, sleepless night",
+        "欧美灵梦",
         "漫漫长眠夜",
         "灵梦1",
         "俄罗斯娜娜",
@@ -16987,11 +16989,11 @@
       "cabinet": "DX",
       "short_id": "10835",
       "aliases": [
+        "believe the rainbow",
         "相信彩虹",
         "相信彩虹1",
         "track 4/3",
         "星星博物馆",
-        "believe the rainbow",
         "🌈",
         "北面",
         "别信彩虹",
@@ -64161,7 +64163,8 @@
         "躯树墓守",
         "蕾米坠机",
         "朽木的守墓人",
-        "别开上下反"
+        "别开上下反",
+        "朽树的守墓人"
       ],
       "offset": 0,
       "bpm": 211,
@@ -70570,7 +70573,8 @@
         "l=f",
         "福瑞3",
         "lia=失败",
-        "蓝牙连接失败"
+        "蓝牙连接失败",
+        "福瑞跑步3"
       ],
       "offset": 0,
       "bpm": 186,
@@ -81950,7 +81954,8 @@
         "叉",
         "∞",
         "高斯函数",
-        "传奇耐降王"
+        "传奇耐降王",
+        "埃隆马斯克"
       ],
       "offset": 0,
       "bpm": 162,
@@ -85045,7 +85050,8 @@
         "华为",
         "华为完了",
         "nova11se",
-        "huawei"
+        "huawei",
+        "1000w以内最好的谱面"
       ],
       "offset": 0,
       "bpm": 175,
@@ -93006,6 +93012,138 @@
         "audio": 3855395,
         "pv": 20872933,
         "background": 307789
+      }
+    },
+    {
+      "id": "1154",
+      "remote_dir_name": "居並ぶ穀物と溜息まじりの運送屋",
+      "title": "居並ぶ穀物と溜息まじりの運送屋",
+      "title_en": "",
+      "artist": "hanzo",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX MAGiCAL",
+      "source_archive": "",
+      "source_folder": "27/1154",
+      "version": "maimai DX MAGiCAL",
+      "versionid": 27,
+      "genre": "maimai",
+      "genreid": 105,
+      "cabinet": "SD",
+      "short_id": "1154",
+      "aliases": [
+        "老汉推车",
+        "老汉拉车",
+        "卖炭翁",
+        "老农民我的乡亲",
+        "骆驼祥子",
+        "老头拉车"
+      ],
+      "offset": 0,
+      "bpm": 160,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Basic",
+          "level": "4.0",
+          "designer": "-",
+          "notes": {
+            "tap": 165,
+            "hold": 10,
+            "slide": 9,
+            "touch": 0,
+            "touch_hold": 0,
+            "break": 4,
+            "total": 188
+          },
+          "duration_ms": 154125
+        },
+        {
+          "slot": 3,
+          "name": "Advanced",
+          "level": "6.9",
+          "designer": "-",
+          "notes": {
+            "tap": 266,
+            "hold": 18,
+            "slide": 14,
+            "touch": 0,
+            "touch_hold": 0,
+            "break": 12,
+            "total": 310
+          },
+          "duration_ms": 154125
+        },
+        {
+          "slot": 4,
+          "name": "Expert",
+          "level": "10.7",
+          "designer": "Luxizhel",
+          "notes": {
+            "tap": 380,
+            "hold": 78,
+            "slide": 55,
+            "touch": 0,
+            "touch_hold": 0,
+            "break": 42,
+            "total": 555
+          },
+          "duration_ms": 154313
+        },
+        {
+          "slot": 5,
+          "name": "Master",
+          "level": "13.8",
+          "designer": "サファ太",
+          "notes": {
+            "tap": 468,
+            "hold": 56,
+            "slide": 174,
+            "touch": 0,
+            "touch_hold": 0,
+            "break": 61,
+            "total": 759
+          },
+          "duration_ms": 154031
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/27/1154/",
+      "page_url": "https://adxdls.saop.cc/charts/1154",
+      "license_note": "Catalog metadata: CC BY 4.0, credit https://adxdls.saop.cc. Chart files, cover art, audio and PV remain with their original rights holders.",
+      "files": {
+        "maidata": "https://astrodx-charts-alice.saop.cc/27/1154/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/27/1154/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/27/1154/bg.png",
+        "pv": ""
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": false,
+        "has_dx_chart": false
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/27/1154/",
+        "cover_url": "https://astrodx-charts.saop.cc/27/1154/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/27/1154/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/27/1154/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/27/1154/track.mp3",
+        "pv_url": ""
+      },
+      "imported_at": "2026-10-10T06:46:08.097090+00:00",
+      "slug": "1154",
+      "added_at": "2026-10-10T06:46:08.097090+00:00",
+      "title_romaji": "居並bu穀物to溜息majirino運送屋",
+      "duration_ms": 154313,
+      "bpm_min": 160,
+      "bpm_max": 160,
+      "file_bytes": {
+        "maidata": 8345,
+        "audio": 5048461,
+        "background": 259801
       }
     },
     {
@@ -108961,7 +109099,8 @@
         "拉普塔",
         "这首歌只有一个字 啊",
         "立交桥",
-        "香格里拉"
+        "香格里拉",
+        "打个中国结"
       ],
       "offset": 0,
       "bpm": 339,
@@ -112227,7 +112366,8 @@
         "蓝的狐",
         "azure vixen",
         "有格调",
-        "阿祖儿微信"
+        "阿祖儿微信",
+        "秦彻"
       ],
       "offset": 0,
       "bpm": 163,
@@ -117055,7 +117195,8 @@
         "boom! boom!! boom!!!",
         "嘭嘭嘭",
         "小爆爆爆",
-        "小bbb"
+        "小bbb",
+        "爆爆爆"
       ],
       "offset": 0,
       "bpm": 170,
@@ -128878,7 +129019,9 @@
       "genreid": 105,
       "cabinet": "DX",
       "short_id": "11815",
-      "aliases": [],
+      "aliases": [
+        "imbrued:flux"
+      ],
       "offset": 0,
       "bpm": 176,
       "difficulties": [
@@ -129004,7 +129147,10 @@
       "genreid": 105,
       "cabinet": "DX",
       "short_id": "11816",
-      "aliases": [],
+      "aliases": [
+        "砂の函",
+        "砂函"
+      ],
       "offset": 0,
       "bpm": 180,
       "difficulties": [
@@ -129131,7 +129277,10 @@
       "cabinet": "DX",
       "short_id": "11817",
       "aliases": [
-        "美国人"
+        "amereistr",
+        "美国人",
+        "2个14守一个13+",
+        "🇺🇸"
       ],
       "offset": 0,
       "bpm": 147,
@@ -129258,8 +129407,9 @@
       "cabinet": "DX",
       "short_id": "11818",
       "aliases": [
-        "世终黑盒",
+        "world's end blackbox",
         "黑盒",
+        "世终黑盒",
         "中国人能飞",
         "世终2",
         "棱镜塔",
@@ -129391,13 +129541,21 @@
       "cabinet": "DX",
       "short_id": "11820",
       "aliases": [
+        "xaleid◆scopix",
         "xx",
         "100日元",
         "别笑你也过不了第二关",
         "百元之恋",
         "起床战争",
         "射雕英雄传",
-        "kop奖金回收计划"
+        "kop奖金回收计划",
+        "100円",
+        "0010",
+        "error0010",
+        "0010x2",
+        "0010*2",
+        "万花筒",
+        "五万日元"
       ],
       "offset": 0,
       "bpm": 180,
@@ -129540,10 +129698,14 @@
       "cabinet": "DX",
       "short_id": "11821",
       "aliases": [
+        "ref:rain (for 7th heaven)",
         "refrain",
         "咏人不知2",
         "咏人2",
-        "相信彩虹2"
+        "相信彩虹2",
+        "酸栗贴贴",
+        "曲目 2/1",
+        "track 2/1"
       ],
       "offset": 0,
       "bpm": 188,
@@ -130312,7 +130474,11 @@
       "genreid": 106,
       "cabinet": "DX",
       "short_id": "11827",
-      "aliases": [],
+      "aliases": [
+        "サウンドプレイヤー",
+        "音频播放器",
+        "sound player"
+      ],
       "offset": 0,
       "bpm": 143,
       "difficulties": [
@@ -134713,6 +134879,7 @@
         "300绝赞2",
         "游戏王",
         "卡牌大师",
+        "绝赞管够",
         "超燃卡牌决斗",
         "音游游戏王"
       ],
@@ -134848,7 +135015,9 @@
         "全称量词命题",
         "全称量词",
         "⚔️🍎",
-        "对于所有"
+        "对于所有",
+        "石中剑",
+        "a"
       ],
       "offset": 0,
       "bpm": 245,
@@ -135764,7 +135933,8 @@
       "cabinet": "DX",
       "short_id": "11868",
       "aliases": [
-        "red"
+        "red",
+        "红谱"
       ],
       "offset": 0,
       "bpm": 168,
@@ -165304,7 +165474,8 @@
         "棱镜节奏",
         "棱镜版本曲",
         "2025△▽025",
-        "两只猫娘魔女"
+        "两只猫娘魔女",
+        "プリズム△▽リズム"
       ],
       "offset": 0,
       "bpm": 155,
@@ -165935,7 +166106,10 @@
       "cabinet": "SD",
       "short_id": "1819",
       "aliases": [
-        "后潘"
+        "后潘",
+        "玉玉症之后",
+        "潘多拉之后",
+        "after pandora"
       ],
       "offset": 0,
       "bpm": 85,
@@ -180746,6 +180920,7 @@
       "cabinet": "SD",
       "short_id": "303",
       "aliases": [
+        "欧美灵梦",
         "endless, sleepless night",
         "漫漫长眠夜",
         "灵梦1",
@@ -207129,6 +207304,7 @@
         "越走越快",
         "当当哈压库",
         "慢慢变快",
+        "逐渐变快",
         "だんだん早くなる",
         "渐渐加速",
         "末白",
@@ -207149,7 +207325,6 @@
         "哈压库",
         "动力小子",
         "走路歌",
-        "逐渐变快",
         "别急8",
         "走路人"
       ],
@@ -240087,6 +240262,7 @@
         "fd",
         "自由坠机↓↓↓",
         "2310",
+        "自由下落",
         "freedom dive (tpz overcute remix)",
         "大陆首杀",
         "丛雨",
@@ -240781,6 +240957,7 @@
         "昭和女人",
         "花雪",
         "ktv金曲",
+        "女人打伞",
         "花と、雪と、ドラムンベース。",
         "雪鸡",
         "花雪一堆日本字",
@@ -242876,6 +243053,7 @@
       "aliases": [
         "金金金金金",
         "来财",
+        "？！钱钱！？",
         "money money",
         "紫苑镇",
         "💰",
@@ -244698,10 +244876,10 @@
       "short_id": "806",
       "aliases": [
         "恶魔派对夜",
+        "nightmare party night",
         "ナイトメア☆パーティーナイト",
         "月下初音",
         "nightmarepartynight",
-        "nightmare party night",
         "噩梦派对之夜",
         "華月",
         "华",

@@ -63,7 +63,28 @@ export function saveBlobAsFile(blob: Blob, fileName: string): void {
 
   anchor.href = objectUrl;
   anchor.download = fileName;
-  anchor.click();
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  // Some mobile download managers resolve the URL after the click task has
+  // returned. Revoking in a microtask races that handoff, especially for blobs.
+  const cleanup = (): void => {
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  };
+  try {
+    anchor.click();
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
+  const timer = setTimeout(cleanup, 60_000);
+  // Node/Bun test runners must not stay alive just for browser URL cleanup.
+  if (typeof timer === "object" && "unref" in timer) timer.unref();
+}
 
-  queueMicrotask(() => URL.revokeObjectURL(objectUrl));
+/** Mobile browsers need a fresh user gesture after an asynchronous pack. */
+export function requiresManualArchiveSave(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|HarmonyOS/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }

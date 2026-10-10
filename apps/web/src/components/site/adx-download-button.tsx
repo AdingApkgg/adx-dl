@@ -131,7 +131,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
   const triggerRef = React.useRef<HTMLButtonElement>(null);
 
   function handleSelect(format: ArchiveFormat) {
-    if (!canDownload || isBusy) {
+    if (!canDownload || isBusy || status === "ready") {
       return;
     }
     // Tell the floating dock where the trigger sits so it can fly a ghost
@@ -160,9 +160,11 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
       ? downloadsDictionary.archiving
       : status === "packing"
         ? detailDictionary.downloadPacking(progress.completed, progress.total)
-        : canDownload
-          ? detailDictionary.onsiteDownload
-          : detailDictionary.onsitePending;
+        : status === "ready"
+          ? downloadsDictionary.readyToSave
+          : canDownload
+            ? detailDictionary.onsiteDownload
+            : detailDictionary.onsitePending;
 
   return (
     <div className="flex flex-col gap-2">
@@ -255,7 +257,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
             <Button
               ref={triggerRef}
               type="button"
-              disabled={!canDownload || isBusy}
+              disabled={!canDownload || isBusy || status === "ready"}
               onClick={() => handleSelect(preferredFormat)}
               className="rounded-r-none"
             >
@@ -282,7 +284,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
                 <Button
                   type="button"
                   size="icon"
-                  disabled={!canDownload || isBusy}
+                  disabled={!canDownload || isBusy || status === "ready"}
                   aria-label={detailDictionary.downloadFormatLabel}
                   title={detailDictionary.downloadFormatLabel}
                   className="-ml-px rounded-l-none border-l border-primary-foreground/25 px-0"
@@ -442,7 +444,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
         ) : null}
       </AnimatePresence>
       <AnimatePresence mode="wait">
-        {status === "success" ? (
+        {status === "success" || status === "ready" ? (
           <motion.div
             key="success"
             initial={{ opacity: 0, y: -4 }}
@@ -457,7 +459,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
               <span className="shrink-0 text-emerald-500">
                 <DrawnCheck size={16} />
               </span>
-              {downloadsDictionary.completed}
+              {status === "ready" ? downloadsDictionary.readyToSave : downloadsDictionary.completed}
             </p>
             <p className="text-xs">{downloadsDictionary.importHint}</p>
           </motion.div>

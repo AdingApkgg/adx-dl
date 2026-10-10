@@ -215,6 +215,11 @@ export type SiteDictionary = {
     advancedFilters: string;
     filterAll: string;
     filterVersion: string;
+    filterDan: string;
+    danRegion: string;
+    danHint: string;
+    danOutsideCatalog: string;
+    danCourseName: (id: string, name: string) => string;
     filterLevel: string;
     filterGenre: string;
     filterCabinet: string;
@@ -414,6 +419,11 @@ export type SiteDictionary = {
     jobsCount: (count: number) => string;
     archiving: string;
     completed: string;
+    readyToSave: string;
+    saveArchive: string;
+    saveAgain: string;
+    saveHint: string;
+    saveError: string;
     importHint: string;
     confirmDiscard: string;
     errorOffline: string;
@@ -428,6 +438,7 @@ export type SiteDictionary = {
     batchVideoSummary: (count: number) => string;
     batchNoVideoSummary: string;
     batchVideoLargeHint: string;
+    batchSizeSplitHint: string;
     batchConfirm: (count: number, includeVideo: boolean) => string;
     batchConfirmStart: string;
     /** Remaining time at the smoothed transfer rate, e.g. "剩余 1:20". */
@@ -974,6 +985,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       advancedFilters: "高级筛选",
       filterAll: "全部",
       filterVersion: "版本",
+      filterDan: "段位",
+      danRegion: "国服",
+      danHint: "每段固定 4 个谱面，按官方顺序列出；下载包含各曲目的全部难度。",
+      danOutsideCatalog: "不在当前曲库范围",
+      danCourseName: (_id, name) => name,
       filterLevel: "等级",
       filterGenre: "曲风",
       filterCabinet: "类型",
@@ -1148,7 +1164,12 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       expand: "展开下载列表",
       jobsCount: (count) => `${count} 个下载任务`,
       archiving: "正在打包归档…",
-      completed: "打包完成，已保存到浏览器下载",
+      completed: "已发起保存，请检查浏览器下载",
+      readyToSave: "打包完成，等待保存文件",
+      saveArchive: "保存文件",
+      saveAgain: "再次保存",
+      saveHint: "逐个点击保存。若下载列表没有文件，可再次保存，无需重新下载。确认保存后移除任务可释放空间；刷新后可从已下载数据重新打包。",
+      saveError: "保存未能发起，请重试或更换浏览器。",
       importHint: "将文件导入 AstroDX 即可游玩（.adx 可直接导入）。",
       confirmDiscard: "再点一次将放弃已下载的数据",
       errorOffline: "网络已断开；已完成文件会保留，联网后点「继续」下载剩余文件",
@@ -1156,15 +1177,16 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       errorGeneric: "下载出错；已完成文件会保留，可点「继续」重试剩余文件",
       batchSummary: (charts, files) => `将打包 ${charts} 首谱面，共 ${files} 个文件`,
       batchSplitSummary: (archives) =>
-        `跨版本选择，将拆成 ${archives} 个下载任务加入队列，每个版本一个压缩包`,
+        `跨版本选择，将拆成 ${archives} 个下载任务加入队列，按版本分别打包`,
       batchSplitSummaryGenre: (archives) =>
-        `跨曲风选择，将拆成 ${archives} 个下载任务加入队列，每种曲风一个压缩包`,
+        `跨曲风选择，将拆成 ${archives} 个下载任务加入队列，按曲风分别打包`,
       groupingLabel: "分类路径",
       groupingVersion: "按版本分文件夹",
       groupingGenre: "按曲风分文件夹",
       batchVideoSummary: (count) => `包含 ${count} 个 BGA 视频文件`,
       batchNoVideoSummary: "不包含 BGA 视频，下载会更轻",
       batchVideoLargeHint: "包含 BGA 会显著增大体积，网络慢或手机流量下建议关闭。",
+      batchSizeSplitHint: "大包会自动拆成多个小于 2 GiB 的独立压缩包，每首谱面保持完整，各包均可单独导入。请允许浏览器下载多个文件。",
       batchConfirm: (count, includeVideo) =>
         includeVideo
           ? `确认开始下载 ${count} 首谱面？当前包含 BGA 视频。`
@@ -1712,6 +1734,14 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       advancedFilters: "Advanced filters",
       filterAll: "All",
       filterVersion: "Version",
+      filterDan: "Dan course",
+      danRegion: "China",
+      danHint: "Each course has 4 fixed charts in official order. Downloads include all difficulties of each song.",
+      danOutsideCatalog: "Outside this catalog",
+      danCourseName: (id) => {
+        const rank = Number(id);
+        return rank <= 10 ? `Dan ${rank}` : rank <= 20 ? `True Dan ${rank - 10}` : rank === 21 ? "True Kaiden" : "Ura Kaiden";
+      },
       filterLevel: "Level",
       filterGenre: "Genre",
       filterCabinet: "Type",
@@ -1891,7 +1921,12 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       expand: "Expand downloads",
       jobsCount: (count) => (count === 1 ? "1 download" : `${count} downloads`),
       archiving: "Packing archive…",
-      completed: "Archive saved — check your browser downloads",
+      completed: "Save requested — check your browser downloads",
+      readyToSave: "Archive ready — save the files below",
+      saveArchive: "Save file",
+      saveAgain: "Save again",
+      saveHint: "Save each file separately. If it is missing from Downloads, save again without fetching it again. Remove the job after saving to free storage; after a reload, you can repack the downloaded files.",
+      saveError: "Could not start saving. Try again or use another browser.",
       importHint: "Import the file into AstroDX to play (.adx imports directly).",
       confirmDiscard: "Click again to discard the downloaded data",
       errorOffline: "You're offline — completed files are kept; Resume downloads the rest",
@@ -1902,9 +1937,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
           ? `Packing 1 chart, ${files} files total`
           : `Packing ${charts} charts, ${files} files total`,
       batchSplitSummary: (archives) =>
-        `Spans multiple versions — queued as ${archives} downloads, one archive per version`,
+        `Spans multiple versions — queued as ${archives} downloads, packed separately by version`,
       batchSplitSummaryGenre: (archives) =>
-        `Spans multiple genres — queued as ${archives} downloads, one archive per genre`,
+        `Spans multiple genres — queued as ${archives} downloads, packed separately by genre`,
       groupingLabel: "Folder layout",
       groupingVersion: "Group by version",
       groupingGenre: "Group by genre",
@@ -1913,6 +1948,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       batchNoVideoSummary: "BGA video excluded for a lighter download",
       batchVideoLargeHint:
         "BGA video can make the archive much larger. Turn it off on slow networks or mobile data.",
+      batchSizeSplitHint: "Large downloads split automatically into independent archives under 2 GiB. Each chart stays whole and each archive can be imported separately. Allow multiple downloads in your browser.",
       batchConfirm: (count, includeVideo) =>
         includeVideo
           ? count === 1
@@ -2482,6 +2518,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       advancedFilters: "詳細フィルター",
       filterAll: "すべて",
       filterVersion: "バージョン",
+      filterDan: "段位",
+      danRegion: "中国版",
+      danHint: "各段位の固定4譜面を公式の曲順で表示します。ダウンロードには各楽曲の全難易度が含まれます。",
+      danOutsideCatalog: "この曲庫の範囲外",
+      danCourseName: (_id, name) => name.replaceAll("传", "伝").replaceAll("里", "裏"),
       filterLevel: "レベル",
       filterGenre: "ジャンル",
       filterCabinet: "種別",
@@ -2656,7 +2697,12 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       expand: "ダウンロード一覧を展開",
       jobsCount: (count) => `${count} 件のダウンロード`,
       archiving: "アーカイブを作成中…",
-      completed: "保存しました — ブラウザのダウンロードをご確認ください",
+      completed: "保存を開始しました — ブラウザのダウンロードをご確認ください",
+      readyToSave: "アーカイブ作成完了 — ファイルを保存してください",
+      saveArchive: "ファイルを保存",
+      saveAgain: "もう一度保存",
+      saveHint: "ファイルを一つずつ保存してください。ダウンロード一覧にない場合、再ダウンロードせずにもう一度保存できます。保存後にタスクを削除すると容量を解放できます。ページを再読み込みした後も、取得済みファイルから再作成できます。",
+      saveError: "保存を開始できませんでした。再試行するか別のブラウザをお試しください。",
       importHint: "ファイルを AstroDX にインポートするとプレイできます（.adx はそのままインポート可）。",
       confirmDiscard: "もう一度クリックするとダウンロード済みデータを破棄します",
       errorOffline: "オフラインです — 完了済みファイルは保持され、接続後に残りを再開できます",
@@ -2664,9 +2710,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       errorGeneric: "ダウンロードエラー — 完了済みファイルを保持して残りを再試行できます",
       batchSummary: (charts, files) => `${charts} 譜面、合計 ${files} ファイルをまとめます`,
       batchSplitSummary: (archives) =>
-        `複数バージョンのため、${archives} 件のダウンロードに分けてキューに追加します（バージョンごとに 1 アーカイブ）`,
+        `複数バージョンのため、${archives} 件のダウンロードに分けてキューに追加し、バージョン別にまとめます`,
       batchSplitSummaryGenre: (archives) =>
-        `複数ジャンルのため、${archives} 件のダウンロードに分けてキューに追加します（ジャンルごとに 1 アーカイブ）`,
+        `複数ジャンルのため、${archives} 件のダウンロードに分けてキューに追加し、ジャンル別にまとめます`,
       groupingLabel: "フォルダ分け",
       groupingVersion: "バージョン別",
       groupingGenre: "ジャンル別",
@@ -2674,6 +2720,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       batchNoVideoSummary: "BGA 動画なしで軽めにダウンロードします",
       batchVideoLargeHint:
         "BGA 動画を含めるとサイズが大きくなります。低速回線やモバイル通信ではオフ推奨です。",
+      batchSizeSplitHint: "大容量のダウンロードは、2 GiB 未満の独立したアーカイブに自動分割します。各譜面は分割せず、各アーカイブを個別にインポートできます。ブラウザーで複数ファイルのダウンロードを許可してください。",
       batchConfirm: (count, includeVideo) =>
         includeVideo
           ? `${count} 譜面を BGA 動画込みで開始しますか？`

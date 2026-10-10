@@ -130,8 +130,11 @@ function installDomShims() {
   }) as typeof fetch;
 
   (globalThis as Record<string, unknown>).document = {
+    body: { appendChild() {} },
     createElement: () => ({
       href: "",
+      style: { display: "" },
+      remove() {},
       set download(value: string) {
         savedFiles.push(value);
       },
@@ -224,6 +227,101 @@ async function waitForCondition(predicate: () => boolean, timeoutMs = 2000): Pro
 }
 
 describe("downloads-store", () => {
+  test("a mobile archive can be rebuilt after reload without fetching its completed files again", async () => {
+    const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
+      userAgent: "Mozilla/5.0 (iPhone)", onLine: true,
+    } });
+    try {
+      const id = "single:reload-save";
+      useDownloadsStore.getState().startSingle({
+        id, title: "Reload chart", includeVideo: false, format: "adx",
+        files: [{ name: "track.mp3", url: "https://example.test/reload/track.mp3" }],
+      });
+      await waitForSettled(id);
+      expect(useDownloadsStore.getState().jobs.find((job) => job.id === id)?.status).toBe("ready");
+      const fetchCount = fetchedUrls.length;
+      resetDownloadQueueForTests();
+      useDownloadsStore.setState({ jobs: [] });
+      useDownloadsStore.getState().hydrateFromStorage();
+      await waitForJob(id, (job) => job.status === "paused");
+      useDownloadsStore.getState().resume(id);
+      await waitForSettled(id);
+      expect(fetchedUrls.length).toBe(fetchCount);
+      expect(savedFiles).toEqual([]);
+      expect(useDownloadsStore.getState().jobs.find((job) => job.id === id)?.status).toBe("ready");
+      expect(useDownloadsStore.getState().saveArchive(id, 0)).toBe(true);
+      expect(await savedArchives()).toEqual({ "Reload chart.adx": ["Reload chart/track.mp3"] });
+    } finally {
+      if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator);
+      else delete (globalThis as Record<string, unknown>).navigator;
+    }
+  });
+
+  test("mobile batch waits for individual save gestures and retains bytes for retries", async () => {
+    const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    Object.defineProperty(globalThis, "navigator", { configurable: true, value: {
+      userAgent: "Mozilla/5.0 (Linux; Android 12; HarmonyOS) HuaweiBrowser/17.0",
+      onLine: true,
+    } });
+    try {
+      const id = newBatchJobId();
+      const charts = ["A", "B"].map((dir, index) => {
+        const url = `https://example.test/${index}/track.mp3`;
+        const name = `${index}/track.mp3`;
+        const blob = new Blob([dir]);
+        Object.defineProperty(blob, "size", { value: 1_200_000_000 });
+        persistedFiles.set(`${id}::${name}`, {
+          key: `${id}::${name}`, jobId: id, name, url, blob, size: blob.size, complete: true,
+        });
+        return { dir, genreDir: "maimai", groupDir: "v1", files: [{ name: "track.mp3", url }] };
+      });
+      const ids = useDownloadsStore.getState().startBatch({
+        id, title: "maimai", includeVideo: false, format: "zip", grouping: "genre", charts,
+      });
+      expect(ids).toEqual([id]);
+      await waitForSettled(id);
+      let job = useDownloadsStore.getState().jobs.find((entry) => entry.id === id)!;
+      expect(job.status).toBe("ready");
+      expect(savedFiles).toEqual([]);
+      expect(persistedJobs.has(id)).toBe(true);
+      expect([...persistedFiles.values()].filter((file) => file.jobId === id)).toHaveLength(2);
+      const downloadsBeforeSave = fetchedUrls.length;
+      expect(useDownloadsStore.getState().saveArchive(id, 0)).toBe(true);
+      expect(savedFiles).toEqual(["maimai (1).zip"]);
+      expect(useDownloadsStore.getState().jobs.find((entry) => entry.id === id)?.status).toBe("ready");
+      expect(useDownloadsStore.getState().saveArchive(id, 1)).toBe(true);
+      job = useDownloadsStore.getState().jobs.find((entry) => entry.id === id)!;
+      expect(job.status).toBe("success");
+      expect(savedFiles).toEqual(["maimai (1).zip", "maimai (2).zip"]);
+      expect(useDownloadsStore.getState().saveArchive(id, 0)).toBe(true);
+      expect(savedFiles).toEqual(["maimai (1).zip", "maimai (2).zip", "maimai (1).zip"]);
+      expect(fetchedUrls.length).toBe(downloadsBeforeSave);
+      const createElement = document.createElement;
+      document.createElement = (() => ({
+        style: { display: "" }, remove() {},
+        click() { throw new Error("Browser refused the save"); },
+      })) as unknown as typeof document.createElement;
+      expect(useDownloadsStore.getState().saveArchive(id, 0)).toBe(false);
+      expect(useDownloadsStore.getState().jobs.find((entry) => entry.id === id)?.status).toBe("ready");
+      expect(useDownloadsStore.getState().jobs.find((entry) => entry.id === id)?.archives?.[0].error).toBe(true);
+      document.createElement = createElement;
+      expect(useDownloadsStore.getState().saveArchive(id, 0)).toBe(true);
+      expect(fetchedUrls.length).toBe(downloadsBeforeSave);
+      expect(await savedArchives()).toEqual({
+        "maimai (1).zip": ["maimai/A/track.mp3"],
+        "maimai (2).zip": ["maimai/B/track.mp3"],
+      });
+      useDownloadsStore.getState().dismiss(id);
+      expect(useDownloadsStore.getState().saveArchive(id, 0)).toBe(false);
+      await waitForCondition(() => !persistedJobs.has(id));
+      expect([...persistedFiles.values()].filter((file) => file.jobId === id)).toHaveLength(0);
+    } finally {
+      if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator);
+      else delete (globalThis as Record<string, unknown>).navigator;
+    }
+  });
+
   beforeEach(() => {
     installDomShims();
     persistedJobs.clear();
@@ -1599,6 +1697,54 @@ describe("downloads-store", () => {
       "25 CiRCLE/Song A/maidata.txt",
       "25 CiRCLE/Song B/maidata.txt",
     ]);
+  });
+
+  test("a large genre job saves every numbered part and completes once", async () => {
+    const id = newBatchJobId();
+    const charts = ["Song A", "Song B"].map((dir, index) => {
+      const url = `https://example.test/${index}/track.mp3`;
+      const name = `${index}/track.mp3`;
+      const blob = new Blob([dir]);
+      Object.defineProperty(blob, "size", { value: 1_200_000_000 });
+      persistedFiles.set(`${id}::${name}`, {
+        key: `${id}::${name}`,
+        jobId: id,
+        name,
+        url,
+        complete: true,
+        size: blob.size,
+        blob,
+      });
+      return {
+        dir,
+        genreDir: "maimai",
+        groupDir: "25 CiRCLE",
+        files: [{ name: "track.mp3", url }],
+      };
+    });
+    const ids = useDownloadsStore.getState().startBatch({
+      id,
+      title: "maimai",
+      charts,
+      includeVideo: true,
+      format: "zip",
+      grouping: "genre",
+    });
+    expect(ids).toEqual([id]);
+    await waitForSettled(id);
+    const job = useDownloadsStore.getState().jobs.find((entry) => entry.id === id);
+    expect(job?.status).toBe("success");
+    expect(job?.completed).toBe(2);
+    expect(job?.receivedBytes).toBe(2_400_000_000);
+    expect(await savedArchives()).toEqual({
+      "maimai (1).zip": ["maimai/Song A/track.mp3"],
+      "maimai (2).zip": ["maimai/Song B/track.mp3"],
+    });
+    expect(useDownloadsStore.getState().history.filter((entry) => entry.job.id === id))
+      .toHaveLength(1);
+    expect(persistedFiles.size).toBe(2);
+    useDownloadsStore.getState().dismiss(id);
+    await waitForCondition(() => persistedFiles.size === 0);
   });
 
   test("each batch start gets its own job id so bars never adopt foreign jobs", async () => {

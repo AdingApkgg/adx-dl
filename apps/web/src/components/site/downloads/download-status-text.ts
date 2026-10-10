@@ -38,6 +38,8 @@ export function downloadJobStateText(
       return detail.downloadPacking(job.completed, job.total);
     case "archiving":
       return tray.archiving;
+    case "ready":
+      return tray.readyToSave;
     case "success":
       return job.skippedFiles.length > 0
         ? `${tray.completed} · ${tray.skippedSummary(job.skippedFiles.length)}`
