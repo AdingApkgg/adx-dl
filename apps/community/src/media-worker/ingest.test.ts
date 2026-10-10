@@ -498,4 +498,125 @@ describe.skipIf(
     expect(after.originalWritten - before.originalWritten).toBe(ready.size);
     expect(after.originalReserved).toBe(before.originalReserved);
   });
+  test("rejected false-size claimant cannot pin a known image hash against another user's verified bytes", async () => {
+    const bytes = new Uint8Array(
+      Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aP1sAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    );
+    const [before] = await f.ctx.db.select().from(storageBudget);
+    const falseUpload = await f.upload(new Uint8Array([7]), undefined, hash(bytes));
+    await completeUpload(f.ctx, falseUpload.userId, falseUpload.dto.id);
+    await ingestUpload(f.mediaCtx, falseUpload.data);
+    expect(await session(falseUpload.dto.id)).toMatchObject({
+      state: "rejected",
+      errorCode: "HASH_MISMATCH",
+    });
+    const pending = await original(falseUpload.dto.id);
+    expect(pending).toMatchObject({
+      size: 1,
+      state: "pending",
+      leaseUntil: null,
+      generation: 0,
+      verifiedAt: null,
+    });
+    const good = await f.upload(bytes);
+    expect(good.userId).not.toBe(falseUpload.userId);
+    await completeUpload(f.ctx, good.userId, good.dto.id);
+    await ingestUpload(f.mediaCtx, good.data);
+    const ready = await original(good.dto.id);
+    expect(ready).toMatchObject({
+      id: pending.id,
+      state: "ready",
+      size: bytes.length,
+      sha256: hash(bytes),
+    });
+    expect(
+      await f.ctx.db
+        .select()
+        .from(blobs)
+        .where(eq(blobs.sha256, hash(bytes))),
+    ).toHaveLength(1);
+    const [after] = await f.ctx.db.select().from(storageBudget);
+    expect(after.originalWritten - before.originalWritten).toBe(bytes.length);
+    expect(after.originalReserved).toBe(before.originalReserved);
+    const stored = await f.mediaCtx.driver.get({ bucket: "original", key: ready.key });
+    expect(hash(new Uint8Array(await new Response(stored.body).arrayBuffer()))).toBe(hash(bytes));
+  });
+  test("competing different pending declarations cannot replace a verified size or reserve their unverified size", async () => {
+    for (const falseFirst of [true, false]) {
+      const bytes = png();
+      const good = await f.upload(bytes);
+      const bad = await f.upload(new Uint8Array([9]), undefined, hash(bytes));
+      const [before] = await f.ctx.db.select().from(storageBudget);
+      const ordered = falseFirst ? [bad, good] : [good, bad];
+      for (const upload of ordered) await completeUpload(f.ctx, upload.userId, upload.dto.id);
+      const pending = await original(good.dto.id);
+      expect(pending).toMatchObject({ state: "pending", generation: 0, leaseUntil: null });
+      await ingestUpload(f.mediaCtx, good.data);
+      await ingestUpload(f.mediaCtx, bad.data);
+      expect((await session(bad.dto.id)).errorCode).toBe("HASH_MISMATCH");
+      expect(await original(good.dto.id)).toMatchObject({
+        id: pending.id,
+        state: "ready",
+        size: bytes.length,
+        generation: 1,
+      });
+      const [after] = await f.ctx.db.select().from(storageBudget);
+      expect(after.originalWritten - before.originalWritten).toBe(bytes.length);
+      expect(after.originalReserved).toBe(before.originalReserved);
+      const lateBad = await f.upload(new Uint8Array([1]), undefined, hash(bytes));
+      await expect(completeUpload(f.ctx, lateBad.userId, lateBad.dto.id)).rejects.toMatchObject({
+        code: "STORAGE_INCONSISTENT",
+      });
+      expect((await original(good.dto.id)).size).toBe(bytes.length);
+    }
+  });
+  test("size correction never changes leased or uncertain pending accounting", async () => {
+    const bytes = png();
+    const good = await f.upload(bytes);
+    const bad = await f.upload(new Uint8Array([6]), undefined, hash(bytes));
+    await completeUpload(f.ctx, good.userId, good.dto.id);
+    await completeUpload(f.ctx, bad.userId, bad.dto.id);
+    // Fault after a real PUT leaves the original leased and its reservation durable.
+    await expect(
+      ingestUpload(
+        {
+          ...f.mediaCtx,
+          driver: {
+            ...f.mediaCtx.driver,
+            put: async (input) => {
+              await f.mediaCtx.driver.put(input);
+              throw new StorageUnavailableError();
+            },
+          },
+        },
+        good.data,
+      ),
+    ).rejects.toMatchObject({ status: 503 });
+    const blob = await original(good.dto.id);
+    const [before] = await f.ctx.db.select().from(storageBudget);
+    await f.ctx.db
+      .update(blobs)
+      .set({ leaseUntil: sql`clock_timestamp()-interval '1 second'` })
+      .where(eq(blobs.id, blob.id));
+    await expect(claimOriginal(f.mediaCtx, bad.data)).rejects.toMatchObject({
+      code: "STORAGE_INCONSISTENT",
+    });
+    const lateBad = await f.upload(new Uint8Array([2]), undefined, hash(bytes));
+    await expect(completeUpload(f.ctx, lateBad.userId, lateBad.dto.id)).rejects.toMatchObject({
+      code: "STORAGE_INCONSISTENT",
+    });
+    const [after] = await f.ctx.db.select().from(storageBudget);
+    expect(after.originalReserved).toBe(before.originalReserved);
+    expect(after.originalWritten).toBe(before.originalWritten);
+    expect(await original(good.dto.id)).toMatchObject({
+      size: bytes.length,
+      generation: blob.generation,
+      state: "pending",
+    });
+    await ingestUpload(f.mediaCtx, good.data);
+    expect((await original(good.dto.id)).state).toBe("ready");
+  });
 });

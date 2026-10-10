@@ -15,6 +15,16 @@ import { lockUploadAccounting, storageTime } from "./usage";
 
 type Session = typeof uploadSessions.$inferSelect;
 type BlobRow = typeof blobs.$inferSelect;
+/** Only this state has never reserved capacity or started a physical write. */
+function isUnclaimedOriginal(blob: BlobRow): boolean {
+  return (
+    blob.state === "pending" &&
+    blob.generation === 0 &&
+    blob.leaseUntil === null &&
+    blob.verifiedAt === null &&
+    blob.detectedMime === null
+  );
+}
 export type ProcessingUpload = {
   tx: DbTransaction;
   session: Session;
@@ -97,7 +107,13 @@ export async function ensureOriginal(
     .from(blobs)
     .where(eq(blobs.sha256, session.expectedSha256))
     .for("update");
-  if (!blob || blob.size !== session.expectedSize || blob.policyId !== policy.id)
+  // Pending declarations are untrusted. Keep their per-session sizes until a
+  // verified ingest takes the first physical claim; completion cannot pin size.
+  if (
+    !blob ||
+    blob.policyId !== policy.id ||
+    (blob.size !== session.expectedSize && !isUnclaimedOriginal(blob))
+  )
     throw new StorageError(503, "STORAGE_INCONSISTENT");
   if (blob.state === "blocked") throw new StorageError(400, "HASH_BLOCKED");
   if (blob.state === "deleting") throw new StorageError(503, "STORAGE_BUSY", "STORAGE_BUSY", 30);
@@ -120,6 +136,11 @@ export async function claimOriginal(
       )
         throw new StorageError(400, "HASH_BLOCKED");
       const [blob] = await tx.select().from(blobs).where(eq(blobs.id, file.blobId)).for("update");
+      if (blob.size !== session.expectedSize && !isUnclaimedOriginal(blob))
+        throw new StorageError(503, "STORAGE_INCONSISTENT");
+      // The caller has verified this session's actual bytes. Correct only an
+      // identity that has never owned a lease/charge; uncertain writes stay fixed.
+      const size = session.expectedSize;
       if (blob.state === "ready") return { kind: "ready" as const, blob };
       if (blob.state === "blocked") throw new StorageError(400, "HASH_BLOCKED");
       if (blob.state === "deleting" || (blob.leaseUntil && blob.leaseUntil > now))
@@ -129,19 +150,20 @@ export async function claimOriginal(
       const reserve = blob.state === "deleted" || !blob.leaseUntil;
       if (reserve) {
         if (
-          budget.originalWritten + budget.originalReserved + blob.size >
+          budget.originalWritten + budget.originalReserved + size >
           ctx.config.limits.originalBudget
         )
           throw new StorageError(503, "STORAGE_BUDGET_EXCEEDED");
         await tx
           .update(storageBudget)
-          .set({ originalReserved: budget.originalReserved + blob.size })
+          .set({ originalReserved: budget.originalReserved + size })
           .where(eq(storageBudget.id, "global"));
       }
       const [claimed] = await tx
         .update(blobs)
         .set({
           state: "pending",
+          size,
           generation: blob.generation + 1,
           leaseUntil: new Date(now.getTime() + 120000),
           verifiedAt: null,
