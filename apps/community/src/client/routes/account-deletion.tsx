@@ -12,6 +12,7 @@ import { htmlLang } from "@/shared/i18n/locale";
 import { queryClientContext } from "@/shared/router-context";
 
 import { accountErrorRedirect } from "../lib/account-errors";
+import { clearUploadRecords } from "../lib/file-upload";
 import { authClient } from "../lib/auth-client";
 import { errorMessage } from "../lib/auth-errors";
 import { getBrowserApi, getRenderApi, jsonRequest } from "../lib/browser";
@@ -87,6 +88,7 @@ function DeletionContent() {
       setPending(false);
       return;
     }
+    if (me) clearUploadRecords(me.id);
     window.location.assign(localizeHref("/"));
   }
 

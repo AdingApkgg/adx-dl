@@ -153,3 +153,8 @@ describe("个人主页 meta", () => {
     expect(tags).toContainEqual({ title: `${m.user_page_pending_title()} - ${m.site_name()}` });
   });
 });
+
+test("active public profile uses the published decorative image",async()=> {
+  const html=render(await visit({...ACTIVE,image:"/media/profile.jpg"}));
+  expect(html).toContain('src="/media/profile.jpg"');expect(html).toContain('alt="" aria-hidden="true"');
+});

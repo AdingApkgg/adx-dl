@@ -146,3 +146,10 @@ describe("首页渲染：登录入口", () => {
     }
   });
 });
+
+test("home header uses the published decorative avatar",async()=> {
+  const data=await visit(true);
+  const me=data.dehydratedState.queries.find(q=>q.queryKey[0]==="me")!;
+  me.state.data={...USER,image:"/media/home.jpg"};
+  const html=renderLoaderData(data);expect(html).toContain('src="/media/home.jpg"');expect(html).toContain('alt="" aria-hidden="true"');
+});

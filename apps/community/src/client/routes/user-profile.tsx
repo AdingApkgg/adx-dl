@@ -85,7 +85,7 @@ function UserContent({ id }: { id: string }) {
   return (
     <main className="space-y-6">
       <div className="flex flex-wrap items-center gap-5">
-        <Avatar id={profile.id} name={profile.name} size={80} />
+        <Avatar image={profile.image} id={profile.id} name={profile.name} size={80} />
         <div className="min-w-0 flex-1 space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight break-words">{profile.name}</h1>
           {/* 昵称可以重名：用户 id 和昵称一起显示，别人冒充不了（spec 第 10.5 节）。 */}

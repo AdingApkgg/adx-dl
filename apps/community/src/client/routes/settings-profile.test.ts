@@ -20,7 +20,7 @@ const USER = {
   createdAt: "2026-09-29T00:00:00.000Z",
   deletionPurgeAt: null,
 };
-const PROFILE = { name: "阿丁", bio: "写谱的", onboardedAt: "2026-09-29T00:00:00.000Z" };
+const PROFILE = { image: null, avatarRevision: 0, name: "阿丁", bio: "写谱的", onboardedAt: "2026-09-29T00:00:00.000Z" };
 
 type LoaderArgs = Parameters<typeof loader>[0];
 type LoaderData = Awaited<ReturnType<typeof loader>>;

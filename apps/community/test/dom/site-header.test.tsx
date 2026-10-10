@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -13,7 +13,7 @@ import { makeQueryClient } from "@/shared/query-client";
 const signOut = vi.hoisted(() => vi.fn());
 vi.mock("@/client/lib/auth-client", () => ({ authClient: { signOut } }));
 
-const USER = { id: "abc2345678", name: "阿丁", image: null, status: "active", createdAt: "", deletionPurgeAt: null };
+const USER = { id: "abc2345678", name: "阿丁", image: null as string | null, status: "active", createdAt: "", deletionPurgeAt: null };
 
 // 页头装在真的 Provider 里；path 同时是浏览器地址（Paraglide 按它判断语言）和路由的当前地址。
 function renderHeader(path: string, me: typeof USER | null) {
@@ -72,6 +72,8 @@ describe("页头的账号菜单", () => {
   });
 
   test("退出登录成功：整页回到当前语言的首页", async () => {
+    localStorage.setItem(`astrodx-uploads:${USER.id}`, "[]");
+    localStorage.setItem("astrodx-uploads:another", "[]");
     signOut.mockResolvedValue({ data: { success: true }, error: null });
     const assign = vi.spyOn(window.location, "assign").mockImplementation(() => {});
     const user = renderHeader("/en/settings/profile", USER);
@@ -80,10 +82,13 @@ describe("页头的账号菜单", () => {
 
     expect(signOut).toHaveBeenCalledTimes(1);
     expect(assign).toHaveBeenCalledWith("/en/");
+    expect(localStorage.getItem(`astrodx-uploads:${USER.id}`)).toBeNull();
+    expect(localStorage.getItem("astrodx-uploads:another")).toBe("[]");
   });
 
   // 会话还在：不能让用户以为已经退出，提示失败、留在本页。
   test("退出登录失败（服务器 500）：toast 提示出错，页面不跳走", async () => {
+    localStorage.setItem(`astrodx-uploads:${USER.id}`, "[]");
     signOut.mockResolvedValue({ data: null, error: { status: 500, statusText: "Internal Server Error" } });
     const assign = vi.spyOn(window.location, "assign").mockImplementation(() => {});
     const user = renderHeader("/", USER);
@@ -92,6 +97,7 @@ describe("页头的账号菜单", () => {
 
     expect(await screen.findByText(m.error_unknown())).toBeTruthy();
     expect(assign).not.toHaveBeenCalled();
+    expect(localStorage.getItem(`astrodx-uploads:${USER.id}`)).toBe("[]");
   });
 
   test("没登录：'登录'链接带着当前地址", () => {
@@ -123,4 +129,11 @@ describe("页头的语言切换", () => {
       ["A", false],
     ]);
   });
+});
+
+test("account menu image is decorative; broken image keeps the accessible account button",()=> {
+  renderHeader("/",{...USER,image:"/media/broken.jpg"});
+  const button=screen.getByRole("button",{name:m.nav_account_menu({name:USER.name})});
+  const image=button.querySelector("img")!;expect(image.getAttribute("aria-hidden")).toBe("true");expect(image.getAttribute("alt")).toBe("");
+  fireEvent.error(image);expect(button.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");expect(screen.queryByRole("img")).toBeNull();
 });

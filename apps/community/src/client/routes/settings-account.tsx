@@ -16,6 +16,7 @@ import { apiContext, queryClientContext } from "@/shared/router-context";
 import { PageTitle, textLinkClass } from "../components/page-title";
 import { isReauthError, QqCodeForm } from "../components/qq-code-form";
 import { accountErrorRedirect } from "../lib/account-errors";
+import { clearUploadRecords } from "../lib/file-upload";
 import { authClient } from "../lib/auth-client";
 import { errorMessage } from "../lib/auth-errors";
 import { getBrowserApi, getRenderApi, jsonRequest } from "../lib/browser";
@@ -160,6 +161,7 @@ function SettingsContent() {
       setPending(false);
       return;
     }
+    if (me) clearUploadRecords(me.id);
     window.location.assign(localizeHref("/"));
   }
 
@@ -368,6 +370,7 @@ export function DeleteAccountSection({ userId, here, onDeleted }: DeleteAccountS
       const result = await okJson(
         await getBrowserApi().api.v1.me.deletion.$post({ json: { deleteContent, confirmId: userId } })
       );
+      clearUploadRecords(userId);
       onDeleted(result.purgeAt);
       // 响应已经清掉了会话 Cookie：缓存里的当前用户也要忘掉。不然页头还显示头像菜单，之后在页面里跳转
       // （首页的 clientLoader、布局的 clientMiddleware 都读这份缓存）也仍当成已登录。
