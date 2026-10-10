@@ -149,20 +149,22 @@ export async function putUploadPart(
     return attempt;
   });
   if (!claim) return;
+  // Rejected PUTs may persist remotely after abort. Keep the attempt and reservation
+  // for uncertain-write repair; immediate cleanup requires confirmed PUT success.
+  await ctx.driver.put({
+    bucket: "original",
+    key: claim.tempKey,
+    body: new ReadableStream({
+      start(controller) {
+        controller.enqueue(bytes);
+        controller.close();
+      },
+    }),
+    size: bytes.length,
+    mime: "application/octet-stream",
+    sha256,
+  });
   try {
-    await ctx.driver.put({
-      bucket: "original",
-      key: claim.tempKey,
-      body: new ReadableStream({
-        start(controller) {
-          controller.enqueue(bytes);
-          controller.close();
-        },
-      }),
-      size: bytes.length,
-      mime: "application/octet-stream",
-      sha256,
-    });
     await withStorageTransaction(ctx.db, async (tx) => {
       const { budget } = await lockUploadAccounting(tx, userId);
       const row = await ownedUpload(tx, userId, id);

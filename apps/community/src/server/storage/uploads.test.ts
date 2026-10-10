@@ -10,6 +10,7 @@ import {
   storageMaintenance,
   storagePolicies,
   storageUsage,
+  storageBudget,
   uploadAttempts,
   uploadSessions,
   uploadParts,
@@ -557,3 +558,85 @@ function transactionFault(
     },
   });
 }
+
+test("a rejected PUT that persists later stays charged and is not immediately deleted", async () => {
+  const id = await owner();
+  const [before] = await ctx.db.select().from(storageBudget).where(eq(storageBudget.id, "global"));
+  const upload = await initUpload(ctx, id, input(), crypto.randomUUID());
+  let received!: () => void;
+  let persist!: () => void;
+  let persisted!: () => void;
+  const receivedBody = new Promise<void>((resolve) => {
+    received = resolve;
+  });
+  const allowPersistence = new Promise<void>((resolve) => {
+    persist = resolve;
+  });
+  const latePersistence = new Promise<void>((resolve) => {
+    persisted = resolve;
+  });
+  const stored: { body: Uint8Array | null } = { body: null };
+  let deletes = 0;
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    async fetch(request) {
+      if (request.method === "PUT") {
+        const body = new Uint8Array(await request.arrayBuffer());
+        received();
+        await allowPersistence;
+        stored.body = body;
+        persisted();
+        return new Response(null, { status: 200, headers: { etag: '"late-put"' } });
+      }
+      if (request.method === "DELETE") {
+        deletes++;
+        stored.body = null;
+        return new Response(null, { status: 204 });
+      }
+      return new Response(null, { status: 404 });
+    },
+  });
+  const driver = createS3Driver(
+    {
+      ...ctx.config,
+      endpoint: server.url.origin,
+      accessKeyId: "isolated-fault-test",
+      secretAccessKey: "isolated-fault-test",
+    },
+    { requestTimeoutMs: 100 },
+  );
+  try {
+    const outcome = putUploadPart({ ...ctx, driver }, id, upload.id, 0, bytes, hash(bytes)).catch(
+      (error) => error,
+    );
+    await receivedBody;
+    expect(await outcome).toMatchObject({ status: 503, code: "STORAGE_UNAVAILABLE" });
+    persist();
+    await latePersistence;
+    expect(stored.body).toEqual(bytes);
+    expect(deletes).toBe(0);
+    const [attempt] = await ctx.db
+      .select()
+      .from(uploadAttempts)
+      .where(eq(uploadAttempts.uploadId, upload.id));
+    expect(attempt).toMatchObject({
+      state: "writing",
+      reservedBytes: 3,
+      writtenBytes: 0,
+      generation: 0,
+    });
+    const [after] = await ctx.db.select().from(storageBudget).where(eq(storageBudget.id, "global"));
+    expect(after.temporaryReserved).toBe(before.temporaryReserved + 3);
+    expect(after.temporaryWritten).toBe(before.temporaryWritten);
+    const [part] = await ctx.db
+      .select()
+      .from(uploadParts)
+      .where(eq(uploadParts.uploadId, upload.id));
+    expect(part).toMatchObject({ state: "writing", attemptId: attempt.id });
+    expect((await getUpload(ctx, id, upload.id)).receivedParts).toEqual([]);
+  } finally {
+    persist();
+    await server.stop(true);
+  }
+});
