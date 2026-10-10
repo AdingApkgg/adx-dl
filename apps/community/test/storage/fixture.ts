@@ -41,7 +41,7 @@ export async function cleanupStorageFixture(
   originalAccounting = false,
 ): Promise<void> {
   if (!owners.length) return;
-  const { inArray, eq, sql } = await import("drizzle-orm");
+  const { inArray, eq, or, sql } = await import("drizzle-orm");
   const {
     user,
     files,
@@ -53,22 +53,24 @@ export async function cleanupStorageFixture(
     userAvatars, mediaPublications, mediaPurgeRequests,
     uploadAttempts,
     storagePolicies,
-    storageBudget,
+    storageBudget, storageQuarantine, storageInventoryProgress,
   } = await import("../../src/server/db/schema");
   const sessions = await db
     .select({ id: uploadSessions.id })
     .from(uploadSessions)
     .where(inArray(uploadSessions.ownerId, owners));
   const ids = sessions.map((row) => row.id);
-  const attempts = ids.length
-    ? await db.select().from(uploadAttempts).where(inArray(uploadAttempts.uploadId, ids))
+  const attempts = ids.length || policies.length
+    ? await db.select().from(uploadAttempts).where(or(ids.length ? inArray(uploadAttempts.uploadId, ids) : undefined, policies.length ? inArray(uploadAttempts.policyId, policies) : undefined))
     : [];
+  const quarantine=policies.length?await db.select().from(storageQuarantine).where(inArray(storageQuarantine.policyId,policies)):[];
   const originals =
     originalAccounting && policies.length
       ? await db.select().from(blobs).where(inArray(blobs.policyId, policies))
       : [];
   const derivatives = originalAccounting && policies.length
     ? await db.select().from(derivedObjects).where(inArray(derivedObjects.policyId, policies)) : [];
+  if (driver) for (const candidate of quarantine) await driver.delete({bucket:"original",key:candidate.key});
   if (driver) for (const output of derivatives) await driver.delete({bucket:"derived",key:output.key});
   if (driver)
     for (const original of originals)
@@ -94,7 +96,8 @@ export async function cleanupStorageFixture(
       await tx.delete(mediaPublications).where(inArray(mediaPublications.outputSha256,hashes));
     }
     await tx.delete(files).where(inArray(files.ownerId, owners));
-    if (ids.length) await tx.delete(uploadAttempts).where(inArray(uploadAttempts.uploadId, ids));
+    if (originals.length) await tx.delete(files).where(inArray(files.blobId, originals.map(b=>b.id)));
+    if (attempts.length) await tx.delete(uploadAttempts).where(inArray(uploadAttempts.id, attempts.map(a=>a.id)));
     if (originals.length) await tx.delete(blobDerivatives).where(inArray(blobDerivatives.sourceBlobId,originals.map(b=>b.id)));
     if (derivatives.length) await tx.delete(derivedObjects).where(inArray(derivedObjects.id,derivatives.map(b=>b.id)));
     if (ownFiles.length) {
@@ -119,18 +122,26 @@ export async function cleanupStorageFixture(
         ),
       );
     await tx.delete(user).where(inArray(user.id, owners));
+    if(policies.length){await tx.delete(storageQuarantine).where(inArray(storageQuarantine.policyId,policies));await tx.delete(storageInventoryProgress).where(inArray(storageInventoryProgress.policyId,policies));}
     if (policies.length)
       await tx.delete(storagePolicies).where(inArray(storagePolicies.id, policies));
+    const writtenCharge = (row: {state:string;generation:number;size:number;properties:Record<string,unknown>}) => {
+      if (row.state === "ready") return row.size;
+      if (row.state !== "deleting") return 0;
+      const deletion = row.properties.deletion as {generation?:number;chargedFrom?:string;startedAt?:unknown;uncertain?:unknown}|undefined;
+      if (!deletion || deletion.generation !== row.generation || deletion.chargedFrom !== "written" || !(deletion.startedAt === null || typeof deletion.startedAt === "string") || typeof deletion.uncertain !== "boolean") throw new Error("Invalid owned fixture deletion charge");
+      return row.size;
+    };
     const reserved = attempts.reduce((n, row) => n + row.reservedBytes, 0);
     const written = attempts.reduce((n, row) => n + row.writtenBytes, 0);
     await tx
       .update(storageBudget)
       .set({
         derivedReserved: sql`${storageBudget.derivedReserved}-${derivatives.filter(b=>b.state === "pending" && b.leaseUntil !== null).reduce((n,b)=>n+b.size,0)}`,
-        derivedWritten: sql`${storageBudget.derivedWritten}-${derivatives.filter(b=>b.state === "ready").reduce((n,b)=>n+b.size,0)}`,
+        derivedWritten: sql`${storageBudget.derivedWritten}-${derivatives.reduce((n,b)=>n+writtenCharge(b),0)}`,
         temporaryReserved: sql`${storageBudget.temporaryReserved}-${reserved}`,
         originalReserved: sql`${storageBudget.originalReserved}-${originals.filter((b) => b.state === "pending" && b.leaseUntil !== null).reduce((n, b) => n + b.size, 0)}`,
-        originalWritten: sql`${storageBudget.originalWritten}-${originals.filter((b) => b.state === "ready").reduce((n, b) => n + b.size, 0)}`,
+        originalWritten: sql`${storageBudget.originalWritten}-${originals.reduce((n, b) => n + writtenCharge(b), 0)+quarantine.filter(q=>q.state !== "deleted").reduce((n,q)=>n+q.size,0)}`,
         temporaryWritten: sql`${storageBudget.temporaryWritten}-${written}`,
       })
       .where(eq(storageBudget.id, "global"));

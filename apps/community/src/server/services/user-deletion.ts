@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { fromDrizzle, type PgBoss } from "pg-boss";
 
 import type { Db } from "../db/client";
+import { lockStorageMutation } from "../storage/transactions";
 import { profiles, session, user } from "../db/schema";
 import { type DbTransaction, enqueueInTx } from "../jobs/boss";
 import { USER_PURGE_QUEUE, type UserPurgeData } from "../jobs/queues";
@@ -15,6 +16,9 @@ import { USER_PURGE_QUEUE, type UserPurgeData } from "../jobs/queues";
  */
 export type DeletionHandler = {
   name: string;
+  beforeTransaction?(): Promise<void>;
+  prepare?(userId: string, tx: DbTransaction): Promise<void>;
+  restore?(userId: string, tx: DbTransaction): Promise<void>;
   hasContent(userId: string, db: Db): Promise<boolean>;
   purge(userId: string, options: { deleteContent: boolean }, tx: DbTransaction): Promise<void>;
 };
@@ -49,12 +53,14 @@ export async function requestDeletion(
 ): Promise<RequestDeletionResult> {
   // 在开事务之前拿到发送端：它第一次启动时可能要等连接，不能占着一个数据库连接等。
   const boss = await deps.boss();
+  for (const handler of deps.handlers) await handler.beforeTransaction?.();
   const contents = await Promise.all(deps.handlers.map((handler) => handler.hasContent(userId, deps.db)));
   const now = Date.now();
   // 同一个值既写进 deletion_purge_at，也当任务的 startAfter。清除时以库里的值和数据库的时钟为准。
   const purgeAt = new Date(contents.some(Boolean) ? now + DELETION_COOLING_OFF_MS : now);
   try {
     return await deps.db.transaction(async (tx) => {
+      await lockStorageMutation(tx);
       const marked = await tx
         .update(user)
         .set({
@@ -70,6 +76,7 @@ export async function requestDeletion(
       }
       // 撤销这个用户的所有会话，包括发起这次请求的那个。
       await tx.delete(session).where(eq(session.userId, userId));
+      for (const handler of deps.handlers) await handler.prepare?.(userId, tx);
       const jobId = await enqueueInTx(boss, tx, USER_PURGE_QUEUE, { userId } satisfies UserPurgeData, {
         singletonKey: userId,
         startAfter: purgeAt,
@@ -126,9 +133,11 @@ export type CancelDeletionResult =
 
 // 撤销注销：只有"注销中、还没到清除时间"才行。到了时间清除任务可能已经在跑：pg-boss 的 cancel 拦不住
 // 执行中的任务，所以由上面的锁和时间来裁判，取消任务只是顺手。本来就是正常状态的算已经撤销（幂等）。
-export async function cancelDeletion(deps: Pick<DeletionDeps, "db" | "boss">, userId: string): Promise<CancelDeletionResult> {
+export async function cancelDeletion(deps: Pick<DeletionDeps, "db" | "boss"> & Partial<Pick<DeletionDeps, "handlers">>, userId: string): Promise<CancelDeletionResult> {
   const boss = await deps.boss();
+  for (const handler of deps.handlers ?? []) await handler.beforeTransaction?.();
   return deps.db.transaction(async (tx) => {
+    await lockStorageMutation(tx);
     const state = await lockDeletionState(tx, userId);
     if (state?.status === "active") {
       return "not_pending";
@@ -140,6 +149,7 @@ export async function cancelDeletion(deps: Pick<DeletionDeps, "db" | "boss">, us
       .update(user)
       .set({ status: "active", deletionRequestedAt: null, deletionPurgeAt: null, deletionDeleteContent: null })
       .where(eq(user.id, userId));
+    for (const handler of deps.handlers ?? []) await handler.restore?.(userId, tx);
     // 任务 id 不存：exclusive 保证这个用户最多一个排队中的任务，按 singletonKey 找就行。和上面的更新在同一个事务里：
     // 事务回滚，任务也没取消。
     const db = fromDrizzle(tx, sql);
@@ -165,7 +175,9 @@ export type PurgeResult = "purged" | "skipped";
 // （没有 secondaryStorage、cookie cache 和 delete 钩子）直接删用户行和它等价；user-deletion.test.ts 的守卫测试
 // 看着这几个前提，哪天变了测试会失败。
 export async function purgeUser(deps: Pick<DeletionDeps, "db" | "handlers">, userId: string): Promise<PurgeResult> {
+  for (const handler of deps.handlers) await handler.beforeTransaction?.();
   return deps.db.transaction(async (tx) => {
+    await lockStorageMutation(tx);
     const state = await lockDeletionState(tx, userId);
     if (state?.status !== "pending_deletion" || !state.due) {
       return "skipped";

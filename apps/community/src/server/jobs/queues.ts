@@ -16,6 +16,8 @@ export const STORAGE_INGEST_QUEUE = "storage.ingest";
 export const MEDIA_AVATAR_QUEUE = "media.avatar";
 export const STORAGE_FINALIZE_QUEUE = "storage.finalize";
 export const STORAGE_SWEEP_QUEUE = "storage.sweep";
+export const STORAGE_RECONCILE_QUEUE="storage.reconcile";
+export const STORAGE_JOURNAL_QUEUE = "storage.journal";
 export const STORAGE_CLEANUP_QUEUE = "storage.cleanup";
 export const STORAGE_DELETE_QUEUE = "storage.delete";
 export const STORAGE_DELETE_DEAD_QUEUE = "storage.delete.dead";
@@ -67,7 +69,7 @@ export const STORAGE_QUEUES: readonly QueueDefinition[] = [
       deadLetter: STORAGE_DEAD_QUEUE,
     },
   },
-  ...[STORAGE_SWEEP_QUEUE, STORAGE_CLEANUP_QUEUE, MEDIA_PURGE_REPAIR_QUEUE].map((name) => ({
+  ...[STORAGE_SWEEP_QUEUE, STORAGE_CLEANUP_QUEUE, STORAGE_JOURNAL_QUEUE, STORAGE_RECONCILE_QUEUE, MEDIA_PURGE_REPAIR_QUEUE].map((name) => ({
     name,
     options: {
       policy: "stately" as const,

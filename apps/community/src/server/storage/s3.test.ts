@@ -162,3 +162,75 @@ test("missing buckets are storage outages rather than missing objects", async ()
     server.close();
   }
 });
+
+test("list honors bounded page size and rejects invalid bounds before sending request", async () => {
+  const seen: number[] = [];
+  const server = await localServer((req, res) => {
+    if (req.method === "HEAD") {
+      res.writeHead(200);
+      res.end();
+      return;
+    }
+    seen.push(Number(new URL(req.url ?? "/", "http://localhost").searchParams.get("max-keys")));
+    res.writeHead(200, { "content-type": "application/xml" });
+    res.end(
+      '<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><IsTruncated>false</IsTruncated></ListBucketResult>',
+    );
+  });
+  try {
+    const driver = createS3Driver(config(server.endpoint));
+    await driver.list({ ...input("unused"), prefix: "sha256/", maxKeys: 100 });
+    expect(seen).toEqual([100]);
+    for (const maxKeys of [0, 1001, 1.5])
+      await expect(driver.list({ bucket: "original", prefix: "tmp/", maxKeys })).rejects.toThrow();
+    expect(seen).toEqual([100]);
+  } finally {
+    server.close();
+  }
+});
+
+test("first DELETE object404 is idempotent only after signed existing-bucket proof", async () => {
+  const requests: { method: string; path: string; signed: boolean }[] = [];
+  const server = await localServer((request, response) => {
+    requests.push({
+      method: request.method ?? "",
+      path: request.url ?? "",
+      signed: !!request.headers.authorization,
+    });
+    if (request.method === "DELETE") {
+      response.writeHead(404, { "content-type": "application/xml" });
+      response.end("<Error><Code>NoSuchKey</Code></Error>");
+    } else {
+      response.writeHead(200);
+      response.end();
+    }
+  });
+  try {
+    await createS3Driver(config(server.endpoint)).delete(input("absent"));
+    expect(requests.map((r) => r.method)).toEqual(["DELETE", "HEAD"]);
+    expect(requests.every((r) => r.signed)).toBe(true);
+    expect(requests[1].path).toMatch(/^\/blobs\/?(?:\?.*)?$/);
+  } finally {
+    server.close();
+  }
+});
+test("DELETE404 with missing or forbidden bucket remains a storage failure", async () => {
+  for (const bucketStatus of [404, 403]) {
+    const server = await localServer((request, response) => {
+      if (request.method === "DELETE") {
+        response.writeHead(404, { "content-type": "application/xml" });
+        response.end("<Error><Code>NoSuchKey</Code></Error>");
+      } else {
+        response.writeHead(bucketStatus);
+        response.end();
+      }
+    });
+    try {
+      await expect(
+        createS3Driver(config(server.endpoint)).delete(input("absent")),
+      ).rejects.toBeInstanceOf(StorageUnavailableError);
+    } finally {
+      server.close();
+    }
+  }
+});

@@ -487,3 +487,68 @@ export const storageJournalProgress = pgTable(
     ),
   ],
 );
+
+/** Observed unknown originals have a distinct identity; never fabricate a ready blob. */
+export const storageQuarantine = pgTable(
+  "storage_quarantine",
+  {
+    id: id(),
+    policyId: uuid()
+      .notNull()
+      .references(() => storagePolicies.id, { onDelete: "restrict" }),
+    sha256: text().notNull(),
+    key: text().notNull(),
+    size: bigint({ mode: "number" }).notNull(),
+    observedEtag: text().notNull(),
+    state: text({ enum: ["quarantined", "deleting", "deleted"] })
+      .default("quarantined")
+      .notNull(),
+    generation: generation(),
+    firstSeenAt: createdAt(),
+    lastObservedAt: createdAt(),
+    deleteStartedAt: timestamp(tz),
+    deleteUncertain: boolean().default(false).notNull(),
+  },
+  (t) => [
+    uniqueIndex("storage_quarantine_policy_key_uidx").on(t.policyId, t.key),
+    index("storage_quarantine_cleanup_idx").on(t.state, t.firstSeenAt),
+    validHash("storage_quarantine_hash_check", t.sha256),
+    nonnegative("storage_quarantine_generation_check", t.generation),
+    check("storage_quarantine_size_check", sql`${t.size} between 1 and 480000000`),
+    check(
+      "storage_quarantine_key_check",
+      sql`${t.key}='sha256/'||substr(${t.sha256},1,2)||'/'||substr(${t.sha256},3,2)||'/'||${t.sha256}`,
+    ),
+    check("storage_quarantine_etag_check", sql`char_length(${t.observedEtag}) between 1 and 1024`),
+    check(
+      "storage_quarantine_state_check",
+      sql`${t.state} in ('quarantined','deleting','deleted')`,
+    ),
+    check(
+      "storage_quarantine_delete_check",
+      sql`(not ${t.deleteUncertain} or ${t.deleteStartedAt} is not null) and (${t.state}<>'deleted' or (${t.deleteStartedAt} is not null and not ${t.deleteUncertain}))`,
+    ),
+  ],
+);
+export const storageInventoryProgress = pgTable(
+  "storage_inventory_progress",
+  {
+    policyId: uuid()
+      .primaryKey()
+      .references(() => storagePolicies.id, { onDelete: "restrict" }),
+    cursor: text(),
+    temporaryCursor: text(),
+    lastCompletedAt: timestamp(tz),
+    updatedAt: createdAt(),
+  },
+  (t) => [
+    check(
+      "storage_inventory_cursor_check",
+      sql`${t.cursor} is null or char_length(${t.cursor}) between 1 and 8192`,
+    ),
+    check(
+      "storage_inventory_tmp_cursor_check",
+      sql`${t.temporaryCursor} is null or char_length(${t.temporaryCursor}) between 1 and 8192`,
+    ),
+  ],
+);

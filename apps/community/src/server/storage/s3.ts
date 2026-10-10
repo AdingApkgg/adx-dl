@@ -225,13 +225,27 @@ export function createS3Driver(config: StorageConfig, options: DriverOptions = {
     },
     delete: (input) =>
       request(true, input.signal, async (signal) => {
-        await client.send(
-          new DeleteObjectCommand({
-            Bucket: bucket(input.bucket),
-            Key: input.key,
-          }),
-          { abortSignal: signal },
-        );
+        try {
+          await client.send(
+            new DeleteObjectCommand({
+              Bucket: bucket(input.bucket),
+              Key: input.key,
+            }),
+            { abortSignal: signal },
+          );
+        } catch (error) {
+          if (storageStatus(error) !== 404) throw error;
+          // Only this uninterrupted DELETE acknowledged object absence. Prove the bucket
+          // exists with the same permit/deadline; this never settles an older uncertain DELETE.
+          try {
+            await client.send(new HeadBucketCommand({ Bucket: bucket(input.bucket) }), {
+              abortSignal: signal,
+            });
+          } catch (bucketError) {
+            if (storageStatus(bucketError) === 404) throw new StorageUnavailableError();
+            throw bucketError;
+          }
+        }
       }),
     copy: (input) =>
       request(true, input.signal, async (signal) => {
@@ -246,14 +260,16 @@ export function createS3Driver(config: StorageConfig, options: DriverOptions = {
           { abortSignal: signal },
         );
       }),
-    list: (input) =>
-      request(false, input.signal, async (signal) => {
+    list: async (input) => {
+      const maxKeys = input.maxKeys ?? 1000;
+      if (!Number.isInteger(maxKeys) || maxKeys < 1 || maxKeys > 1000) throw new Error("Invalid list page size");
+      return request(false, input.signal, async (signal) => {
         const page = await client.send(
           new ListObjectsV2Command({
             Bucket: bucket(input.bucket),
             Prefix: input.prefix,
             ContinuationToken: input.cursor,
-            MaxKeys: 1000,
+            MaxKeys: maxKeys,
           }),
           { abortSignal: signal },
         );
@@ -269,7 +285,8 @@ export function createS3Driver(config: StorageConfig, options: DriverOptions = {
           }),
           cursor: page.NextContinuationToken,
         };
-      }),
+      });
+    },
     ready: (signal) =>
       request(false, signal, async (requestSignal) => {
         try {

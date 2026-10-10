@@ -13,7 +13,6 @@ import { testDbHandle } from "../testing/test-db";
 import {
   cancelDeletion,
   DELETION_COOLING_OFF_MS,
-  DELETION_HANDLERS,
   type DeletionHandler,
   purgeUser,
   requestDeletion,
@@ -310,9 +309,6 @@ describe("最终清除", () => {
     expect(await purgeUser(deps(), id)).toBe("purged");
   }, 30_000);
 
-  test("1c 里还没有模块注册处理器", () => {
-    expect(DELETION_HANDLERS).toEqual([]);
-  });
 });
 
 // 最终清除直接删用户行，靠外键把其余的行带走，也靠下面这些前提和 Better Auth 的 internalAdapter.deleteUser 等价。
@@ -342,4 +338,73 @@ describe("直接删用户行的前提", () => {
       expect(options.databaseHooks?.[model]?.delete, model).toBeUndefined();
     }
   });
+});
+
+// A dropped hook or a second transaction would leave account/storage state split.
+test("prepare and restore run in the outer lifecycle transaction and rollback together", async () => {
+  const id = await seedUser();
+  const seen: string[] = [];
+  const handler: DeletionHandler & {
+    prepare(userId: string, tx: Parameters<DeletionHandler["purge"]>[2]): Promise<void>;
+    restore(userId: string, tx: Parameters<DeletionHandler["purge"]>[2]): Promise<void>;
+  } = {
+    ...withContent("hooks"),
+    prepare: async (userId, tx) => {
+      const [row] = await tx.select().from(user).where(eq(user.id, userId));
+      expect(row.status).toBe("pending_deletion");
+      await tx.update(profiles).set({ bio: "suspended" }).where(eq(profiles.userId, userId));
+      seen.push("prepare");
+    },
+    restore: async (userId, tx) => {
+      const [row] = await tx.select().from(user).where(eq(user.id, userId));
+      expect(row.status).toBe("active");
+      await tx.update(profiles).set({ bio: "restored" }).where(eq(profiles.userId, userId));
+      seen.push("restore");
+    },
+  };
+  await requestDeletion(deps([handler]), id, { deleteContent: false });
+  expect(seen).toEqual(["prepare"]);
+  expect(await cancelDeletion(deps([handler]), id)).toBe("cancelled");
+  expect(seen).toEqual(["prepare", "restore"]);
+  const [profile] = await testDbHandle().db.select().from(profiles).where(eq(profiles.userId, id));
+  expect(profile.bio).toBe("restored");
+  expect(await cancelDeletion(deps([handler]), id)).toBe("not_pending");
+  expect(seen).toEqual(["prepare", "restore"]);
+});
+
+test("failed prepare preserves active account, auth sessions and queue atomically", async () => {
+  const id = await seedUser();
+  const broken = {
+    ...withContent("broken-hook"),
+    prepare: async () => {
+      throw new Error("prepare failed");
+    },
+  };
+  await expect(requestDeletion(deps([broken]), id, { deleteContent: false })).rejects.toThrow(
+    "prepare failed",
+  );
+  expect((await userRow(id)).status).toBe("active");
+  expect(await rowsLeft(id)).toMatchObject({ sessions: 1, profiles: 1 });
+  expect(await boss.findJobs(USER_PURGE_QUEUE, { key: id })).toHaveLength(0);
+});
+
+test("cold producer readiness failure occurs before admission and leaves account untouched", async () => {
+  const id = await seedUser();
+  const handlers = [
+    {
+      ...withContent("readiness"),
+      beforeTransaction: async () => {
+        await testDbHandle().db.transaction(async (tx) => {
+          await tx.execute(sql`select pg_advisory_xact_lock(${714102026})`);
+          await tx.execute(sql`select id from "user" where id=${id} for update nowait`);
+        });
+        throw new Error("cold producer failed");
+      },
+    },
+  ];
+  await expect(requestDeletion(deps(handlers), id, { deleteContent: false })).rejects.toThrow(
+    "cold producer failed",
+  );
+  expect((await userRow(id)).status).toBe("active");
+  expect((await rowsLeft(id)).sessions).toBe(1);
 });

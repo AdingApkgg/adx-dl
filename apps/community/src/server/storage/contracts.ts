@@ -28,6 +28,7 @@ export type ObjectDriver = {
     bucket: ObjectBucket;
     prefix: string;
     cursor?: string;
+    maxKeys?: number;
     signal?: AbortSignal;
   }): Promise<{ objects: { key: string; size: number; modifiedAt: Date }[]; cursor?: string }>;
   copy(input: { bucket: ObjectBucket; sourceKey: string; key: string; signal?: AbortSignal }): Promise<void>;

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   blobs,
   blobDerivatives,
@@ -7,6 +7,7 @@ import {
   files,
   storageBudget,
   storagePolicies,
+  storageQuarantine,
   uploadSessions,
 } from "../db/schema";
 import type { DbTransaction, StorageContext, StorageJobData } from "./contracts";
@@ -95,6 +96,7 @@ export async function ensureOriginal(
     .orderBy(storagePolicies.id)
     .limit(1);
   if (!policy) throw new StorageUnavailableError();
+  await assertOriginalKeyAvailable(tx, ctx, objectKey(session.expectedSha256));
   await tx
     .insert(blobs)
     .values({
@@ -138,6 +140,7 @@ export async function claimOriginal(
       )
         throw new StorageError(400, "HASH_BLOCKED");
       const [blob] = await tx.select().from(blobs).where(eq(blobs.id, file.blobId)).for("update");
+      await assertOriginalKeyAvailable(tx, ctx, blob.key);
       if (blob.size !== session.expectedSize && !isUnclaimedOriginal(blob))
         throw new StorageError(503, "STORAGE_INCONSISTENT");
       // The caller has verified this session's actual bytes. Correct only an
@@ -464,4 +467,27 @@ export async function publishAvatarOutput(
       },
     )) === true
   );
+}
+
+/** Unknown physical keys must settle their deletion before any canonical writer can reincarnate them. */
+export async function assertOriginalKeyAvailable(
+  tx: DbTransaction,
+  ctx: StorageContext,
+  key: string,
+): Promise<void> {
+  const rows = await tx
+    .select({ id: storageQuarantine.id })
+    .from(storageQuarantine)
+    .innerJoin(storagePolicies, eq(storagePolicies.id, storageQuarantine.policyId))
+    .where(
+      and(
+        eq(storageQuarantine.key, key),
+        sql`${storageQuarantine.state}<>'deleted'`,
+        eq(storagePolicies.endpoint, ctx.config.endpoint),
+        eq(storagePolicies.region, ctx.config.region),
+        eq(storagePolicies.originalBucket, ctx.config.originalBucket),
+      ),
+    )
+    .limit(1);
+  if (rows.length) throw new StorageError(503, "STORAGE_BUSY", "STORAGE_BUSY", 3600);
 }

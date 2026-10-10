@@ -1,3 +1,4 @@
+import { createDeletionHandlers } from "./storage/deletion";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { HTTPException } from "hono/http-exception";
@@ -79,6 +80,7 @@ export function createApp(deps: AppDeps) {
   } : storage;
   const services: ApiServices = {
     ...deps.services, storage: configuredStorage, auth: deps.auth, log: deps.log,
+    deletionHandlers: configuredStorage ? createDeletionHandlers(configuredStorage, deps.services.deletionHandlers.filter(h => h.name !== "storage")) : deps.services.deletionHandlers,
   };
   // Redis 宕掉时每个请求都会在限流这一步出错：三条限流规则共用一个限了频的日志（1a 评审 R14）。
   const onRateLimitStoreError = throttledErrorLog(deps.log, "rate_limit_store_error");

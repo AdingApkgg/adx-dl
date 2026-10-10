@@ -1,3 +1,4 @@
+import { notifyCurrentUserAvatar } from "../storage/deletion";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { z } from "zod";
@@ -149,9 +150,12 @@ export const meRoutes = new Hono<AppEnv>()
   // 重试，或者另一个标签页已经撤销）也返回 200：结果和撤销成功一样，不能对用户说"冷静期已经结束"。
   .delete("/deletion", async (c) => {
     const { user } = currentAuth(c);
-    if ((await cancelDeletion(c.get("services"), user.id)) === "not_cancellable") {
+    const services = c.get("services");
+    const result = await cancelDeletion({ ...services, handlers: services.deletionHandlers }, user.id);
+    if (result === "not_cancellable") {
       return jsonError(c, 409, "DELETION_NOT_CANCELLABLE", "This deletion can no longer be cancelled");
     }
+    if (services.storage) await notifyCurrentUserAvatar(services.storage, user.id);
     return c.json({ status: "active" as const });
   })
   .get("/logins", async (c) => {
