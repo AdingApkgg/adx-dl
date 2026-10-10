@@ -51,8 +51,8 @@ export function Layout({ children }: { children: ReactNode }) {
             ThemeBootScript 带上真的 nonce。 */}
         <Links nonce="" />
         {/* Umami 的统计脚本走本站的 /_s/（Hono 转发，CSP 的 'self' 就放行）。data-host-url 让上报发到 /_s/api/send。
-            不记查询串和 # 后面的内容（data-exclude-*），只在本站的域名上记（data-domains）。defer：排在 React Router
-            的模块脚本前面执行，hydrate 之后 window.umami 已经在了（LoginEvent 要用）。 */}
+            不记查询串和 # 后面的内容（data-exclude-*），只在本站的域名上记（data-domains）。defer 避免阻塞 HTML 解析；
+            React Router 的 async 模块可能先执行，trackEvent 会等本脚本 load 后补报。 */}
         {analytics ? (
           <script
             defer

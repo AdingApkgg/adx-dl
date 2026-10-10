@@ -10,7 +10,7 @@ export function LoginEvent() {
     if (!method) {
       return;
     }
-    // 统计脚本是 defer 的，排在 React Router 的模块脚本前面执行，hydrate 之后 tracker 已经在 window.umami 上。
+    // tracker 尚未就绪时，trackEvent 等统计脚本 load 后补报；登录标记仍立即清除。
     trackEvent("login", { method });
     // history.state 原样传回去：React Router 在里面记着这一页的 key。replaceState 不会让 React Router 重新导航。
     window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}`);

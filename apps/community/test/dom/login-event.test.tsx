@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { LoginEvent } from "@/client/components/login-event";
@@ -7,6 +7,7 @@ const page = window as unknown as { umami?: { track: (event: string, data?: unkn
 
 afterEach(() => {
   delete page.umami;
+  document.querySelector('script[src="/_s/script.js"]')?.remove();
 });
 
 describe("登录统计：落地页上报 # 后面带来的登录方式", () => {
@@ -41,5 +42,24 @@ describe("登录统计：落地页上报 # 后面带来的登录方式", () => {
 
     expect(window.location.hash).toBe("");
     expect(window.location.pathname).toBe("/u/abc2345678");
+  });
+
+  test("统计脚本晚于 React 加载：清除标记后仍上报一次通行密钥登录", () => {
+    document.head.insertAdjacentHTML("beforeend", '<script defer src="/_s/script.js" data-website-id="test-site"></script>');
+    const script = document.querySelector<HTMLScriptElement>('script[src="/_s/script.js"]');
+    if (!script) throw new Error("analytics script fixture missing");
+    window.history.replaceState({ key: "late" }, "", "/settings/account?tab=security#login=passkey");
+
+    render(<LoginEvent />);
+
+    expect(window.location.hash).toBe("");
+    expect(window.history.state).toEqual({ key: "late" });
+    const track = vi.fn();
+    page.umami = { track };
+    fireEvent.load(script);
+    fireEvent.load(script);
+
+    expect(track.mock.calls).toEqual([["login", { method: "passkey" }]]);
+    expect(`${window.location.pathname}${window.location.search}`).toBe("/settings/account?tab=security");
   });
 });

@@ -8,11 +8,20 @@ type Tracker = { track(event: string, data?: Record<string, string>): unknown };
 export function trackEvent(event: "login", data: { method: LoginMethod }): void;
 export function trackEvent(event: "onboarding_done"): void;
 export function trackEvent(event: string, data?: Record<string, string>): void {
-  try {
-    // 统计脚本加载后把 tracker 放在 window.umami 上。没开统计、被拦截插件挡掉时没有它。
-    (globalThis as { umami?: Tracker }).umami?.track(event, data);
-  } catch {
-    // 统计出错不能影响页面。
+  const send = () => {
+    try {
+      // load 回调时重新读 tracker：注册回调时脚本还没执行。
+      (globalThis as { umami?: Tracker }).umami?.track(event, data);
+    } catch {
+      // 统计出错不能影响页面。
+    }
+  };
+  if ((globalThis as { umami?: Tracker }).umami) {
+    send();
+  } else if (typeof document !== "undefined") {
+    // React Router 的模块脚本是 async，可能先于 defer 的 Umami 执行。
+    // 事件只留在本页内存；没开统计或脚本被拦截时不阻塞页面。
+    document.querySelector('script[src="/_s/script.js"]')?.addEventListener("load", send, { once: true });
   }
 }
 
