@@ -57,6 +57,13 @@
       "when": 1791632627222,
       "tag": "0007_natural_queen_noir",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791650927809,
+      "tag": "0008_storage_runtime_roles",
+      "breakpoints": true
     }
   ]
 }

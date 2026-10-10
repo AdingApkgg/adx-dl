@@ -63,6 +63,7 @@ jobs:
     env:
       TEST_DATABASE_URL: postgres://community:community@localhost:5432/community_test
       TEST_REDIS_URL: redis://localhost:6379
+      STORAGE_TEST_ENDPOINT: http://127.0.0.1:58333
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -74,6 +75,18 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Authenticated isolated storage
+        working-directory: apps/community
+        run: |
+          bun test/storage/create-fixture.ts .storage-dev
+          echo "STORAGE_TEST_FIXTURE_PATH=$PWD/.storage-dev/s3.json" >> "$GITHUB_ENV"
+          docker compose -f compose.dev.yaml up -d seaweedfs
+          for attempt in $(seq 1 60); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:58333/blobs/ci-anonymous)" = 403 ]; then exit 0; fi
+            sleep 1
+          done
+          exit 1
 
       # 共享界面包的测试和社区站的交互测试（test/dom）用 vitest，它跑在 Node 上（vitest 5 要求 Node ^22.12 || ^24 || >=26）。
       # 要排在下面两步之前：社区站 check 的最后一步就是 vitest run。
@@ -111,4 +124,12 @@ jobs:
 
       # 构建只在部署时才跑，构建坏了就要到部署时才发现（dash 踩过的坑）。
       - name: Docker build
-        run: docker build -f apps/community/Dockerfile -t community:ci .
+        run: |
+          docker build -f apps/community/Dockerfile -t community:ci .
+          docker build -f apps/community/ops/backup/Dockerfile -t community-backup:ci .
+          docker run --rm --network none --read-only --tmpfs /tmp community:ci bun -e 'import sharp from "sharp"; import {processAvatar} from "./src/media-worker/avatar.ts"; await sharp({create:{width:32,height:32,channels:3,background:"white"}}).png().toFile("/tmp/input.png"); const output=await processAvatar("/tmp/input.png","/tmp/output.jpg"); if(output.width!==512||output.size>524288)throw new Error("native recipe failed");'
+
+      - name: Stop owned CI storage
+        if: always()
+        working-directory: apps/community
+        run: docker compose -f compose.dev.yaml stop seaweedfs

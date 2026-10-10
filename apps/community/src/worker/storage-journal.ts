@@ -1,3 +1,4 @@
+import { runStorageWork } from "../server/storage/runtime";
 import type { PgBoss } from "pg-boss";
 import type { StorageContext } from "../server/storage/contracts";
 import { StorageError } from "../server/storage/errors";
@@ -21,7 +22,7 @@ export async function registerStorageJournalWorker(
   exporter?: StorageJournalExporter,
 ) {
   await boss.work(STORAGE_JOURNAL_QUEUE, async () => {
-    await exportStorageJournal(ctx, exporter);
+    await runStorageWork(ctx, () => exportStorageJournal(ctx, exporter));
   });
   await boss.schedule(
     STORAGE_JOURNAL_QUEUE,

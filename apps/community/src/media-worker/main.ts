@@ -1,3 +1,7 @@
+import { createStorageIOTracker } from "../server/storage/maintenance";
+import { startStorageRole } from "../server/storage/runtime-role";
+import { rebuildMissingDerived } from "../server/storage/backup";
+import { assertMediaScratch } from "../server/storage/health";
 import { assertNormalStorageStartup } from "../../ops/backup/restore";
 import type {
   StorageContext,
@@ -34,7 +38,10 @@ export async function registerMediaWorkers(ctx: StorageContext): Promise<void> {
       queue,
       { localConcurrency: 1, batchSize: 1 },
       async (jobs) => {
-        for (const job of jobs) await handle(ctx, job.data);
+        for (const job of jobs) {
+          const run = () => handle(ctx, job.data);
+          await (ctx.lifecycle ? ctx.lifecycle.run(run) : run());
+        }
       },
     );
   }
@@ -49,19 +56,35 @@ if (import.meta.main) {
     log.error("media_jobs_error", describeError(error)),
   );
   const { db, pool } = createDb(url);
+  const tracker = createStorageIOTracker();
+  const controller = new AbortController();
   const ctx = createStorageContext({
+    tracker, signal: controller.signal,
     db,
     boss: async () => boss,
     log,
     role: "media",
   });
+  await assertMediaScratch(ctx.config.tempDir);
+  const role = await startStorageRole({databaseUrl:url,role:"media",tracker});
   await boss.start();
   await registerMediaWorkers(ctx);
   let stopping = false;
+  let rebuilding: Promise<unknown> | undefined;
+  const repairTimer = setInterval(() => {
+    if(stopping || rebuilding || tracker.status().paused || tracker.status().active) return;
+    rebuilding=tracker.run(() => rebuildMissingDerived(ctx,1)).catch(error=>log.error("storage_rebuild_failed",describeError(error))).finally(()=>{rebuilding=undefined;});
+  },1000);
   const stop = async () => {
     if (stopping) return;
     stopping = true;
+    clearInterval(repairTimer);
+    tracker.pause();
+    controller.abort();
     await boss.stop({ graceful: true, timeout: 125000 });
+    await rebuilding;
+    await tracker.pauseAndDrain(AbortSignal.timeout(5000));
+    await role.stop();
     await pool.end();
   };
   process.on("SIGTERM", () => void stop());

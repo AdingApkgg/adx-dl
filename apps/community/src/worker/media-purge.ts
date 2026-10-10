@@ -1,3 +1,4 @@
+import { runStorageWork } from "../server/storage/runtime";
 import { createHash } from "node:crypto";
 import { and, asc, eq, lte, or, sql } from "drizzle-orm";
 import type { PgBoss, Job } from "pg-boss";
@@ -159,7 +160,7 @@ export async function revokeMedia(
   if (ctx.config.role !== "control") throw new MediaPurgeError("MEDIA_CONTROL_REQUIRED");
   const config = ctx.config;
   const deps = injected ?? {
-    fetch,
+    fetch: (url: string, init: RequestInit) => fetch(url, {...init, signal: ctx.lifecycle ? AbortSignal.any([ctx.lifecycle.signal, ...(init.signal ? [init.signal] : [])]) : init.signal}),
     sleep: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
     now: () => performance.now(),
     drainUrl: `${config.internalMediaUrl}/internal/media/drain`,
@@ -355,12 +356,13 @@ export async function recordMediaPurgeDead(ctx: StorageContext, jobs: Job<MediaP
   }
 }
 export async function registerMediaPurgeWorker(ctx: StorageContext, boss: PgBoss) {
-  await boss.work<MediaPurgeJobData>(MEDIA_PURGE_QUEUE, createMediaPurgeHandler(ctx));
+  const handle = createMediaPurgeHandler(ctx);
+  await boss.work<MediaPurgeJobData>(MEDIA_PURGE_QUEUE, (jobs) => runStorageWork(ctx, () => handle(jobs)));
   await boss.work<MediaPurgeJobData>(MEDIA_PURGE_DEAD_QUEUE, (jobs) =>
-    recordMediaPurgeDead(ctx, jobs),
+    runStorageWork(ctx, () => recordMediaPurgeDead(ctx, jobs)),
   );
   await boss.work(MEDIA_PURGE_REPAIR_QUEUE, async () => {
-    await repairMediaPurges(ctx);
+    await runStorageWork(ctx, () => repairMediaPurges(ctx));
   });
   await boss.schedule(
     MEDIA_PURGE_REPAIR_QUEUE,

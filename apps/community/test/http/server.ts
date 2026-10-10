@@ -1,3 +1,4 @@
+import { storageFixtureConfig } from "../storage/fixture";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,7 +13,7 @@ import { prepareTestQueues } from "../../src/server/testing/test-boss";
 export type RunningServer = {
   origin: string;
   url(path: string): string;
-  stop(): void;
+  stop(): Promise<void>;
 };
 
 const appRoot = fileURLToPath(new URL("../..", import.meta.url));
@@ -34,6 +35,7 @@ export async function startBuiltServer(extraEnv: Record<string, string> = {}): P
 
   const restoreStateDirectory = await mkdtemp(join(tmpdir(), "community-http-restore-state-"));
   await initializeRestoreState(restoreStateDirectory);
+  const storage=await storageFixtureConfig();
   const port = 40_000 + Math.floor(Math.random() * 10_000);
   const origin = `http://127.0.0.1:${port}`;
   const proc = Bun.spawn(["bun", "./build/server/index.js"], {
@@ -49,6 +51,14 @@ export async function startBuiltServer(extraEnv: Record<string, string> = {}): P
       REDIS_URL: httpTestRedisUrl(),
       BETTER_AUTH_SECRET: HTTP_TEST_AUTH_SECRET,
       STORAGE_RESTORE_STATE_DIR: restoreStateDirectory,
+      STORAGE_INTERNAL_PORT: String(port+10000),
+      STORAGE_S3_ENDPOINT: storage.endpoint,
+      STORAGE_WEB_ACCESS_KEY_ID: storage.accessKeyId,
+      STORAGE_WEB_SECRET_ACCESS_KEY: storage.secretAccessKey,
+      STORAGE_TEMP_DIR: storage.tempDir,
+      STORAGE_CAPACITY_DIR: storage.tempDir,
+      STORAGE_RECIPE_BUILD: storage.recipeBuild,
+      STORAGE_INTERNAL_MEDIA_SECRET: "http-test-internal-media-secret-0123456789",
       GOOGLE_CLIENT_ID: "http-test-google-client",
       GOOGLE_CLIENT_SECRET: "http-test-google-secret",
       TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
@@ -75,7 +85,7 @@ export async function startBuiltServer(extraEnv: Record<string, string> = {}): P
     }
     try {
       if ((await fetch(`${origin}/healthz`)).ok) {
-        return { origin, url: (path) => `${origin}${path}`, stop: () => { proc.kill(); void proc.exited.then(() => rm(restoreStateDirectory, { recursive: true, force: true })); } };
+        return { origin, url: (path) => `${origin}${path}`, stop: async () => { proc.kill(); await proc.exited; await rm(restoreStateDirectory, { recursive: true, force: true }); } };
       }
     } catch {
       // 还没起来。

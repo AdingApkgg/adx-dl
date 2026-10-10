@@ -145,7 +145,7 @@ export async function ingestUpload(ctx: StorageContext, data: StorageJobData): P
     await checkStorageDisk(ctx);
     directory = await mkdtemp(join(ctx.config.tempDir, "ingest-"));
     const path = join(directory, "original");
-    const signal = AbortSignal.timeout(120000);
+    const signal = ctx.lifecycle ? AbortSignal.any([ctx.lifecycle.signal, AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000);
     const sources = instant
       ? [{ key: blob.key, size: blob.size, sha256: blob.sha256 }]
       : parts.map((p) => ({ key: p.tempKey, size: p.size, sha256: p.sha256 }));

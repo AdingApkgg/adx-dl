@@ -45,6 +45,7 @@ export type StorageConfigBase = {
   accessKeyId: string;
   secretAccessKey: string;
   tempDir: string;
+  capacityDir?: string;
   recipeBuild: string;
   limits: {
     temporaryBudget: number;
@@ -72,6 +73,8 @@ export type StorageContext = {
   config: StorageConfig;
   log: Logger;
   now?: () => Date;
+  /** Executable process lifecycle; tests/library callers may omit it. */
+  lifecycle?: { signal: AbortSignal; run<T>(operation: () => Promise<T>): Promise<T> };
   /** Web publication notification, after commit only. Task11 must configure real web/control publishers. */
   onMediaPublished?: (hash: string, generation: number) => Promise<void>;
 };

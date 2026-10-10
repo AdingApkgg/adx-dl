@@ -1,3 +1,4 @@
+import { storageFilesystemBytes } from "./disk";
 import { statfs } from "node:fs/promises";
 import { eq, sql } from "drizzle-orm";
 import { user, storageUsage, storageBudget } from "../db/schema";
@@ -7,8 +8,8 @@ import { StorageError, StorageUnavailableError } from "./errors";
 /** Filesystem IO must happen before entering a business transaction. */
 export async function checkStorageDisk(ctx: StorageContext): Promise<void> {
   try {
-    const stats = await statfs(ctx.config.tempDir, { bigint: true });
-    if (stats.bavail * stats.bsize < BigInt(ctx.config.limits.minFreeDiskBytes))
+    const stats = await statfs(ctx.config.capacityDir ?? ctx.config.tempDir, { bigint: true });
+    if (storageFilesystemBytes(stats).available < ctx.config.limits.minFreeDiskBytes)
       throw new StorageUnavailableError();
   } catch {
     throw new StorageUnavailableError();

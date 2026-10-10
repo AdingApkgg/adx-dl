@@ -24,7 +24,7 @@ export default defineConfig({
     }),
     // 必须排在 reactRouter() 前面。服务端入口不用默认的 src/client/server.ts，
     // 放在 src/server 里，路径不要加 "./" 前缀（插件按子串匹配它）。
-    reactRouterHonoServer({ runtime: "bun", serverEntryPoint: "src/server/index.ts" }),
+    reactRouterHonoServer({ runtime: "node", serverEntryPoint: "src/server/index.ts" }),
     reactRouter(),
   ],
   resolve: {

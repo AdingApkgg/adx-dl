@@ -165,7 +165,7 @@ export async function deriveAvatar(
       throw new StorageError(413, "FILE_TOO_LARGE");
     await checkStorageDisk(ctx);
     directory = await mkdtemp(join(ctx.config.tempDir, "avatar-"));
-    const signal = AbortSignal.timeout(120000);
+    const signal = ctx.lifecycle ? AbortSignal.any([ctx.lifecycle.signal, AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000);
     const input = join(directory, "input"),
       outputPath = join(directory, "output.jpg");
     await copyVerified(

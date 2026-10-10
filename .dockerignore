@@ -44,3 +44,6 @@
 /.superpowers
 /apps/web/public
 /apps/web/src
+
+# Local authenticated development storage configuration.
+**/.storage-dev

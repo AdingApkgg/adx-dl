@@ -39,3 +39,5 @@
 Task10 opt-in `fresh-restore.test.ts` 在新 PG/SeaweedFS volumes 上实际执行双库 pg_dump/pg_restore、restic backup/restore、Linux amd64 Bun1.4.2 sharp0.35.5/libvips8.18.7 native rebuild，测量 RTO，并记录 daily backup RPO=24h。本机 HTTP Cloudflare API fixture 只证明协议与源站证据，不能替代 Task12 的真实生产 purge/cache/edge 验收。完整额度、runtime consumer/role ACK、持久 mounts/首次初始化及 crash pause reconciliation 仍是 Task11 强制交接。
 
 `media_revoked` version 1 has two authenticated variants. Null `userId` and `fileId` record a global publication generation. Paired identities record the exact former account/file/output association with the new avatar revision. Replay clears only a matching older association; individual revisions never become purge generations. Shared references and later saves survive. Half-null identities or invalid generation/identifier ranges fail closed.
+
+Task11 实际入口现由 `runtime.ts` 分配每次独占0700目录并调用真实三角色数据库协调器。`community-full` 的 forget 使用 `--group-by host,tags`，避免不同目录各自形成永久保留组。部署接线和显式首次初始化见 [运行手册](../seaweed/README.md)；本地集成不等于生产容量/Cloudflare验收。

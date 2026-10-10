@@ -44,8 +44,8 @@ beforeAll(async () => {
   server = await startBuiltServer();
 }, 60_000);
 
-afterAll(() => {
-  server.stop();
+afterAll(async () => {
+  await server.stop();
 });
 
 describe("隐私说明的登录状态", () => {

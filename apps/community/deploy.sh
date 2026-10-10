@@ -71,6 +71,7 @@ current="$(git rev-parse HEAD)"
 echo "== 部署 $current（部署前是 $previous）"
 
 rollback_hint() {
+  echo "已保留实际镜像 astrodx-community:rollback-$previous；使用 COMPOSE_FILE 原有 overlay，仅回滚应用服务。" >&2
   echo "回滚：git checkout --detach $previous && ./deploy.sh --no-pull" >&2
   echo "修好以后回到 pre：git checkout pre && ./deploy.sh" >&2
 }
@@ -79,7 +80,15 @@ rollback_hint() {
 docker compose config --quiet
 
 echo "== 构建镜像"
-docker compose build web
+# Preserve the actual serving image; repeated failed attempts cannot overwrite this rollback tag.
+serving="$(docker compose ps -q web)"
+if [ -n "$serving" ]; then
+  image_id="$(docker inspect --format '{{.Image}}' "$serving")"
+  if [ -n "$image_id" ] && ! docker image inspect "astrodx-community:rollback-$previous" > /dev/null 2>&1; then
+    docker image tag "$image_id" "astrodx-community:rollback-$previous"
+  fi
+fi
+docker compose build web backup
 
 echo "== 迁移"
 if ! docker compose run --rm migrate; then
@@ -87,8 +96,14 @@ if ! docker compose run --rm migrate; then
   exit 1
 fi
 
-echo "== 重启 web 和 worker"
-docker compose up -d web worker
+echo "== 存储预检"
+docker compose run --rm --no-deps storage-config
+docker compose up -d seaweedfs
+# Existing state must be explicitly initialized by the first-install runbook; never auto-adopt it.
+docker compose run --rm --no-deps backup bun ops/backup/preflight.ts
+
+echo "== 重启 web、worker 和 media-worker"
+docker compose up -d --no-deps web worker media-worker
 
 echo "== 等 /readyz（最多 ${READY_TIMEOUT} 秒）"
 deadline=$(( $(date +%s) + READY_TIMEOUT ))
@@ -97,7 +112,7 @@ while true; do
   [ "$remaining" -gt 0 ] || break
   probe_timeout=5
   [ "$remaining" -ge "$probe_timeout" ] || probe_timeout="$remaining"
-  if body="$(curl -fsS --max-time "$probe_timeout" "$READY_URL" 2>/dev/null)"; then
+  if body="$(curl -fsS --max-time "$probe_timeout" "$READY_URL" 2>/dev/null)" && docker compose exec -T media-worker bun src/server/storage/health.ts media > /dev/null 2>&1; then
     # 探针返回时再核对一次：期限已经过去就不能把这次部署记成成功。
     if [ "$(date +%s)" -le "$deadline" ]; then
       save_revision "$current"

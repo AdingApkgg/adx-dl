@@ -33,6 +33,8 @@ export function parseStorageEnv(
   const credentialsRef = `STORAGE_${role.toUpperCase()}`;
   const tempDir = required("STORAGE_TEMP_DIR");
   if (!isAbsolute(tempDir) || normalize(tempDir) !== tempDir) problems.add("STORAGE_TEMP_DIR");
+  const capacityDir = source.STORAGE_CAPACITY_DIR ?? (source.NODE_ENV === "production" ? required("STORAGE_CAPACITY_DIR") : tempDir);
+  if (!isAbsolute(capacityDir) || normalize(capacityDir) !== capacityDir) problems.add("STORAGE_CAPACITY_DIR");
   const recipeBuild = required("STORAGE_RECIPE_BUILD");
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(recipeBuild)) problems.add("STORAGE_RECIPE_BUILD");
   const common = {
@@ -45,6 +47,7 @@ export function parseStorageEnv(
     accessKeyId: required(`${credentialsRef}_ACCESS_KEY_ID`),
     secretAccessKey: required(`${credentialsRef}_SECRET_ACCESS_KEY`),
     tempDir,
+    capacityDir,
     recipeBuild,
     limits: {
       temporaryBudget: budget("STORAGE_TEMPORARY_BUDGET", STORAGE_LIMITS.temporaryBudget),

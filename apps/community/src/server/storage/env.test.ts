@@ -78,3 +78,8 @@ describe("parseStorageEnv", () => {
     expect(config.limits.minFreeDiskBytes).toBe(6_000_000_000);
   });
 });
+
+test("production storage requires explicit capacity path independent of bounded media scratch", () => {
+ expect(()=>parseStorageEnv({NODE_ENV:"production",STORAGE_CAPACITY_DIR:"relative"},"media")).toThrow("STORAGE_CAPACITY_DIR");
+ expect(()=>parseStorageEnv({NODE_ENV:"production"},"media")).toThrow("STORAGE_CAPACITY_DIR");
+});

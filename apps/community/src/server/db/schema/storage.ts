@@ -552,3 +552,16 @@ export const storageInventoryProgress = pgTable(
     ),
   ],
 );
+
+/** Ephemeral live process evidence; never restored as proof of actual role quiescence. */
+export const storageRuntimeRoles = pgTable("storage_runtime_roles", {
+ role: text().primaryKey(),
+ processId: uuid().notNull(),
+ backendPid: integer().notNull(),
+ heartbeatAt: timestamp(tz).notNull(),
+ pauseOwner: uuid(),
+ acknowledgedAt: timestamp(tz),
+}, t => [
+ check("storage_runtime_roles_role_check", sql`${t.role} in ('web','media','control')`),
+ check("storage_runtime_roles_check", sql`${t.acknowledgedAt} is null or ${t.pauseOwner} is not null`),
+]);

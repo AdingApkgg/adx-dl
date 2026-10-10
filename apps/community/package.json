@@ -16,7 +16,9 @@
     "check": "bun run lint && bun run i18n && bun run typegen && tsc --noEmit && bun test --timeout 30000 src test/ops && vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/server/db/migrate.ts",
-    "worker": "bun run src/worker/main.ts"
+    "worker": "bun run src/worker/main.ts",
+    "media-worker": "bun run src/media-worker/main.ts",
+    "storage:health": "bun run src/server/storage/health.ts"
   },
   "dependencies": {
     "@astrodx/tsconfig": "workspace:*",

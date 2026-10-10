@@ -273,7 +273,7 @@ export async function rebuildDerivedIntent(
   if (!claim) return false;
   let directory: string | undefined;
   let childUnreaped = false, outputClaimStarted = false;
-  const signal = AbortSignal.timeout(120000);
+  const signal = ctx.lifecycle ? AbortSignal.any([ctx.lifecycle.signal, AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000);
   try {
     directory = await mkdtemp(join(ctx.config.tempDir, "rebuild-"));
     const original = await stageOriginal(

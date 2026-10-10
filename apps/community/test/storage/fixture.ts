@@ -8,7 +8,7 @@ export async function storageFixtureConfig(role: StorageRole = "web"): Promise<S
   if (process.env.STORAGE_TEST_FIXTURE_PATH) {
     const fixture = JSON.parse(await readFile(process.env.STORAGE_TEST_FIXTURE_PATH, "utf8"));
     const identity = fixture.identities.find(
-      (item: { name: string }) => item.name === `community-test-${role}`,
+      (item: { name: string }) => item.name === `community-test-${role}` || item.name === role,
     );
     access = identity?.credentials[0]?.accessKey;
     secret = identity?.credentials[0]?.secretKey;

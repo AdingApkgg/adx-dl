@@ -14,6 +14,8 @@ const SECRETS = [
   "POSTGRES_PASSWORD",
   "UMAMI_DB_PASSWORD",
   "UMAMI_APP_SECRET",
+  "STORAGE_INTERNAL_MEDIA_SECRET",
+  ...["WEB", "MEDIA", "CONTROL", "BACKUP"].flatMap(role => [`STORAGE_${role}_ACCESS_KEY_ID`, `STORAGE_${role}_SECRET_ACCESS_KEY`]),
 ];
 
 let dir: string | undefined;

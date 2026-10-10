@@ -1,3 +1,4 @@
+import { runStorageWork } from "../server/storage/runtime";
 import { and, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
 import { fromDrizzle, type JobWithMetadata, type PgBoss } from "pg-boss";
 import { getTableConfig } from "drizzle-orm/pg-core";
@@ -952,10 +953,10 @@ export async function registerStorageWorkers(ctx: StorageContext, boss: PgBoss) 
     STORAGE_DEAD_QUEUE,
     { includeMetadata: true },
     async (jobs) => {
-      for (const job of jobs) await recordStorageDead(ctx, job);
+      await runStorageWork(ctx, async () => { for (const job of jobs) await recordStorageDead(ctx, job); });
     },
   );
-  await boss.work<StorageDeleteData>(STORAGE_DELETE_QUEUE, async (jobs) => {
+  await boss.work<StorageDeleteData>(STORAGE_DELETE_QUEUE, async (jobs) => runStorageWork(ctx, async () => {
     for (const job of jobs) {
       const data = job.data;
       if (
@@ -968,15 +969,15 @@ export async function registerStorageWorkers(ctx: StorageContext, boss: PgBoss) 
         throw new Error("Invalid storage deletion job");
       await deleteStorageObject(ctx, data);
     }
-  });
+  }));
   await boss.work(STORAGE_SWEEP_QUEUE, async () => {
-    await sweepStorage(ctx);
+    await runStorageWork(ctx, () => sweepStorage(ctx));
   });
   await boss.work(STORAGE_CLEANUP_QUEUE, async () => {
-    await sweepStorage(ctx);
+    await runStorageWork(ctx, () => sweepStorage(ctx));
   });
   await boss.work(STORAGE_RECONCILE_QUEUE, async () => {
-    await reconcileStorage(ctx);
+    await runStorageWork(ctx, () => reconcileStorage(ctx));
   });
   await boss.schedule(
     STORAGE_RECONCILE_QUEUE,

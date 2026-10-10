@@ -1,3 +1,4 @@
+import { storageFilesystemBytes } from "../../src/server/storage/disk";
 import { createHash } from "node:crypto";
 import { chmod, lstat, mkdir, open, rename, rm, stat, statfs, link } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -153,7 +154,7 @@ export async function preflightSpace(
   }
   for (const item of devices.values()) {
     const fs = await statfs(item.path);
-    const available = Number(fs.bavail) * Number(fs.bsize);
+    const available = storageFilesystemBytes(fs).available;
     if (available - item.bytes < floor) throw new Error("STORAGE_BACKUP_DISK_LOW");
   }
   return devices;
@@ -448,24 +449,7 @@ export async function backupOriginals(
     ["restic", "backup", "--host", "astrodx-community", "--tag", "community-full", bundle],
     job,
   );
-  await command(
-    [
-      "restic",
-      "forget",
-      "--host",
-      "astrodx-community",
-      "--tag",
-      "community-full",
-      "--prune",
-      "--keep-daily",
-      "7",
-      "--keep-weekly",
-      "4",
-      "--keep-monthly",
-      "6",
-    ],
-    job,
-  );
+  await command(communityFullRetentionCommand(), job);
   await durableFile(
     join(stage, "last-success.json"),
     Buffer.from(
@@ -497,10 +481,8 @@ export async function withinDeadline<T>(fn: () => Promise<T>, signal: AbortSigna
 }
 
 if (import.meta.main) {
-  // Task11 must supply the real owner-scoped web/media/control process coordinator.
-  // Refuse rather than infer quiescence from a lease or invent a zero-IO acknowledgement.
-  console.error("STORAGE_DRAIN_UNAVAILABLE");
-  process.exitCode = 1;
+  try { await (await import("./runtime")).runBackup(); }
+  catch { console.error("STORAGE_BACKUP_FAILED"); process.exitCode=1; }
 }
 
 /** Current role ACKs do not erase ambiguous remote IO; retained durable claims veto a snapshot. */
@@ -513,4 +495,9 @@ export async function assertStorageDrained(c: Pick<Client, "query">) {
  exists(select 1 from storage_quarantine where state='deleting' or delete_uncertain) or
  exists(select 1 from media_purge_requests where state='running')`);
   if (uncertain.rowCount) throw new Error("STORAGE_IO_UNCERTAIN");
+}
+
+/** Group by the fixed host/tag, because private run directories deliberately have unique paths. */
+export function communityFullRetentionCommand() {
+ return ["restic","forget","--host","astrodx-community","--tag","community-full","--group-by","host,tags","--prune","--keep-daily","7","--keep-weekly","4","--keep-monthly","6"];
 }

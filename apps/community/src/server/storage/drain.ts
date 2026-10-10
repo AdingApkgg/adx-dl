@@ -14,6 +14,7 @@ const denied = () =>
   );
 export type MediaRegistration = { signal: AbortSignal; release(): void };
 export type MediaDrain = {
+  shutdown(): void;
   register(hash: string): MediaRegistration | null;
   drain(hash: string, generation: number): Promise<{ generation: number; drained: true }>;
   resume(hash: string, generation: number): Promise<boolean>;
@@ -22,12 +23,14 @@ export type MediaDrain = {
 export function createMediaDrain({ db, secret }: { db: Db; secret: string }): MediaDrain {
   const latches = new Map<string, number>();
   let registrations = 0;
+  let closed = false;
   const active = new Map<string, Set<AbortController>>();
   // Resume's async PG check and drain's synchronous admission update share this epoch.
   const epochs = new Map<string, number>();
   const api: MediaDrain = {
+    shutdown() { closed = true; for(const controllers of active.values()) for(const controller of [...controllers]) controller.abort(); },
     register(hash) {
-      if (latches.has(hash)) return null;
+      if (closed || latches.has(hash)) return null;
       if (registrations >= STORAGE_LIMITS.readConcurrency) throw new StorageUnavailableError();
       registrations++;
       const controller = new AbortController();

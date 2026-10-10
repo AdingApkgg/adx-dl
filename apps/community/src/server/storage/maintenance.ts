@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { Client } from "pg";
 import { sql } from "drizzle-orm";
 import type { Db } from "../db/client";
@@ -120,17 +121,21 @@ export function createStorageIOTracker() {
   let paused = false;
   let active = 0;
   const waiters = new Set<() => void>();
+  const admitted = new AsyncLocalStorage<{ live: boolean }>();
   return {
     async run<T>(fn: () => Promise<T>): Promise<T> {
-      if (paused) throw unavailable();
+      if (paused && !admitted.getStore()?.live) throw unavailable();
       active++;
+      const token = { live: true };
       try {
-        return await fn();
+        return await admitted.run(token, fn);
       } finally {
+        token.live = false;
         active--;
         if (!active) for (const wake of waiters) wake();
       }
     },
+    pause() { paused = true; },
     async pauseAndDrain(signal: AbortSignal) {
       paused = true;
       signal.throwIfAborted();
