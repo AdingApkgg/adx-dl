@@ -71,5 +71,7 @@ export type StorageContext = {
   config: StorageConfig;
   log: Logger;
   now?: () => Date;
+  /** Web publication notification, after commit only. Task11 must configure real web/control publishers. */
+  onMediaPublished?: (hash: string, generation: number) => Promise<void>;
 };
 export type StorageJobData = { uploadId: string; generation: number };

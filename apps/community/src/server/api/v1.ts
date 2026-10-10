@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 
 import type { AppEnv } from "../app-env";
+import { fileRoutes } from "./files";
+import { avatarRoutes } from "./avatar";
 import { uploadRoutes } from "./uploads";
 import { meRoutes } from "./me";
 import { userRoutes } from "./users";
@@ -11,6 +13,8 @@ export const apiV1 = new Hono<AppEnv>()
   // 登录页的配置：Turnstile 站点密钥、QQ 登录能不能用。不要求登录。
   .get("/login-options", async (c) => c.json(await c.get("services").loginOptions()))
   .route("/uploads", uploadRoutes)
+  .route("/files", fileRoutes)
+  .route("/me/avatar", avatarRoutes)
   .route("/me", meRoutes)
   // 个人主页的公开资料（spec 第 10.5 节），不要求登录。
   .route("/users", userRoutes);

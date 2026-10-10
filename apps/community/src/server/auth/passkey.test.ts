@@ -140,7 +140,7 @@ describe("只用通行密钥注册", () => {
     const userId = await currentUserId(browser);
     expect(userId).toMatch(/^[2-9a-hjkmnp-z]{10}$/);
     expect(await usersNamed(nickname)).toEqual([
-      expect.objectContaining({ id: userId, email: `${userId}@placeholder.invalid` }),
+      expect.objectContaining({ id: userId, email: `${userId}@placeholder.invalid`, image: null }),
     ]);
     expect(await passkeysOf(userId)).toHaveLength(1);
   }, 30_000);

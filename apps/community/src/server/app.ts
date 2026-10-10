@@ -6,6 +6,8 @@ import { requestId } from "hono/request-id";
 import { describeError } from "@/shared/describe-error";
 import type { Logger } from "@/shared/log";
 
+import { createMediaDrain, type MediaDrain } from "./storage/drain";
+import { createPublicMediaHandler, isMediaRequest } from "./storage/public-media";
 import { isUploadPartRequest } from "./storage/parts";
 import { StorageError } from "./storage/errors";
 import { apiRoutes } from "./api/v1";
@@ -51,18 +53,56 @@ export type AppDeps = {
   auth: Auth;
   /** /api/v1 的接口用到的依赖（auth、log 由 createApp 从上面同名的两项放进去）。 */
   services: Omit<ApiServices, "auth" | "log">;
+  /** Task11 also mounts this same instance on the internal-only listener. */
+  mediaDrain?: MediaDrain;
 };
 
 // 中间件顺序是 spec 第 8.1 节定的，改动前先对照 spec。
 export function createApp(deps: AppDeps) {
   const app = new Hono<AppEnv>();
-  const services: ApiServices = { ...deps.services, auth: deps.auth, log: deps.log };
+  const storage = deps.services.storage;
+  const secret = storage && "internalMediaSecret" in storage.config
+    ? storage.config.internalMediaSecret : undefined;
+  const drain = deps.mediaDrain ?? (storage && secret
+    ? createMediaDrain({ db: storage.db, secret }) : undefined);
+  const configuredStorage = storage && drain && secret ? {
+    ...storage,
+    onMediaPublished: async (hash: string, generation: number) => {
+      const response = await drain.handle(new Request("http://internal/internal/media/resume", {
+        method: "POST",
+        headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
+        body: JSON.stringify({ hash, generation }),
+      }));
+      if (!response.ok) throw new StorageError(503, "STORAGE_UNAVAILABLE");
+    },
+  } : storage;
+  const services: ApiServices = {
+    ...deps.services, storage: configuredStorage, auth: deps.auth, log: deps.log,
+  };
   // Redis 宕掉时每个请求都会在限流这一步出错：三条限流规则共用一个限了频的日志（1a 评审 R14）。
   const onRateLimitStoreError = throttledErrorLog(deps.log, "rate_limit_store_error");
 
   app.use("*", requestId());
   app.use("*", clientIp());
   app.use("*", requestLog(deps.log));
+  const media = storage && drain ? createPublicMediaHandler(storage, drain) : undefined;
+  app.use("*", async (c, next) => {
+    // Node adapter exposes the exact request-target before URL dot-segment normalization.
+    const rawTarget = (c.env as { incoming?: { url?: string } } | undefined)?.incoming?.url;
+    if (!isMediaRequest(c.req.raw, rawTarget)) return next();
+    if (!media) return jsonError(c, 404, "NOT_FOUND", "Not found");
+    const response = await media(c.req.raw, rawTarget);
+    response.headers.set("X-Request-Id", c.get("requestId"));
+    return response;
+  });
+
+  // File streams retain their sandbox policy after the page security middleware completes.
+  app.use("/api/v1/files/*", async (c, next) => {
+    await next();
+    if (c.res.headers.get("accept-ranges") === "bytes") {
+      c.res.headers.set("Content-Security-Policy", "default-src 'none'; sandbox");
+    }
+  });
   app.use("*", securityHeaders({ isProduction: deps.isProduction }));
 
   // 服务端渲染时 loader 经进程内 API 调 /api/v1（in-process-api.ts）。会话满一天时续期发生在那次进程内
@@ -94,7 +134,6 @@ export function createApp(deps: AppDeps) {
     }
   });
 
-  app.all("/media/*", (c) => jsonError(c, 404, "NOT_FOUND", "Not found"));
 
   // spec 第 8.1 节第 5 条：和 /media 一样挂在会话中间件之前。
   app.route(

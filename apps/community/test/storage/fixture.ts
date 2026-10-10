@@ -50,6 +50,7 @@ export async function cleanupStorageFixture(
     derivedObjects,
     blobBlocks,
     uploadSessions,
+    userAvatars, mediaPublications, mediaPurgeRequests,
     uploadAttempts,
     storagePolicies,
     storageBudget,
@@ -85,6 +86,13 @@ export async function cleanupStorageFixture(
     for (const id of ids)
       await tx.execute(sql`delete from pgboss.job where data->>'uploadId'=${id}`);
     await tx.delete(uploadSessions).where(inArray(uploadSessions.ownerId, owners));
+    await tx.delete(userAvatars).where(inArray(userAvatars.userId, owners));
+    if(derivatives.length) {
+      const hashes=derivatives.map(b=>b.outputSha256);
+      for(const hash of hashes) await tx.execute(sql`delete from pgboss.job where name='media.purge' and data->>'hash'=${hash}`);
+      await tx.delete(mediaPurgeRequests).where(inArray(mediaPurgeRequests.outputSha256,hashes));
+      await tx.delete(mediaPublications).where(inArray(mediaPublications.outputSha256,hashes));
+    }
     await tx.delete(files).where(inArray(files.ownerId, owners));
     if (ids.length) await tx.delete(uploadAttempts).where(inArray(uploadAttempts.uploadId, ids));
     if (originals.length) await tx.delete(blobDerivatives).where(inArray(blobDerivatives.sourceBlobId,originals.map(b=>b.id)));
