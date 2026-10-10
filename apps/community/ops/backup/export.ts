@@ -1,3 +1,4 @@
+import { parseDumpBounds } from "./dump-bounds";
 import { storageFilesystemBytes } from "../../src/server/storage/disk";
 import { createHash } from "node:crypto";
 import { chmod, lstat, mkdir, open, rename, rm, stat, statfs, link } from "node:fs/promises";
@@ -295,8 +296,7 @@ export async function backupOriginals(
   await mkdir(stage, { recursive: true, mode: 0o700 });
   await mkdir(bundle, { recursive: true, mode: 0o700 });
   // A bound is mandatory even for an empty DB; never assume unknown dump size is zero.
-  for (const v of Object.values(options.dumpBounds))
-    if (!Number.isSafeInteger(v) || v < 1) throw new Error("STORAGE_CAPACITY_BOUND_MISSING");
+  const { total: dumpBytes } = parseDumpBounds(options.dumpBounds.community, options.dumpBounds.umami);
   const projected = await withBackupReadClient(
     options.databaseUrl,
     job,
@@ -310,15 +310,14 @@ export async function backupOriginals(
     const overhead = 1024 * 1024 * (entries.length + 10);
     const payload =
       entries.reduce((n, e) => n + e.size, 0) +
-      options.dumpBounds.community +
-      options.dumpBounds.umami +
+      dumpBytes +
       overhead;
     // Assume zero dedup/compression: all payload may be new, plus per-file and repository overhead.
     await preflightSpace([
       { path: stage, additional: missing },
       {
         path: bundle,
-        additional: options.dumpBounds.community + options.dumpBounds.umami + overhead,
+        additional: dumpBytes + overhead,
       },
       { path: options.repositoryDirectory, additional: payload + overhead + 256 * 1024 * 1024 },
     ]);

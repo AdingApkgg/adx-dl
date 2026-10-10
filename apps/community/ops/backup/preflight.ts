@@ -1,3 +1,4 @@
+import { parseDumpBounds } from "./dump-bounds";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { createDb } from "../../src/server/db/client";
@@ -9,6 +10,9 @@ import { preflightSpace, readOriginalManifest, verifiedStaging } from "./export"
 import { Client } from "pg";
 /** Live additional demand, measured after scratch is allocated; existing object/staging bytes are not charged twice. */
 export async function preflightStorage() {
+  const { total: dump } = parseDumpBounds(
+    process.env.STORAGE_COMMUNITY_DUMP_BOUND, process.env.STORAGE_UMAMI_DUMP_BOUND,
+  );
   await assertNormalStorageStartup();
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("STORAGE_DATABASE_REQUIRED");
@@ -33,10 +37,6 @@ export async function preflightStorage() {
       repo = process.env.RESTIC_REPOSITORY;
     if (!stage || !bundle || !repo) throw new Error("STORAGE_BACKUP_PATH_INVALID");
     for (const path of [stage, bundle]) await mkdir(path, { recursive: true, mode: 0o700 });
-    const dump =
-      Number(process.env.STORAGE_COMMUNITY_DUMP_BOUND) +
-      Number(process.env.STORAGE_UMAMI_DUMP_BOUND);
-    if (!Number.isSafeInteger(dump) || dump < 2) throw new Error("STORAGE_CAPACITY_BOUND_MISSING");
     await assertMediaScratch("/media-tmp");
     await ctx.driver.ready(AbortSignal.timeout(5000));
     await c.connect();
