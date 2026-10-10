@@ -4,6 +4,7 @@ import * as React from "react";
 import useSWR from "swr";
 import {
   ArrowDownUpIcon,
+  BanIcon,
   ChevronDownIcon,
   ListFilterIcon,
   SearchIcon,
@@ -71,6 +72,11 @@ import {
   writeCatalogSelection,
 } from "@/lib/catalog-selection";
 import { attachMouseDragScroll } from "@/lib/drag-scroll";
+import {
+  matchesVersionFilter,
+  parseVersionFilterMode,
+  type VersionFilterMode,
+} from "@/lib/catalog-version-filter";
 import { DAN_COURSES, getEntryDanIds, orderCatalogByDan, parseDanIds } from "@/lib/maimai-dan";
 import {
   CATALOG_SORT_IDS,
@@ -261,6 +267,7 @@ export function CatalogBrowser({
   // Categorical dimensions are multi-select chip rows: an empty set means "all",
   // and selections are OR within a dimension, AND across dimensions.
   const [versionSet, setVersionSet] = React.useState<ReadonlySet<string>>(new Set());
+  const [versionMode, setVersionMode] = React.useState<VersionFilterMode>("include");
   const [danSet, setDanSet] = React.useState<ReadonlySet<string>>(new Set());
   const [genreIds, setGenreIds] = React.useState<ReadonlySet<string>>(new Set());
   const [cabinetSet, setCabinetSet] = React.useState<ReadonlySet<string>>(new Set());
@@ -406,6 +413,8 @@ export function CatalogBrowser({
         )
       : null;
     if (versionIds && versionIds.size > 0) setVersionSet(versionIds);
+    const versionModeFromUrl = parseVersionFilterMode(params.get("version_mode"));
+    setVersionMode(versionModeFromUrl);
     const danIds = parseDanIds(params.get("dan"));
     if (danIds.size > 0) setDanSet(danIds);
     // Level and BPM are ranges now; both readers still accept the chip-list form
@@ -433,6 +442,7 @@ export function CatalogBrowser({
     // user can see and adjust them.
     if (
       (versionIds && versionIds.size > 0) ||
+      versionModeFromUrl === "exclude" ||
       danIds.size > 0 ||
       level ||
       genreSet ||
@@ -624,7 +634,8 @@ export function CatalogBrowser({
     return {
       version:
         versionSet.size > 0
-          ? (entry: CatalogCardEntry) => versionSet.has(catalogVersionFilterId(entry))
+          ? (entry: CatalogCardEntry) =>
+              matchesVersionFilter(catalogVersionFilterId(entry), versionSet, versionMode)
           : null,
       dan:
         danSet.size > 0
@@ -660,6 +671,7 @@ export function CatalogBrowser({
     };
   }, [
     versionSet,
+    versionMode,
     danSet,
     danIdsByEntry,
     levelRange,
@@ -835,6 +847,15 @@ export function CatalogBrowser({
     setCurrentPage(1);
   };
   const toggleVersion = toggleIn(setVersionSet);
+  const clearVersionFilter = () => {
+    setVersionSet(new Set());
+    setVersionMode("include");
+    setCurrentPage(1);
+  };
+  const changeVersionMode = (mode: VersionFilterMode) => {
+    setVersionMode(mode);
+    setCurrentPage(1);
+  };
   const toggleDan = toggleIn(setDanSet);
   const toggleGenre = toggleIn(setGenreIds);
   const toggleCabinet = toggleIn(setCabinetSet);
@@ -864,6 +885,7 @@ export function CatalogBrowser({
     setInputValue("");
     setQuery("");
     setVersionSet(new Set());
+    setVersionMode("include");
     setDanSet(new Set());
     setGenreIds(new Set());
     setCabinetSet(new Set());
@@ -895,6 +917,7 @@ export function CatalogBrowser({
     };
     apply("q", hasQuery ? query : null);
     apply("version", joinSet(versionSet));
+    apply("version_mode", versionMode === "exclude" ? "exclude" : null);
     apply("dan", joinSet(danSet));
     // Levels go out as labels ("8-13+") rather than indices, so a shared link
     // survives the scale growing a level.
@@ -924,6 +947,7 @@ export function CatalogBrowser({
     hasQuery,
     query,
     versionSet,
+    versionMode,
     danSet,
     levelRange,
     levelScale,
@@ -1111,7 +1135,7 @@ export function CatalogBrowser({
   const dropDimension = (key: (typeof emptySuggestions)[number]["key"]) => {
     switch (key) {
       case "version":
-        return clearSet(setVersionSet)();
+        return clearVersionFilter();
       case "dan":
         return clearSet(setDanSet)();
       case "genre":
@@ -1162,6 +1186,7 @@ export function CatalogBrowser({
                   onClick={() => {
                     setCategory(value);
                     setVersionSet(new Set());
+                    setVersionMode("include");
                     setHasUserSelectedCategory(true);
                     setCurrentPage(1);
                   }}
@@ -1268,8 +1293,32 @@ export function CatalogBrowser({
                 Each row's "all" chip clears just that dimension. */}
             <div className="flex flex-col gap-2.5 pt-1">
         {versionOptions.length > 0 ? (
-          <ChipFilterRow label={dictionary.filterVersion}>
-            <AllChip active={versionSet.size === 0} onClick={clearSet(setVersionSet)}>
+          <ChipFilterRow
+            label={dictionary.filterVersion}
+            controls={
+              <div role="group" aria-label={dictionary.versionModeLabel} className="flex flex-wrap gap-1">
+                {(["include", "exclude"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    aria-pressed={versionMode === mode}
+                    onClick={() => changeVersionMode(mode)}
+                    className={cn(
+                      CHIP_FOCUS_CLASS,
+                      "min-h-11 rounded-lg border px-3 text-xs font-medium transition-colors",
+                      versionMode === mode
+                        ? "border-primary bg-primary/15 text-primary"
+                        : "border-border text-muted-foreground hover:bg-muted/60"
+                    )}
+                  >
+                    {mode === "include" ? dictionary.versionModeInclude : dictionary.versionModeExclude}
+                  </button>
+                ))}
+              </div>
+            }
+            hint={versionMode === "exclude" ? dictionary.versionExcludeHint : dictionary.versionIncludeHint}
+          >
+            <AllChip active={versionSet.size === 0} onClick={clearVersionFilter}>
               {dictionary.filterAll}
             </AllChip>
             {versionOptions.map((option) => {
@@ -1283,6 +1332,11 @@ export function CatalogBrowser({
                 <ToggleChip
                   key={option.id}
                   active={versionSet.has(option.id)}
+                  tone={
+                    versionMode === "exclude" && versionSet.has(option.id)
+                      ? "border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                      : undefined
+                  }
                   disabled={isChipDisabled(
                     "version",
                     option.id,
@@ -1291,12 +1345,13 @@ export function CatalogBrowser({
                   onClick={() => toggleVersion(option.id)}
                   className="px-2 py-1"
                   count={chipCount("version", option.id)}
-                  ariaLabel={dictionary.chipCountLabel(
+                  ariaLabel={(versionMode === "exclude" ? dictionary.excludedVersionCountLabel : dictionary.chipCountLabel)(
                     option.label,
                     chipCount("version", option.id)
                   )}
-                  title={option.label}
+                  title={versionMode === "exclude" ? dictionary.excludedVersionLabel(option.label) : option.label}
                 >
+                  {versionMode === "exclude" && versionSet.has(option.id) ? <BanIcon className="size-3.5 shrink-0" aria-hidden="true" /> : null}
                   {iconSources ? (
                     <CompatibleImage
                       sources={iconSources}
@@ -1535,11 +1590,12 @@ export function CatalogBrowser({
               unknownVersionLabel;
             const iconSources =
               imageIndex !== null ? versionImageSourcesByIndex(imageIndex) : null;
+            const filterLabel = versionMode === "exclude" ? dictionary.excludedVersionLabel(label) : label;
             return (
               <FilterChip
                 key={`v-${id}`}
                 onRemove={() => toggleVersion(id)}
-                removeLabel={dictionary.removeFilter(label)}
+                removeLabel={dictionary.removeFilter(filterLabel)}
                 icon={
                   iconSources ? (
                     <CompatibleImage
@@ -1552,7 +1608,7 @@ export function CatalogBrowser({
                   ) : undefined
                 }
               >
-                {versionShortName(label)}
+                {versionMode === "exclude" ? dictionary.excludedVersionLabel(versionShortName(label)) : versionShortName(label)}
               </FilterChip>
             );
           })}
@@ -1939,7 +1995,12 @@ export function CatalogBrowser({
 // long dimension like version stays a single compact line. Scrollbar hidden.
 // A motion row so the advanced panel's open stagger cascades through it (the
 // variants are inherited from the panel — no own animate prop).
-function ChipFilterRow({ label, children }: { label: string; children: React.ReactNode }) {
+function ChipFilterRow({ label, children, controls, hint }: {
+  label: string;
+  children: React.ReactNode;
+  controls?: React.ReactNode;
+  hint?: string;
+}) {
   // Without the group + aria-labelledby tie, a screen reader walking the panel
   // hears six identical "全部, toggle button" rows with nothing saying which
   // dimension each belongs to.
@@ -1954,21 +2015,25 @@ function ChipFilterRow({ label, children }: { label: string; children: React.Rea
       variants={filterRowVariants}
       role="group"
       aria-labelledby={labelId}
-      className="flex items-center gap-x-2"
+      className="flex flex-col gap-1"
     >
-      <span
-        id={labelId}
-        className="w-12 shrink-0 text-xs font-medium text-muted-foreground"
-      >
-        {label}
-      </span>
-      {/* overflow-x also clips overflow-y, so pad vertically (and a touch right)
-          to give the selected chip's ring room instead of shearing its edge. */}
-      <div
-        ref={scrollRef}
-        className="flex min-w-0 flex-1 gap-2 overflow-x-auto py-1.5 pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&_button:not(:disabled)]:cursor-[inherit]"
-      >
-        {children}
+      {controls ? <div className="ml-14 flex flex-wrap items-center gap-2">{controls}</div> : null}
+      {hint ? <p className="ml-14 text-xs text-muted-foreground">{hint}</p> : null}
+      <div className="flex items-center gap-x-2">
+        <span
+          id={labelId}
+          className="w-12 shrink-0 text-xs font-medium text-muted-foreground"
+        >
+          {label}
+        </span>
+        {/* overflow-x also clips overflow-y, so pad vertically (and a touch right)
+            to give the selected chip's ring room instead of shearing its edge. */}
+        <div
+          ref={scrollRef}
+          className="flex min-w-0 flex-1 gap-2 overflow-x-auto py-1.5 pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&_button:not(:disabled)]:cursor-[inherit]"
+        >
+          {children}
+        </div>
       </div>
     </motion.div>
   );

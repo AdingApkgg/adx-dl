@@ -215,6 +215,13 @@ export type SiteDictionary = {
     advancedFilters: string;
     filterAll: string;
     filterVersion: string;
+    versionModeLabel: string;
+    versionModeInclude: string;
+    versionModeExclude: string;
+    versionIncludeHint: string;
+    versionExcludeHint: string;
+    excludedVersionLabel: (label: string) => string;
+    excludedVersionCountLabel: (label: string, count: number) => string;
     filterDan: string;
     danRegion: string;
     danHint: string;
@@ -1012,6 +1019,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       advancedFilters: "高级筛选",
       filterAll: "全部",
       filterVersion: "版本",
+      versionModeLabel: "版本筛选方式",
+      versionModeInclude: "仅看所选",
+      versionModeExclude: "排除所选",
+      versionIncludeHint: "显示选中的版本；切换到排除可反选范围。",
+      versionExcludeHint: "隐藏选中的版本；数字为该版本匹配的谱面数。点「全部」恢复。",
+      excludedVersionLabel: (label) => `排除：${label}`,
+      excludedVersionCountLabel: (label, count) => `排除 ${label}（${count} 首）`,
       filterDan: "段位",
       danRegion: "国服",
       danHint: "每段固定 4 个谱面，按官方顺序列出；下载包含各曲目的全部难度。",
@@ -1793,6 +1807,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       advancedFilters: "Advanced filters",
       filterAll: "All",
       filterVersion: "Version",
+      versionModeLabel: "Version filter mode",
+      versionModeInclude: "Only selected",
+      versionModeExclude: "Exclude selected",
+      versionIncludeHint: "Show selected versions. Switch to exclusion to invert the filter.",
+      versionExcludeHint: "Hide selected versions. Numbers count matching charts in each version. Choose All to reset.",
+      excludedVersionLabel: (label) => `Exclude: ${label}`,
+      excludedVersionCountLabel: (label, count) => `Exclude ${label} (${count} ${count === 1 ? "chart" : "charts"})`,
       filterDan: "Dan course",
       danRegion: "China",
       danHint: "Each course has 4 fixed charts in official order. Downloads include all difficulties of each song.",
@@ -2609,6 +2630,13 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       advancedFilters: "詳細フィルター",
       filterAll: "すべて",
       filterVersion: "バージョン",
+      versionModeLabel: "バージョンの絞り込み方法",
+      versionModeInclude: "選択のみ",
+      versionModeExclude: "選択を除外",
+      versionIncludeHint: "選択したバージョンを表示します。除外に切り替えると絞り込みを反転できます。",
+      versionExcludeHint: "選択したバージョンを非表示にします。数字は各バージョンで条件に合う譜面数です。「すべて」で解除。",
+      excludedVersionLabel: (label) => `除外：${label}`,
+      excludedVersionCountLabel: (label, count) => `${label} を除外（${count} 譜面）`,
       filterDan: "段位",
       danRegion: "中国版",
       danHint: "各段位の固定4譜面を公式の曲順で表示します。ダウンロードには各楽曲の全難易度が含まれます。",
