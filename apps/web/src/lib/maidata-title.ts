@@ -1,21 +1,16 @@
 /**
  * Pack-time `maidata.txt` normalization: kind markers become spaced title
- * suffixes, and — by device-local preference — community aliases ride along in
- * the title while decimal chart constants collapse to display levels.
+ * prefixes, and device-local preferences add aliases and display levels.
  *
- * AstroDX's level list shows nothing but `&title`, so a song's standard and DX
- * charts — whose titles are identical upstream — are indistinguishable in-game
- * once both are installed. Standard charts get a ` [SD]` suffix, mirroring
- * SimaiHub's convention ("SD" is the ecosystem's abbreviation — diving-fish's
- * `type` field, prober bots, SimaiHub filenames — and since 2026-08 the
- * catalog's `cabinet` value too); DX charts stay unmarked. UTAGE titles come
- * with a `[X]` kanji PREFIX upstream — that marker moves to the end
- * ("[即]ジングルベル" → "ジングルベル [即]") so every marker sits in the same
- * place and the list alphabetizes by the actual song name.
+ * AstroDX's level list shows only `&title`. Prefixing standard charts with
+ * `[SD] ` distinguishes them from same-named DX charts even when long titles
+ * are clipped. DX charts stay unmarked. UTAGE keeps its upstream bracket
+ * marker at the front with a space ("[即]ジングルベル" → "[即] ジングルベル").
+ * Previously packed suffix markers are moved to the front on a new pass.
  *
  * Two settings extend that output (see `useDownloadsStore`, both defaulting to
  * today's behaviour): `aliasesByShortId` appends the chart's community
- * nicknames after the kind marker — "ジングルベル [SD] (圣诞歌/铃儿响叮当)" —
+ * nicknames after the song title — "[SD] ジングルベル (圣诞歌/铃儿响叮当)" —
  * so a chart can be found by alias inside AstroDX's search; `preciseLevels:
  * false` rewrites `&lv_N=13.7` to the display level `13+`, grouped exactly the
  * way the site's level filter groups constants.
@@ -57,18 +52,20 @@ function markTitle(title: string, id: number): string {
     return title; // DX stays unmarked by ruling.
   }
   if (id >= UTAGE_SHORT_ID_MIN) {
-    // "[即]ジングルベル" → "ジングルベル [即]". A title without the bracket
-    // prefix (or with nothing after it) is left alone; a moved marker leaves
-    // no leading bracket behind, so a second pass is naturally a no-op.
-    const moved = /^\[([^\]]+)\]\s*(\S.*)$/.exec(title);
-    return moved ? `${moved[2]!.trimEnd()} [${moved[1]!}]` : title;
+    const prefixed = /^\[([^\]]+)\]\s*(\S.*)$/.exec(title);
+    if (prefixed) {
+      return `[${prefixed[1]!}] ${prefixed[2]!}`;
+    }
+    const suffixed = /^(\S.*)\s+\[([^\]]+)\]$/.exec(title);
+    return suffixed ? `[${suffixed[2]!}] ${suffixed[1]!.trimEnd()}` : title;
   }
-  return title.endsWith("[SD]") ? title : `${title} [SD]`;
+  const bare = title.replace(/^\[SD\]\s*/, "").replace(/\s+\[SD\]$/, "");
+  return bare === "" ? title : `[SD] ${bare}`;
 }
 
 /**
  * Returns the maidata text with the title tagged (and, given `aliases`, the
- * alias tail appended after the marker), or the input string itself (`===`)
+ * alias tail appended after the song title), or the input string itself (`===`)
  * when there is nothing to do — callers use the identity to skip rebuilding
  * the Blob.
  */

@@ -25,12 +25,12 @@ function maidata(shortid: string, title = "ジングルベル"): string {
 }
 
 describe("tagMaidataTitle", () => {
-  test("appends [SD] to a standard chart's title", () => {
+  test("prefixes [SD] to a standard chart's title", () => {
     const tagged = tagMaidataTitle(maidata("70"));
 
-    expect(tagged).toContain("&title=ジングルベル [SD]\r\n");
+    expect(tagged).toContain("&title=[SD] ジングルベル\r\n");
     // Only the title line changes; everything else must be byte-identical.
-    expect(tagged.replace("ジングルベル [SD]", "ジングルベル")).toBe(maidata("70"));
+    expect(tagged.replace("[SD] ジングルベル", "ジングルベル")).toBe(maidata("70"));
   });
 
   test("returns the input string itself for a DX chart", () => {
@@ -39,12 +39,12 @@ describe("tagMaidataTitle", () => {
     expect(tagMaidataTitle(text)).toBe(text);
   });
 
-  test("moves an UTAGE chart's kanji prefix to a spaced suffix", () => {
+  test("keeps an UTAGE chart's kanji marker at the front with a space", () => {
     const tagged = tagMaidataTitle(maidata("100070", "[即]ジングルベル"));
 
-    expect(tagged).toContain("&title=ジングルベル [即]\r\n");
+    expect(tagged).toContain("&title=[即] ジングルベル\r\n");
     // Only the title line changes; everything else must be byte-identical.
-    expect(tagged.replace("ジングルベル [即]", "[即]ジングルベル")).toBe(
+    expect(tagged.replace("[即] ジングルベル", "[即]ジングルベル")).toBe(
       maidata("100070", "[即]ジングルベル")
     );
   });
@@ -75,6 +75,21 @@ describe("tagMaidataTitle", () => {
     expect(tagMaidataTitle(utage)).toBe(utage);
   });
 
+  test("moves legacy suffix markers to the front without duplicating them", () => {
+    expect(tagMaidataTitle(maidata("70", "Song [SD]"))).toBe(maidata("70", "[SD] Song"));
+    expect(tagMaidataTitle(maidata("100070", "Song [即]"))).toBe(maidata("100070", "[即] Song"));
+    expect(tagMaidataTitle(maidata("70", "[SD]Song"))).toBe(maidata("70", "[SD] Song"));
+    expect(tagMaidataTitle(maidata("70", "[SD] Song"))).toBe(maidata("70", "[SD] Song"));
+  });
+
+  test("moves legacy markers before the title while preserving the alias tail", () => {
+    for (const [id, marker] of [["70", "SD"], ["100070", "宴"]]) {
+      const tagged = tagMaidataTitle(maidata(id!, `Song [${marker}] (别名)`), ["别名"]);
+      expect(tagged).toBe(maidata(id!, `[${marker}] Song (别名)`));
+      expect(tagMaidataTitle(tagged, ["别名"])).toBe(tagged);
+    }
+  });
+
   test("leaves an empty title alone", () => {
     const text = maidata("70", "");
 
@@ -85,20 +100,20 @@ describe("tagMaidataTitle", () => {
     const text = `﻿${maidata("70")}`;
     const tagged = tagMaidataTitle(text);
 
-    expect(tagged.startsWith("﻿&title=ジングルベル [SD]")).toBe(true);
+    expect(tagged.startsWith("﻿&title=[SD] ジングルベル")).toBe(true);
   });
 
   test("works with LF line endings too", () => {
     const tagged = tagMaidataTitle("&title=Song\n&shortid=70\n&inote_2=E\n");
 
-    expect(tagged).toBe("&title=Song [SD]\n&shortid=70\n&inote_2=E\n");
+    expect(tagged).toBe("&title=[SD] Song\n&shortid=70\n&inote_2=E\n");
   });
 
   test("only rewrites the first &title line", () => {
     const text = "&title=Song\r\n&shortid=70\r\n&inote_2=E\r\n&title=Song\r\n";
 
     expect(tagMaidataTitle(text)).toBe(
-      "&title=Song [SD]\r\n&shortid=70\r\n&inote_2=E\r\n&title=Song\r\n"
+      "&title=[SD] Song\r\n&shortid=70\r\n&inote_2=E\r\n&title=Song\r\n"
     );
   });
 });
@@ -120,8 +135,8 @@ describe("packMaidataInputs", () => {
     ];
     const result = await packMaidataInputs(inputs);
 
-    expect(await result[0]?.blob.text()).toContain("&title=ジングルベル [SD]\r\n");
-    expect(await result[1]?.blob.text()).toContain("&title=Link [SD]\r\n");
+    expect(await result[0]?.blob.text()).toContain("&title=[SD] ジングルベル\r\n");
+    expect(await result[1]?.blob.text()).toContain("&title=[SD] Link\r\n");
     // Non-maidata blobs keep their identity — no decode/re-encode round trip.
     expect(result[2]?.blob).toBe(inputs[2]!.blob);
   });
@@ -157,7 +172,7 @@ describe("packMaidataInputs", () => {
       preciseLevels: false,
     });
 
-    expect(await result[0]?.blob.text()).toContain("&title=ジングルベル [SD] (铃儿响叮当)\r\n");
+    expect(await result[0]?.blob.text()).toContain("&title=[SD] ジングルベル (铃儿响叮当)\r\n");
     expect(await result[0]?.blob.text()).toContain("&lv_2=6\r\n");
     expect(await result[1]?.blob.text()).toContain("&title=Link (链接)\r\n");
   });
@@ -171,11 +186,11 @@ describe("packMaidataInputs", () => {
 });
 
 describe("tagMaidataTitle with aliases", () => {
-  test("appends the aliases in parentheses after the kind marker", () => {
+  test("appends the aliases in parentheses after the song title", () => {
     const tagged = tagMaidataTitle(maidata("70"), ["铃儿响叮当", "jingle"]);
 
-    expect(tagged).toContain("&title=ジングルベル [SD] (铃儿响叮当/jingle)\r\n");
-    expect(tagged.replace("ジングルベル [SD] (铃儿响叮当/jingle)", "ジングルベル")).toBe(
+    expect(tagged).toContain("&title=[SD] ジングルベル (铃儿响叮当/jingle)\r\n");
+    expect(tagged.replace("[SD] ジングルベル (铃儿响叮当/jingle)", "ジングルベル")).toBe(
       maidata("70")
     );
   });
@@ -186,9 +201,9 @@ describe("tagMaidataTitle with aliases", () => {
     );
   });
 
-  test("puts the aliases after a moved UTAGE marker", () => {
+  test("puts the aliases after an UTAGE song title", () => {
     expect(tagMaidataTitle(maidata("100070", "[即]ジングルベル"), ["铃儿响叮当"])).toContain(
-      "&title=ジングルベル [即] (铃儿响叮当)\r\n"
+      "&title=[即] ジングルベル (铃儿响叮当)\r\n"
     );
   });
 
@@ -260,7 +275,7 @@ describe("packMaidata", () => {
       preciseLevels: false,
     });
 
-    expect(packed).toContain("&title=ジングルベル [SD] (铃儿响叮当)\r\n");
+    expect(packed).toContain("&title=[SD] ジングルベル (铃儿响叮当)\r\n");
     expect(packed).toContain("&lv_2=6\r\n");
     expect(packed).not.toContain("wrong chart");
   });

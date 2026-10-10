@@ -1088,8 +1088,8 @@ export const useDownloadsStore = create<DownloadsState>((set, get) => {
         return;
       }
 
-      // Normalize `&title` kind markers into spaced suffixes (" [SD]", utage
-      // "[即]…" → "… [即]") so same-named charts stay tellable apart in
+      // Normalize `&title` kind markers into spaced prefixes ("[SD] ", utage
+      // "[即]…" → "[即] …") so same-named charts stay tellable apart in
       // AstroDX's level list, and apply the device-local maidata options (alias
       // tail, display-level constants). Pack-time only: the checkpoints
       // persisted above and the served files keep the original.

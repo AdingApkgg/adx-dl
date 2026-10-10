@@ -1106,7 +1106,7 @@ describe("downloads-store", () => {
     // archive names. (Pack-time-only is covered by maidata-title.test.ts's
     // blob-identity cases; a successful job deletes its checkpoints, so there
     // is nothing persisted left to compare here.)
-    expect(unpacked["000070 st-jingle.adx"]).toContain("&title=ジングルベル [SD]\r\n");
+    expect(unpacked["000070 st-jingle.adx"]).toContain("&title=[SD] ジングルベル\r\n");
     expect(unpacked["010070 dx-jingle.adx"]).toBe(dxMaidata);
     // With aliases off (the default) the manifest is never even requested.
     expect(fetchedUrls).not.toContain("/charts/aliases.json");
@@ -1152,7 +1152,7 @@ describe("downloads-store", () => {
     const entries = unzipSync(new Uint8Array(await savedBlobs[0]!.arrayBuffer()));
     const maidata = Object.entries(entries).find(([path]) => path.endsWith("maidata.txt"));
     const packed = new TextDecoder().decode(maidata![1]);
-    expect(packed).toContain("&title=ジングルベル [SD] (圣诞歌/铃儿响叮当)\r\n");
+    expect(packed).toContain("&title=[SD] ジングルベル (圣诞歌/铃儿响叮当)\r\n");
     expect(packed).toContain("&lv_5=14+\r\n");
     expect(fetchedUrls).toContain("/charts/aliases.json");
   });
@@ -1199,7 +1199,7 @@ describe("downloads-store", () => {
     const entries = unzipSync(new Uint8Array(await savedBlobs[0]!.arrayBuffer()));
     const maidata = Object.entries(entries).find(([path]) => path.endsWith("maidata.txt"));
     const packed = new TextDecoder().decode(maidata![1]);
-    expect(packed).toContain("&title=ジングルベル [SD]\r\n");
+    expect(packed).toContain("&title=[SD] ジングルベル\r\n");
     // Constants stay precise by default even though the alias switch is on.
     expect(packed).toContain("&lv_5=14.4\r\n");
   });
