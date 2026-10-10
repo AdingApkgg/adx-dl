@@ -518,24 +518,27 @@ test("real PG: stalled COMMIT transport phase cannot continue after timeout", as
     connect = pool.connect;
   const listeners = pool.listeners("error"),
     errors: string[] = [];
-  pool.removeAllListeners("error");
-  pool.on("error", (error) => {
-    errors.push((error as Error & { code: string }).code);
-  });
   let release!: () => void, clientQuery: import("pg").PoolClient["query"] | undefined;
   const barrier = new Promise<void>((r) => (release = r));
-  pool.connect = (async () => {
-    const client = await Reflect.apply(connect, pool, []),
-      query = client.query;
-    clientQuery = query;
-    client.query = (async (...args: unknown[]) => {
-      const text = typeof args[0] === "string" ? args[0] : (args[0] as { text: string }).text;
-      if (text === "commit") await barrier;
-      return Reflect.apply(query, client, args);
-    }) as typeof client.query;
-    return client;
-  }) as typeof pool.connect;
+  let failed = false,
+    failure: unknown;
+  const cleanupErrors: unknown[] = [];
   try {
+    pool.removeAllListeners("error");
+    pool.on("error", (error) => {
+      errors.push((error as Error & { code: string }).code);
+    });
+    pool.connect = (async () => {
+      const client = await Reflect.apply(connect, pool, []),
+        query = client.query;
+      clientQuery = query;
+      client.query = (async (...args: unknown[]) => {
+        const text = typeof args[0] === "string" ? args[0] : (args[0] as { text: string }).text;
+        if (text === "commit") await barrier;
+        return Reflect.apply(query, client, args);
+      }) as typeof client.query;
+      return client;
+    }) as typeof pool.connect;
     await expect(
       withPurgeTransaction(ctx.db, realBudget(100), async (tx) => {
         await tx
@@ -545,19 +548,42 @@ test("real PG: stalled COMMIT transport phase cannot continue after timeout", as
       }),
     ).rejects.toMatchObject({ code: "MEDIA_ATTEMPT_DEADLINE" });
     expect(clientQuery).toBeDefined();
-  } finally {
     pool.connect = connect;
     release();
-  }
-  try {
     expect((await outbox(data.hash)).lastErrorCode).toBeNull();
     expect(errors.length).toBeLessThanOrEqual(1);
     expect(errors.every((code) => code === "25P04")).toBe(true);
+  } catch (error) {
+    failed = true;
+    failure = error;
   } finally {
-    pool.removeAllListeners("error");
-    for (const listener of listeners)
-      pool.on("error", listener as (error: Error, client: import("pg").PoolClient) => void);
+    // Attempt every restoration even if one cleanup step fails; preserve assertion errors.
+    for (const restore of [
+      () => {
+        pool.connect = connect;
+      },
+      release,
+      () => {
+        pool.removeAllListeners("error");
+      },
+      ...listeners.map((listener) => () => {
+        pool.on("error", listener as (error: Error, client: import("pg").PoolClient) => void);
+      }),
+    ]) {
+      try {
+        restore();
+      } catch (error) {
+        cleanupErrors.push(error);
+      }
+    }
   }
+  if (cleanupErrors.length)
+    throw new AggregateError(
+      failed ? [failure, ...cleanupErrors] : cleanupErrors,
+      "stalled COMMIT fixture cleanup failed",
+      failed ? { cause: failure } : undefined,
+    );
+  if (failed) throw failure;
 });
 test("real PG: pool acquisition is bounded and a late acquired client is discarded", async () => {
   const { createDb } = await import("@/server/db/client");
