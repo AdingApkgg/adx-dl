@@ -1,10 +1,13 @@
 import { Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { HTTPException } from "hono/http-exception";
 import { requestId } from "hono/request-id";
 
 import { describeError } from "@/shared/describe-error";
 import type { Logger } from "@/shared/log";
 
+import { isUploadPartRequest } from "./storage/parts";
+import { StorageError } from "./storage/errors";
 import { apiRoutes } from "./api/v1";
 import type { AppEnv } from "./app-env";
 import type { Auth } from "./auth/auth";
@@ -15,7 +18,7 @@ import { bodyLimitWhenDeclared } from "./middleware/body-limit";
 import { clientIp, rateLimitKeyForIp } from "./middleware/client-ip";
 import { csrfGuard } from "./middleware/csrf";
 import { pendingDeletionGuard } from "./middleware/pending-deletion";
-import { rateLimit, type RateLimitStore } from "./middleware/rate-limit";
+import { rateLimit, uploadRateLimits, type RateLimitStore } from "./middleware/rate-limit";
 import { requestLog } from "./middleware/request-log";
 import { securityHeaders } from "./middleware/security-headers";
 import { umamiProxy } from "./middleware/umami";
@@ -174,13 +177,15 @@ export function createApp(deps: AppDeps) {
   });
   app.use("/api/v1/*", csrfGuard({ publicOrigin: deps.publicOrigin }));
   // JSON 校验器会先把整个请求体读进内存、解析完，才轮到各接口自己的规则，所以大小要在这里先限住。
-  app.use(
-    "/api/v1/*",
-    bodyLimitWhenDeclared({
-      maxSize: API_BODY_LIMIT,
-      onError: (c) => jsonError(c, 413, "PAYLOAD_TOO_LARGE", "Request body is too large"),
-    })
-  );
+  const jsonBodyLimit = bodyLimitWhenDeclared({
+    maxSize: API_BODY_LIMIT,
+    onError: (c) => jsonError(c, 413, "PAYLOAD_TOO_LARGE", "Request body is too large"),
+  });
+  app.use("/api/v1/*", async (c, next) => {
+    // Exact parts read their bounded stream after authentication and concurrency admission.
+    if (isUploadPartRequest(c.req.method, c.req.path)) return next();
+    return jsonBodyLimit(c, next);
+  });
   // spec 第 10.2 节：改数据的接口按用户每分钟 60 次。读请求和未登录的请求不算。
   app.use(
     "/api/v1/*",
@@ -189,10 +194,17 @@ export function createApp(deps: AppDeps) {
       name: "api-user-write",
       limit: 60,
       windowSec: 60,
-      key: (c) => (READ_METHODS.has(c.req.method) ? null : (c.get("auth")?.user.id ?? null)),
+      key: (c) =>
+        READ_METHODS.has(c.req.method) || isUploadPartRequest(c.req.method, c.req.path)
+          ? null
+          : (c.get("auth")?.user.id ?? null),
       onStoreError: onRateLimitStoreError,
     })
   );
+  for (const middleware of uploadRateLimits({
+    store: deps.rateLimitStore,
+    onStoreError: onRateLimitStoreError,
+  })) app.use("/api/v1/*", middleware);
   // spec 第 10.6 节：注销冷静期里除了几个接口，一律 403 ACCOUNT_PENDING_DELETION。
   app.use("/api/v1/*", pendingDeletionGuard());
   app.route("/", apiRoutes);
@@ -201,6 +213,10 @@ export function createApp(deps: AppDeps) {
   app.all("/api/*", (c) => jsonError(c, 404, "NOT_FOUND", "Not found"));
 
   app.onError((error, c) => {
+    if (error instanceof StorageError) {
+      if (error.retryAfter) c.header("Retry-After", String(error.retryAfter));
+      return jsonError(c, error.status as ContentfulStatusCode, error.code, error.message);
+    }
     if (error instanceof HTTPException) {
       return jsonError(c, error.status, codeForStatus(error.status), error.message || "Request failed");
     }

@@ -1,5 +1,8 @@
 import type { Context, Env, MiddlewareHandler } from "hono";
 
+import type { AppEnv } from "../app-env";
+import { isUploadPartRequest } from "../storage/parts";
+import { rateLimitKeyForIp } from "./client-ip";
 import { jsonError } from "../errors";
 import { withTimeout } from "../with-timeout";
 
@@ -78,7 +81,10 @@ export function rateLimit<E extends Env>(options: RateLimitOptions<E>): Middlewa
 
     let hit: RateLimitHit;
     try {
-      hit = await withTimeout(options.store.hit(`rl:${options.name}:${id}`, options.windowSec), STORE_TIMEOUT_MS);
+      hit = await withTimeout(
+        options.store.hit(`rl:${options.name}:${id}`, options.windowSec),
+        STORE_TIMEOUT_MS,
+      );
     } catch (error) {
       options.onStoreError?.(error);
       await next();
@@ -91,4 +97,36 @@ export function rateLimit<E extends Env>(options: RateLimitOptions<E>): Middlewa
     }
     await next();
   };
+}
+
+/** Upload traffic has independent counters; PostgreSQL remains quota authority. */
+export function uploadRateLimits(
+  options: Pick<RateLimitOptions<AppEnv>, "store" | "onStoreError">,
+): MiddlewareHandler<AppEnv>[] {
+  const isInit = (c: Context<AppEnv>) =>
+    c.req.method === "POST" && c.req.path === "/api/v1/uploads";
+  return [
+    rateLimit<AppEnv>({
+      ...options,
+      name: "upload-parts-user",
+      limit: 120,
+      windowSec: 60,
+      key: (c) =>
+        isUploadPartRequest(c.req.method, c.req.path) ? (c.get("auth")?.user.id ?? null) : null,
+    }),
+    rateLimit<AppEnv>({
+      ...options,
+      name: "upload-init-user",
+      limit: 10,
+      windowSec: 3600,
+      key: (c) => (isInit(c) ? (c.get("auth")?.user.id ?? null) : null),
+    }),
+    rateLimit<AppEnv>({
+      ...options,
+      name: "upload-init-ip",
+      limit: 60,
+      windowSec: 3600,
+      key: (c) => (isInit(c) ? rateLimitKeyForIp(c.get("clientIp")) : null),
+    }),
+  ];
 }

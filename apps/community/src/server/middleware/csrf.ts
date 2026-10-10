@@ -1,5 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 
+import { isUploadPartRequest } from "../storage/parts";
 import { jsonError } from "../errors";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -18,8 +19,18 @@ export function csrfGuard({ publicOrigin }: { publicOrigin: string }): Middlewar
     }
 
     const contentType = c.req.header("content-type") ?? "";
-    if (!/^application\/json(\s*;|$)/i.test(contentType)) {
-      return jsonError(c, 415, "UNSUPPORTED_MEDIA_TYPE", "State-changing requests must send application/json");
+    const accepted = isUploadPartRequest(c.req.method, c.req.path)
+      ? /^application\/octet-stream(\s*;|$)/i
+      : /^application\/json(\s*;|$)/i;
+    if (!accepted.test(contentType)) {
+      return jsonError(
+        c,
+        415,
+        "UNSUPPORTED_MEDIA_TYPE",
+        isUploadPartRequest(c.req.method, c.req.path)
+          ? "Parts require application/octet-stream"
+          : "State-changing requests must send application/json",
+      );
     }
     if (c.req.header("origin") !== publicOrigin) {
       return jsonError(c, 403, "CSRF_ORIGIN_MISMATCH", "Origin does not match this site");
