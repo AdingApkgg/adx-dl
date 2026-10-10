@@ -376,5 +376,8 @@ describe("page views locale-driven content", () => {
     expect(html).toContain(detail.chartPreview);
     expect(html).toContain(detail.chartPreviewDescription);
     expect(html).toContain('href="/preview/song-1"');
+    expect(html).toContain(detail.chartConfirm);
+    expect(html).toContain('href="https://search.bilibili.com/video?keyword=%E6%9B%B2%E7%9B%AE%201%20maimai%20%E6%89%8B%E5%85%83"');
+    expect(html).toContain('rel="noopener noreferrer"');
   });
 });

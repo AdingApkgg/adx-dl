@@ -6,6 +6,7 @@ import {
   FilmIcon,
   MessageCircleIcon,
   PlayCircleIcon,
+  SearchIcon,
   Share2Icon,
 } from "lucide-react";
 
@@ -141,18 +142,21 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
       <TooltipProvider>
         <div className="flex flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-3" role="group" aria-label={detail.actionsLabel}>
-            {/* The preview is the one action worth a full-width button: it was
-                a 40px Maximize2 icon, which everyone reads as "enlarge the
-                cover", behind a Radix tooltip that bails out on touch
-                pointers — i.e. an unlabelled square on every phone. */}
+            {/* Visible labels keep preview and gameplay search discoverable on touch screens. */}
             {hasChartPreview ? (
-              <Button variant="secondary" asChild>
+              <Button variant="secondary" className="min-h-11" asChild>
                 <Link href={buildPreviewHref(entry, locale)}>
                   <PlayCircleIcon data-icon="inline-start" aria-hidden="true" />
                   {detail.chartPreview}
                 </Link>
               </Button>
             ) : null}
+            <Button variant="outline" className="min-h-11" asChild>
+              <a href={`https://search.bilibili.com/video?keyword=${encodeURIComponent(`${entry.title} maimai 手元`)}`} target="_blank" rel="noopener noreferrer" title={detail.chartConfirmHint}>
+                <SearchIcon data-icon="inline-start" aria-hidden="true" />
+                {detail.chartConfirm}
+              </a>
+            </Button>
             {hasMedia ? (
               <ActionIconButton
                 label={mediaLabel}

@@ -352,6 +352,8 @@ export type SiteDictionary = {
     actionsLabel: string;
     chartPreview: string;
     chartPreviewDescription: string;
+    chartConfirm: string;
+    chartConfirmHint: string;
     /** Opens the preview already switched to one difficulty (from the table). */
     chartPreviewAt: (difficulty: string) => string;
     pvLabel: string;
@@ -1137,6 +1139,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       actionsLabel: "谱面操作",
       chartPreview: "谱面预览",
       chartPreviewDescription: "在浏览器中播放谱面，与音频同步。",
+      chartConfirm: "谱面确认",
+      chartConfirmHint: "在哔哩哔哩搜索游玩手元视频（新标签页）",
       chartPreviewAt: (difficulty) => `预览 ${difficulty} 难度`,
       pvLabel: "PV 影像",
       audioLabel: "音频试听",
@@ -1933,6 +1937,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       actionsLabel: "Chart actions",
       chartPreview: "Chart preview",
       chartPreviewDescription: "Play the chart in your browser, synced to the audio.",
+      chartConfirm: "Chart gameplay",
+      chartConfirmHint: "Search gameplay videos on bilibili (new tab)",
       chartPreviewAt: (difficulty) => `Preview the ${difficulty} chart`,
       pvLabel: "Promotion Video (PV)",
       audioLabel: "Audio preview",
@@ -2748,6 +2754,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       actionsLabel: "譜面の操作",
       chartPreview: "譜面プレビュー",
       chartPreviewDescription: "ブラウザで譜面を音源と同期して再生します。",
+      chartConfirm: "譜面確認",
+      chartConfirmHint: "bilibiliで手元プレイ動画を検索（新しいタブ）",
       chartPreviewAt: (difficulty) => `${difficulty} をプレビュー`,
       pvLabel: "PV 映像",
       audioLabel: "音源試聴",
