@@ -13,6 +13,7 @@ export type IndexNowCatalogEntry = {
   id: string;
   slug?: string | null;
   imported_at?: string | null;
+  files?: { maidata?: string | null };
 };
 
 const staticPaths = [
@@ -56,12 +57,14 @@ function joinUrl(siteUrl: string, pathname: string): string {
   return pathname === "/" ? `${normalizedSiteUrl}/` : `${normalizedSiteUrl}${pathname}`;
 }
 
-export function buildIndexNowUrlList(siteUrl: string, slugs: string[]): string[] {
+export function buildIndexNowUrlList(siteUrl: string, slugs: string[], previewSlugs: string[] = []): string[] {
   const uniqueSlugs = Array.from(new Set(slugs));
+  const uniquePreviewSlugs = Array.from(new Set(previewSlugs));
 
   const defaultUrls = [
     ...staticPaths.map((pathname) => joinUrl(siteUrl, pathname)),
     ...uniqueSlugs.map((slug) => joinUrl(siteUrl, `/charts/${encodeURIComponent(slug)}`)),
+    ...uniquePreviewSlugs.map((slug) => joinUrl(siteUrl, `/preview/${encodeURIComponent(slug)}`)),
   ];
 
   const localizedUrls = prefixedLocales.flatMap((locale) => [
@@ -69,9 +72,22 @@ export function buildIndexNowUrlList(siteUrl: string, slugs: string[]): string[]
       joinUrl(siteUrl, pathname === "/" ? `/${locale}` : `/${locale}${pathname}`)
     ),
     ...uniqueSlugs.map((slug) => joinUrl(siteUrl, `/${locale}/charts/${encodeURIComponent(slug)}`)),
+    ...uniquePreviewSlugs.map((slug) => joinUrl(siteUrl, `/${locale}/preview/${encodeURIComponent(slug)}`)),
   ]);
 
   return [...defaultUrls, ...localizedUrls];
+}
+
+export function selectIndexNowPreviewSlugs(entries: IndexNowCatalogEntry[], changedSlugs: string[], frontendChanged: boolean): string[] {
+  const changed = new Set(changedSlugs);
+  return entries.filter((entry) => Boolean(entry.files?.maidata) && (frontendChanged || changed.has(entrySlug(entry)))).map(entrySlug);
+}
+
+/** IndexNow accepts at most 10000 URLs per POST. */
+export function chunkIndexNowUrls(urls: string[]): string[][] {
+  const chunks: string[][] = [];
+  for (let offset = 0; offset < urls.length; offset += 10000) chunks.push(urls.slice(offset, offset + 10000));
+  return chunks;
 }
 
 // Which entries changed between two catalog builds. An entry needs re-submitting
@@ -100,7 +116,8 @@ export function diffChangedSlugs(
     const isChanged =
       !previous ||
       entrySlug(previous) !== slug ||
-      (previous.imported_at ?? null) !== (entry.imported_at ?? null);
+      (previous.imported_at ?? null) !== (entry.imported_at ?? null) ||
+      Boolean(previous.files?.maidata) !== Boolean(entry.files?.maidata);
 
     if (isChanged) {
       changedSlugs.push(slug);

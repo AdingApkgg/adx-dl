@@ -8,6 +8,8 @@ import {
   buildIndexNowUrlList,
   diffChangedSlugs,
   resolveIndexNowKey,
+  selectIndexNowPreviewSlugs,
+  chunkIndexNowUrls,
   type IndexNowCatalogEntry,
 } from "@/lib/indexnow";
 import { entrySlug } from "@/lib/route-slug";
@@ -17,8 +19,8 @@ const endpoint = process.env.INDEXNOW_ENDPOINT ?? "https://api.indexnow.org/inde
 const siteUrl = resolveSiteUrl(process.env.INDEXNOW_SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL);
 const key = resolveIndexNowKey(process.env.INDEXNOW_KEY);
 
-// The commit the live site was last built from — github.event.before in CI.
-// Absent (workflow_dispatch, a branch's first push) means we can't tell what changed.
+// The previously published pages-live commit, supplied by the deployment workflow.
+// Absent means we cannot tell what changed and must submit the full catalog.
 const baseRef = process.env.INDEXNOW_BASE_REF?.trim();
 
 const repoRoot = path.resolve(process.cwd(), "..", "..");
@@ -91,13 +93,14 @@ async function main() {
     );
     // Changed charts always ship alongside the static pages: the browse and
     // version listings re-render whenever any chart changes.
-    urlList = buildIndexNowUrlList(config.siteUrl, changedSlugs);
+    urlList = buildIndexNowUrlList(config.siteUrl, changedSlugs, selectIndexNowPreviewSlugs(entries, changedSlugs, frontendChanged));
   } else {
     // Submitting all ~1600 charts is exactly the "batch mode" Bing Webmaster Tools
     // warns about, so it stays a fallback for when the diff base is really missing.
     urlList = buildIndexNowUrlList(
       config.siteUrl,
-      entries.map((entry) => entrySlug(entry))
+      entries.map((entry) => entrySlug(entry)),
+      selectIndexNowPreviewSlugs(entries, [], true)
     );
     console.warn(
       baseRef
@@ -106,33 +109,39 @@ async function main() {
     );
   }
 
-  const payload = buildIndexNowPayload({ siteUrl: config.siteUrl, key: config.key, urlList });
+  const batches = chunkIndexNowUrls(urlList);
+  console.log(`Submitting ${urlList.length} URLs (${urlList.filter((url) => new URL(url).pathname.includes("/preview/")).length} preview URLs) in ${batches.length} batch(es) to ${endpoint}`);
 
-  console.log(`Submitting ${payload.urlList.length} URLs to ${endpoint}`);
-  console.log(`IndexNow host: ${payload.host}`);
-  console.log(`IndexNow keyLocation: ${payload.keyLocation}`);
+  for (const [index, batch] of batches.entries()) {
+    const payload = buildIndexNowPayload({ siteUrl: config.siteUrl, key: config.key, urlList: batch });
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-    },
-    body: JSON.stringify(payload),
-  });
+    console.log(`IndexNow batch ${index + 1}/${batches.length}: ${payload.urlList.length} URLs`);
+    console.log(`IndexNow host: ${payload.host}`);
+    console.log(`IndexNow keyLocation: ${payload.keyLocation}`);
 
-  const responseText = await response.text();
-  console.log(`IndexNow response: ${response.status} ${response.statusText}`);
-  console.log(responseText);
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(60_000),
+    });
 
-  if (!response.ok) {
-    // IndexNow is a best-effort SEO ping; the site is already published, so a
-    // rejected submission must not fail the build. New sites commonly return
-    // 403 "SiteVerificationNotCompleted" until IndexNow verifies the key file —
-    // later deploys succeed once verification completes.
-    console.warn(
-      `⚠️ IndexNow did not accept the submission (status ${response.status}). ` +
-        `Non-fatal — search engines will be re-pinged on the next deploy.`
-    );
+    const responseText = await response.text();
+    console.log(`IndexNow response: ${response.status} ${response.statusText}`);
+    console.log(responseText);
+
+    if (!response.ok) {
+      // IndexNow is a best-effort SEO ping; the site is already published, so a
+      // rejected submission must not fail the build. New sites commonly return
+      // 403 "SiteVerificationNotCompleted" until IndexNow verifies the key file —
+      // later deploys succeed once verification completes.
+      console.warn(
+        `⚠️ IndexNow did not accept the submission (status ${response.status}). ` +
+          `Non-fatal — search engines will be re-pinged on the next deploy.`
+      );
+    }
   }
 }
 

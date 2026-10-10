@@ -9,9 +9,38 @@ import {
   diffChangedSlugs,
   normalizeSiteUrl,
   resolveIndexNowKey,
+  selectIndexNowPreviewSlugs,
+  chunkIndexNowUrls,
 } from "@/lib/indexnow";
 
 describe("indexnow helpers", () => {
+  test("preview URLs include three locales, deduplicate slugs and encode route segments", () => {
+    const urls = buildIndexNowUrlList("https://adxdls.saop.cc", [], ["song a", "song a"]);
+    expect(urls.filter((url) => url.includes("/preview/"))).toEqual([
+      "https://adxdls.saop.cc/preview/song%20a",
+      "https://adxdls.saop.cc/en/preview/song%20a",
+      "https://adxdls.saop.cc/ja/preview/song%20a",
+    ]);
+    expect(urls.some((url) => url.includes("?"))).toBe(false);
+  });
+
+  test("incremental preview submissions omit unchanged charts and entries without maidata", () => {
+    const entries = [{ id: "1", files: { maidata: "maidata.txt" } }, { id: "2", files: { maidata: "maidata.txt" } }, { id: "3", files: { maidata: "" } }];
+    expect(selectIndexNowPreviewSlugs(entries, ["2", "3"], false)).toEqual(["2"]);
+    expect(selectIndexNowPreviewSlugs(entries, [], true)).toEqual(["1", "2"]);
+  });
+
+  test("a newly available preview is a catalog change even without a timestamp change", () => {
+    expect(diffChangedSlugs([{ id: "1", files: { maidata: "" } }], [{ id: "1", files: { maidata: "maidata.txt" } }])).toEqual(["1"]);
+  });
+
+  test("full submissions are split at the 10000 URL protocol limit without omissions", () => {
+    const urls = Array.from({ length: 10001 }, (_, i) => `https://adxdls.saop.cc/preview/${i}`);
+    const chunks = chunkIndexNowUrls(urls);
+    expect(chunks.map((chunk) => chunk.length)).toEqual([10000, 1]);
+    expect(chunks.flat()).toEqual(urls);
+    expect(chunkIndexNowUrls([])).toEqual([]);
+  });
   test("resolveIndexNowKey falls back to the committed default when unset or blank", () => {
     const fallback = resolveIndexNowKey(undefined);
     expect(fallback).toMatch(/^[a-zA-Z0-9-]{8,}$/);
