@@ -6,7 +6,7 @@ import { currentAuth } from "../auth/mount";
 import { readUploadPartBody } from "../middleware/body-limit";
 import { StorageError, StorageUnavailableError } from "../storage/errors";
 import { isUploadPartRequest, putUploadPart, withUploadPartPermit } from "../storage/parts";
-import { cancelUpload, getUpload, initUpload } from "../storage/uploads";
+import { cancelUpload, completeUpload, getUpload, initUpload } from "../storage/uploads";
 const input = z
   .object({
     purpose: z.enum(["avatar", "chart-source"]),
@@ -40,6 +40,12 @@ export const uploadRoutes = new Hono<AppEnv>()
       ),
       201,
     );
+  })
+  .post("/:id/complete", async (c) => {
+    const ctx = c.get("services").storage;
+    if (!ctx) throw new StorageUnavailableError();
+    const result = await completeUpload(ctx, currentAuth(c).user.id, c.req.param("id"));
+    return c.json(result, result.state === "ready" ? 200 : 202);
   })
   .get("/:id", async (c) => {
     const ctx = c.get("services").storage;

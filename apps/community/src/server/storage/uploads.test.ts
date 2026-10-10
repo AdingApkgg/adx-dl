@@ -15,6 +15,7 @@ import {
   uploadSessions,
   uploadParts,
 } from "../db/schema";
+import { testSender } from "../testing/test-boss";
 import { resetTestDatabase, testDbHandle } from "../testing/test-db";
 import { cleanupStorageFixture, storageFixtureConfig } from "../../../test/storage/fixture";
 import type { DbTransaction, StorageContext } from "./contracts";
@@ -34,9 +35,7 @@ beforeAll(async () => {
     db: testDbHandle().db,
     config,
     driver: createS3Driver(config),
-    boss: async () => {
-      throw Error("no jobs in task3");
-    },
+    boss: testSender,
     log: createLogger(() => {}),
   };
   const [policy] = await ctx.db
@@ -423,7 +422,7 @@ test("private original knowledge grants no shortcut; only owner ready original b
     code: "STORAGE_BUDGET_EXCEEDED",
   });
   expect((await initUpload(full, originalOwner, request, crypto.randomUUID())).state).toBe(
-    "receiving",
+    "processing",
   );
   await ctx.db.insert(blobBlocks).values({ sha256, reasonCode: "test" });
   await expect(initUpload(ctx, originalOwner, request, crypto.randomUUID())).rejects.toMatchObject({

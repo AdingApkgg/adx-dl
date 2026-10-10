@@ -2,7 +2,8 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { createApp } from "../app";
-import { storagePolicies } from "../db/schema";
+import { eq } from "drizzle-orm";
+import { uploadSessions, uploadParts, storagePolicies } from "../db/schema";
 import { testAppDeps } from "../testing/app-deps";
 import { googleProfile, signInWithGoogle, currentUserId } from "../testing/auth";
 import { Browser } from "../testing/auth-browser";
@@ -11,7 +12,7 @@ import { cleanupStorageFixture, storageFixtureConfig } from "../../../test/stora
 import { initUpload } from "../storage/uploads";
 import type { StorageContext } from "../storage/contracts";
 import { createS3Driver } from "../storage/s3";
-import { isUploadPartRequest } from "../storage/parts";
+import { isUploadPartRequest, putUploadPart } from "../storage/parts";
 import { createMemoryRateLimitStore } from "../middleware/rate-limit";
 const hash = (data: Uint8Array) => createHash("sha256").update(data).digest("hex");
 beforeAll(resetTestDatabase, 30000);
@@ -149,7 +150,7 @@ test("binary HTTP length, hash, CSRF, ownership and sibling limits", async () =>
         body: "{}",
       })
     ).status,
-  ).toBe(404);
+  ).toBe(202);
   expect(f.calls.filter((k) => k.startsWith("rl:upload-parts-user:")).length).toBeGreaterThan(0);
   expect(f.calls.filter((k) => k.startsWith("rl:api-ip:")).length).toBeGreaterThan(0);
 });
@@ -541,4 +542,39 @@ test("HTTP init is idempotent, rejects changed bodies, and cancellation replays2
     expect(
       (await f.browser.request("DELETE", `/api/v1/uploads/${first.json.id}`, { body: {} })).status,
     ).toBe(204);
+});
+
+test("complete HTTP returns incomplete409, processing202 and ready replay200 with owner-only access", async () => {
+  const f = await fixture();
+  const bytes = new Uint8Array([1, 2, 3]);
+  const upload = await initUpload(
+    f.ctx,
+    f.owner,
+    { purpose: "avatar", name: "a.png", size: bytes.length, sha256: hash(bytes) },
+    crypto.randomUUID(),
+  );
+  const path = `/api/v1/uploads/${upload.id}/complete`;
+  expect((await f.browser.request("POST", path, { body: {} })).status).toBe(409);
+  await putUploadPart(f.ctx, f.owner, upload.id, 0, bytes, hash(bytes));
+  await f.ctx.db
+    .update(uploadParts)
+    .set({ state: "writing" })
+    .where(eq(uploadParts.uploadId, upload.id));
+  expect((await f.browser.request("POST", path, { body: {} })).status).toBe(409);
+  await f.ctx.db
+    .update(uploadParts)
+    .set({ state: "ready" })
+    .where(eq(uploadParts.uploadId, upload.id));
+  const a = await f.browser.request("POST", path, { body: {} });
+  const b = await f.browser.request("POST", path, { body: {} });
+  expect(a.status).toBe(202);
+  expect(b.status).toBe(202);
+  expect(a.json).toEqual(b.json);
+  await f.ctx.db
+    .update(uploadSessions)
+    .set({ state: "ready" })
+    .where(eq(uploadSessions.id, upload.id));
+  expect((await f.browser.request("POST", path, { body: {} })).status).toBe(200);
+  const other = await fixture();
+  expect((await other.browser.request("POST", path, { body: {} })).status).toBe(404);
 });

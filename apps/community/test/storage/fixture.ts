@@ -1,8 +1,8 @@
 import { readFile, mkdir } from "node:fs/promises";
 import { parseStorageEnv } from "../../src/server/storage/env";
-import type { StorageConfig } from "../../src/server/storage/contracts";
+import type { StorageConfig, StorageRole } from "../../src/server/storage/contracts";
 /** External, opt-in isolated credentials; never depend on ignored source modules. */
-export async function storageFixtureConfig(role = "web"): Promise<StorageConfig> {
+export async function storageFixtureConfig(role: StorageRole = "web"): Promise<StorageConfig> {
   let access = process.env[`STORAGE_TEST_${role.toUpperCase()}_ACCESS_KEY_ID`];
   let secret = process.env[`STORAGE_TEST_${role.toUpperCase()}_SECRET_ACCESS_KEY`];
   if (process.env.STORAGE_TEST_FIXTURE_PATH) {
@@ -21,11 +21,14 @@ export async function storageFixtureConfig(role = "web"): Promise<StorageConfig>
       STORAGE_S3_ENDPOINT: process.env.STORAGE_TEST_ENDPOINT ?? "http://127.0.0.1:58333",
       STORAGE_TEMP_DIR: tempDir,
       STORAGE_RECIPE_BUILD: "test-v1",
-      STORAGE_WEB_ACCESS_KEY_ID: access ?? "isolated-test",
-      STORAGE_WEB_SECRET_ACCESS_KEY: secret ?? "isolated-test",
+      [`STORAGE_${role.toUpperCase()}_ACCESS_KEY_ID`]: access ?? "isolated-test",
+      [`STORAGE_${role.toUpperCase()}_SECRET_ACCESS_KEY`]: secret ?? "isolated-test",
       STORAGE_INTERNAL_MEDIA_SECRET: "test-internal-secret-0123456789abcdef",
+      STORAGE_INTERNAL_MEDIA_URL: "http://web:3001",
+      CLOUDFLARE_ZONE_ID: "0".repeat(32),
+      CLOUDFLARE_PURGE_TOKEN: "isolated-test-control-token",
     },
-    "web",
+    role,
   );
 }
 
@@ -35,6 +38,7 @@ export async function cleanupStorageFixture(
   owners: string[],
   policies: string[],
   driver?: import("../../src/server/storage/contracts").ObjectDriver,
+  originalAccounting = false,
 ): Promise<void> {
   if (!owners.length) return;
   const { inArray, eq, sql } = await import("drizzle-orm");
@@ -56,6 +60,13 @@ export async function cleanupStorageFixture(
   const attempts = ids.length
     ? await db.select().from(uploadAttempts).where(inArray(uploadAttempts.uploadId, ids))
     : [];
+  const originals =
+    originalAccounting && policies.length
+      ? await db.select().from(blobs).where(inArray(blobs.policyId, policies))
+      : [];
+  if (driver)
+    for (const original of originals)
+      await driver.delete({ bucket: "original", key: original.key });
   if (driver)
     for (const attempt of attempts)
       await driver.delete({ bucket: "original", key: attempt.tempKey });
@@ -66,6 +77,8 @@ export async function cleanupStorageFixture(
       .from(files)
       .innerJoin(blobs, eq(files.blobId, blobs.id))
       .where(inArray(files.ownerId, owners));
+    for (const id of ids)
+      await tx.execute(sql`delete from pgboss.job where data->>'uploadId'=${id}`);
     await tx.delete(uploadSessions).where(inArray(uploadSessions.ownerId, owners));
     await tx.delete(files).where(inArray(files.ownerId, owners));
     if (ids.length) await tx.delete(uploadAttempts).where(inArray(uploadAttempts.uploadId, ids));
@@ -83,6 +96,13 @@ export async function cleanupStorageFixture(
         ),
       );
     }
+    if (originals.length)
+      await tx.delete(blobs).where(
+        inArray(
+          blobs.id,
+          originals.map((b) => b.id),
+        ),
+      );
     await tx.delete(user).where(inArray(user.id, owners));
     if (policies.length)
       await tx.delete(storagePolicies).where(inArray(storagePolicies.id, policies));
@@ -92,6 +112,8 @@ export async function cleanupStorageFixture(
       .update(storageBudget)
       .set({
         temporaryReserved: sql`${storageBudget.temporaryReserved}-${reserved}`,
+        originalReserved: sql`${storageBudget.originalReserved}-${originals.filter((b) => b.state === "pending" && b.leaseUntil !== null).reduce((n, b) => n + b.size, 0)}`,
+        originalWritten: sql`${storageBudget.originalWritten}-${originals.filter((b) => b.state === "ready").reduce((n, b) => n + b.size, 0)}`,
         temporaryWritten: sql`${storageBudget.temporaryWritten}-${written}`,
       })
       .where(eq(storageBudget.id, "global"));

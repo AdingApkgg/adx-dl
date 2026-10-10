@@ -1,8 +1,12 @@
+import { fromDrizzle, type PgBoss } from "pg-boss";
+import { MEDIA_AVATAR_QUEUE, STORAGE_FINALIZE_QUEUE } from "../jobs/queues";
+import { enqueueStorageFlow } from "./flow";
+import { ensureOriginal, withProcessingUpload } from "./objects";
 import { createHash } from "node:crypto";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import type { InitUploadInput, UploadDto } from "@/shared/storage";
+import type { InitUploadInput, UploadDto, StorageErrorCode } from "@/shared/storage";
 import { blobs, blobBlocks, files, storageUsage, uploadParts, uploadSessions } from "../db/schema";
-import type { DbTransaction, StorageContext } from "./contracts";
+import type { DbTransaction, StorageContext, StorageJobData } from "./contracts";
 import { StorageError } from "./errors";
 import { normalizeOriginalName } from "./keys";
 import { AVATAR_RULE, STORAGE_LIMITS } from "./rules";
@@ -100,6 +104,7 @@ export async function initUpload(
     .update(JSON.stringify([input.purpose, input.name, input.size, input.sha256]))
     .digest("hex");
   await checkStorageDisk(ctx);
+  const boss = await ctx.boss();
   return withStorageTransaction(ctx.db, async (tx) => {
     const { usage, budget } = await lockUploadAccounting(tx, userId);
     const now = await storageTime(tx);
@@ -161,7 +166,7 @@ export async function initUpload(
         updatedAt: now,
       })
       .where(eq(storageUsage.userId, userId));
-    return uploadDto(row, [], now);
+    return reusable ? beginProcessing(ctx, boss, tx, row, now) : uploadDto(row, [], now);
   });
 }
 async function readyParts(db: Pick<StorageContext["db"], "select">, id: string) {
@@ -215,4 +220,117 @@ export async function cancelUpload(ctx: StorageContext, userId: string, id: stri
       })
       .where(eq(storageUsage.userId, userId));
   });
+}
+
+/** Caller holds accounting and the session lock; both ordinary and instant uploads use this transition. */
+async function beginProcessing(
+  ctx: StorageContext,
+  boss: PgBoss,
+  tx: DbTransaction,
+  row: Session,
+  now: Date,
+): Promise<UploadDto> {
+  const blob = await ensureOriginal(ctx, tx, row);
+  const [file] = await tx
+    .insert(files)
+    .values({
+      ownerId: row.ownerId,
+      blobId: blob.id,
+      originalName: row.originalName,
+      purpose: row.purpose,
+      size: row.expectedSize,
+      state: "processing",
+    })
+    .returning();
+  const flowJobIds = await enqueueStorageFlow(boss, tx, {
+    uploadId: row.id,
+    generation: row.generation,
+  });
+  const [processing] = await tx
+    .update(uploadSessions)
+    .set({ state: "processing", fileId: file.id, flowJobIds, updatedAt: now })
+    .where(eq(uploadSessions.id, row.id))
+    .returning();
+  return uploadDto(processing, await readyParts(tx, row.id), now);
+}
+export async function completeUpload(
+  ctx: StorageContext,
+  userId: string,
+  id: string,
+): Promise<UploadDto> {
+  if (!UUID_PATTERN.test(id)) throw new StorageError(404, "NOT_FOUND");
+  const boss = await ctx.boss();
+  return withStorageTransaction(ctx.db, async (tx) => {
+    await lockUploadAccounting(tx, userId);
+    const row = await ownedUpload(tx, userId, id);
+    const now = await storageTime(tx);
+    if (row.state === "processing" || row.state === "ready")
+      return uploadDto(row, await readyParts(tx, row.id), now);
+    requireReceiving(row, now);
+    if (
+      (await tx.select().from(blobBlocks).where(eq(blobBlocks.sha256, row.expectedSha256))).length
+    )
+      throw new StorageError(400, "HASH_BLOCKED");
+    const parts = await tx
+      .select()
+      .from(uploadParts)
+      .where(eq(uploadParts.uploadId, row.id))
+      .orderBy(uploadParts.index)
+      .for("update");
+    if (
+      parts.length !== row.partCount ||
+      parts.some(
+        (part, index) =>
+          part.index !== index ||
+          part.state !== "ready" ||
+          part.size !== Math.min(row.partSize, row.expectedSize - index * row.partSize),
+      )
+    )
+      throw new StorageError(409, "UPLOAD_INCOMPLETE");
+    return beginProcessing(ctx, boss, tx, row, now);
+  });
+}
+/** Permanent input failure, quota release and descendant cancellation commit together. */
+export async function rejectUpload(
+  ctx: StorageContext,
+  data: StorageJobData,
+  code: StorageErrorCode,
+): Promise<void> {
+  const boss = await ctx.boss();
+  await withProcessingUpload(
+    ctx,
+    data,
+    async ({ tx, session, file, accounting: { usage }, now }) => {
+      await tx
+        .update(uploadSessions)
+        .set({
+          state: "rejected",
+          errorCode: code,
+          reservedBytes: 0,
+          generation: session.generation + 1,
+          updatedAt: now,
+        })
+        .where(eq(uploadSessions.id, session.id));
+      await tx
+        .update(files)
+        .set({
+          state: "rejected",
+          retainedUntil: new Date(now.getTime() + STORAGE_LIMITS.fileRetentionMs),
+        })
+        .where(eq(files.id, file.id));
+      await tx
+        .update(storageUsage)
+        .set({
+          reservedBytes: usage.reservedBytes - session.reservedBytes,
+          activeUploads: usage.activeUploads - 1,
+          updatedAt: now,
+        })
+        .where(eq(storageUsage.userId, session.ownerId));
+      const db = fromDrizzle(tx, sql);
+      if (session.flowJobIds[1])
+        await boss.cancel(MEDIA_AVATAR_QUEUE, session.flowJobIds[1], { db });
+      if (session.flowJobIds[2])
+        await boss.cancel(STORAGE_FINALIZE_QUEUE, session.flowJobIds[2], { db });
+    },
+  );
 }

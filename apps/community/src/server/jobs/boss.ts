@@ -17,6 +17,8 @@ export function createBoss(databaseUrl: string, role: BossRole): PgBoss {
     schema: BOSS_SCHEMA,
     // 不设的话三种角色的连接都叫 pgboss，pg_stat_activity 里分不清是哪个进程的。
     application_name: `community-${role}`,
+    // pg-boss 12.35 Navigator also requires supervise: true to unblock flow descendants.
+    // Media/control worker bootstrap must use this worker role, not the web sender.
     supervise: role === "worker",
     schedule: role === "worker",
     migrate: role !== "sender",

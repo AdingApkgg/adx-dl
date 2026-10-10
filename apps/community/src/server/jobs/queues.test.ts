@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { testSender } from "../testing/test-boss";
 import {
+  STORAGE_QUEUES,
   ensureQueues,
   QUEUES,
   type QueueDefinition,
@@ -71,4 +72,10 @@ describe("QUEUES", () => {
     },
     30_000
   );
+});
+
+test("every real storage queue persists its dependency-safe policy and retry configuration", async () => {
+  const boss = await testSender();
+  for (const queue of STORAGE_QUEUES)
+    expect(await boss.getQueue(queue.name)).toMatchObject(queue.options);
 });
