@@ -1,12 +1,11 @@
 import { parseDumpBounds } from "./dump-bounds";
 import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import { createDb } from "../../src/server/db/client";
 import { createStorageContext } from "../../src/server/storage/runtime";
 import { createLogger } from "../../src/shared/log";
 import { assertMediaScratch } from "../../src/server/storage/health";
 import { assertNormalStorageStartup } from "./restore";
-import { preflightSpace, readOriginalManifest, verifiedStaging } from "./export";
+import { preflightSpace, readOriginalManifest, backupCapacityRequirements } from "./export";
 import { Client } from "pg";
 /** Live additional demand, measured after scratch is allocated; existing object/staging bytes are not charged twice. */
 export async function preflightStorage() {
@@ -42,20 +41,10 @@ export async function preflightStorage() {
     await c.connect();
     const budget = (await c.query("select * from storage_budget where id='global'")).rows[0];
     if (!budget) throw new Error("STORAGE_BUDGET_MISSING");
-    let staged = 0;
-    for (const original of await readOriginalManifest(c))
-      if (await verifiedStaging(join(stage, original.sha256), original)) staged += original.size;
-    const limits = ctx.config.limits;
-    const remaining =
-      Math.max(0, limits.originalBudget - Number(budget.original_written)) +
-      Math.max(0, limits.derivedBudget - Number(budget.derived_written)) +
-      Math.max(0, limits.temporaryBudget - Number(budget.temporary_written));
-    await preflightSpace([
-      { path: ctx.config.capacityDir!, additional: remaining },
-      { path: stage, additional: Math.max(0, limits.originalBudget - staged) },
-      { path: bundle, additional: dump + 268435456 },
-      { path: repo, additional: limits.originalBudget + dump + 268435456 },
-    ]);
+    const originals = await readOriginalManifest(c);
+    await preflightSpace(await backupCapacityRequirements(originals, {
+      objects: ctx.config.capacityDir!, stage, bundle, repo,
+    }, dump));
     console.log("STORAGE_PREFLIGHT_OK");
   } finally {
     await c.end();

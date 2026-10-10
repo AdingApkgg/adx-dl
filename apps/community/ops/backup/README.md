@@ -11,7 +11,9 @@
 
 ## 导出顺序与边界
 
-导出前依据实际未验证/缺失暂存字节、两份显式 dump 上限及 restic 最坏零去重增长，按实际 filesystem 合并容量需求并保留 5 GiB 可用空间。暂存与 bundle 同 filesystem 以硬链接冻结原件；只复用真实 SHA256/大小吻合的只读文件。此计算不构成部署全额度接受，g510 的 38.28 GiB 可用空间仍不足以宣称已验证完整额度。
+2026-10-11 用户明确采用按实际使用增长的容量政策：20/2/2 GiB 是原件/派生/临时对象的应用上限，不为尚未使用的额度预留物理磁盘。部署 preflight 与实际 exporter 共用当前 manifest 的需求公式：仅缺失或未验证的暂存字节、本次全部原件 payload、两份显式 dump 上限和既有 metadata overhead；不假设 restic 去重。对象 filesystem additional=0，已存在对象及缓存已反映在 statfs 可用空间中，不再收费一次。同 filesystem 合并需求并保留不变的5 GiB底线；每次实际导出仍重复容量/hash/drain/journal检查。
+
+暂存与 bundle 同 filesystem 以硬链接冻结原件；只复用真实 SHA256/大小吻合的只读文件。历史71 GiB/340 GiB是满额度极端规划示例，不是上线最低门槛。旧g510可用空间观测没有在本轮更新，不能据此判断当前够不够。已验证stage缓存尚无淘汰，增长优化留待需要时实施；本轮不增加GC/协调机制，剩余空间不足仍拒绝本次工作。
 
 纯同步 owner-bound coordinator handle 在任何暂停副作用之前创建。关闭新写入后，实际角色进程关闭新工作并排空完整 handler/native child/driver PUT DELETE COPY；协调器必须验证当前 web/media/control 身份与维护 owner。随后再次检查所有 durable physical claims 和 DELETE started/uncertain markers，过期 lease 和本地 active=0 均不证明远端 IO 静止。缺少角色 ACK 或不确定 IO 使本次备份失败。
 

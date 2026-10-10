@@ -1,5 +1,7 @@
 # Community avatar/storage acceptance — 2026-10-11
 
+**Current capacity policy supersession —2026-10-11:** the user now requires on-demand growth. Historical71 GiB/340 GiB full-quota figures below remain historical evidence, not current startup gates.20/2/2 GiB ceilings and5 GiB floor remain; live preflight now budgets current manifest/cache gap/full backup payload/dump bounds/metadata only. g510 was not rechecked; old38.41 GiB is not a current sufficiency claim. Other failed/unverified acceptance remains unchanged.
+
 Source under acceptance: `832cf81` (parent `127a9f24b94ee0ffd7b533f1519a74d08206574c`), branch `codex/community-storage-design`. Actual first-install HTTP acceptance exposed missing policy initialization; the focused fix creates/validates WEB and MEDIA namespace metadata before opening state and refuses used databases. It stores no secrets in policies and does not widen role credentials. Three focused initializer cases pass (14 assertions); purge timing fixture passes with unchanged product59/60s limits. No public push, production deployment, Dash publication, AWMC or personal-photo work occurred. Final independent review follows this record.
 
 ## Fixed images and recovery evidence
@@ -152,3 +154,12 @@ The one failure was a **test monitor setup error**: pg-pool's acquire event fire
 Final changed-file lint:3files,exit0/0.88s (131ms analyzer). TypeScript `bun x tsc --noEmit`:exit0/9.78s. Output `storage-r44-static.log`. `git diff --check` passes. Documentation also corrects the previous imprecise Bun.sleep wording to the actual production setTimeout-backed sleep; M2 source is unchanged. No13-case repeat, S3, build, browser, restore, Docker or unrelated suite ran. No product deadline/role/capacity budget was widened. Test clients/pools were closed; retained fixtures/scratch remain for root cleanup.
 
 All previously stated acceptance limitations remain, including unverified final relay streaming/hash/cancel and lifecycle/restart behavior, final immutable HTTP, UI, current-image recovery, DOM and other incomplete original gates. Existing pre-relay transport evidence does not prove streaming through the new relay. No production readiness/Task12 acceptance, push or deployment is claimed. Root performs final adjudication of this exact R1 correction, with no third broad review.
+
+
+## User-authorized on-demand capacity policy
+
+Base076795634b257ee624402775ade512bb4970ab91. `preflight.ts` now uses actual `readOriginalManifest` and the shared `backupCapacityRequirements` already used by export. Object additional0 avoids future-quota reservation and double-charging existing allocations; stage counts only missing/unverified current originals; bundle/repository keep both explicit dump bounds and existing per-file/256MiB overhead, with zero-dedup full payload. Per-filesystem aggregation and5 GiB floor are unchanged. Application20/2/2 GiB limits, actual export/recovery safety and scratch bounds remain unchanged. No cache eviction/GC was added.
+
+One focused temporary-file/statfs invocation, no database/Docker/browser/build: `storage-check bun test --timeout 15000 ops/backup/capacity-policy.test.ts ops/backup/dump-bounds.test.ts` —6pass/0fail/37assert,1.481s test/1.62s wall. Covers empty/small manifests without reserving full quotas, actual hash/size/read-only cache eligibility, full repository payload, same-filesystem sum and exact5GiB boundary, invalid mandatory dump bounds before service checks. Safe output: `community-storage-acceptance/storage-capacity-policy-tests.log`. No g510 inspection, capacity sufficiency declaration, deployment or public push. Fullquota71/340GiB examples are superseded only as startup policy, not erased from historical evidence. Main controller handoff: `/Users/i/Code/AstroDX/.superpowers/claude-continuation/storage-capacity-on-demand-20261011.md`.
+
+Final TypeScript verification after the fixture-only overload annotation correction:exit0/46.50s, no diagnostics. Changed-file lint remains passed. Final diff check passes. No runtime test repeat.

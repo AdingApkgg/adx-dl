@@ -373,3 +373,10 @@ SeaweedFS、sharp、pg-boss、Cloudflare 和 AWS SDK 均做了 Context7 文档�
 - [sharp 输入安全选项](https://sharp.pixelplumbing.com/api-constructor/)、[metadata/输出/timeout](https://sharp.pixelplumbing.com/api-output/)、[native 安装支持](https://sharp.pixelplumbing.com/install/)
 - [Cloudflare 缓存默认规则与大小上限](https://developers.cloudflare.com/cache/concepts/default-cache-behavior/)、[CDA](https://developers.cloudflare.com/cache/cache-security/cache-deception-armor/)、[purge](https://developers.cloudflare.com/cache/how-to/purge-cache/)、[查询串缓存级别](https://developers.cloudflare.com/cache/how-to/set-caching-levels/)
 - [AWS SDK v3 endpoint/流/checksum 配置](https://github.com/aws/aws-sdk-js-v3/blob/main/supplemental-docs/CLIENTS.md)
+
+
+## 2026-10-11 用户容量政策补充（按需增长）
+
+用户明确要求小服务器按实际使用增长，避免各项目提前占满容量。此后20 GiB原件、2 GiB派生、2 GiB临时对象仅为应用上限，不作为物理磁盘预留。部署启动门槛改用当前ready原件manifest、已验证只读stage缓存缺口、本次完整原件payload、两份明确dump上限和原有metadata overhead，按filesystem聚合并保留5 GiB空闲底线；对象路径additional=0，已存在对象/缓存通过statfs可用空间体现，不能重复计费。实际backup的容量、hash、drain和journal安全不变，配额与scratch边界不降低。
+
+71 GiB首次需求及340 GiB保留原件均为历史满额度极端估算，不再是上线条件。旧g51038.41 GiB观测没有更新，不构成当前可用空间或足够容量的证明。stage缓存无淘汰仍是待按增长需要处理的优化，本轮不引入新GC/协调平台。此附记优先于前述任何全额度预留假设；历史失败和未完成验收记录继续保留。

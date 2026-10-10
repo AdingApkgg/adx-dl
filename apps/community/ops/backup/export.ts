@@ -140,6 +140,26 @@ export async function readOriginalManifest(c: Client): Promise<OriginalEntry[]> 
     recipes: r.recipes,
   }));
 }
+/** Current backup demand only: quotas are application ceilings, not disk reservations.
+ * Existing object/cache bytes already reduce statfs available space and are never charged again. */
+export async function backupCapacityRequirements(
+  entries: readonly Pick<OriginalEntry, "size" | "sha256">[],
+  paths: { stage: string; bundle: string; repo: string; objects?: string },
+  dumpBytes: number,
+) {
+  let missing = 0;
+  for (const entry of entries)
+    if (!(await verifiedStaging(join(paths.stage, entry.sha256), entry))) missing += entry.size;
+  const overhead = 1024 * 1024 * (entries.length + 10);
+  const payload = entries.reduce((sum, entry) => sum + entry.size, 0) + dumpBytes + overhead;
+  // Keep the exporter's existing metadata and zero-dedup repository allowance.
+  return [
+    ...(paths.objects ? [{ path: paths.objects, additional: 0 }] : []),
+    { path: paths.stage, additional: missing },
+    { path: paths.bundle, additional: dumpBytes + overhead },
+    { path: paths.repo, additional: payload + overhead + 256 * 1024 * 1024 },
+  ];
+}
 /** Group reservations by real filesystem; never add available bytes for two paths on the same disk. */
 export async function preflightSpace(
   requirements: { path: string; additional: number }[],
@@ -304,23 +324,9 @@ export async function backupOriginals(
     readOriginalManifest,
   );
   async function capacity(entries: OriginalEntry[]) {
-    let missing = 0;
-    for (const e of entries)
-      if (!(await verifiedStaging(join(stage, e.sha256), e))) missing += e.size;
-    const overhead = 1024 * 1024 * (entries.length + 10);
-    const payload =
-      entries.reduce((n, e) => n + e.size, 0) +
-      dumpBytes +
-      overhead;
-    // Assume zero dedup/compression: all payload may be new, plus per-file and repository overhead.
-    await preflightSpace([
-      { path: stage, additional: missing },
-      {
-        path: bundle,
-        additional: dumpBytes + overhead,
-      },
-      { path: options.repositoryDirectory, additional: payload + overhead + 256 * 1024 * 1024 },
-    ]);
+    await preflightSpace(await backupCapacityRequirements(entries, {
+      stage, bundle, repo: options.repositoryDirectory,
+    }, dumpBytes));
     if ((await stat(stage)).dev !== (await stat(bundle)).dev)
       throw new Error("STORAGE_STAGE_FILESYSTEM_MISMATCH");
   }
