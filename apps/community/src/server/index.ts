@@ -18,7 +18,7 @@ import { getDb, pingDb } from "./db/client";
 import { parseEnv } from "./env";
 import { createInProcessApi } from "./in-process-api";
 import { assertQueueExists, getSender, stopSender } from "./jobs/boss";
-import { USER_PURGE_QUEUE } from "./jobs/queues";
+import { USER_PURGE_QUEUE, MEDIA_PURGE_QUEUE } from "./jobs/queues";
 import { createRedisRateLimitStore } from "./middleware/rate-limit";
 import { createOneBotClient } from "./napcat/client";
 import { createNapcatSender } from "./napcat/sender";
@@ -77,7 +77,11 @@ const app = createApp({
     db: () => pingDb(db),
     redis: () => pingRedis(redis),
     // 部署脚本轮询 /readyz：pg-boss 的表或 user.purge 队列不在（迁移没跑），这里就是 fail。
-    jobs: async () => assertQueueExists(await getBoss(), USER_PURGE_QUEUE),
+    jobs: async () => {
+      const boss = await getBoss();
+      await assertQueueExists(boss, USER_PURGE_QUEUE);
+      await assertQueueExists(boss, MEDIA_PURGE_QUEUE);
+    },
   },
   rateLimitStore,
   auth,

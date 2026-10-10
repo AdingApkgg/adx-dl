@@ -371,6 +371,13 @@ export const mediaPublications = pgTable(
     nonnegative("media_publications_generation_check", t.generation),
   ],
 );
+export type MediaPurgeObservation = { at: string; elapsedMs: number; status: number };
+export type MediaPurgeEvidence = {
+  failure?: { code: string; status?: number; apiCodes?: number[] };
+  drain?: MediaPurgeObservation & { generation: number };
+  purges: MediaPurgeObservation[];
+  probes: (MediaPurgeObservation & { cacheStatus: string | null; bodyLength: number; bodySha256: string })[];
+};
 // Durable revocation outbox must outlive deleted accounts and physical metadata.
 export const mediaPurgeRequests = pgTable(
   "media_purge_requests",
@@ -382,6 +389,8 @@ export const mediaPurgeRequests = pgTable(
       .default("pending")
       .notNull(),
     attempts: integer().default(0).notNull(),
+    attemptStartedAt: timestamp(tz),
+    evidence: jsonb().$type<MediaPurgeEvidence>(),
     nextAttemptAt: createdAt(),
     lastErrorCode: text(),
     createdAt: createdAt(),

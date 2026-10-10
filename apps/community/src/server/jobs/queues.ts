@@ -21,6 +21,7 @@ export const STORAGE_DELETE_QUEUE = "storage.delete";
 export const STORAGE_DELETE_DEAD_QUEUE = "storage.delete.dead";
 export const MEDIA_PURGE_QUEUE = "media.purge";
 export const MEDIA_PURGE_DEAD_QUEUE = "media.purge.dead";
+export const MEDIA_PURGE_REPAIR_QUEUE = "media.purge.repair";
 const DAY = 86_400;
 const storageDefaults = {
   policy: "exclusive" as const,
@@ -66,7 +67,7 @@ export const STORAGE_QUEUES: readonly QueueDefinition[] = [
       deadLetter: STORAGE_DEAD_QUEUE,
     },
   },
-  ...[STORAGE_SWEEP_QUEUE, STORAGE_CLEANUP_QUEUE].map((name) => ({
+  ...[STORAGE_SWEEP_QUEUE, STORAGE_CLEANUP_QUEUE, MEDIA_PURGE_REPAIR_QUEUE].map((name) => ({
     name,
     options: {
       policy: "stately" as const,

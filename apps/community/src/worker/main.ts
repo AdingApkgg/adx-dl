@@ -17,6 +17,9 @@ import { DELETION_HANDLERS } from "@/server/services/user-deletion";
 import { describeError } from "@/shared/describe-error";
 import { createLogger } from "@/shared/log";
 
+import { createStorageContext } from "@/server/storage/runtime";
+import { registerMediaPurgeWorker } from "./media-purge";
+
 import { startNapcatEvents } from "./napcat-events";
 import { createUserPurgeHandler } from "./purge";
 import { PURGE_SWEEP_CRON, PURGE_SWEEP_TZ, runPurgeSweep } from "./purge-sweep";
@@ -38,6 +41,11 @@ await connectRedis(redis, log);
 await boss.start();
 // 部署时 db:migrate 已经建过；再调一次无害（幂等），开发库在加了新队列之后没重跑 db:migrate 时也能补上。
 await ensureQueues(boss);
+// Storage config is supplied by the control deployment (Task11).
+if (process.env.STORAGE_CONTROL_ACCESS_KEY_ID) {
+  const storage = createStorageContext({ db, boss: async () => boss, log, role: "control" });
+  await registerMediaPurgeWorker(storage, boss);
+}
 
 // 注销的最终清除（spec 第 10.6 节）、每天的补投和过期行清理，都和有没有 QQ 机器人无关。
 await boss.work<UserPurgeData>(USER_PURGE_QUEUE, createUserPurgeHandler({ db, handlers: DELETION_HANDLERS, log }));
