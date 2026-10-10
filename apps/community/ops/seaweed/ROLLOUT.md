@@ -38,3 +38,45 @@ Before the first public avatar, configure `/api/*` cache bypass and query reject
 For a startup/readiness failure before new writes, the deployment script retains the previous actual serving image and additive schema; return web/control to that saved image and preserve all storage volumes/journal/key/state. Stop new media admission and its owned native processes before rollback. Verify old community, NapCat and Umami health. Never overwrite the rollback tag with a failed candidate.
 
 After new avatars/writes exist, preserve a fresh data backup and latest journal first. An old application image is not a data rollback: it can leave public associations/revocations requiring the new control runtime. Keep origin media closed if safe revocation cannot be established, retain the current storage data and use the reviewed fail-closed recovery procedure. Do not delete the external restore lock on PID/TTL/HEAD-absence guesses; require proof that old owned processes and remote IO ended. Database restoration requires both dumps, verified originals, latest authenticated journal, native rebuild, restricted recovery revocation and final invariants before opening.
+
+## Publisher interlock recovery (Ruling 41)
+
+Every journal initializer/exporter/retention publisher creates mode0600 `.publisher.lock` with an owner nonce and syncs it before publication. A successful owner removes only its own inode/nonce after all filesystem operations and the applicable database checkpoint finish. The45s caller deadline still returns a failure promptly; timeout, process death, failed checkpoint or owner replacement retains the marker. Other publishers and restore's latest-journal verification reject it. This can deliberately block backup/restore until operator recovery; it must never be removed because its age/lease expired.
+
+For recovery, stop all journal publishers and every backup/restore caller and keep normal storage admission closed. Save the whole outside-snapshot journal directory, its marker/owner metadata and the current database checkpoint as evidence. Prove the exact former publisher process is reaped and its outstanding filesystem operations have completed; a missing PID, timeout, missing key or absent object by itself is not that proof. Resolve any still-running process or uncertain storage IO before proceeding. No automatic cleanup command is provided for an uncertain owner.
+
+Only after that proof, with all competing callers still stopped, move the exact recorded marker into a private evidence directory (never discard it). Run the existing `exportJournal(journalConfig())` against the original authoritative database and directory as the sole controlled recovery process. It verifies the authenticated head/anchor chain and reconciles any published-but-uncheckpointed suffix against the exact committed tombstone rows before advancing the checkpoint. It refuses checkpoint-ahead/head regression or a suffix mismatch. Then run `verifyLatestJournal(journalConfig())` and compare its returned head with `storage_journal_progress`. Do not reopen restore or normal roles until both succeed and there is no publisher marker. If verification/export fails, preserve the new marker if present, otherwise restore the saved exact marker, keep admission closed, and investigate from the saved evidence; never substitute a snapshot's older signed head or hand-edit the checkpoint.
+
+Ruling40 remains first-install-only: `ops/backup/initialize.ts` creates/validates the two exact unused WEB/MEDIA namespace policies with backup credentials, rejects used DBs, and writes open state last. Its cost is two metadata rows and an explicit setup gate. Ruling41's additional cost is an external durable publisher marker and possible manual recovery after uncertain failure; no TTL-based ownership loss or new service is introduced.
+
+
+After the publisher evidence and reap conditions above have been met and the exact marker has been moved to retained evidence, run this sole recovery check from `apps/community` with the same Compose overlay and original database/journal mounts (all other publishers/restore callers remain stopped):
+
+```sh
+docker compose run --rm --no-deps backup bun -e '
+import { Client } from "pg";
+import { journalConfig } from "./ops/backup/runtime";
+import { exportJournal, verifyLatestJournal } from "./ops/backup/journal";
+const config = journalConfig();
+await exportJournal(config);
+const { head } = await verifyLatestJournal(config);
+const client = new Client({ connectionString: config.databaseUrl });
+await client.connect();
+try {
+  const { rows } = await client.query("select exported_sequence,chain_hash from storage_journal_progress where id=$1", ["global"]);
+  if (rows.length !== 1 || Number(rows[0].exported_sequence) !== head.sequence ||
+      (rows[0].chain_hash ?? "0".repeat(64)) !== head.hash) throw new Error("CHECKPOINT_MISMATCH");
+  console.log(JSON.stringify({ sequence: head.sequence, hash: head.hash, verified: true }));
+} finally { await client.end(); }
+'
+```
+
+A nonzero result leaves admission closed and follows the evidence/marker restoration procedure above. This command intentionally does not remove a marker or decide that an old process is reaped.
+
+## Raw-interface isolation (Rulings 42–43)
+
+Pinned Seaweed4.48 exposes raw filer, master and volume interfaces independently of S3 ACLs; absence of host ports does not isolate peers on the Compose network. An actual anonymous peer read of a synthetic original through filer8888 returned200. `mini` and standalone `s3` share their HTTP/gRPC bind address, so a separate externally bound S3 process would still expose internal gRPC. The final single-service configuration binds the entire mini process, advertised address and volume lookup to127.0.0.1. The existing BusyBox `nc` accepts only8333 and forwards unchanged bytes to the authenticated loopback S3 port8334. Internal S3 gRPC18334 and every raw interface stay on loopback. Admin UI/WebDAV/Iceberg/Lance are explicitly disabled; pinned mini still starts loopback admin backend listeners23646/33646, which the peer rejection check includes. No additional host port, tunnel, image, service, role credential or privilege is introduced.
+
+`ops/seaweed/entrypoint.sh` supervises mini and relay; TERM/INT stop and wait for both, either main child exit makes the service exit1. Container teardown reaps any connection descendants. `pids_limit:256` bounds the per-connection relay process cost; this is a small deployment transport, with fork/concurrency and throughput limits rather than a general proxy platform. `forward-s3.sh` has no additional whole-transfer deadline or buffering. The existing S3/app deadlines remain responsible for read/write timeouts. BusyBox's documented `-w` wording is “connects and final net reads”; the initially exercised120 setting was removed because that wording did not establish an idle-only semantic. Do not silently add a transfer deadline.
+
+Deploy only after the outstanding fixture restart/INT/child-exit checks and existing acceptance prerequisites pass. Current scoped evidence: actual peer raw-port rejection, anonymous403, all four signed role ACLs and TERM/reap pass; restart command exceeded35s and the remaining lifecycle cases were not run. No production rollout is authorized by these partial results. Rollback must preserve this raw-interface boundary: reverting to externally bound mini reintroduces the confirmed bypass.

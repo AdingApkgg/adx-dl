@@ -133,53 +133,80 @@ async function readHead(path: string, k: Buffer) {
   if (!validHead(h)) throw fail();
   return h;
 }
-async function publishHead(config: JournalConfig, k: Buffer, h: JournalHead, name = "head.json") {
+async function publishHead(config: JournalConfig, k: Buffer, h: JournalHead, signal: AbortSignal, name = "head.json") {
   await durableFile(
     join(config.directory, name),
     seal(h, k, { version: 1, sequence: h.sequence, hash: h.hash }),
+    0o600, signal,
   );
+}
+const publisherPath = (config: JournalConfig) => join(config.directory, ".publisher.lock");
+async function assertNoPublisher(config: JournalConfig) {
+  try { await lstat(publisherPath(config)); }
+  catch (e) { if ((e as NodeJS.ErrnoException).code === "ENOENT") return; throw e; }
+  throw new Error("STORAGE_JOURNAL_PUBLISHER_ACTIVE");
+}
+async function syncDirectory(directory: string) {
+  const d = await open(directory, "r");
+  try { await d.sync(); } finally { await d.close(); }
 }
 async function dedicated<T>(
   config: JournalConfig,
-  fn: (c: Client) => Promise<T>,
+  fn: (c: Client, signal: AbortSignal) => Promise<T>,
   external?: AbortSignal,
 ) {
   const signal = AbortSignal.any([AbortSignal.timeout(45000), ...(external ? [external] : [])]);
   signal.throwIfAborted();
   const c = new Client({ connectionString: config.databaseUrl, connectionTimeoutMillis: 5000 });
   c.on("error", () => {});
+  const owner = crypto.randomUUID();
   let abort: () => void = () => {};
   const expired = new Promise<never>((_, reject) => {
-    abort = () => {
-      void c.end().catch(() => {});
-      reject(new Error("STORAGE_JOURNAL_DEADLINE"));
-    };
+    abort = () => { void c.end().catch(() => {}); reject(new Error("STORAGE_JOURNAL_DEADLINE")); };
     signal.addEventListener("abort", abort, { once: true });
     if (signal.aborted) abort();
   });
-  try {
-    return await Promise.race([
-      (async () => {
-        await c.connect();
-        await c.query(
-          "set statement_timeout='40s';set lock_timeout='40s';set idle_session_timeout='45s'",
-        );
-        await c.query("select pg_advisory_lock($1::bigint)", [PUBLISH_LOCK]);
-        return fn(c);
-      })(),
-      expired,
-    ]);
-  } finally {
-    signal.removeEventListener("abort", abort);
-    await c.end().catch(() => {});
-  }
+  // The caller may time out; this promise still owns every started FS operation.
+  // Failed/aborted publishers retain their durable marker, even after their callbacks settle.
+  const work = (async () => {
+    try {
+      await c.connect();
+      await c.query("set statement_timeout='40s';set lock_timeout='40s';set idle_session_timeout='45s'");
+      await c.query("select pg_advisory_lock($1::bigint)", [PUBLISH_LOCK]);
+      signal.throwIfAborted();
+      const path = publisherPath(config);
+      let f: Awaited<ReturnType<typeof open>>;
+      try { f = await open(path, "wx", 0o600); }
+      catch (e) { if ((e as NodeJS.ErrnoException).code === "EEXIST") throw new Error("STORAGE_JOURNAL_PUBLISHER_ACTIVE"); throw e; }
+      let identity: Awaited<ReturnType<typeof lstat>>;
+      try {
+        identity = await f.stat();
+        await f.writeFile(JSON.stringify({ owner, pid: process.pid, startedAt: new Date().toISOString() }));
+        await f.sync();
+      } finally { await f.close(); }
+      await syncDirectory(config.directory);
+      signal.throwIfAborted();
+      const result = await fn(c, signal);
+      signal.throwIfAborted();
+      // Only the exact owner, after successful checkpoint/publication and actual FS quiescence, can unlock.
+      const current = await lstat(path);
+      if (current.ino !== identity.ino || current.dev !== identity.dev || JSON.parse(await readFile(path, "utf8")).owner !== owner)
+        throw new Error("STORAGE_JOURNAL_PUBLISHER_CHANGED");
+      signal.throwIfAborted();
+      await unlink(path);
+      await syncDirectory(config.directory);
+      return result;
+    } finally { await c.end().catch(() => {}); }
+  })();
+  try { return await Promise.race([work, expired]); }
+  finally { signal.removeEventListener("abort", abort); }
 }
 /** Task11 invokes this explicitly once. Missing state never implicitly becomes genesis. */
 export async function initializeJournal(config: JournalConfig) {
   const k = await key(config);
   await mkdir(config.directory, { recursive: true, mode: 0o700 });
-  return dedicated(config, async (c) => {
-    const files = await readdir(config.directory);
+  return dedicated(config, async (c, signal) => {
+    const files = (await readdir(config.directory)).filter((name) => name !== ".publisher.lock");
     if (files.length) throw fail();
     const r = await c.query(
       "select exported_sequence,chain_hash from storage_journal_progress where id='global'",
@@ -190,8 +217,8 @@ export async function initializeJournal(config: JournalConfig) {
       r.rows[0].chain_hash !== null
     )
       throw fail();
-    await publishHead(config, k, genesis, "anchor.json");
-    await publishHead(config, k, genesis);
+    await publishHead(config, k, genesis, signal, "anchor.json");
+    await publishHead(config, k, genesis, signal);
   });
 }
 async function segmentsIn(config: JournalConfig, k: Buffer) {
@@ -226,7 +253,7 @@ function publishedChain(all: Segment[], anchor: JournalHead, latest: JournalHead
   return chain;
 }
 /** Read only the authoritative outside-snapshot directory. A bundle's old signed head is never a latest witness. */
-export async function verifyLatestJournal(
+async function verifyJournal(
   config: JournalConfig,
   from?: JournalHead,
 ): Promise<{ head: JournalHead; anchor: JournalHead; records: JournalRecord[] }> {
@@ -255,6 +282,16 @@ export async function verifyLatestJournal(
   if (!found) throw fail();
   return { head: latest, anchor, records };
 }
+/** A publisher marker fences restore too; verify a stable head/anchor, never a timed-out writer's partial state. */
+export async function verifyLatestJournal(config: JournalConfig, from?: JournalHead) {
+  await assertNoPublisher(config);
+  const verified = await verifyJournal(config, from);
+  const k = await key(config);
+  if (!equal(await readHead(join(config.directory, "head.json"), k), verified.head) ||
+      !equal(await readHead(join(config.directory, "anchor.json"), k), verified.anchor)) throw fail();
+  await assertNoPublisher(config);
+  return verified;
+}
 function record(r: Record<string, unknown>): JournalRecord {
   const result: JournalRecord = {
     sequence: Number(r.sequence),
@@ -275,11 +312,11 @@ export async function exportJournal(
 ): Promise<JournalHead> {
   const signal = external ?? AbortSignal.timeout(45000);
   signal.throwIfAborted();
-  const k = await key(config);
   return dedicated(
     config,
-    async (c) => {
-      const verified = await verifyLatestJournal(config);
+    async (c, signal) => {
+      const k = await key(config);
+      const verified = await verifyJournal(config);
       let current = verified.head;
       const progress = await c.query(
         "select exported_sequence,chain_hash from storage_journal_progress where id='global'",
@@ -299,7 +336,7 @@ export async function exportJournal(
           hash: p.chain_hash ?? genesis.hash,
           capturedAt: genesis.capturedAt,
         };
-        const suffix = await verifyLatestJournal(config, old);
+        const suffix = await verifyJournal(config, old);
         const dbRecords = (
           await c.query(
             "select * from storage_tombstones where sequence>$1 and sequence<=$2 order by sequence",
@@ -343,7 +380,7 @@ export async function exportJournal(
           )
             throw fail();
           signal.throwIfAborted();
-          await publishHead(config, k, orphan.head);
+          await publishHead(config, k, orphan.head, signal);
           signal.throwIfAborted();
           await checkpoint(c, current, orphan.head);
           current = orphan.head;
@@ -395,7 +432,7 @@ export async function exportJournal(
           await d.close();
         }
         signal.throwIfAborted();
-        await publishHead(config, k, h);
+        await publishHead(config, k, h, signal);
         signal.throwIfAborted();
         await checkpoint(c, current, h);
         current = h;
@@ -421,10 +458,10 @@ async function checkpoint(c: Client, previous: JournalHead, next: JournalHead) {
   }
 }
 /** Seven calendar months; preserve an authenticated anchor and refuse snapshots preceding it. */
-export async function retainJournal(config: JournalConfig, now = new Date()) {
-  return dedicated(config, async () => {
+export async function retainJournal(config: JournalConfig, now = new Date(), external?: AbortSignal) {
+  return dedicated(config, async (_c, signal) => {
     const k = await key(config);
-    await verifyLatestJournal(config);
+    await verifyJournal(config);
     const cutoff = new Date(now);
     cutoff.setUTCMonth(cutoff.getUTCMonth() - 7);
     let anchor = await readHead(join(config.directory, "anchor.json"), k);
@@ -446,8 +483,9 @@ export async function retainJournal(config: JournalConfig, now = new Date()) {
     for (const item of old) {
       if (!equal(item.s.previous, anchor)) continue;
       anchor = item.s.head;
-      await publishHead(config, k, anchor, "anchor.json");
+      await publishHead(config, k, anchor, signal, "anchor.json");
+      signal.throwIfAborted();
       await unlink(join(config.directory, item.name));
     }
-  });
+  }, external);
 }

@@ -131,24 +131,23 @@ async function json(response: Response, signal: AbortSignal) {
   }
 }
 async function pause(deps: MediaPurgeDeps, b: PurgeBudget, previous: number) {
-  const ms = Math.max(0, 5000 - (deps.now() - previous));
-  b.check();
-  if (ms >= b.remaining()) throw new MediaPurgeError("MEDIA_ATTEMPT_DEADLINE");
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    await Promise.race([
-      deps.sleep(ms),
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new MediaPurgeError("MEDIA_ATTEMPT_DEADLINE")),
-          b.remaining(),
-        );
-      }),
-    ]);
+  for (let wakes = 0; deps.now() - previous < 5000; wakes++) {
+    if (wakes >= 16) throw new MediaPurgeError("MEDIA_DELAY_INVALID");
     b.check();
-    if (deps.now() - previous < 5000) throw new MediaPurgeError("MEDIA_DELAY_INVALID");
-  } finally {
-    clearTimeout(timer);
+    const ms = Math.max(1, Math.ceil(5000 - (deps.now() - previous)));
+    if (ms >= b.remaining()) throw new MediaPurgeError("MEDIA_ATTEMPT_DEADLINE");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        deps.sleep(ms),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new MediaPurgeError("MEDIA_ATTEMPT_DEADLINE")), b.remaining());
+        }),
+      ]);
+      b.check();
+    } finally {
+      clearTimeout(timer);
+    }
   }
 }
 export async function revokeMedia(

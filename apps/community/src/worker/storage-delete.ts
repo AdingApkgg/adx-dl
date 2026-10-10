@@ -22,7 +22,7 @@ import {
   type FileReference,
 } from "../server/storage/references";
 import { withPurgeTransaction, type PurgeBudget } from "../server/storage/publication";
-import { withStorageTransaction } from "../server/storage/transactions";
+import { lockStorageAdmission, withStorageTransaction } from "../server/storage/transactions";
 /** One configured driver may access only its recorded physical namespace. */
 export function storageNamespaceCandidate(
   ctx: StorageContext,
@@ -268,7 +268,9 @@ export async function deleteStorageObject(
       bucket: data.kind === "blob" ? "original" : "derived",
       key: claim.row.key,
     });
-    await withStorageTransaction(ctx.db, async (tx) => {
+    // Only this invocation's completed DELETE may settle behind the maintenance gate.
+    await ctx.db.transaction(async (tx) => {
+      await lockStorageAdmission(tx);
       const [budget] = await tx
         .select()
         .from(storageBudget)

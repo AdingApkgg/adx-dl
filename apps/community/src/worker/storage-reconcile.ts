@@ -12,7 +12,7 @@ import {
 import type { DbTransaction, StorageContext } from "../server/storage/contracts";
 import { StorageError } from "../server/storage/errors";
 import { objectKey } from "../server/storage/keys";
-import { withStorageTransaction } from "../server/storage/transactions";
+import { lockStorageAdmission, withStorageTransaction } from "../server/storage/transactions";
 import { withPurgeTransaction, type PurgeBudget } from "../server/storage/publication";
 import { assertStorageNamespace, storageNamespaceCandidate } from "./storage-delete";
 const DAY = 86400000;
@@ -359,7 +359,14 @@ export async function cleanupStorageQuarantine(
       }
       try {
         await ctx.driver.delete({ bucket: "original", key: row.key });
-        await run(async (tx) => {
+        // No new work is admitted: settle only the exact successful in-flight claim.
+        budget?.check();
+        const settled = await ctx.db.transaction(async (tx) => {
+          if (budget) {
+            budget.check();
+            await tx.execute(sql`select set_config('transaction_timeout', ${String(Math.max(1, Math.floor(budget.remaining())))}, true)`);
+          }
+          await lockStorageAdmission(tx);
           const [b] = await tx
             .select()
             .from(storageBudget)
@@ -373,6 +380,7 @@ export async function cleanupStorageQuarantine(
           if (
             current?.state !== "deleting" ||
             current.generation !== claim ||
+            current.deleteStartedAt?.getTime() !== now.getTime() ||
             current.deleteUncertain
           )
             return;
@@ -384,8 +392,10 @@ export async function cleanupStorageQuarantine(
             .update(storageBudget)
             .set({ originalWritten: b.originalWritten - row.size })
             .where(eq(storageBudget.id, "global"));
-          result.deleted++;
+          budget?.check();
+          return true;
         });
+        if (settled) result.deleted++;
       } catch {
         // Best-effort uncertainty flag; durable started state alone already prevents every retry/reincarnation.
         if (!budget || budget.remaining() > 0)

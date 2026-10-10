@@ -1,0 +1,5 @@
+Flag --time has been deprecated, use --timeout instead
+community-storage-test-seaweedfs-1
+
+exit 0
+duration 6.51

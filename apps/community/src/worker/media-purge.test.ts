@@ -804,3 +804,14 @@ test("malformed jobs fail before any network request", async () => {
   }
   expect(clock.calls).toHaveLength(0);
 });
+
+test("M2 early fractional timer wake waits the monotonic remainder before the next request", async () => {
+  const { ctx, data } = await revoked(), clock = timeline(data.generation);
+  const { revokeMedia } = await import("./media-purge");
+  let wakes = 0;
+  clock.deps.sleep = async (ms) => { clock.advance(wakes++ === 0 ? ms - 0.25 : ms); };
+  await revokeMedia(ctx, data, clock.deps);
+  expect(wakes).toBeGreaterThan(2);
+  expect(clock.calls[2].at-clock.calls[1].at).toBeGreaterThanOrEqual(5000);
+  expect(clock.calls[4].at-clock.calls[3].at).toBeGreaterThanOrEqual(5000);
+});

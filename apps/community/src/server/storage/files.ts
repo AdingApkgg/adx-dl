@@ -7,6 +7,7 @@ import {
   blobDerivatives,
   derivedObjects,
   storageUsage,
+  storageTombstones,
 } from "../db/schema";
 import type { StorageContext, ObjectBucket } from "./contracts";
 import { StorageError, StorageUnavailableError } from "./errors";
@@ -71,6 +72,7 @@ export async function deleteFile(ctx: StorageContext, userId: string, id: string
       .update(files)
       .set({ state: "deleted", deletedAt: now, retainedUntil: new Date(now.getTime() + 86400000) })
       .where(eq(files.id, id));
+    await tx.insert(storageTombstones).values({ kind: "file_deleted", fileId: id, createdAt: now });
     if (file.state === "ready") {
       if (usage.usedBytes < file.size) throw new StorageError(503, "STORAGE_INCONSISTENT");
       await tx

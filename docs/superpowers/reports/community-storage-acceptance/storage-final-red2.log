@@ -1,0 +1,68 @@
+bun test v1.4.2 (744846f84)
+
+ops/backup/journal-publication.test.ts:
+40 |     res = resolve
+41 |     rej = reject
+42 |   }).catch((err) => {
+43 |     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+44 |     // application that created the query
+45 |     Error.captureStackTrace(err)
+               ^
+error: storage tombstones are append-only
+     length: 163,
+   severity: "ERROR",
+     detail: undefined,
+       hint: undefined,
+   position: undefined,
+ internalPosition: undefined,
+ internalQuery: undefined,
+      where: "PL/pgSQL function storage_tombstone_append_only() line 3 at RAISE",
+     schema: undefined,
+      table: undefined,
+   dataType: undefined,
+ constraint: undefined,
+       file: "pl_exec.c",
+    routine: "exec_stmt_raise",
+       code: "23514"
+
+      at /Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg-pool@3.14.0+00a0136bc273dfed/node_modules/pg-pool/index.js:45:11
+      at processTicksAndRejections (native:7:39)
+(fail) I3 late head rename keeps durable ownership across timeout and cannot be overtaken [154.39ms]
+
+test/storage/final-review.test.ts:
+71 |  const before=(await ctx.db.select().from(storageBudget))[0].originalWritten;await ctx.db.update(storageBudget).set({originalWritten:before+size});
+72 |  let start!:()=>void,release!:()=>void;const started=new Promise<void>(r=>start=r),paused=new Promise<void>(r=>release=r);let calls=0;
+73 |  const scoped={...ctx,driver:{...ctx.driver,head:async()=>({size,mime:'image/png',sha256:hash,etag:'v1'}),delete:async()=>{calls++;start();await paused;}}};
+74 |  const work=kind==='canonical'?deleteStorageObject(scoped,{kind:'blob',id:row.id,generation:2}):cleanupStorageQuarantine(scoped);
+75 |  const observed=work.then(()=>null,e=>e);let lease:Awaited<ReturnType<typeof acquireStorageMaintenance>>|undefined;
+76 |  try{await started;lease=await acquireStorageMaintenance(ctx.db);release();expect(await observed).toBeNull();
+                                                                                                       ^
+error: expect(received).toBeNull()
+
+Received: 17 |   await lockStorageAdmission(tx);
+18 |   const lease = await tx.execute(
+19 |     sql`select 1 from storage_maintenance where id='global' and lease_until > clock_timestamp()`,
+20 |   );
+21 |   if (lease.rows.length)
+22 |     throw new StorageError(503, "STORAGE_MAINTENANCE", "STORAGE_MAINTENANCE", 5);
+               ^
+StorageError: STORAGE_MAINTENANCE
+     status: 503,
+ retryAfter: 5,
+       code: "STORAGE_MAINTENANCE"
+
+      at lockStorageMutation (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/src/server/storage/transactions.ts:22:11)
+      at async <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/src/server/storage/transactions.ts:35:13)
+      at async transaction (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/drizzle-orm@0.45.3+888bfaee68f299c3/node_modules/drizzle-orm/node-postgres/session.js:186:28)
+      at async withStorageTransaction (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/src/server/storage/transactions.ts:34:21)
+      at async cleanupStorageQuarantine (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/src/worker/storage-reconcile.ts:415:15)
+
+
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/test/storage/final-review.test.ts:76:99)
+(fail) I2 admitted quarantine successful DELETE settles once while maintenance is closed [2270.49ms]
+
+ 0 pass
+ 4 filtered out
+ 2 fail
+ 1 expect() calls
+Ran 2 tests across 2 files. [12.36s]

@@ -1,0 +1,84 @@
+$ bun x --bun react-router build
+ℹ [paraglide-js] Compilation skipped — inputs unchanged (message-modules)
+Using Vite Environment API
+vite v8.3.1 building client environment for production...
+ℹ [paraglide-js] Compilation skipped — inputs unchanged (message-modules)
+transforming...
+✓ 2892 modules transformed.
+rendering chunks...
+computing gzip size...
+build/client/assets/file-hash-DcSoxCHm.js                                6.11 kB
+build/client/assets/noto-sans-greek-ext-wght-normal-12T8GTDR.woff2      10.76 kB
+build/client/assets/noto-sans-vietnamese-wght-normal-DLTJy58D.woff2     14.45 kB
+build/client/assets/noto-sans-cyrillic-wght-normal-B2hlT84T.woff2       20.08 kB
+build/client/.vite/manifest.json                                        21.50 kB │ gzip:  2.45 kB
+build/client/assets/noto-sans-greek-wght-normal-Ymb6dZNd.woff2          21.77 kB
+build/client/assets/noto-sans-latin-wght-normal-BYSzYMf3.woff2          35.82 kB
+build/client/assets/noto-sans-cyrillic-ext-wght-normal-DSNfmdVt.woff2   70.68 kB
+build/client/assets/noto-sans-devanagari-wght-normal-Cv-Vwajv.woff2     99.23 kB
+build/client/assets/noto-sans-latin-ext-wght-normal-W1qJv59z.woff2     167.96 kB
+build/client/assets/app-DWH9lybR.css                                    68.99 kB │ gzip: 12.20 kB
+build/client/assets/queryOptions-Dfvzj6n2.js                             0.03 kB │ gzip:  0.05 kB
+build/client/assets/home-client-loader-Bg3diNr4.js                       0.05 kB │ gzip:  0.07 kB
+build/client/assets/locale-client-loader-Bg3diNr4.js                     0.05 kB │ gzip:  0.07 kB
+build/client/assets/settings-account-client-loader-Bg3diNr4.js           0.05 kB │ gzip:  0.07 kB
+build/client/assets/settings-account-client-middleware-Zr-X_2gJ.js       0.05 kB │ gzip:  0.07 kB
+build/client/assets/locale-3qd8rtW7.js                                   0.07 kB │ gzip:  0.08 kB
+build/client/assets/not-found-B1nKXrpa.js                                0.09 kB │ gzip:  0.11 kB
+build/client/assets/next-path-CRTwZXyE.js                                0.12 kB │ gzip:  0.10 kB
+build/client/assets/locale-uRIUT191.js                                   0.14 kB │ gzip:  0.12 kB
+build/client/assets/user_page_id-D0jdSwmr.js                             0.19 kB │ gzip:  0.17 kB
+build/client/assets/privacy_link-CnktyFdB.js                             0.22 kB │ gzip:  0.22 kB
+build/client/assets/site_name-Bs0f1Vnz.js                                0.23 kB │ gzip:  0.22 kB
+build/client/assets/me-8iFQlMB7.js                                       0.23 kB │ gzip:  0.20 kB
+build/client/assets/toast_passkey_added-DHnfW60j.js                      0.24 kB │ gzip:  0.24 kB
+build/client/assets/nickname-ChoPXrXx.js                                 0.25 kB │ gzip:  0.20 kB
+build/client/assets/account-errors-BChnObwS.js                           0.33 kB │ gzip:  0.27 kB
+build/client/assets/use-hydrated-CjzZ5Tvd.js                             0.34 kB │ gzip:  0.28 kB
+build/client/assets/settings_profile_title-C1SjAHa2.js                   0.36 kB │ gzip:  0.29 kB
+build/client/assets/page-title-B3nIeyc9.js                               0.40 kB │ gzip:  0.27 kB
+build/client/assets/analytics-DGe4d-8H.js                                0.41 kB │ gzip:  0.29 kB
+build/client/assets/jsx-runtime-IICjP95_.js                              0.42 kB │ gzip:  0.29 kB
+build/client/assets/alert-Cy7wutwr.js                                    0.48 kB │ gzip:  0.31 kB
+build/client/assets/require-user-4RrmPSWD.js                             0.49 kB │ gzip:  0.29 kB
+build/client/assets/locale-D12JuFZA.js                                   0.51 kB │ gzip:  0.35 kB
+build/client/assets/login-options-Dm8rlksc.js                            0.61 kB │ gzip:  0.49 kB
+build/client/assets/dist-BZuj4mb5.js                                     0.74 kB │ gzip:  0.50 kB
+build/client/assets/seo-BL7Pqd8u.js                                      0.81 kB │ gzip:  0.42 kB
+build/client/assets/avatar-Nn9h2hLF.js                                   1.02 kB │ gzip:  0.66 kB
+build/client/assets/label-C3lTlfc-.js                                    1.64 kB │ gzip:  0.88 kB
+build/client/assets/error-card-BLHOe-Ox.js                               2.55 kB │ gzip:  1.37 kB
+build/client/assets/root-ChhhKdlY.js                                     3.13 kB │ gzip:  1.51 kB
+build/client/assets/profile-BOwM0gov.js                                  3.30 kB │ gzip:  1.66 kB
+build/client/assets/runtime-CkTchidG.js                                  3.44 kB │ gzip:  1.48 kB
+build/client/assets/user-profile-CpblBm7o.js                             3.49 kB │ gzip:  1.75 kB
+build/client/assets/react-dom-sFhfRZD1.js                                3.85 kB │ gzip:  1.39 kB
+build/client/assets/account-deletion-Bcbob6ZK.js                         3.91 kB │ gzip:  1.94 kB
+build/client/assets/home-Cg4IFOdA.js                                     4.19 kB │ gzip:  2.02 kB
+build/client/assets/file-upload-anmd-NRN.js                              4.25 kB │ gzip:  1.96 kB
+build/client/assets/qq-code-form-B9oolo1E.js                             4.92 kB │ gzip:  2.28 kB
+build/client/assets/onboarding-Bt13kXFR.js                               5.24 kB │ gzip:  2.60 kB
+build/client/assets/auth-errors-D9Mlbhk-.js                              7.99 kB │ gzip:  3.39 kB
+build/client/assets/login-Bm7IWuwJ.js                                    8.67 kB │ gzip:  3.82 kB
+build/client/assets/useQuery-DsmNuF8F.js                                 9.85 kB │ gzip:  3.60 kB
+build/client/assets/lib-CF1GSN6L.js                                     10.86 kB │ gzip:  4.36 kB
+build/client/assets/settings-profile-CGHIWdSH.js                        15.07 kB │ gzip:  5.89 kB
+build/client/assets/settings-account-CaDRNVtk.js                        15.69 kB │ gzip:  5.73 kB
+build/client/assets/privacy-DuqeNbUm.js                                 19.74 kB │ gzip:  8.25 kB
+build/client/assets/utils-ClvgYzxi.js                                   21.08 kB │ gzip:  8.27 kB
+build/client/assets/browser-J02STbfA.js                                 30.19 kB │ gzip:  9.42 kB
+build/client/assets/errorBoundaries-DXqkZf5r.js                         33.39 kB │ gzip: 11.71 kB
+build/client/assets/sonner-B-CpdRPO.js                                  40.49 kB │ gzip: 11.84 kB
+build/client/assets/auth-client-N8Yeo2qw.js                             44.42 kB │ gzip: 15.36 kB
+build/client/assets/components-Yn3eBt1g.js                              66.43 kB │ gzip: 21.32 kB
+build/client/assets/locale-main-rIYfVSDO.js                            102.96 kB │ gzip: 34.93 kB
+build/client/assets/card-TyEjDIS5.js                                   161.00 kB │ gzip: 51.84 kB
+build/client/assets/entry.client-BUCdW0y5.js                           211.11 kB │ gzip: 66.30 kB
+
+✓ built in 1m 13s
+vite v8.3.1 building ssr environment for production...
+ℹ [paraglide-js] Compilation skipped — inputs unchanged (message-modules)
+transforming...
+
+OUTER_EXIT=124 WALL_SECONDS=120.13
+error: script "build" exited with code 143

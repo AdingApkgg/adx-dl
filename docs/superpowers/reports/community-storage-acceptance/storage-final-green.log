@@ -1,0 +1,26 @@
+bun test v1.4.2 (744846f84)
+
+ops/backup/journal-publication.test.ts:
+(pass) I3 late head rename keeps durable ownership across timeout and cannot be overtaken [947.74ms]
+(pass) I3 late retention rename keeps durable ownership across timeout and cannot be overtaken [2600.26ms]
+(pass) I3 successful publisher cannot remove a replacement owner nonce [809.43ms]
+
+src/worker/media-purge.test.ts:
+(pass) real PG: injected elapsed request time and DB time consume the whole budget [5784.28ms]
+(pass) M2 early fractional timer wake waits the monotonic remainder before the next request [13807.39ms]
+
+test/storage/final-review.test.ts:
+(pass) I1 explicit private delete journals once and replay preserves another file sharing the blob [11797.47ms]
+(pass) I4 shared cooling-off withdrawal replays individually and cancellation advances the revision [5827.03ms]
+(pass) I2 admitted canonical success DELETE settlement while maintenance is closed [2484.59ms]
+(pass) I2 admitted canonical stale DELETE settlement while maintenance is closed [2445.67ms]
+(pass) I2 admitted canonical failure DELETE settlement while maintenance is closed [1331.19ms]
+(pass) I2 admitted quarantine success DELETE settlement while maintenance is closed [1213.80ms]
+(pass) I2 admitted quarantine stale DELETE settlement while maintenance is closed [1415.68ms]
+(pass) I2 admitted quarantine failure DELETE settlement while maintenance is closed [838.88ms]
+
+ 13 pass
+ 37 filtered out
+ 0 fail
+ 76 expect() calls
+Ran 13 tests across 3 files. [68.49s]

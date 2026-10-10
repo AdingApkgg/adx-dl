@@ -199,7 +199,7 @@ export async function restoreStorageAvatar(
   const now = await storageTime(tx);
   await tx
     .update(userAvatars)
-    .set({ suspendedAt: null, updatedAt: now })
+    .set({ suspendedAt: null, revision: a.avatar.revision + 1, updatedAt: now })
     .where(
       and(
         eq(userAvatars.userId, userId),
@@ -242,9 +242,15 @@ export function createStorageDeletionHandler(
       const a = await lockedAvatar(tx, userId);
       await tx.update(user).set({ image: null, updatedAt: now }).where(eq(user.id, userId));
       if (a) {
+        const revision = a.avatar.revision + (a.avatar.suspendedAt ? 0 : 1);
+        if (!a.avatar.suspendedAt)
+          await tx.insert(storageTombstones).values({
+            kind: "media_revoked", userId, fileId: a.file.id,
+            sha256: a.output.outputSha256, generation: revision, createdAt: now,
+          });
         await tx
           .update(userAvatars)
-          .set({ suspendedAt: a.avatar.suspendedAt ?? now, updatedAt: now })
+          .set({ suspendedAt: a.avatar.suspendedAt ?? now, revision, updatedAt: now })
           .where(eq(userAvatars.userId, userId));
         await withdraw(tx, boss(), a.output.outputSha256, now, registry);
       }

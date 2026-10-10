@@ -137,13 +137,13 @@ const honoApp = await createHonoServer<AppEnv>({
     internalServer=serve({hostname:env.host,port:Number(process.env.STORAGE_INTERNAL_PORT ?? 3001),overrideGlobalObjects:false,fetch:request=>mediaDrain.handle(request)});
     observe(internalServer);
   },
-  serveStaticOptions: {
-    // 构建产物文件名带哈希，内容永远不变；默认的缓存头里没有 immutable。
-    clientAssets: {
-      onFound: (_path, c) => {
-        c.header("Cache-Control", "public, max-age=31536000, immutable");
-      },
-    },
+  beforeAll(server) {
+    // Run after the adapter's static middleware has materialized its final response.
+    server.use("/assets/*", async (c, next) => {
+      await next();
+      if (c.res.status === 200 && /\/[^/]+-[A-Za-z0-9_-]+\.[A-Za-z0-9]+$/.test(c.req.path))
+        c.res.headers.set("Cache-Control", "public, max-age=31536000, immutable");
+    });
   },
   // 必须返回 RouterContextProvider：React Router 8 用 instanceof 检查。
   // 它在我们的中间件都跑过之后才调用，所以请求 ID、nonce、访客 IP 都已经有了。
