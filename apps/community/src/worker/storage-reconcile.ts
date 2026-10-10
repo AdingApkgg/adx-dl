@@ -14,6 +14,7 @@ import { StorageError } from "../server/storage/errors";
 import { objectKey } from "../server/storage/keys";
 import { withStorageTransaction } from "../server/storage/transactions";
 import { withPurgeTransaction, type PurgeBudget } from "../server/storage/publication";
+import { assertStorageNamespace, storageNamespaceCandidate } from "./storage-delete";
 const DAY = 86400000;
 export type StorageWorkBudget = PurgeBudget & { available(): boolean; ctx: StorageContext };
 /** Reuse the existing bounded pool/BEGIN/statement/COMMIT helper and driver's AbortSignal. */
@@ -136,7 +137,8 @@ export async function reconcileStorage(
   await withPurgeTransaction(ctx.db, work, async (tx) => {
     await tx.insert(storageInventoryProgress).values({ policyId: policy.id }).onConflictDoNothing();
   });
-  while (work.available() && result.processed < 1000) {
+  let listRequests = 0;
+  while (work.available() && result.processed < 1000 && listRequests < 100) {
     const [progress] = await withPurgeTransaction(ctx.db, work, (tx) =>
       tx
         .select()
@@ -145,6 +147,7 @@ export async function reconcileStorage(
     );
     let page: Awaited<ReturnType<StorageContext["driver"]["list"]>>;
     try {
+      listRequests++;
       page = await ctx.driver.list({
         bucket: "original",
         prefix: "sha256/",
@@ -179,6 +182,9 @@ export async function reconcileStorage(
       if (identity) {
         if (identity.state === "ready")
           try {
+            await withPurgeTransaction(ctx.db, work, (tx) =>
+              assertStorageNamespace(tx, ctx, identity.policyId, "original"),
+            );
             const head = await ctx.driver.head({ bucket: "original", key: entry.key });
             if (!head || head.size !== identity.size || head.sha256 !== identity.sha256)
               result.storageFailures++;
@@ -287,6 +293,7 @@ export async function cleanupStorageQuarantine(
       .from(storageQuarantine)
       .where(
         and(
+          storageNamespaceCandidate(ctx, storageQuarantine.policyId, "original"),
           eq(storageQuarantine.state, "quarantined"),
           sql`${storageQuarantine.lastObservedAt}<=${new Date(now.getTime() - 2 * DAY)}`,
         ),
@@ -298,6 +305,7 @@ export async function cleanupStorageQuarantine(
     if (budget && budget.remaining() <= 0) break;
     result.processed++;
     try {
+      await run((tx) => assertStorageNamespace(tx, ctx, row.policyId, "original"));
       const head = await ctx.driver.head({ bucket: "original", key: row.key });
       if (
         !head ||
@@ -330,6 +338,7 @@ export async function cleanupStorageQuarantine(
           .where(eq(storageQuarantine.id, row.id))
           .for("update");
         if (current?.state !== "quarantined" || current.generation !== row.generation) return null;
+        await assertStorageNamespace(tx, ctx, current.policyId, "original");
         if (await known(tx, row.key, row.sha256)) {
           await tx
             .update(storageQuarantine)
@@ -401,6 +410,23 @@ export async function cleanupStorageQuarantine(
       }
     } catch {
       result.storageFailures++;
+      // Failure rotates the scan only. Keep first observation, identity, uncertainty and charge intact.
+      if (!budget || budget.remaining() > 0)
+        await run(async (tx) => {
+          await tx.select().from(storageBudget).where(eq(storageBudget.id, "global")).for("update");
+          await tx
+            .update(storageQuarantine)
+            .set({
+              lastObservedAt: sql`greatest(${now}, ${storageQuarantine.lastObservedAt} + interval '1 millisecond')`,
+            })
+            .where(
+              and(
+                eq(storageQuarantine.id, row.id),
+                eq(storageQuarantine.generation, row.generation),
+                eq(storageQuarantine.state, "quarantined"),
+              ),
+            );
+        });
     }
   }
   return result;
@@ -427,6 +453,10 @@ export async function requestMissingDerivedRebuild(
     ? await withPurgeTransaction(ctx.db, budget, identity)
     : await identity(ctx.db);
   if (snapshot?.state !== "ready" || snapshot.generation !== data.generation) return false;
+  const guard = (tx: Pick<DbTransaction, "select">) =>
+    assertStorageNamespace(tx, ctx, snapshot.policyId, "derived");
+  if (budget) await withPurgeTransaction(ctx.db, budget, guard);
+  else await guard(ctx.db);
   budget?.check();
   // The exported producer enforces definitive absence itself; no network work holds business locks.
   const head = await ctx.driver.head({

@@ -318,3 +318,101 @@ test("quarantine and inventory migrations reject invalid identities and preserve
   }
   expect(code).toBe("23001");
 });
+
+test("review: 101 quarantined keys advance past first100 HEAD failures without identity ACK or refund", async () => {
+  const { ctx, policy } = fixture,
+    { cleanupStorageQuarantine } = await implementation(),
+    now = Date.now(),
+    rows = await ctx.db
+      .insert(storageQuarantine)
+      .values(
+        Array.from({ length: 101 }, () => {
+          const hash = crypto.randomUUID().replaceAll("-", "").repeat(2);
+          return {
+            policyId: policy.id,
+            sha256: hash,
+            key: objectKey(hash),
+            size: 1,
+            observedEtag: "same",
+            firstSeenAt: new Date(now - 49 * 3600000),
+            lastObservedAt: new Date(now - 49 * 3600000),
+          };
+        }),
+      )
+      .returning();
+  rows.sort((a, b) => a.id.localeCompare(b.id));
+  const last = rows[100];
+  let deletes = 0;
+  await ctx.db
+    .update(storageBudget)
+    .set({ originalWritten: sql`${storageBudget.originalWritten}+101` });
+  const before = (await ctx.db.select().from(storageBudget))[0].originalWritten;
+  const scoped = {
+    ...ctx,
+    now: () => new Date(now),
+    driver: {
+      ...ctx.driver,
+      head: async (input: Parameters<typeof ctx.driver.head>[0]) => {
+        if (input.key !== last.key) throw new Error("HEAD unavailable");
+        return { size: 1, mime: "image/png", sha256: last.sha256, etag: "same" };
+      },
+      delete: async () => {
+        deletes++;
+      },
+    },
+  };
+  expect((await cleanupStorageQuarantine(scoped)).deleted).toBe(0);
+  expect((await ctx.db.select().from(storageBudget))[0].originalWritten).toBe(before);
+  expect(
+    (await cleanupStorageQuarantine({ ...scoped, now: () => new Date(now + 1) })).deleted,
+  ).toBe(1);
+  expect(deletes).toBe(1);
+  const current = await ctx.db.select().from(storageQuarantine);
+  for (const row of rows.slice(0, 100)) {
+    const a = current.find((q) => q.id === row.id)!;
+    expect(a).toMatchObject({
+      state: "quarantined",
+      generation: 0,
+      observedEtag: "same",
+      size: 1,
+      deleteStartedAt: null,
+      deleteUncertain: false,
+    });
+    expect(a.firstSeenAt).toEqual(row.firstSeenAt);
+  }
+  expect((await ctx.db.select().from(storageBudget))[0].originalWritten).toBe(before - 1);
+});
+test("review: nightly inventory stops at100 empty continuation pages and resumes durable cursor", async () => {
+  const { ctx, policy } = fixture,
+    { storageInventoryProgress } = await import("../server/db/schema"),
+    { reconcileStorage } = await implementation();
+  await ctx.db
+    .insert(storageInventoryProgress)
+    .values({ policyId: policy.id })
+    .onConflictDoUpdate({ target: storageInventoryProgress.policyId, set: { cursor: null } });
+  let calls = 0;
+  const scoped = {
+    ...ctx,
+    driver: {
+      ...ctx.driver,
+      list: async (input: Parameters<typeof ctx.driver.list>[0]) => {
+        calls++;
+        const next = Number(input.cursor ?? 0) + 1;
+        return { objects: [], cursor: next < 200 ? String(next) : undefined };
+      },
+    },
+  };
+  const first = await reconcileStorage(scoped);
+  expect(calls).toBe(100);
+  expect(first.complete).toBe(false);
+  expect(
+    (
+      await ctx.db
+        .select()
+        .from(storageInventoryProgress)
+        .where(eq(storageInventoryProgress.policyId, policy.id))
+    )[0].cursor,
+  ).toBe("100");
+  expect((await reconcileStorage({ ...scoped })).complete).toBe(true);
+  expect(calls).toBe(200);
+});

@@ -327,3 +327,128 @@ test("first acknowledged object404 plus bucket proof confirms business deletion 
     server.close();
   }
 });
+
+test("review: foreign physical policy never uses this driver's key or refunds its charge", async () => {
+  const { ctx, policy } = fixture,
+    { storagePolicies, derivedObjects } = await import("../server/db/schema"),
+    { sweepStorage } = await import("./storage-sweep"),
+    { cleanupStorageQuarantine } = await import("./storage-reconcile"),
+    { storageQuarantine } = await import("../server/db/schema"),
+    id = await own();
+  const [foreign] = await ctx.db
+    .insert(storagePolicies)
+    .values({
+      name: crypto.randomUUID(),
+      endpoint: "http://foreign-storage.invalid",
+      region: ctx.config.region,
+      originalBucket: "foreign-original",
+      derivedBucket: "foreign-derived",
+      credentialsRef: policy.credentialsRef,
+    })
+    .returning();
+  const hash = crypto.randomUUID().replaceAll("-", "").repeat(2),
+    key = `sha256/${hash.slice(0, 2)}/${hash.slice(2, 4)}/${hash}`,
+    calls: string[] = [];
+  try {
+    const [original] = await ctx.db
+      .insert(blobs)
+      .values({
+        policyId: foreign.id,
+        sha256: hash,
+        key,
+        size: 1,
+        state: "ready",
+        detectedMime: "image/png",
+        verifiedAt: new Date(),
+        orphanedAt: new Date(0),
+      })
+      .returning();
+    const [derived] = await ctx.db
+      .insert(derivedObjects)
+      .values({
+        policyId: foreign.id,
+        outputSha256: crypto.randomUUID().replaceAll("-", "").repeat(2),
+        key: `foreign-derived/${hash}`,
+        size: 1,
+        mime: "image/jpeg",
+        state: "ready",
+        orphanedAt: new Date(0),
+      })
+      .returning();
+    const qHash = crypto.randomUUID().replaceAll("-", "").repeat(2),
+      qKey = `sha256/${qHash.slice(0, 2)}/${qHash.slice(2, 4)}/${qHash}`;
+    await ctx.db
+      .insert(storageQuarantine)
+      .values({
+        policyId: foreign.id,
+        sha256: qHash,
+        key: qKey,
+        size: 1,
+        observedEtag: "foreign",
+        firstSeenAt: new Date(0),
+        lastObservedAt: new Date(0),
+      });
+    await ctx.db
+      .update(storageBudget)
+      .set({
+        originalWritten: sql`${storageBudget.originalWritten}+2`,
+        derivedWritten: sql`${storageBudget.derivedWritten}+1`,
+      });
+    const foreignKeys = new Set([key, derived.key, qKey]),
+      scoped = {
+        ...ctx,
+        driver: {
+          ...ctx.driver,
+          head: async (input: Parameters<typeof ctx.driver.head>[0]) => {
+            if (foreignKeys.has(input.key)) calls.push(input.key);
+            return null;
+          },
+          list: async () => ({ objects: [] }),
+          delete: async (input: Parameters<typeof ctx.driver.delete>[0]) => {
+            if (foreignKeys.has(input.key)) calls.push(input.key);
+          },
+        },
+      };
+    const before = (await ctx.db.select().from(storageBudget))[0];
+    await sweepStorage(scoped);
+    await cleanupStorageQuarantine(scoped);
+    expect(calls).toEqual([]);
+    expect((await ctx.db.select().from(blobs).where(eq(blobs.id, original.id)))[0].state).toBe(
+      "ready",
+    );
+    expect(
+      (await ctx.db.select().from(derivedObjects).where(eq(derivedObjects.id, derived.id)))[0]
+        .state,
+    ).toBe("ready");
+    const { deleteStorageObject } = await implementation();
+    for (const [kind, row, table] of [
+      ["blob", original, blobs],
+      ["derived", derived, derivedObjects],
+    ] as const) {
+      await ctx.db
+        .update(table)
+        .set({
+          state: "deleting",
+          generation: 1,
+          properties: {
+            deletion: { generation: 1, chargedFrom: "written", startedAt: null, uncertain: false },
+          },
+        })
+        .where(eq(table.id, row.id));
+      await expect(
+        deleteStorageObject(scoped, { kind, id: row.id, generation: 1 }),
+      ).rejects.toMatchObject({ code: "STORAGE_INCONSISTENT" });
+      expect(
+        (await ctx.db.select().from(table).where(eq(table.id, row.id)))[0].properties.deletion,
+      ).toMatchObject({ startedAt: null, uncertain: false });
+    }
+    expect(calls).toEqual([]);
+    const after = (await ctx.db.select().from(storageBudget))[0];
+    expect([after.originalWritten, after.derivedWritten]).toEqual([
+      before.originalWritten,
+      before.derivedWritten,
+    ]);
+  } finally {
+    await cleanupStorageFixture(ctx.db, [id], [foreign.id], undefined, true);
+  }
+}, 30000);

@@ -45,6 +45,8 @@ import {
 import { withStorageTransaction } from "../server/storage/transactions";
 import {
   claimStorageObjectDeletion,
+  storageNamespaceCandidate,
+  assertStorageNamespace,
   deleteStorageObject,
   originalHasDependencies,
   derivedHasDependencies,
@@ -200,11 +202,13 @@ async function cleanupAttempt(ctx: StorageContext, id: string): Promise<boolean>
     if (session && ["receiving", "processing"].includes(session.state) && part?.state === "ready")
       return null;
     if (
-      session
+      attempt.state !== "deleting" &&
+      (session
         ? session.updatedAt.getTime() + HOUR > now.getTime()
-        : attempt.updatedAt.getTime() + 2 * DAY > now.getTime()
+        : attempt.updatedAt.getTime() + 2 * DAY > now.getTime())
     )
       return null;
+    await assertStorageNamespace(tx, ctx, attempt.policyId, "original");
     if (attempt.state !== "deleting")
       await tx
         .update(uploadAttempts)
@@ -214,47 +218,67 @@ async function cleanupAttempt(ctx: StorageContext, id: string): Promise<boolean>
   });
   if (!claim) return false;
   // Attempt keys are unique and never reincarnated: retry DELETE is safe here.
-  await ctx.driver.delete({ bucket: "original", key: claim.tempKey });
-  await sweepTransaction(ctx, async (tx) => {
-    const [budget] = await tx
-      .select()
-      .from(storageBudget)
-      .where(eq(storageBudget.id, "global"))
-      .for("update");
-    await tx
-      .select()
-      .from(uploadSessions)
-      .where(eq(uploadSessions.id, claim.uploadId))
-      .for("update");
-    const parts = await tx
-      .select()
-      .from(uploadParts)
-      .where(eq(uploadParts.attemptId, id))
-      .for("update");
-    const [attempt] = await tx
-      .select()
-      .from(uploadAttempts)
-      .where(eq(uploadAttempts.id, id))
-      .for("update");
-    if (attempt?.state !== "deleting" || attempt.generation !== claim.generation) return;
-    if (parts.length) await tx.delete(uploadParts).where(eq(uploadParts.attemptId, id));
-    await tx
-      .update(uploadAttempts)
-      .set({
-        state: "deleted",
-        reservedBytes: 0,
-        writtenBytes: 0,
-        updatedAt: ctx.now?.() ?? new Date(),
-      })
-      .where(eq(uploadAttempts.id, id));
-    await tx
-      .update(storageBudget)
-      .set({
-        temporaryReserved: budget.temporaryReserved - attempt.reservedBytes,
-        temporaryWritten: budget.temporaryWritten - attempt.writtenBytes,
-      })
-      .where(eq(storageBudget.id, "global"));
-  });
+  try {
+    await ctx.driver.delete({ bucket: "original", key: claim.tempKey });
+    await sweepTransaction(ctx, async (tx) => {
+      const [budget] = await tx
+        .select()
+        .from(storageBudget)
+        .where(eq(storageBudget.id, "global"))
+        .for("update");
+      await tx
+        .select()
+        .from(uploadSessions)
+        .where(eq(uploadSessions.id, claim.uploadId))
+        .for("update");
+      const parts = await tx
+        .select()
+        .from(uploadParts)
+        .where(eq(uploadParts.attemptId, id))
+        .for("update");
+      const [attempt] = await tx
+        .select()
+        .from(uploadAttempts)
+        .where(eq(uploadAttempts.id, id))
+        .for("update");
+      if (attempt?.state !== "deleting" || attempt.generation !== claim.generation) return;
+      if (parts.length) await tx.delete(uploadParts).where(eq(uploadParts.attemptId, id));
+      await tx
+        .update(uploadAttempts)
+        .set({
+          state: "deleted",
+          reservedBytes: 0,
+          writtenBytes: 0,
+          updatedAt: ctx.now?.() ?? new Date(),
+        })
+        .where(eq(uploadAttempts.id, id));
+      await tx
+        .update(storageBudget)
+        .set({
+          temporaryReserved: budget.temporaryReserved - attempt.reservedBytes,
+          temporaryWritten: budget.temporaryWritten - attempt.writtenBytes,
+        })
+        .where(eq(storageBudget.id, "global"));
+    });
+  } catch (error) {
+    // Ordering progress is not completion evidence; unique attempt keys remain charged.
+    await sweepTransaction(ctx, async (tx) => {
+      await tx.select().from(storageBudget).where(eq(storageBudget.id, "global")).for("update");
+      await tx
+        .update(uploadAttempts)
+        .set({
+          updatedAt: sql`greatest(${ctx.now?.() ?? new Date()}, ${uploadAttempts.updatedAt} + interval '1 millisecond')`,
+        })
+        .where(
+          and(
+            eq(uploadAttempts.id, id),
+            eq(uploadAttempts.generation, claim.generation),
+            eq(uploadAttempts.state, "deleting"),
+          ),
+        );
+    });
+    throw error;
+  }
   return true;
 }
 async function cleanupUnknownTemporary(
@@ -613,6 +637,7 @@ export async function sweepStorage(
       const hash = await sweepTransaction(ctx, async (tx) => {
         const [owner] = await tx.select().from(user).where(eq(user.id, p.id)).for("update");
         if (owner?.status !== "active") return null;
+        await lockDeletionAccounting(tx, p.id);
         const [association] = await tx
           .select()
           .from(userAvatars)
@@ -657,7 +682,7 @@ export async function sweepStorage(
     for (const pub of resumes) {
       if (!visit()) break;
       try {
-        await notifyPublicMedia(ctx, pub.hash);
+        await notifyPublicMedia(ctx, pub.hash, work);
         if (!ctx.onMediaPublished) throw new StorageError(503, "STORAGE_UNAVAILABLE");
       } catch {
         result.storageFailures++;
@@ -739,14 +764,15 @@ export async function sweepStorage(
           .from(uploadAttempts)
           .where(
             and(
+              storageNamespaceCandidate(ctx, uploadAttempts.policyId, "original"),
               inArray(uploadAttempts.state, ["ready", "deleting"]),
               lte(uploadAttempts.leaseUntil, now),
               sql`not exists(select 1 from upload_sessions s where s.id=${uploadAttempts.uploadId} and s.state in ('receiving','processing'))`,
-              sql`(exists(select 1 from upload_sessions s where s.id=${uploadAttempts.uploadId} and s.updated_at<=${new Date(now.getTime() - HOUR)}) or (not exists(select 1 from upload_sessions s where s.id=${uploadAttempts.uploadId}) and ${uploadAttempts.updatedAt}<=${new Date(now.getTime() - 2 * DAY)}))`,
+              sql`(${uploadAttempts.state}='deleting' or exists(select 1 from upload_sessions s where s.id=${uploadAttempts.uploadId} and s.updated_at<=${new Date(now.getTime() - HOUR)}) or (not exists(select 1 from upload_sessions s where s.id=${uploadAttempts.uploadId}) and ${uploadAttempts.updatedAt}<=${new Date(now.getTime() - 2 * DAY)}))`,
               cursor ? gt(uploadAttempts.id, cursor) : undefined,
             ),
           )
-          .orderBy(uploadAttempts.id)
+          .orderBy(uploadAttempts.updatedAt, uploadAttempts.id)
           .limit(100),
       );
       if (!rows.length) break;
@@ -802,7 +828,17 @@ export async function sweepStorage(
           tx
             .select()
             .from(table)
-            .where(and(eq(table.state, "ready"), cursor ? gt(table.id, cursor) : undefined))
+            .where(
+              and(
+                storageNamespaceCandidate(
+                  ctx,
+                  table.policyId,
+                  kind === "blob" ? "original" : "derived",
+                ),
+                eq(table.state, "ready"),
+                cursor ? gt(table.id, cursor) : undefined,
+              ),
+            )
             .orderBy(
               sql`case when ${table.properties}->>'gcCheckedAt' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T' then ${table.properties}->>'gcCheckedAt' else '1970-01-01T00:00:00.000Z' end`,
               table.id,
@@ -816,6 +852,14 @@ export async function sweepStorage(
           if (await scanOrphan(ctx, kind, o.id, registry)) result.objectsClaimed++;
           else
             try {
+              await sweepTransaction(ctx, (tx) =>
+                assertStorageNamespace(
+                  tx,
+                  ctx,
+                  o.policyId,
+                  kind === "blob" ? "original" : "derived",
+                ),
+              );
               const head = await ctx.driver.head({
                 bucket: kind === "blob" ? "original" : "derived",
                 key: o.key,
@@ -845,6 +889,11 @@ export async function sweepStorage(
           .from(table)
           .where(
             and(
+              storageNamespaceCandidate(
+                ctx,
+                table.policyId,
+                kind === "blob" ? "original" : "derived",
+              ),
               eq(table.state, "deleting"),
               sql`${table.properties}->'deletion'->>'startedAt' is null`,
             ),

@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql, type SQLWrapper } from "drizzle-orm";
 import { fromDrizzle } from "pg-boss";
 import {
   blobs,
@@ -8,6 +8,7 @@ import {
   mediaPublications,
   mediaPurgeRequests,
   storageBudget,
+  storagePolicies,
   uploadSessions,
   userAvatars,
 } from "../server/db/schema";
@@ -22,6 +23,41 @@ import {
 } from "../server/storage/references";
 import { withPurgeTransaction, type PurgeBudget } from "../server/storage/publication";
 import { withStorageTransaction } from "../server/storage/transactions";
+/** One configured driver may access only its recorded physical namespace. */
+export function storageNamespaceCandidate(
+  ctx: StorageContext,
+  policyId: SQLWrapper,
+  bucket: "original" | "derived",
+) {
+  const physicalBucket =
+    bucket === "original" ? storagePolicies.originalBucket : storagePolicies.derivedBucket;
+  const configuredBucket =
+    bucket === "original" ? ctx.config.originalBucket : ctx.config.derivedBucket;
+  return sql`exists(select 1 from ${storagePolicies} where ${storagePolicies.id}=${policyId} and ${storagePolicies.endpoint}=${ctx.config.endpoint} and ${storagePolicies.region}=${ctx.config.region} and ${physicalBucket}=${configuredBucket})`;
+}
+export async function assertStorageNamespace(
+  tx: Pick<DbTransaction, "select">,
+  ctx: StorageContext,
+  policyId: string,
+  bucket: "original" | "derived",
+) {
+  const physicalBucket =
+    bucket === "original" ? storagePolicies.originalBucket : storagePolicies.derivedBucket;
+  const configuredBucket =
+    bucket === "original" ? ctx.config.originalBucket : ctx.config.derivedBucket;
+  const [policy] = await tx
+    .select({ id: storagePolicies.id })
+    .from(storagePolicies)
+    .where(
+      and(
+        eq(storagePolicies.id, policyId),
+        eq(storagePolicies.endpoint, ctx.config.endpoint),
+        eq(storagePolicies.region, ctx.config.region),
+        eq(physicalBucket, configuredBucket),
+      ),
+    );
+  if (!policy) throw new StorageError(503, "STORAGE_INCONSISTENT");
+}
 export type StorageDeleteData = { kind: "blob" | "derived"; id: string; generation: number };
 type DeletionMarker = {
   generation: number;
@@ -152,6 +188,12 @@ export async function claimStorageObjectDeletion(
       row.orphanedAt.getTime() + 7 * 86400000 > now.getTime()
     )
       return null;
+    await assertStorageNamespace(
+      tx,
+      ctx,
+      row.policyId,
+      input.kind === "blob" ? "original" : "derived",
+    );
     if (
       input.kind === "blob"
         ? await originalHasDependencies(tx, row.id, registry)
@@ -204,6 +246,12 @@ export async function deleteStorageObject(
     await tx.select().from(storageBudget).where(eq(storageBudget.id, "global")).for("update");
     const [row] = await tx.select().from(table).where(eq(table.id, data.id)).for("update");
     if (row?.state !== "deleting" || row.generation !== data.generation) return null;
+    await assertStorageNamespace(
+      tx,
+      ctx,
+      row.policyId,
+      data.kind === "blob" ? "original" : "derived",
+    );
     const m = marker(row.properties, data.generation);
     if (m.startedAt || m.uncertain)
       throw new StorageError(503, "STORAGE_BUSY", "STORAGE_BUSY", 3600);

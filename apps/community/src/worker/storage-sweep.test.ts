@@ -698,3 +698,275 @@ test("51 deferred avatars rotate past still-revoking first50 with a nonadvancing
     `/media/${outputRows[50].outputSha256}.jpg`,
   );
 }, 30000);
+
+test("review: 101 temporary attempts advance past first100 DELETE failures and preserve charges", async () => {
+  const { ctx, policy } = fixture,
+    { uploadAttempts } = await import("../server/db/schema"),
+    { sweepStorage } = await implementation(),
+    now = Date.now(),
+    rows = await ctx.db
+      .insert(uploadAttempts)
+      .values(
+        Array.from({ length: 101 }, () => {
+          const id = crypto.randomUUID(),
+            uploadId = crypto.randomUUID();
+          return {
+            id,
+            uploadId,
+            index: 0,
+            policyId: policy.id,
+            tempKey: `tmp/${uploadId}/0/${id}`,
+            size: 1,
+            state: "deleting" as const,
+            generation: 1,
+            writtenBytes: 1,
+            leaseUntil: new Date(0),
+            createdAt: new Date(now - 49 * 3600000),
+            updatedAt: new Date(now - 49 * 3600000),
+          };
+        }),
+      )
+      .returning();
+  rows.sort((a, b) => a.id.localeCompare(b.id));
+  const last = rows[100];
+  let deleted = false;
+  await ctx.db
+    .update(storageBudget)
+    .set({ temporaryWritten: sql`${storageBudget.temporaryWritten}+101` });
+  const before = (await ctx.db.select().from(storageBudget))[0].temporaryWritten;
+  const scoped = {
+    ...ctx,
+    now: () => new Date(now),
+    driver: {
+      ...ctx.driver,
+      head: async () => null,
+      list: async () => ({ objects: [] }),
+      delete: async (input: Parameters<typeof ctx.driver.delete>[0]) => {
+        if (input.key !== last.tempKey) throw new Error("DELETE unavailable");
+        deleted = true;
+      },
+    },
+  };
+  await sweepStorage(scoped);
+  expect(deleted).toBe(false);
+  expect((await ctx.db.select().from(storageBudget))[0].temporaryWritten).toBe(before);
+  await sweepStorage({ ...scoped, now: () => new Date(now + 1) });
+  expect(deleted).toBe(true);
+  expect(
+    (await ctx.db.select().from(uploadAttempts).where(eq(uploadAttempts.id, last.id)))[0],
+  ).toMatchObject({ state: "deleted", writtenBytes: 0 });
+  expect((await ctx.db.select().from(storageBudget))[0].temporaryWritten).toBe(before - 1);
+});
+test("review: foreign temporary policy is skipped before DELETE and retains charge", async () => {
+  const { ctx, policy } = fixture,
+    { storagePolicies, uploadAttempts } = await import("../server/db/schema"),
+    { sweepStorage } = await implementation(),
+    id = await own(),
+    now = Date.now();
+  const [foreign] = await ctx.db
+    .insert(storagePolicies)
+    .values({
+      name: crypto.randomUUID(),
+      endpoint: ctx.config.endpoint,
+      region: ctx.config.region,
+      originalBucket: "foreign-original",
+      derivedBucket: ctx.config.derivedBucket,
+      credentialsRef: policy.credentialsRef,
+    })
+    .returning();
+  const attemptId = crypto.randomUUID(),
+    uploadId = crypto.randomUUID(),
+    key = `tmp/${uploadId}/0/${attemptId}`;
+  let calls = 0;
+  try {
+    await ctx.db
+      .insert(uploadAttempts)
+      .values({
+        id: attemptId,
+        uploadId,
+        index: 0,
+        policyId: foreign.id,
+        tempKey: key,
+        size: 1,
+        state: "ready",
+        writtenBytes: 1,
+        leaseUntil: new Date(0),
+        createdAt: new Date(now - 49 * 3600000),
+        updatedAt: new Date(now - 49 * 3600000),
+      });
+    await ctx.db
+      .update(storageBudget)
+      .set({ temporaryWritten: sql`${storageBudget.temporaryWritten}+1` });
+    const before = (await ctx.db.select().from(storageBudget))[0].temporaryWritten;
+    await sweepStorage({
+      ...ctx,
+      driver: {
+        ...ctx.driver,
+        head: async () => null,
+        list: async () => ({ objects: [] }),
+        delete: async (input: Parameters<typeof ctx.driver.delete>[0]) => {
+          if (input.key === key) calls++;
+          else throw new Error("prior fixture attempts remain failed");
+        },
+      },
+    });
+    expect(calls).toBe(0);
+    expect(
+      (await ctx.db.select().from(uploadAttempts).where(eq(uploadAttempts.id, attemptId)))[0],
+    ).toMatchObject({ state: "ready", writtenBytes: 1 });
+    expect((await ctx.db.select().from(storageBudget))[0].temporaryWritten).toBe(before);
+  } finally {
+    await cleanupStorageFixture(ctx.db, [id], [foreign.id], undefined, true);
+  }
+});
+test("review: notification publication read obeys whole budget and cannot call resume late", async () => {
+  const { ctx, policy } = fixture,
+    id = await own(),
+    a = await readyFile(ctx, policy.id, id),
+    { notifyPublicMedia } = await import("../server/storage/avatars"),
+    { createStorageWorkBudget } = await import("./storage-reconcile"),
+    { testDbHandle } = await import("../server/testing/test-db");
+  await setAvatar(ctx, id, { fileId: a.file.id, expectedRevision: 0 }, crypto.randomUUID());
+  let calls = 0;
+  const client = await testDbHandle().pool.connect();
+  await client.query("begin");
+  await client.query("lock table media_publications in access exclusive mode");
+  const unlocked = new Promise<void>((resolve) =>
+    setTimeout(() => {
+      void client.query("rollback").finally(() => {
+        client.release();
+        resolve();
+      });
+    }, 300),
+  );
+  const work = createStorageWorkBudget(
+      {
+        ...ctx,
+        onMediaPublished: async () => {
+          calls++;
+        },
+      },
+      70,
+    ),
+    start = performance.now();
+  let rejected = false;
+  try {
+    await notifyPublicMedia(work.ctx, a.derived.outputSha256, work);
+  } catch {
+    rejected = true;
+  }
+  const elapsed = performance.now() - start;
+  await unlocked;
+  expect(rejected).toBe(true);
+  expect(elapsed).toBeLessThan(220);
+  expect(calls).toBe(0);
+});
+test("review: deferred restore waits on accounting before taking current association lock", async () => {
+  const { ctx, policy } = fixture,
+    id = await own(),
+    a = await readyFile(ctx, policy.id, id),
+    { createStorageDeletionHandler } = await import("../server/storage/deletion"),
+    { testDbHandle } = await import("../server/testing/test-db"),
+    { sweepStorage } = await implementation();
+  await setAvatar(ctx, id, { fileId: a.file.id, expectedRevision: 0 }, crypto.randomUUID());
+  const deps = {
+    db: ctx.db,
+    boss: ctx.boss,
+    handlers: [
+      { name: "fixture", hasContent: async () => true, purge: async () => {} },
+      createStorageDeletionHandler(ctx),
+    ],
+  };
+  await requestDeletion(deps, id, { deleteContent: false });
+  await cancelDeletion(deps, id);
+  await ctx.db
+    .update(userAvatars)
+    .set({ updatedAt: new Date(0) })
+    .where(eq(userAvatars.userId, id));
+  const client = await testDbHandle().pool.connect();
+  await client.query("begin");
+  await client.query("select 1 from storage_budget where id='global' for update");
+  const sweeping = sweepStorage({
+    ...ctx,
+    driver: { ...ctx.driver, head: async () => null, list: async () => ({ objects: [] }) },
+  });
+  let lockCode: string | undefined,
+    waiting = false;
+  try {
+    for (let i = 0; i < 100; i++) {
+      await client.query("select pg_stat_clear_snapshot()");
+      const q = await client.query(
+        "select 1 from pg_stat_activity where wait_event_type='Lock' and query like '%storage_budget%' and lower(query) like '%for update%' limit 1",
+      );
+      if (q.rows.length) {
+        waiting = true;
+        break;
+      }
+      await Bun.sleep(10);
+    }
+    try {
+      await client.query("select 1 from user_avatars where user_id=$1 for update nowait", [id]);
+    } catch (error) {
+      lockCode = (error as { code?: string }).code;
+    }
+  } finally {
+    await client.query("rollback");
+    client.release();
+    await sweeping;
+  }
+  expect(waiting).toBe(true);
+  expect(lockCode).toBeUndefined();
+}, 30000);
+
+test("review: notification failure recheck also obeys whole budget outside callback", async () => {
+  const { ctx, policy } = fixture,
+    id = await own(),
+    a = await readyFile(ctx, policy.id, id),
+    { notifyPublicMedia } = await import("../server/storage/avatars"),
+    { createStorageWorkBudget } = await import("./storage-reconcile"),
+    { testDbHandle } = await import("../server/testing/test-db");
+  await setAvatar(ctx, id, { fileId: a.file.id, expectedRevision: 0 }, crypto.randomUUID());
+  let calls = 0;
+  let unlocked: Promise<void> | undefined;
+  const work = createStorageWorkBudget(
+      {
+        ...ctx,
+        onMediaPublished: async () => {
+          calls++;
+          const client = await testDbHandle().pool.connect();
+          await client.query("begin");
+          await client.query("lock table media_publications in access exclusive mode");
+          unlocked = new Promise<void>((resolve) =>
+            setTimeout(() => {
+              void client.query("rollback").finally(() => {
+                client.release();
+                resolve();
+              });
+            }, 300),
+          );
+          throw new Error("remote resume failed");
+        },
+      },
+      90,
+    ),
+    start = performance.now();
+  let rejected = false;
+  try {
+    await notifyPublicMedia(work.ctx, a.derived.outputSha256, work);
+  } catch {
+    rejected = true;
+  }
+  const elapsed = performance.now() - start;
+  await unlocked;
+  expect(rejected).toBe(true);
+  expect(elapsed).toBeLessThan(220);
+  expect(calls).toBe(1);
+  expect(
+    (
+      await ctx.db
+        .select()
+        .from(mediaPublications)
+        .where(eq(mediaPublications.outputSha256, a.derived.outputSha256))
+    )[0].state,
+  ).toBe("public");
+});

@@ -15,9 +15,10 @@ import {
   userAvatars,
 } from "../db/schema";
 import { MEDIA_PURGE_QUEUE } from "../jobs/queues";
+import { withPurgeTransaction, type PurgeBudget } from "./publication";
 import type { StorageContext } from "./contracts";
 import { StorageError } from "./errors";
-import { hasPublicRepresentation } from "./references";
+import { hasPublicRepresentation, type ReferenceDb } from "./references";
 import { withStorageTransaction } from "./transactions";
 import { lockUploadAccounting, storageTime } from "./usage";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -230,26 +231,29 @@ export async function setAvatar(
   return result;
 }
 /** Task8 restores call this only after their outer transaction commits. Old replay is a no-op. */
-export async function notifyPublicMedia(ctx: StorageContext, hash: string): Promise<void> {
+export async function notifyPublicMedia(
+  ctx: StorageContext,
+  hash: string,
+  budget?: PurgeBudget,
+): Promise<void> {
   if (!ctx.onMediaPublished) return;
-  const [pub] = await ctx.db
-    .select()
-    .from(mediaPublications)
-    .where(eq(mediaPublications.outputSha256, hash));
-  if (pub?.state !== "public" || !(await hasPublicRepresentation(ctx.db, hash))) return;
-  try {
-    await ctx.onMediaPublished(hash, pub.generation);
-  } catch {
-    const [current] = await ctx.db
+  const read = async (tx: ReferenceDb) => {
+    const [pub] = await tx
       .select()
       .from(mediaPublications)
       .where(eq(mediaPublications.outputSha256, hash));
-    if (
-      current?.state !== "public" ||
-      current.generation !== pub.generation ||
-      !(await hasPublicRepresentation(ctx.db, hash))
-    )
-      return;
+    return pub?.state === "public" && (await hasPublicRepresentation(tx, hash)) ? pub : null;
+  };
+  const current = () => (budget ? withPurgeTransaction(ctx.db, budget, read) : read(ctx.db));
+  const pub = await current();
+  if (!pub) return;
+  budget?.check();
+  try {
+    await ctx.onMediaPublished(hash, pub.generation);
+    budget?.check();
+  } catch {
+    const latest = await current();
+    if (!latest || latest.generation !== pub.generation) return;
     throw new StorageError(503, "STORAGE_UNAVAILABLE");
   }
 }
