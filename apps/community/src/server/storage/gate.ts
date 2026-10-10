@@ -36,8 +36,7 @@ export type BreakerAttempt = {
   cancel(): void;
 };
 export function createStorageBreaker({ now = Date.now }: { now?: () => number } = {}) {
-  let failures = 0;
-  let firstFailure = 0;
+  let failures: number[] = [];
   let openUntil: number | null = null;
   let probing = false;
   let epoch = 0;
@@ -61,17 +60,15 @@ export function createStorageBreaker({ now = Date.now }: { now?: () => number } 
         )
           return;
         if (result === "success") {
-          failures = 0;
+          failures = [];
           openUntil = null;
           return;
         }
         const failedAt = now();
-        if (!failures || failedAt - firstFailure > 30_000) {
-          failures = 0;
-          firstFailure = failedAt;
-        }
-        failures++;
-        if (probe || failures >= 5) {
+        // Keep the latest five failures in the rolling window, even when an older failure expires.
+        failures = failures.filter((timestamp) => failedAt - timestamp <= 30_000).slice(-4);
+        failures.push(failedAt);
+        if (probe || failures.length >= 5) {
           openUntil = failedAt + 15_000;
           epoch++;
         }

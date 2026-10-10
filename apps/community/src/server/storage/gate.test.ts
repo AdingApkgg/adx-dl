@@ -36,6 +36,22 @@ describe("storage breaker", () => {
     probe.success();
     breaker.acquire().success();
   });
+  test("rolling window keeps recent failures after the oldest expires", () => {
+    let time = 0;
+    const breaker = createStorageBreaker({ now: () => time });
+    for (const failedAt of [0, 29_000, 30_500, 31_000, 32_000, 33_000]) {
+      time = failedAt;
+      breaker.acquire().failure(new Error("transport"));
+    }
+    expect(() => breaker.acquire()).toThrow(StorageUnavailableError);
+    time = 47_999;
+    expect(() => breaker.acquire()).toThrow(StorageUnavailableError);
+    time = 48_000;
+    const probe = breaker.acquire();
+    expect(() => breaker.acquire()).toThrow(StorageUnavailableError);
+    probe.success();
+    breaker.acquire().success();
+  });
   test("success and elapsed window reset consecutive failures", () => {
     let time = 0;
     const breaker = createStorageBreaker({ now: () => time });
