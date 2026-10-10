@@ -7,12 +7,15 @@ import {
   derivedObjects,
   mediaPublications,
   mediaPurgeRequests,
+  storageBudget,
+  storageQuarantine,
+  storagePolicies,
   type MediaPurgeEvidence,
 } from "../db/schema";
 import type { DbTransaction, StorageContext } from "./contracts";
 import type { MediaPurgeJobData } from "./avatars";
 import { hasPublicRepresentation } from "./references";
-import { lockStorageMutation } from "./transactions";
+import { lockStorageAdmission, lockStorageMutation } from "./transactions";
 
 export class MediaPurgeError extends Error {
   constructor(
@@ -31,6 +34,15 @@ export type PurgeAttempt = MediaPurgeJobData & { attempt: number };
 export async function withPurgeTransaction<T>(
   db: Db,
   budget: PurgeBudget,
+  fn: (tx: DbTransaction) => Promise<T>,
+): Promise<T> {
+  return boundedTransaction(db, budget, "mutation", fn);
+}
+// The gate choice is private. Public callers cannot supply an arbitrary maintenance bypass.
+async function boundedTransaction<T>(
+  db: Db,
+  budget: PurgeBudget,
+  operation: "mutation" | "quarantine-delete-settlement",
   fn: (tx: DbTransaction) => Promise<T>,
 ): Promise<T> {
   budget.check();
@@ -73,7 +85,8 @@ export async function withPurgeTransaction<T>(
       await tx.execute(
         sql`select set_config('transaction_timeout', ${String(Math.max(1, Math.floor(budget.remaining())))}, true)`,
       );
-      await lockStorageMutation(tx);
+      if (operation === "mutation") await lockStorageMutation(tx);
+      else await lockStorageAdmission(tx);
       const ms = Math.max(1, Math.floor(Math.min(5000, budget.remaining())));
       await tx.execute(sql`select set_config('statement_timeout', ${String(ms)}, true)`);
       const result = await fn(tx);
@@ -101,6 +114,46 @@ export async function withPurgeTransaction<T>(
       client.release();
     }
   }
+}
+export type SuccessfulQuarantineDelete = Pick<
+  typeof storageQuarantine.$inferSelect,
+  "id" | "generation" | "policyId" | "key" | "sha256" | "size"
+> & { deleteStartedAt: Date };
+/** Only call after this exact invocation's admitted remote DELETE has succeeded.
+ * This exports a specific settlement, never a callback that can mutate behind maintenance. */
+export async function settleSuccessfulQuarantineDelete(
+  ctx: Pick<StorageContext, "db" | "config">,
+  claim: SuccessfulQuarantineDelete,
+  budget?: PurgeBudget,
+): Promise<boolean> {
+  const settle = async (tx: DbTransaction) => {
+    const [accounting] = await tx.select().from(storageBudget)
+      .where(eq(storageBudget.id, "global")).for("update");
+    const [current] = await tx.select().from(storageQuarantine)
+      .where(eq(storageQuarantine.id, claim.id)).for("update");
+    if (current?.state !== "deleting" || current.generation !== claim.generation ||
+        current.deleteStartedAt?.getTime() !== claim.deleteStartedAt.getTime() ||
+        current.deleteUncertain || current.policyId !== claim.policyId ||
+        current.key !== claim.key || current.sha256 !== claim.sha256 || current.size !== claim.size)
+      return false;
+    const [policy] = await tx.select({ id: storagePolicies.id }).from(storagePolicies).where(and(
+      eq(storagePolicies.id, current.policyId),
+      eq(storagePolicies.endpoint, ctx.config.endpoint),
+      eq(storagePolicies.region, ctx.config.region),
+      eq(storagePolicies.originalBucket, ctx.config.originalBucket),
+    ));
+    if (!policy || !accounting || accounting.originalWritten < current.size)
+      throw new Error("STORAGE_INCONSISTENT");
+    await tx.update(storageQuarantine).set({ state: "deleted" }).where(eq(storageQuarantine.id, current.id));
+    await tx.update(storageBudget).set({ originalWritten: accounting.originalWritten - current.size })
+      .where(eq(storageBudget.id, "global"));
+    return true;
+  };
+  if (budget) return boundedTransaction(ctx.db, budget, "quarantine-delete-settlement", settle);
+  return ctx.db.transaction(async (tx) => {
+    await lockStorageAdmission(tx);
+    return settle(tx);
+  });
 }
 async function locked(tx: DbTransaction, data: MediaPurgeJobData) {
   await tx

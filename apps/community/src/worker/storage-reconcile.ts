@@ -12,8 +12,8 @@ import {
 import type { DbTransaction, StorageContext } from "../server/storage/contracts";
 import { StorageError } from "../server/storage/errors";
 import { objectKey } from "../server/storage/keys";
-import { lockStorageAdmission, withStorageTransaction } from "../server/storage/transactions";
-import { withPurgeTransaction, type PurgeBudget } from "../server/storage/publication";
+import { withStorageTransaction } from "../server/storage/transactions";
+import { settleSuccessfulQuarantineDelete, withPurgeTransaction, type PurgeBudget } from "../server/storage/publication";
 import { assertStorageNamespace, storageNamespaceCandidate } from "./storage-delete";
 const DAY = 86400000;
 export type StorageWorkBudget = PurgeBudget & { available(): boolean; ctx: StorageContext };
@@ -359,42 +359,11 @@ export async function cleanupStorageQuarantine(
       }
       try {
         await ctx.driver.delete({ bucket: "original", key: row.key });
-        // No new work is admitted: settle only the exact successful in-flight claim.
-        budget?.check();
-        const settled = await ctx.db.transaction(async (tx) => {
-          if (budget) {
-            budget.check();
-            await tx.execute(sql`select set_config('transaction_timeout', ${String(Math.max(1, Math.floor(budget.remaining())))}, true)`);
-          }
-          await lockStorageAdmission(tx);
-          const [b] = await tx
-            .select()
-            .from(storageBudget)
-            .where(eq(storageBudget.id, "global"))
-            .for("update");
-          const [current] = await tx
-            .select()
-            .from(storageQuarantine)
-            .where(eq(storageQuarantine.id, row.id))
-            .for("update");
-          if (
-            current?.state !== "deleting" ||
-            current.generation !== claim ||
-            current.deleteStartedAt?.getTime() !== now.getTime() ||
-            current.deleteUncertain
-          )
-            return;
-          await tx
-            .update(storageQuarantine)
-            .set({ state: "deleted" })
-            .where(eq(storageQuarantine.id, row.id));
-          await tx
-            .update(storageBudget)
-            .set({ originalWritten: b.originalWritten - row.size })
-            .where(eq(storageBudget.id, "global"));
-          budget?.check();
-          return true;
-        });
+        // The production budget still covers pool admission, BEGIN, COMMIT and lost ACKs.
+        const settled = await settleSuccessfulQuarantineDelete(ctx, {
+          id: row.id, generation: claim, deleteStartedAt: now,
+          policyId: row.policyId, key: row.key, sha256: row.sha256, size: row.size,
+        }, budget);
         if (settled) result.deleted++;
       } catch {
         // Best-effort uncertainty flag; durable started state alone already prevents every retry/reincarnation.
