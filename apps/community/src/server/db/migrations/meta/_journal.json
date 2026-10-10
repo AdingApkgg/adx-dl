@@ -29,6 +29,13 @@
       "when": 1790750330788,
       "tag": "0003_login_method_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791616735648,
+      "tag": "0004_storage",
+      "breakpoints": true
     }
   ]
 }
