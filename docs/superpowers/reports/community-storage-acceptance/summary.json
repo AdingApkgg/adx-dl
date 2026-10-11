@@ -1,0 +1,39 @@
+{
+  "source": "832cf81",
+  "status": "DONE_WITH_CONCERNS",
+  "completeHttpFlow": "passed",
+  "initializer": {
+    "pass": 3,
+    "assertions": 14,
+    "seconds": 1.77
+  },
+  "finalImages": "image-source-proof.json",
+  "browser": "upload failed; preview/save/remove not accepted",
+  "freshFixed": {
+    "exit": 124,
+    "seconds": 238.42,
+    "completed": false
+  },
+  "freshPrior": {
+    "pass": 1,
+    "assertions": 88,
+    "seconds": 75.45,
+    "rtoMs": 36599.303637,
+    "source": "127a9f2 plus optional real-role test harness"
+  },
+  "dom": {
+    "exit": 124,
+    "seconds": 120.17,
+    "completedTests": 0
+  },
+  "httpTail": {
+    "pass": 47,
+    "fail": 3,
+    "assertions": 197,
+    "seconds": 57.27
+  },
+  "unexecutedContinuationFiles": 95,
+  "finalGatePassed": false,
+  "productionDeployment": false,
+  "publicPush": false
+}

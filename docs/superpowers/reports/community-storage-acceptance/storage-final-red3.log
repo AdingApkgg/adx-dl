@@ -1,0 +1,23 @@
+bun test v1.4.2 (744846f84)
+
+ops/backup/journal-publication.test.ts:
+22 |  try{
+23 |   const future=new Date();future.setUTCMonth(future.getUTCMonth()+8);
+24 |   work=mode==='head'?exportJournal(config,controller.signal):retainJournal(config,future,controller.signal);
+25 |   const observed=work.then(()=>null,e=>e);await pending;controller.abort();expect((await observed)?.message).toBe('STORAGE_JOURNAL_DEADLINE');
+26 |   await pool.query("insert into storage_tombstones(kind,user_id) values('user_deleted','later')");
+27 |   await expect(exportJournal(config)).rejects.toThrow();
+                                                   ^
+error: expect(received).rejects.toThrow(expected)
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/ops/backup/journal-publication.test.ts:27:47)
+(fail) I3 late head rename keeps durable ownership across timeout and cannot be overtaken [1206.01ms]
+
+ 0 pass
+ 1 filtered out
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [10.29s]

@@ -1,10 +1,17 @@
+import { createDeletionHandlers } from "./storage/deletion";
 import { Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { HTTPException } from "hono/http-exception";
 import { requestId } from "hono/request-id";
 
 import { describeError } from "@/shared/describe-error";
 import type { Logger } from "@/shared/log";
 
+import { createMediaDrain, type MediaDrain } from "./storage/drain";
+import { createPublicMediaHandler, isMediaRequest } from "./storage/public-media";
+import { mediaDenial } from "./storage/files";
+import { isUploadPartRequest } from "./storage/parts";
+import { StorageError } from "./storage/errors";
 import { apiRoutes } from "./api/v1";
 import type { AppEnv } from "./app-env";
 import type { Auth } from "./auth/auth";
@@ -15,7 +22,7 @@ import { bodyLimitWhenDeclared } from "./middleware/body-limit";
 import { clientIp, rateLimitKeyForIp } from "./middleware/client-ip";
 import { csrfGuard } from "./middleware/csrf";
 import { pendingDeletionGuard } from "./middleware/pending-deletion";
-import { rateLimit, type RateLimitStore } from "./middleware/rate-limit";
+import { rateLimit, uploadRateLimits, type RateLimitStore } from "./middleware/rate-limit";
 import { requestLog } from "./middleware/request-log";
 import { securityHeaders } from "./middleware/security-headers";
 import { umamiProxy } from "./middleware/umami";
@@ -48,18 +55,63 @@ export type AppDeps = {
   auth: Auth;
   /** /api/v1 的接口用到的依赖（auth、log 由 createApp 从上面同名的两项放进去）。 */
   services: Omit<ApiServices, "auth" | "log">;
+  /** Task11 also mounts this same instance on the internal-only listener. */
+  mediaDrain?: MediaDrain;
 };
 
 // 中间件顺序是 spec 第 8.1 节定的，改动前先对照 spec。
 export function createApp(deps: AppDeps) {
   const app = new Hono<AppEnv>();
-  const services: ApiServices = { ...deps.services, auth: deps.auth, log: deps.log };
+  const storage = deps.services.storage;
+  const secret = storage && "internalMediaSecret" in storage.config
+    ? storage.config.internalMediaSecret : undefined;
+  const drain = deps.mediaDrain ?? (storage && secret
+    ? createMediaDrain({ db: storage.db, secret }) : undefined);
+  const configuredStorage = storage && drain && secret ? {
+    ...storage,
+    onMediaPublished: async (hash: string, generation: number) => {
+      const response = await drain.handle(new Request("http://internal/internal/media/resume", {
+        method: "POST",
+        headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
+        body: JSON.stringify({ hash, generation }),
+      }));
+      if (!response.ok) throw new StorageError(503, "STORAGE_UNAVAILABLE");
+    },
+  } : storage;
+  const services: ApiServices = {
+    ...deps.services, storage: configuredStorage, auth: deps.auth, log: deps.log,
+    deletionHandlers: configuredStorage ? createDeletionHandlers(configuredStorage, deps.services.deletionHandlers.filter(h => h.name !== "storage")) : deps.services.deletionHandlers,
+  };
   // Redis 宕掉时每个请求都会在限流这一步出错：三条限流规则共用一个限了频的日志（1a 评审 R14）。
   const onRateLimitStoreError = throttledErrorLog(deps.log, "rate_limit_store_error");
 
   app.use("*", requestId());
   app.use("*", clientIp());
   app.use("*", requestLog(deps.log));
+  app.use("/api/v1/me/charts/*", async (c, next) => {
+    c.header("cache-control", "private, no-store");
+    c.header("x-content-type-options", "nosniff");
+    await next();
+    if (c.res.headers.get("accept-ranges") === "bytes")
+      c.res.headers.set("content-security-policy", "default-src 'none'; sandbox");
+  });
+  const media = storage && drain ? createPublicMediaHandler(storage, drain) : undefined;
+  app.use("*", async (c, next) => {
+    // Node adapter exposes the exact request-target before URL dot-segment normalization.
+    const rawTarget = (c.env as { incoming?: { url?: string } } | undefined)?.incoming?.url;
+    if (!isMediaRequest(c.req.raw, rawTarget)) return next();
+    const response = media ? await media(c.req.raw, rawTarget) : mediaDenial();
+    response.headers.set("X-Request-Id", c.get("requestId"));
+    return response;
+  });
+
+  // File streams retain their sandbox policy after the page security middleware completes.
+  app.use("/api/v1/files/*", async (c, next) => {
+    await next();
+    if (c.res.headers.get("accept-ranges") === "bytes") {
+      c.res.headers.set("Content-Security-Policy", "default-src 'none'; sandbox");
+    }
+  });
   app.use("*", securityHeaders({ isProduction: deps.isProduction }));
 
   // 服务端渲染时 loader 经进程内 API 调 /api/v1（in-process-api.ts）。会话满一天时续期发生在那次进程内
@@ -91,7 +143,6 @@ export function createApp(deps: AppDeps) {
     }
   });
 
-  app.all("/media/*", (c) => jsonError(c, 404, "NOT_FOUND", "Not found"));
 
   // spec 第 8.1 节第 5 条：和 /media 一样挂在会话中间件之前。
   app.route(
@@ -174,13 +225,15 @@ export function createApp(deps: AppDeps) {
   });
   app.use("/api/v1/*", csrfGuard({ publicOrigin: deps.publicOrigin }));
   // JSON 校验器会先把整个请求体读进内存、解析完，才轮到各接口自己的规则，所以大小要在这里先限住。
-  app.use(
-    "/api/v1/*",
-    bodyLimitWhenDeclared({
-      maxSize: API_BODY_LIMIT,
-      onError: (c) => jsonError(c, 413, "PAYLOAD_TOO_LARGE", "Request body is too large"),
-    })
-  );
+  const jsonBodyLimit = bodyLimitWhenDeclared({
+    maxSize: API_BODY_LIMIT,
+    onError: (c) => jsonError(c, 413, "PAYLOAD_TOO_LARGE", "Request body is too large"),
+  });
+  app.use("/api/v1/*", async (c, next) => {
+    // Exact parts read their bounded stream after authentication and concurrency admission.
+    if (isUploadPartRequest(c.req.method, c.req.path)) return next();
+    return jsonBodyLimit(c, next);
+  });
   // spec 第 10.2 节：改数据的接口按用户每分钟 60 次。读请求和未登录的请求不算。
   app.use(
     "/api/v1/*",
@@ -189,10 +242,17 @@ export function createApp(deps: AppDeps) {
       name: "api-user-write",
       limit: 60,
       windowSec: 60,
-      key: (c) => (READ_METHODS.has(c.req.method) ? null : (c.get("auth")?.user.id ?? null)),
+      key: (c) =>
+        READ_METHODS.has(c.req.method) || isUploadPartRequest(c.req.method, c.req.path)
+          ? null
+          : (c.get("auth")?.user.id ?? null),
       onStoreError: onRateLimitStoreError,
     })
   );
+  for (const middleware of uploadRateLimits({
+    store: deps.rateLimitStore,
+    onStoreError: onRateLimitStoreError,
+  })) app.use("/api/v1/*", middleware);
   // spec 第 10.6 节：注销冷静期里除了几个接口，一律 403 ACCOUNT_PENDING_DELETION。
   app.use("/api/v1/*", pendingDeletionGuard());
   app.route("/", apiRoutes);
@@ -201,6 +261,10 @@ export function createApp(deps: AppDeps) {
   app.all("/api/*", (c) => jsonError(c, 404, "NOT_FOUND", "Not found"));
 
   app.onError((error, c) => {
+    if (error instanceof StorageError) {
+      if (error.retryAfter) c.header("Retry-After", String(error.retryAfter));
+      return jsonError(c, error.status as ContentfulStatusCode, error.code, error.message);
+    }
     if (error instanceof HTTPException) {
       return jsonError(c, error.status, codeForStatus(error.status), error.message || "Request failed");
     }

@@ -1,0 +1,32 @@
+import { test, expect } from "bun:test";
+import type { PgBoss } from "pg-boss";
+import type { StorageContext } from "../server/storage/contracts";
+import { createStorageIOTracker } from "../server/storage/maintenance";
+import { registerStorageWorkers } from "./storage-sweep";
+import { registerMediaPurgeWorker } from "./media-purge";
+import { registerStorageJournalWorker } from "./storage-journal";
+import { STORAGE_JOURNAL_QUEUE } from "../server/jobs/queues";
+
+test("control storage jobs freeze admission and active journal completion gates drain", async () => {
+  const handlers = new Map<string, (jobs: never[]) => Promise<unknown>>();
+  const boss = { work: async (name: string, ...args: unknown[]) => { handlers.set(name, args.at(-1) as (jobs: never[]) => Promise<unknown>); }, schedule: async () => {} } as unknown as PgBoss;
+  const tracker = createStorageIOTracker();
+  const controller = new AbortController();
+  const ctx = { lifecycle: { run: tracker.run, signal: controller.signal } } as StorageContext;
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await registerStorageWorkers(ctx, boss);
+  await registerMediaPurgeWorker(ctx, boss);
+  await registerStorageJournalWorker(ctx, boss, async () => { await pending; await tracker.run(async () => {}); });
+  const work = handlers.get(STORAGE_JOURNAL_QUEUE)!([]);
+  expect(tracker.status().active).toBe(1);
+  let drained = false;
+  const drain = tracker.pauseAndDrain(AbortSignal.timeout(2000)).then(() => { drained = true; });
+  for (const handler of handlers.values()) await expect(handler([])).rejects.toMatchObject({ code: "STORAGE_MAINTENANCE" });
+  expect(drained).toBe(false);
+  release();
+  await work;
+  await drain;
+  expect(tracker.status()).toEqual({ paused: true, active: 0 });
+  expect(handlers.size).toBe(9);
+});

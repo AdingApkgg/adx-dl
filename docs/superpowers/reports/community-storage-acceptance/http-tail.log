@@ -1,0 +1,270 @@
+bun test v1.4.2 (744846f84)
+
+test/http/umami.test.ts:
+93 |     await Bun.sleep(200);
+94 |   }
+95 |   proc.kill();
+96 |   await proc.exited;
+97 |   await rm(restoreStateDirectory, { recursive: true, force: true });
+98 |   throw new Error("server did not become healthy within 20s");
+                 ^
+error: server did not become healthy within 20s
+      at startBuiltServer (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/test/http/server.ts:98:13)
+      at async <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/test/http/umami.test.ts:26:18)
+(fail) (unnamed) [27495.90ms]
+28 |     UMAMI_INTERNAL_URL: upstream.url.href,
+29 |   });
+30 | }, 60_000);
+31 |
+32 | afterAll(async () => {
+33 |   await server.stop();
+             ^
+TypeError: undefined is not an object (evaluating 'server.stop')
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/test/http/umami.test.ts:33:9)
+(fail) (unnamed) [12.12ms]
+
+test/http/auth.test.ts:
+🚀 Server started on port 41698
+🌍 http://127.0.0.1:41698
+🏎️ Server started in 333ms
+{"time":"2026-10-10T18:22:23.717Z","level":"info","event":"request","requestId":"363fa42d-82ca-477d-af82-416188caf02f","method":"GET","path":"/healthz","status":200,"ms":5,"ip":"unknown"}
+{"time":"2026-10-10T18:22:23.817Z","level":"info","event":"request","requestId":"11c31454-3d18-408c-a596-def915094df9","method":"GET","path":"/api/v1/me","status":401,"ms":29,"ip":"unknown"}
+{"time":"2026-10-10T18:22:23.831Z","level":"info","event":"request","requestId":"11c31454-3d18-408c-a596-def915094df9","method":"GET","path":"/api/v1/login-options","status":200,"ms":6,"ip":"unknown"}
+{"time":"2026-10-10T18:22:23.973Z","level":"info","event":"request","requestId":"11c31454-3d18-408c-a596-def915094df9","method":"GET","path":"/login","status":200,"ms":233,"ip":"unknown"}
+(pass) 登录页 > 200、不缓存、不收录，三种登录方式都在 [244.39ms]
+{"time":"2026-10-10T18:22:23.995Z","level":"info","event":"request","requestId":"b35da93c-f0fa-4330-9de1-ec192047ca39","method":"GET","path":"/api/v1/me","status":401,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:24.001Z","level":"info","event":"request","requestId":"b35da93c-f0fa-4330-9de1-ec192047ca39","method":"GET","path":"/api/v1/login-options","status":200,"ms":6,"ip":"unknown"}
+{"time":"2026-10-10T18:22:24.022Z","level":"info","event":"request","requestId":"b35da93c-f0fa-4330-9de1-ec192047ca39","method":"GET","path":"/en/login","status":200,"ms":34,"ip":"unknown"}
+(pass) 登录页 > /en/login 是英文 [45.56ms]
+{"time":"2026-10-10T18:22:24.028Z","level":"info","event":"request","requestId":"af52f93b-9efe-4e45-942f-e50f1f737c84","method":"GET","path":"/api/v1/me","status":401,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:24.033Z","level":"info","event":"request","requestId":"af52f93b-9efe-4e45-942f-e50f1f737c84","method":"GET","path":"/api/v1/login-options","status":200,"ms":2,"ip":"unknown"}
+{"time":"2026-10-10T18:22:24.043Z","level":"info","event":"request","requestId":"af52f93b-9efe-4e45-942f-e50f1f737c84","method":"GET","path":"/login","status":200,"ms":17,"ip":"unknown"}
+(pass) 登录页 > 每个内联脚本都带着本次响应 CSP 里的 nonce [24.77ms]
+{"time":"2026-10-10T18:22:24.056Z","level":"info","event":"request","requestId":"d0b1b724-a394-4e2d-8324-fe1de2b1c890","method":"GET","path":"/api/v1/me","status":401,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:24.061Z","level":"info","event":"request","requestId":"d0b1b724-a394-4e2d-8324-fe1de2b1c890","method":"GET","path":"/settings/account","status":302,"ms":7,"ip":"unknown"}
+{"time":"2026-10-10T18:22:24.067Z","level":"info","event":"request","requestId":"b8d705b5-6e64-4e71-8053-59ad69121e5a","method":"GET","path":"/api/v1/me","status":401,"ms":2,"ip":"unknown"}
+{"time":"2026-10-10T18:22:24.068Z","level":"info","event":"request","requestId":"b8d705b5-6e64-4e71-8053-59ad69121e5a","method":"GET","path":"/ja/settings/account","status":302,"ms":5,"ip":"unknown"}
+(pass) 需要登录的页面 > 未登录访问账号设置，跳到登录页并带上原地址 [18.73ms]
+{"time":"2026-10-10T18:22:24.078Z","level":"info","event":"request","requestId":"47c34064-65ca-43b5-affc-c3b2ac045ec1","method":"GET","path":"/fr/settings/account","status":404,"ms":9,"ip":"unknown"}
+(pass) 需要登录的页面 > 不认识的语言前缀直接 404 [10.38ms]
+{"time":"2026-10-10T18:22:24.102Z","level":"error","event":"better_auth","message":"Rate limiting could not determine a client IP and is falling back to a single shared per-path bucket. Ensure your runtime forwards a trusted client IP header, then set `advanced.ipAddress.ipAddressHeaders` or `advanced.ipAddress.trustedProxies` so the address can be resolved."}
+{"time":"2026-10-10T18:22:24.113Z","level":"info","event":"request","requestId":"2b98a7b4-fd66-4f6e-8763-3593c108c8a5","method":"GET","path":"/api/auth/get-session","status":200,"ms":33,"ip":"unknown"}
+(pass) 账号接口 > 未登录时取会话是 null [35.77ms]
+{"time":"2026-10-10T18:22:24.130Z","level":"info","event":"request","requestId":"ed3c2f1e-f9b5-4cfe-9c6e-cf1680d828a4","method":"POST","path":"/api/auth/update-user","status":404,"ms":10,"ip":"unknown"}
+(pass) 账号接口 > 关掉的 Better Auth 接口返回 404 [16.87ms]
+{"time":"2026-10-10T18:22:24.311Z","level":"info","event":"request","requestId":"d0dc774d-74d2-4211-9c88-238441a04f7d","method":"POST","path":"/api/auth/sign-in/social","status":200,"ms":177,"ip":"unknown"}
+(pass) 账号接口 > 发起 Google 登录返回 Google 的授权地址 [187.39ms]
+{"time":"2026-10-10T18:22:24.329Z","level":"info","event":"request","requestId":"f31ab275-6561-4934-9643-017aa8c49a41","method":"GET","path":"/api/v1/login-options","status":200,"ms":8,"ip":"unknown"}
+(pass) 账号接口 > /api/v1/login-options 给出 Turnstile 站点密钥和 QQ 状态 [11.59ms]
+{"time":"2026-10-10T18:22:24.357Z","level":"info","event":"request","requestId":"0814a095-3dab-45c5-86f6-5dce21c47a85","method":"GET","path":"/api/v1/login-options","status":200,"ms":11,"ip":"unknown"}
+(pass) 账号接口 > 机器人状态从 HTTP 测试专用的 Redis 库（1 号库）读 [29.22ms]
+{"time":"2026-10-10T18:22:24.515Z","level":"info","event":"request","requestId":"de833dc7-56e2-46d4-a76a-56020d3af3be","method":"GET","path":"/api/v1/me","status":200,"ms":49,"ip":"unknown"}
+{"time":"2026-10-10T18:22:24.527Z","level":"info","event":"request","requestId":"de833dc7-56e2-46d4-a76a-56020d3af3be","method":"GET","path":"/api/v1/meta","status":200,"ms":9,"ip":"unknown"}
+{"time":"2026-10-10T18:22:24.550Z","level":"info","event":"request","requestId":"de833dc7-56e2-46d4-a76a-56020d3af3be","method":"GET","path":"/","status":200,"ms":88,"ip":"unknown"}
+(pass) 服务端渲染时的会话续期 > 文档请求：页面响应带回 30 天的会话 Cookie，库里的有效期也延长到约 30 天后 [265.80ms]
+{"time":"2026-10-10T18:22:24.696Z","level":"info","event":"request","requestId":"fc959bc2-2398-4cf8-8a3f-30fe46c91c28","method":"GET","path":"/api/v1/me","status":200,"ms":42,"ip":"unknown"}
+{"time":"2026-10-10T18:22:24.703Z","level":"info","event":"request","requestId":"fc959bc2-2398-4cf8-8a3f-30fe46c91c28","method":"GET","path":"/api/v1/meta","status":200,"ms":5,"ip":"unknown"}
+{"time":"2026-10-10T18:22:24.704Z","level":"info","event":"request","requestId":"fc959bc2-2398-4cf8-8a3f-30fe46c91c28","method":"GET","path":"/_.data","status":200,"ms":52,"ip":"unknown"}
+(pass) 服务端渲染时的会话续期 > .data 请求：响应同样带回 30 天的会话 Cookie [81.95ms]
+{"time":"2026-10-10T18:22:24.759Z","level":"info","event":"request","requestId":"4fae031a-1db4-4945-b05b-f20593909395","method":"GET","path":"/api/v1/me","status":401,"ms":6,"ip":"unknown"}
+{"time":"2026-10-10T18:22:24.770Z","level":"info","event":"request","requestId":"4fae031a-1db4-4945-b05b-f20593909395","method":"GET","path":"/api/v1/meta","status":200,"ms":10,"ip":"unknown"}
+{"time":"2026-10-10T18:22:24.790Z","level":"info","event":"request","requestId":"4fae031a-1db4-4945-b05b-f20593909395","method":"GET","path":"/","status":200,"ms":41,"ip":"unknown"}
+(pass) 服务端渲染时的会话续期 > 会话已经被删掉：页面响应不带任何 Set-Cookie [83.03ms]
+
+test/http/profile-deletion.test.ts:
+🚀 Server started on port 44964
+🌍 http://127.0.0.1:44964
+🏎️ Server started in 198ms
+{"time":"2026-10-10T18:22:30.800Z","level":"info","event":"request","requestId":"b30f7aa4-d81d-445a-949d-f123010d1be4","method":"GET","path":"/healthz","status":200,"ms":3,"ip":"unknown"}
+{"time":"2026-10-10T18:22:31.218Z","level":"info","event":"request","requestId":"69de2058-a789-4862-a275-2dd412803e60","method":"GET","path":"/api/v1/me","status":200,"ms":209,"ip":"unknown"}
+{"time":"2026-10-10T18:22:31.351Z","level":"info","event":"request","requestId":"69de2058-a789-4862-a275-2dd412803e60","method":"GET","path":"/privacy","status":200,"ms":492,"ip":"unknown"}
+{"time":"2026-10-10T18:22:31.440Z","level":"info","event":"request","requestId":"fac23a95-ee64-4fb3-bbe7-2ff3e249a5f3","method":"GET","path":"/api/v1/me","status":200,"ms":74,"ip":"unknown"}
+{"time":"2026-10-10T18:22:31.480Z","level":"info","event":"request","requestId":"fac23a95-ee64-4fb3-bbe7-2ff3e249a5f3","method":"GET","path":"/en/privacy","status":200,"ms":117,"ip":"unknown"}
+{"time":"2026-10-10T18:22:31.510Z","level":"info","event":"request","requestId":"71f1260b-4431-4b95-bd43-c5df555217bb","method":"GET","path":"/api/v1/me","status":200,"ms":19,"ip":"unknown"}
+{"time":"2026-10-10T18:22:31.570Z","level":"info","event":"request","requestId":"71f1260b-4431-4b95-bd43-c5df555217bb","method":"GET","path":"/ja/privacy","status":200,"ms":83,"ip":"unknown"}
+{"time":"2026-10-10T18:22:31.677Z","level":"info","event":"request","requestId":"302a5e70-f01f-4640-ba74-01b2de82858b","method":"GET","path":"/api/v1/me","status":200,"ms":16,"ip":"unknown"}
+{"time":"2026-10-10T18:22:31.687Z","level":"info","event":"request","requestId":"302a5e70-f01f-4640-ba74-01b2de82858b","method":"GET","path":"/privacy","status":200,"ms":43,"ip":"unknown"}
+{"time":"2026-10-10T18:22:31.731Z","level":"info","event":"request","requestId":"05b1da09-8e06-462e-b1e3-c0a271bcd6ba","method":"GET","path":"/api/v1/me","status":200,"ms":17,"ip":"unknown"}
+{"time":"2026-10-10T18:22:31.748Z","level":"info","event":"request","requestId":"05b1da09-8e06-462e-b1e3-c0a271bcd6ba","method":"GET","path":"/en/privacy","status":200,"ms":46,"ip":"unknown"}
+{"time":"2026-10-10T18:22:31.772Z","level":"info","event":"request","requestId":"afa38d28-71a7-4f68-a410-294b6dc1b08c","method":"GET","path":"/api/v1/me","status":200,"ms":15,"ip":"unknown"}
+{"time":"2026-10-10T18:22:31.789Z","level":"info","event":"request","requestId":"afa38d28-71a7-4f68-a410-294b6dc1b08c","method":"GET","path":"/ja/privacy","status":200,"ms":35,"ip":"unknown"}
+(pass) 隐私说明的登录状态 > 正常和待注销用户都可阅读，待注销状态不会触发重定向 [984.81ms]
+{"time":"2026-10-10T18:22:32.045Z","level":"info","event":"request","requestId":"26c4393c-15ab-4320-a4f7-d0c6161bc7d8","method":"GET","path":"/api/v1/me","status":401,"ms":7,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.089Z","level":"info","event":"request","requestId":"26c4393c-15ab-4320-a4f7-d0c6161bc7d8","method":"GET","path":"/api/v1/users/6kky3ce6tw","status":200,"ms":38,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.114Z","level":"info","event":"request","requestId":"26c4393c-15ab-4320-a4f7-d0c6161bc7d8","method":"GET","path":"/u/6kky3ce6tw","status":200,"ms":84,"ip":"unknown"}
+(pass) 个人主页 > 允许收录：标题、描述是昵称和简介，显示用户 ID；不缓存 [328.37ms]
+{"time":"2026-10-10T18:22:32.305Z","level":"info","event":"request","requestId":"be5988ae-9346-4d1b-8248-d6a06674f4c0","method":"GET","path":"/api/v1/me","status":401,"ms":14,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.320Z","level":"info","event":"request","requestId":"be5988ae-9346-4d1b-8248-d6a06674f4c0","method":"GET","path":"/api/v1/users/msuexr95dj","status":200,"ms":11,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.343Z","level":"info","event":"request","requestId":"be5988ae-9346-4d1b-8248-d6a06674f4c0","method":"GET","path":"/u/msuexr95dj","status":200,"ms":55,"ip":"unknown"}
+(pass) 个人主页 > 正在注销：显示'该用户正在注销'，不收录，也不出现昵称 [240.76ms]
+{"time":"2026-10-10T18:22:32.388Z","level":"info","event":"request","requestId":"25dfd08c-9d15-40e9-9dde-7d569b8a191c","method":"GET","path":"/api/v1/me","status":401,"ms":2,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.424Z","level":"info","event":"request","requestId":"25dfd08c-9d15-40e9-9dde-7d569b8a191c","method":"GET","path":"/api/v1/users/a4hn9mx64m","status":404,"ms":33,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.444Z","level":"info","event":"request","requestId":"25dfd08c-9d15-40e9-9dde-7d569b8a191c","method":"GET","path":"/u/a4hn9mx64m","status":404,"ms":81,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.472Z","level":"info","event":"request","requestId":"581bed33-8709-457e-bde2-2d58971bef68","method":"GET","path":"/api/v1/me","status":401,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.473Z","level":"info","event":"request","requestId":"581bed33-8709-457e-bde2-2d58971bef68","method":"GET","path":"/api/v1/users/NOT-AN-ID","status":404,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.529Z","level":"info","event":"request","requestId":"581bed33-8709-457e-bde2-2d58971bef68","method":"GET","path":"/u/NOT-AN-ID","status":404,"ms":56,"ip":"unknown"}
+(pass) 个人主页 > 不存在的 id、格式不对的 id：404 页 [170.31ms]
+{"time":"2026-10-10T18:22:32.567Z","level":"info","event":"request","requestId":"0386e815-be59-46ce-82b8-b29a1da289f1","method":"GET","path":"/api/v1/me","status":401,"ms":4,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.574Z","level":"info","event":"request","requestId":"0386e815-be59-46ce-82b8-b29a1da289f1","method":"GET","path":"/settings/profile","status":302,"ms":12,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.586Z","level":"info","event":"request","requestId":"17a98163-8974-463a-be2a-f68a1a1f9f5e","method":"GET","path":"/api/v1/me","status":401,"ms":5,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.601Z","level":"info","event":"request","requestId":"17a98163-8974-463a-be2a-f68a1a1f9f5e","method":"GET","path":"/onboarding","status":302,"ms":21,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.604Z","level":"info","event":"request","requestId":"5bf22c4f-8782-42e7-bb12-40d50ed22f27","method":"GET","path":"/api/v1/me","status":401,"ms":0,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.608Z","level":"info","event":"request","requestId":"5bf22c4f-8782-42e7-bb12-40d50ed22f27","method":"GET","path":"/account-deletion","status":302,"ms":5,"ip":"unknown"}
+(pass) 需要登录的新页面 > 未登录访问个人资料、引导页、注销提示页：跳到登录页并带上原地址 [83.20ms]
+{"time":"2026-10-10T18:22:32.672Z","level":"info","event":"request","requestId":"327b8e38-9097-47cc-8025-acee5c7cb336","method":"GET","path":"/api/v1/me","status":200,"ms":12,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.779Z","level":"info","event":"request","requestId":"327b8e38-9097-47cc-8025-acee5c7cb336","method":"GET","path":"/api/v1/me/profile","status":200,"ms":105,"ip":"unknown"}
+{"time":"2026-10-10T18:22:32.959Z","level":"info","event":"request","requestId":"327b8e38-9097-47cc-8025-acee5c7cb336","method":"GET","path":"/settings/profile","status":200,"ms":302,"ip":"unknown"}
+{"time":"2026-10-10T18:22:33.042Z","level":"info","event":"request","requestId":"540e3367-63df-4d78-b367-4f6129a3eb16","method":"GET","path":"/api/v1/me","status":200,"ms":16,"ip":"unknown"}
+{"time":"2026-10-10T18:22:33.086Z","level":"info","event":"request","requestId":"540e3367-63df-4d78-b367-4f6129a3eb16","method":"GET","path":"/api/v1/me/profile","status":200,"ms":41,"ip":"unknown"}
+{"time":"2026-10-10T18:22:33.113Z","level":"info","event":"request","requestId":"540e3367-63df-4d78-b367-4f6129a3eb16","method":"GET","path":"/onboarding","status":200,"ms":96,"ip":"unknown"}
+(pass) 需要登录的新页面 > 已登录：个人资料页和引导页正常显示，不收录 [500.81ms]
+{"time":"2026-10-10T18:22:33.187Z","level":"info","event":"request","requestId":"8d2c5ff5-3e1f-4a28-a5f1-c2d47ab328fc","method":"GET","path":"/api/v1/me","status":200,"ms":30,"ip":"unknown"}
+{"time":"2026-10-10T18:22:33.189Z","level":"info","event":"request","requestId":"8d2c5ff5-3e1f-4a28-a5f1-c2d47ab328fc","method":"GET","path":"/","status":302,"ms":32,"ip":"unknown"}
+{"time":"2026-10-10T18:22:33.207Z","level":"info","event":"request","requestId":"a6b6a6aa-462b-4bdd-9565-31173314528c","method":"GET","path":"/api/v1/me","status":200,"ms":11,"ip":"unknown"}
+{"time":"2026-10-10T18:22:33.207Z","level":"info","event":"request","requestId":"a6b6a6aa-462b-4bdd-9565-31173314528c","method":"GET","path":"/settings/account","status":302,"ms":14,"ip":"unknown"}
+{"time":"2026-10-10T18:22:33.222Z","level":"info","event":"request","requestId":"67cb65db-66f5-425f-89a2-07a760f089d7","method":"GET","path":"/api/v1/me","status":200,"ms":8,"ip":"unknown"}
+{"time":"2026-10-10T18:22:33.223Z","level":"info","event":"request","requestId":"67cb65db-66f5-425f-89a2-07a760f089d7","method":"GET","path":"/login","status":302,"ms":11,"ip":"unknown"}
+{"time":"2026-10-10T18:22:33.247Z","level":"info","event":"request","requestId":"dba35d57-8468-4af3-8359-5f4ace0aa2e7","method":"GET","path":"/api/v1/me","status":200,"ms":17,"ip":"unknown"}
+{"time":"2026-10-10T18:22:33.248Z","level":"info","event":"request","requestId":"dba35d57-8468-4af3-8359-5f4ace0aa2e7","method":"GET","path":"/en/settings/profile","status":302,"ms":19,"ip":"unknown"}
+{"time":"2026-10-10T18:22:33.277Z","level":"info","event":"request","requestId":"181b3d1a-2dfb-44ab-83dd-d6c190ff268f","method":"GET","path":"/api/v1/me","status":200,"ms":13,"ip":"unknown"}
+{"time":"2026-10-10T18:22:33.318Z","level":"info","event":"request","requestId":"181b3d1a-2dfb-44ab-83dd-d6c190ff268f","method":"GET","path":"/account-deletion","status":200,"ms":55,"ip":"unknown"}
+(pass) 注销冷静期里的用户 > 别的页面一律跳到注销提示页（保留语言前缀）；注销提示页本身正常显示 [205.56ms]
+{"time":"2026-10-10T18:22:33.405Z","level":"info","event":"request","requestId":"0d4fc291-c69f-4126-8cec-37233f643ddc","method":"GET","path":"/api/v1/me","status":200,"ms":10,"ip":"unknown"}
+{"time":"2026-10-10T18:22:33.416Z","level":"info","event":"request","requestId":"05493c4c-bf6e-46ed-9449-4e305c6dcb71","method":"GET","path":"/api/v1/me/logins","status":403,"ms":7,"ip":"unknown"}
+(pass) 注销冷静期里的用户 > 接口：白名单里的（取当前用户）可以，白名单之外一律 403 ACCOUNT_PENDING_DELETION [95.15ms]
+{"time":"2026-10-10T18:22:33.446Z","level":"info","event":"request","requestId":"c56191f6-6c23-4459-a043-d6eb1fd5ad07","method":"GET","path":"/api/v1/me","status":200,"ms":6,"ip":"unknown"}
+{"time":"2026-10-10T18:22:33.447Z","level":"info","event":"request","requestId":"c56191f6-6c23-4459-a043-d6eb1fd5ad07","method":"GET","path":"/account-deletion","status":302,"ms":8,"ip":"unknown"}
+(pass) 注销冷静期里的用户 > 正常用户打开注销提示页：回首页 [31.40ms]
+{"time":"2026-10-10T18:22:33.544Z","level":"info","event":"request","requestId":"73fa8a07-516b-4be2-91fe-b1a09c5eb25a","method":"DELETE","path":"/api/v1/me/deletion","status":200,"ms":80,"ip":"unknown"}
+(pass) 没有请求体的 DELETE > 撤销注销：200，账号恢复正常 [99.40ms]
+{"time":"2026-10-10T18:22:33.592Z","level":"info","event":"request","requestId":"cb0ea42e-a92b-4186-a8e5-8740ab28856b","method":"DELETE","path":"/api/v1/me/sessions/fc761701-03f9-42ec-9601-ce2e0988d961","status":200,"ms":21,"ip":"unknown"}
+(pass) 没有请求体的 DELETE > 踢下线：200，指定的会话被删掉 [47.13ms]
+
+test/http/pages.test.ts:
+🚀 Server started on port 40479
+🌍 http://127.0.0.1:40479
+🏎️ Server started in 193ms
+{"time":"2026-10-10T18:22:37.052Z","level":"info","event":"request","requestId":"97e34f0f-e898-4f90-8da7-f0eeb073bec5","method":"GET","path":"/healthz","status":200,"ms":5,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.136Z","level":"info","event":"request","requestId":"02c8f156-7fad-4f7f-8b6c-bad225efaaf1","method":"GET","path":"/api/v1/me","status":401,"ms":29,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.316Z","level":"info","event":"request","requestId":"02c8f156-7fad-4f7f-8b6c-bad225efaaf1","method":"GET","path":"/privacy","status":200,"ms":253,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.355Z","level":"info","event":"request","requestId":"a78b2501-45fb-438c-915a-97c63a296016","method":"GET","path":"/api/v1/me","status":401,"ms":2,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.368Z","level":"info","event":"request","requestId":"a78b2501-45fb-438c-915a-97c63a296016","method":"GET","path":"/en/privacy","status":200,"ms":19,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.382Z","level":"info","event":"request","requestId":"63fbf213-85cb-45db-a496-1caaa3ba1156","method":"GET","path":"/api/v1/me","status":401,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.400Z","level":"info","event":"request","requestId":"63fbf213-85cb-45db-a496-1caaa3ba1156","method":"GET","path":"/ja/privacy","status":200,"ms":25,"ip":"unknown"}
+(pass) 页面 > 隐私说明无需登录，三种语言有正文、联系邮箱与 canonical [349.29ms]
+{"time":"2026-10-10T18:22:37.438Z","level":"info","event":"request","requestId":"011454b8-f126-4b69-8c37-77b4e03e4571","method":"GET","path":"/api/v1/me","status":401,"ms":3,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.445Z","level":"info","event":"request","requestId":"011454b8-f126-4b69-8c37-77b4e03e4571","method":"GET","path":"/api/v1/meta","status":200,"ms":3,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.477Z","level":"info","event":"request","requestId":"011454b8-f126-4b69-8c37-77b4e03e4571","method":"GET","path":"/","status":200,"ms":50,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.490Z","level":"info","event":"request","requestId":"638a540a-2be6-45ff-9e7e-d7fb5db3df36","method":"GET","path":"/api/v1/me","status":401,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.496Z","level":"info","event":"request","requestId":"638a540a-2be6-45ff-9e7e-d7fb5db3df36","method":"GET","path":"/api/v1/login-options","status":200,"ms":4,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.518Z","level":"info","event":"request","requestId":"638a540a-2be6-45ff-9e7e-d7fb5db3df36","method":"GET","path":"/login","status":200,"ms":31,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.526Z","level":"info","event":"request","requestId":"e2c0d12b-448b-45f3-b4f8-62de5aa8c603","method":"GET","path":"/api/v1/me","status":401,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.531Z","level":"info","event":"request","requestId":"e2c0d12b-448b-45f3-b4f8-62de5aa8c603","method":"GET","path":"/api/v1/meta","status":200,"ms":4,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.554Z","level":"info","event":"request","requestId":"e2c0d12b-448b-45f3-b4f8-62de5aa8c603","method":"GET","path":"/en/","status":200,"ms":30,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.565Z","level":"info","event":"request","requestId":"883f34b7-c8da-4b51-bb1b-13c094e22989","method":"GET","path":"/api/v1/me","status":401,"ms":2,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.568Z","level":"info","event":"request","requestId":"883f34b7-c8da-4b51-bb1b-13c094e22989","method":"GET","path":"/api/v1/login-options","status":200,"ms":2,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.579Z","level":"info","event":"request","requestId":"883f34b7-c8da-4b51-bb1b-13c094e22989","method":"GET","path":"/en/login","status":200,"ms":19,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.645Z","level":"info","event":"request","requestId":"a76a9457-e962-44e2-80bf-60b1c0de40f2","method":"GET","path":"/api/v1/me","status":401,"ms":2,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.667Z","level":"info","event":"request","requestId":"a76a9457-e962-44e2-80bf-60b1c0de40f2","method":"GET","path":"/api/v1/meta","status":200,"ms":18,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.682Z","level":"info","event":"request","requestId":"a76a9457-e962-44e2-80bf-60b1c0de40f2","method":"GET","path":"/ja/","status":200,"ms":45,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.693Z","level":"info","event":"request","requestId":"1e08c00f-01aa-4472-a1be-0bf34f318e23","method":"GET","path":"/api/v1/me","status":401,"ms":0,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.695Z","level":"info","event":"request","requestId":"1e08c00f-01aa-4472-a1be-0bf34f318e23","method":"GET","path":"/api/v1/login-options","status":200,"ms":2,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.711Z","level":"info","event":"request","requestId":"1e08c00f-01aa-4472-a1be-0bf34f318e23","method":"GET","path":"/ja/login","status":200,"ms":22,"ip":"unknown"}
+(pass) 页面 > 首页和登录页都提供当前语言的隐私入口 [310.65ms]
+{"time":"2026-10-10T18:22:37.722Z","level":"info","event":"request","requestId":"64727a6b-59d1-4f3a-ab5e-31c635fcabd3","method":"GET","path":"/api/v1/me","status":401,"ms":2,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.724Z","level":"info","event":"request","requestId":"64727a6b-59d1-4f3a-ab5e-31c635fcabd3","method":"GET","path":"/api/v1/meta","status":200,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.738Z","level":"info","event":"request","requestId":"64727a6b-59d1-4f3a-ab5e-31c635fcabd3","method":"GET","path":"/","status":200,"ms":20,"ip":"unknown"}
+(pass) 页面 > 首页：中文，200，不缓存 [47.78ms]
+{"time":"2026-10-10T18:22:37.779Z","level":"info","event":"request","requestId":"52a8654d-b8d8-44fe-93ba-c41e2f92cf5e","method":"GET","path":"/api/v1/me","status":401,"ms":3,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.782Z","level":"info","event":"request","requestId":"52a8654d-b8d8-44fe-93ba-c41e2f92cf5e","method":"GET","path":"/api/v1/meta","status":200,"ms":0,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.796Z","level":"info","event":"request","requestId":"52a8654d-b8d8-44fe-93ba-c41e2f92cf5e","method":"GET","path":"/","status":200,"ms":22,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.810Z","level":"info","event":"request","requestId":"5318c68a-2bf9-4ffb-a32a-38da5ebf25b9","method":"GET","path":"/_s/script.js","status":404,"ms":1,"ip":"unknown"}
+(pass) 页面 > 没开统计：页面里没有统计脚本，/_s/script.js 是 404 [45.88ms]
+{"time":"2026-10-10T18:22:37.818Z","level":"info","event":"request","requestId":"149f80ce-8134-4207-8dd7-ea786cb12ba4","method":"GET","path":"/api/v1/me","status":401,"ms":2,"ip":"unknown"}
+{"time":"2026-10-10T18:22:37.998Z","level":"info","event":"request","requestId":"149f80ce-8134-4207-8dd7-ea786cb12ba4","method":"GET","path":"/api/v1/meta","status":200,"ms":19,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.319Z","level":"info","event":"request","requestId":"149f80ce-8134-4207-8dd7-ea786cb12ba4","method":"GET","path":"/","status":200,"ms":505,"ip":"unknown"}
+(pass) 页面 > 每个内联脚本都带着本次响应 CSP 里的 nonce [562.67ms]
+{"time":"2026-10-10T18:22:38.394Z","level":"info","event":"request","requestId":"c6e51ce9-ef19-4021-a614-6143f5bcd694","method":"GET","path":"/api/v1/me","status":401,"ms":6,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.402Z","level":"info","event":"request","requestId":"c6e51ce9-ef19-4021-a614-6143f5bcd694","method":"GET","path":"/api/v1/meta","status":200,"ms":2,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.415Z","level":"info","event":"request","requestId":"c6e51ce9-ef19-4021-a614-6143f5bcd694","method":"GET","path":"/","status":200,"ms":28,"ip":"unknown"}
+(pass) 页面 > 防闪烁脚本在 <head> 里，nonce 和响应头 CSP 里的一致 [49.66ms]
+{"time":"2026-10-10T18:22:38.537Z","level":"info","event":"request","requestId":"e65903db-c551-4005-bf6a-8b6795d076aa","method":"GET","path":"/api/v1/me","status":401,"ms":90,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.550Z","level":"info","event":"request","requestId":"e65903db-c551-4005-bf6a-8b6795d076aa","method":"GET","path":"/api/v1/meta","status":200,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.575Z","level":"info","event":"request","requestId":"e65903db-c551-4005-bf6a-8b6795d076aa","method":"GET","path":"/","status":200,"ms":130,"ip":"unknown"}
+(pass) 页面 > 样式表的 <link> 带空的 nonce，不是 CSP 里的那个 [156.47ms]
+{"time":"2026-10-10T18:22:38.589Z","level":"info","event":"request","requestId":"0f811ebb-67fb-472d-baa6-b1b082de15b5","method":"GET","path":"/api/v1/me","status":401,"ms":0,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.590Z","level":"info","event":"request","requestId":"0f811ebb-67fb-472d-baa6-b1b082de15b5","method":"GET","path":"/api/v1/meta","status":200,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.600Z","level":"info","event":"request","requestId":"0f811ebb-67fb-472d-baa6-b1b082de15b5","method":"GET","path":"/","status":200,"ms":15,"ip":"unknown"}
+(pass) 页面 > 首页经由进程内 API 拿到了数据 [25.37ms]
+{"time":"2026-10-10T18:22:38.615Z","level":"info","event":"request","requestId":"e98bc78c-26c9-4f4a-9f99-eee8b5ff9586","method":"GET","path":"/api/v1/me","status":401,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.624Z","level":"info","event":"request","requestId":"e98bc78c-26c9-4f4a-9f99-eee8b5ff9586","method":"GET","path":"/api/v1/meta","status":200,"ms":7,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.642Z","level":"info","event":"request","requestId":"e98bc78c-26c9-4f4a-9f99-eee8b5ff9586","method":"GET","path":"/","status":200,"ms":33,"ip":"unknown"}
+(pass) 页面 > 首页：未登录显示登录链接，登录后回到首页 [49.08ms]
+{"time":"2026-10-10T18:22:38.700Z","level":"info","event":"request","requestId":"4d571fe4-36ad-4616-a7ab-74dc6dee8560","method":"GET","path":"/api/v1/me","status":401,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.708Z","level":"info","event":"request","requestId":"4d571fe4-36ad-4616-a7ab-74dc6dee8560","method":"GET","path":"/api/v1/meta","status":200,"ms":3,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.720Z","level":"info","event":"request","requestId":"4d571fe4-36ad-4616-a7ab-74dc6dee8560","method":"GET","path":"/en","status":200,"ms":45,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.745Z","level":"info","event":"request","requestId":"99d26117-47ed-4e89-ac05-159016009cfa","method":"GET","path":"/api/v1/me","status":401,"ms":3,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.747Z","level":"info","event":"request","requestId":"99d26117-47ed-4e89-ac05-159016009cfa","method":"GET","path":"/api/v1/meta","status":200,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.803Z","level":"info","event":"request","requestId":"99d26117-47ed-4e89-ac05-159016009cfa","method":"GET","path":"/ja/","status":200,"ms":79,"ip":"unknown"}
+(pass) 页面 > 英文和日文前缀：服务端用对应的语言渲染 [160.81ms]
+{"time":"2026-10-10T18:22:38.858Z","level":"info","event":"request","requestId":"3fb167bb-f801-4b50-a90d-e1596fc04c4d","method":"GET","path":"/zh/foo","status":301,"ms":15,"ip":"unknown"}
+(pass) 页面 > /zh 前缀 301 到不带前缀的地址，不缓存 [44.46ms]
+{"time":"2026-10-10T18:22:38.865Z","level":"info","event":"request","requestId":"5aa24dad-ae8d-4cf7-a04c-1095a9ba7cc8","method":"GET","path":"/robots.txt","status":200,"ms":1,"ip":"unknown"}
+(pass) 页面 > /robots.txt 是纯文本，不是 404 页 [9.29ms]
+{"time":"2026-10-10T18:22:38.900Z","level":"info","event":"request","requestId":"a7ebb42c-9470-44c6-aaac-5e45effbc917","method":"GET","path":"/zh//evil.com","status":301,"ms":6,"ip":"unknown"}
+(pass) 页面 > /zh//evil.com 仍然跳回本站 [33.98ms]
+{"time":"2026-10-10T18:22:38.963Z","level":"info","event":"request","requestId":"aa118c3c-7697-4e47-a6a1-52ace36f4212","method":"GET","path":"/definitely-missing","status":404,"ms":43,"ip":"unknown"}
+(pass) 页面 > 未知地址返回真正的 404，也不缓存 [63.41ms]
+{"time":"2026-10-10T18:22:38.975Z","level":"info","event":"request","requestId":"1af255c0-cecb-4a86-9ff9-7008c3f53cf5","method":"GET","path":"/api/v1/me","status":401,"ms":3,"ip":"unknown"}
+{"time":"2026-10-10T18:22:38.984Z","level":"info","event":"request","requestId":"1af255c0-cecb-4a86-9ff9-7008c3f53cf5","method":"GET","path":"/en/definitely-missing","status":404,"ms":14,"ip":"unknown"}
+(pass) 页面 > 英文下的未知地址也是 404，用英文显示 [16.14ms]
+{"time":"2026-10-10T18:22:39.004Z","level":"info","event":"request","requestId":"7eef410c-4c39-4470-a8c7-afe118dd48b7","method":"GET","path":"/EN","status":404,"ms":14,"ip":"unknown"}
+(pass) 页面 > 大小写不对的语言前缀也是 404 [19.08ms]
+{"time":"2026-10-10T18:22:39.012Z","level":"info","event":"request","requestId":"c29f1500-02e7-49b9-98c2-85a8d2fb9068","method":"GET","path":"/api/v1/me","status":401,"ms":2,"ip":"unknown"}
+{"time":"2026-10-10T18:22:39.017Z","level":"info","event":"request","requestId":"c29f1500-02e7-49b9-98c2-85a8d2fb9068","method":"GET","path":"/api/v1/meta","status":200,"ms":4,"ip":"unknown"}
+{"time":"2026-10-10T18:22:39.041Z","level":"info","event":"request","requestId":"c29f1500-02e7-49b9-98c2-85a8d2fb9068","method":"GET","path":"/","status":200,"ms":33,"ip":"unknown"}
+{"time":"2026-10-10T18:22:39.055Z","level":"info","event":"request","requestId":"5cb6db0e-49a2-4d7f-8193-f4ca5e97e3d6","method":"GET","path":"/assets/entry.client-BUCdW0y5.js","status":200,"ms":8,"ip":"unknown"}
+178 |     const asset = /\/assets\/[^"']+\.js/.exec(html)?.[0];
+179 |
+180 |     expect(asset).toBeTruthy();
+181 |     const res = await fetch(server.url(asset ?? ""));
+182 |     expect(res.status).toBe(200);
+183 |     expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: "public, max-age=31536000, immutable"
+Received: "public, max-age=31536000"
+
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/test/http/pages.test.ts:183:46)
+(fail) 页面 > 构建产物带 immutable [69.35ms]
+{"time":"2026-10-10T18:22:39.083Z","level":"info","event":"request","requestId":"af097c61-0006-4f05-a75a-ee1d792f3a76","method":"GET","path":"/api/v1/me","status":401,"ms":0,"ip":"unknown"}
+{"time":"2026-10-10T18:22:39.084Z","level":"info","event":"request","requestId":"af097c61-0006-4f05-a75a-ee1d792f3a76","method":"GET","path":"/api/v1/meta","status":200,"ms":1,"ip":"unknown"}
+{"time":"2026-10-10T18:22:39.089Z","level":"info","event":"request","requestId":"af097c61-0006-4f05-a75a-ee1d792f3a76","method":"GET","path":"/","status":200,"ms":8,"ip":"unknown"}
+(pass) 页面 > Permissions-Policy 没有禁用通行密钥 [14.07ms]
+{"time":"2026-10-10T18:22:39.097Z","level":"info","event":"request","requestId":"8a59647b-60ce-424e-90e8-93fda9f8133a","method":"GET","path":"/api/v1/meta","status":200,"ms":7,"ip":"unknown"}
+(pass) 接口和健康检查 > GET /api/v1/meta [10.84ms]
+{"time":"2026-10-10T18:22:39.104Z","level":"info","event":"request","requestId":"9cc9eb5e-28f7-4fe8-b864-cb93e45b16da","method":"GET","path":"/api/v1/nope","status":404,"ms":2,"ip":"unknown"}
+(pass) 接口和健康检查 > 未知接口返回 JSON 404 [3.47ms]
+{"time":"2026-10-10T18:22:39.109Z","level":"info","event":"request","requestId":"2a5294d2-3781-4912-a174-d332329ca62c","method":"POST","path":"/api/v1/meta","status":415,"ms":2,"ip":"unknown"}
+(pass) 接口和健康检查 > 表单提交被 CSRF 规则拒绝 [5.68ms]
+{"time":"2026-10-10T18:22:39.334Z","level":"error","event":"readiness_check_failed","check":"media","name":"Error","message":"STORAGE_ROLE_UNAVAILABLE"}
+{"time":"2026-10-10T18:22:39.594Z","level":"info","event":"request","requestId":"5556703e-629c-4f83-91da-0ab61a291e07","method":"GET","path":"/readyz","status":503,"ms":484,"ip":"unknown"}
+(pass) 接口和健康检查 > /readyz：缺少实际媒体进程时保持未就绪 [486.45ms]
+{"time":"2026-10-10T18:22:39.609Z","level":"info","event":"request","requestId":"f2047b36-2358-49fe-aac8-25088665a816","method":"GET","path":"/readyz","status":404,"ms":0,"ip":"203.0.113.7"}
+(pass) 接口和健康检查 > /readyz 不回答经 Cloudflare 来的请求 [14.99ms]
+
+test/http/build-output.test.ts:
+(pass) 服务端构建产物 > 只 import 生产依赖和运行时自带的模块（静态的和动态的 import 都算） [31.01ms]
+
+3 tests failed:
+(fail) (unnamed) [27495.90ms]
+(fail) (unnamed) [12.12ms]
+(fail) 页面 > 构建产物带 immutable [69.35ms]
+
+ 47 pass
+ 3 fail
+ 197 expect() calls
+Ran 50 tests across 5 files. [57.03s]
+
+OUTER_EXIT=1 WALL_SECONDS=57.27

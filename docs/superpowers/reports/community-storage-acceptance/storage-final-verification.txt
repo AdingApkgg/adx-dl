@@ -1,0 +1,5 @@
+Final changed-file lint: exit0,4.45s wall;11files,588ms analyzer; no diagnostics.
+Final bun x tsc --noEmit: exit0,44.45s wall; stdout/stderr empty.
+Shell sh -n: entrypoint.sh and forward-s3.sh passed.
+Final git diff --check: exit0, no output.
+No full suite/build retry.

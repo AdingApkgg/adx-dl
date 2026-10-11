@@ -42,6 +42,7 @@ describe("申请注销账号", () => {
     const fetch = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(Response.json({ purgeAt: PURGE_AT, signedOut: true }));
+    localStorage.setItem(`astrodx-uploads:${USER.id}`, "[]");
     const onDeleted = vi.fn();
     const user = renderPage(onDeleted);
     const accountMenu = () => screen.queryByRole("button", { name: m.nav_account_menu({ name: USER.name }) });
@@ -53,6 +54,7 @@ describe("申请注销账号", () => {
     const signIn = await screen.findByRole("link", { name: m.nav_sign_in() });
     expect(signIn.getAttribute("href")).toBe("/login?next=%2Fsettings%2Faccount");
     expect(accountMenu()).toBeNull();
+    expect(localStorage.getItem(`astrodx-uploads:${USER.id}`)).toBeNull();
     expect(onDeleted).toHaveBeenCalledWith(PURGE_AT);
     expect(String(fetch.mock.calls[0]?.[0])).toMatch(/\/api\/v1\/me\/deletion$/);
   });

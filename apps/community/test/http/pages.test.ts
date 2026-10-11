@@ -9,8 +9,8 @@ beforeAll(async () => {
   server = await startBuiltServer();
 }, 30_000);
 
-afterAll(() => {
-  server.stop();
+afterAll(async () => {
+  await server.stop();
 });
 
 describe("页面", () => {
@@ -212,10 +212,10 @@ describe("接口和健康检查", () => {
     expect(res.status).toBe(415);
   });
 
-  test("/readyz：PG、Redis 和任务队列都可用", async () => {
+  test("/readyz：缺少实际媒体进程时保持未就绪", async () => {
     const res = await fetch(server.url("/readyz"));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, checks: { db: "ok", redis: "ok", jobs: "ok" } });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ ok: false, checks: { db: "ok", redis: "ok", jobs: "ok",media:"fail" } });
   });
 
   test("/readyz 不回答经 Cloudflare 来的请求", async () => {

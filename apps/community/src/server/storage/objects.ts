@@ -1,0 +1,674 @@
+import { and, eq, isNull, sql } from "drizzle-orm";
+import {
+  blobs,
+  blobDerivatives,
+  derivedObjects,
+  blobBlocks,
+  files,
+  storageBudget,
+  storagePolicies,
+  storageQuarantine,
+  uploadSessions,
+} from "../db/schema";
+import type { DbTransaction, StorageContext, StorageJobData } from "./contracts";
+import { StorageError, StorageUnavailableError } from "./errors";
+import { objectKey } from "./keys";
+import { lockStorageAdmission, withStorageTransaction } from "./transactions";
+import { lockUploadAccounting, storageTime } from "./usage";
+import { assertStorageNamespace } from "../../worker/storage-delete";
+import type { StoragePurpose } from "@/shared/storage";
+import { purposeRule } from "./rules";
+import { recipeBuildFor } from "../charts/recipe";
+
+type Session = typeof uploadSessions.$inferSelect;
+type BlobRow = typeof blobs.$inferSelect;
+/** Only this state has never reserved capacity or started a physical write. */
+function isUnclaimedOriginal(blob: BlobRow): boolean {
+  return (
+    blob.state === "pending" &&
+    blob.generation === 0 &&
+    blob.leaseUntil === null &&
+    blob.verifiedAt === null &&
+    blob.detectedMime === null
+  );
+}
+export type ProcessingUpload = {
+  tx: DbTransaction;
+  session: Session;
+  file: typeof files.$inferSelect;
+  accounting: Awaited<ReturnType<typeof lockUploadAccounting>>;
+  now: Date;
+};
+/** Common worker admission and lock order. A stale/terminal/inactive job is a successful no-op. */
+export async function withProcessingUpload<T>(
+  ctx: StorageContext,
+  data: StorageJobData,
+  fn: (locked: ProcessingUpload) => Promise<T>,
+): Promise<T | null> {
+  const [snapshot] = await ctx.db
+    .select()
+    .from(uploadSessions)
+    .where(eq(uploadSessions.id, data.uploadId));
+  if (snapshot?.state !== "processing" || snapshot.generation !== data.generation) return null;
+  try {
+    return await withStorageTransaction(ctx.db, async (tx) => {
+      const accounting = await lockUploadAccounting(tx, snapshot.ownerId);
+      const [session] = await tx
+        .select()
+        .from(uploadSessions)
+        .where(eq(uploadSessions.id, data.uploadId))
+        .for("update");
+      if (
+        session?.state !== "processing" ||
+        session.generation !== data.generation ||
+        !session.fileId
+      )
+        return null;
+      const [file] = await tx
+        .select()
+        .from(files)
+        .where(eq(files.id, session.fileId))
+        .for("update");
+      if (file?.state !== "processing" || file.ownerId !== session.ownerId || file.deletedAt)
+        return null;
+      return fn({ tx, session, file, accounting, now: await storageTime(tx) });
+    });
+  } catch (error) {
+    if (error instanceof StorageError && error.code === "ACCOUNT_INACTIVE") return null;
+    throw error;
+  }
+}
+/** Requires upload accounting locks. Creating this identity does not reserve physical bytes. */
+export async function ensureOriginal(
+  ctx: StorageContext,
+  tx: DbTransaction,
+  session: Session,
+): Promise<BlobRow> {
+  const [policy] = await tx
+    .select()
+    .from(storagePolicies)
+    .where(
+      and(
+        eq(storagePolicies.enabled, true),
+        eq(storagePolicies.endpoint, ctx.config.endpoint),
+        eq(storagePolicies.region, ctx.config.region),
+        eq(storagePolicies.originalBucket, ctx.config.originalBucket),
+        eq(storagePolicies.derivedBucket, ctx.config.derivedBucket),
+        eq(storagePolicies.credentialsRef, ctx.config.credentialsRef),
+      ),
+    )
+    .orderBy(storagePolicies.id)
+    .limit(1);
+  if (!policy) throw new StorageUnavailableError();
+  await assertOriginalKeyAvailable(tx, ctx, objectKey(session.expectedSha256));
+  await tx
+    .insert(blobs)
+    .values({
+      sha256: session.expectedSha256,
+      size: session.expectedSize,
+      policyId: policy.id,
+      key: objectKey(session.expectedSha256),
+    })
+    .onConflictDoNothing();
+  const [blob] = await tx
+    .select()
+    .from(blobs)
+    .where(eq(blobs.sha256, session.expectedSha256))
+    .for("update");
+  // Pending declarations are untrusted. Keep their per-session sizes until a
+  // verified ingest takes the first physical claim; completion cannot pin size.
+  if (
+    !blob ||
+    blob.policyId !== policy.id ||
+    (blob.size !== session.expectedSize && !isUnclaimedOriginal(blob))
+  )
+    throw new StorageError(503, "STORAGE_INCONSISTENT");
+  if (blob.state === "blocked") throw new StorageError(400, "HASH_BLOCKED");
+  if (blob.state === "deleting") throw new StorageError(503, "STORAGE_BUSY", "STORAGE_BUSY", 30);
+  return blob;
+}
+export type OriginalClaim = { kind: "ready" | "writer"; blob: BlobRow };
+/** Called only after local bytes/hash/purpose verification, immediately before remote IO. */
+export async function claimOriginal(
+  ctx: StorageContext,
+  data: StorageJobData,
+): Promise<OriginalClaim | null> {
+  return withProcessingUpload(
+    ctx,
+    data,
+    async ({ tx, session, file, accounting: { budget }, now }) => {
+      if (session.expiresAt <= now) throw new StorageError(410, "UPLOAD_EXPIRED");
+      if (
+        (await tx.select().from(blobBlocks).where(eq(blobBlocks.sha256, session.expectedSha256)))
+          .length
+      )
+        throw new StorageError(400, "HASH_BLOCKED");
+      const [blob] = await tx.select().from(blobs).where(eq(blobs.id, file.blobId)).for("update");
+      await assertOriginalKeyAvailable(tx, ctx, blob.key);
+      if (blob.size !== session.expectedSize && !isUnclaimedOriginal(blob))
+        throw new StorageError(503, "STORAGE_INCONSISTENT");
+      // The caller has verified this session's actual bytes. Correct only an
+      // identity that has never owned a lease/charge; uncertain writes stay fixed.
+      const size = session.expectedSize;
+      if (blob.state === "ready") return { kind: "ready" as const, blob };
+      if (blob.state === "blocked") throw new StorageError(400, "HASH_BLOCKED");
+      if (blob.state === "deleting" || (blob.leaseUntil && blob.leaseUntil > now))
+        throw new StorageError(503, "STORAGE_BUSY", "STORAGE_BUSY", 30);
+      // pending+lease means a previous PUT may still settle. Never delete or refund it.
+      // A deleted row is a Task8 confirmation that the old DELETE has finished.
+      const reserve = blob.state === "deleted" || !blob.leaseUntil;
+      if (reserve) {
+        if (
+          budget.originalWritten + budget.originalReserved + size >
+          ctx.config.limits.originalBudget
+        )
+          throw new StorageError(503, "STORAGE_BUDGET_EXCEEDED");
+        await tx
+          .update(storageBudget)
+          .set({ originalReserved: budget.originalReserved + size })
+          .where(eq(storageBudget.id, "global"));
+      }
+      const [claimed] = await tx
+        .update(blobs)
+        .set({
+          state: "pending",
+          size,
+          generation: blob.generation + 1,
+          leaseUntil: new Date(now.getTime() + 120000),
+          verifiedAt: null,
+          detectedMime: null,
+          orphanedAt: null,
+        })
+        .where(eq(blobs.id, blob.id))
+        .returning();
+      return { kind: "writer" as const, blob: claimed };
+    },
+  );
+}
+/** Successful PUT/head is insufficient: publication also requires the still-live independent lease and session. */
+export async function publishOriginal(
+  ctx: StorageContext,
+  data: StorageJobData,
+  claim: OriginalClaim,
+  mime: string,
+): Promise<boolean> {
+  const result = await withProcessingSettlement(
+    ctx,
+    data,
+    {kind:"original",original:claim},
+    async ({ tx, session, file, accounting: { budget }, now }) => {
+      if (session.expiresAt <= now) return false;
+      if (
+        (await tx.select().from(blobBlocks).where(eq(blobBlocks.sha256, session.expectedSha256)))
+          .length
+      )
+        return false;
+      const [blob] = await tx.select().from(blobs).where(eq(blobs.id, file.blobId)).for("update");
+      if (
+        blob.id !== claim.blob.id ||
+        blob.state !== "pending" ||
+        blob.generation !== claim.blob.generation ||
+        !blob.leaseUntil ||
+        blob.leaseUntil <= now
+      )
+        return false;
+      await tx
+        .update(blobs)
+        .set({ state: "ready", detectedMime: mime, verifiedAt: now, leaseUntil: null })
+        .where(eq(blobs.id, blob.id));
+      await tx
+        .update(storageBudget)
+        .set({
+          originalReserved: budget.originalReserved - blob.size,
+          originalWritten: budget.originalWritten + blob.size,
+        })
+        .where(eq(storageBudget.id, "global"));
+      return true;
+    },
+  );
+  return result === true;
+}
+
+export type RecipeClaim = {
+  blob: BlobRow;
+  recipe: typeof blobDerivatives.$inferSelect;
+};
+const busy = () => new StorageError(503, "STORAGE_BUSY", "STORAGE_BUSY", 30);
+/** Locks follow original -> recipe -> derived; all IO happens after this transaction. */
+export async function claimAvatarRecipe(
+  ctx: StorageContext,
+  data: StorageJobData,
+): Promise<RecipeClaim | null> {
+  return claimRecipe(ctx,data,"avatar");
+}
+export async function claimRecipe(
+  ctx: StorageContext,
+  data: StorageJobData,
+  purpose: StoragePurpose,
+): Promise<RecipeClaim | null> {
+  const rule = purposeRule(purpose);
+  const build = recipeBuildFor(ctx,purpose);
+  return withProcessingUpload(ctx, data, async ({ tx, session, file, now }) => {
+    if (session.expiresAt <= now) throw new StorageError(410, "UPLOAD_EXPIRED");
+    if (session.purpose !== purpose || file.purpose !== purpose)
+      throw new StorageError(400, "PURPOSE_NOT_AVAILABLE");
+    if (
+      (
+        await tx
+          .select()
+          .from(blobBlocks)
+          .where(eq(blobBlocks.sha256, session.expectedSha256))
+      ).length
+    )
+      throw new StorageError(400, "HASH_BLOCKED");
+    const [blob] = await tx
+      .select()
+      .from(blobs)
+      .where(eq(blobs.id, file.blobId))
+      .for("update");
+    if (blob.state !== "ready") throw busy();
+    await tx
+      .insert(blobDerivatives)
+      .values({
+        sourceBlobId: blob.id,
+        recipe: rule.recipe,
+        recipeBuild: build,
+      })
+      .onConflictDoNothing();
+    const [recipe] = await tx
+      .select()
+      .from(blobDerivatives)
+      .where(
+        and(
+          eq(blobDerivatives.sourceBlobId, blob.id),
+          eq(blobDerivatives.recipe, rule.recipe),
+          eq(blobDerivatives.recipeBuild, build),
+        ),
+      )
+      .for("update");
+    if (recipe.state === "ready") return { blob, recipe };
+    if (recipe.state === "rejected")
+      throw new StorageError(400, recipe.errorCode ?? (purpose === "avatar" ? "IMAGE_INVALID" : "CHART_PACKAGE_INVALID"));
+    if (
+      recipe.state === "retired" ||
+      (recipe.leaseUntil && recipe.leaseUntil > now)
+    )
+      throw busy();
+    const [claimed] = await tx
+      .update(blobDerivatives)
+      .set({
+        generation: recipe.generation + 1,
+        leaseUntil: new Date(now.getTime() + 120000),
+      })
+      .where(eq(blobDerivatives.id, recipe.id))
+      .returning();
+    return { blob, recipe: claimed };
+  });
+}
+export type DerivedClaim = {
+  kind: "ready" | "writer";
+  object: typeof derivedObjects.$inferSelect;
+};
+/** Release only our completed local computation, before any output claim/remote write.
+ * An uncertain physical output lease must remain available to reconciliation.
+ */
+export async function releaseRecipeComputation(ctx: StorageContext, source: RecipeClaim): Promise<void> {
+  if (source.recipe.state !== "pending" || !source.recipe.leaseUntil || source.recipe.derivedObjectId) return;
+  const leaseUntil = source.recipe.leaseUntil;
+  await ctx.db.transaction(async tx => {
+    await lockStorageAdmission(tx);
+    await tx.select({id:blobs.id}).from(blobs).where(eq(blobs.id,source.blob.id)).for("update");
+    await tx.update(blobDerivatives).set({leaseUntil:null}).where(and(
+      eq(blobDerivatives.id,source.recipe.id),
+      eq(blobDerivatives.sourceBlobId,source.blob.id),
+      eq(blobDerivatives.state,"pending"),
+      eq(blobDerivatives.generation,source.recipe.generation),
+      eq(blobDerivatives.leaseUntil,leaseUntil),
+      isNull(blobDerivatives.derivedObjectId),
+    ));
+  });
+}
+/** Never replaces an uncertain charge; source/recipe and physical generations are independent. */
+export async function claimAvatarOutput(
+  ctx: StorageContext,
+  data: StorageJobData,
+  source: RecipeClaim,
+  output: { hash: string; size: number },
+): Promise<DerivedClaim | null> {
+  return claimRecipeOutput(ctx,data,source,{...output,mime:"image/jpeg"});
+}
+export type RecipeOutput = {hash:string;size:number;mime:string;properties?:Record<string,unknown>};
+function canonical(value: unknown): string {
+  if(Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if(value && typeof value === "object") return `{${Object.keys(value).sort().map(k=>`${JSON.stringify(k)}:${canonical((value as Record<string,unknown>)[k])}`).join(",")}}`;
+  return JSON.stringify(value) ?? "null";
+}
+export async function claimRecipeOutput(
+  ctx: StorageContext,
+  data: StorageJobData,
+  source: RecipeClaim,
+  output: RecipeOutput,
+): Promise<DerivedClaim | null> {
+  const purpose: StoragePurpose = source.recipe.recipe === "avatar-v1" ? "avatar" : "chart-source";
+  const rule = purposeRule(purpose);
+  if(source.recipe.recipe !== rule.recipe || output.size < 1 || output.size > rule.maxOutputSize ||
+    output.mime !== rule.outputMime || !/^[a-f0-9]{64}$/.test(output.hash) ||
+    (purpose === "chart-source" && !output.properties?.chartPreview))
+    throw new StorageError(503,"STORAGE_INCONSISTENT");
+  return withProcessingUpload(
+    ctx,
+    data,
+    async ({ tx, session, file, accounting: { budget }, now }) => {
+      if (session.purpose !== purpose || file.purpose !== purpose) throw new StorageError(400,"PURPOSE_NOT_AVAILABLE");
+      if (session.expiresAt <= now)
+        throw new StorageError(410, "UPLOAD_EXPIRED");
+      if (
+        (
+          await tx
+            .select()
+            .from(blobBlocks)
+            .where(sql`${blobBlocks.sha256} in (${session.expectedSha256},${output.hash})`)
+        ).length
+      )
+        throw new StorageError(400, "HASH_BLOCKED");
+      const [blob] = await tx
+        .select()
+        .from(blobs)
+        .where(eq(blobs.id, file.blobId))
+        .for("update");
+      if (blob.id !== source.blob.id || blob.state !== "ready") throw busy();
+      const [recipe] = await tx
+        .select()
+        .from(blobDerivatives)
+        .where(eq(blobDerivatives.id, source.recipe.id))
+        .for("update");
+      if (
+        recipe.state !== "pending" ||
+        recipe.sourceBlobId !== blob.id ||
+        recipe.recipe !== rule.recipe ||
+        recipe.recipeBuild !== recipeBuildFor(ctx,purpose) ||
+        recipe.generation !== source.recipe.generation ||
+        !recipe.leaseUntil ||
+        recipe.leaseUntil <= now
+      )
+        throw busy();
+      await tx
+        .insert(derivedObjects)
+        .values({
+          outputSha256: output.hash,
+          size: output.size,
+          mime: output.mime,
+          properties: output.properties ?? {},
+          policyId: blob.policyId,
+          key: objectKey(output.hash),
+        })
+        .onConflictDoNothing();
+      const [object] = await tx
+        .select()
+        .from(derivedObjects)
+        .where(eq(derivedObjects.outputSha256, output.hash))
+        .for("update");
+      if (
+        object.size !== output.size ||
+        object.mime !== output.mime ||
+        (purpose === "chart-source" && canonical(object.properties.chartPreview) !== canonical(output.properties?.chartPreview)) ||
+        object.policyId !== blob.policyId
+      )
+        throw new StorageError(503, "STORAGE_INCONSISTENT");
+      if (object.state === "blocked")
+        throw new StorageError(400, "HASH_BLOCKED");
+      if (
+        object.state === "deleting" ||
+        (object.leaseUntil && object.leaseUntil > now)
+      )
+        throw busy();
+      if (object.state === "ready") {
+        await tx
+          .update(blobDerivatives)
+          .set({ state: "ready", derivedObjectId: object.id, leaseUntil: null })
+          .where(eq(blobDerivatives.id, recipe.id));
+        return { kind: "ready" as const, object };
+      }
+      if (object.state === "deleted" || !object.leaseUntil) {
+        if (
+          budget.derivedReserved + budget.derivedWritten + object.size >
+          ctx.config.limits.derivedBudget
+        )
+          throw new StorageError(503, "STORAGE_BUDGET_EXCEEDED");
+        await tx
+          .update(storageBudget)
+          .set({ derivedReserved: budget.derivedReserved + object.size })
+          .where(eq(storageBudget.id, "global"));
+      }
+      const [claimed] = await tx
+        .update(derivedObjects)
+        .set({
+          state: "pending",
+          generation: object.generation + 1,
+          leaseUntil: new Date(now.getTime() + 120000),
+          orphanedAt: null,
+        })
+        .where(eq(derivedObjects.id, object.id))
+        .returning();
+      await tx
+        .update(blobDerivatives)
+        .set({ derivedObjectId: object.id })
+        .where(eq(blobDerivatives.id, recipe.id));
+      return { kind: "writer" as const, object: claimed };
+    },
+  );
+}
+export async function publishAvatarOutput(
+  ctx: StorageContext,
+  data: StorageJobData,
+  source: RecipeClaim,
+  claim: DerivedClaim,
+): Promise<boolean> {
+  return publishRecipeOutput(ctx,data,source,claim);
+}
+export async function publishRecipeOutput(
+  ctx: StorageContext,
+  data: StorageJobData,
+  source: RecipeClaim,
+  claim: DerivedClaim,
+): Promise<boolean> {
+  return (
+    (await withProcessingSettlement(
+      ctx,
+      data,
+      {kind:"derived",source,output:claim},
+      async ({ tx, session, file, accounting: { budget }, now }) => {
+        if (session.expiresAt <= now) return false;
+        if (
+          (
+            await tx
+              .select()
+              .from(blobBlocks)
+              .where(sql`${blobBlocks.sha256} in (${session.expectedSha256},${claim.object.outputSha256})`)
+          ).length
+        )
+          return false;
+        const [blob] = await tx
+          .select()
+          .from(blobs)
+          .where(eq(blobs.id, file.blobId))
+          .for("update");
+        const [recipe] = await tx
+          .select()
+          .from(blobDerivatives)
+          .where(eq(blobDerivatives.id, source.recipe.id))
+          .for("update");
+        const [object] = await tx
+          .select()
+          .from(derivedObjects)
+          .where(eq(derivedObjects.id, claim.object.id))
+          .for("update");
+        if (
+          blob.id !== source.blob.id ||
+          blob.state !== "ready" ||
+          recipe.state !== "pending" ||
+          recipe.generation !== source.recipe.generation ||
+          !recipe.leaseUntil ||
+          recipe.leaseUntil <= now ||
+          object.state !== "pending" ||
+          object.generation !== claim.object.generation ||
+          !object.leaseUntil ||
+          object.leaseUntil <= now
+        )
+          return false;
+        await tx
+          .update(derivedObjects)
+          .set({ state: "ready", leaseUntil: null })
+          .where(eq(derivedObjects.id, object.id));
+        await tx
+          .update(blobDerivatives)
+          .set({ state: "ready", derivedObjectId: object.id, leaseUntil: null })
+          .where(eq(blobDerivatives.id, recipe.id));
+        await tx
+          .update(storageBudget)
+          .set({
+            derivedReserved: budget.derivedReserved - object.size,
+            derivedWritten: budget.derivedWritten + object.size,
+          })
+          .where(eq(storageBudget.id, "global"));
+        return true;
+      },
+    )) === true
+  );
+}
+
+/** Unknown physical keys must settle their deletion before any canonical writer can reincarnate them. */
+export async function assertOriginalKeyAvailable(
+  tx: DbTransaction,
+  ctx: StorageContext,
+  key: string,
+): Promise<void> {
+  const rows = await tx
+    .select({ id: storageQuarantine.id })
+    .from(storageQuarantine)
+    .innerJoin(storagePolicies, eq(storagePolicies.id, storageQuarantine.policyId))
+    .where(
+      and(
+        eq(storageQuarantine.key, key),
+        sql`${storageQuarantine.state}<>'deleted'`,
+        eq(storagePolicies.endpoint, ctx.config.endpoint),
+        eq(storagePolicies.region, ctx.config.region),
+        eq(storagePolicies.originalBucket, ctx.config.originalBucket),
+      ),
+    )
+    .limit(1);
+  if (rows.length) throw new StorageError(503, "STORAGE_BUSY", "STORAGE_BUSY", 3600);
+}
+
+/** Private to the two operation-specific publication functions; cannot claim/reserve/renew/start IO. */
+async function withProcessingSettlement<T>(
+  ctx: StorageContext,
+  data: StorageJobData,
+  proof:
+    | { kind: "original"; original: OriginalClaim }
+    | { kind: "derived"; source: RecipeClaim; output: DerivedClaim },
+  fn: (locked: ProcessingUpload) => Promise<T>,
+): Promise<T | null> {
+  const [snapshot] = await ctx.db
+    .select()
+    .from(uploadSessions)
+    .where(eq(uploadSessions.id, data.uploadId));
+  if (snapshot?.state !== "processing" || snapshot.generation !== data.generation) return null;
+  try {
+    return await ctx.db.transaction(async (tx) => {
+      await lockStorageAdmission(tx);
+      const accounting = await lockUploadAccounting(tx, snapshot.ownerId);
+      const [session] = await tx
+        .select()
+        .from(uploadSessions)
+        .where(eq(uploadSessions.id, data.uploadId))
+        .for("update");
+      if (
+        session?.state !== "processing" ||
+        session.generation !== data.generation ||
+        !session.fileId
+      )
+        return null;
+      const [file] = await tx
+        .select()
+        .from(files)
+        .where(eq(files.id, session.fileId))
+        .for("update");
+      const now = await storageTime(tx);
+      if (
+        file?.state !== "processing" ||
+        file.ownerId !== session.ownerId ||
+        file.deletedAt ||
+        session.expiresAt <= now
+      )
+        return null;
+      const [blob] = await tx.select().from(blobs).where(eq(blobs.id, file.blobId)).for("update");
+      if (!blob || blob.sha256 !== session.expectedSha256 || blob.size !== session.expectedSize)
+        return null;
+      await assertStorageNamespace(tx, ctx, blob.policyId, "original");
+      if (proof.kind === "original") {
+        if (
+          blob?.id !== proof.original.blob.id ||
+          blob.state !== "pending" ||
+          blob.generation !== proof.original.blob.generation ||
+          blob.sha256 !== proof.original.blob.sha256 ||
+          blob.size !== proof.original.blob.size ||
+          blob.key !== proof.original.blob.key ||
+          blob.policyId !== proof.original.blob.policyId ||
+          !blob.leaseUntil ||
+          blob.leaseUntil <= now
+        )
+          return null;
+      } else {
+        if (
+          blob?.id !== proof.source.blob.id ||
+          blob.state !== "ready" ||
+          blob.generation !== proof.source.blob.generation
+        )
+          return null;
+        const [recipe] = await tx
+          .select()
+          .from(blobDerivatives)
+          .where(eq(blobDerivatives.id, proof.source.recipe.id))
+          .for("update");
+        const [output] = await tx
+          .select()
+          .from(derivedObjects)
+          .where(eq(derivedObjects.id, proof.output.object.id))
+          .for("update");
+        if (
+          recipe?.state !== "pending" ||
+          recipe.sourceBlobId !== blob.id ||
+          recipe.recipe !== purposeRule(session.purpose).recipe ||
+          recipe.recipe !== proof.source.recipe.recipe ||
+          recipe.recipeBuild !== recipeBuildFor(ctx,session.purpose) ||
+          recipe.recipeBuild !== proof.source.recipe.recipeBuild ||
+          recipe.derivedObjectId !== output?.id ||
+          proof.output.kind !== "writer" ||
+          recipe.generation !== proof.source.recipe.generation ||
+          !recipe.leaseUntil ||
+          recipe.leaseUntil <= now ||
+          output?.state !== "pending" ||
+          output.generation !== proof.output.object.generation ||
+          output.policyId !== blob.policyId ||
+          output.policyId !== proof.output.object.policyId ||
+          output.outputSha256 !== proof.output.object.outputSha256 ||
+          output.size !== proof.output.object.size ||
+          output.key !== proof.output.object.key ||
+          output.mime !== purposeRule(session.purpose).outputMime ||
+          output.mime !== proof.output.object.mime ||
+          (session.purpose === "chart-source" && canonical(output.properties.chartPreview) !== canonical(proof.output.object.properties.chartPreview)) ||
+          !output.leaseUntil ||
+          output.leaseUntil <= now
+        )
+          return null;
+      }
+      if (proof.kind === "derived")
+        await assertStorageNamespace(tx, ctx, proof.output.object.policyId, "derived");
+      return fn({ tx, session, file, accounting, now });
+    });
+  } catch (error) {
+    if (error instanceof StorageError && error.code === "ACCOUNT_INACTIVE") return null;
+    throw error;
+  }
+}

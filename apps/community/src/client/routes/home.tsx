@@ -76,7 +76,7 @@ function HomeContent() {
         <CardContent className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
           {me ? (
             <>
-              <Avatar id={me.id} name={me.name} size={32} /> {m.home_signed_in_as({ name: me.name })} ·{" "}
+              <Avatar image={me.image} id={me.id} name={me.name} size={32} /> {m.home_signed_in_as({ name: me.name })} ·{" "}
               <Link to={localizeHref(`/u/${me.id}`)} className={textLinkClass}>
                 {m.home_my_page()}
               </Link>{" "}

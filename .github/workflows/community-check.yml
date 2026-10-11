@@ -1,7 +1,8 @@
 name: Community check
 
 # 社区站的检查：lint、类型检查、单元与集成测试、构建、对构建产物的 HTTP 测试、
-# Docker 构建（只构建不推送）。部署是在 g510 上手动做的，不经 GitHub。
+# Docker 构建，以及相关改动的真实浏览器/隔离备份恢复验收（只检查不推送）。
+# 部署是在 g510 上手动做的，不经 GitHub。
 on:
   push:
     branches:
@@ -37,6 +38,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:18
@@ -63,9 +65,27 @@ jobs:
     env:
       TEST_DATABASE_URL: postgres://community:community@localhost:5432/community_test
       TEST_REDIS_URL: redis://localhost:6379
+      STORAGE_TEST_ENDPOINT: http://127.0.0.1:58333
+      ACCEPTANCE_PROJECT: community-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      ACCEPTANCE_SOURCE_SHA: ${{ github.sha }}
+      ACCEPTANCE_APP_IMAGE: community:ci
+      ACCEPTANCE_BACKUP_IMAGE: community-backup:ci
+      ACCEPTANCE_TEST_IMAGE: community-acceptance:ci
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Select relevant runtime acceptance
+        id: acceptance
+        env:
+          ACCEPTANCE_EVENT: ${{ github.event_name }}
+          ACCEPTANCE_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          ACCEPTANCE_HEAD_SHA: ${{ github.sha }}
+        run: |
+          printf 'ACCEPTANCE_ROOT=%s/community-acceptance\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          bash apps/community/test/acceptance/select.sh >> "$GITHUB_OUTPUT"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -74,6 +94,18 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Authenticated isolated storage
+        working-directory: apps/community
+        run: |
+          bun test/storage/create-fixture.ts .storage-dev
+          echo "STORAGE_TEST_FIXTURE_PATH=$PWD/.storage-dev/s3.json" >> "$GITHUB_ENV"
+          docker compose -f compose.dev.yaml up -d seaweedfs
+          for attempt in $(seq 1 60); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:58333/blobs/ci-anonymous)" = 403 ]; then exit 0; fi
+            sleep 1
+          done
+          exit 1
 
       # 共享界面包的测试和社区站的交互测试（test/dom）用 vitest，它跑在 Node 上（vitest 5 要求 Node ^22.12 || ^24 || >=26）。
       # 要排在下面两步之前：社区站 check 的最后一步就是 vitest run。
@@ -111,4 +143,57 @@ jobs:
 
       # 构建只在部署时才跑，构建坏了就要到部署时才发现（dash 踩过的坑）。
       - name: Docker build
-        run: docker build -f apps/community/Dockerfile -t community:ci .
+        run: |
+          docker build --label "org.opencontainers.image.revision=$GITHUB_SHA" -f apps/community/Dockerfile -t community:ci .
+          docker build --label "org.opencontainers.image.revision=$GITHUB_SHA" -f apps/community/ops/backup/Dockerfile -t community-backup:ci .
+          docker run --rm --network none --read-only --tmpfs /tmp community:ci bun -e 'import sharp from "sharp"; import {processAvatar} from "./src/media-worker/avatar.ts"; await sharp({create:{width:32,height:32,channels:3,background:"white"}}).png().toFile("/tmp/input.png"); const output=await processAvatar("/tmp/input.png","/tmp/output.jpg"); if(output.width!==512||output.size>524288)throw new Error("native recipe failed");'
+
+      # 复用以上镜像；没有生产密钥，DB/S3/账号和有界磁盘均为本轮临时 fixture。
+      - name: Prepare isolated native acceptance
+        if: steps.acceptance.outputs.browser == 'true' || steps.acceptance.outputs.restore == 'true'
+        run: bash apps/community/test/acceptance/run.sh prepare
+
+      - name: Install only the CI browser
+        if: steps.acceptance.outputs.browser == 'true'
+        run: |
+          npm install --prefix "$RUNNER_TEMP/community-browser" --no-audit --no-fund --package-lock=false playwright@1.58.2
+          "$RUNNER_TEMP/community-browser/node_modules/.bin/playwright" install --with-deps --only-shell chromium
+
+      - name: Start built web and media worker
+        if: steps.acceptance.outputs.browser == 'true'
+        run: bash apps/community/test/acceptance/run.sh up
+
+      - name: Chromium upload and private draft acceptance
+        if: steps.acceptance.outputs.browser == 'true'
+        env:
+          ACCEPTANCE_FIXTURE_DIR: ${{ runner.temp }}/community-acceptance/fixture
+          ACCEPTANCE_EVIDENCE_DIR: ${{ runner.temp }}/community-acceptance/evidence
+          ACCEPTANCE_PLAYWRIGHT_PATH: ${{ runner.temp }}/community-browser/node_modules/playwright/index.mjs
+        run: timeout --signal=TERM --kill-after=10s 300s node apps/community/test/acceptance/browser.mjs
+
+      # 与浏览器用例顺序执行；停止其角色后，单独跑现有 opt-in full restore case。
+      - name: Fresh-volume backup and recovery acceptance
+        if: steps.acceptance.outputs.restore == 'true'
+        run: bash apps/community/test/acceptance/run.sh restore
+
+      - name: Clean isolated acceptance resources
+        if: always() && (steps.acceptance.outputs.browser == 'true' || steps.acceptance.outputs.restore == 'true')
+        run: bash apps/community/test/acceptance/run.sh down
+
+      - name: Upload acceptance evidence
+        if: always() && (steps.acceptance.outputs.browser == 'true' || steps.acceptance.outputs.restore == 'true')
+        uses: actions/upload-artifact@v7
+        with:
+          name: community-acceptance-${{ github.run_id }}-${{ github.run_attempt }}
+          # 白名单：不上传 env、会话、PG dump、restic 仓库或包含凭据的 trace。
+          path: |
+            ${{ runner.temp }}/community-acceptance/evidence/*.json
+            ${{ runner.temp }}/community-acceptance/evidence/*.result
+            ${{ runner.temp }}/community-acceptance/evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop owned CI storage
+        if: always()
+        working-directory: apps/community
+        run: docker compose -f compose.dev.yaml stop seaweedfs

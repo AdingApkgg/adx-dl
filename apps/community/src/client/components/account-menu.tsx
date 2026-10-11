@@ -14,6 +14,7 @@ import { Link, useLocation } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { deLocalizeHref, localizeHref } from "@/paraglide/runtime.js";
 
+import { clearUploadRecords } from "../lib/file-upload";
 import { authClient } from "../lib/auth-client";
 import { errorMessage } from "../lib/auth-errors";
 import { getRenderApi } from "../lib/browser";
@@ -51,6 +52,7 @@ export function AccountMenu() {
       toast.error(errorMessage(error) ?? m.error_unknown());
       return;
     }
+    if (me) clearUploadRecords(me.id);
     window.location.assign(localizeHref("/"));
   }
 
@@ -59,13 +61,16 @@ export function AccountMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full" aria-label={m.nav_account_menu({ name: me.name })}>
-          <Avatar id={me.id} name={me.name} size={28} />
+          <Avatar image={me.image} id={me.id} name={me.name} size={28} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent instant className="min-w-44">
         <DropdownMenuLabel className="truncate">{me.name}</DropdownMenuLabel>
         {pending ? null : (
           <>
+            <DropdownMenuItem asChild>
+              <Link to={localizeHref("/me/charts")}>{m.charts_title()}</Link>
+            </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link to={localizeHref(`/u/${me.id}`)}>{m.nav_my_page()}</Link>
             </DropdownMenuItem>

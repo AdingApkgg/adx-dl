@@ -236,3 +236,137 @@ describe("DELETE /api/v1/me/deletion", () => {
     expect(anonymous.status).toBe(401);
   });
 });
+
+test("HTTP cancellation maps deletionHandlers to restore in the same account transaction", async () => {
+  const handler: DeletionHandler = {
+    ...withContent,
+    name: "restore-profile",
+    restore: async (userId, tx) => {
+      await tx.update(user).set({ name: "restored-name" }).where(eq(user.id, userId));
+    },
+  };
+  const app = newApp([handler]);
+  const { browser, userId, profile } = await signedIn(app);
+  expect((await requestDeletion(browser, { deleteContent: false, confirmId: userId })).status).toBe(
+    200,
+  );
+  const loggedIn = new Browser(app);
+  await signInWithGoogle(loggedIn, profile);
+  const response = await loggedIn.request("DELETE", "/api/v1/me/deletion", {
+    headers: JSON_HEADERS,
+  });
+  expect(response.status).toBe(200);
+  expect((await userRow(userId))?.name).toBe("restored-name");
+});
+
+test.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)(
+  "HTTP committed cancellation failure is repairable by replay using configured context and real readable bytes",
+  async () => {
+    const { readyContext, readyFile, digest } = await import("../../../test/storage/ready-file"),
+      { cleanupStorageFixture, storageFixtureConfig } = await import(
+        "../../../test/storage/fixture"
+      );
+    const { createS3Driver } = await import("../storage/s3"),
+      { createMediaDrain } = await import("../storage/drain"),
+      { setAvatar } = await import("../storage/avatars"),
+      { mediaPublications, userAvatars } = await import("../db/schema"),
+      { revokeMedia } = await import("../../worker/media-purge");
+    const { ctx, policy } = await readyContext(),
+      secret = "internalMediaSecret" in ctx.config ? ctx.config.internalMediaSecret : "",
+      drain = createMediaDrain({ db: ctx.db, secret });
+    let failResume = false,
+      resumes = 0;
+    const { deps } = testAppDeps({ auth: createTestAuth().auth });
+    const app = createApp({
+      ...deps,
+      mediaDrain: {
+        ...drain,
+        handle: async (request) => {
+          if (request.url.endsWith("/resume")) {
+            resumes++;
+            if (failResume) return new Response(null, { status: 503 });
+          }
+          return drain.handle(request);
+        },
+      },
+      services: {
+        ...deps.services,
+        storage: {
+          ...ctx,
+          onMediaPublished: async () => {
+            throw new Error("unconfigured factory context used");
+          },
+        },
+        deletionHandlers: [withContent],
+      },
+    });
+    const { browser, userId, profile } = await signedIn(app);
+    try {
+      const a = await readyFile(ctx, policy.id, userId);
+      await setAvatar(ctx, userId, { fileId: a.file.id, expectedRevision: 0 }, crypto.randomUUID());
+      expect(
+        (await requestDeletion(browser, { deleteContent: false, confirmId: userId })).status,
+      ).toBe(200);
+      const [pub] = await ctx.db
+        .select()
+        .from(mediaPublications)
+        .where(eq(mediaPublications.outputSha256, a.derived.outputSha256));
+      let elapsed = 0;
+      await revokeMedia(
+        { ...ctx, config: await storageFixtureConfig("control") },
+        { hash: pub.outputSha256, generation: pub.generation },
+        {
+          now: () => elapsed,
+          sleep: async (ms) => {
+            elapsed += ms;
+          },
+          drainUrl: "http://internal/internal/media/drain",
+          fetch: async (url, init) =>
+            url.includes("/internal/")
+              ? drain.handle(new Request(url, init))
+              : url.includes("api.cloudflare.com")
+                ? Response.json({ success: true, errors: [] })
+                : app.request(url, init),
+        },
+      );
+      const active = new Browser(app);
+      await signInWithGoogle(active, profile);
+      failResume = true;
+      expect(
+        (await active.request("DELETE", "/api/v1/me/deletion", { headers: JSON_HEADERS })).status,
+      ).toBe(503);
+      expect((await userRow(userId))?.status).toBe("active");
+      expect(
+        (await ctx.db.select().from(userAvatars).where(eq(userAvatars.userId, userId)))[0]
+          .suspendedAt,
+      ).toBeNull();
+      expect((await app.request(`/media/${a.derived.outputSha256}.jpg`)).status).toBe(404);
+      failResume = false;
+      expect(
+        (await active.request("DELETE", "/api/v1/me/deletion", { headers: JSON_HEADERS })).status,
+      ).toBe(200);
+      expect(resumes).toBe(2);
+      const readable = await app.request(`/media/${a.derived.outputSha256}.jpg`);
+      expect(readable.status).toBe(200);
+      expect(digest(new Uint8Array(await readable.arrayBuffer()))).toBe(a.derived.outputSha256);
+      expect((await ctx.db.select().from(userAvatars).where(eq(userAvatars.userId, userId)))[0].revision).toBe(3);
+      await expect(
+        setAvatar(ctx, userId, { fileId: null, expectedRevision: 1 }, crypto.randomUUID()),
+      ).rejects.toMatchObject({ code: "AVATAR_CHANGED" });
+      await setAvatar(ctx, userId, { fileId: null, expectedRevision: 3 }, crypto.randomUUID());
+      expect(
+        (await active.request("DELETE", "/api/v1/me/deletion", { headers: JSON_HEADERS })).status,
+      ).toBe(200);
+      expect(resumes).toBe(2);
+    } finally {
+      await cleanupStorageFixture(
+        ctx.db,
+        [userId],
+        [policy.id],
+        createS3Driver(await storageFixtureConfig("control")),
+        true,
+      );
+    }
+  },
+  30000,
+);

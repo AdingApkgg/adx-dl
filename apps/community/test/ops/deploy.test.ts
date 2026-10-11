@@ -15,7 +15,11 @@ const FAKES = {
   "rev-parse --abbrev-ref HEAD") echo "\${FAKE_BRANCH:-pre}" ;;
   "pull --ff-only") echo "\${FAKE_PULL_HEAD:-bbbbbbb}" > "$FAKE_DIR/head" ;;
 esac`,
-  docker: `[ "$*" = "compose run --rm migrate" ] && exit "\${FAKE_MIGRATE_EXIT:-0}"
+  docker: `if [ "$*" = "compose ps -q web" ]; then [ -n "\${FAKE_SERVING_IMAGE:-}" ] && echo serving; exit 0; fi
+if [ "$*" = "inspect --format {{.Image}} serving" ]; then echo "$FAKE_SERVING_IMAGE"; exit 0; fi
+if [ "$*" = "image inspect astrodx-community:rollback-aaaaaaa" ]; then exit "\${FAKE_ROLLBACK_INSPECT_EXIT:-1}"; fi
+if [ "$*" = "compose exec -T media-worker bun src/server/storage/health.ts media" ]; then exit "\${FAKE_MEDIA_HEALTH_EXIT:-0}"; fi
+[ "$*" = "compose run --rm migrate" ] && exit "\${FAKE_MIGRATE_EXIT:-0}"
 exit 0`,
   date: `[ "$*" = '+%s' ] || exit 1
 cat "$FAKE_DIR/clock"`,
@@ -77,9 +81,14 @@ describe("deploy.sh", () => {
       "git pull --ff-only",
       "git rev-parse HEAD",
       "docker compose config --quiet",
-      "docker compose build web",
+      "docker compose ps -q web",
+      "docker compose build web backup",
       "docker compose run --rm migrate",
-      "docker compose up -d web worker",
+      "docker compose run --rm --no-deps storage-config",
+      "docker compose up -d seaweedfs",
+      "docker compose run --rm --no-deps backup bun ops/backup/preflight.ts",
+      "docker compose up -d --no-deps web worker media-worker",
+      "docker compose exec -T media-worker bun src/server/storage/health.ts media",
     ]);
     expect(await commands(["curl"])).toEqual(Array(3).fill("curl -fsS --max-time 5 http://127.0.0.1:12703/readyz"));
     expect(output).toContain("部署 bbbbbbb（部署前是 aaaaaaa）");
@@ -107,7 +116,8 @@ describe("deploy.sh", () => {
     expect(output).toContain("迁移失败");
     expect(await commands(["docker"])).toEqual([
       "docker compose config --quiet",
-      "docker compose build web",
+      "docker compose ps -q web",
+      "docker compose build web backup",
       "docker compose run --rm migrate",
     ]);
     expect(await commands(["curl"])).toEqual([]);
@@ -259,3 +269,20 @@ describe("deploy.sh：失败重试和就绪期限", () => {
     }
   );
 });
+
+test("unhealthy media process cannot complete deployment even if web ready; preserve Compose overlay",async()=>{
+ const script=await setup();
+ const result=await sandbox.run(script,[],{FAKE_MEDIA_HEALTH_EXIT:"1",READY_TIMEOUT:"1",COMPOSE_FILE:"compose.yaml:.superpowers/napcat-reuse.compose.yaml"});
+ expect(result.code).toBe(1);
+ expect(await deployedRevision()).toBe("aaaaaaa\n");
+ expect((await commands(["docker"])).some(c=>c.includes("exec -T media-worker"))).toBe(true);
+ expect((await commands(["docker"])).some(c=>c.includes("--remove-orphans")||c.includes(" down")||c.includes(" -f "))).toBe(false);
+});
+
+ test("failed retry cannot overwrite the preserved serving rollback image", async () => {
+ const script=await setup();
+ await sandbox.run(script, [], {FAKE_SERVING_IMAGE:"sha256:old",FAKE_READY_AFTER:"0",READY_TIMEOUT:"1"});
+ expect(await sandbox.calls()).toContain("docker image tag sha256:old astrodx-community:rollback-aaaaaaa");
+ await sandbox.run(script, [], {FAKE_SERVING_IMAGE:"sha256:failed-new",FAKE_ROLLBACK_INSPECT_EXIT:"0",FAKE_READY_AFTER:"0",READY_TIMEOUT:"1"});
+ expect(await sandbox.calls()).not.toContain("docker image tag sha256:failed-new astrodx-community:rollback-aaaaaaa");
+ });

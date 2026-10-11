@@ -1,0 +1,11 @@
+bun test v1.4.2 (744846f84)
+
+test/storage/quarantine-settlement.test.ts:
+(pass) R44 settlement pool deadline discards the late real client without touching the claim [422.00ms]
+
+ 1 pass
+ 4 filtered out
+ 0 fail
+ 4 expect() calls
+Ran 1 test across 1 file. [6.00s]
+EXIT 0 WALL_SECONDS 6.1

@@ -42,7 +42,16 @@ x-app-env: &app-env
   UMAMI_INTERNAL_URL: http://umami:3000
   # 不走代理的主机。Turnstile 的 siteverify 直连（见 web 的 HTTPS_PROXY）；容器网络里的服务也写上：万一 Docker 往容器里
   # 塞了 HTTP_PROXY（客户端的 ~/.docker/config.json 配了 proxies 时会这样），连它们的请求也不会被交给代理。
-  NO_PROXY: challenges.cloudflare.com,umami,napcat
+  NO_PROXY: challenges.cloudflare.com,umami,napcat,seaweedfs,postgres,redis,web,localhost,127.0.0.1
+
+x-storage-env: &storage-env
+  PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?required}
+  STORAGE_S3_ENDPOINT: http://seaweedfs:8333
+  STORAGE_TEMP_DIR: /storage-capacity
+  STORAGE_CAPACITY_DIR: /storage-capacity
+  STORAGE_RECIPE_BUILD: avatar-v1.sharp-0.35.5.vips-8.18.7.rotate-srgb-cover512-centre-white-jpeg85-baseline-strip.container-v1
+  STORAGE_RESTORE_STATE_DIR: /storage-state
+  NO_PROXY: seaweedfs,postgres,redis,web,localhost,127.0.0.1
 
 services:
   web:
@@ -50,8 +59,19 @@ services:
     build:
       context: ../..
       dockerfile: apps/community/Dockerfile
+    volumes:
+      - type: volume
+        source: storage-data
+        target: /storage-capacity
+        read_only: true
+        volume:
+          subpath: .capacity
+      - storage-state:/storage-state:ro
     environment:
-      <<: *app-env
+      <<: [*app-env, *storage-env]
+      STORAGE_WEB_ACCESS_KEY_ID: ${STORAGE_WEB_ACCESS_KEY_ID:?run fill-secrets}
+      STORAGE_WEB_SECRET_ACCESS_KEY: ${STORAGE_WEB_SECRET_ACCESS_KEY:?run fill-secrets}
+      STORAGE_INTERNAL_MEDIA_SECRET: ${STORAGE_INTERNAL_MEDIA_SECRET:?run fill-secrets}
       # 服务端访问 Google（OAuth 换令牌）走 g510 上的代理：g510 在国内。.env 里的 OUTBOUND_HTTPS_PROXY 空着就不用代理。
       # 不直接用 .env 里的 HTTPS_PROXY 这个名字：执行 docker compose 的 shell 里要是设了 HTTPS_PROXY（开着代理的机器常这样），
       # 插值时它会盖过 .env 的值，容器拿到的是宿主机视角的地址。Bun 的 fetch 自己读这两个变量，只对 https 生效，
@@ -65,10 +85,13 @@ services:
     ports:
       - "127.0.0.1:12703:3000"
     depends_on:
+      seaweedfs:
+        condition: service_started
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    stop_grace_period: 45s
     healthcheck:
       test: ["CMD", "bun", "-e", "await fetch('http://127.0.0.1:3000/healthz').then((r) => { if (!r.ok) process.exit(1); })"]
       interval: 30s
@@ -80,15 +103,109 @@ services:
     <<: *app
     pull_policy: never
     command: ["bun", "src/worker/main.ts"]
-    environment: *app-env
+    volumes:
+      - type: volume
+        source: storage-data
+        target: /storage-capacity
+        read_only: true
+        volume:
+          subpath: .capacity
+      - storage-state:/storage-state:ro
+      - storage-journal:/storage-journal
+      - storage-journal-key:/storage-key:ro
+    environment:
+      <<: [*app-env, *storage-env]
+      STORAGE_CONTROL_ACCESS_KEY_ID: ${STORAGE_CONTROL_ACCESS_KEY_ID:?run fill-secrets}
+      STORAGE_CONTROL_SECRET_ACCESS_KEY: ${STORAGE_CONTROL_SECRET_ACCESS_KEY:?run fill-secrets}
+      STORAGE_INTERNAL_MEDIA_SECRET: ${STORAGE_INTERNAL_MEDIA_SECRET:?run fill-secrets}
+      STORAGE_INTERNAL_MEDIA_URL: http://web:3001
+      CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID:?required}
+      CLOUDFLARE_PURGE_TOKEN: ${CLOUDFLARE_PURGE_TOKEN:?required}
+      STORAGE_JOURNAL_DIR: /storage-journal
+      STORAGE_JOURNAL_KEY_FILE: /storage-key/key
     # main.ts 收到 SIGTERM 后最多等 30 秒，让正在跑的任务做完（清除任务被打断会白白用掉一次重试）。
     # 留出余量，docker 不要提前 SIGKILL。
-    stop_grace_period: 45s
+    stop_grace_period: 75s
     depends_on:
+      seaweedfs:
+        condition: service_started
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  storage-config:
+    <<: *app
+    restart: "no"
+    command: ["bun", "ops/seaweed/write-config.ts", "/config", "/storage/.capacity"]
+    environment:
+      STORAGE_WEB_ACCESS_KEY_ID: ${STORAGE_WEB_ACCESS_KEY_ID:?run fill-secrets}
+      STORAGE_WEB_SECRET_ACCESS_KEY: ${STORAGE_WEB_SECRET_ACCESS_KEY:?run fill-secrets}
+      STORAGE_MEDIA_ACCESS_KEY_ID: ${STORAGE_MEDIA_ACCESS_KEY_ID:?run fill-secrets}
+      STORAGE_MEDIA_SECRET_ACCESS_KEY: ${STORAGE_MEDIA_SECRET_ACCESS_KEY:?run fill-secrets}
+      STORAGE_CONTROL_ACCESS_KEY_ID: ${STORAGE_CONTROL_ACCESS_KEY_ID:?run fill-secrets}
+      STORAGE_CONTROL_SECRET_ACCESS_KEY: ${STORAGE_CONTROL_SECRET_ACCESS_KEY:?run fill-secrets}
+      STORAGE_BACKUP_ACCESS_KEY_ID: ${STORAGE_BACKUP_ACCESS_KEY_ID:?run fill-secrets}
+      STORAGE_BACKUP_SECRET_ACCESS_KEY: ${STORAGE_BACKUP_SECRET_ACCESS_KEY:?run fill-secrets}
+    volumes:
+      - storage-config:/config
+      - storage-data:/storage
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    restart: unless-stopped
+    logging: *logging
+    entrypoint: ["/opt/community-seaweed/entrypoint.sh"]
+    pids_limit: 256
+    environment:
+      NO_PROXY: seaweedfs,localhost,127.0.0.1
+    volumes:
+      - storage-data:/data
+      - storage-config:/config:ro
+      - ./ops/seaweed:/opt/community-seaweed:ro
+    depends_on:
+      storage-config:
+        condition: service_completed_successfully
+    stop_grace_period: 45s
+
+  media-worker:
+    <<: *app
+    pull_policy: never
+    command: ["bun", "src/media-worker/main.ts"]
+    cpus: 1
+    mem_limit: 512m
+    pids_limit: 128
+    stop_grace_period: 135s
+    environment:
+      <<: *storage-env
+      DATABASE_URL: postgres://community:${POSTGRES_PASSWORD:?run fill-secrets}@postgres:5432/community
+      STORAGE_MEDIA_ACCESS_KEY_ID: ${STORAGE_MEDIA_ACCESS_KEY_ID:?run fill-secrets}
+      STORAGE_MEDIA_SECRET_ACCESS_KEY: ${STORAGE_MEDIA_SECRET_ACCESS_KEY:?run fill-secrets}
+      STORAGE_TEMP_DIR: /media-tmp
+    volumes:
+      - storage-state:/storage-state:ro
+      - type: volume
+        source: storage-data
+        target: /storage-capacity
+        read_only: true
+        volume:
+          subpath: .capacity
+      - type: bind
+        source: ${STORAGE_MEDIA_SCRATCH_DIR:?provision private bounded filesystem first}
+        target: /media-tmp
+        bind:
+          create_host_path: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "bun", "src/server/storage/health.ts", "media"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   # 部署时 deploy.sh 先跑它（docker compose run --rm migrate），成功了才重启 web 和 worker（spec 第 9.3 节）。
   migrate:
@@ -194,15 +311,27 @@ services:
 
   # 每天的备份（ops/backup/backup.sh）：g510 上的 systemd 定时器 03:30 执行 docker compose run --rm -T backup。
   # 不依赖 postgres 自动起来：库没在跑时这次备份就该失败，systemd 里看得到。
-  backup:
+  backup: &backup
     build:
-      context: ./ops/backup
+      context: ../..
+      dockerfile: apps/community/ops/backup/Dockerfile
     image: astrodx-community-backup:latest
     profiles: [tools]
     restart: "no"
     logging: *logging
-    command: ["bash", "/backup/backup.sh"]
+    command: ["bash", "./ops/backup/backup.sh"]
     environment:
+      <<: *storage-env
+      DATABASE_URL: postgres://community:${POSTGRES_PASSWORD:?run fill-secrets}@postgres:5432/community
+      UMAMI_DATABASE_URL: postgres://umami:${UMAMI_DB_PASSWORD:?run fill-secrets}@postgres:5432/umami
+      STORAGE_BACKUP_ACCESS_KEY_ID: ${STORAGE_BACKUP_ACCESS_KEY_ID:?run fill-secrets}
+      STORAGE_BACKUP_SECRET_ACCESS_KEY: ${STORAGE_BACKUP_SECRET_ACCESS_KEY:?run fill-secrets}
+      STORAGE_JOURNAL_DIR: /storage-journal
+      STORAGE_JOURNAL_KEY_FILE: /storage-key/key
+      STORAGE_STAGING_DIR: /staging
+      STORAGE_BUNDLE_ROOT: /bundles
+      STORAGE_COMMUNITY_DUMP_BOUND: ${STORAGE_COMMUNITY_DUMP_BOUND:?set verified dump bound}
+      STORAGE_UMAMI_DUMP_BOUND: ${STORAGE_UMAMI_DUMP_BOUND:?set verified dump bound}
       PGHOST: postgres
       PGUSER: community
       PGPASSWORD: ${POSTGRES_PASSWORD:?先运行 ops/fill-secrets.sh}
@@ -210,7 +339,23 @@ services:
       # 没设时 backup.sh 自己报错退出；这里不写成必填，免得没配备份时别的 compose 命令也跑不了。
       RESTIC_PASSWORD: ${RESTIC_PASSWORD:-}
     volumes:
-      - ./ops/backup/backup.sh:/backup/backup.sh:ro
+      - storage-state:/storage-state:ro
+      - type: volume
+        source: storage-data
+        target: /storage-capacity
+        read_only: true
+        volume:
+          subpath: .capacity
+      - storage-journal:/storage-journal
+      - storage-journal-key:/storage-key:ro
+      - storage-staging:/staging
+      - storage-bundles:/bundles
+      - type: bind
+        source: ${STORAGE_MEDIA_SCRATCH_DIR:?provision private bounded filesystem first}
+        target: /media-tmp
+        read_only: true
+        bind:
+          create_host_path: false
       # restic 仓库在宿主机上的目录。目录不在就报错，不自动建：设错了路径不能悄悄备份到别处。
       - type: bind
         source: ${BACKUP_REPO_DIR:-/BACKUP_REPO_DIR-is-not-set}
@@ -218,7 +363,25 @@ services:
         bind:
           create_host_path: false
 
+  storage-init:
+    <<: *backup
+    command: ["bun", "ops/backup/initialize.ts"]
+    volumes:
+      - storage-staging:/staging
+      - storage-bundles:/bundles
+      - storage-state:/storage-state
+      - storage-journal:/storage-journal
+      - storage-journal-key:/storage-key
+
 volumes:
   pgdata:
   napcat-qq:
   napcat-config:
+
+  storage-data:
+  storage-config:
+  storage-state:
+  storage-journal:
+  storage-journal-key:
+  storage-staging:
+  storage-bundles:

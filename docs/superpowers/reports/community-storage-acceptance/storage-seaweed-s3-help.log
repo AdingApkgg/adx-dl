@@ -1,0 +1,169 @@
+Example: weed s3 [-port=8333] [-filer=<ip:port>[,<ip:port>]...] [-config=</path/to/config.json>]
+Default Usage:
+  -allowDeleteBucketNotEmpty
+        allow recursive deleting all entries along with bucket (default true)
+  -allowEmptyFolder
+        deprecated, ignored. Empty folder cleanup is now automatic. (default true)
+  -allowUntrustedRemoteEndpoints
+        if true, a read of a remote-only entry accepts arbitrary remote S3 endpoints including loopback / link-local hosts. Default rejects internal / metadata endpoints.
+  -allowedOrigins string
+        comma separated list of allowed origins (default "*")
+  -auditLogConfig string
+        path to the audit log config file
+  -autoCreateBucket
+        create the bucket on upload if it does not exist, for admin identities only (default true)
+  -cacert.file string
+        path to the TLS CA certificate file
+  -cacheCapacityMB int
+        in-memory chunk cache capacity in MB for S3 GETs shared across requests (0 disables)
+  -cert.file string
+        path to the TLS certificate file
+  -concurrentFileUploadLimit int
+        limit number of concurrent file uploads, 0 means unlimited
+  -concurrentUploadLimitMB int
+        limit total concurrent upload size, 0 means unlimited
+  -config string
+        path to the config file
+  -dataCenter string
+        prefer to read and write to volumes in this data center
+  -debug
+        serves runtime profiling data via pprof on the port specified by -debug.port
+  -debug.port int
+        http port for debugging (default 6060)
+  -defaultFileMode string
+        default file mode for S3 uploaded objects, e.g. 0660, 0644, 0666
+  -domainName string
+        suffix of the host name in comma separated list, {bucket}.{domainName}
+  -encryptVolumeData
+        encrypt data on volume servers
+  -externalUrl string
+        the external URL clients use to connect (e.g. https://api.example.com:9000). Advertised to Iceberg and Lance clients, and tried first when verifying S3 signatures behind a reverse proxy. Falls back to S3_EXTERNAL_URL env var.
+  -filer string
+        comma-separated filer server addresses for high availability (default "localhost:8888")
+  -iam
+        enable embedded IAM API on the same port (default true)
+  -iam.config string
+        path to the advanced IAM config file
+  -iam.readOnly
+        disable IAM write operations on this server (default true)
+  -iceberg.credentialDurationSeconds int
+        lifetime of credentials vended by the Iceberg catalog (default 3600)
+  -iceberg.credentialRole string
+        IAM role ARN the Iceberg catalog assumes to vend table-scoped credentials (empty disables vending)
+  -idleTimeout int
+        connection idle seconds (default 120)
+  -ip string
+        ip address advertised to the cluster. If empty, default to -ip.bind, or the auto-detected address.
+  -ip.bind string
+        ip address to bind to. If empty, default to 0.0.0.0.
+  -key.file string
+        path to the TLS private key file
+  -localFilerSocket string
+        local filer socket path
+  -localSocket string
+        default to /tmp/seaweedfs-s3-<port>.sock
+  -metricsIp string
+        metrics listen ip. If empty, default to same as -ip.bind option.
+  -metricsPort int
+        Prometheus metrics listen port
+  -options string
+        a file of command line options, each line in optionName=optionValue format
+  -port int
+        s3 server http listen port (default 8333)
+  -port.grpc int
+        s3 server grpc listen port
+  -port.https int
+        s3 server https listen port
+  -port.iceberg int
+        Iceberg REST Catalog server listen port (0 to disable) (default 8181)
+  -port.lance int
+        Lance Namespace server listen port (0 to disable); credential vending uses -iceberg.credentialRole (default 9101)
+  -readerCacheSizeMB int
+        memory budget in MiB for downloaded and in-flight reader buffers across all S3 GETs (0 means unlimited)
+  -tlsVerifyClientCert
+        whether to verify the client's certificate
+Description:
+  start a s3 API compatible server that is backed by filer(s).
+
+        Multiple filer addresses can be specified for high availability, separated by commas.
+        The S3 server will automatically failover between filers if one becomes unavailable.
+
+        By default, you can use any access key and secret key to access the S3 APIs.
+        To enable credential based access, create a config.json file similar to this:
+
+{
+  "identities": [
+    {
+      "name": "anonymous",
+      "actions": [
+        "Read"
+      ]
+    },
+    {
+      "name": "some_admin_user",
+      "credentials": [
+        {
+          "accessKey": "some_access_key1",
+          "secretKey": "some_secret_key1"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "List",
+        "Tagging",
+        "Write"
+      ]
+    },
+    {
+      "name": "some_read_only_user",
+      "credentials": [
+        {
+          "accessKey": "some_access_key2",
+          "secretKey": "some_secret_key2"
+        }
+      ],
+      "actions": [
+        "Read"
+      ]
+    },
+    {
+      "name": "some_normal_user",
+      "credentials": [
+        {
+          "accessKey": "some_access_key3",
+          "secretKey": "some_secret_key3"
+        }
+      ],
+      "actions": [
+        "Read",
+        "List",
+        "Tagging",
+        "Write"
+      ]
+    },
+    {
+      "name": "user_limited_to_bucket1",
+      "credentials": [
+        {
+          "accessKey": "some_access_key4",
+          "secretKey": "some_secret_key4"
+        }
+      ],
+      "actions": [
+        "Read:bucket1",
+        "List:bucket1",
+        "Tagging:bucket1",
+        "Write:bucket1"
+      ]
+    }
+  ]
+}
+
+        Alternatively, you can use environment variables as fallback admin credentials:
+
+        AWS_ACCESS_KEY_ID=your_access_key AWS_SECRET_ACCESS_KEY=your_secret_key weed s3
+
+        Environment variables are only used when no S3 configuration file is provided
+        and no configuration is available from the filer. This provides a simple way
+        to get started without requiring configuration files.

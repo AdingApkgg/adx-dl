@@ -1,0 +1,10 @@
+COMMAND /Users/i/.bun/bin/bun x biome lint apps/community/ops/backup/preflight.ts apps/community/ops/backup/export.ts apps/community/ops/backup/capacity-policy.test.ts
+Checked 3 files in 524ms. No fixes applied.
+EXIT 0 WALL_SECONDS 4.99
+COMMAND .superpowers/sdd/2026-10-10-community-storage/storage-check bun x tsc --noEmit
+ops/backup/capacity-policy.test.ts(50,57): error TS2345: Argument of type '() => Promise<BigIntStatsFs | StatsFs>' is not assignable to parameter of type '{ (path: PathLike, opts?: (StatFsOptions & { bigint?: false | undefined; }) | undefined): Promise<StatsFs>; (path: PathLike, opts: StatFsOptions & { ...; }): Promise<...>; (path: PathLike, opts?: StatFsOptions | undefined): Promise<...>; }'.
+  Type 'Promise<BigIntStatsFs | StatsFs>' is not assignable to type 'Promise<StatsFs>'.
+    Type 'BigIntStatsFs | StatsFs' is not assignable to type 'StatsFs'.
+      Type 'BigIntStatsFs' is not assignable to type 'StatsFsBase<number>'.
+        Type 'bigint' is not assignable to type 'number'.
+EXIT 1 WALL_SECONDS 35.33

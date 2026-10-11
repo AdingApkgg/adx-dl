@@ -1,0 +1,325 @@
+Example: weed mini -dir=/tmp
+Default Usage:
+  -admin.dataDir string
+        directory to store admin configuration and data files
+  -admin.master string
+        master server address (automatically set)
+  -admin.password string
+        admin interface password (if empty, auth is disabled)
+  -admin.port int
+        admin server http listen port (default 23646)
+  -admin.port.grpc int
+        admin server grpc listen port (default: admin http port + GrpcPortOffset)
+  -admin.readOnlyPassword string
+        read-only user password (optional, for view-only access; requires admin.password to be set)
+  -admin.readOnlyUser string
+        read-only user username (optional, for view-only access)
+  -admin.ui
+        enable Admin UI (default true)
+  -admin.urlPrefix string
+        URL path prefix when running the admin UI behind a reverse proxy under a subdirectory (e.g. /seaweedfs)
+  -admin.user string
+        admin interface username (default "admin")
+  -bucket string
+        comma-separated S3 bucket names to create on startup if they do not already exist; leave empty to skip. Falls back to S3_BUCKET env var.
+  -cpuprofile string
+        cpu profile output file
+  -dataCenter string
+        current volume server's data center name
+  -debug
+        serves runtime profiling data, e.g., http://localhost:6060/debug/pprof/goroutine?debug=2
+  -debug.port int
+        http port for debugging (default 6060)
+  -dir string
+        directory to store data files (default ".")
+  -disableHttp
+        disable http requests, only gRPC operations are allowed.
+  -filer.allowUntrustedRemoteEndpoints
+        if true, a read of a remote-only entry accepts arbitrary remote S3 endpoints including loopback / link-local hosts. Default rejects internal / metadata endpoints.
+  -filer.allowedOrigins string
+        comma separated list of allowed origins (default "*")
+  -filer.collection string
+        all data will be stored in this collection
+  -filer.concurrentFileUploadLimit int
+        limit number of concurrent file uploads
+  -filer.concurrentUploadLimitMB int
+        limit total concurrent upload size
+  -filer.defaultReplicaPlacement string
+        default replication type. If not specified, use master setting.
+  -filer.dirListLimit int
+        limit sub dir listing size (default 1000)
+  -filer.disableDirListing
+        turn off directory listing
+  -filer.disk string
+        [hdd|ssd|<tag>] hard drive or solid state drive or any tag
+  -filer.downloadMaxMBps int
+        download max speed for each download request, in MB per second
+  -filer.encryptVolumeData
+        encrypt data on volume servers
+  -filer.exposeDirectoryData
+        whether to return directory metadata and content in Filer UI (default true)
+  -filer.filerGroup string
+        share metadata with other filers in the same filerGroup
+  -filer.localSocket string
+        default to /tmp/seaweedfs-filer-<port>.sock
+  -filer.maxMB int
+        split files larger than the limit (default 4)
+  -filer.port int
+        filer server http listen port (default 8888)
+  -filer.port.grpc int
+        filer server grpc listen port
+  -filer.port.public int
+        filer server public http listen port
+  -filer.saveToFilerLimit int
+        files smaller than this limit will be saved in filer store
+  -filer.tusBasePath string
+        TUS resumable upload endpoint base path (default "/.tus")
+  -filer.tusMaxSizeMB int
+        maximum TUS upload size in MB (default 5120)
+  -filer.tusSessionExpiry duration
+        incomplete TUS upload sessions are cleaned up after this duration (default 24h0m0s)
+  -filer.ui.deleteDir
+        enable filer UI show delete directory button (default true)
+  -idleTimeout int
+        connection idle seconds (default 30)
+  -ip string
+        ip or server name, also used as identifier (default "192.168.148.2")
+  -ip.bind string
+        ip address to bind to. If empty, default to same as -ip option. (default "0.0.0.0")
+  -master.defaultReplication string
+        Default replication type if not specified.
+  -master.dir string
+        data directory to store meta data, default to same as -dir specified
+  -master.electionTimeout duration
+        election timeout of master servers (default 10s)
+  -master.garbageThreshold float
+        threshold to vacuum and reclaim spaces (default 0.3)
+  -master.heartbeatInterval duration
+        heartbeat interval of master servers, and will be randomly multiplied by [1, 1.25) (default 300ms)
+  -master.maxParallelVacuumPerServer int
+        maximum number of volumes to vacuum in parallel on one volume server (default 1)
+  -master.metrics.address string
+        Prometheus gateway address
+  -master.metrics.intervalSeconds int
+        Prometheus push interval in seconds (default 15)
+  -master.peers string
+        all master nodes in comma separated ip:masterPort list (default: none for single master)
+  -master.port int
+        master server http listen port (default 9333)
+  -master.port.grpc int
+        master server grpc listen port
+  -master.raftBootstrap
+        whether to bootstrap the Raft cluster
+  -master.raftHashicorp
+        use hashicorp raft
+  -master.resumeState
+        resume previous state on start master server (default true)
+  -master.telemetry
+        report anonymous cluster statistics to master.telemetry.url, use -master.telemetry=false to opt out (default true)
+  -master.telemetry.url string
+        telemetry server URL (default "https://telemetry.seaweedfs.com/api/collect")
+  -master.vacuumDeleteEmptyAfterSeconds int
+        automatic sweep deletes volume copies that stay empty this many seconds; 0 disables
+  -master.vacuumIntervalSeconds int
+        seconds between automatic vacuum sweeps (default 840)
+  -master.volumePreallocate
+        Preallocate disk space for volumes.
+  -master.volumeSizeLimitMB uint
+        Master stops directing writes to oversized volumes (default: 128MB for mini) (default 128)
+  -memprofile string
+        memory profile output file
+  -metricsIp string
+        metrics listen ip. If empty, default to same as -ip.bind option.
+  -metricsPort int
+        Prometheus metrics listen port
+  -options string
+        a file of command line options, each line in optionName=optionValue format
+  -rack string
+        current volume server's rack name
+  -s3
+        enable S3 server (default true)
+  -s3.allowDeleteBucketNotEmpty
+        allow recursive deleting all entries along with bucket (default true)
+  -s3.allowUntrustedRemoteEndpoints
+        if true, a read of a remote-only entry accepts arbitrary remote S3 endpoints including loopback / link-local hosts. Default rejects internal / metadata endpoints.
+  -s3.allowedOrigins string
+        comma separated list of allowed origins (default "*")
+  -s3.auditLogConfig string
+        path to the audit log config file
+  -s3.autoCreateBucket
+        create the bucket on upload if it does not exist, for admin identities only (default true)
+  -s3.cacert.file string
+        path to the TLS CA certificate file
+  -s3.cacheCapacityMB int
+        in-memory chunk cache capacity in MB for S3 GETs shared across requests (0 disables)
+  -s3.cert.file string
+        path to the TLS certificate file
+  -s3.concurrentFileUploadLimit int
+        limit number of concurrent file uploads
+  -s3.concurrentUploadLimitMB int
+        limit total concurrent upload size
+  -s3.config string
+        path to the S3 config file
+  -s3.dataCenter string
+        prefer to read and write to volumes in this data center
+  -s3.debug.port int
+        http port for debugging (unused in mini mode) (default 6060)
+  -s3.defaultFileMode string
+        default file mode for S3 uploaded objects, e.g. 0660, 0644, 0666
+  -s3.domainName string
+        suffix of the host name in comma separated list, {bucket}.{domainName}
+  -s3.encryptVolumeData
+        encrypt data on volume servers for S3 uploads
+  -s3.externalUrl string
+        the external URL clients use to connect (e.g. https://api.example.com:9000). Advertised to Iceberg and Lance clients, and tried first when verifying S3 signatures behind a reverse proxy. Falls back to S3_EXTERNAL_URL env var.
+  -s3.iam
+        enable embedded IAM API on the same port (default true)
+  -s3.iam.config string
+        path to the advanced IAM config file for S3
+  -s3.iam.readOnly
+        disable IAM write operations on this server (default true)
+  -s3.iceberg.credentialDurationSeconds int
+        lifetime of credentials vended by the Iceberg catalog (default 3600)
+  -s3.iceberg.credentialRole string
+        IAM role ARN the Iceberg catalog assumes to vend table-scoped credentials (empty disables vending)
+  -s3.idleTimeout int
+        connection idle seconds (default 120)
+  -s3.key.file string
+        path to the TLS private key file
+  -s3.localFilerSocket string
+        local filer socket path
+  -s3.localSocket string
+        default to /tmp/seaweedfs-s3-<port>.sock
+  -s3.metricsIp string
+        metrics listen ip
+  -s3.metricsPort int
+        Prometheus metrics listen port
+  -s3.port int
+        s3 server http listen port (default 8333)
+  -s3.port.grpc int
+        s3 server grpc listen port
+  -s3.port.https int
+        s3 server https listen port
+  -s3.port.iceberg int
+        Iceberg REST Catalog server listen port (0 to disable) (default 8181)
+  -s3.port.lance int
+        Lance Namespace server listen port (0 to disable) (default 9101)
+  -s3.readerCacheSizeMB int
+        memory budget in MiB for downloaded and in-flight reader buffers across all S3 GETs (0 means unlimited)
+  -s3.tlsVerifyClientCert
+        whether to verify the client's certificate
+  -tableBucket string
+        comma-separated S3 Tables buckets to create on startup if they do not already exist, each name[:FORMAT] with FORMAT one of ICEBERG (default) or LANCE, e.g. warehouse,vectors:LANCE; leave empty to skip. Falls back to S3_TABLE_BUCKET env var.
+  -volume.allowUntrustedRemoteEndpoints
+        if true, FetchAndWriteNeedle accepts arbitrary remote S3 endpoints including loopback / link-local hosts. Default rejects internal / metadata endpoints.
+  -volume.compactionMBps int
+        limit compaction speed in mega bytes per second
+  -volume.concurrentDownloadLimitMB int
+        limit total concurrent download size
+  -volume.concurrentUploadLimitMB int
+        limit total concurrent upload size
+  -volume.dir.idx string
+        directory to store .idx files
+  -volume.disk string
+        [hdd|ssd|<tag>] hard drive or solid state drive or any tag
+  -volume.fileSizeLimitMB int
+        limit file size to avoid out of memory (default 256)
+  -volume.hasSlowRead
+        if true, prevents slow reads from blocking other requests (default true)
+  -volume.id string
+        volume server id. If empty, default to ip:port
+  -volume.images.fix.orientation
+        Adjust jpg orientation when uploading.
+  -volume.index string
+        Choose [memory|leveldb|leveldbMedium|leveldbLarge] mode for memory~performance balance. (default "memory")
+  -volume.index.leveldbTimeout int
+        alive time for leveldb
+  -volume.inflightDownloadDataTimeout duration
+        inflight download data wait timeout (default 1m0s)
+  -volume.inflightUploadDataTimeout duration
+        inflight upload data wait timeout (default 1m0s)
+  -volume.maintenanceMBps int
+        limit maintenance IO rate in MB/s
+  -volume.max string
+        maximum numbers of volumes, count[,count]... If set to zero, the limit will be auto configured as free disk space divided by volume size.
+  -volume.port int
+        volume server http listen port (default 9340)
+  -volume.port.grpc int
+        volume server grpc listen port
+  -volume.port.public int
+        volume server public port
+  -volume.pprof
+        enable pprof http handlers
+  -volume.preStopSeconds int
+        number of seconds between stop send heartbeats and stop volume server (default: 1 for mini) (default 1)
+  -volume.publicUrl string
+        publicly accessible address
+  -volume.readBufferSizeMB int
+        read buffer size in MB (default 4)
+  -volume.readMode string
+        [local|proxy|redirect] how to deal with non-local volume: 'not found|read in remote node|redirect volume location'. (default "proxy")
+  -volume.tags string
+        comma-separated tag groups per data dir; each group uses ':' (e.g. fast:ssd,archive)
+  -webdav
+        enable WebDAV server (default true)
+  -webdav.cacheCapacityMB int
+        local cache capacity in MB
+  -webdav.cacheDir string
+        local cache directory for file chunks (default "/tmp")
+  -webdav.cert.file string
+        path to the TLS certificate file
+  -webdav.collection string
+        collection to create the files
+  -webdav.disk string
+        [hdd|ssd|<tag>] hard drive or solid state drive or any tag
+  -webdav.filer.path string
+        use this remote path from filer server (default "/")
+  -webdav.key.file string
+        path to the TLS private key file
+  -webdav.maxMB int
+        split files larger than the limit (default 4)
+  -webdav.port int
+        webdav server http listen port (default 7333)
+  -webdav.replication string
+        replication to create the files
+  -whiteList string
+        comma separated Ip addresses having write permission. No limit if empty.
+Description:
+  start a complete SeaweedFS setup with all components optimized for small/dev use cases
+
+This command starts all components in one process (master, volume, filer,
+S3 gateway, WebDAV gateway, and Admin UI).
+
+All settings are optimized for small/dev use cases:
+- Volume size limit: auto configured based on disk space (64MB-1024MB)
+- Volume max: 0 (auto-configured based on free disk space), see -volume.max
+- Pre-stop seconds: 1 (faster shutdown)
+- Master peers: none (single master mode)
+
+This is perfect for:
+- Development and testing
+- Learning SeaweedFS
+- Small deployments
+- Local S3-compatible storage
+
+Example Usage:
+        weed mini                   # Use current directory
+        weed mini -dir=/data        # Custom data directory
+        weed mini -dir=/data -master.port=9444  # Custom master port
+        weed mini -dir=/data -bucket=my-bucket             # Pre-create an S3 bucket on startup
+        weed mini -dir=/data -bucket=bucket1,bucket2       # Pre-create multiple S3 buckets
+        weed mini -dir=/data -tableBucket=iceberg-tables   # Pre-create an S3 Tables bucket
+
+After starting, you can access:
+- Master UI:       http://localhost:9333
+- Volume Server:   http://localhost:9340
+- Filer UI:        http://localhost:8888
+- S3 Endpoint:     http://localhost:8333
+- Iceberg Catalog: http://localhost:8181
+- WebDAV:          http://localhost:7333
+- Admin UI:        http://localhost:23646
+
+S3 Access:
+The S3 endpoint is available at http://localhost:8333. For client
+configuration and IAM setup, see the project documentation or use the
+Admin UI (http://localhost:23646) to manage users and policies.

@@ -1,5 +1,13 @@
+import { serve, type ServerType } from "@hono/node-server";
+import type { Socket } from "node:net";
+import { createStorageContext } from "./storage/runtime";
+import { createStorageIOTracker } from "./storage/maintenance";
+import { startStorageRole, assertMediaProcess } from "./storage/runtime-role";
+import { createMediaDrain } from "./storage/drain";
+import { STORAGE_QUEUES } from "./jobs/queues";
+import { assertNormalStorageStartup } from "../../ops/backup/restore";
 import { RouterContextProvider } from "react-router";
-import { createHonoServer } from "react-router-hono-server/bun";
+import { createHonoServer } from "react-router-hono-server/node";
 
 import { describeError } from "@/shared/describe-error";
 import { createLogger } from "@/shared/log";
@@ -18,7 +26,7 @@ import { getDb, pingDb } from "./db/client";
 import { parseEnv } from "./env";
 import { createInProcessApi } from "./in-process-api";
 import { assertQueueExists, getSender, stopSender } from "./jobs/boss";
-import { USER_PURGE_QUEUE } from "./jobs/queues";
+import { USER_PURGE_QUEUE, MEDIA_PURGE_QUEUE } from "./jobs/queues";
 import { createRedisRateLimitStore } from "./middleware/rate-limit";
 import { createOneBotClient } from "./napcat/client";
 import { createNapcatSender } from "./napcat/sender";
@@ -27,6 +35,7 @@ import { createLoginOptions } from "./services/login-options";
 import { DELETION_HANDLERS } from "./services/user-deletion";
 import { throttledErrorLog } from "./throttled-log";
 
+await assertNormalStorageStartup();
 const env = parseEnv(process.env);
 const log = createLogger();
 const { db, pool } = getDb(env.databaseUrl, {
@@ -68,20 +77,36 @@ const auth = createAuth({
 // 换 Google 令牌这一步加上超时（原因写在 google-timeout.ts）。
 await limitGoogleTokenExchange(auth);
 
+const tracker = createStorageIOTracker();
+const controller = new AbortController();
+const storage = createStorageContext({db,boss:getBoss,log,role:"web",tracker,signal:controller.signal});
+if(storage.config.role!=="web") throw new Error("STORAGE_WEB_REQUIRED");
+const mediaDrain = createMediaDrain({db,secret:storage.config.internalMediaSecret});
+const role = await startStorageRole({databaseUrl:env.databaseUrl,role:"web",tracker});
 const app = createApp({
+  mediaDrain,
   log,
   isProduction: env.nodeEnv === "production",
   publicOrigin: env.publicOrigin,
   umamiInternalUrl: env.umami?.internalUrl ?? null,
   checks: {
     db: () => pingDb(db),
+    storage: () => storage.driver.ready(AbortSignal.timeout(1800)),
+    media: () => assertMediaProcess(env.databaseUrl),
+    runtime: async () => role.ready(),
     redis: () => pingRedis(redis),
     // 部署脚本轮询 /readyz：pg-boss 的表或 user.purge 队列不在（迁移没跑），这里就是 fail。
-    jobs: async () => assertQueueExists(await getBoss(), USER_PURGE_QUEUE),
+    jobs: async () => {
+      const boss = await getBoss();
+      await assertQueueExists(boss, USER_PURGE_QUEUE);
+      await assertQueueExists(boss, MEDIA_PURGE_QUEUE);
+      for(const {name} of STORAGE_QUEUES) await assertQueueExists(boss,name);
+    },
   },
   rateLimitStore,
   auth,
   services: {
+    storage,
     db,
     boss: getBoss,
     loginOptions: createLoginOptions({
@@ -94,20 +119,31 @@ const app = createApp({
   },
 });
 
-// 生产环境里，这个模块一被 import 就会自己调用 Bun.serve。默认导出必须原样是
-// createHonoServer 的返回值：换成别的 fetch，Bun 会再按默认导出起一个服务，端口冲突。
-export default await createHonoServer<AppEnv>({
+// Node owns the public listener. Never default-export Hono.fetch to the Bun CLI.
+let publicServer: ServerType | undefined;
+let internalServer: ServerType | undefined;
+const sockets = new Set<Socket>();
+const observe = (server: ServerType) => {
+ server.on("connection",socket=>{sockets.add(socket);socket.once("close",()=>sockets.delete(socket));});
+};
+const honoApp = await createHonoServer<AppEnv>({
   app,
   defaultLogger: false,
   port: env.port,
-  customBunServer: { hostname: env.host },
-  serveStaticOptions: {
-    // 构建产物文件名带哈希，内容永远不变；默认的缓存头里没有 immutable。
-    clientAssets: {
-      onFound: (_path, c) => {
-        c.header("Cache-Control", "public, max-age=31536000, immutable");
-      },
-    },
+  hostname: env.host,
+  overrideGlobalObjects: false,
+  onServe(server) {
+    publicServer=server; observe(server);
+    internalServer=serve({hostname:env.host,port:Number(process.env.STORAGE_INTERNAL_PORT ?? 3001),overrideGlobalObjects:false,fetch:request=>mediaDrain.handle(request)});
+    observe(internalServer);
+  },
+  beforeAll(server) {
+    // Run after the adapter's static middleware has materialized its final response.
+    server.use("/assets/*", async (c, next) => {
+      await next();
+      if (c.res.status === 200 && /\/[^/]+-[A-Za-z0-9_-]+\.[A-Za-z0-9]+$/.test(c.req.path))
+        c.res.headers.set("Cache-Control", "public, max-age=31536000, immutable");
+    });
   },
   // 必须返回 RouterContextProvider：React Router 8 用 instanceof 检查。
   // 它在我们的中间件都跑过之后才调用，所以请求 ID、nonce、访客 IP 都已经有了。
@@ -136,10 +172,18 @@ export default await createHonoServer<AppEnv>({
     context.set(queryClientContext, makeQueryClient());
     return context;
   },
-  onGracefulShutdown: async () => {
-    redis.close();
-    // 发送端有自己的连接池，先停它，再关 Drizzle 的池。
-    await stopSender();
-    await pool.end();
-  },
-});
+ });
+let stopping=false;
+async function shutdown() {
+ if(stopping)return;stopping=true;
+ tracker.pause();controller.abort();mediaDrain.shutdown();
+ const closed=[publicServer,internalServer].map(server=>server ? new Promise<void>(resolve=>server.close(()=>resolve())) : Promise.resolve());
+ for(const socket of sockets)socket.destroy();
+ await Promise.all(closed);
+ await tracker.pauseAndDrain(AbortSignal.timeout(30000));
+ await role.stop();
+ redis.close();await stopSender();await pool.end();
+}
+process.once("SIGTERM",()=>void shutdown());
+process.once("SIGINT",()=>void shutdown());
+export default import.meta.env.DEV ? honoApp : undefined;

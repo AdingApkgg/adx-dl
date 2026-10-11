@@ -40,7 +40,7 @@ describe("GET /api/v1/me/profile", () => {
     const res = await browser.request("GET", "/api/v1/me/profile");
 
     expect(res.status).toBe(200);
-    expect(res.json).toEqual({ name: "阿丁", bio: "", onboardedAt: null });
+    expect(res.json).toEqual({ name: "阿丁", bio: "", onboardedAt: null, image: null, avatarRevision: 0 });
     expect(await profileRow(userId)).toEqual([]);
   });
 });
@@ -62,7 +62,7 @@ describe("PATCH /api/v1/me/profile", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(res.json).toEqual({ name: "新昵称", bio: "第一行\n第二行", onboardedAt: null });
+    expect(res.json).toEqual({ name: "新昵称", bio: "第一行\n第二行", onboardedAt: null, image: null, avatarRevision: 0 });
     expect((await browser.request("GET", "/api/v1/me")).json.name).toBe("新昵称");
     const [row] = await profileRow(userId);
     expect(row?.bio).toBe("第一行\n第二行");
@@ -74,7 +74,7 @@ describe("PATCH /api/v1/me/profile", () => {
     await browser.request("PATCH", "/api/v1/me/profile", { body: { bio: "简介" } });
     const res = await browser.request("PATCH", "/api/v1/me/profile", { body: { name: "改过的昵称" } });
 
-    expect(res.json).toEqual({ name: "改过的昵称", bio: "简介", onboardedAt: null });
+    expect(res.json).toEqual({ name: "改过的昵称", bio: "简介", onboardedAt: null, image: null, avatarRevision: 0 });
   });
 
   test("昵称空白、超过 24 个字符：400 NICKNAME_INVALID，什么也没改", async () => {

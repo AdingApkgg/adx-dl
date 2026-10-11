@@ -1,14 +1,22 @@
 import { Hono } from "hono";
 
 import type { AppEnv } from "../app-env";
+import { fileRoutes } from "./files";
+import { avatarRoutes } from "./avatar";
+import { uploadRoutes } from "./uploads";
 import { meRoutes } from "./me";
 import { userRoutes } from "./users";
+import { chartRoutes } from "./charts";
 
 // 必须链式定义：Hono RPC 从链式调用的返回类型里推导出每个接口的类型。
 export const apiV1 = new Hono<AppEnv>()
   .get("/meta", (c) => c.json({ name: "astrodx-community", apiVersion: 1 as const }))
   // 登录页的配置：Turnstile 站点密钥、QQ 登录能不能用。不要求登录。
   .get("/login-options", async (c) => c.json(await c.get("services").loginOptions()))
+  .route("/uploads", uploadRoutes)
+  .route("/files", fileRoutes)
+  .route("/me/avatar", avatarRoutes)
+  .route("/me/charts", chartRoutes)
   .route("/me", meRoutes)
   // 个人主页的公开资料（spec 第 10.5 节），不要求登录。
   .route("/users", userRoutes);

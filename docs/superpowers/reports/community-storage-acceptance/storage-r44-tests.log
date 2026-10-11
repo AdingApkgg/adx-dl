@@ -1,0 +1,39 @@
+bun test v1.4.2 (744846f84)
+
+test/storage/quarantine-settlement.test.ts:
+(pass) R44 production-budget quarantine DELETE settles once after admission closes [696.73ms]
+{"time":"2026-10-10T19:31:58.367Z","level":"error","event":"pg_pool_error","name":"TypeError","message":"undefined is not an object (evaluating 'client.release.bind')"}
+36 |   async queryWithCache(queryString, params, query) {
+37 |     if (this.cache === void 0 || is(this.cache, NoopCache) || this.queryMetadata === void 0) {
+38 |       try {
+39 |         return await query();
+40 |       } catch (e) {
+41 |         throw new DrizzleQueryError(queryString, params, e);
+                   ^
+error: Failed query: select 1
+params:
+  query: "select 1",
+ params: [],
+
+      at queryWithCache (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/drizzle-orm@0.45.3+888bfaee68f299c3/node_modules/drizzle-orm/pg-core/session.js:41:15)
+
+40 |     res = resolve
+41 |     rej = reject
+42 |   }).catch((err) => {
+43 |     // replace the stack trace that leads to `TCP.onStreamRead` with one that leads back to the
+44 |     // application that created the query
+45 |     Error.captureStackTrace(err)
+               ^
+error: timeout exceeded when trying to connect
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/node_modules/.bun/pg-pool@3.14.0+00a0136bc273dfed/node_modules/pg-pool/index.js:45:11)
+(fail) R44 settlement pool deadline discards the late real client without touching the claim [13790.66ms]
+(pass) R44 settlement begin stall destroys its connection and preserves authoritative state [3242.86ms]
+{"time":"2026-10-10T19:32:16.550Z","level":"error","event":"pg_pool_error","name":"DatabaseError","code":"25P04","severity":"FATAL","routine":"ProcessInterrupts"}
+(pass) R44 settlement commit stall destroys its connection and preserves authoritative state [1625.26ms]
+(pass) R44 settlement commit-ack stall destroys its connection and preserves authoritative state [1895.18ms]
+
+ 4 pass
+ 1 fail
+ 26 expect() calls
+Ran 5 tests across 1 file. [26.61s]
+EXIT 1 WALL_SECONDS 26.78

@@ -1,4 +1,4 @@
-import { Point2D, RendererConfig, TouchPosition, ButtonPosition } from "../types";
+import type { Point2D, RendererConfig, TouchPosition, ButtonPosition } from "../types";
 import {
   BASE_ANGLE,
   BUTTON_ANGLE_OFFSET,

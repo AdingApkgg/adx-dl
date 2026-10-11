@@ -3,8 +3,8 @@ import {
   type TouchDrawCommand,
   type TouchPart,
 } from "../utils/touchDrawOrder";
-import { BaseRenderer, mixHexColor, RenderContext } from "./BaseRenderer";
-import { TouchNote, TouchHoldStartNote, Point2D } from "../types";
+import { BaseRenderer, mixHexColor, type RenderContext } from "./BaseRenderer";
+import type { TouchNote, TouchHoldStartNote, Point2D } from "../types";
 import {
   TOUCH_APPROACH_MULTIPLIER,
   TOUCH_CENTER_DOT_RATIO,

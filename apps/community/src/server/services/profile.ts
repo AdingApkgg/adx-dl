@@ -1,18 +1,27 @@
 import { eq, sql } from "drizzle-orm";
 
 import type { Db } from "../db/client";
-import { profiles, user } from "../db/schema";
+import { profiles, user, userAvatars } from "../db/schema";
 
 /** 自己的资料：昵称在 user 表，简介和引导页状态在 profiles 表（没有这一行时按默认值）。 */
-export type MyProfile = { name: string; bio: string; onboardedAt: Date | null };
+export type MyProfile = {
+  name: string; bio: string; onboardedAt: Date | null; image: string | null; avatarRevision: number;
+};
 
 export async function getMyProfile(db: Db, userId: string): Promise<MyProfile | null> {
   const [row] = await db
-    .select({ name: user.name, bio: profiles.bio, onboardedAt: profiles.onboardedAt })
+    .select({
+      name: user.name, image: user.image, avatarRevision: userAvatars.revision,
+      bio: profiles.bio, onboardedAt: profiles.onboardedAt,
+    })
     .from(user)
     .leftJoin(profiles, eq(profiles.userId, user.id))
+    .leftJoin(userAvatars, eq(userAvatars.userId, user.id))
     .where(eq(user.id, userId));
-  return row ? { name: row.name, bio: row.bio ?? "", onboardedAt: row.onboardedAt ?? null } : null;
+  return row ? {
+    name: row.name, image: row.image, avatarRevision: row.avatarRevision ?? 0,
+    bio: row.bio ?? "", onboardedAt: row.onboardedAt ?? null,
+  } : null;
 }
 
 /** 已经规整、校验过的改动（见 api/me.ts）：没给的字段不动。 */

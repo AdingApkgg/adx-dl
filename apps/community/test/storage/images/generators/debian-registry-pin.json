@@ -1,0 +1,23 @@
+{
+  "indexDigest": "sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f",
+  "selected": {
+    "annotations": {
+      "com.docker.official-images.bashbrew.arch": "amd64",
+      "org.opencontainers.image.base.name": "scratch",
+      "org.opencontainers.image.created": "2026-10-05T00:00:00Z",
+      "org.opencontainers.image.revision": "a3751996111ce2c1c904050c84440184535e23b1",
+      "org.opencontainers.image.source": "https://github.com/debuerreotype/docker-debian-artifacts.git",
+      "org.opencontainers.image.url": "https://hub.docker.com/_/debian",
+      "org.opencontainers.image.version": "trixie-slim"
+    },
+    "digest": "sha256:918311b7b6c4c6f68b232ba516584925f6c78ad82b6fd534b98979df6438e483",
+    "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "platform": {
+      "architecture": "amd64",
+      "os": "linux"
+    },
+    "size": 1021
+  },
+  "source": "https://registry-1.docker.io/v2/library/debian/manifests/trixie-slim",
+  "verifiedTLS": true
+}

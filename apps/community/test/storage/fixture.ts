@@ -1,0 +1,150 @@
+import { readFile, mkdir } from "node:fs/promises";
+import { parseStorageEnv } from "../../src/server/storage/env";
+import type { StorageConfig, StorageRole } from "../../src/server/storage/contracts";
+/** External, opt-in isolated credentials; never depend on ignored source modules. */
+export async function storageFixtureConfig(role: StorageRole = "web"): Promise<StorageConfig> {
+  let access = process.env[`STORAGE_TEST_${role.toUpperCase()}_ACCESS_KEY_ID`];
+  let secret = process.env[`STORAGE_TEST_${role.toUpperCase()}_SECRET_ACCESS_KEY`];
+  if (process.env.STORAGE_TEST_FIXTURE_PATH) {
+    const fixture = JSON.parse(await readFile(process.env.STORAGE_TEST_FIXTURE_PATH, "utf8"));
+    const identity = fixture.identities.find(
+      (item: { name: string }) => item.name === `community-test-${role}` || item.name === role,
+    );
+    access = identity?.credentials[0]?.accessKey;
+    secret = identity?.credentials[0]?.secretKey;
+  }
+  const tempDir = "/tmp/community-storage-test";
+  await mkdir(tempDir, { recursive: true });
+  return parseStorageEnv(
+    {
+      PUBLIC_ORIGIN: "https://community.example.test",
+      STORAGE_S3_ENDPOINT: process.env.STORAGE_TEST_ENDPOINT ?? "http://127.0.0.1:58333",
+      STORAGE_TEMP_DIR: tempDir,
+      STORAGE_CAPACITY_DIR: process.env.STORAGE_TEST_CAPACITY_DIR,
+      STORAGE_RECIPE_BUILD: "test-v1",
+      [`STORAGE_${role.toUpperCase()}_ACCESS_KEY_ID`]: access ?? "isolated-test",
+      [`STORAGE_${role.toUpperCase()}_SECRET_ACCESS_KEY`]: secret ?? "isolated-test",
+      STORAGE_INTERNAL_MEDIA_SECRET: "test-internal-secret-0123456789abcdef",
+      STORAGE_INTERNAL_MEDIA_URL: "http://web:3001",
+      CLOUDFLARE_ZONE_ID: "0".repeat(32),
+      CLOUDFLARE_PURGE_TOKEN: "isolated-test-control-token",
+    },
+    role,
+  );
+}
+
+/** Remove only this fixture's rows/keys and charges; shared test DB resets once per process. */
+export async function cleanupStorageFixture(
+  db: import("../../src/server/db/client").Db,
+  owners: string[],
+  policies: string[],
+  driver?: import("../../src/server/storage/contracts").ObjectDriver,
+  originalAccounting = false,
+): Promise<void> {
+  if (!owners.length) return;
+  const { inArray, eq, or, sql } = await import("drizzle-orm");
+  const {
+    user,
+    files,
+    blobs,
+    blobDerivatives,
+    derivedObjects,
+    blobBlocks,
+    uploadSessions,
+    userAvatars, mediaPublications, mediaPurgeRequests,
+    uploadAttempts,
+    storagePolicies,
+    storageBudget, storageQuarantine, storageInventoryProgress,
+  } = await import("../../src/server/db/schema");
+  const sessions = await db
+    .select({ id: uploadSessions.id })
+    .from(uploadSessions)
+    .where(inArray(uploadSessions.ownerId, owners));
+  const ids = sessions.map((row) => row.id);
+  const attempts = ids.length || policies.length
+    ? await db.select().from(uploadAttempts).where(or(ids.length ? inArray(uploadAttempts.uploadId, ids) : undefined, policies.length ? inArray(uploadAttempts.policyId, policies) : undefined))
+    : [];
+  const quarantine=policies.length?await db.select().from(storageQuarantine).where(inArray(storageQuarantine.policyId,policies)):[];
+  const originals =
+    originalAccounting && policies.length
+      ? await db.select().from(blobs).where(inArray(blobs.policyId, policies))
+      : [];
+  const derivatives = originalAccounting && policies.length
+    ? await db.select().from(derivedObjects).where(inArray(derivedObjects.policyId, policies)) : [];
+  if (driver) for (const candidate of quarantine) await driver.delete({bucket:"original",key:candidate.key});
+  if (driver) for (const output of derivatives) await driver.delete({bucket:"derived",key:output.key});
+  if (driver)
+    for (const original of originals)
+      await driver.delete({ bucket: "original", key: original.key });
+  if (driver)
+    for (const attempt of attempts)
+      await driver.delete({ bucket: "original", key: attempt.tempKey });
+  await db.transaction(async (tx) => {
+    await tx.select().from(storageBudget).where(eq(storageBudget.id, "global")).for("update");
+    const ownFiles = await tx
+      .select({ blobId: files.blobId, sha256: blobs.sha256 })
+      .from(files)
+      .innerJoin(blobs, eq(files.blobId, blobs.id))
+      .where(inArray(files.ownerId, owners));
+    for (const id of ids)
+      await tx.execute(sql`delete from pgboss.job where data->>'uploadId'=${id}`);
+    await tx.delete(uploadSessions).where(inArray(uploadSessions.ownerId, owners));
+    await tx.delete(userAvatars).where(inArray(userAvatars.userId, owners));
+    if(derivatives.length) {
+      const hashes=derivatives.map(b=>b.outputSha256);
+      for(const hash of hashes) await tx.execute(sql`delete from pgboss.job where name='media.purge' and data->>'hash'=${hash}`);
+      await tx.delete(mediaPurgeRequests).where(inArray(mediaPurgeRequests.outputSha256,hashes));
+      await tx.delete(mediaPublications).where(inArray(mediaPublications.outputSha256,hashes));
+    }
+    await tx.delete(files).where(inArray(files.ownerId, owners));
+    if (originals.length) await tx.delete(files).where(inArray(files.blobId, originals.map(b=>b.id)));
+    if (attempts.length) await tx.delete(uploadAttempts).where(inArray(uploadAttempts.id, attempts.map(a=>a.id)));
+    if (originals.length) await tx.delete(blobDerivatives).where(inArray(blobDerivatives.sourceBlobId,originals.map(b=>b.id)));
+    if (derivatives.length) await tx.delete(derivedObjects).where(inArray(derivedObjects.id,derivatives.map(b=>b.id)));
+    if (ownFiles.length) {
+      await tx.delete(blobBlocks).where(
+        inArray(
+          blobBlocks.sha256,
+          ownFiles.map((row) => row.sha256),
+        ),
+      );
+      await tx.delete(blobs).where(
+        inArray(
+          blobs.id,
+          ownFiles.map((row) => row.blobId),
+        ),
+      );
+    }
+    if (originals.length)
+      await tx.delete(blobs).where(
+        inArray(
+          blobs.id,
+          originals.map((b) => b.id),
+        ),
+      );
+    await tx.delete(user).where(inArray(user.id, owners));
+    if(policies.length){await tx.delete(storageQuarantine).where(inArray(storageQuarantine.policyId,policies));await tx.delete(storageInventoryProgress).where(inArray(storageInventoryProgress.policyId,policies));}
+    if (policies.length)
+      await tx.delete(storagePolicies).where(inArray(storagePolicies.id, policies));
+    const writtenCharge = (row: {state:string;generation:number;size:number;properties:Record<string,unknown>}) => {
+      if (row.state === "ready") return row.size;
+      if (row.state !== "deleting") return 0;
+      const deletion = row.properties.deletion as {generation?:number;chargedFrom?:string;startedAt?:unknown;uncertain?:unknown}|undefined;
+      if (!deletion || deletion.generation !== row.generation || deletion.chargedFrom !== "written" || !(deletion.startedAt === null || typeof deletion.startedAt === "string") || typeof deletion.uncertain !== "boolean") throw new Error("Invalid owned fixture deletion charge");
+      return row.size;
+    };
+    const reserved = attempts.reduce((n, row) => n + row.reservedBytes, 0);
+    const written = attempts.reduce((n, row) => n + row.writtenBytes, 0);
+    await tx
+      .update(storageBudget)
+      .set({
+        derivedReserved: sql`${storageBudget.derivedReserved}-${derivatives.filter(b=>b.state === "pending" && b.leaseUntil !== null).reduce((n,b)=>n+b.size,0)}`,
+        derivedWritten: sql`${storageBudget.derivedWritten}-${derivatives.reduce((n,b)=>n+writtenCharge(b),0)}`,
+        temporaryReserved: sql`${storageBudget.temporaryReserved}-${reserved}`,
+        originalReserved: sql`${storageBudget.originalReserved}-${originals.filter((b) => b.state === "pending" && b.leaseUntil !== null).reduce((n, b) => n + b.size, 0)}`,
+        originalWritten: sql`${storageBudget.originalWritten}-${originals.reduce((n, b) => n + writtenCharge(b), 0)+quarantine.filter(q=>q.state !== "deleted").reduce((n,q)=>n+q.size,0)}`,
+        temporaryWritten: sql`${storageBudget.temporaryWritten}-${written}`,
+      })
+      .where(eq(storageBudget.id, "global"));
+  });
+}

@@ -1,0 +1,33 @@
+bun test v1.4.2 (744846f84)
+
+ops/backup/fresh-restore.test.ts:
+{"time":"2026-10-10T17:42:33.001Z","level":"info","event":"media_worker_started","recipeBuild":"avatar-v1.sharp-0.35.5.vips-8.18.7.rotate-srgb-cover512-centre-white-jpeg85-baseline-strip.container-v1"}
+{"time":"2026-10-10T17:42:33.611Z","level":"info","event":"worker_started","queues":18,"qqSender":"console"}
+🚀 Server started on port 44112
+🌍 http://127.0.0.1:44112
+🏎️ Server started in 264ms
+{"time":"2026-10-10T17:42:34.489Z","level":"info","event":"request","requestId":"4733dce2-707d-4bf1-9a9c-0c935ef829fd","method":"GET","path":"/readyz","status":200,"ms":313,"ip":"unknown"}
+proof: three actual normal entrypoints ready; real coordinator enabled
+proof: source prepared; actual full backup
+{"time":"2026-10-10T17:42:40.478Z","level":"info","event":"worker_stopping","signal":"SIGTERM"}
+proof: actual coordinated snapshot complete; normal roles stopped and reaped
+proof: restic restored; committing later source facts
+proof: latest head verified; fail-closed exercises
+proof: closed normal entry ./src/server/index.ts
+proof: closed normal result {"entry":"./src/server/index.ts","elapsedMs":3048.4380290000045,"exit":1,"signal":null,"watchdogKilled":false}
+proof: closed normal entry ./src/worker/main.ts
+proof: closed normal result {"entry":"./src/worker/main.ts","elapsedMs":1778.1923099999985,"exit":1,"signal":null,"watchdogKilled":false}
+proof: closed normal entry ./src/media-worker/main.ts
+proof: closed normal result {"entry":"./src/media-worker/main.ts","elapsedMs":1703.9645739999978,"exit":1,"signal":null,"watchdogKilled":false}
+proof: delayed remote IO reaped; fresh-volume restoration
+proof: both databases/originals/rebuild complete; restricted recovery
+{"originals":4,"rtoMs":36599.303637,"rpoMs":86400000,"platform":"linux","arch":"x64"}
+(pass) actual Linux PG/restic/S3/native full snapshot, post-snapshot deletion, fresh-volume fail-closed restore [75445.75ms]
+
+ 1 pass
+ 0 fail
+ 88 expect() calls
+Ran 1 test across 1 file. [78.45s]
+real 80.60
+user 0.03
+sys 0.08

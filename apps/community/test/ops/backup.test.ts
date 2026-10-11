@@ -7,21 +7,15 @@ import { copyScript, createSandbox, type Sandbox } from "./fake-commands";
 const BACKUP = fileURLToPath(new URL("../../ops/backup/backup.sh", import.meta.url));
 const SYSTEMD = fileURLToPath(new URL("../../ops/systemd/", import.meta.url));
 
-// 假的 pg_dump：把 --file= 指的文件写出来；FAKE_PG_DUMP_FAIL 指定的库导出失败。假的 restic：cat config 和 backup 的
-// 退出码由环境变量决定。
+// 假 restic 只检查仓库；timeout 转发协调器命令，假 bun 的退出码由环境变量决定。
+// 实际双库导出和 restic 恢复由 opt-in 新卷用例验证。
 const FAKES = {
-  pg_dump: `for arg in "$@"; do
-  case "$arg" in
-    --dbname=*) db="\${arg#--dbname=}" ;;
-    --file=*) file="\${arg#--file=}" ;;
-  esac
-done
-[ "$db" = "\${FAKE_PG_DUMP_FAIL:-}" ] && exit 1
-echo "dump of $db" > "$file"`,
   restic: `case "$1" in
   cat) exit "\${FAKE_RESTIC_CAT_EXIT:-0}" ;;
-  backup) exit "\${FAKE_RESTIC_BACKUP_EXIT:-0}" ;;
-esac`,
+  esac`,
+  timeout: 'shift 3; exec "$@"',
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: The fixture shell expands this literal variable when executed.
+  bun: 'exit "${FAKE_EXPORT_EXIT:-0}"',
 };
 
 let sandbox: Sandbox;
@@ -44,16 +38,13 @@ async function runBackup(env: Record<string, string> = {}) {
 }
 
 describe("ops/backup/backup.sh", () => {
-  test("两个库各导出一份，交给 restic，再按 7 天、4 周、6 个月清理；主机名和路径固定", async () => {
+  test("existing job delegates to bounded full coordinator without DB-only prune", async () => {
     const { code, calls, output } = await runBackup();
-
     expect(code).toBe(0);
     expect(calls).toEqual([
       "restic cat config",
-      "pg_dump --format=custom --dbname=community --file=<dumps>/community.dump",
-      "pg_dump --format=custom --dbname=umami --file=<dumps>/umami.dump",
-      "restic backup --host astrodx-community --tag community-db <dumps>",
-      "restic forget --host astrodx-community --tag community-db --prune --keep-daily 7 --keep-weekly 4 --keep-monthly 6",
+      "timeout --signal=TERM --kill-after=5s 1795s bun ./ops/backup/export.ts",
+      "bun ./ops/backup/export.ts",
     ]);
     expect(output).not.toContain("restic-password");
   });
@@ -75,19 +66,12 @@ describe("ops/backup/backup.sh", () => {
     expect(calls).toEqual(["restic cat config"]);
   });
 
-  test("有一个库没导出来：不做这一次快照，也不清理旧的", async () => {
-    const { code, calls } = await runBackup({ FAKE_PG_DUMP_FAIL: "umami" });
-
+  test("coordinator failure produces no shell snapshot/prune/completion", async () => {
+    const { code, calls } = await runBackup({ FAKE_EXPORT_EXIT: "1" });
     expect(code).not.toBe(0);
-    expect(calls.filter((call) => call.startsWith("restic backup") || call.startsWith("restic forget"))).toEqual([]);
+    expect(calls.some((call) => call.startsWith("restic backup") || call.startsWith("restic forget"))).toBe(false);
   });
 
-  test("restic backup 失败：不清理旧的快照", async () => {
-    const { code, calls } = await runBackup({ FAKE_RESTIC_BACKUP_EXIT: "1" });
-
-    expect(code).not.toBe(0);
-    expect(calls.at(-1)).toBe("restic backup --host astrodx-community --tag community-db <dumps>");
-  });
 });
 
 describe("ops/systemd", () => {

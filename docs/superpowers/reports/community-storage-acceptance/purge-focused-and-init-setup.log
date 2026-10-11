@@ -1,0 +1,40 @@
+bun test v1.4.2 (744846f84)
+
+ops/backup/initialize.test.ts:
+71 |         zoneId,
+72 |         purgeToken: required("CLOUDFLARE_PURGE_TOKEN"),
+73 |       };
+74 |     } else config = { ...common, role, internalMediaSecret };
+75 |   } else config = { ...common, role };
+76 |   if (problems.size) throw new Error(`Invalid storage environment: ${[...problems].sort().join(", ")}`);
+                                    ^
+error: Invalid storage environment: STORAGE_CAPACITY_DIR, STORAGE_TEMP_DIR
+      at parseStorageEnv (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/src/server/storage/env.ts:76:32)
+      at initializePolicies (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/ops/backup/initialize.ts:15:18)
+      at initializeStorageState (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/ops/backup/initialize.ts:49:9)
+      at async <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/ops/backup/initialize.test.ts:40:11)
+      at async fixture (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/ops/backup/initialize.test.ts:29:15)
+      at async <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/ops/backup/initialize.test.ts:39:9)
+(fail) fresh explicit initialization registers web/media policies before opening and keeps secrets outside rows [13.59ms]
+52 | });
+53 |
+54 | test("existing mismatched or disabled policy cannot be silently adopted and restore state stays unopened", async () => {
+55 |   const { db } = testDbHandle();
+56 |   const [policy] = await db.select().from(storagePolicies);
+57 |   expect(policy).toBeDefined();
+                      ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/i/.codex/worktrees/community-storage-design/AstroDX/apps/community/ops/backup/initialize.test.ts:57:18)
+(fail) existing mismatched or disabled policy cannot be silently adopted and restore state stays unopened [46.64ms]
+
+src/worker/media-purge.test.ts:
+(pass) real PG: injected elapsed request time and DB time consume the whole budget [1128.49ms]
+
+ 1 pass
+ 37 filtered out
+ 2 fail
+ 6 expect() calls
+Ran 3 tests across 2 files. [5.60s]

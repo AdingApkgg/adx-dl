@@ -1,0 +1,17 @@
+bun test v1.4.2 (744846f84)
+
+ops/backup/capacity-policy.test.ts:
+(pass) empty and small actual manifests need current backup space, not 20/2/2 GiB ceilings [24.20ms]
+(pass) only hash-verified read-only staging reduces current missing bytes; full payload remains in repo demand [17.54ms]
+(pass) same-filesystem demands aggregate once and still require exactly the 5 GiB floor [16.72ms]
+
+ops/backup/dump-bounds.test.ts:
+(pass) each mandatory dump bound must be a positive safe integer before summing [2.09ms]
+(pass) valid environment and numeric exporter bounds preserve the exact safe total [0.14ms]
+(pass) deploy preflight rejects an invalid bound before filesystem or service checks [1039.33ms]
+
+ 6 pass
+ 0 fail
+ 37 expect() calls
+Ran 6 tests across 2 files. [1481.00ms]
+EXIT 0 WALL_SECONDS 1.62

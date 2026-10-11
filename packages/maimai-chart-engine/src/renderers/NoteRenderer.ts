@@ -1,5 +1,5 @@
-import { BaseRenderer, RenderContext, getGradientColors } from "./BaseRenderer";
-import { Note, Point2D, NoteRenderPosition, ButtonPosition } from "../types";
+import { BaseRenderer, type RenderContext, getGradientColors } from "./BaseRenderer";
+import type { Note, Point2D, NoteRenderPosition, ButtonPosition } from "../types";
 import {
   NOTE_SIZE_RATIO,
   TAP_INNER_RING_RATIO,

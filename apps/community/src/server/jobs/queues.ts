@@ -11,12 +11,103 @@ export const SESSION_CLEANUP_QUEUE = "session.cleanup";
 /** user.purge 任务的内容：只有用户 id，其余都以数据库里的 user 行为准。 */
 export type UserPurgeData = { userId: string };
 
+export const STORAGE_DEAD_QUEUE = "storage.dead";
+export const STORAGE_INGEST_QUEUE = "storage.ingest";
+export const MEDIA_AVATAR_QUEUE = "media.avatar";
+export const MEDIA_CHART_QUEUE = "media.chart-import";
+export const STORAGE_FINALIZE_QUEUE = "storage.finalize";
+export const STORAGE_SWEEP_QUEUE = "storage.sweep";
+export const STORAGE_RECONCILE_QUEUE="storage.reconcile";
+export const STORAGE_JOURNAL_QUEUE = "storage.journal";
+export const STORAGE_CLEANUP_QUEUE = "storage.cleanup";
+export const STORAGE_DELETE_QUEUE = "storage.delete";
+export const STORAGE_DELETE_DEAD_QUEUE = "storage.delete.dead";
+export const MEDIA_PURGE_QUEUE = "media.purge";
+export const MEDIA_PURGE_DEAD_QUEUE = "media.purge.dead";
+export const MEDIA_PURGE_REPAIR_QUEUE = "media.purge.repair";
 const DAY = 86_400;
+const storageDefaults = {
+  policy: "exclusive" as const,
+  retryDelay: 30,
+  retryBackoff: true,
+  retentionSeconds: 7 * DAY,
+  deleteAfterSeconds: 7 * DAY,
+};
+export const STORAGE_QUEUES: readonly QueueDefinition[] = [
+  ...[STORAGE_DEAD_QUEUE, STORAGE_DELETE_DEAD_QUEUE, MEDIA_PURGE_DEAD_QUEUE].map((name) => ({
+    name,
+    options: { retentionSeconds: 90 * DAY },
+  })),
+  {
+    name: STORAGE_INGEST_QUEUE,
+    options: {
+      ...storageDefaults,
+      retryLimit: 5,
+      retryDelayMax: 600,
+      expireInSeconds: 600,
+      heartbeatSeconds: 30,
+      deadLetter: STORAGE_DEAD_QUEUE,
+    },
+  },
+  ...[MEDIA_AVATAR_QUEUE, MEDIA_CHART_QUEUE].map(name => ({
+    name,
+    options: {
+      ...storageDefaults,
+      retryLimit: 3,
+      retryDelayMax: 300,
+      expireInSeconds: 120,
+      heartbeatSeconds: 30,
+      deadLetter: STORAGE_DEAD_QUEUE,
+    },
+  })),
+  {
+    name: STORAGE_FINALIZE_QUEUE,
+    options: {
+      ...storageDefaults,
+      retryLimit: 5,
+      retryDelayMax: 600,
+      expireInSeconds: 60,
+      deadLetter: STORAGE_DEAD_QUEUE,
+    },
+  },
+  ...[STORAGE_SWEEP_QUEUE, STORAGE_CLEANUP_QUEUE, STORAGE_JOURNAL_QUEUE, STORAGE_RECONCILE_QUEUE, MEDIA_PURGE_REPAIR_QUEUE].map((name) => ({
+    name,
+    options: {
+      policy: "stately" as const,
+      retryLimit: 0,
+      expireInSeconds: 600,
+      retentionSeconds: 7 * DAY,
+      deleteAfterSeconds: 7 * DAY,
+    },
+  })),
+  {
+    name: STORAGE_DELETE_QUEUE,
+    options: {
+      ...storageDefaults,
+      retryLimit: 8,
+      retryDelayMax: 3600,
+      expireInSeconds: 120,
+      deadLetter: STORAGE_DELETE_DEAD_QUEUE,
+    },
+  },
+  {
+    name: MEDIA_PURGE_QUEUE,
+    options: {
+      ...storageDefaults,
+      retryLimit: 8,
+      retryDelayMax: 3600,
+      expireInSeconds: 90,
+      heartbeatSeconds: 30,
+      deadLetter: MEDIA_PURGE_DEAD_QUEUE,
+    },
+  },
+];
 
 // 所有队列在这里登记，重试、死信、心跳、超时策略集中定义（spec 第 9.5 节）。网页进程（投递）、worker（执行）和
 // db:migrate（部署时建队列）都从这里读，所以放在 src/server 下，而不是 src/worker。
 // 顺序有要求：死信队列必须排在指向它的队列前面，createQueue 会先检查死信队列存在。
 export const QUEUES: readonly QueueDefinition[] = [
+  ...STORAGE_QUEUES,
   // 每分钟检查一次机器人在不在线，结果写进 Redis，登录页据此显示"QQ 登录暂不可用"。
   // 检查本身就是周期性的，失败不重试；stately：同一时刻最多一个排队、一个在跑，
   // worker 停一阵再起来也不会堆出一串任务。

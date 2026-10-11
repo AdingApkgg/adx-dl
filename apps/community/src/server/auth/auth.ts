@@ -212,7 +212,7 @@ export function createAuth(deps: AuthDeps) {
                 id,
                 email: `${id}@placeholder.invalid`,
                 emailVerified: false,
-                // Google 会带头像地址进来；子项目 2 之前一律为空。
+                // Provider images never create storage associations; only the explicit avatar service publishes.
                 image: null,
                 name: normalizeNickname(data.name) || id,
               },
@@ -222,6 +222,9 @@ export function createAuth(deps: AuthDeps) {
         update: {
           // 保险：任何路径都不许改 email。
           before: async (data) => {
+            if (data.image !== undefined) {
+              throw new APIError("BAD_REQUEST", { code: "AVATAR_EXPLICIT_REQUIRED", message: "Use the avatar endpoint" });
+            }
             if ("email" in data) {
               throw new APIError("BAD_REQUEST", { code: "EMAIL_IMMUTABLE", message: "Email cannot be changed" });
             }
@@ -297,6 +300,7 @@ export function createAuth(deps: AuthDeps) {
     },
     socialProviders: {
       google: {
+        overrideUserInfoOnSignIn: false,
         clientId: deps.google.clientId,
         clientSecret: deps.google.clientSecret,
         // 浏览器里登着多个 Google 账号时，登录和绑定都让用户选。

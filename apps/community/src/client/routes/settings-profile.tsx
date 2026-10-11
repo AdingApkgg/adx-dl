@@ -13,6 +13,7 @@ import { parseBio } from "@/shared/bio";
 import { parseNickname } from "@/shared/nickname";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
+import { AvatarUpload } from "../components/avatar-upload";
 import { Avatar } from "../components/avatar";
 import { PageTitle, textLinkClass } from "../components/page-title";
 import { ProfileFields } from "../components/profile-fields";
@@ -57,9 +58,10 @@ function ProfileContent() {
     <main className="space-y-6">
       <PageTitle>{m.settings_profile_title()}</PageTitle>
       <div className="flex items-center gap-4">
-        <Avatar id={me.id} name={profile.name} size={64} />
+        <Avatar image={profile.image} id={me.id} name={profile.name} size={64} />
         <p className="text-sm text-muted-foreground">{m.user_page_id({ id: me.id })}</p>
       </div>
+      <AvatarUpload userId={me.id} image={profile.image} revision={profile.avatarRevision} />
       <ProfileForm initialName={profile.name} initialBio={profile.bio} />
       <p className="text-sm">
         <Link to={localizeHref(`/u/${me.id}`)} className={textLinkClass}>

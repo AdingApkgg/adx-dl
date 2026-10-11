@@ -1,0 +1,11 @@
+bun test v1.4.2 (744846f84)
+
+ops/backup/initialize.test.ts:
+(pass) fresh explicit initialization registers web/media policies before opening and keeps secrets outside rows [202.13ms]
+(pass) existing mismatched or disabled policy cannot be silently adopted and restore state stays unopened [155.41ms]
+(pass) first-install initializer refuses an already used storage database even with empty external state [163.52ms]
+
+ 3 pass
+ 0 fail
+ 14 expect() calls
+Ran 3 tests across 1 file. [1.77s]

@@ -1,5 +1,5 @@
-import { BaseRenderer, RenderContext } from "./BaseRenderer";
-import { HoldStartNote, HoldEndNote, NoteRenderPosition, ButtonPosition, Point2D } from "../types";
+import { BaseRenderer, type RenderContext } from "./BaseRenderer";
+import type { HoldStartNote, HoldEndNote, NoteRenderPosition, ButtonPosition, Point2D } from "../types";
 import {
   NOTE_SIZE_RATIO,
   HOLD_WIDTH_RATIO,

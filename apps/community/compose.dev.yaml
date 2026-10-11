@@ -21,5 +21,27 @@ services:
     ports:
       - "127.0.0.1:56379:6379"
 
+  # Generate .storage-dev/s3.json using ops/seaweed/write-config.ts before first start.
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    # Keep the generated 0600 fixture private. The image's default entrypoint
+    # drops to an unrelated UID, which cannot read a GitHub runner-owned fixture.
+    entrypoint: ["/usr/bin/weed"]
+    user: "0:0"
+    command: ["mini", "-dir=/data", "-s3.port=8333", "-bucket=blobs,derived", "-s3.config=/config/s3.json"]
+    ports:
+      - "127.0.0.1:58333:8333"
+    volumes:
+      - storage-data:/data
+      - type: bind
+        source: ./.storage-dev/s3.json
+        target: /config/s3.json
+        read_only: true
+        bind:
+          create_host_path: false
+    environment:
+      NO_PROXY: seaweedfs,localhost,127.0.0.1
+
 volumes:
+  storage-data:
   pgdata:

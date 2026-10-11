@@ -1,0 +1,2 @@
+ALTER TABLE "storage_inventory_progress" ADD COLUMN "temporary_cursor" text;--> statement-breakpoint
+ALTER TABLE "storage_inventory_progress" ADD CONSTRAINT "storage_inventory_tmp_cursor_check" CHECK ("storage_inventory_progress"."temporary_cursor" is null or char_length("storage_inventory_progress"."temporary_cursor") between 1 and 8192);

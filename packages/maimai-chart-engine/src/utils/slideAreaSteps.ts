@@ -1,4 +1,4 @@
-import { ButtonPosition, SlidePathType } from "../types";
+import type { ButtonPosition, SlidePathType } from "../types";
 
 /**
  * 滑条分段消失（chunky disappearance）的形状判定与步进数据。

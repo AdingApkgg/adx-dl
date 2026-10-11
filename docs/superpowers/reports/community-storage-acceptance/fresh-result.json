@@ -1,0 +1,49 @@
+{
+  "runtime": {
+    "platform": "linux",
+    "arch": "x64",
+    "bun": "1.4.2",
+    "recipeBuild": "avatar-v1.sharp-0.35.5.vips-8.18.7.rotate-srgb-cover512-centre-white-jpeg85-baseline-strip.container-v1"
+  },
+  "originals": 4,
+  "dumps": {
+    "community": {
+      "size": 124198,
+      "sha256": "4d2229975d2e24e5c2f0305c995a7c19056aa64052093a61b2ff30655b0b4c89"
+    },
+    "umami": {
+      "size": 1803,
+      "sha256": "d10a9258a5096cf28b297dfbc07b64a662c5bf17a5249bcf20344214b154877e"
+    }
+  },
+  "latestJournal": {
+    "sequence": 7,
+    "hash": "908e10e13749cf9edda6b3f9ad4d3d4f628c9fbc8dc8efb34f24b27544b9b4a4",
+    "capturedAt": "2026-10-10T17:42:42.752Z"
+  },
+  "measuredRtoMs": 36599.303637,
+  "dailyRpoMs": 86400000,
+  "snapshotAgeMs": 49383,
+  "purgeObservations": [
+    {
+      "at": 46912.394175
+    },
+    {
+      "at": 51917.849817
+    },
+    {
+      "at": 57070.453349
+    },
+    {
+      "at": 62083.395341
+    },
+    {
+      "at": 67237.34533
+    },
+    {
+      "at": 72244.675861
+    }
+  ],
+  "sourceStopped": true,
+  "freshVolumes": true
+}

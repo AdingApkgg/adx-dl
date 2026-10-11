@@ -1,0 +1,2 @@
+{"time":"2026-10-10T17:59:08.808Z","level":"info","event":"media_worker_started","recipeBuild":"avatar-v1.sharp-0.35.5.vips-8.18.7.rotate-srgb-cover512-centre-white-jpeg85-baseline-strip.container-v1"}
+{"time":"2026-10-10T18:13:13.161Z","level":"error","event":"media_jobs_error","message":"[object Object]"}

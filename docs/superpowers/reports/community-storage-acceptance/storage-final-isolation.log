@@ -1,0 +1,55 @@
+COMMAND docker ['exec', 'community-storage-test-seaweedfs-1', 'sh', '-c']
+PID   USER     TIME  COMMAND
+    1 root      0:00 {entrypoint.sh} /bin/sh /opt/community-seaweed/entrypoint.sh
+    6 root      1:16 weed mini -dir=/data -ip=127.0.0.1 -ip.bind=127.0.0.1 -s3.port=8334 -s3.port.grpc=18334 -s3.config=/config/s3.json -bucket=blobs,derived -admin.ui=false -webdav=false -s3.port.iceberg=0 -s3.port.lance=0
+    7 root      0:00 nc -l -k -s 0.0.0.0 -p 8333 -e /opt/community-seaweed/forward-s3.sh
+   21 root      0:00 sh -c ps; netstat -lnt
+   26 root      0:00 ps
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State
+tcp        0      0 127.0.0.1:23646         0.0.0.0:*               LISTEN
+tcp        0      0 0.0.0.0:8333            0.0.0.0:*               LISTEN
+tcp        0      0 127.0.0.1:19333         0.0.0.0:*               LISTEN
+tcp        0      0 127.0.0.1:19340         0.0.0.0:*               LISTEN
+tcp        0      0 127.0.0.1:18888         0.0.0.0:*               LISTEN
+tcp        0      0 127.0.0.1:18334         0.0.0.0:*               LISTEN
+tcp        0      0 127.0.0.1:9333          0.0.0.0:*               LISTEN
+tcp        0      0 127.0.0.1:9340          0.0.0.0:*               LISTEN
+tcp        0      0 127.0.0.11:46261        0.0.0.0:*               LISTEN
+tcp        0      0 127.0.0.1:33646         0.0.0.0:*               LISTEN
+tcp        0      0 127.0.0.1:8888          0.0.0.0:*               LISTEN
+tcp        0      0 127.0.0.1:8334          0.0.0.0:*               LISTEN
+EXIT 0
+COMMAND docker ['run', '--rm', '--name', 'community-storage-final-peer']
+WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
+peer TCP 8888: refused
+peer TCP 18888: refused
+peer TCP 9333: refused
+peer TCP 19333: refused
+peer TCP 9340: refused
+peer TCP 19340: refused
+peer TCP 8334: refused
+peer TCP 18334: refused
+peer TCP 18333: refused
+peer TCP 7333: refused
+peer TCP 23646: refused
+peer TCP 33646: refused
+peer TCP 8181: refused
+peer TCP 9101: refused
+peer authenticated S3 surface: anonymous GET 403
+EXIT 0
+COMMAND .superpowers/sdd/2026-10-10-community-storage/storage-check ['bun', 'test', '--timeout', '30000']
+bun test v1.4.2 (744846f84)
+
+test/storage/s3.test.ts:
+(pass) real authenticated S3 adapter > anonymous GET and PUT are forbidden [497.34ms]
+(pass) real authenticated S3 adapter > actual role prefix ACLs reject web durable writes and backup mutations [478.93ms]
+(pass) real authenticated S3 adapter > media writes canonical originals/derivatives and control removes them [288.61ms]
+
+ 3 pass
+ 4 filtered out
+ 0 fail
+ 15 expect() calls
+Ran 3 tests across 1 file. [4.69s]
+EXIT 0
+DURATION 28.93

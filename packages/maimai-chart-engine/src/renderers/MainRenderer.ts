@@ -4,24 +4,24 @@ import {
   TouchDrawOrder,
   type TouchDrawCommand,
 } from "../utils/touchDrawOrder";
-import { RenderContext, getGradientColors } from "./BaseRenderer";
+import { type RenderContext, getGradientColors } from "./BaseRenderer";
 import { NoteRenderer } from "./NoteRenderer";
 import { SlideRenderer } from "./SlideRenderer";
 import { HoldRenderer } from "./HoldRenderer";
 import { TouchRenderer } from "./TouchRenderer";
 import { TimingTimeline } from "../core/timing/TimingTimeline";
 import {
-  Note,
-  Chart,
-  HudLabels,
-  RendererConfig,
-  SlideNote,
-  HoldStartNote,
-  HoldEndNote,
-  TapNote,
-  TouchNote,
-  TouchHoldStartNote,
-  ButtonPosition,
+  type Note,
+  type Chart,
+  type HudLabels,
+  type RendererConfig,
+  type SlideNote,
+  type HoldStartNote,
+  type HoldEndNote,
+  type TapNote,
+  type TouchNote,
+  type TouchHoldStartNote,
+  type ButtonPosition,
   isTapNote,
   isSlideNote,
   isHoldStartNote,

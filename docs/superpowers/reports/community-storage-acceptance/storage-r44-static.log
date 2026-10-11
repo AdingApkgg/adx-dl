@@ -1,0 +1,5 @@
+COMMAND /Users/i/.bun/bin/bun x biome lint apps/community/src/server/storage/publication.ts apps/community/src/worker/storage-reconcile.ts apps/community/test/storage/quarantine-settlement.test.ts
+Checked 3 files in 131ms. No fixes applied.
+EXIT 0 WALL_SECONDS 0.88
+COMMAND .superpowers/sdd/2026-10-10-community-storage/storage-check bun x tsc --noEmit
+EXIT 0 WALL_SECONDS 9.78

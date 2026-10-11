@@ -1,0 +1,73 @@
+apps/community/ops/backup/journal-publication.test.ts:35:26 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    33 │   await expect(verifyLatestJournal(config)).rejects.toThrow();
+    34 │   // Test-only simulation of an operator-confirmed reaped publisher, all callers stopped.
+  > 35 │   await fs.rename(marker,marker+'.reaped');rename.mockRestore();await exportJournal(config);
+       │                          ^^^^^^^^^^^^^^^^
+    36 │   const verified=await verifyLatestJournal(config);expect(verified.records.some(r=>r.userId==='later')).toBe(true);
+    37 │  }finally{release();if(intercepted)await settled;await work?.catch(()=>{});rename.mockRestore();await fs.rm(dir,{recursive:true,force:true});}
+
+  i Unsafe fix: Use a template literal.
+
+    33 33 │     await expect(verifyLatestJournal(config)).rejects.toThrow();
+    34 34 │     // Test-only simulation of an operator-confirmed reaped publisher, all callers stopped.
+    35    │ - ··await·fs.rename(marker,marker+'.reaped');rename.mockRestore();await·exportJournal(config);
+       35 │ + ··await·fs.rename(marker,`${marker}.reaped`);rename.mockRestore();await·exportJournal(config);
+    36 36 │     const verified=await verifyLatestJournal(config);expect(verified.records.some(r=>r.userId==='later')).toBe(true);
+    37 37 │    }finally{release();if(intercepted)await settled;await work?.catch(()=>{});rename.mockRestore();await fs.rm(dir,{recursive:true,force:true});}
+
+
+apps/community/test/storage/final-review.test.ts:2:14 lint/correctness/noUnusedImports  FIXABLE  ━━━━━━━━━━
+
+  ! Several of these imports are unused.
+
+    1 │ import { beforeAll, expect, test } from "bun:test";
+  > 2 │ import { eq, sql } from "drizzle-orm";
+      │              ^^^
+    3 │ import { mkdtemp, writeFile, rm } from "node:fs/promises";
+    4 │ import { tmpdir } from "node:os";
+
+  i Unused imports might be the result of an incomplete refactoring.
+
+  i Unsafe fix: Remove the unused imports.
+
+    2 │ import·{·eq,·sql·}·from·"drizzle-orm";
+      │              ----
+
+apps/community/ops/backup/journal.ts:178:11 lint/suspicious/noImplicitAnyLet ━━━━━━━━━━━━━━━━━━━━━━━
+
+  × This variable implicitly has the any type.
+
+    176 │       signal.throwIfAborted();
+    177 │       const path = publisherPath(config);
+  > 178 │       let f;
+        │           ^
+    179 │       try { f = await open(path, "wx", 0o600); }
+    180 │       catch (e) { if ((e as NodeJS.ErrnoException).code === "EEXIST") throw new Error("STORAGE_JOURNAL_PUBLISHER_ACTIVE"); throw e; }
+
+  i Variable declarations without type annotation and initialization implicitly have the any type. Declare a type or initialize the variable with some value.
+
+
+apps/community/ops/backup/journal.ts:181:11 lint/suspicious/noImplicitAnyLet ━━━━━━━━━━━━━━━━━━━━━━━
+
+  × This variable implicitly has the any type.
+
+    179 │       try { f = await open(path, "wx", 0o600); }
+    180 │       catch (e) { if ((e as NodeJS.ErrnoException).code === "EEXIST") throw new Error("STORAGE_JOURNAL_PUBLISHER_ACTIVE"); throw e; }
+  > 181 │       let identity;
+        │           ^^^^^^^^
+    182 │       try {
+    183 │         identity = await f.stat();
+
+  i Variable declarations without type annotation and initialization implicitly have the any type. Declare a type or initialize the variable with some value.
+
+
+Checked 11 files in 750ms. No fixes applied.
+Found 2 errors.
+Found 1 warning.
+Found 1 info.
+lint ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
