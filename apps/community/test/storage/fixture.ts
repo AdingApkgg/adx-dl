@@ -20,6 +20,7 @@ export async function storageFixtureConfig(role: StorageRole = "web"): Promise<S
       PUBLIC_ORIGIN: "https://community.example.test",
       STORAGE_S3_ENDPOINT: process.env.STORAGE_TEST_ENDPOINT ?? "http://127.0.0.1:58333",
       STORAGE_TEMP_DIR: tempDir,
+      STORAGE_CAPACITY_DIR: process.env.STORAGE_TEST_CAPACITY_DIR,
       STORAGE_RECIPE_BUILD: "test-v1",
       [`STORAGE_${role.toUpperCase()}_ACCESS_KEY_ID`]: access ?? "isolated-test",
       [`STORAGE_${role.toUpperCase()}_SECRET_ACCESS_KEY`]: secret ?? "isolated-test",

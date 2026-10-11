@@ -1,0 +1,142 @@
+name: ${ACCEPTANCE_PROJECT:?required}
+
+x-runtime: &runtime
+  image: ${ACCEPTANCE_TEST_IMAGE:?required}
+  pull_policy: never
+  init: true
+  restart: "no"
+  working_dir: /repo/apps/community
+  cpus: 1
+  mem_limit: 512m
+  pids_limit: 128
+  stop_grace_period: 135s
+
+x-capacity: &capacity
+  type: volume
+  source: source-storage
+  target: /storage-capacity
+  read_only: true
+  volume:
+    subpath: .capacity
+
+services:
+  postgres:
+    image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    cpus: 1
+    mem_limit: 512m
+    pids_limit: 128
+    environment:
+      POSTGRES_USER: community
+      POSTGRES_PASSWORD: ${ACCEPTANCE_PG_PASSWORD:?required}
+      POSTGRES_DB: community_acceptance_ui_test
+    volumes: [source-pg:/var/lib/postgresql]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U community -d community_acceptance_ui_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  redis:
+    image: redis:8
+    cpus: 0.5
+    mem_limit: 320m
+    pids_limit: 64
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    cpus: 1
+    mem_limit: 512m
+    pids_limit: 256
+    command: ["mini", "-dir=/data", "-s3.port=8333", "-bucket=blobs,derived", "-s3.config=/config/s3.json"]
+    volumes:
+      - source-storage:/data
+      - ${ACCEPTANCE_ROOT:?required}/fixture/s3.json:/config/s3.json:ro
+
+  bootstrap:
+    <<: *runtime
+    profiles: [tools]
+    command: ["bun", "./test/acceptance/bootstrap.ts"]
+    env_file: ["${ACCEPTANCE_ROOT:?required}/fixture/bootstrap.env"]
+    volumes:
+      - ${ACCEPTANCE_ROOT:?required}/fixture:/acceptance-fixture
+      - ${ACCEPTANCE_ROOT:?required}/state/ui:/acceptance-ui
+      - *capacity
+
+  web:
+    <<: *runtime
+    image: ${ACCEPTANCE_APP_IMAGE:?required}
+    profiles: [browser]
+    command: ["bun", "./build/server/index.js"]
+    env_file: ["${ACCEPTANCE_ROOT:?required}/fixture/web.env"]
+    ports: ["127.0.0.1:41909:3000"]
+    volumes:
+      - ${ACCEPTANCE_ROOT:?required}/state/ui/restore:/storage-state:ro
+      - *capacity
+
+  media:
+    <<: *runtime
+    image: ${ACCEPTANCE_APP_IMAGE:?required}
+    profiles: [browser]
+    command: ["bun", "./src/media-worker/main.ts"]
+    env_file: ["${ACCEPTANCE_ROOT:?required}/fixture/media.env"]
+    volumes:
+      - ${ACCEPTANCE_ROOT:?required}/state/ui/restore:/storage-state:ro
+      - ${ACCEPTANCE_ROOT:?required}/scratch:/media-tmp
+      - *capacity
+
+  restore-postgres:
+    profiles: [restore]
+    image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    cpus: 1
+    mem_limit: 512m
+    pids_limit: 128
+    environment:
+      POSTGRES_USER: community
+      POSTGRES_PASSWORD: ${ACCEPTANCE_PG_PASSWORD:?required}
+      POSTGRES_DB: community_storage_restore_test
+    volumes: [restore-pg:/var/lib/postgresql]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U community -d community_storage_restore_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  restore-seaweedfs:
+    profiles: [restore]
+    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    cpus: 1
+    mem_limit: 512m
+    pids_limit: 256
+    command: ["mini", "-dir=/data", "-s3.port=8333", "-bucket=blobs,derived", "-s3.config=/config/s3.json"]
+    volumes:
+      - restore-storage:/data
+      - ${ACCEPTANCE_ROOT:?required}/fixture/s3.json:/config/s3.json:ro
+
+  restore:
+    <<: *runtime
+    profiles: [restore]
+    cpus: 2
+    mem_limit: 2g
+    pids_limit: 256
+    stop_grace_period: 15s
+    command: ["bun", "test", "ops/backup/fresh-restore.test.ts", "--timeout", "180000"]
+    env_file: ["${ACCEPTANCE_ROOT:?required}/fixture/restore.env"]
+    volumes:
+      - ${ACCEPTANCE_ROOT:?required}/fixture:/acceptance-fixture:ro
+      - ${ACCEPTANCE_ROOT:?required}/state/proof:/proof
+      - ${ACCEPTANCE_ROOT:?required}/scratch:/media-tmp
+      - ${ACCEPTANCE_ROOT:?required}/scratch:/tmp/community-storage-test
+      - ./../storage/images:/fixtures:ro
+      - *capacity
+
+volumes:
+  source-pg:
+  source-storage:
+  restore-pg:
+  restore-storage:

@@ -8,7 +8,7 @@ import { ingestFixture } from "../../test/storage/ingest-fixture";
 import { storageFixtureConfig } from "../../test/storage/fixture";
 import { createDb } from "../../src/server/db/client";
 import { testSender } from "../../src/server/testing/test-boss";
-import { resetTestDatabase, testDbHandle } from "../../src/server/testing/test-db";
+import { assertTestDatabaseUrl, resetTestDatabase, testDbHandle } from "../../src/server/testing/test-db";
 import { createS3Driver } from "../../src/server/storage/s3";
 import { completeUpload, initUpload } from "../../src/server/storage/uploads";
 import { ingestUpload } from "../../src/media-worker/ingest";
@@ -58,6 +58,9 @@ import { createBackupCoordinator } from "../../src/server/storage/runtime-role";
 test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
   "actual Linux PG/restic/S3/native full snapshot, post-snapshot deletion, fresh-volume fail-closed restore",
   async () => {
+    const targetUrl = process.env.STORAGE_TEST_TARGET_DATABASE_URL!;
+    assertTestDatabaseUrl(targetUrl);
+    const targetDatabase = decodeURIComponent(new URL(targetUrl).pathname.slice(1));
     const root = "/proof",
       stateDirectory = join(root, "state"),
       journal = {
@@ -334,7 +337,6 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
     });
     const latest = await exportJournal(journal);
     expect(latest.sequence).toBeGreaterThan(manifest.journal.sequence);
-    const targetUrl = process.env.STORAGE_TEST_TARGET_DATABASE_URL!;
     const target = createDb(targetUrl);
     const targetConfig = {
       ...(await storageFixtureConfig("media")),
@@ -564,7 +566,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
         await runBoundedCommand(
           [
             "pg_restore",
-            "--dbname=community_storage_restore_test",
+            `--dbname=${targetDatabase}`,
             "--clean",
             "--if-exists",
             "--no-owner",
