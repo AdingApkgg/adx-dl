@@ -42,7 +42,8 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # 公开仓库的 PR 留在 GitHub runner；自托管 runner 另有主机侧事件白名单。
+    runs-on: ${{ fromJSON(((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && contains(fromJSON('["refs/heads/main","refs/heads/dev","refs/heads/pre"]'), github.ref)) && '["self-hosted","linux","x64","astrodx-ci"]' || '["ubuntu-latest"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -53,6 +54,12 @@ jobs:
           # 以根 package.json 的 packageManager 为唯一版本来源。定时重建旧提交时，
           # 用的也是那个提交当时固定的版本。
           bun-version-file: package.json
+
+      # 自托管镜像不预装系统 Node；依赖安装、CLI 的 node shebang 和 vitest 都需要它。
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -83,12 +90,6 @@ jobs:
       - name: Lint
         run: bun run lint
 
-      # 共享界面包的测试用 vitest，它跑在 Node 上（vitest 5 要求 Node ^22.12 || ^24 || >=26）。
-      - name: Setup Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-
       # 共享界面包（@astrodx/ui）只放源码：web 的 tsc 只检查用到的文件，包自己的测试也要跑。
       - name: Typecheck and test the shared UI package
         working-directory: packages/ui
@@ -100,4 +101,7 @@ jobs:
 
       - name: Build site
         working-directory: apps/web
+        # Next 16 默认按宿主机 CPU 数创建 worker；自托管构建限制为 8 个。
+        env:
+          CIRCLE_NODE_TOTAL: ${{ runner.environment == 'self-hosted' && '9' || '' }}
         run: bun run build

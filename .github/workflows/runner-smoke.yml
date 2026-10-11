@@ -1,0 +1,80 @@
+name: Managed runner smoke
+
+# 只验证 runner 池，不安装项目依赖、不构建，也不发布。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: contains(fromJSON('["refs/heads/main","refs/heads/dev","refs/heads/pre"]'), github.ref)
+    runs-on: [self-hosted, linux, x64, astrodx-ci]
+    timeout-minutes: 10
+    services:
+      redis:
+        image: redis:8
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+        ports:
+          - "6379"
+    steps:
+      - name: Inspect CPU and isolated runner identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'Runner name: %s\nContainer hostname: %s\n' "$RUNNER_NAME" "$(hostname)"
+          id
+          test "$(id -u)" -ne 0
+          test -f /.dockerenv
+          lscpu
+          printf 'Available CPUs: %s\nOnline host CPUs: %s\n' "$(nproc)" "$(getconf _NPROCESSORS_ONLN)"
+          if [ -f /sys/fs/cgroup/cpu.max ]; then
+            printf 'CPU quota: '
+            cat /sys/fs/cgroup/cpu.max
+          fi
+          if [ -f /sys/fs/cgroup/memory.max ]; then
+            printf 'Memory limit: '
+            cat /sys/fs/cgroup/memory.max
+          fi
+          docker version
+          docker info --format 'Docker server: {{.Name}} ({{.ID}})'
+
+      - name: Check Docker service connectivity
+        shell: bash
+        env:
+          REDIS_PORT: ${{ job.services.redis.ports['6379'] }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import socket
+
+          with socket.create_connection(("127.0.0.1", int(os.environ["REDIS_PORT"])), timeout=15) as connection:
+              connection.sendall(b"*1\r\n$4\r\nPING\r\n")
+              with connection.makefile("rb") as response:
+                  assert response.readline() == b"+PONG\r\n"
+          print("Docker service responds on its dynamically assigned port.")
+          PY
+
+      - name: Check the workspace volume shared with Docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe_dir="$RUNNER_TEMP/runner-smoke-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          probe_value="managed-ci:$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT"
+          mkdir -p "$probe_dir"
+          trap 'rm -rf "$probe_dir"' EXIT
+          printf '%s\n' "$probe_value" > "$probe_dir/input"
+          docker run --rm --user "$(id -u):$(id -g)" \
+            --mount "type=bind,source=$probe_dir,target=/probe" \
+            redis:8 sh -ec '
+              test "$(cat /probe/input)" = "$1"
+              printf "%s\n" "$1" > /probe/output
+            ' sh "$probe_value"
+          test "$(cat "$probe_dir/output")" = "$probe_value"
+          printf 'Runner and Docker can read/write the same workspace volume.\n'

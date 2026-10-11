@@ -56,22 +56,14 @@ jobs:
           echo "build_sha=$build_sha" >> "$GITHUB_OUTPUT"
           echo "live_sha=$live_sha" >> "$GITHUB_OUTPUT"
 
-  deploy:
+  # 重构建只读；生产发布及其写权限继续留在 GitHub runner。
+  build:
     needs: resolve
     if: needs.resolve.outputs.build_sha != ''
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ${{ fromJSON((github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && contains(fromJSON('["refs/heads/main","refs/heads/dev","refs/heads/pre"]'), github.ref))) && '["self-hosted","linux","x64","astrodx-ci"]' || '["ubuntu-latest"]') }}
 
     steps:
-      # Full commit history (95 commits, tiny) so the IndexNow step can diff the
-      # catalog against the previously deployed commit. blob:none keeps that cheap:
-      # file contents are fetched on demand rather than pulling ~1.5G of history.
+      # 定时任务必须构建 pages-live 的旧提交，不能把 main 上未发布的代码带上线。
       - name: Checkout
         uses: actions/checkout@v7
         with:
@@ -85,6 +77,12 @@ jobs:
           # 以根 package.json 的 packageManager 为唯一版本来源。定时重建旧提交时，
           # 用的也是那个提交当时固定的版本。
           bun-version-file: package.json
+
+      # 自托管镜像不预装系统 Node；依赖安装和 CLI 的 node shebang 都需要它。
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -142,15 +140,65 @@ jobs:
 
       - name: Build site
         working-directory: apps/web
+        # Next 16 默认按宿主机 CPU 数创建 worker；自托管构建限制为 8 个。
+        env:
+          CIRCLE_NODE_TOTAL: ${{ runner.environment == 'self-hosted' && '9' || '' }}
         run: bun run build
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v6
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
           path: ./apps/web/out
+
+      # IndexNow 要对比的是本次实际生成并发布的目录，不能在发布 job 中重新生成。
+      - name: Upload IndexNow catalog
+        uses: actions/upload-artifact@v7
+        with:
+          name: indexnow-catalog
+          path: data/catalog/index.json
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    needs: [resolve, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # IndexNow 使用同一版本的脚本，并取完整历史与发布前目录做 diff。
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.build_sha }}
+          fetch-depth: 0
+          filter: blob:none
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Download IndexNow catalog
+        uses: actions/download-artifact@v8
+        with:
+          name: indexnow-catalog
+          path: data/catalog
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
 
       - name: Deploy to GitHub Pages
         id: deployment
@@ -168,7 +216,7 @@ jobs:
         run: bun run submit:indexnow
 
   # 只有手动发布才移动 `pages-live`；定时重建构建的本来就是它指向的提交。
-  # 写权限只给这一个不装任何第三方 action 的 job，上面的构建 job 仍然只读。
+  # 标签写权限只给这个不装第三方 action 的 job，构建 job 仍然只读。
   mark-live:
     needs: [resolve, deploy]
     if: github.event_name == 'workflow_dispatch'

@@ -36,7 +36,8 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # 公开仓库的 PR 留在 GitHub runner；自托管 runner 另有主机侧事件白名单。
+    runs-on: ${{ fromJSON(((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && contains(fromJSON('["refs/heads/main","refs/heads/dev","refs/heads/pre"]'), github.ref)) && '["self-hosted","linux","x64","astrodx-ci"]' || '["ubuntu-latest"]') }}
     services:
       postgres:
         image: postgres:18
@@ -50,7 +51,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
         ports:
-          - 5432:5432
+          - "5432"
       redis:
         image: redis:8
         options: >-
@@ -59,11 +60,17 @@ jobs:
           --health-timeout 5s
           --health-retries 10
         ports:
-          - 6379:6379
-    env:
-      TEST_DATABASE_URL: postgres://community:community@localhost:5432/community_test
-      TEST_REDIS_URL: redis://localhost:6379
+          - "6379"
     steps:
+      # 同一物理机的多个 runner 可以并发运行，服务不能抢固定宿主端口。
+      # job.services 在 step 中才可用，不能放进 job 级 env。
+      - name: Configure test service endpoints
+        env:
+          TEST_DATABASE_URL: postgres://community:community@localhost:${{ job.services.postgres.ports['5432'] }}/community_test
+          TEST_REDIS_URL: redis://localhost:${{ job.services.redis.ports['6379'] }}
+        run: |
+          printf 'TEST_DATABASE_URL=%s\nTEST_REDIS_URL=%s\n' "$TEST_DATABASE_URL" "$TEST_REDIS_URL" >> "$GITHUB_ENV"
+
       - name: Checkout
         uses: actions/checkout@v7
 
@@ -72,15 +79,14 @@ jobs:
         with:
           bun-version-file: package.json
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      # 共享界面包的测试和社区站的交互测试（test/dom）用 vitest，它跑在 Node 上（vitest 5 要求 Node ^22.12 || ^24 || >=26）。
-      # 要排在下面两步之前：社区站 check 的最后一步就是 vitest run。
+      # 自托管镜像不预装系统 Node；依赖安装、CLI 的 node shebang 和 vitest 都需要它。
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
           node-version: 24
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       # 共享界面包（@astrodx/ui）的类型检查和测试；它的 lint 由仓库根目录的 biome（web-check）负责。
       - name: Typecheck and test the shared UI package
@@ -111,4 +117,13 @@ jobs:
 
       # 构建只在部署时才跑，构建坏了就要到部署时才发现（dash 踩过的坑）。
       - name: Docker build
-        run: docker build -f apps/community/Dockerfile -t community:ci .
+        run: docker build -f apps/community/Dockerfile -t "community:ci-${{ github.run_id }}-${{ github.run_attempt }}" .
+
+      # 自托管 Docker daemon 会跨 job 保留；只删本次镜像，不动其它 job 的 tag 或构建缓存。
+      - name: Remove this run's CI image
+        if: always()
+        run: |
+          image="community:ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if docker image inspect "$image" >/dev/null 2>&1; then
+            docker image rm "$image"
+          fi

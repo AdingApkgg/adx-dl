@@ -39,7 +39,8 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # 公开仓库的 PR 留在 GitHub runner；自托管 runner 另有主机侧事件白名单。
+    runs-on: ${{ fromJSON(((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && contains(fromJSON('["refs/heads/main","refs/heads/dev","refs/heads/pre"]'), github.ref)) && '["self-hosted","linux","x64","astrodx-ci"]' || '["ubuntu-latest"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -50,6 +51,12 @@ jobs:
           # 以根 package.json 的 packageManager 为唯一版本来源。定时重建旧提交时，
           # 用的也是那个提交当时固定的版本。
           bun-version-file: package.json
+
+      # 自托管镜像不预装系统 Node；依赖安装和 CLI 的 node shebang 都需要它。
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
