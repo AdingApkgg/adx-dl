@@ -1,0 +1,27 @@
+import { m } from "@/paraglide/messages.js";
+import { errorCodeOf, errorMessage } from "./auth-errors";
+import { storageErrorMessage } from "./storage-errors";
+export function chartErrorMessage(error: unknown): string {
+  const code = errorCodeOf(error);
+  if (code === "CHART_FOLDER_UNSUPPORTED") return m.chart_error_folder_unsupported();
+  if (code === "REAUTH_REQUIRED" || code === "SESSION_NOT_FRESH") return errorMessage(error) ?? m.error_unknown();
+  const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
+  if (status === 403 && code !== "ACCOUNT_PENDING_DELETION") return m.chart_error_forbidden();
+  if (status === 404) return m.chart_error_not_found();
+  if (code === "CHART_CHANGED") return m.chart_error_changed();
+  if (code === "CHART_CURRENT_VERSION") return m.chart_error_current();
+  if (code === "CHART_DRAFT_LIMIT" || code === "CHART_VERSION_LIMIT") return m.chart_error_limit();
+  if (code === "CHART_FILE_ASSIGNED" || code === "CHART_FILE_NOT_READY") return m.chart_error_file();
+  if (code === "QUOTA_EXCEEDED") return m.chart_error_quota();
+  if (code === "FILE_TOO_LARGE") return m.chart_error_size();
+  if (code === "CHART_PATH_INVALID" || code === "CHART_PATH_COLLISION") return m.chart_error_path();
+  if (code === "CHART_ASSET_AMBIGUOUS") return m.chart_error_ambiguous();
+  if (code === "CHART_MAIDATA_MISSING") return m.chart_error_maidata();
+  if (code === "CHART_INVALID_UTF8") return m.chart_error_utf8();
+  if (code === "CHART_ENTRY_LIMIT" || code === "CHART_EXPANDED_LIMIT" || code === "CHART_ASSET_TOO_LARGE") return m.chart_error_expanded();
+  if (code === "CHART_DIFFICULTY_INVALID" || code === "CHART_METADATA_INVALID") return m.chart_error_metadata();
+  if (code === "CHART_COMPLEXITY_EXCEEDED") return m.chart_error_complexity();
+  if (code === "CHART_ASSET_INVALID") return m.chart_error_asset();
+  if (code?.startsWith("CHART_")) return m.chart_error_import({ code });
+  return storageErrorMessage(error);
+}

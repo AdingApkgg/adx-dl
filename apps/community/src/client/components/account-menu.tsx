@@ -69,6 +69,9 @@ export function AccountMenu() {
         {pending ? null : (
           <>
             <DropdownMenuItem asChild>
+              <Link to={localizeHref("/me/charts")}>{m.charts_title()}</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
               <Link to={localizeHref(`/u/${me.id}`)}>{m.nav_my_page()}</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>

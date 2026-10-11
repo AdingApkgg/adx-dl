@@ -1,4 +1,4 @@
-import { and, eq, isNull, notExists, or, sql } from "drizzle-orm";
+import { and, eq, isNull, notExists, or, sql, type SQL } from "drizzle-orm";
 import { type PgTable, getTableConfig } from "drizzle-orm/pg-core";
 import {
   blobs,
@@ -11,6 +11,7 @@ import {
 } from "../db/schema";
 import type { DbTransaction } from "./contracts";
 import type { Db } from "../db/client";
+import { chartFileReference } from "../charts/references";
 export type ReferenceDb = Db | DbTransaction;
 /** A module must pair all three decisions with its account-deletion registration. Task8 binds storage. */
 export type FileReference = {
@@ -20,6 +21,8 @@ export type FileReference = {
   references(db: ReferenceDb, fileId: string): Promise<boolean>;
   publicRepresentations(db: ReferenceDb, outputSha256: string): Promise<boolean>;
   retention(db: ReferenceDb, fileId: string): Promise<boolean>;
+  /** Optional SQL candidate filter for a reference table with soft-deleted history. Rechecked under locks. */
+  unreferenced?: SQL;
 };
 export function registerFileReferences(
   entries: readonly FileReference[],
@@ -55,6 +58,7 @@ async function avatarReference(db: ReferenceDb, fileId: string) {
   );
 }
 export const FILE_REFERENCES = registerFileReferences([
+  chartFileReference,
   {
     name: "avatar",
     referenceTable: userAvatars,

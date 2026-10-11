@@ -88,6 +88,13 @@ export function createApp(deps: AppDeps) {
   app.use("*", requestId());
   app.use("*", clientIp());
   app.use("*", requestLog(deps.log));
+  app.use("/api/v1/me/charts/*", async (c, next) => {
+    c.header("cache-control", "private, no-store");
+    c.header("x-content-type-options", "nosniff");
+    await next();
+    if (c.res.headers.get("accept-ranges") === "bytes")
+      c.res.headers.set("content-security-policy", "default-src 'none'; sandbox");
+  });
   const media = storage && drain ? createPublicMediaHandler(storage, drain) : undefined;
   app.use("*", async (c, next) => {
     // Node adapter exposes the exact request-target before URL dot-segment normalization.

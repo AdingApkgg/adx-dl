@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   blobs,
   blobDerivatives,
@@ -415,7 +415,7 @@ export type DerivedRebuildIntent = {
   generation: number;
   sourceBlobId: string;
   recipeId: string;
-  recipe: "avatar-v1";
+  recipe: "avatar-v1" | "chart-preview-v1";
   recipeBuild: string;
   expectedOutputSha256: string;
   requestedAt: string;
@@ -454,7 +454,7 @@ export async function requestMissingDerivedRebuild(
         and(
           eq(blobDerivatives.derivedObjectId, data.id),
           eq(blobDerivatives.state, "ready"),
-          eq(blobDerivatives.recipe, "avatar-v1"),
+          inArray(blobDerivatives.recipe, ["avatar-v1","chart-preview-v1"]),
           eq(blobs.state, "ready"),
         ),
       )
@@ -491,7 +491,7 @@ export async function requestMissingDerivedRebuild(
       generation: data.generation,
       sourceBlobId: blob.id,
       recipeId: recipe.id,
-      recipe: "avatar-v1",
+      recipe: recipe.recipe as DerivedRebuildIntent["recipe"],
       recipeBuild: recipe.recipeBuild,
       expectedOutputSha256: output.outputSha256,
       requestedAt: (ctx.now?.() ?? new Date()).toISOString(),
@@ -525,7 +525,7 @@ export async function readDerivedRebuildIntents(
     const i = row.properties.rebuild as Partial<DerivedRebuildIntent> | undefined;
     return i?.state === "pending" &&
       i.generation === row.generation &&
-      i.recipe === "avatar-v1" &&
+      (i.recipe === "avatar-v1" || i.recipe === "chart-preview-v1") &&
       i.expectedOutputSha256 === row.outputSha256 &&
       typeof i.recipeBuild === "string" &&
       typeof i.sourceBlobId === "string" &&

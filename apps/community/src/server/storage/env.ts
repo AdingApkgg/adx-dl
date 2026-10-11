@@ -37,6 +37,8 @@ export function parseStorageEnv(
   if (!isAbsolute(capacityDir) || normalize(capacityDir) !== capacityDir) problems.add("STORAGE_CAPACITY_DIR");
   const recipeBuild = required("STORAGE_RECIPE_BUILD");
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(recipeBuild)) problems.add("STORAGE_RECIPE_BUILD");
+  const chartRecipeBuild = source.STORAGE_CHART_RECIPE_BUILD?.trim();
+  if (chartRecipeBuild && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(chartRecipeBuild)) problems.add("STORAGE_CHART_RECIPE_BUILD");
   const common = {
     publicOrigin: origin("PUBLIC_ORIGIN"),
     endpoint: origin("STORAGE_S3_ENDPOINT"),
@@ -49,6 +51,7 @@ export function parseStorageEnv(
     tempDir,
     capacityDir,
     recipeBuild,
+    ...(chartRecipeBuild ? { chartRecipeBuild } : {}),
     limits: {
       temporaryBudget: budget("STORAGE_TEMPORARY_BUDGET", STORAGE_LIMITS.temporaryBudget),
       originalBudget: budget("STORAGE_ORIGINAL_BUDGET", STORAGE_LIMITS.originalBudget),

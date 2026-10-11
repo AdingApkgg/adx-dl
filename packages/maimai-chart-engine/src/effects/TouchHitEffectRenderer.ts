@@ -1,5 +1,5 @@
-import { BaseRenderer, RenderContext } from "../renderers/BaseRenderer";
-import { TouchHoldStartNote, TouchNote, TouchPosition } from "../types";
+import { BaseRenderer, type RenderContext } from "../renderers/BaseRenderer";
+import type { TouchHoldStartNote, TouchNote, TouchPosition } from "../types";
 import { HIT_EFFECT_COLORS, TOUCH_RING_ALPHA_PROFILE } from "./constants";
 import { PANEL_RADIUS_UNITS } from "../utils/constants";
 

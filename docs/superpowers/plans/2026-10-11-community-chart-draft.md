@@ -8,7 +8,15 @@
 
 **Tech Stack:** 沿用锁文件 Bun 1.4.2、React Router、Hono、Drizzle/PostgreSQL、pg-boss、SeaweedFS、sharp；新增固定 yauzl 3.2.0，客户端按需引用 fflate 0.8.3，均在远程更新锁文件。
 
-**Spec:** [单首谱面上传与私有草稿设计](/Users/i/Code/AstroDX/docs/superpowers/specs/2026-10-11-community-chart-draft-design.md)。状态待设计审阅；本文细化总计划 Task 6–14，不把提案当成已批准实现。远程准备/头像收尾按总计划 Task 2–5 独立执行。
+**Spec:** [单首谱面上传与私有草稿设计](/Users/i/Code/AstroDX/docs/superpowers/specs/2026-10-11-community-chart-draft-design.md)。2026-10-11 用户已批准设计并授权继续编码。本文细化总计划 Task 6–14；远程准备/头像收尾按总计划 Task 2–5 独立执行。
+
+## 本轮执行记录（2026-10-11）
+
+Task 6–14 的实现已落地：用途隔离和实际用量、受限 ZIP/maidata 导入、source-bound recipe、私有草稿 API/版本/删除、文件夹上传和恢复、三语列表/编辑及按需 Canvas 预览。按照用户的必要测试要求，使用隔离 PG/S3 和固定 Bun 在远程运行定向用例；没有逐片重复全套或旧登录验收。
+
+一次最终独立复核发现的六个问题均已修复；另外补齐取消后的计算 lease 清理，仅释放已结束且未持有物理输出 claim 的本代计算。实现和必要测试合并整理为一个原子功能提交，避免用途开放与 worker/业务链路分离。下面的逐项命令和拟定提交名保留为原实施切片，不代表这些命令全部运行过。
+
+远程真实浏览器和 fresh-volume full restore 仍依赖待完成的 sparse scratch sudo 安装；此项不冒充已验收。测试逐项结果、构建和发布边界见 `docs/verification/community-chart-drafts-2026-10-11.md`。不推送、不部署。
 
 ## Global Constraints
 

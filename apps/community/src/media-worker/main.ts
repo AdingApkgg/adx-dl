@@ -14,6 +14,7 @@ import {
   STORAGE_QUEUES,
   STORAGE_INGEST_QUEUE,
   MEDIA_AVATAR_QUEUE,
+  MEDIA_CHART_QUEUE,
   STORAGE_FINALIZE_QUEUE,
 } from "../server/jobs/queues";
 import { createStorageContext } from "../server/storage/runtime";
@@ -23,15 +24,19 @@ import { deriveAvatar } from "./avatar";
 import { finalizeUpload } from "./finalize";
 import { ingestUpload } from "./ingest";
 import { RECIPE_BUILD } from "./image-child";
+import { handleChartImport } from "./chart-import";
+import { currentChartRecipeBuild, recipeBuildFor } from "../server/charts/recipe";
 /** The supplied boss must be started with the worker role so Navigator advances flow edges. */
 export async function registerMediaWorkers(ctx: StorageContext): Promise<void> {
   if (ctx.config.role !== "media" || ctx.config.recipeBuild !== RECIPE_BUILD)
     throw new Error("Media recipe configuration mismatch");
+  if(recipeBuildFor(ctx,"chart-source") !== currentChartRecipeBuild()) throw new Error("Chart recipe configuration mismatch");
   const boss = await ctx.boss();
   await ensureQueues(boss, STORAGE_QUEUES);
   for (const [queue, handle] of [
     [STORAGE_INGEST_QUEUE, ingestUpload],
     [MEDIA_AVATAR_QUEUE, deriveAvatar],
+    [MEDIA_CHART_QUEUE, handleChartImport],
     [STORAGE_FINALIZE_QUEUE, finalizeUpload],
   ] as const) {
     await boss.work<StorageJobData>(

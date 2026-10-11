@@ -1,8 +1,11 @@
+import { CHART_IMPORT_ERROR_CODES, CHART_BUSINESS_ERROR_CODES, type ChartImportSummary } from "./charts";
 /** JSON contracts: timestamps are ISO strings; bytes/revisions are safe integers. */
 export type StoragePurpose = "avatar" | "chart-source";
 export type UploadState = "receiving" | "processing" | "ready" | "rejected" | "cancelled" | "expired";
 export type FileState = "processing" | "ready" | "rejected" | "deleted";
 export const STORAGE_ERROR_CODES = [
+  ...CHART_IMPORT_ERROR_CODES,
+  ...CHART_BUSINESS_ERROR_CODES,
   "PURPOSE_NOT_AVAILABLE",
   "INVALID_UPLOAD",
   "FILE_TOO_LARGE",
@@ -56,6 +59,7 @@ export type FileDto = {
   state: FileState;
   createdAt: string;
   previewUrl?: string;
+  chart?: ChartImportSummary;
 };
 export type AvatarDto = { image: string | null; avatarRevision: number };
 export type SaveAvatarInput = { fileId: string; expectedRevision: number };

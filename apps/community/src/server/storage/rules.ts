@@ -1,4 +1,5 @@
 import type { StoragePurpose } from "@/shared/storage";
+import { chartUploadRule } from "../charts/upload-rules";
 
 export const STORAGE_LIMITS = {
   maxSize: 480_000_000,
@@ -51,3 +52,7 @@ export const AVATAR_RULE = {
   outputMime: "image/jpeg",
   quality: 85,
 } as const satisfies PurposeRule & Record<string, unknown>;
+
+export function purposeRule(purpose: StoragePurpose) {
+  return purpose === "avatar" ? AVATAR_RULE : chartUploadRule;
+}

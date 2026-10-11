@@ -235,6 +235,9 @@ export async function replayJournal(c: Client, records: JournalRecord[], head: J
     await c.query("select pg_advisory_xact_lock($1::bigint)", [714102026]);
     for (const r of records) {
       if (r.kind === "user_deleted") {
+        // Private chart metadata never becomes anonymously readable when the owner is purged.
+        await c.query("update chart_versions set deleted_at=coalesce(deleted_at,$2) where chart_id in(select id from charts where owner_id=$1)", [r.userId, r.createdAt]);
+        await c.query("update charts set deleted_at=coalesce(deleted_at,$2),updated_at=$2 where owner_id=$1", [r.userId, r.createdAt]);
         await c.query(
           "update files set state='deleted',deleted_at=coalesce(deleted_at,$2),retained_until=$2::timestamptz+interval '30 days',original_name='removed' where owner_id=$1 and state<>'deleted'",
           [r.userId, r.createdAt],
@@ -251,6 +254,21 @@ export async function replayJournal(c: Client, records: JournalRecord[], head: J
           "update files set state='deleted',deleted_at=coalesce(deleted_at,$2),retained_until=$2::timestamptz+interval '30 days',original_name='removed' where id=$1",
           [r.fileId, r.createdAt],
         );
+        // The logical File is exclusive to one version. A lost current version selects the newest
+        // surviving ready history; the final whole-chart tombstone therefore cannot resurrect it.
+        await c.query(`with lost as (
+          update chart_versions set deleted_at=$2 where source_file_id=$1 and deleted_at is null returning chart_id,id
+        ), affected as (
+          select ch.id, ch.current_version_id=lost.id as lost_current,
+            (select v.id from chart_versions v join files f on f.id=v.source_file_id
+             where v.chart_id=ch.id and v.deleted_at is null and f.state='ready'
+             order by v.ordinal desc limit 1) as replacement
+          from charts ch join lost on lost.chart_id=ch.id
+        ) update charts ch set
+          current_version_id=case when a.lost_current then a.replacement else ch.current_version_id end,
+          deleted_at=case when a.lost_current and a.replacement is null then coalesce(ch.deleted_at,$2) else ch.deleted_at end,
+          revision=least(ch.revision::bigint+1,2147483647)::integer,updated_at=$2
+          from affected a where ch.id=a.id`, [r.fileId, r.createdAt]);
       } else if (r.kind === "hash_blocked") {
         await c.query(
           "insert into blob_blocks(sha256,reason_code) values($1,'RESTORED_BLOCK') on conflict do nothing",
@@ -319,7 +337,7 @@ export async function replayJournal(c: Client, records: JournalRecord[], head: J
       "update storage_maintenance set owner_id=null,lease_until=null where id='global'",
     );
     await c.query(
-      "delete from pgboss.job where name in ('storage.ingest','media.avatar','storage.finalize')",
+      "delete from pgboss.job where name in ('storage.ingest','media.avatar','media.chart-import','storage.finalize')",
     );
     // SQL mirrors actual avatar public-representation predicate; revocations never erase surviving shared references.
     const hashes = new Set(

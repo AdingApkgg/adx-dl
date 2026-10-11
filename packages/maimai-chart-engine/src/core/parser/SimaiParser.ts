@@ -1,5 +1,5 @@
 import { match } from "ts-pattern";
-import {
+import type {
   Chart,
   ChartMetadata,
   ChartLevels,
@@ -27,6 +27,21 @@ interface ParseNotesResult {
   firstBpm: number;
   bpmEvents: BpmEvent[];
   divisorEvents: DivisorEvent[];
+}
+
+export interface ParseDiagnostic { code: string; line?: number }
+export interface SimaiParseOptions {
+  onDiagnostic?: (diagnostic: ParseDiagnostic) => void;
+  maxNotes?: number;
+  maxDurationMs?: number;
+}
+export class ParseLimitError extends Error {
+  constructor() { super("Chart parsing resource limit exceeded"); this.name = "ParseLimitError"; }
+}
+interface ParseBudget {
+  maxNotes: number;
+  checkDuration: (milliseconds: number) => void;
+  diagnostic: (code: string, line?: number) => void;
 }
 
 const INOTE_MARKERS = [
@@ -99,7 +114,7 @@ export function getAvailableDifficulties(simaiText: string): AvailableDifficulti
  *
  * @throws {Error} 文本为空、缺少 `&` 元数据、指定难度不存在、缺少 BPM 声明或语法解析出错时抛错。
  */
-export function parseSimaiChart(simaiText: string, difficulty?: ChartDifficulty): Chart {
+export function parseSimaiChart(simaiText: string, difficulty?: ChartDifficulty, options?: SimaiParseOptions): Chart {
   if (!simaiText || typeof simaiText !== "string") {
     throw new Error("Invalid input: expected a non-empty string");
   }
@@ -195,6 +210,7 @@ export function parseSimaiChart(simaiText: string, difficulty?: ChartDifficulty)
     const designerKey = `des_${selectedDifficulty}` as keyof ChartDesigners;
     const selectedDesigner = metadata.designers[designerKey] || metadata.designer;
 
+    const hadMetadataBpm = !Number.isNaN(metadata.bpm);
     if (Number.isNaN(metadata.bpm)) {
       const inlineBpm = chartBody.match(/\((\d+(?:\.\d+)?)\)/);
       if (inlineBpm) metadata.bpm = parseFloat(inlineBpm[1]);
@@ -206,7 +222,18 @@ export function parseSimaiChart(simaiText: string, difficulty?: ChartDifficulty)
       metadata.bpm = 120;
     }
 
-    const parseResult = parseNotes(chartBody, metadata.bpm);
+    let diagnosticCount = 0;
+    const diagnostic = (code: string, line?: number) => {
+      if (!options?.onDiagnostic) return;
+      if (diagnosticCount < 63) options.onDiagnostic({ code, ...(line === undefined ? {} : { line }) });
+      else if (diagnosticCount === 63) options.onDiagnostic({ code: "WARNINGS_TRUNCATED" });
+      diagnosticCount++;
+    };
+    if (!hadMetadataBpm && !/^\s*\([\d.]+\)/.test(chartBody)) diagnostic("MISSING_START_BPM", 1);
+    const parseResult = parseNotes(chartBody, metadata.bpm, options ? { maxNotes: options.maxNotes ?? Infinity,
+      checkDuration: (milliseconds) => {
+        if (!Number.isFinite(milliseconds) || milliseconds < 0 || milliseconds > (options.maxDurationMs ?? Infinity)) throw new ParseLimitError();
+      }, diagnostic } : undefined);
     const notes = parseResult.notes;
     const bpmEvents = parseResult.bpmEvents;
     const divisorEvents = parseResult.divisorEvents;
@@ -296,6 +323,7 @@ export function parseSimaiChart(simaiText: string, difficulty?: ChartDifficulty)
       firstMs: metadata.firstSec !== undefined ? metadata.firstSec * 1000 : undefined,
     };
   } catch (error) {
+    if (error instanceof ParseLimitError) throw error;
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Parse error: ${message}`);
   }
@@ -358,7 +386,7 @@ function parseMetadataLine(line: string, metadata: ChartMetadata): void {
  * 解析谱面字符流里的所有音符以及 BPM、分频变化。
  * 时间推进全靠逗号 `,`；BPM、分频、流速等标记就地生效，不消耗拍数。
  */
-function parseNotes(chartBody: string, initialBpm: number): ParseNotesResult {
+function parseNotes(chartBody: string, initialBpm: number, budget?: ParseBudget): ParseNotesResult {
   const notes: Note[] = [];
   const bpmEvents: BpmEvent[] = [];
   const divisorEvents: DivisorEvent[] = [];
@@ -371,9 +399,11 @@ function parseNotes(chartBody: string, initialBpm: number): ParseNotesResult {
   let currentHiSpeed = 1;
 
   let pos = 0;
+  let line = 1;
 
   const skipWhitespace = () => {
     while (pos < chartBody.length && isWhitespace(chartBody[pos])) {
+      if (chartBody[pos] === "\n") line++;
       pos++;
     }
   };
@@ -384,10 +414,12 @@ function parseNotes(chartBody: string, initialBpm: number): ParseNotesResult {
 
     let noteContent = "";
     const startPos = pos;
+    const startLine = line;
 
     while (pos < chartBody.length && chartBody[pos] !== ",") {
       const char = chartBody[pos];
       if (isWhitespace(char)) {
+        if (char === "\n") line++;
         pos++;
         continue;
       }
@@ -479,17 +511,36 @@ function parseNotes(chartBody: string, initialBpm: number): ParseNotesResult {
           currentBpm,
           isSimultaneous,
           hasDelayMarker,
+          budget ? { ...budget, maxNotes: budget.maxNotes - notes.length } : undefined,
         );
+
+        if (budget && !parsedNotes.length && noteStr !== "E") {
+          const outOfRange = /^\d+[hbx$]*($|\[)/i.test(noteStr) || /^([ABDE]\d+|C\d+)[hbfx]*(\[.*\])?$/i.test(noteStr);
+          budget.diagnostic(outOfRange ? "NOTE_OUT_OF_RANGE" : "UNKNOWN_TOKEN", startLine);
+        }
+        if (budget) {
+          if (notes.length + parsedNotes.length > budget.maxNotes) throw new ParseLimitError();
+          for (const note of parsedNotes) {
+            let endMs = note.timingMs;
+            if (note.type === "slide") {
+              for (let i = 0; i < (note.allDurationMs?.length ?? 1); i++) endMs = Math.max(endMs, note.timingMs + (note.allDelayMs?.[i] ?? note.delayMs ?? 0) + (note.allDurationMs?.[i] ?? note.durationMs ?? 0));
+              if (note.allSlideSegments?.some((segments) => segments.some((segment) => segment.endPos < 1 || segment.endPos > 8 || (segment.midPos !== undefined && (segment.midPos < 1 || segment.midPos > 8))))) budget.diagnostic("NOTE_OUT_OF_RANGE", startLine);
+              if (!note.slideSegments?.length) budget.diagnostic("UNKNOWN_TOKEN", startLine);
+            } else if ("isHoldStart" in note && note.isHoldStart && "duration" in note) endMs += note.duration * 60000 / note.bpm;
+            budget.checkDuration(endMs + 240000 / (firstBpm ?? initialBpm));
+          }
+        }
 
         if (currentHiSpeed !== 1) {
           for (const note of parsedNotes) note.hiSpeed = currentHiSpeed;
         }
-        notes.push(...parsedNotes);
+        for (const note of parsedNotes) notes.push(note);
       }
     }
 
     currentBeat += beatIncrement;
     currentMs += (60000 * beatIncrement) / currentBpm;
+    budget?.checkDuration(currentMs + 240000 / (firstBpm ?? initialBpm));
 
     if (pos < chartBody.length && chartBody[pos] === ",") {
       pos++;
@@ -527,12 +578,14 @@ function parseNoteString(
   bpm: number,
   isSimultaneous: boolean,
   hasDelayMarker: boolean,
+  budget?: ParseBudget,
 ): Note[] {
   const notes: Note[] = [];
   const delayOffset = hasDelayMarker ? 1 : 0;
 
   const holdMatch = noteStr.match(/^(\d+)[hbx]{1,3}\[(?:([\d.]+):([\d.]+)|#([\d.]+))\][bx]*$/i);
   if (holdMatch) {
+    if (budget && budget.maxNotes < 2) throw new ParseLimitError();
     const position = parseInt(holdMatch[1]) as ButtonPosition;
     const holdDuration = parseHoldDuration(holdMatch[2], holdMatch[3], holdMatch[4], bpm);
     const lowerNoteStr = noteStr.toLowerCase();
@@ -609,6 +662,7 @@ function parseNoteString(
     const isEx = noteStr.toLowerCase().includes("x");
 
     const slideParts = slideNotation.split("*");
+    if (budget && (budget.maxNotes < 1 || slideParts.length > budget.maxNotes)) throw new ParseLimitError();
     const allSlideSegments: SlideSegment[][] = [];
     const allDurations: number[] = [];
     const allDurationMs: number[] = [];
@@ -623,7 +677,7 @@ function parseNoteString(
       const hasMultipleTimings = (part.match(/\[[\d.:#+]+\]/g) || []).length > 1;
 
       if (hasMultipleTimings) {
-        const parseResult = parseSlideSegmentsWithTiming(startPosition, part, bpm);
+        const parseResult = parseSlideSegmentsWithTiming(startPosition, part, bpm, budget?.maxNotes, budget ? () => budget.diagnostic("UNKNOWN_TOKEN") : undefined);
         allSlideSegments.push(parseResult.segments);
         allDurations.push(parseResult.totalDuration);
         allDurationMs.push(parseResult.totalDurationMs);
@@ -678,10 +732,10 @@ function parseNoteString(
         allCustomLengths.push(customDurationSeconds);
 
         const pathOnly = part
-          .replace(/\[(?:(?:[\d.]+#)?[\d.]+:[\d.]+(?:##[\d.]+)?|[\d.]+##[\d.]+)\]/gi, "")
+          .replace(/\[(?:#[\d.]+|(?:[\d.]+#)?[\d.]+:[\d.]+(?:##[\d.]+)?|[\d.]+##[\d.]+)\]/gi, "")
           .replace(/[bx]/gi, "");
 
-        const segments = parseSlideSegments(startPosition, pathOnly);
+        const segments = parseSlideSegments(startPosition, pathOnly, budget?.maxNotes, budget ? () => budget.diagnostic("UNKNOWN_TOKEN") : undefined);
         allSlideSegments.push(segments);
       }
     }
@@ -725,6 +779,7 @@ function parseNoteString(
   }
 
   if (isMultiDigitNote(noteStr)) {
+    if (budget && noteStr.length > budget.maxNotes) throw new ParseLimitError();
     const digits = noteStr.split("");
     let allValid = true;
 
@@ -777,6 +832,7 @@ function parseNoteString(
       const hasFirework = modifiers.includes("f");
 
       if (isHold && (touchMatch[4] || touchMatch[6])) {
+        if (budget && budget.maxNotes < 2) throw new ParseLimitError();
         const holdDuration = parseHoldDuration(touchMatch[4], touchMatch[5], touchMatch[6], bpm);
         const durationMs = (60000 * holdDuration) / bpm;
 
@@ -883,6 +939,8 @@ function parseSlideSegmentsWithTiming(
   startPosition: number,
   pathNotation: string,
   defaultBpm: number,
+  maxSegments = Infinity,
+  onUnsupported?: () => void,
 ): SlidePathParseResult {
   const segments: SlideSegment[] = [];
   const segmentDurations: number[] = [];
@@ -891,6 +949,7 @@ function parseSlideSegmentsWithTiming(
   let i = 0;
 
   while (i < pathNotation.length) {
+    if (segments.length >= maxSegments) throw new ParseLimitError();
     const char = pathNotation[i];
     let pathType: SlidePathType | null = null;
 
@@ -901,6 +960,7 @@ function parseSlideSegmentsWithTiming(
       pathType = char as SlidePathType;
       i++;
     } else {
+      if (!/[bx?!@]/i.test(char)) onUnsupported?.();
       i++;
       continue;
     }
@@ -915,6 +975,9 @@ function parseSlideSegmentsWithTiming(
       if (i < pathNotation.length && pathNotation[i] === "[") {
         const bracketEnd = pathNotation.indexOf("]", i);
         if (bracketEnd !== -1) {
+          // Independent V timing is not implemented here. Diagnostic callers
+          // must not describe the legacy one-beat fallback as a complete preview.
+          onUnsupported?.();
           i = bracketEnd + 1;
         }
       }
@@ -942,6 +1005,7 @@ function parseSlideSegmentsWithTiming(
           segmentDurations.push(1);
           segmentDurationMs.push(60000 / defaultBpm);
         } else {
+          if (segments.length + 2 > maxSegments) throw new ParseLimitError();
           segments.push({ type: "-", startPos: start as ButtonPosition, endPos: midPos });
           segments.push({ type: "-", startPos: midPos, endPos });
           segmentDurations.push(0.5, 0.5);
@@ -949,7 +1013,7 @@ function parseSlideSegmentsWithTiming(
         }
 
         currentPos = endPos;
-      }
+      } else onUnsupported?.();
     } else {
       let numStr = "";
       while (i < pathNotation.length && /\d/.test(pathNotation[i])) {
@@ -986,7 +1050,7 @@ function parseSlideSegmentsWithTiming(
               } else {
                 segDurationMs = (60000 * segDuration) / defaultBpm;
               }
-            }
+            } else onUnsupported?.();
           }
 
           i = bracketEnd + 1;
@@ -1007,7 +1071,7 @@ function parseSlideSegmentsWithTiming(
         segmentDurations.push(segDuration);
         segmentDurationMs.push(segDurationMs);
         currentPos = endPos;
-      }
+      } else onUnsupported?.();
     }
   }
 
@@ -1024,6 +1088,6 @@ function parseSlideSegmentsWithTiming(
 }
 
 /** 仅提取 Slide 分段结构（缺省用 120 BPM 占位）。 */
-function parseSlideSegments(startPosition: number, pathNotation: string): SlideSegment[] {
-  return parseSlideSegmentsWithTiming(startPosition, pathNotation, 120).segments;
+function parseSlideSegments(startPosition: number, pathNotation: string, maxSegments?: number, onUnsupported?: () => void): SlideSegment[] {
+  return parseSlideSegmentsWithTiming(startPosition, pathNotation, 120, maxSegments, onUnsupported).segments;
 }

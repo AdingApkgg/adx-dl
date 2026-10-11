@@ -1,5 +1,8 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { FileDto } from "@/shared/storage";
+import type { ChartImportSummary } from "@/shared/charts";
+import { validateChartPreviewManifest } from "../charts/artifact";
+import { CHART_PREVIEW_MIME, recipeBuildFor } from "../charts/recipe";
 import {
   blobs,
   files,
@@ -9,7 +12,7 @@ import {
   storageUsage,
   storageTombstones,
 } from "../db/schema";
-import type { StorageContext, ObjectBucket } from "./contracts";
+import type { StorageContext, ObjectBucket, DbTransaction } from "./contracts";
 import { StorageError, StorageUnavailableError } from "./errors";
 import { hasFileReferences } from "./references";
 import { withStorageTransaction } from "./transactions";
@@ -25,7 +28,7 @@ async function owned(ctx: StorageContext, userId: string, id: string) {
     .where(and(eq(files.id, id), eq(files.ownerId, userId)));
   if (
     !row ||
-    row.file.state === "deleted" ||
+    row.file.state === "deleted" || row.file.deletedAt !== null ||
     row.blob.state !== "ready" ||
     (await ctx.db.select().from(blobBlocks).where(eq(blobBlocks.sha256, row.blob.sha256))).length
   )
@@ -33,14 +36,25 @@ async function owned(ctx: StorageContext, userId: string, id: string) {
   return row;
 }
 export async function getFile(ctx: StorageContext, userId: string, id: string): Promise<FileDto> {
-  const { file } = await owned(ctx, userId, id);
+  const { file, blob } = await owned(ctx, userId, id);
   let preview = false;
+  let chart: ChartImportSummary | undefined;
   if (file.state === "ready" && file.purpose === "avatar") {
     try {
       await resolvePrivateFile(ctx, userId, id, "preview");
       preview = true;
     } catch (e) {
       if (!(e instanceof StorageError) || e.status !== 404) throw e;
+    }
+  }
+  if (file.state === "ready" && file.purpose === "chart-source") {
+    const [row] = await ctx.db.select({ output: derivedObjects }).from(blobDerivatives)
+      .innerJoin(derivedObjects, eq(derivedObjects.id, blobDerivatives.derivedObjectId))
+      .where(and(eq(blobDerivatives.sourceBlobId, blob.id), eq(blobDerivatives.recipe, "chart-preview-v1"),
+        eq(blobDerivatives.recipeBuild, recipeBuildFor(ctx, "chart-source")), eq(blobDerivatives.state, "ready"), eq(derivedObjects.state, "ready")));
+    if (row?.output.mime === CHART_PREVIEW_MIME && !(await ctx.db.select().from(blobBlocks).where(eq(blobBlocks.sha256, row.output.outputSha256))).length) {
+      try { chart = validateChartPreviewManifest(row.output.properties.chartPreview, row.output.size).summary; }
+      catch { throw new StorageError(503, "STORAGE_INCONSISTENT"); }
     }
   }
   return {
@@ -51,12 +65,18 @@ export async function getFile(ctx: StorageContext, userId: string, id: string): 
     state: file.state,
     createdAt: file.createdAt.toISOString(),
     ...(preview ? { previewUrl: `/api/v1/files/${file.id}/preview` } : {}),
+    ...(chart ? { chart } : {}),
   };
 }
 export async function deleteFile(ctx: StorageContext, userId: string, id: string): Promise<void> {
   if (!uuid.test(id)) throw new StorageError(404, "NOT_FOUND");
   await withStorageTransaction(ctx.db, async (tx) => {
-    const { usage } = await lockUploadAccounting(tx, userId);
+    await lockUploadAccounting(tx, userId);
+    await deleteFileInTransaction(tx, userId, id);
+  });
+}
+/** Caller owns user/usage/budget locks and has withdrawn business references in this transaction. */
+export async function deleteFileInTransaction(tx: DbTransaction, userId: string, id: string): Promise<void> {
     const [file] = await tx
       .select()
       .from(files)
@@ -74,13 +94,13 @@ export async function deleteFile(ctx: StorageContext, userId: string, id: string
       .where(eq(files.id, id));
     await tx.insert(storageTombstones).values({ kind: "file_deleted", fileId: id, createdAt: now });
     if (file.state === "ready") {
-      if (usage.usedBytes < file.size) throw new StorageError(503, "STORAGE_INCONSISTENT");
+      const [usage] = await tx.select().from(storageUsage).where(eq(storageUsage.userId, userId)).for("update");
+      if (!usage || usage.usedBytes < file.size) throw new StorageError(503, "STORAGE_INCONSISTENT");
       await tx
         .update(storageUsage)
         .set({ usedBytes: sql`${storageUsage.usedBytes}-${file.size}`, updatedAt: now })
         .where(eq(storageUsage.userId, userId));
     }
-  });
 }
 export type FileRepresentation = {
   bucket: ObjectBucket;

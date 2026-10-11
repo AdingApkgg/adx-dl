@@ -24,6 +24,7 @@ import {
   STORAGE_SWEEP_QUEUE,
   STORAGE_CLEANUP_QUEUE,
   STORAGE_RECONCILE_QUEUE,
+  STORAGE_INGEST_QUEUE, MEDIA_AVATAR_QUEUE, MEDIA_CHART_QUEUE, STORAGE_FINALIZE_QUEUE,
 } from "../server/jobs/queues";
 import type { StorageContext, StorageJobData, DbTransaction } from "../server/storage/contracts";
 import {
@@ -85,7 +86,7 @@ export async function recordStorageDead(
 ): Promise<boolean> {
   if (
     !job.sourceId ||
-    !["storage.ingest", "media.avatar", "storage.finalize"].includes(job.sourceName ?? "")
+    ![STORAGE_INGEST_QUEUE, MEDIA_AVATAR_QUEUE, MEDIA_CHART_QUEUE, STORAGE_FINALIZE_QUEUE].includes(job.sourceName ?? "")
   )
     return false;
   return changeUpload(ctx, job.data, "dead", job.sourceId);
@@ -136,16 +137,16 @@ async function changeUpload(
         await tx.update(uploadSessions).set({ updatedAt: now }).where(eq(uploadSessions.id, s.id));
         return false;
       }
-      await cancelStorageFlow(boss, tx, s.flowJobIds);
+      await cancelStorageFlow(boss, tx, s.flowJobIds, s.purpose);
       const generation = s.generation + 1;
-      const ids = await enqueueStorageFlow(boss, tx, { uploadId: s.id, generation });
+      const ids = await enqueueStorageFlow(boss, tx, { uploadId: s.id, generation }, s.purpose);
       await tx
         .update(uploadSessions)
         .set({ generation, flowJobIds: ids, updatedAt: now })
         .where(eq(uploadSessions.id, s.id));
       return true;
     }
-    await cancelStorageFlow(boss, tx, s.flowJobIds);
+    await cancelStorageFlow(boss, tx, s.flowJobIds, s.purpose);
     await tx
       .update(uploadSessions)
       .set({
@@ -790,7 +791,7 @@ export async function sweepStorage(
     }
     cursor = undefined;
     while (available()) {
-      const unreferenced = registry.flatMap((entry) =>
+      const unreferenced = registry.flatMap((entry) => entry.unreferenced ? [entry.unreferenced] :
         getTableConfig(entry.referenceTable)
           .foreignKeys.filter((fk) => fk.reference().foreignTable === files)
           .map((fk) => {

@@ -1,5 +1,5 @@
-import { BaseRenderer, RenderContext } from "../renderers/BaseRenderer";
-import { ButtonPosition, HoldEndNote, HoldStartNote } from "../types";
+import { BaseRenderer, type RenderContext } from "../renderers/BaseRenderer";
+import type { ButtonPosition, HoldEndNote, HoldStartNote } from "../types";
 import { HOLD_ACTIVE_CYCLE_MS } from "../utils/constants";
 
 type Rgb = { r: number; g: number; b: number };

@@ -15,6 +15,9 @@ import type {
 import { StorageError } from "../server/storage/errors";
 import { withProcessingUpload } from "../server/storage/objects";
 import { rejectUpload } from "../server/storage/uploads";
+import { purposeRule } from "../server/storage/rules";
+import { recipeBuildFor } from "../server/charts/recipe";
+import { validateChartPreviewManifest } from "../server/charts/artifact";
 /** Makes the logical file ready, private and unattached; only an explicit save may publish it. */
 export async function finalizeUpload(
   ctx: StorageContext,
@@ -27,8 +30,6 @@ export async function finalizeUpload(
       async ({ tx, session, file, accounting: { usage }, now }) => {
         if (session.expiresAt <= now)
           throw new StorageError(410, "UPLOAD_EXPIRED");
-        if (session.purpose !== "avatar")
-          throw new StorageError(400, "PURPOSE_NOT_AVAILABLE");
         if (
           (
             await tx
@@ -49,8 +50,8 @@ export async function finalizeUpload(
           .where(
             and(
               eq(blobDerivatives.sourceBlobId, blob.id),
-              eq(blobDerivatives.recipe, "avatar-v1"),
-              eq(blobDerivatives.recipeBuild, ctx.config.recipeBuild),
+              eq(blobDerivatives.recipe, purposeRule(session.purpose).recipe),
+              eq(blobDerivatives.recipeBuild, recipeBuildFor(ctx,session.purpose)),
             ),
           )
           .for("update");
@@ -67,6 +68,14 @@ export async function finalizeUpload(
           .for("update");
         if (output.state !== "ready")
           throw new StorageError(503, "STORAGE_BUSY");
+        if(output.mime !== purposeRule(session.purpose).outputMime)
+          throw new StorageError(503,"STORAGE_INCONSISTENT");
+        if((await tx.select().from(blobBlocks).where(eq(blobBlocks.sha256,output.outputSha256))).length)
+          throw new StorageError(400,"HASH_BLOCKED");
+        if(session.purpose === "chart-source") {
+          try { validateChartPreviewManifest(output.properties.chartPreview,output.size); }
+          catch { throw new StorageError(503,"STORAGE_INCONSISTENT"); }
+        }
         if (session.reservedBytes !== file.size)
           throw new StorageError(503, "STORAGE_INCONSISTENT");
         await tx

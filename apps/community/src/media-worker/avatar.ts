@@ -8,6 +8,8 @@ import {
   claimAvatarOutput,
   publishAvatarOutput,
   withProcessingUpload,
+  releaseRecipeComputation,
+  type RecipeClaim,
 } from "../server/storage/objects";
 import { checkStorageDisk } from "../server/storage/usage";
 import { rejectUpload } from "../server/storage/uploads";
@@ -18,7 +20,8 @@ import { mkdtemp, open, rm, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { StorageError } from "../server/storage/errors";
 import { CHILD_ERRORS } from "./image-child";
-let childRunning = false;
+import { withNativeSlot } from "./native-slot";
+import { watchProcessingUpload } from "./upload-cancellation";
 /** One owned process, hard wall deadline; capacity is held until SIGKILL has actually reaped it. */
 export async function processAvatar(
   inputPath: string,
@@ -32,10 +35,7 @@ export async function processAvatar(
   height: 512;
   mime: "image/jpeg";
 }> {
-  signal?.throwIfAborted();
-  if (childRunning)
-    throw new StorageError(503, "STORAGE_BUSY", "STORAGE_BUSY", 1);
-  childRunning = true;
+  return withNativeSlot(async signal => {
   let success = false;
   let timedOut = false;
   let child: ReturnType<typeof Bun.spawn> | undefined;
@@ -85,16 +85,18 @@ export async function processAvatar(
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener("abort", kill);
+    if (child && child.exitCode === null) { kill(); await child.exited; }
     try {
       if (!success) await rm(outputPath, { force: true });
     } finally {
-      childRunning = false;
+      // Capacity releases only after the child has actually exited.
     }
   }
+  },signal);
 }
 
 /** Reads bounded bytes to disk and authenticates the actual stream, including recovery after uncertain PUT. */
-async function copyVerified(
+export async function copyVerified(
   ctx: StorageContext,
   bucket: ObjectBucket,
   key: string,
@@ -158,14 +160,19 @@ export async function deriveAvatar(
   if (deriving) throw new StorageError(503, "STORAGE_BUSY", "STORAGE_BUSY", 1);
   deriving = true;
   let directory: string | undefined;
+  let source: RecipeClaim | null = null;
+  let outputClaimStarted = false;
+  let cancellation: Awaited<ReturnType<typeof watchProcessingUpload>> | undefined;
   try {
-    const source = await claimAvatarRecipe(ctx, data);
+    source = await claimAvatarRecipe(ctx, data);
     if (!source || source.recipe.state === "ready") return;
     if (source.blob.size > 8388608)
       throw new StorageError(413, "FILE_TOO_LARGE");
     await checkStorageDisk(ctx);
     directory = await mkdtemp(join(ctx.config.tempDir, "avatar-"));
-    const signal = ctx.lifecycle ? AbortSignal.any([ctx.lifecycle.signal, AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000);
+    const upstream = ctx.lifecycle ? AbortSignal.any([ctx.lifecycle.signal, AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000);
+    cancellation = await watchProcessingUpload(ctx, data, upstream);
+    const signal = cancellation.signal;
     const input = join(directory, "input"),
       outputPath = join(directory, "output.jpg");
     await copyVerified(
@@ -177,9 +184,12 @@ export async function deriveAvatar(
       source.blob.sha256,
       signal,
     );
+    await cancellation.check(); signal.throwIfAborted();
     const output = await processAvatar(input, outputPath, signal);
+    outputClaimStarted = true;
     const claim = await claimAvatarOutput(ctx, data, source, output);
-    if (!claim || claim.kind === "ready") return;
+    if (!claim) { outputClaimStarted = false; return; }
+    if (claim.kind === "ready") return;
     const object = claim.object;
     const existing = await ctx.driver.head({
       bucket: "derived",
@@ -231,8 +241,10 @@ export async function deriveAvatar(
     }
     throw error;
   } finally {
+    cancellation?.stop();
     try {
       if (directory) await rm(directory, { recursive: true, force: true });
+      if (source && !outputClaimStarted) await releaseRecipeComputation(ctx, source);
     } finally {
       deriving = false;
     }

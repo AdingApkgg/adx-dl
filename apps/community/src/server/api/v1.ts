@@ -6,6 +6,7 @@ import { avatarRoutes } from "./avatar";
 import { uploadRoutes } from "./uploads";
 import { meRoutes } from "./me";
 import { userRoutes } from "./users";
+import { chartRoutes } from "./charts";
 
 // 必须链式定义：Hono RPC 从链式调用的返回类型里推导出每个接口的类型。
 export const apiV1 = new Hono<AppEnv>()
@@ -15,6 +16,7 @@ export const apiV1 = new Hono<AppEnv>()
   .route("/uploads", uploadRoutes)
   .route("/files", fileRoutes)
   .route("/me/avatar", avatarRoutes)
+  .route("/me/charts", chartRoutes)
   .route("/me", meRoutes)
   // 个人主页的公开资料（spec 第 10.5 节），不要求登录。
   .route("/users", userRoutes);

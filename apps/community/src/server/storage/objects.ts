@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import {
   blobs,
   blobDerivatives,
@@ -16,6 +16,9 @@ import { objectKey } from "./keys";
 import { lockStorageAdmission, withStorageTransaction } from "./transactions";
 import { lockUploadAccounting, storageTime } from "./usage";
 import { assertStorageNamespace } from "../../worker/storage-delete";
+import type { StoragePurpose } from "@/shared/storage";
+import { purposeRule } from "./rules";
+import { recipeBuildFor } from "../charts/recipe";
 
 type Session = typeof uploadSessions.$inferSelect;
 type BlobRow = typeof blobs.$inferSelect;
@@ -236,9 +239,18 @@ export async function claimAvatarRecipe(
   ctx: StorageContext,
   data: StorageJobData,
 ): Promise<RecipeClaim | null> {
+  return claimRecipe(ctx,data,"avatar");
+}
+export async function claimRecipe(
+  ctx: StorageContext,
+  data: StorageJobData,
+  purpose: StoragePurpose,
+): Promise<RecipeClaim | null> {
+  const rule = purposeRule(purpose);
+  const build = recipeBuildFor(ctx,purpose);
   return withProcessingUpload(ctx, data, async ({ tx, session, file, now }) => {
     if (session.expiresAt <= now) throw new StorageError(410, "UPLOAD_EXPIRED");
-    if (session.purpose !== "avatar")
+    if (session.purpose !== purpose || file.purpose !== purpose)
       throw new StorageError(400, "PURPOSE_NOT_AVAILABLE");
     if (
       (
@@ -259,8 +271,8 @@ export async function claimAvatarRecipe(
       .insert(blobDerivatives)
       .values({
         sourceBlobId: blob.id,
-        recipe: "avatar-v1",
-        recipeBuild: ctx.config.recipeBuild,
+        recipe: rule.recipe,
+        recipeBuild: build,
       })
       .onConflictDoNothing();
     const [recipe] = await tx
@@ -269,14 +281,14 @@ export async function claimAvatarRecipe(
       .where(
         and(
           eq(blobDerivatives.sourceBlobId, blob.id),
-          eq(blobDerivatives.recipe, "avatar-v1"),
-          eq(blobDerivatives.recipeBuild, ctx.config.recipeBuild),
+          eq(blobDerivatives.recipe, rule.recipe),
+          eq(blobDerivatives.recipeBuild, build),
         ),
       )
       .for("update");
     if (recipe.state === "ready") return { blob, recipe };
     if (recipe.state === "rejected")
-      throw new StorageError(400, recipe.errorCode ?? "IMAGE_INVALID");
+      throw new StorageError(400, recipe.errorCode ?? (purpose === "avatar" ? "IMAGE_INVALID" : "CHART_PACKAGE_INVALID"));
     if (
       recipe.state === "retired" ||
       (recipe.leaseUntil && recipe.leaseUntil > now)
@@ -297,6 +309,25 @@ export type DerivedClaim = {
   kind: "ready" | "writer";
   object: typeof derivedObjects.$inferSelect;
 };
+/** Release only our completed local computation, before any output claim/remote write.
+ * An uncertain physical output lease must remain available to reconciliation.
+ */
+export async function releaseRecipeComputation(ctx: StorageContext, source: RecipeClaim): Promise<void> {
+  if (source.recipe.state !== "pending" || !source.recipe.leaseUntil || source.recipe.derivedObjectId) return;
+  const leaseUntil = source.recipe.leaseUntil;
+  await ctx.db.transaction(async tx => {
+    await lockStorageAdmission(tx);
+    await tx.select({id:blobs.id}).from(blobs).where(eq(blobs.id,source.blob.id)).for("update");
+    await tx.update(blobDerivatives).set({leaseUntil:null}).where(and(
+      eq(blobDerivatives.id,source.recipe.id),
+      eq(blobDerivatives.sourceBlobId,source.blob.id),
+      eq(blobDerivatives.state,"pending"),
+      eq(blobDerivatives.generation,source.recipe.generation),
+      eq(blobDerivatives.leaseUntil,leaseUntil),
+      isNull(blobDerivatives.derivedObjectId),
+    ));
+  });
+}
 /** Never replaces an uncertain charge; source/recipe and physical generations are independent. */
 export async function claimAvatarOutput(
   ctx: StorageContext,
@@ -304,10 +335,31 @@ export async function claimAvatarOutput(
   source: RecipeClaim,
   output: { hash: string; size: number },
 ): Promise<DerivedClaim | null> {
+  return claimRecipeOutput(ctx,data,source,{...output,mime:"image/jpeg"});
+}
+export type RecipeOutput = {hash:string;size:number;mime:string;properties?:Record<string,unknown>};
+function canonical(value: unknown): string {
+  if(Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if(value && typeof value === "object") return `{${Object.keys(value).sort().map(k=>`${JSON.stringify(k)}:${canonical((value as Record<string,unknown>)[k])}`).join(",")}}`;
+  return JSON.stringify(value) ?? "null";
+}
+export async function claimRecipeOutput(
+  ctx: StorageContext,
+  data: StorageJobData,
+  source: RecipeClaim,
+  output: RecipeOutput,
+): Promise<DerivedClaim | null> {
+  const purpose: StoragePurpose = source.recipe.recipe === "avatar-v1" ? "avatar" : "chart-source";
+  const rule = purposeRule(purpose);
+  if(source.recipe.recipe !== rule.recipe || output.size < 1 || output.size > rule.maxOutputSize ||
+    output.mime !== rule.outputMime || !/^[a-f0-9]{64}$/.test(output.hash) ||
+    (purpose === "chart-source" && !output.properties?.chartPreview))
+    throw new StorageError(503,"STORAGE_INCONSISTENT");
   return withProcessingUpload(
     ctx,
     data,
     async ({ tx, session, file, accounting: { budget }, now }) => {
+      if (session.purpose !== purpose || file.purpose !== purpose) throw new StorageError(400,"PURPOSE_NOT_AVAILABLE");
       if (session.expiresAt <= now)
         throw new StorageError(410, "UPLOAD_EXPIRED");
       if (
@@ -315,7 +367,7 @@ export async function claimAvatarOutput(
           await tx
             .select()
             .from(blobBlocks)
-            .where(eq(blobBlocks.sha256, session.expectedSha256))
+            .where(sql`${blobBlocks.sha256} in (${session.expectedSha256},${output.hash})`)
         ).length
       )
         throw new StorageError(400, "HASH_BLOCKED");
@@ -332,6 +384,9 @@ export async function claimAvatarOutput(
         .for("update");
       if (
         recipe.state !== "pending" ||
+        recipe.sourceBlobId !== blob.id ||
+        recipe.recipe !== rule.recipe ||
+        recipe.recipeBuild !== recipeBuildFor(ctx,purpose) ||
         recipe.generation !== source.recipe.generation ||
         !recipe.leaseUntil ||
         recipe.leaseUntil <= now
@@ -342,7 +397,8 @@ export async function claimAvatarOutput(
         .values({
           outputSha256: output.hash,
           size: output.size,
-          mime: "image/jpeg",
+          mime: output.mime,
+          properties: output.properties ?? {},
           policyId: blob.policyId,
           key: objectKey(output.hash),
         })
@@ -354,7 +410,8 @@ export async function claimAvatarOutput(
         .for("update");
       if (
         object.size !== output.size ||
-        object.mime !== "image/jpeg" ||
+        object.mime !== output.mime ||
+        (purpose === "chart-source" && canonical(object.properties.chartPreview) !== canonical(output.properties?.chartPreview)) ||
         object.policyId !== blob.policyId
       )
         throw new StorageError(503, "STORAGE_INCONSISTENT");
@@ -407,11 +464,19 @@ export async function publishAvatarOutput(
   source: RecipeClaim,
   claim: DerivedClaim,
 ): Promise<boolean> {
+  return publishRecipeOutput(ctx,data,source,claim);
+}
+export async function publishRecipeOutput(
+  ctx: StorageContext,
+  data: StorageJobData,
+  source: RecipeClaim,
+  claim: DerivedClaim,
+): Promise<boolean> {
   return (
     (await withProcessingSettlement(
       ctx,
       data,
-      {kind:"avatar",source,output:claim},
+      {kind:"derived",source,output:claim},
       async ({ tx, session, file, accounting: { budget }, now }) => {
         if (session.expiresAt <= now) return false;
         if (
@@ -419,7 +484,7 @@ export async function publishAvatarOutput(
             await tx
               .select()
               .from(blobBlocks)
-              .where(eq(blobBlocks.sha256, session.expectedSha256))
+              .where(sql`${blobBlocks.sha256} in (${session.expectedSha256},${claim.object.outputSha256})`)
           ).length
         )
           return false;
@@ -501,7 +566,7 @@ async function withProcessingSettlement<T>(
   data: StorageJobData,
   proof:
     | { kind: "original"; original: OriginalClaim }
-    | { kind: "avatar"; source: RecipeClaim; output: DerivedClaim },
+    | { kind: "derived"; source: RecipeClaim; output: DerivedClaim },
   fn: (locked: ProcessingUpload) => Promise<T>,
 ): Promise<T | null> {
   const [snapshot] = await ctx.db
@@ -574,8 +639,10 @@ async function withProcessingSettlement<T>(
         if (
           recipe?.state !== "pending" ||
           recipe.sourceBlobId !== blob.id ||
-          recipe.recipe !== "avatar-v1" ||
-          recipe.recipeBuild !== ctx.config.recipeBuild ||
+          recipe.recipe !== purposeRule(session.purpose).recipe ||
+          recipe.recipe !== proof.source.recipe.recipe ||
+          recipe.recipeBuild !== recipeBuildFor(ctx,session.purpose) ||
+          recipe.recipeBuild !== proof.source.recipe.recipeBuild ||
           recipe.derivedObjectId !== output?.id ||
           proof.output.kind !== "writer" ||
           recipe.generation !== proof.source.recipe.generation ||
@@ -588,13 +655,15 @@ async function withProcessingSettlement<T>(
           output.outputSha256 !== proof.output.object.outputSha256 ||
           output.size !== proof.output.object.size ||
           output.key !== proof.output.object.key ||
-          output.mime !== "image/jpeg" ||
+          output.mime !== purposeRule(session.purpose).outputMime ||
+          output.mime !== proof.output.object.mime ||
+          (session.purpose === "chart-source" && canonical(output.properties.chartPreview) !== canonical(proof.output.object.properties.chartPreview)) ||
           !output.leaseUntil ||
           output.leaseUntil <= now
         )
           return null;
       }
-      if (proof.kind === "avatar")
+      if (proof.kind === "derived")
         await assertStorageNamespace(tx, ctx, proof.output.object.policyId, "derived");
       return fn({ tx, session, file, accounting, now });
     });

@@ -6,14 +6,19 @@ import { blobs, uploadParts } from "../server/db/schema";
 import type { StorageContext, StorageJobData } from "../server/storage/contracts";
 import { StorageError, StorageUnavailableError } from "../server/storage/errors";
 import { claimOriginal, publishOriginal, withProcessingUpload } from "../server/storage/objects";
-import { AVATAR_RULE } from "../server/storage/rules";
+import { purposeRule } from "../server/storage/rules";
+import type { StoragePurpose } from "@/shared/storage";
 import { rejectUpload } from "../server/storage/uploads";
 import { checkStorageDisk } from "../server/storage/usage";
 
 type Source = { key: string; size: number; sha256: string };
 /** Recognition only. Task5 performs bounded container/animation checks and complete decoding. */
-export function originalMime(header: Uint8Array): string {
+export function originalMime(header: Uint8Array, purpose: StoragePurpose = "avatar"): string {
   const b = Buffer.from(header);
+  if (purpose === "chart-source") {
+    if(b.length >= 4 && (b.readUInt32LE(0) === 0x04034b50 || b.readUInt32LE(0) === 0x06054b50)) return "application/zip";
+    throw new StorageError(422,"CHART_PACKAGE_INVALID");
+  }
   if (b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return "image/png";
   if (b.length >= 3 && b[0] === 255 && b[1] === 216 && b[2] === 255) return "image/jpeg";
   if (
@@ -48,6 +53,7 @@ async function assemble(
   expectedSize: number,
   expectedHash: string,
   signal: AbortSignal,
+  purpose: StoragePurpose = "avatar",
 ) {
   const output = await open(path, "wx", 0o600);
   const fullHash = createHash("sha256");
@@ -93,7 +99,7 @@ async function assemble(
     }
     if (total !== expectedSize || fullHash.digest("hex") !== expectedHash)
       throw new StorageError(400, "HASH_MISMATCH");
-    return originalMime(header.subarray(0, headerSize));
+    return originalMime(header.subarray(0, headerSize),purpose);
   } finally {
     await output.close();
   }
@@ -107,6 +113,7 @@ const permanent = new Set([
   "HASH_BLOCKED",
   "UPLOAD_EXPIRED",
   "UPLOAD_INCOMPLETE",
+  "CHART_PACKAGE_INVALID",
 ]);
 let running = false;
 /** The media process admits one ingest; lease CAS remains the protection across restarts/processes. */
@@ -127,8 +134,7 @@ export async function ingestUpload(ctx: StorageContext, data: StorageJobData): P
   try {
     const { session, blob, parts, now } = snapshot;
     if (session.expiresAt <= now) throw new StorageError(410, "UPLOAD_EXPIRED");
-    if (session.purpose !== "avatar") throw new StorageError(400, "PURPOSE_NOT_AVAILABLE");
-    if (session.expectedSize > AVATAR_RULE.maxSize) throw new StorageError(413, "FILE_TOO_LARGE");
+    if (session.expectedSize > purposeRule(session.purpose).maxSize) throw new StorageError(413, "FILE_TOO_LARGE");
     const instant = parts.length === 0 && blob.state === "ready";
     if (
       !instant &&
@@ -156,6 +162,7 @@ export async function ingestUpload(ctx: StorageContext, data: StorageJobData): P
       session.expectedSize,
       session.expectedSha256,
       signal,
+      session.purpose,
     );
     const claim = await claimOriginal(ctx, data);
     if (!claim || claim.kind === "ready") return;
@@ -171,6 +178,7 @@ export async function ingestUpload(ctx: StorageContext, data: StorageJobData): P
           claim.blob.size,
           claim.blob.sha256,
           signal,
+          session.purpose,
         );
         if (recoveredMime !== mime) throw new StorageUnavailableError();
       } catch (error) {

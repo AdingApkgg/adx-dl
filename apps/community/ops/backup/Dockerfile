@@ -5,6 +5,7 @@ COPY package.json bun.lock ./
 COPY apps/community/package.json apps/community/
 COPY packages/ui/package.json packages/ui/
 COPY packages/tsconfig/package.json packages/tsconfig/
+COPY packages/maimai-chart-engine/package.json packages/maimai-chart-engine/
 COPY patches/ patches/
 RUN bun install --frozen-lockfile --filter community
 COPY apps/community/project.inlang/settings.json /repo/apps/community/project.inlang/
@@ -18,6 +19,7 @@ COPY package.json bun.lock ./
 COPY apps/community/package.json apps/community/
 COPY packages/ui/package.json packages/ui/
 COPY packages/tsconfig/package.json packages/tsconfig/
+COPY packages/maimai-chart-engine/package.json packages/maimai-chart-engine/
 COPY patches/ patches/
 RUN bun install --frozen-lockfile --production --filter community
 
@@ -27,6 +29,7 @@ COPY --from=dependencies /usr/local/bin/bun /usr/local/bin/bun
 COPY --from=dependencies /repo /repo
 COPY --from=restic /usr/bin/restic /usr/local/bin/restic
 COPY packages/tsconfig/base.json /repo/packages/tsconfig/
+COPY packages/maimai-chart-engine/src /repo/packages/maimai-chart-engine/src
 COPY apps/community/tsconfig.json /repo/apps/community/
 COPY apps/community/src /repo/apps/community/src
 COPY --from=translations /repo/apps/community/src/paraglide /repo/apps/community/src/paraglide

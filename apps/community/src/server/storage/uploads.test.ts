@@ -110,6 +110,11 @@ test("ownership, inactive users, quota, budget and global cap fail without sessi
   });
   const next = await owner();
   await ctx.db.insert(storageUsage).values({ userId: next, usedBytes: 33554432 });
+  const quotaHash = createHash("sha256").update(next).digest("hex");
+  const [quotaBlob] = await ctx.db.insert(blobs).values({sha256:quotaHash,size:33554432,
+    policyId:fixturePolicies[0],key:`sha256/${quotaHash}`,state:"ready",detectedMime:"image/png",verifiedAt:new Date()}).returning();
+  await ctx.db.insert(files).values({ownerId:next,blobId:quotaBlob.id,purpose:"avatar",
+    originalName:"quota.png",size:33554432,state:"ready"});
   await expect(initUpload(ctx, next, input(), crypto.randomUUID())).rejects.toMatchObject({
     code: "QUOTA_EXCEEDED",
   });

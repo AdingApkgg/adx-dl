@@ -10,6 +10,7 @@ COPY package.json bun.lock ./
 COPY apps/community/package.json apps/community/
 COPY packages/ui/package.json packages/ui/
 COPY packages/tsconfig/package.json packages/tsconfig/
+COPY packages/maimai-chart-engine/package.json packages/maimai-chart-engine/
 COPY patches/ patches/
 RUN bun install --frozen-lockfile --filter community
 # 只按白名单复制源码，不整目录复制，避免把 .env 带进镜像层。
@@ -23,6 +24,7 @@ COPY apps/community/ops/seaweed/*.ts apps/community/ops/seaweed/
 COPY packages/tsconfig/base.json packages/tsconfig/
 COPY packages/ui/tsconfig.json packages/ui/
 COPY packages/ui/src packages/ui/src
+COPY packages/maimai-chart-engine/src packages/maimai-chart-engine/src
 WORKDIR /repo/apps/community
 # 构建时 Vite 插件把文案编译进 src/paraglide/，插件从 node_modules 加载，不连 CDN。
 RUN bun run build
@@ -37,6 +39,7 @@ COPY package.json bun.lock ./
 COPY apps/community/package.json apps/community/
 COPY packages/ui/package.json packages/ui/
 COPY packages/tsconfig/package.json packages/tsconfig/
+COPY packages/maimai-chart-engine/package.json packages/maimai-chart-engine/
 COPY patches/ patches/
 RUN bun install --frozen-lockfile --production --filter community
 COPY --from=builder /repo/apps/community/build apps/community/build
@@ -47,6 +50,7 @@ COPY apps/community/tsconfig.json apps/community/
 # 上面的 tsconfig 继承 @astrodx/tsconfig（在 dependencies 里，bun install 链接了它），它的 base.json 也要在。
 COPY packages/tsconfig/base.json packages/tsconfig/
 COPY --from=builder /repo/apps/community/src apps/community/src
+COPY packages/maimai-chart-engine/src packages/maimai-chart-engine/src
 COPY apps/community/ops/backup/*.ts apps/community/ops/backup/
 COPY apps/community/ops/seaweed/*.ts apps/community/ops/seaweed/
 WORKDIR /repo/apps/community

@@ -24,6 +24,9 @@ import { StorageError } from "./errors";
 import { objectKey } from "./keys";
 import { processAvatar } from "../../media-worker/avatar";
 import { RECIPE_BUILD } from "../../media-worker/image-child";
+import { processChart } from "../../media-worker/chart-child";
+import { currentChartRecipeBuild, CHART_PREVIEW_MIME } from "../charts/recipe";
+import { chartManifestBytes, validateChartPreviewManifest } from "../charts/artifact";
 import { assertStorageNamespace } from "../../worker/storage-delete";
 import {
   type DerivedRebuildIntent,
@@ -81,7 +84,7 @@ async function claimRebuild(
       recipe.state !== "ready" ||
       recipe.sourceBlobId !== blob.id ||
       recipe.derivedObjectId !== output.id ||
-      recipe.recipe !== "avatar-v1" ||
+      recipe.recipe !== intent.recipe ||
       recipe.recipeBuild !== intent.recipeBuild ||
       output.state !== "ready" ||
       output.generation !== intent.generation ||
@@ -171,6 +174,8 @@ async function lockClaim(
     recipe?.state !== "ready" ||
     recipe.generation !== claim.recipeGeneration ||
     recipe.sourceBlobId !== blob.id ||
+    recipe.recipe !== claim.intent.recipe ||
+    recipe.recipeBuild !== claim.intent.recipeBuild ||
     recipe.derivedObjectId !== claim.output.id ||
     output?.state !== "ready" ||
     output.generation !== claim.output.generation ||
@@ -231,7 +236,7 @@ async function releaseUnwrittenRebuild(ctx: StorageContext, claim: RebuildClaim)
     if (blob?.state !== "ready" || blob.generation !== claim.sourceGeneration ||
       blob.sha256 !== claim.blob.sha256 || blob.key !== claim.blob.key || blob.policyId !== claim.blob.policyId ||
       recipe?.state !== "ready" || recipe.generation !== claim.recipeGeneration ||
-      recipe.recipe !== "avatar-v1" || recipe.recipeBuild !== claim.intent.recipeBuild ||
+      recipe.recipe !== claim.intent.recipe || recipe.recipeBuild !== claim.intent.recipeBuild ||
       recipe.sourceBlobId !== blob.id || recipe.derivedObjectId !== claim.output.id ||
       output?.state !== "ready" || output.generation !== claim.output.generation ||
       output.outputSha256 !== claim.output.outputSha256 || output.key !== claim.output.key || output.policyId !== claim.output.policyId ||
@@ -252,7 +257,7 @@ export async function rebuildDerivedIntent(
   if (
     ctx.config.role !== "media" ||
     ctx.config.recipeBuild !== RECIPE_BUILD ||
-    intent.recipeBuild !== RECIPE_BUILD
+    (intent.recipe === "avatar-v1" ? intent.recipeBuild !== RECIPE_BUILD : intent.recipeBuild !== currentChartRecipeBuild())
   )
     throw fail();
   const [snapshot] = await ctx.db
@@ -296,16 +301,24 @@ export async function rebuildDerivedIntent(
       directory,
       signal,
     );
-    const outputPath = join(directory, "output.jpg"),
-      result = await processAvatar(original.path, outputPath, signal, (state) => {
-        childUnreaped = state === "started";
-      });
+    const outputPath = join(directory, "output");
+    let result: { hash:string;size:number;mime:string };
+    if(intent.recipe === "chart-preview-v1") {
+      const inspection = await processChart(original.path,outputPath,signal);
+      const expected = validateChartPreviewManifest(claim.output.properties.chartPreview,claim.output.size);
+      if(!chartManifestBytes(expected).equals(chartManifestBytes(inspection.manifest))) throw fail();
+      result = {hash:inspection.artifact.sha256,size:inspection.artifact.size,mime:CHART_PREVIEW_MIME};
+    } else result = await processAvatar(original.path, outputPath, signal, (state) => {
+      childUnreaped = state === "started";
+    });
     if (result.hash !== claim.output.outputSha256) {
+      // Private chart summaries/assets are immutable; a missing recorded build stays closed.
+      if(intent.recipe === "chart-preview-v1") throw fail();
       // Drift allocates another physical claim; failures after this boundary remain conservatively owned.
       outputClaimStarted = true;
-      return await rebuildDrift(ctx, claim, result, outputPath, signal);
+      return await rebuildDrift(ctx, claim, {...result,mime:"image/jpeg"}, outputPath, signal);
     }
-    if (result.size !== claim.output.size) throw fail();
+    if (result.size !== claim.output.size || result.mime !== claim.output.mime) throw fail();
     // Recheck under the same owned physical claim before IO; no expired writer takeover.
     const valid = await withStorageTransaction(ctx.db, async (tx) => {
       await tx.select().from(storageBudget).where(eq(storageBudget.id, "global")).for("update");

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { hashChunks } from "../workers/file-hash";
 import { createUploadController, readUploadRecords, clearUploadRecords } from "./file-upload";
 import type { StorageApi } from "../queries/storage";
-import type { UploadDto } from "@/shared/storage";
+import type { StoragePurpose, UploadDto } from "@/shared/storage";
 
 class MemoryStorage {
   values = new Map<string, string>();
@@ -45,7 +45,7 @@ const originalWorker = globalThis.Worker;
 afterEach(() => {
   globalThis.Worker = originalWorker;
 });
-function fixture() {
+function fixture(purpose: StoragePurpose = "avatar") {
   globalThis.Worker = HashWorker as unknown as typeof Worker;
   const storage = new MemoryStorage();
   let upload = dto();
@@ -78,6 +78,7 @@ function fixture() {
     removeAvatar: async () => ({ image: null, avatarRevision: 2 }),
   };
   const controller = createUploadController({
+    purpose,
     api,
     userId: "alice",
     storage,
@@ -122,7 +123,7 @@ describe("upload controller", () => {
     expect(f.states.at(-1)?.phase).toBe("ready");
     const records = readUploadRecords(f.storage, "alice");
     expect(records).toHaveLength(1);
-    expect(Object.keys(records[0]!).sort()).toEqual(["expiry", "hash", "name", "size", "uploadId"]);
+    expect(Object.keys(records[0]!).sort()).toEqual(["expiry", "hash", "name", "purpose", "schemaVersion", "size", "uploadId"]);
     f.controller.forget(records[0]!.uploadId);
     expect(readUploadRecords(f.storage, "alice")).toEqual([]);
     f.controller.dispose();
@@ -278,5 +279,40 @@ test("late cancelled upload DELETE cannot reset a newer ready upload", async () 
   release();
   await cancel;
   expect(f.states.at(-1)?.phase).toBe("ready");
+  f.controller.dispose();
+});
+
+test("chart controller uses chart purpose and accepts a ready private summary without public preview", async () => {
+  const f = fixture("chart-source");
+  let purpose: StoragePurpose | undefined;
+  f.api.init = async (input) => { purpose = input.purpose; return dto(); };
+  f.api.file = async () => ({ id: "file", purpose: "chart-source", name: "chart.zip", size: 5242880,
+    state: "ready", createdAt: "", chart: { title: "Test", artist: "", maidataMd5Base64: "md5",
+      difficulties: [], warnings: [], audio: null, hasCover: false } });
+  await f.controller.start(new File([new Uint8Array(5 * 1024 * 1024)], "chart.zip", { type: "application/zip" }));
+  expect(purpose).toBe("chart-source");
+  expect(f.states.at(-1)?.phase).toBe("ready");
+  expect(readUploadRecords(f.storage, "alice")).toEqual([]);
+  expect(readUploadRecords(f.storage, "alice", "chart-source")[0]).toMatchObject({ schemaVersion: 2, purpose: "chart-source" });
+  f.controller.dispose();
+});
+
+test("recovery keeps old avatars separate from schema v2 chart records and preserves both purposes", async () => {
+  const f = fixture("chart-source");
+  const legacy = { uploadId: "old", name: "a.png", size: 1, hash, expiry: dto().expiresAt };
+  const chart = { ...legacy, schemaVersion: 2, purpose: "chart-source", uploadId: "chart", size: 20 * 1024 * 1024 };
+  f.storage.setItem("astrodx-uploads:alice", JSON.stringify([legacy, chart, { ...chart, schemaVersion: 3 }, { ...chart, purpose: "other" }]));
+  expect(readUploadRecords(f.storage, "alice").map((row) => row.uploadId)).toEqual(["old"]);
+  expect(readUploadRecords(f.storage, "alice", "chart-source").map((row) => row.uploadId)).toEqual(["chart"]);
+  f.controller.forget("chart");
+  expect(readUploadRecords(f.storage, "alice").map((row) => row.uploadId)).toEqual(["old"]);
+  f.controller.dispose();
+});
+
+test("chart resume cannot adopt a legacy avatar record", async () => {
+  const f = fixture("chart-source");
+  await f.controller.resume(new File(["x"], "a.zip"), { uploadId: "old", name: "a", size: 1, hash, expiry: dto().expiresAt });
+  expect(f.parts).toEqual([]);
+  expect(f.states.at(-1)?.phase).toBe("error");
   f.controller.dispose();
 });

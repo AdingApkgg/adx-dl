@@ -47,6 +47,7 @@ export type StorageConfigBase = {
   tempDir: string;
   capacityDir?: string;
   recipeBuild: string;
+  chartRecipeBuild?: string;
   limits: {
     temporaryBudget: number;
     originalBudget: number;

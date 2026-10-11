@@ -1,4 +1,4 @@
-import { Note, SlideNote, AudioConfig } from "../../types";
+import type { Note, SlideNote, AudioConfig } from "../../types";
 import { ANSWER_SOUND_BASE_OFFSET_MS } from "../../utils/constants";
 import { getAudioContextOutputTime } from "./audioClock";
 

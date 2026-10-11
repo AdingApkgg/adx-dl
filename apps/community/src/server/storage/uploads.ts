@@ -1,6 +1,6 @@
 import { fromDrizzle, type PgBoss } from "pg-boss";
 import { MEDIA_AVATAR_QUEUE, STORAGE_FINALIZE_QUEUE } from "../jobs/queues";
-import { enqueueStorageFlow } from "./flow";
+import { enqueueStorageFlow, storageFlowQueues } from "./flow";
 import { ensureOriginal, withProcessingUpload } from "./objects";
 import { createHash } from "node:crypto";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -9,9 +9,11 @@ import { blobs, blobBlocks, files, storageUsage, uploadParts, uploadSessions } f
 import type { DbTransaction, StorageContext, StorageJobData } from "./contracts";
 import { StorageError } from "./errors";
 import { normalizeOriginalName } from "./keys";
-import { AVATAR_RULE, STORAGE_LIMITS } from "./rules";
+import { purposeRule, STORAGE_LIMITS } from "./rules";
+import { usageByPurpose } from "../charts/upload-rules";
 import { withStorageTransaction } from "./transactions";
 import { checkStorageDisk, lockUploadAccounting, storageTime } from "./usage";
+import { cancelStorageFlow } from "./deletion";
 export const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const SHA256_PATTERN = /^[0-9a-f]{64}$/;
@@ -83,7 +85,8 @@ export async function initUpload(
   input: InitUploadInput,
   idempotencyKey: string,
 ): Promise<UploadDto> {
-  if (input?.purpose !== "avatar") throw new StorageError(400, "PURPOSE_NOT_AVAILABLE");
+  if (input?.purpose !== "avatar" && input?.purpose !== "chart-source") throw new StorageError(400, "PURPOSE_NOT_AVAILABLE");
+  const rule = purposeRule(input.purpose);
   if (
     !Number.isSafeInteger(input.size) ||
     input.size < 1 ||
@@ -93,7 +96,7 @@ export async function initUpload(
     !UUID_PATTERN.test(idempotencyKey)
   )
     throw new StorageError(400, "INVALID_UPLOAD");
-  if (input.size > AVATAR_RULE.maxSize) throw new StorageError(413, "FILE_TOO_LARGE");
+  if (input.size > rule.maxSize) throw new StorageError(413, "FILE_TOO_LARGE");
   let name: string;
   try {
     name = normalizeOriginalName(input.name);
@@ -122,7 +125,8 @@ export async function initUpload(
     }
     if ((await tx.select().from(blobBlocks).where(eq(blobBlocks.sha256, input.sha256))).length)
       throw new StorageError(400, "HASH_BLOCKED");
-    if (usage.usedBytes + usage.reservedBytes + input.size > AVATAR_RULE.quota)
+    const purposeUsage = await usageByPurpose(tx,userId,input.purpose);
+    if (purposeUsage.usedBytes + purposeUsage.reservedBytes + input.size > rule.quota)
       throw new StorageError(409, "QUOTA_EXCEEDED");
     const active = await tx.execute<{ n: string }>(
       sql`select count(*) as n from upload_sessions where state in ('receiving','processing')`,
@@ -150,8 +154,8 @@ export async function initUpload(
         originalName: name,
         expectedSha256: input.sha256,
         expectedSize: input.size,
-        partSize: AVATAR_RULE.partSize,
-        partCount: Math.ceil(input.size / AVATAR_RULE.partSize),
+        partSize: rule.partSize,
+        partCount: Math.ceil(input.size / rule.partSize),
         expiresAt: new Date(now.getTime() + STORAGE_LIMITS.uploadTtlMs),
         reservedBytes: input.size,
         idempotencyKey,
@@ -201,6 +205,10 @@ export async function cancelUpload(ctx: StorageContext, userId: string, id: stri
     if (row.state === "ready") throw new StorageError(409, "UPLOAD_ALREADY_COMPLETED");
     if (["cancelled", "expired", "rejected"].includes(row.state)) return;
     const now = await storageTime(tx);
+    await cancelStorageFlow(await ctx.boss(), tx, row.flowJobIds, row.purpose);
+    if (row.fileId) await tx.update(files)
+      .set({ state: "rejected", retainedUntil: new Date(now.getTime() + 86400000) })
+      .where(and(eq(files.id, row.fileId), eq(files.state, "processing")));
     await tx
       .update(uploadSessions)
       .set({
@@ -245,7 +253,7 @@ async function beginProcessing(
   const flowJobIds = await enqueueStorageFlow(boss, tx, {
     uploadId: row.id,
     generation: row.generation,
-  });
+  },row.purpose);
   const [processing] = await tx
     .update(uploadSessions)
     .set({ state: "processing", fileId: file.id, flowJobIds, updatedAt: now })
@@ -328,7 +336,7 @@ export async function rejectUpload(
         .where(eq(storageUsage.userId, session.ownerId));
       const db = fromDrizzle(tx, sql);
       if (session.flowJobIds[1])
-        await boss.cancel(MEDIA_AVATAR_QUEUE, session.flowJobIds[1], { db });
+        await boss.cancel(storageFlowQueues(session.purpose)[1], session.flowJobIds[1], { db });
       if (session.flowJobIds[2])
         await boss.cancel(STORAGE_FINALIZE_QUEUE, session.flowJobIds[2], { db });
     },

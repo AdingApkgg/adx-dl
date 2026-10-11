@@ -1,5 +1,5 @@
-import { BaseRenderer, RenderContext } from "./BaseRenderer";
-import {
+import { BaseRenderer, type RenderContext } from "./BaseRenderer";
+import type {
   SlideNote,
   SlideSegment,
   Point2D,

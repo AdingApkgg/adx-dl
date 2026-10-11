@@ -1,8 +1,10 @@
 import { ApiError } from "@/shared/api-client";
-import type { FileDto, UploadDto } from "@/shared/storage";
+import type { FileDto, StoragePurpose, UploadDto } from "@/shared/storage";
 import type { StorageApi } from "../queries/storage";
 
 export type UploadRecord = {
+  schemaVersion?: 2;
+  purpose?: StoragePurpose;
   uploadId: string;
   name: string;
   size: number;
@@ -27,7 +29,7 @@ export type UploadController = {
 const keyFor = (id: string) => `astrodx-uploads:${id}`;
 const active = new Map<string, Set<() => void>>();
 
-export function readUploadRecords(storage: RecoveryStorage, userId: string): UploadRecord[] {
+export function readUploadRecords(storage: RecoveryStorage, userId: string, purpose: StoragePurpose = "avatar"): UploadRecord[] {
   try {
     const value: unknown = JSON.parse(storage.getItem(keyFor(userId)) ?? "[]");
     if (!Array.isArray(value)) return [];
@@ -39,11 +41,16 @@ export function readUploadRecords(storage: RecoveryStorage, userId: string): Upl
           typeof r.name === "string" &&
           Number.isSafeInteger(r.size) &&
           r.size > 0 &&
-          r.size <= 8_388_608 &&
+          (r.schemaVersion === undefined
+            ? purpose === "avatar" && (r.purpose === undefined || r.purpose === "avatar")
+            : r.schemaVersion === 2 && r.purpose === purpose) &&
+          r.size <= (purpose === "avatar" ? 8_388_608 : 67_108_864) &&
           /^[a-f0-9]{64}$/.test(r.hash) &&
           Date.parse(r.expiry) > Date.now(),
       )
       .map(({ uploadId, name, size, hash, expiry }) => ({
+        schemaVersion: 2,
+        purpose,
         uploadId,
         name,
         size,
@@ -106,11 +113,13 @@ export function createUploadController({
   userId,
   storage,
   onState,
+  purpose = "avatar",
 }: {
   api: StorageApi;
   userId: string;
   storage: RecoveryStorage;
   onState: (state: UploadSnapshot) => void;
+  purpose?: StoragePurpose;
 }): UploadController {
   let generation = 0;
   let disposed = false;
@@ -126,7 +135,8 @@ export function createUploadController({
   const current = (g: number) => !disposed && g === generation && !aborter?.signal.aborted;
   const records = (record?: UploadRecord, removeId?: string) => {
     try {
-      const rows = readUploadRecords(storage, userId).filter((r) => r.uploadId !== (record?.uploadId ?? removeId));
+      const rows = [...readUploadRecords(storage, userId, "avatar"), ...readUploadRecords(storage, userId, "chart-source")]
+        .filter((r) => r.uploadId !== (record?.uploadId ?? removeId));
       if (record) rows.push(record);
       storage.setItem(keyFor(userId), JSON.stringify(rows));
     } catch {
@@ -150,7 +160,8 @@ export function createUploadController({
     if (dto.state === "ready" && dto.fileId) {
       const file = await api.file(dto.fileId, signal);
       if (!current(g)) return;
-      if (file.state !== "ready" || !file.previewUrl) throw terminalError(dto);
+      if (file.state !== "ready" || file.purpose !== purpose || (purpose === "avatar" ? !file.previewUrl : !file.chart))
+        throw terminalError(dto);
       processing = undefined;
       emit({ phase: "ready", progress: 1, file, uploadId: dto.id }, g);
       return;
@@ -195,8 +206,9 @@ export function createUploadController({
     try {
       if (
         file.size < 1 ||
-        file.size > 8_388_608 ||
-        !["image/jpeg", "image/png", "image/webp", "image/avif"].includes(file.type)
+        file.size > (purpose === "avatar" ? 8_388_608 : 67_108_864) ||
+        (purpose === "avatar" && !["image/jpeg", "image/png", "image/webp", "image/avif"].includes(file.type)) ||
+        (record && ((record.purpose ?? "avatar") !== purpose || (purpose === "chart-source" && record.schemaVersion !== 2)))
       )
         throw new ApiError(400, "TYPE_NOT_ALLOWED", "Invalid image");
       emit({ phase: "hashing", progress: 0 }, g);
@@ -211,7 +223,7 @@ export function createUploadController({
         ? await api.upload(record.uploadId, signal)
         : await api.init(
             {
-              purpose: "avatar",
+              purpose,
               name: file.name,
               size: file.size,
               sha256: hash,
@@ -225,6 +237,8 @@ export function createUploadController({
       }
       uploadId = dto.id;
       records({
+        schemaVersion: 2,
+        purpose,
         uploadId: dto.id,
         name: file.name,
         size: file.size,

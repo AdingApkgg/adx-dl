@@ -33,6 +33,9 @@ import {
 import { notifyPublicMedia } from "./avatars";
 import { StorageError } from "./errors";
 import { storageTime } from "./usage";
+import { chartDeletionHandler } from "../charts/deletion";
+import { storageFlowQueues } from "./flow";
+import type { StoragePurpose } from "@/shared/storage";
 
 /** Existing lifecycle already owns user; pending owners are valid here, never for uploads. */
 export async function lockDeletionAccounting(tx: DbTransaction, userId: string) {
@@ -45,8 +48,8 @@ export async function lockDeletionAccounting(tx: DbTransaction, userId: string) 
   await tx.select().from(storageBudget).where(eq(storageBudget.id, "global")).for("update");
   return usage;
 }
-export async function cancelStorageFlow(boss: PgBoss, tx: DbTransaction, ids: string[]) {
-  const queues = [STORAGE_INGEST_QUEUE, MEDIA_AVATAR_QUEUE, STORAGE_FINALIZE_QUEUE];
+export async function cancelStorageFlow(boss: PgBoss, tx: DbTransaction, ids: string[], purpose: StoragePurpose = "avatar") {
+  const queues = storageFlowQueues(purpose);
   for (const [i, queue] of queues.entries())
     if (ids[i]) await boss.cancel(queue, ids[i], { db: fromDrizzle(tx, sql) });
 }
@@ -79,7 +82,7 @@ export async function stopStorageSessions(
         updatedAt: now,
       })
       .where(eq(uploadSessions.id, session.id));
-    await cancelStorageFlow(boss, tx, session.flowJobIds);
+    await cancelStorageFlow(boss, tx, session.flowJobIds, session.purpose);
   }
   if (sessions.length)
     await tx
@@ -310,14 +313,15 @@ export function createDeletionHandlers(
   business: readonly DeletionHandler[] = [],
   registry = FILE_REFERENCES,
 ): readonly DeletionHandler[] {
-  const names = new Set(business.map((h) => h.name));
-  if (names.size !== business.length || names.has("storage"))
+  const modules = business.some(h => h.name === "charts") ? business : [...business, chartDeletionHandler];
+  const names = new Set(modules.map((h) => h.name));
+  if (names.size !== modules.length || names.has("storage"))
     throw new Error("Duplicate deletion registration");
   names.add("storage");
   for (const reference of registry)
     if (!names.has(reference.deletionPartner))
       throw new Error("Missing file reference deletion partner");
-  return Object.freeze([...business, createStorageDeletionHandler(ctx, registry)]);
+  return Object.freeze([...modules, createStorageDeletionHandler(ctx, registry)]);
 }
 
 /** Retry only the user's CURRENT public association, never a captured old image/selection. */
