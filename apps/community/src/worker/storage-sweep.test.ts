@@ -180,7 +180,11 @@ test("cancel during revoking defers restoration until convergence and changed se
   expect(resumed).toContain(a.derived.outputSha256);
   await requestDeletion(deps, id, { deleteContent: false });
   await cancelDeletion(deps, id);
-  await setAvatar(ctx, id, { fileId: null, expectedRevision: 1 }, crypto.randomUUID());
+  expect((await ctx.db.select().from(userAvatars).where(eq(userAvatars.userId, id)))[0].revision).toBe(4);
+  await expect(
+    setAvatar(ctx, id, { fileId: null, expectedRevision: 1 }, crypto.randomUUID()),
+  ).rejects.toMatchObject({ code: "AVATAR_CHANGED" });
+  await setAvatar(ctx, id, { fileId: null, expectedRevision: 4 }, crypto.randomUUID());
   await ctx.db
     .update(mediaPublications)
     .set({ state: "private" })

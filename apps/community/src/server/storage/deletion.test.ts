@@ -160,7 +160,7 @@ test("shared output remains public and cancellation restores only avatar, never 
   expect((await row(user, one)).image).toBe(`/media/${a.derived.outputSha256}.jpg`);
   expect(
     (await ctx.db.select().from(userAvatars).where(eq(userAvatars.userId, one)))[0],
-  ).toMatchObject({ suspendedAt: null, revision: 1, fileId: a.file.id });
+  ).toMatchObject({ suspendedAt: null, revision: 3, fileId: a.file.id });
   expect(
     (await ctx.db.select().from(uploadSessions).where(eq(uploadSessions.id, upload.id)))[0].state,
   ).toBe("cancelled");

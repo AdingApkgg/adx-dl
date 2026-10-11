@@ -238,7 +238,10 @@ describe.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)(
             },
           },
         };
-        await deriveAvatar(ctx, a.data);
+        if (action === "cancel")
+          await expect(deriveAvatar(ctx, a.data)).rejects.toMatchObject({ code: "UPLOAD_CANCELLED" });
+        else
+          await deriveAvatar(ctx, a.data);
         await finalizeUpload(f.mediaCtx, a.data);
         const s = await session(a.dto.id);
         expect(s.state).not.toBe("ready");

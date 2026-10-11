@@ -349,7 +349,11 @@ test.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)(
       const readable = await app.request(`/media/${a.derived.outputSha256}.jpg`);
       expect(readable.status).toBe(200);
       expect(digest(new Uint8Array(await readable.arrayBuffer()))).toBe(a.derived.outputSha256);
-      await setAvatar(ctx, userId, { fileId: null, expectedRevision: 1 }, crypto.randomUUID());
+      expect((await ctx.db.select().from(userAvatars).where(eq(userAvatars.userId, userId)))[0].revision).toBe(3);
+      await expect(
+        setAvatar(ctx, userId, { fileId: null, expectedRevision: 1 }, crypto.randomUUID()),
+      ).rejects.toMatchObject({ code: "AVATAR_CHANGED" });
+      await setAvatar(ctx, userId, { fileId: null, expectedRevision: 3 }, crypto.randomUUID());
       expect(
         (await active.request("DELETE", "/api/v1/me/deletion", { headers: JSON_HEADERS })).status,
       ).toBe(200);
