@@ -11,7 +11,8 @@ export async function watchProcessingUpload(ctx: StorageContext, data: StorageJo
   let stopped = false, reading: Promise<void> | undefined;
   const check = (): Promise<void> => {
     if (stopped || signal.aborted) return Promise.resolve();
-    return reading ??= (async () => {
+    if (reading) return reading;
+    reading = (async () => {
       try {
         const query = {
           text: "select 1 from upload_sessions where id=$1 and generation=$2 and state='processing' and expires_at>clock_timestamp()",
@@ -23,6 +24,7 @@ export async function watchProcessingUpload(ctx: StorageContext, data: StorageJo
         if (!stopped) controller.abort(new StorageError(503, "STORAGE_BUSY", "STORAGE_BUSY", 1));
       } finally { reading = undefined; }
     })();
+    return reading;
   };
   await check();
   const timer = setInterval(() => { void check(); }, 250);

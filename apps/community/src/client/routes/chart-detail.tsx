@@ -46,7 +46,7 @@ function Detail({ id }: { id: string }) {
     const target = accountErrorRedirect(queryError, `${location.pathname}${location.search}`);
     if (target) window.location.assign(target);
   }, [queryError, location.pathname, location.search]);
-  useEffect(() => { if (chart && !metadataDirty.current) { setTitle(chart.title); setArtist(chart.artist); } }, [chart?.title, chart?.artist]);
+  useEffect(() => { if (chart && !metadataDirty.current) { setTitle(chart.title); setArtist(chart.artist); } }, [chart]);
   const refresh = async (updated?: ChartDto) => {
     if (updated) client.setQueryData(chartQuery(getBrowserApi(), id).queryKey, updated);
     await client.invalidateQueries({ queryKey: ["me", "charts"] });

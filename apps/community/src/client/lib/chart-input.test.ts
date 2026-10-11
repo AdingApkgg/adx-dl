@@ -10,6 +10,8 @@ test("folder packaging validates normalized paths and uses a stable order", () =
   expect(chartFolderEntries([file("track.mp3"), file("maidata.txt")]).map((row) => row.path)).toEqual(["maidata.txt", "track.mp3"]);
   expect(() => chartFolderEntries([file("../maidata.txt")])).toThrow();
   expect(() => chartFolderEntries([file("a\\b")])).toThrow();
+  for (const code of [0, 31, 127]) expect(() => chartFolderEntries([file(`a${String.fromCharCode(code)}b.txt`)])).toThrow();
+  expect(chartFolderEntries([file("a b.txt")])[0]?.path).toBe("a b.txt");
   expect(() => chartFolderEntries([file("é.txt"), file("e\u0301.txt")])).toThrow();
   expect(() => chartFolderEntries([file("A.txt"), file("a.txt")])).toThrow();
   expect(() => chartFolderEntries(Array.from({ length: 129 }, (_, index) => file(`${index}.txt`)))).toThrow();

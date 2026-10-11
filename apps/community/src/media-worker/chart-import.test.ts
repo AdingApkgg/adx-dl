@@ -86,7 +86,7 @@ describe.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH && !process.env.STORAGE_T
       const bytes = zipSync({"maidata.txt":strToU8(`&title=Navigator ${crypto.randomUUID()}\n&inote_4=(120){4}1,2,E`)},{level:0});
       const u = await upload(bytes);
       const deadline = Date.now()+20_000;
-      let result;
+      let result: Awaited<ReturnType<typeof getUpload>> | undefined;
       do {
         result = await getUpload(f.ctx,u.userId,u.dto.id);
         if(result.state === "ready" || result.state === "rejected") break;

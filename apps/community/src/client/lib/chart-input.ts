@@ -11,7 +11,7 @@ export function chartFolderEntries(files: readonly File[]): FolderFile[] {
     if (!file.webkitRelativePath) throw new ApiError(422, "CHART_FOLDER_UNSUPPORTED", "Choose a ZIP when directory paths are unavailable");
     const path = file.webkitRelativePath.normalize("NFC");
     const parts = path.split("/");
-    if (path.includes("\\") || /^[A-Za-z]:/.test(path) || /[\x00-\x1f\x7f]/.test(path) ||
+    if (path.includes("\\") || /^[A-Za-z]:/.test(path) || Array.from(path).some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127) ||
       parts.some((part) => !part || part === "." || part === "..") || parts.length > 8 || new TextEncoder().encode(path).length > 240)
       throw new ApiError(422, "CHART_PATH_INVALID", "Invalid folder path");
     const key = path.toLowerCase();

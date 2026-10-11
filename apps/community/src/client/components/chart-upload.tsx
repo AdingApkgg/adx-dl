@@ -44,7 +44,7 @@ export function ChartUpload({ userId, onSave }: { userId: string; onSave: (file:
     });
     controller.current = upload;
     return () => { lifecycle.current++; packaging.current?.abort(); upload.dispose(); controller.current = null; };
-  }, [userId]);
+  }, [userId, location.pathname, location.search]);
   const busy = packing || pending || ["hashing", "uploading", "processing"].includes(state.phase);
   async function choose(files: File[], folder: boolean) {
     if (!files.length) return;
