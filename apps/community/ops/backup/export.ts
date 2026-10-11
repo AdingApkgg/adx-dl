@@ -486,8 +486,14 @@ export async function withinDeadline<T>(fn: () => Promise<T>, signal: AbortSigna
 }
 
 if (import.meta.main) {
-  try { await (await import("./runtime")).runBackup(); }
-  catch { console.error("STORAGE_BACKUP_FAILED"); process.exitCode=1; }
+  // Finish evaluating before runtime imports this module through the coordinator.
+  // Awaiting here deadlocks the CLI after normal storage startup succeeds.
+  void import("./runtime")
+    .then((runtime) => runtime.runBackup())
+    .catch(() => {
+      console.error("STORAGE_BACKUP_FAILED");
+      process.exitCode = 1;
+    });
 }
 
 /** Current role ACKs do not erase ambiguous remote IO; retained durable claims veto a snapshot. */
