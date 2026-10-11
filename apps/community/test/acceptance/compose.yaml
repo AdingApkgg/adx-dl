@@ -50,6 +50,9 @@ services:
 
   seaweedfs:
     image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    # Keep the generated host-owned 0600 fixture readable without broadening permissions.
+    entrypoint: ["/usr/bin/weed"]
+    user: "0:0"
     cpus: 1
     mem_limit: 512m
     pids_limit: 256
@@ -110,6 +113,9 @@ services:
   restore-seaweedfs:
     profiles: [restore]
     image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    # Keep the generated host-owned 0600 fixture readable without broadening permissions.
+    entrypoint: ["/usr/bin/weed"]
+    user: "0:0"
     cpus: 1
     mem_limit: 512m
     pids_limit: 256
