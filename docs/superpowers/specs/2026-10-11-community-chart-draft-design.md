@@ -58,7 +58,7 @@
 
 community 中新增结构扫描器：提取 title、artist、first、lv_1…7 和完整多行 inote 块。缺少标题/艺术家允许保存，固有 summary 保留空字符串；上传摘要界面及创建 Chart 时才用本人 File.originalName 去 ZIP 扩展名、trim 并截至 120 字符作为默认标题，仍为空用 `Untitled`。上传文件名不进入 artifact/recipe 输入，因此同 ZIP 改名不会改变派生 hash。重复相同 key、重复 inote、inote 编号不在 1–7、无任何非空难度、非数值或非正 BPM/分拍返回拒绝。空难度忽略并警告；没有 inote 标记的单一谱面正文沿用难度 4，并警告 legacy 格式。标题/艺术家显示最多 120 字符；first 须是有限数值且绝对值不超过 3600 秒。
 
-复用纯核心 `getAvailableDifficulties` / `parseSimaiChart`，不引用 Web 的 Zustand、下载器或整个 chart-preview 组件。现有 Simai 解析器会默认 BPM 120、跳过未知 token；因此新增**可选诊断回调和结果资源界限**，旧的两参数调用行为不变。结构扫描通过但解析器发现未知 token、越界音符或缺少起始 BPM 时，原件可成为私有草稿，该难度标记 `previewSupported=false`，显示具体警告；不能把部分渲染说成完整有效谱面。
+复用纯核心 `getAvailableDifficulties` / `parseSimaiChart`，不引用 Web 的 Zustand、下载器或整个 chart-preview 组件。现有 workspace 名为 `@lxns-network/maimai-chart-engine`，新增只导出 ChartParser 的 `./parser` 子路径，社区作为直接 workspace 依赖；应用/备份镜像复制其清单和源码，服务端不导入含浏览器模块的根 barrel。现有 Simai 解析器会默认 BPM 120、跳过未知 token；因此新增**可选诊断回调和结果资源界限**，旧的两参数调用行为不变。结构扫描通过但解析器发现未知 token、越界音符或缺少起始 BPM 时，原件可成为私有草稿，该难度标记 `previewSupported=false`，显示具体警告；不能把部分渲染说成完整有效谱面。
 
 每难度最多 100000 个解析后音符，时间轴不超过 3600 秒，警告最多 64 条（超出合并为一条）。限制在解析过程中检查，失败返回 `CHART_COMPLEXITY_EXCEEDED`；不是先无界生成整个结果再计数。整个解析与资源处理都在上述受限子进程内完成。
 

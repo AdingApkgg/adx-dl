@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 源码基线 `codex/community-storage-design` / `3b0a580`，排除主工作区主站和 AWMC；开始产品代码前确认详细设计定稿。
+- 源码基线 `codex/community-storage-design` / `3b0a580`，排除主工作区主站和 AWMC；开始产品代码前确认详细设计定稿。谱面阶段同步白名单增补 tracked `packages/maimai-chart-engine`；头像阶段原镜像不因文档变化重建。
 - 本机只有轻量读写/Git/SSH；所有安装、迁移生成、fixture、构建、测试、预览在 `i@localhost-1.tailac9c6f.ts.net:/home/i/astrodx-community-storage-dev-20261011` 的 owned 容器中执行。远程不可用则停运行，不回退本机。
 - 源 ZIP 64 MiB，128 条目/128 MiB 实际展开，8 层/240 UTF-8 字节路径；maidata 1 MiB UTF-8，音频 32 MiB，封面输入 8 MiB/16 MP/8192 边，输出 1024 内 JPEG85/1 MiB，artifact 48 MiB/manifest 32 KiB。
 - 每人谱面 256 MiB/头像独立 32 MiB；未完成上传共享最多两个，4 MiB 分片。每人 50 草稿/每谱面 20 活版本。历史版本、未保存 ready File 和各 purpose reservation 正常计逻辑费用；零物理预留。
@@ -59,7 +59,7 @@
 
 ### Task 7: ZIP 包检查和 maidata 摘要
 
-**Files:** Create `src/server/charts/{package-validation,maidata-summary}.ts` 及同名 tests；Modify `packages/maimai-chart-engine/src/core/parser/SimaiParser.ts`（仓库根相对路径）、`apps/community/package.json`、根 `bun.lock`；按需要添加对应 engine 定向 test。
+**Files:** Create `src/server/charts/{package-validation,maidata-summary}.ts` 及同名 tests；Modify `packages/maimai-chart-engine/{package.json,src/core/parser/ChartParser.ts,src/core/parser/SimaiParser.ts}`（仓库根相对路径）、`apps/community/package.json`、`apps/community/Dockerfile`、`apps/community/ops/backup/Dockerfile`、根 `bun.lock`；按需要添加对应 engine 定向 test。
 
 **Interfaces:**
 - `summarizeMaidata(bytes:Uint8Array):ChartImportSummary`；audio=null/hasCover=false，完整包再填。
@@ -67,7 +67,7 @@
 - `parseSimaiChart(text,difficulty?,options?:{onDiagnostic?:(diagnostic:ParseDiagnostic)=>void;maxNotes?:number;maxDurationMs?:number})`；旧调用不设限/不收诊断，保持原来结果。
 - `ChartImportError={code:ChartImportErrorCode}`，码见 spec 第 7 节；包处理在 child 内调用，禁止 Web/main 请求进程直接执行完整解析。
 
-- [ ] 在远程固定 Bun 容器安装锁定 yauzl；一个小包确认文件式读取、真实 size/CRC、close/cancel。按依赖版本 API 实现，不调用 master 未确认的 Promise API；不能本机安装。
+- [ ] 在远程固定 Bun 容器安装锁定 yauzl，并登记 `@lxns-network/maimai-chart-engine:workspace:*`；新增package export `./parser -> ./src/core/parser/ChartParser.ts` 及诊断类型导出。应用/备份所有依赖安装阶段补清单，运行镜像补engine源码；纯服务端只用parser子路径。一个小包确认文件式读取、真实 size/CRC、close/cancel。按依赖版本 API 实现，不调用 master 未确认的 Promise API；不能本机安装。
 - [ ] 先写用例：NFC/大小写碰撞、包装目录、ambiguous/missing maidata、symlink/encryption、真实膨胀/CRC、取消；UTF-8 BOM/CRLF raw hash差异、多行1–7、重复/非法难度、非正 BPM、未知 token 的预览禁用。
 - [ ] 远程确认失败，再实现顺序中央目录/逐流计数与 CRC；拒绝 128 条目/128 MiB/路径超限，无界数据不落盘；只保留选中资产 scratch，其他条目验证后丢弃。
 - [ ] 实现独立结构扫描+可选 parser 诊断/资源限额；完整 raw bytes 先哈希再解码。缺失标题在固有 summary 留空，相同ZIP改外部名字输出仍一致，默认标题留File/Chart显示层。没有音频仅警告，不挡保存；未知 token 不伪装完整解析。
