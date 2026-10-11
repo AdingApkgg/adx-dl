@@ -1,0 +1,37 @@
+{
+  "log": { "level": "info", "timestamp": true },
+  "dns": {
+    "servers": [
+      {
+        "type": "https",
+        "tag": "cn-dns",
+        "server": "223.5.5.5",
+        "server_port": 443,
+        "path": "/dns-query",
+        "tls": { "enabled": true, "server_name": "dns.alidns.com" }
+      }
+    ],
+    "final": "cn-dns"
+  },
+  "inbounds": [
+    { "type": "mixed", "tag": "ci-local", "listen": "127.0.0.1", "listen_port": 11092 },
+    { "type": "mixed", "tag": "ci-docker", "listen": "172.17.0.1", "listen_port": 11092 }
+  ],
+  "outbounds": [
+    { "type": "direct", "tag": "direct", "domain_resolver": "cn-dns" },
+    { "type": "http", "tag": "upstream", "server": "127.0.0.1", "server_port": 11090 }
+  ],
+  "route": {
+    "rule_set": [
+      { "type": "local", "tag": "cn-domains", "format": "binary", "path": "/rules/geosite-cn.srs" },
+      { "type": "local", "tag": "cn-ips", "format": "binary", "path": "/rules/geoip-cn.srs" }
+    ],
+    "rules": [
+      { "ip_is_private": true, "action": "route", "outbound": "direct" },
+      { "rule_set": "cn-domains", "action": "route", "outbound": "direct" },
+      { "rule_set": "cn-ips", "action": "route", "outbound": "direct" }
+    ],
+    "final": "upstream",
+    "default_domain_resolver": "cn-dns"
+  }
+}

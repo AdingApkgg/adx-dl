@@ -36,7 +36,21 @@ Keep pull-request jobs on GitHub-hosted runners. The management command does not
 ./scripts/ci/runnerctl.sh add OWNER/REPO 02
 ```
 
-Calling `add` again for an existing instance starts the existing configuration without replacing its registration. The initial default branch plus `main`, `dev`, and `pre` are trusted; scheduled jobs are denied by default for newly added repositories. Review and explicitly update the instance's policy to add scheduled workflows or additional workflow filenames.
+Calling `add` again for an existing instance preserves its registration and caches. `add` and `start` regenerate Compose from the instance manifest and shared network settings, recreating both containers when that configuration changes; use them only while the runner is idle. The initial default branch plus `main`, `dev`, and `pre` are trusted; scheduled jobs are denied by default for newly added repositories. Review and explicitly update the instance's policy to add scheduled workflows or additional workflow filenames.
+
+## Shared network routing
+
+The installed CI egress service sends CN domains and literal CN IPs directly and other destinations through the existing proxy. Unknown domains use the proxy. Its setup, rule update commands, and actual routing checks are in [proxy/README.md](proxy/README.md).
+
+All repository instances read the following shared file on the remote host, `/home/i/.local/share/gha-runners/network.json`:
+
+```json
+{"proxy_url":"http://172.17.0.1:11092"}
+```
+
+The manager injects proxy variables into the runner and its private Docker daemon. Initialization also configures Docker CLI defaults, so job/service containers and Dockerfile `RUN` instructions inherit the proxy. Private/loopback destinations bypass it. Each DinD uses `10.240.0.1/24` and a `10.241.0.0/16` address pool, keeping the host bridge proxy reachable. Check route conflicts before installing on a different host.
+
+After editing shared settings, check GitHub's runner busy state and call `start OWNER/REPO` for each idle instance. `restart` only restarts the listener and does not refresh configuration. Removing `proxy_url` removes an unchanged default written by this manager, while preserving registry credentials, other Docker contexts, and administrator edits. This CI setup does not change the host Docker daemon's network configuration; host-level bootstrap image builds need a separately configured proxy. Administrative workstation Git/GitHub requests also need its working proxy environment.
 
 ## Installation and maintenance
 
@@ -50,7 +64,7 @@ Remote management lives under `/home/i/.local/share/gha-runners`. Every instance
 
 The local client creates a one-hour registration token and sends it on SSH stdin. Long-lived administrative GitHub credentials stay on the workstation. No registration token is written to manifests, Compose environment, source files, or task logs. Runner credentials issued by GitHub are stored only in that instance's private Docker state volume.
 
-The runner uses the official GitHub runner 2.338.0 image with Python, Compose, and the job admission hook added. It runs as UID 1001 without sudo or host-home/host-Docker-socket mounts. The runner shares only its private daemon's network namespace and workspace. DinD requires a privileged sidecar: this is isolation from accidental service/cache conflicts, not a VM-grade boundary against malicious privileged Docker workloads. Only trusted branch jobs are admitted; do not grant untrusted contributors push access to these branches or expose the daemon's port.
+The runner uses the official GitHub runner 2.338.0 image with Python, Compose, and the job admission hook added. It runs as UID 1001 without sudo or host-home/host-Docker-socket mounts. The runner shares its private daemon's network namespace, workspace, and tool cache; DinD sees runner state read-only so job containers can mount action executables. An initializer seeds fresh volumes before the daemon starts. DinD requires a privileged sidecar: this is isolation from accidental service/cache conflicts, not a VM-grade boundary against malicious privileged Docker workloads. Only trusted branch jobs are admitted; do not grant untrusted contributors push access to these branches or expose the daemon's port.
 
 The read-only policy and hook reject public PR events and unsupported workflows/refs before user steps. A rejected job terminates its own Runner.Worker; returning a failed hook alone would allow malicious `always()` steps. Persistent state is shared by trusted jobs within one repository. For stronger isolation from compromised trusted code, use a dedicated VM or replace persistent workers with fresh per-job environments.
 

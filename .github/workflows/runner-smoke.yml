@@ -78,3 +78,42 @@ jobs:
             ' sh "$probe_value"
           test "$(cat "$probe_dir/output")" = "$probe_value"
           printf 'Runner and Docker can read/write the same workspace volume.\n'
+
+  # GitHub 的 job container 还要能访问 /__w、/__e 和 /__t，不能只验证 docker run。
+  container_smoke:
+    if: contains(fromJSON('["refs/heads/main","refs/heads/dev","refs/heads/pre"]'), github.ref)
+    runs-on: [self-hosted, linux, x64, astrodx-ci]
+    timeout-minutes: 10
+    container: node:24-bookworm
+    steps:
+      - name: Checkout inside the job container
+        uses: actions/checkout@v7
+
+      - name: Setup Node inside the job container
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Check the job container workspace and tool cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const assert = require("node:assert/strict");
+          const fs = require("node:fs");
+          const path = require("node:path");
+
+          const workspace = process.env.GITHUB_WORKSPACE;
+          const toolCache = process.env.RUNNER_TOOL_CACHE;
+          assert.ok(workspace, "GITHUB_WORKSPACE is set");
+          assert.equal(toolCache, "/__t", "the job container sees the shared tool cache");
+          assert.ok(fs.readFileSync(path.join(workspace, "README.md"), "utf8").length > 0);
+          const manifest = JSON.parse(fs.readFileSync(path.join(workspace, "package.json"), "utf8"));
+          assert.equal(manifest.name, "astrodx");
+          fs.accessSync(toolCache, fs.constants.R_OK | fs.constants.W_OK);
+          assert.ok(fs.existsSync(path.join(toolCache, "node")), "setup-node populated the tool cache");
+          assert.ok(process.execPath.startsWith(path.join(toolCache, "node") + path.sep));
+          assert.equal(process.versions.node.split(".")[0], "24");
+          console.log(`Node ${process.versions.node}: workspace ${workspace}, tool cache ${toolCache}`);
+          console.log("The job container can run Node and read the checked-out repository.");
+          NODE
