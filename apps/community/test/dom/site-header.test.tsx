@@ -45,11 +45,12 @@ afterEach(() => {
 });
 
 describe("页头的账号菜单", () => {
-  test("登录了：点头像打开菜单，有我的主页、个人资料、账号设置和退出登录", async () => {
+  test("登录了：点头像打开菜单，有我的谱面、我的主页、个人资料、账号设置和退出登录", async () => {
     const user = renderHeader("/", USER);
     await user.click(screen.getByRole("button", { name: m.nav_account_menu({ name: USER.name }) }));
 
     expect(menuItems()).toEqual([
+      { name: m.charts_title(), href: "/me/charts" },
       { name: m.nav_my_page(), href: `/u/${USER.id}` },
       { name: m.nav_profile(), href: "/settings/profile" },
       { name: m.nav_account(), href: "/settings/account" },
@@ -61,7 +62,7 @@ describe("页头的账号菜单", () => {
     const user = renderHeader("/en/settings/profile", USER);
     await user.click(screen.getByRole("button", { name: m.nav_account_menu({ name: USER.name }, { locale: "en" }) }));
 
-    expect(menuItems().map((item) => item.href)).toEqual([`/en/u/${USER.id}`, "/en/settings/profile", "/en/settings/account", null]);
+    expect(menuItems().map((item) => item.href)).toEqual(["/en/me/charts", `/en/u/${USER.id}`, "/en/settings/profile", "/en/settings/account", null]);
   });
 
   test("待注销的用户（在注销提示页上）：菜单里只有退出登录", async () => {
