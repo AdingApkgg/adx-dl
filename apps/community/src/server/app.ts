@@ -107,7 +107,9 @@ export function createApp(deps: AppDeps) {
 
   // File streams retain their sandbox policy after the page security middleware completes.
   app.use("/api/v1/files/*", async (c, next) => {
+    c.header("cdn-cache-control", "no-store");
     await next();
+    c.res.headers.set("cdn-cache-control", "no-store");
     if (c.res.headers.get("accept-ranges") === "bytes") {
       c.res.headers.set("Content-Security-Policy", "default-src 'none'; sandbox");
     }

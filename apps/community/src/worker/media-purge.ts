@@ -10,6 +10,7 @@ import {
   failMediaPurge,
   finishMediaPurge,
   recordMediaPurge,
+  privateNoStoreCacheControl,
   MediaPurgeError,
   withPurgeTransaction,
   type PurgeBudget,
@@ -169,7 +170,7 @@ export async function revokeMedia(
     work = budget(deps.now, start + 59000);
   const attempt = await claimMediaPurge(ctx, data, work);
   if (!attempt) return;
-  const evidence: MediaPurgeEvidence = { purges: [], probes: [] };
+  const evidence: MediaPurgeEvidence = { protocol: "origin-private-v1", purges: [], probes: [] };
   const observed = (status: number) => ({
     at: (ctx.now?.() ?? new Date()).toISOString(),
     elapsedMs: deps.now() - start,
@@ -209,44 +210,6 @@ export async function revokeMedia(
     evidence.drain = { ...drain, generation: data.generation };
     await recordMediaPurge(ctx, attempt, evidence, work, true);
     for (let i = 0; i < 2; i++) {
-      if (i) await pause(deps, work, start + evidence.purges[0].elapsedMs);
-      const purge = await request(
-        deps,
-        work,
-        `https://api.cloudflare.com/client/v4/zones/${config.zoneId}/purge_cache`,
-        {
-          method: "POST",
-          redirect: "error",
-          headers: {
-            authorization: `Bearer ${config.purgeToken}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({ files: [url] }),
-        },
-        async (r, s) => {
-          if (r.status !== 200) {
-            cancel(r.body);
-            throw new MediaPurgeError("MEDIA_PURGE_STATUS", { status: r.status });
-          }
-          const result = await json(r, s);
-          if (result?.success !== true || !Array.isArray(result.errors) || result.errors.length) {
-            const apiCodes = Array.isArray(result?.errors)
-              ? result.errors
-                  .map((e: unknown) =>
-                    e && typeof e === "object" ? (e as { code?: unknown }).code : null,
-                  )
-                  .filter((code: unknown): code is number => Number.isSafeInteger(code))
-                  .slice(0, 16)
-              : [];
-            throw new MediaPurgeError("MEDIA_PURGE_API", { status: r.status, apiCodes });
-          }
-          return observed(r.status);
-        },
-      );
-      evidence.purges.push(purge);
-      await recordMediaPurge(ctx, attempt, evidence, work);
-    }
-    for (let i = 0; i < 2; i++) {
       if (i) await pause(deps, work, start + evidence.probes[0].elapsedMs);
       const probe = await request(
         deps,
@@ -261,10 +224,16 @@ export async function revokeMedia(
               status: r.status,
             });
           }
+          const cacheControl = r.headers.get("cache-control")?.trim() ?? null;
+          if (!privateNoStoreCacheControl(cacheControl)) {
+            cancel(r.body);
+            throw new MediaPurgeError("MEDIA_PROBE_CACHE_CONTROL", { status: r.status });
+          }
           const body = await boundedBody(r, s);
           return {
             ...observed(r.status),
             cacheStatus,
+            cacheControl,
             bodyLength: body.length,
             bodySha256: createHash("sha256").update(body).digest("hex"),
           };

@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { readFile } from "node:fs/promises";
 // Parsed service contracts, followed by real Compose and runtime validation at integration acceptance.
-test("role services publish only existing web port and never share peer S3 or purge credentials", async () => {
+test("role services publish only existing web port, isolate S3 credentials and require no CDN purge token", async () => {
   const c = Bun.YAML.parse(
     await readFile(new URL("../../compose.yaml", import.meta.url), "utf8"),
   ) as any;
@@ -26,7 +26,8 @@ test("role services publish only existing web port and never share peer S3 or pu
     expect(s.environment.NO_PROXY).toContain("seaweedfs");
     for (const other of ["WEB", "CONTROL", "MEDIA", "BACKUP"].filter((x) => x !== role))
       expect(s.environment[`STORAGE_${other}_ACCESS_KEY_ID`]).toBeUndefined();
-    if (service !== "worker") expect(s.environment.CLOUDFLARE_PURGE_TOKEN).toBeUndefined();
+    expect(s.environment.CLOUDFLARE_ZONE_ID).toBeUndefined();
+    expect(s.environment.CLOUDFLARE_PURGE_TOKEN).toBeUndefined();
   }
   expect(c.services["media-worker"].healthcheck.test).toContain("src/server/storage/health.ts");
   expect(c.services["media-worker"].cpus).toBe(1);

@@ -119,8 +119,6 @@ services:
       STORAGE_CONTROL_SECRET_ACCESS_KEY: ${STORAGE_CONTROL_SECRET_ACCESS_KEY:?run fill-secrets}
       STORAGE_INTERNAL_MEDIA_SECRET: ${STORAGE_INTERNAL_MEDIA_SECRET:?run fill-secrets}
       STORAGE_INTERNAL_MEDIA_URL: http://web:3001
-      CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID:?required}
-      CLOUDFLARE_PURGE_TOKEN: ${CLOUDFLARE_PURGE_TOKEN:?required}
       STORAGE_JOURNAL_DIR: /storage-journal
       STORAGE_JOURNAL_KEY_FILE: /storage-key/key
     # main.ts 收到 SIGTERM 后最多等 30 秒，让正在跑的任务做完（清除任务被打断会白白用掉一次重试）。

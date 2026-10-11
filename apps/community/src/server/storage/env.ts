@@ -64,15 +64,11 @@ export function parseStorageEnv(
     const internalMediaSecret = required("STORAGE_INTERNAL_MEDIA_SECRET");
     if (internalMediaSecret.length < 32) problems.add("STORAGE_INTERNAL_MEDIA_SECRET");
     if (role === "control") {
-      const zoneId = required("CLOUDFLARE_ZONE_ID");
-      if (!/^[a-fA-F0-9]{32}$/.test(zoneId)) problems.add("CLOUDFLARE_ZONE_ID");
       config = {
         ...common,
         role,
         internalMediaSecret,
         internalMediaUrl: origin("STORAGE_INTERNAL_MEDIA_URL"),
-        zoneId,
-        purgeToken: required("CLOUDFLARE_PURGE_TOKEN"),
       };
     } else config = { ...common, role, internalMediaSecret };
   } else config = { ...common, role };

@@ -62,8 +62,6 @@ export type StorageConfig = StorageConfigBase &
         role: "control";
         internalMediaSecret: string;
         internalMediaUrl: string;
-        zoneId: string;
-        purgeToken: string;
       }
     | { role: "media" | "backup" }
   );

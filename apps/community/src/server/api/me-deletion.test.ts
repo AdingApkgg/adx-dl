@@ -324,9 +324,7 @@ test.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)(
           fetch: async (url, init) =>
             url.includes("/internal/")
               ? drain.handle(new Request(url, init))
-              : url.includes("api.cloudflare.com")
-                ? Response.json({ success: true, errors: [] })
-                : app.request(url, init),
+              : app.request(url, init),
         },
       );
       const active = new Browser(app);

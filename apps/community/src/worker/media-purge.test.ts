@@ -56,9 +56,7 @@ function timeline(generation: number) {
     fetch: async (url: string | URL | Request, init?: RequestInit) => {
       calls.push({ url: String(url), init: init!, at: time });
       if (String(url).includes("/internal/")) return Response.json({ generation, drained: true });
-      if (String(url).includes("api.cloudflare.com"))
-        return Response.json({ success: true, errors: [] });
-      return new Response("missing", { status: 404, headers: { "cf-cache-status": "DYNAMIC" } });
+      return new Response("missing", { status: 404, headers: { "cf-cache-status": "DYNAMIC", "cache-control": "private, no-store" } });
     },
   };
   return {
@@ -69,15 +67,15 @@ function timeline(generation: number) {
     },
   };
 }
-test("real PG: ordered durable drain/two purges/two anonymous probes converge private/done", async () => {
+test("real PG: ordered durable drain/two anonymous no-store probes converge private/done", async () => {
   const { ctx, data } = await revoked(),
     clock = timeline(data.generation);
   const { revokeMedia } = await import("./media-purge");
   await revokeMedia(ctx, data, clock.deps);
-  expect(clock.calls).toHaveLength(5);
+  expect(clock.calls).toHaveLength(3);
   expect(clock.calls[2].at - clock.calls[1].at).toBeGreaterThanOrEqual(5000);
-  expect(clock.calls[4].at - clock.calls[3].at).toBeGreaterThanOrEqual(5000);
-  for (const call of clock.calls.slice(3)) {
+  expect(clock.calls.some((call) => call.url.includes("api.cloudflare.com"))).toBe(false);
+  for (const call of clock.calls.slice(1)) {
     expect(call.url).toBe(`${ctx.config.publicOrigin}/media/${data.hash}.jpg`);
     expect([...new Headers(call.init.headers)].length).toBe(0);
     expect(call.init).toMatchObject({ method: "GET", credentials: "omit", redirect: "error" });
@@ -93,8 +91,10 @@ test("real PG: ordered durable drain/two purges/two anonymous probes converge pr
     .where(eq(mediaPurgeRequests.outputSha256, data.hash));
   expect(pub.state).toBe("private");
   expect(out.state).toBe("done");
-  expect(out.evidence?.purges).toHaveLength(2);
+  expect(out.evidence?.protocol).toBe("origin-private-v1");
+  expect(out.evidence?.purges).toEqual([]);
   expect(out.evidence?.probes).toHaveLength(2);
+  expect(out.evidence?.probes.every((probe) => probe.cacheControl === "private, no-store")).toBe(true);
 });
 test("real PG: non-404 cancels old body and durably fails without downloading pixels", async () => {
   const { ctx, data } = await revoked(),
@@ -174,36 +174,28 @@ for (const [name, response, code] of [
     expect((await outbox(data.hash)).lastErrorCode).toBe(code);
     expect(JSON.stringify(await outbox(data.hash))).not.toContain("private upstream");
   });
-for (const [name, response, code] of [
-  [
-    "API false",
-    () => Response.json({ success: false, errors: [{ code: 1134, message: "private upstream" }] }),
-    "MEDIA_PURGE_API",
-  ],
-  [
-    "API error envelope",
-    () => Response.json({ success: true, errors: [{ code: 1134 }] }),
-    "MEDIA_PURGE_API",
-  ],
-  ["API invalid JSON", () => new Response("private upstream"), "MEDIA_RESPONSE_INVALID"],
-  ["API oversize", () => new Response("x".repeat(65537)), "MEDIA_BODY_LIMIT"],
-  ["API 429", () => new Response("private upstream", { status: 429 }), "MEDIA_PURGE_STATUS"],
+for (const [name, cacheControl] of [
+  ["missing", undefined],
+  ["shared immutable", "public, max-age=31536000, immutable"],
+  ["browser immutable", "private, max-age=86400, immutable"],
+  ["missing private", "no-store"],
+  ["contradictory public", "public, private, no-store"],
 ] as const)
-  test(`real PG: ${name} does not retry or probe`, async () => {
+  test(`real PG: 404 ${name} cache policy cannot complete withdrawal`, async () => {
     const { ctx, data } = await revoked(),
       clock = timeline(data.generation),
       normal = clock.deps.fetch;
-    let purges = 0;
+    let probes = 0;
     clock.deps.fetch = async (url, init) => {
-      if (!String(url).includes("api.cloudflare.com")) return normal(url, init);
-      purges++;
-      return response();
+      if (!String(url).startsWith(ctx.config.publicOrigin)) return normal(url, init);
+      probes++;
+      return new Response("missing", { status: 404, headers: cacheControl ? { "cache-control": cacheControl } : {} });
     };
     const { revokeMedia } = await import("./media-purge");
-    await expect(revokeMedia(ctx, data, clock.deps)).rejects.toMatchObject({ code });
-    expect(purges).toBe(1);
-    expect(clock.calls).toHaveLength(1);
-    expect((await outbox(data.hash)).lastErrorCode).toBe(code);
+    await expect(revokeMedia(ctx, data, clock.deps)).rejects.toMatchObject({ code: "MEDIA_PROBE_CACHE_CONTROL" });
+    expect(probes).toBe(1);
+    expect((await publication(data.hash)).state).toBe("revoking");
+    expect((await outbox(data.hash)).lastErrorCode).toBe("MEDIA_PROBE_CACHE_CONTROL");
   });
 for (const status of [206, 304, 301, 503])
   test(`real PG: probe ${status} immediately cancels body`, async () => {
@@ -266,7 +258,7 @@ test("real PG: 404 HIT cancels without body; CF status missing is recorded null"
   expect(cancelled).toBe(true);
   clock.deps.fetch = async (url, init) =>
     String(url).startsWith(ctx.config.publicOrigin)
-      ? new Response(null, { status: 404 })
+      ? new Response(null, { status: 404, headers: { "cache-control": "private, no-store" } })
       : normal(url, init);
   await revokeMedia(ctx, data, clock.deps);
   expect((await outbox(data.hash)).evidence?.probes.map((p) => p.cacheStatus)).toEqual([
@@ -297,7 +289,7 @@ for (const size of [65536, 65537])
           },
           { highWaterMark: 0 },
         ),
-        { status: 404, headers: { "cf-cache-status": "BYPASS" } },
+        { status: 404, headers: { "cf-cache-status": "BYPASS", "cache-control": "private, no-store" } },
       );
     };
     const { revokeMedia } = await import("./media-purge");
@@ -383,7 +375,7 @@ for (const boundary of ["drain", "final"])
     });
     expect((await publication(data.hash)).state).toBe("revoking");
     expect((await outbox(data.hash)).state).toBe("failed");
-    expect(clock.calls).toHaveLength(boundary === "drain" ? 1 : 5);
+    expect(clock.calls).toHaveLength(boundary === "drain" ? 1 : 3);
   });
 test("real PG: overlapping same-generation attempts clear evidence and fence old evidence/error/final writes", async () => {
   const { ctx, data } = await revoked(),
@@ -394,7 +386,7 @@ test("real PG: overlapping same-generation attempts clear evidence and fence old
   const barrier = new Promise<void>((r) => (release = r)),
     hit = new Promise<void>((r) => (reached = r));
   first.deps.fetch = async (url, init) => {
-    if (String(url).includes("api.cloudflare.com")) {
+    if (String(url).startsWith(ctx.config.publicOrigin)) {
       reached();
       await barrier;
     }
@@ -420,21 +412,23 @@ test("real PG: overlapping same-generation attempts clear evidence and fence old
   expect(await outbox(data.hash)).toEqual(fresh);
   expect((await publication(data.hash)).state).toBe("revoking");
 });
-test("real PG: injected elapsed request time and DB time consume the whole budget", async () => {
+test("real PG: bounded requests and an overslept probe interval consume the whole budget", async () => {
   const { ctx, data } = await revoked(),
     clock = timeline(data.generation),
     normal = clock.deps.fetch;
   clock.deps.fetch = async (url, init) => {
-    // Reach the 59s work deadline while preserving the promised 1s DB settlement window.
-    // 9999ms per request left only 5ms, an invalid assumption under real PG scheduling.
+    // Each request remains below its 10s deadline. An overslept probe interval consumes the whole budget.
     clock.advance(9800);
     return normal(url, init);
+  };
+  clock.deps.sleep = async () => {
+    clock.advance(39500);
   };
   const { revokeMedia } = await import("./media-purge");
   await expect(revokeMedia(ctx, data, clock.deps)).rejects.toMatchObject({
     code: "MEDIA_ATTEMPT_DEADLINE",
   });
-  expect(clock.calls.length).toBeLessThanOrEqual(5);
+  expect(clock.calls).toHaveLength(2);
   expect((await publication(data.hash)).state).toBe("revoking");
   expect((await outbox(data.hash)).lastErrorCode).toBe("MEDIA_ATTEMPT_DEADLINE");
 });
@@ -476,6 +470,23 @@ test("real PG: final transaction rejects incomplete durable evidence atomically"
   });
   expect((await publication(data.hash)).state).toBe("revoking");
   expect((await outbox(data.hash)).state).toBe("running");
+});
+test("withdrawal gate rejects old protocols, cached denials and incomplete probe spacing", async () => {
+  const { completeMediaPurgeEvidence } = await import("@/server/storage/publication");
+  const at = new Date(0).toISOString();
+  const probe = { at, elapsedMs: 1, status: 404, cacheStatus: null, cacheControl: "private, no-store", bodyLength: 0, bodySha256: "a".repeat(64) };
+  const evidence: import("@/server/db/schema").MediaPurgeEvidence = {
+    protocol: "origin-private-v1",
+    drain: { at, elapsedMs: 0, status: 200, generation: 2 },
+    purges: [],
+    probes: [probe, { ...probe, elapsedMs: 5001 }],
+  };
+  expect(completeMediaPurgeEvidence(evidence, 2)).toBe(true);
+  expect(completeMediaPurgeEvidence(evidence, 3)).toBe(false);
+  expect(completeMediaPurgeEvidence({ ...evidence, protocol: undefined } as unknown as typeof evidence, 2)).toBe(false);
+  expect(completeMediaPurgeEvidence({ ...evidence, purges: [{ at, elapsedMs: 0, status: 200 }] }, 2)).toBe(false);
+  expect(completeMediaPurgeEvidence({ ...evidence, probes: [probe, { ...probe, elapsedMs: 5000 }] }, 2)).toBe(false);
+  expect(completeMediaPurgeEvidence({ ...evidence, probes: [probe, { ...probe, elapsedMs: 5001, cacheControl: "private, max-age=86400" }] }, 2)).toBe(false);
 });
 function realBudget(ms: number) {
   const deadline = performance.now() + ms;
@@ -667,7 +678,7 @@ test("real PG: old dead observation preserves fresh attempt; repair enqueues due
   );
   expect(jobs.rows).toHaveLength(1);
 });
-test("real PG: lost ACK after accepted COMMIT reconciles done and sends no extra Cloudflare requests", async () => {
+test("real PG: lost ACK after accepted COMMIT reconciles done and sends no extra withdrawal requests", async () => {
   const { ctx, data } = await revoked(),
     clock = timeline(data.generation);
   const { revokeMedia } = await import("./media-purge");
@@ -781,9 +792,10 @@ for (const failure of [false, true])
       await revokeMedia(ctx, data, clock.deps);
       const out = await outbox(data.hash);
       expect(out.state).toBe("done");
-      expect(out.evidence?.purges).toHaveLength(2);
+      expect(out.evidence?.protocol).toBe("origin-private-v1");
+      expect(out.evidence?.purges).toEqual([]);
       expect(out.evidence?.probes).toHaveLength(2);
-      expect(clock.calls).toHaveLength(5);
+      expect(clock.calls).toHaveLength(3);
     }
     expect((await publication(data.hash)).state).toBe("blocked");
   });
@@ -811,7 +823,6 @@ test("M2 early fractional timer wake waits the monotonic remainder before the ne
   let wakes = 0;
   clock.deps.sleep = async (ms) => { clock.advance(wakes++ === 0 ? ms - 0.25 : ms); };
   await revokeMedia(ctx, data, clock.deps);
-  expect(wakes).toBeGreaterThan(2);
+  expect(wakes).toBe(2);
   expect(clock.calls[2].at-clock.calls[1].at).toBeGreaterThanOrEqual(5000);
-  expect(clock.calls[4].at-clock.calls[3].at).toBeGreaterThanOrEqual(5000);
 });

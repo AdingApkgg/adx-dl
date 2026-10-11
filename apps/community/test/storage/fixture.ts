@@ -26,8 +26,6 @@ export async function storageFixtureConfig(role: StorageRole = "web"): Promise<S
       [`STORAGE_${role.toUpperCase()}_SECRET_ACCESS_KEY`]: secret ?? "isolated-test",
       STORAGE_INTERNAL_MEDIA_SECRET: "test-internal-secret-0123456789abcdef",
       STORAGE_INTERNAL_MEDIA_URL: "http://web:3001",
-      CLOUDFLARE_ZONE_ID: "0".repeat(32),
-      CLOUDFLARE_PURGE_TOKEN: "isolated-test-control-token",
     },
     role,
   );

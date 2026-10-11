@@ -373,10 +373,11 @@ export const mediaPublications = pgTable(
 );
 export type MediaPurgeObservation = { at: string; elapsedMs: number; status: number };
 export type MediaPurgeEvidence = {
+  protocol: "origin-private-v1";
   failure?: { code: string; status?: number; apiCodes?: number[] };
   drain?: MediaPurgeObservation & { generation: number };
   purges: MediaPurgeObservation[];
-  probes: (MediaPurgeObservation & { cacheStatus: string | null; bodyLength: number; bodySha256: string })[];
+  probes: (MediaPurgeObservation & { cacheStatus: string | null; cacheControl: string | null; bodyLength: number; bodySha256: string })[];
 };
 // Durable revocation outbox must outlive deleted accounts and physical metadata.
 export const mediaPurgeRequests = pgTable(

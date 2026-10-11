@@ -212,8 +212,6 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
                   ...(role === "control"
                     ? {
                         STORAGE_INTERNAL_MEDIA_URL: "http://127.0.0.1:54112",
-                        CLOUDFLARE_ZONE_ID: "0".repeat(32),
-                        CLOUDFLARE_PURGE_TOKEN: "isolated-fixture",
                       }
                     : {}),
                   [prefix + "_ACCESS_KEY_ID"]: config.accessKeyId,
@@ -513,15 +511,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
     await unlink(join(stateDirectory, ".restore.lock")); // Explicit operator fixture: process callback ended and real remote PUT/DELETE completed.
     let recoveryPublic: ReturnType<typeof Bun.serve> | undefined,
       recoveryInternal: ReturnType<typeof Bun.serve> | undefined;
-    const purgeRequests: { at: number; body: unknown }[] = [];
-    const cf = Bun.serve({
-      hostname: "127.0.0.1",
-      port: 0,
-      fetch: async (r) => {
-        purgeRequests.push({ at: performance.now(), body: await r.json() });
-        return Response.json({ success: true, errors: [] });
-      },
-    });
+    const withdrawalProbes: { at: number; url: string; status: number; cacheControl: string | null }[] = [];
     const controlConfig = {
       ...sourceControlConfig,
       endpoint: targetConfig.endpoint,
@@ -617,8 +607,13 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
       },
       revoke: (data) =>
         revokeMedia(targetControl, data, {
-          fetch: (url, init) =>
-            fetch(url.startsWith("https://api.cloudflare.com/") ? cf.url.href : url, init),
+          fetch: async (url, init) => {
+            const target = new URL(url);
+            expect(target.origin).toBe(target.pathname.startsWith("/internal/") ? "http://127.0.0.1:3001" : origin);
+            const response = await fetch(url, init);
+            if (url.startsWith(origin)) withdrawalProbes.push({ at: performance.now(), url, status: response.status, cacheControl: response.headers.get("cache-control") });
+            return response;
+          },
           sleep: (ms) => Bun.sleep(ms),
           now: () => performance.now(),
           drainUrl: "http://127.0.0.1:3001/internal/media/drain",
@@ -713,7 +708,8 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
           .where(eq(mediaPurgeRequests.outputSha256, publication.outputSha256));
         const done = requests.find((r) => r.state === "done")!;
         expect(done.evidence!.drain!.generation).toBe(publication.generation);
-        expect(done.evidence!.purges).toHaveLength(2);
+        expect(done.evidence!.protocol).toBe("origin-private-v1");
+        expect(done.evidence!.purges).toEqual([]);
         expect(done.evidence!.probes).toHaveLength(2);
         expect(
           done.evidence!.probes[1].elapsedMs - done.evidence!.probes[0].elapsedMs,
@@ -722,13 +718,12 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
     });
     expect(result.rtoMs).toBeGreaterThan(10000);
     expect(result.rpoMs).toBe(86400000);
-    expect(purgeRequests).toHaveLength(6);
+    expect(withdrawalProbes).toHaveLength(6);
     for (const image of [deletedImage, removedImage, blockedImage]) {
-      const requests = purgeRequests.filter(
-        (p) => JSON.stringify(p.body) === JSON.stringify({ files: [origin + image] }),
-      );
-      expect(requests).toHaveLength(2);
-      expect(requests[1].at - requests[0].at).toBeGreaterThanOrEqual(5000);
+      const probes = withdrawalProbes.filter((probe) => probe.url === origin + image);
+      expect(probes).toHaveLength(2);
+      expect(probes[1].at - probes[0].at).toBeGreaterThanOrEqual(5000);
+      expect(probes.every((probe) => probe.status === 404 && probe.cacheControl === "private, no-store")).toBe(true);
     }
     expect((await readRestoreState(stateDirectory)).state).toBe("open");
     const openDrain = createMediaDrain({
@@ -766,7 +761,8 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
       measuredRtoMs: result.rtoMs,
       dailyRpoMs: result.rpoMs,
       snapshotAgeMs: Date.now() - Date.parse(manifest.createdAt),
-      purgeObservations: purgeRequests.map((p) => ({ at: p.at })),
+      withdrawalProtocol: "origin-private-v1",
+      withdrawalObservations: withdrawalProbes,
       sourceStopped,
       freshVolumes: true,
     };
@@ -781,7 +777,6 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
       }),
     );
     await normal.stop(true);
-    await cf.stop(true);
     await target.pool.end();
     await f.ctx.db.delete(blobBlocks).where(eq(blobBlocks.sha256, blockedImage.slice(7, -4)));
     await f.cleanup();

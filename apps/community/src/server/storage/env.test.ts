@@ -8,8 +8,6 @@ const common = {
   STORAGE_RECIPE_BUILD: "test-build-v1",
   STORAGE_INTERNAL_MEDIA_SECRET: secret,
   STORAGE_INTERNAL_MEDIA_URL: "http://media:3001",
-  CLOUDFLARE_ZONE_ID: "a".repeat(32),
-  CLOUDFLARE_PURGE_TOKEN: "test-purge-secret",
 };
 function source(role: string) {
   return {
@@ -19,7 +17,7 @@ function source(role: string) {
   };
 }
 describe("parseStorageEnv", () => {
-  test("role credentials and purge authority are separated", () => {
+  test("role credentials and internal media authority are separated", () => {
     for (const role of ["web", "media", "backup", "control"] as const) {
       const config = parseStorageEnv(source(role), role);
       expect(config.role).toBe(role);
@@ -28,8 +26,6 @@ describe("parseStorageEnv", () => {
       expect(config.originalBucket).toBe("blobs");
       expect(config.derivedBucket).toBe("derived");
       expect(config.credentialsRef).toBe(`STORAGE_${role.toUpperCase()}`);
-      expect("purgeToken" in config).toBe(role === "control");
-      expect("zoneId" in config).toBe(role === "control");
       expect("internalMediaSecret" in config).toBe(role === "web" || role === "control");
     }
   });
@@ -44,7 +40,7 @@ describe("parseStorageEnv", () => {
     } catch (error) {
       expect(String(error)).not.toContain("do-not-log-me");
     }
-    expect(() => parseStorageEnv({}, "control")).toThrow("CLOUDFLARE_PURGE_TOKEN");
+    expect(() => parseStorageEnv({}, "control")).toThrow("STORAGE_INTERNAL_MEDIA_URL");
   });
   test("canonical origin, endpoint, temp path and build are validated without leaking input", () => {
     for (const [key, value] of [

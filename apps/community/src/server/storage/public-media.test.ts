@@ -125,8 +125,11 @@ real(
       path = `/media/${f.derived.outputSha256}.jpg`,
       etag = `"sha256-${f.derived.outputSha256}"`;
     try {
-      const get = async (path: string, headers: Record<string, string> = {}, method = "GET") =>
-        fetch(origin + path, { method, headers: { cookie: browser.cookieHeader(), ...headers } });
+      const get = async (path: string, headers: Record<string, string> = {}, method = "GET") => {
+        const response = await fetch(origin + path, { method, headers: { cookie: browser.cookieHeader(), ...headers } });
+        expect(response.headers.get("cdn-cache-control")).toBe("no-store");
+        return response;
+      };
       const response = await get(path);
       expect(response.status).toBe(200);
       const bytes = new Uint8Array(await response.arrayBuffer());
@@ -137,7 +140,7 @@ real(
         JSON.stringify([...response.headers]),
       ).toBe(bytes.length);
       expect(response.headers.get("etag")).toBe(etag);
-      expect(response.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+      expect(response.headers.get("cache-control")).toBe("private, max-age=86400, immutable");
       expect(response.headers.get("content-security-policy")).toBe("default-src 'none'; sandbox");
       expect(response.headers.get("cross-origin-resource-policy")).toBe("same-origin");
       expect(response.headers.get("x-content-type-options")).toBe("nosniff");
@@ -151,6 +154,7 @@ real(
       ] as const) {
         const r = await get(path, { range });
         expect(r.status).toBe(206);
+        expect(r.headers.get("cache-control")).toBe("private, max-age=86400, immutable");
         expect(r.headers.get("content-range")).toBe(`bytes ${start}-${end}/${bytes.length}`);
         expect(new Uint8Array(await r.arrayBuffer())).toEqual(bytes.slice(start, end + 1));
       }
@@ -159,6 +163,7 @@ real(
         expect(r.status).toBe(416);
         expect(r.headers.get("content-range")).toBe(`bytes */${bytes.length}`);
         expect(r.headers.get("cache-control")).toBe("private, no-store");
+        expect(r.headers.get("cdn-cache-control")).toBe("no-store");
         await r.text();
       }
       for (const rawTarget of [
@@ -187,13 +192,22 @@ real(
         });
         expect(raw.status).toBe(404);
         expect(raw.headers["cache-control"]).toBe("private, no-store");
+        expect(raw.headers["cdn-cache-control"]).toBe("no-store");
         expect(raw.headers["set-cookie"]).toBeUndefined();
       }
       const head = await get(path, {}, "HEAD");
       expect(head.status).toBe(200);
       expect(await head.text()).toBe("");
       expect(head.headers.get("content-length")).toBe(String(bytes.length));
-      expect((await get(path, { "if-none-match": etag })).status).toBe(304);
+      expect(head.headers.get("cache-control")).toBe("private, max-age=86400, immutable");
+      const headRange = await get(path, { range: "bytes=2-5" }, "HEAD");
+      expect(headRange.status).toBe(206);
+      expect(headRange.headers.get("content-length")).toBe("4");
+      expect(headRange.headers.get("cache-control")).toBe("private, max-age=86400, immutable");
+      expect(await headRange.text()).toBe("");
+      const notModified = await get(path, { "if-none-match": etag });
+      expect(notModified.status).toBe(304);
+      expect(notModified.headers.get("cache-control")).toBe("private, max-age=86400, immutable");
       const mismatch = await get(path, { range: "bytes=2-5", "if-range": "wrong" });
       expect(mismatch.status).toBe(200);
       await mismatch.arrayBuffer();
@@ -212,6 +226,7 @@ real(
         const r = await get(bad, { "if-none-match": etag, range: "bytes=0-3" });
         expect(r.status).toBe(404);
         expect(r.headers.get("cache-control")).toBe("private, no-store");
+        expect(r.headers.get("cdn-cache-control")).toBe("no-store");
         expect(r.headers.get("set-cookie")).toBeNull();
         await r.text();
       }
@@ -226,6 +241,11 @@ real(
       expect(new Uint8Array(await content.arrayBuffer())).toEqual(f.original.slice(2, 6));
       const preview = await get(`/api/v1/files/${f.file.id}/preview`);
       expect(digest(new Uint8Array(await preview.arrayBuffer()))).toBe(f.derived.outputSha256);
+      const anonymous = await fetch(`${origin}/api/v1/files/${f.file.id}/content`);
+      expect(anonymous.status).toBe(401);
+      expect(anonymous.headers.get("cache-control")).toBe("private, no-store");
+      expect(anonymous.headers.get("cdn-cache-control")).toBe("no-store");
+      await anonymous.text();
       const other = new Browser(app);
       await login(other);
       for (const method of ["GET", "HEAD"]) {
@@ -239,6 +259,7 @@ real(
         });
         expect(r.status).toBe(404);
         expect(r.headers.get("cache-control")).toBe("private, no-store");
+        expect(r.headers.get("cdn-cache-control")).toBe("no-store");
         await r.text();
       }
       await ctx.db.insert(blobBlocks).values({ sha256: f.blob.sha256, reasonCode: "test" });
@@ -272,6 +293,7 @@ real("ready DB with missing S3 bytes returns 503, including conditional requests
   );
   expect(response.status).toBe(503);
   expect(response.headers.get("cache-control")).toBe("private, no-store");
+  expect(response.headers.get("cdn-cache-control")).toBe("no-store");
 });
 real(
   "registration precedes real PG permission barrier; drain denies old lookup and generation resume repairs publication",
@@ -324,6 +346,7 @@ real(
       expect(response.status).toBe(404);
       expect(response.headers.get("set-cookie")).toBeNull();
       expect(response.headers.get("cache-control")).toBe("private, no-store");
+      expect(response.headers.get("cdn-cache-control")).toBe("no-store");
     } finally {
       release();
       pool.query = query;
@@ -559,6 +582,7 @@ test("media registrations cap permissions/streams at32 and saturation is503 with
   const response = await media(new Request(`http://x/media/${hash}.jpg`));
   expect(response.status).toBe(503);
   expect(response.headers.get("cache-control")).toBe("private, no-store");
+  expect(response.headers.get("cdn-cache-control")).toBe("no-store");
   tickets[0].release();
   // Actual PG query failure while occupying the32nd permission-registration slot.
   const pool = testDbHandle().pool,
@@ -571,6 +595,7 @@ test("media registrations cap permissions/streams at32 and saturation is503 with
     const failed = await media(new Request(`http://x/media/${hash}.jpg`));
     expect(failed.status).toBe(503);
     expect(failed.headers.get("cache-control")).toBe("private, no-store");
+    expect(failed.headers.get("cdn-cache-control")).toBe("no-store");
   } finally {
     pool.query = query;
   }
@@ -599,6 +624,7 @@ test("unconfigured storage denies canonical and invalid media with no-store befo
     const response = await app.request(target, { headers: { cookie: "session=invalid" } });
     expect(response.status).toBe(404);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(response.headers.get("cdn-cache-control")).toBe("no-store");
     expect(response.headers.get("set-cookie")).toBeNull();
     expect(response.headers.get("vary")).toBeNull();
   }

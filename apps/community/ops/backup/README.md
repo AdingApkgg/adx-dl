@@ -29,7 +29,7 @@
 2. durable 写 closed，确认正常 web/media/control 与其 owned IO 实际停止。校验 bundle 的双 dump 和所有原件。最新 head 必须来自 live 外部日志或可信强制源 flush；旧签名快照 head 仅是认证链起点。
 3. 在停止状态恢复两库与私有原件，重放最新 user/file/block/media_revoked 事实，取消所有暂存会话/分片并重算配额；旧头像撤回只失效旧 generation 的公开关联/投影，保留私有文件和确实较新的合法共享引用，blocked 状态继续 blocked。
 4. 缺失派生头像由 sessionless durable intent 驱动，实际调用同一个原生配方；已有不确定 PUT/DELETE、旧代次或 namespace 不一致不能覆盖。相同输出不再计费；输出变化创建新 hash/key 并按现有引用/撤回协议更新当前投影。
-5. 同一应用镜像独立启动 recovery-web，只公开 canonical 404/no-store、health 和真实认证 drain，不导入正常 auth/SSR/API/private bootstrap，不领普通任务。重建后重新收集当代撤回（含 drift 新建与快照已有 outbox），直接调用既有严格 revokeMedia 完成：60-second attempt、每请求 10-second、两次 purge 与两次 anonymous canonical 404/non-HIT probes 分别间隔至少五秒、最终锁内代次与引用检查。恢复协调器随后内建核对当代 outbox done、publication private/blocked、完整证据及无合法公开引用；不把 verifyInvariants 的空成功当作完成。
+5. 同一应用镜像独立启动 recovery-web，只公开 canonical 404/no-store、health 和真实认证 drain，不导入正常 auth/SSR/API/private bootstrap，不领普通任务。重建后重新收集当代撤回（含 drift 新建与快照已有 outbox），直接调用既有严格 revokeMedia 完成：60-second attempt、每请求 10-second、固定 origin-private-v1 协议、无 Cloudflare API 请求、两次 anonymous canonical 404/non-HIT/private-no-store probes 间隔至少五秒、最终锁内代次与引用检查。恢复协调器随后内建核对当代 outbox done、publication private/blocked、完整证据及无合法公开引用；不把 verifyInvariants 的空成功当作完成。
 6. 停止并确认 recovery-web，检查删除账号不可访问、原件 SHA/ACL、暂存/配额、头像可重建与撤回证据，再确认 live latest head 未变化，只有全部成功才原子 open。失败路径永不在 finally 中打开。
 
 正常成功释放自己的锁。停止正常进程成功之后的纯本地 manifest/latest 验证失败，可在明确未启动恢复 IO 时释放自己的锁并保持 closed。停止进程失败或任何 DB/S3/rebuild/recovery 回调开始后的任何失败，连同 generic backend error，均保留 closed + `.restore.lock`；即使错误已返回也不能证明远端 PUT/DELETE 已结束。崩溃保留锁。Task11 操作员清锁步骤必须先取得旧进程与所有 owned child/remote IO 已结束的明确证据；只查 PID、HEAD missing、重复 DELETE204 或等待 TTL 不够。确认之前不能开始下一次恢复。
@@ -38,7 +38,7 @@
 
 ## 演练证据与上线门槛
 
-Task10 opt-in `fresh-restore.test.ts` 在新 PG/SeaweedFS volumes 上实际执行双库 pg_dump/pg_restore、restic backup/restore、Linux amd64 Bun1.4.2 sharp0.35.5/libvips8.18.7 native rebuild，测量 RTO，并记录 daily backup RPO=24h。本机 HTTP Cloudflare API fixture 只证明协议与源站证据，不能替代 Task12 的真实生产 purge/cache/edge 验收。完整额度、runtime consumer/role ACK、持久 mounts/首次初始化及 crash pause reconciliation 仍是 Task11 强制交接。
+Task10 opt-in `fresh-restore.test.ts` 在新 PG/SeaweedFS volumes 上实际执行双库 pg_dump/pg_restore、restic backup/restore、Linux amd64 Bun1.4.2 sharp0.35.5/libvips8.18.7 native rebuild，测量 RTO，并记录 daily backup RPO=24h。隔离 HTTP fixture 证明撤回协议与源站证据，不能替代真实生产媒体响应的禁止共享缓存及撤回验收。完整额度、runtime consumer/role ACK、持久 mounts/首次初始化及 crash pause reconciliation 仍是 Task11 强制交接。
 
 `media_revoked` version 1 has two authenticated variants. Null `userId` and `fileId` record a global publication generation. Paired identities record the exact former account/file/output association with the new avatar revision. Replay clears only a matching older association; individual revisions never become purge generations. Shared references and later saves survive. Half-null identities or invalid generation/identifier ranges fail closed.
 

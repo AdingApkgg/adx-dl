@@ -281,12 +281,6 @@ test.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)("restore intrinsically settl
   const sourceHash = digest(source), sourceKey = objectKey(sourceHash);
   const restoredHash = "b".repeat(64);
   let publicServer: ReturnType<typeof Bun.serve> | undefined, internalServer: ReturnType<typeof Bun.serve> | undefined;
-  const cf = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: async (r) => {
-    expect(r.method).toBe("POST");
-    const body = await r.json() as { files: string[] };
-    expect(body.files).toHaveLength(1);
-    return Response.json({ success: true, errors: [] });
-  } });
   try {
     await controlDriver.delete({ bucket: "original", key: f.blob.key });
     await controlDriver.delete({ bucket: "derived", key: f.derived.key });
@@ -367,7 +361,7 @@ test.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)("restore intrinsically settl
     await initializeRestoreState(activeState);
     await restoreOriginals({ ...options, stateDirectory: activeState, revoke: async (data) => {
       revoked.push(data);
-      await revokeMedia(control, data, { fetch: (url, init) => fetch(url.startsWith("https://api.cloudflare.com/") ? cf.url.href : url, init), sleep: (ms) => Bun.sleep(Math.ceil(ms) + 1), now: () => performance.now(), drainUrl: `${internalServer!.url.origin}/internal/media/drain` });
+      await revokeMedia(control, data, { fetch: (url, init) => fetch(url, init), sleep: (ms) => Bun.sleep(Math.ceil(ms) + 1), now: () => performance.now(), drainUrl: `${internalServer!.url.origin}/internal/media/drain` });
     } });
     expect((await readRestoreState(activeState)).state).toBe("open");
     await assertNormalStorageStartup(activeState);
@@ -378,14 +372,14 @@ test.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)("restore intrinsically settl
     for (const data of revoked) {
       const request = (await ctx.db.select().from(mediaPurgeRequests).where(eq(mediaPurgeRequests.outputSha256, data.hash))).find((r) => r.generation === data.generation)!;
       expect(request.state).toBe("done"); expect(request.evidence!.drain!.generation).toBe(data.generation);
-      expect(request.evidence!.purges).toHaveLength(2); expect(request.evidence!.probes).toHaveLength(2);
-      expect(request.evidence!.purges[1].elapsedMs-request.evidence!.purges[0].elapsedMs).toBeGreaterThanOrEqual(5000);
+      expect(request.evidence!.protocol).toBe("origin-private-v1");
+      expect(request.evidence!.purges).toEqual([]); expect(request.evidence!.probes).toHaveLength(2);
       expect(request.evidence!.probes[1].elapsedMs-request.evidence!.probes[0].elapsedMs).toBeGreaterThanOrEqual(5000);
-      expect(request.evidence!.probes.every((p) => p.status===404 && p.cacheStatus!=="HIT")).toBe(true);
+      expect(request.evidence!.probes.every((p) => p.status===404 && p.cacheStatus!=="HIT" && p.cacheControl==="private, no-store")).toBe(true);
     }
     expect((await ctx.db.select().from(mediaPublications).where(eq(mediaPublications.outputSha256, restoredHash)))[0].state).toBe("blocked");
   } finally {
-    await publicServer?.stop(true); await internalServer?.stop(true); await cf.stop(true);
+    await publicServer?.stop(true); await internalServer?.stop(true);
     await ctx.db.delete(mediaPurgeRequests).where(eq(mediaPurgeRequests.outputSha256, restoredHash));
     await ctx.db.delete(mediaPublications).where(eq(mediaPublications.outputSha256, restoredHash));
     await cleanupStorageFixture(ctx.db, [owner], [policy.id], controlDriver, true);

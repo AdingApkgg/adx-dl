@@ -162,7 +162,7 @@ export async function resolvePrivateFile(
 export function mediaDenial(status = 404, code = "NOT_FOUND") {
   return Response.json(
     { error: { code, message: code } },
-    { status, headers: { "cache-control": "private, no-store" } },
+    { status, headers: { "cache-control": "private, no-store", "cdn-cache-control": "no-store" } },
   );
 }
 function disposition(name: string) {
@@ -200,7 +200,8 @@ export async function representationResponse(
       "content-length": String(file.size),
       etag,
       "accept-ranges": "bytes",
-      "cache-control": isPublic ? "public, max-age=31536000, immutable" : "private, no-store",
+      "cache-control": isPublic ? "private, max-age=86400, immutable" : "private, no-store",
+      "cdn-cache-control": "no-store",
       "x-content-type-options": "nosniff",
       "content-security-policy": "default-src 'none'; sandbox",
       "cross-origin-resource-policy": "same-origin",

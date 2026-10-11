@@ -205,7 +205,7 @@ export async function claimMediaPurge(
         state: "running",
         attempts: attempt,
         attemptStartedAt: now,
-        evidence: { purges: [], probes: [] },
+        evidence: { protocol: "origin-private-v1", purges: [], probes: [] },
         lastErrorCode: "MEDIA_ATTEMPT_INCOMPLETE",
         nextAttemptAt: new Date(now.getTime() + 90000),
       })
@@ -231,28 +231,36 @@ export async function recordMediaPurge(
       .where(eq(mediaPurgeRequests.id, rows.out.id));
   });
 }
+/** Withdrawal responses must prohibit browser and shared caching. */
+export function privateNoStoreCacheControl(value: string | null) {
+  const directives = value?.toLowerCase().split(",").map((directive) => directive.trim()) ?? [];
+  return (
+    directives.includes("private") &&
+    directives.includes("no-store") &&
+    !directives.includes("public")
+  );
+}
 export function completeMediaPurgeEvidence(e: MediaPurgeEvidence | null, generation: number) {
   if (
-    !e?.drain ||
+    e?.protocol !== "origin-private-v1" ||
+    !e.drain ||
     e.drain.generation !== generation ||
     e.drain.status !== 200 ||
-    e.purges.length !== 2 ||
+    !Array.isArray(e.purges) ||
+    e.purges.length !== 0 ||
+    !Array.isArray(e.probes) ||
     e.probes.length !== 2
   )
     return false;
-  const [p1, p2] = e.purges,
-    [g1, g2] = e.probes;
+  const [g1, g2] = e.probes;
   return (
-    e.drain.elapsedMs <= p1.elapsedMs &&
-    p1.status === 200 &&
-    p2.status === 200 &&
-    p2.elapsedMs - p1.elapsedMs >= 5000 &&
-    g1.elapsedMs >= p2.elapsedMs &&
+    e.drain.elapsedMs <= g1.elapsedMs &&
     g2.elapsedMs - g1.elapsedMs >= 5000 &&
     e.probes.every(
       (p) =>
         p.status === 404 &&
         p.cacheStatus !== "HIT" &&
+        privateNoStoreCacheControl(p.cacheControl) &&
         p.bodyLength <= 65536 &&
         p.bodyLength >= 0 &&
         /^[a-f0-9]{64}$/.test(p.bodySha256),
@@ -303,7 +311,7 @@ export async function failMediaPurge(
         state: "failed",
         lastErrorCode: code,
         evidence: {
-          ...(rows.out.evidence ?? { purges: [], probes: [] }),
+          ...(rows.out.evidence ?? { protocol: "origin-private-v1", purges: [], probes: [] }),
           failure: { code, ...detail },
         },
         nextAttemptAt: new Date((ctx.now?.() ?? new Date()).getTime() + 30000),
