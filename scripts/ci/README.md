@@ -36,6 +36,8 @@ Keep pull-request jobs on GitHub-hosted runners. The management command does not
 ./scripts/ci/runnerctl.sh add OWNER/REPO 02
 ```
 
+Job containers share persistent work/tool volumes. Use `container.options: --user 1001:123` for this runner image, matching the volumes' owner. Running checkout or setup actions as container root can leave files that later runner-host jobs cannot clean up. See `runner-smoke.yml` for a Node job-container example.
+
 Calling `add` again for an existing instance preserves its registration and caches. `add` and `start` regenerate Compose from the instance manifest and shared network settings, recreating both containers when that configuration changes; use them only while the runner is idle. The initial default branch plus `main`, `dev`, and `pre` are trusted; scheduled jobs are denied by default for newly added repositories. Review and explicitly update the instance's policy to add scheduled workflows or additional workflow filenames.
 
 ## Shared network routing
@@ -48,7 +50,7 @@ All repository instances read the following shared file on the remote host, `/ho
 {"proxy_url":"http://172.17.0.1:11092"}
 ```
 
-The manager injects proxy variables into the runner and its private Docker daemon. Initialization also configures Docker CLI defaults, so job/service containers and Dockerfile `RUN` instructions inherit the proxy. Private/loopback destinations bypass it. Each DinD uses `10.240.0.1/24` and a `10.241.0.0/16` address pool, keeping the host bridge proxy reachable. Check route conflicts before installing on a different host.
+The manager injects proxy variables into the runner and its private Docker daemon. Initialization also configures Docker CLI defaults, so job/service containers and Dockerfile `RUN` instructions built from runner-host steps inherit the proxy. A workflow that invokes `docker build` inside a job container must pass `--build-arg HTTP_PROXY --build-arg HTTPS_PROXY --build-arg NO_PROXY` or configure that container's Docker CLI; the runner's private CLI credentials/configuration are not mounted there. Private/loopback destinations bypass the proxy. Each DinD uses `10.240.0.1/24` and a `10.241.0.0/16` address pool, keeping the host bridge proxy reachable. Check route conflicts before installing on a different host.
 
 After editing shared settings, check GitHub's runner busy state and call `start OWNER/REPO` for each idle instance. `restart` only restarts the listener and does not refresh configuration. Removing `proxy_url` removes an unchanged default written by this manager, while preserving registry credentials, other Docker contexts, and administrator edits. This CI setup does not change the host Docker daemon's network configuration; host-level bootstrap image builds need a separately configured proxy. Administrative workstation Git/GitHub requests also need its working proxy environment.
 

@@ -84,7 +84,10 @@ jobs:
     if: contains(fromJSON('["refs/heads/main","refs/heads/dev","refs/heads/pre"]'), github.ref)
     runs-on: [self-hosted, linux, x64, astrodx-ci]
     timeout-minutes: 10
-    container: node:24-bookworm
+    container:
+      image: node:24-bookworm
+      # 与持久卷的 runner 所有者一致，避免后续 host job 无法清理 root 文件。
+      options: --user 1001:123
     steps:
       - name: Checkout inside the job container
         uses: actions/checkout@v7
@@ -98,6 +101,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test "$(id -u)" = 1001
           node - <<'NODE'
           const assert = require("node:assert/strict");
           const fs = require("node:fs");
