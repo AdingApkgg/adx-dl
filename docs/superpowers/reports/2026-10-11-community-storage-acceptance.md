@@ -1,5 +1,31 @@
 # Community avatar/storage acceptance — 2026-10-11
 
+## Latest remote continuation — design first, necessary checks only
+
+This section supersedes the historical three-sweep failure status below, only for those exact names. Product code built/tested is the selected commit `3b0a58041e8d4b41c19cccd63d3508f0ac9b1940`. New branch commits `cfee72d` / `b90418c` contain only chart design/planning documents. No chart product code, push, production deployment or Cloudflare change occurred.
+
+Host `i@localhost-1.tailac9c6f.ts.net` was confirmed Linux/x86_64, user i, Docker Linux amd64 29.8.0. Isolated root `/home/i/astrodx-community-storage-dev-20261011`, Compose project `adxc-storage-dev-20261011`; only tracked selected source plus finite new tooling transferred. No old .env, credentials, identities, dependencies or volume data transferred. PG/Redis/S3 have no host ports. Existing `astrodx-community-dev-postgres-1` and `...-redis-1` remain running after owned project stop.
+
+The original app Dockerfile built once remotely, exit0; original backup Dockerfile built remotely, exit0 including pinned sharp/vips check. Lightweight test image copies that backup, the existing app build and tracked test source, exit0; no second Vite build/install. Full image IDs and revision labels live in remote evidence `{app,backup,test}-image.txt`, exact logs `{app,backup,test-image}-build.log`. These are remote-image/source observations, not production or browser acceptance.
+
+Fresh fixture generation/readiness succeeded after one tooling-only mountpoint fix. First prepare exited125 before container startup because readonly source lacked its `.acceptance` child mountpoint; precreating an owned empty directory corrected it without rebuilding or modifying tracked product code. Configuration remains remote0600. `_test` guard rejects non-test database before reset, missing SHA exits2, and a self-created empty foreign-label volume is refused without deletion. The explicit probe was removed only after its identity was checked. Owned stop→prepare preserves volumes; final owned stop exited0.
+
+Three prior failed sweep names ran in three independent remote processes, once each, no product fixes or timeout relaxation:
+
+| Selected name | Actual result |
+|---|---|
+| physical scans rotate beyond batch100 and failed resume batches cannot starve later generations | 1pass/0fail/7assert, 6.44s process / 4.496s case |
+| unknown physical temporary prefix waits48h and accounts once before deletion | 1pass/0fail/4assert, 0.471s process / 0.096s case |
+| 51 deferred avatars rotate past still-revoking first50 with a nonadvancing clock | 1pass/0fail/6assert, 1.367s process / 1.037s case |
+
+Each filtered out the other17 cases. Launcher exits0 after all three; per-case logs/results are remote `evidence/sweep-{1,2,3}.{log,result}`. No whole suite, auth/login, native lifecycle, capacity or unrelated DOM repeat. This new result does not establish the exclusive cause of old failures.
+
+**Still unaccepted:** actual avatar UI upload/save/remove and current-image full restore. Neither was attempted in this continuation: current media startup requires an independent32MiB–2GiB disk filesystem, and the remote ordinary directory is on a2TiB root filesystem; tmpfs/overlay are correctly rejected. `sudo -n true` reports a password is required. Prepared human-terminal script creates a512MiB logical sparse ext4 scratch, actual-demand growth without fallocate, and refuses foreign/partial mounts. No privileged-container workaround, shared old scratch or weakened product guard. See primary `.superpowers/claude-continuation/community-remote-scratch-install.md`.
+
+The detailed chart ZIP/folder/private-draft design and Task6–14 plan are saved, independently builder-checked once, and marked pending user review. ZIP64/streaming download main-site work and AWMC remain out of scope. Runtime services of this project are stopped, evidence/volumes retained. Storage candidate remains pending UI/full restore and later independent live production capacity/backup/edge checks; no readiness declaration.
+
+---
+
 **Current capacity policy supersession —2026-10-11:** the user now requires on-demand growth. Historical71 GiB/340 GiB full-quota figures below remain historical evidence, not current startup gates.20/2/2 GiB ceilings and5 GiB floor remain; live preflight now budgets current manifest/cache gap/full backup payload/dump bounds/metadata only. g510 was not rechecked; old38.41 GiB is not a current sufficiency claim. Other failed/unverified acceptance remains unchanged.
 
 Source under acceptance: `832cf81` (parent `127a9f24b94ee0ffd7b533f1519a74d08206574c`), branch `codex/community-storage-design`. Actual first-install HTTP acceptance exposed missing policy initialization; the focused fix creates/validates WEB and MEDIA namespace metadata before opening state and refuses used databases. It stores no secrets in policies and does not widen role credentials. Three focused initializer cases pass (14 assertions); purge timing fixture passes with unchanged product59/60s limits. No public push, production deployment, Dash publication, AWMC or personal-photo work occurred. Final independent review follows this record.
