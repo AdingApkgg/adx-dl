@@ -16,6 +16,7 @@ import {
   PlusIcon,
   SaveIcon,
   Settings2Icon,
+  SparklesIcon,
   TagsIcon,
   Trash2Icon,
 } from "lucide-react";
@@ -36,6 +37,8 @@ import {
   useDownloadsStore,
 } from "@/components/site/downloads/downloads-store";
 import { HEADER_ACTION_CLASS } from "@/components/site/header-actions";
+import { getLive2DCopy } from "@/components/site/live2d/live2d-copy";
+import { useMascotHidden } from "@/components/site/live2d/use-mascot-hidden";
 import { getMusicPlayerCopy } from "@/components/site/music-player/music-player-copy";
 import { useMusicPlayerPreferences } from "@/components/site/music-player/music-player-preferences";
 import {
@@ -56,6 +59,7 @@ import {
   SheetTrigger,
 } from "@astrodx/ui/components/sheet";
 import { ARCHIVE_FORMATS } from "@/lib/adx-archive-shared";
+import { setMascotHidden } from "@/lib/live2d/mascot-preference";
 import {
   getDownloadSource,
   type CustomDownloadSourceConfig,
@@ -216,6 +220,9 @@ export function SiteSettingsContent({
     hydrateMusicPlayerPreferences();
   }, [hydrateMusicPlayerPreferences]);
 
+  const live2dCopy = getLive2DCopy(locale);
+  const mascotEnabled = !useMascotHidden();
+
   const handleLocaleSelect = (
     event: React.MouseEvent<HTMLAnchorElement>,
     targetLocale: Locale
@@ -356,6 +363,40 @@ export function SiteSettingsContent({
                     {value
                       ? musicPlayerCopy.settings.enable
                       : musicPlayerCopy.settings.disable}
+                  </span>
+                  {active ? (
+                    <CheckIcon aria-hidden="true" className="ml-auto size-3.5" />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </SettingsSection>
+
+        <SettingsSection
+          icon={<SparklesIcon />}
+          title={live2dCopy.settings.title}
+          description={live2dCopy.settings.description}
+        >
+          <div className="grid grid-cols-2 gap-2">
+            {([true, false] as const).map((value) => {
+              const active = mascotEnabled === value;
+              return (
+                <button
+                  key={String(value)}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setMascotHidden(!value)}
+                  className={choiceClass(active)}
+                >
+                  <SparklesIcon
+                    aria-hidden="true"
+                    className={value ? undefined : "opacity-50"}
+                  />
+                  <span>
+                    {value
+                      ? live2dCopy.settings.enable
+                      : live2dCopy.settings.disable}
                   </span>
                   {active ? (
                     <CheckIcon aria-hidden="true" className="ml-auto size-3.5" />
