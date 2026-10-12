@@ -145,10 +145,25 @@ jobs:
           CIRCLE_NODE_TOTAL: ${{ runner.environment == 'self-hosted' && '9' || '' }}
         run: bun run build
 
+      # Official v5 Linux tar recipe, without verbose per-file stdout.
+      # Inline so scheduled builds can still check out an older pages-live.
+      - name: Package Pages artifact
+        run: |
+          started=$SECONDS
+          tar --dereference --hard-dereference \
+            --directory "$GITHUB_WORKSPACE/apps/web/out" \
+            -cf "$RUNNER_TEMP/artifact.tar" \
+            --exclude=.git --exclude=.github --exclude='.[^/]*' .
+          printf 'Pages archive: %s bytes; packing: %s seconds\n' \
+            "$(stat -c '%s' "$RUNNER_TEMP/artifact.tar")" "$((SECONDS - started))"
+
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
-          path: ./apps/web/out
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
 
       # IndexNow 要对比的是本次实际生成并发布的目录，不能在发布 job 中重新生成。
       - name: Upload IndexNow catalog

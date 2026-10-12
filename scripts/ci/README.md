@@ -16,6 +16,10 @@ The first worker uses 32 CPU equivalents and an 8 GiB RAM limit, plus a private 
 
 AstroDX's two site-build steps cap Next 16's static-generation pool at eight workers. Docker's CPU quota alone does not change the host CPU count used by Next; the override is scoped to these build steps and does not affect other repositories.
 
+Runner-host Bun installs use `BUN_INSTALL_CACHE_DIR=/opt/actions-runner/_work/.bun-install-cache`. This cache lives on the workspace mount, outside the nested repository checkout, so package installs can hardlink and checkout cleanup preserves it. It remains isolated per runner instance. Before recreating an existing worker, copy its old `/home/runner/.bun/install/cache` contents here while idle to retain the warm cache. In a job container, use the translated workspace path `/__w/.bun-install-cache` if installing with Bun there.
+
+Pages packaging uses the official v5 Linux tar flags without per-file verbose output, then the standard artifact uploader with its default compression. To measure it without publication, run `web-check.yml`, then `runner-smoke.yml` with `pages_archive=true` on the same ref before another checkout job. The benchmark checks the preceding checkout SHA, verifies a Bun cache hardlink, packages its output, and uploads a one-day `github-pages` artifact. It never deploys or moves `pages-live`.
+
 ## Add another repository
 
 Run this from an authenticated administrative workstation with `gh`, `jq`, SSH, and repository admin access:

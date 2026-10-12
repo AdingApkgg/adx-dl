@@ -124,6 +124,9 @@ def compose_config(repository, instance, label, cpus, memory, policy_path, netwo
                     "MANAGED_RUNNER_NAME": "localhost-128-" + key[:40] + "-" + hashlib.sha256(key.encode()).hexdigest()[:8],
                     "MANAGED_RUNNER_LABELS": "managed-ci," + label,
                     "DOCKER_CONFIG": "/opt/actions-runner/.docker",
+                    # Keep packages and node_modules on the same mount so Bun
+                    # can hardlink; checkout only cleans the nested repository.
+                    "BUN_INSTALL_CACHE_DIR": "/opt/actions-runner/_work/.bun-install-cache",
                     **proxy_environment,
                 },
                 "volumes": ["state:/opt/actions-runner", "work:/opt/actions-runner/_work", "tools:/opt/hostedtoolcache", str(policy_path) + ":/etc/gha-runner/policy.json:ro"],

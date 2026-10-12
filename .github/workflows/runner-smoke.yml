@@ -1,15 +1,20 @@
 name: Managed runner smoke
 
-# 只验证 runner 池，不安装项目依赖、不构建，也不发布。
+# 验证 runner；可单独测量上一轮 Web CI 的 Pages 打包与上传，不发布。
 on:
   workflow_dispatch:
+    inputs:
+      pages_archive:
+        description: Benchmark the preceding Web CI archive (run Web check first)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   smoke:
-    if: contains(fromJSON('["refs/heads/main","refs/heads/dev","refs/heads/pre"]'), github.ref)
+    if: contains(fromJSON('["refs/heads/main","refs/heads/dev","refs/heads/pre"]'), github.ref) && !inputs.pages_archive
     runs-on: [self-hosted, linux, x64, astrodx-ci]
     timeout-minutes: 10
     services:
@@ -81,7 +86,7 @@ jobs:
 
   # GitHub 的 job container 还要能访问 /__w、/__e 和 /__t，不能只验证 docker run。
   container_smoke:
-    if: contains(fromJSON('["refs/heads/main","refs/heads/dev","refs/heads/pre"]'), github.ref)
+    if: contains(fromJSON('["refs/heads/main","refs/heads/dev","refs/heads/pre"]'), github.ref) && !inputs.pages_archive
     runs-on: [self-hosted, linux, x64, astrodx-ci]
     timeout-minutes: 10
     container:
@@ -121,3 +126,41 @@ jobs:
           console.log(`Node ${process.versions.node}: workspace ${workspace}, tool cache ${toolCache}`);
           console.log("The job container can run Node and read the checked-out repository.");
           NODE
+
+  pages_archive:
+    if: inputs.pages_archive && contains(fromJSON('["refs/heads/main","refs/heads/dev","refs/heads/pre"]'), github.ref)
+    runs-on: [self-hosted, linux, x64, astrodx-ci]
+    timeout-minutes: 20
+    steps:
+      # Checkout would delete the preceding build. Require the same commit and
+      # source output instead; this benchmark never invokes deploy-pages.
+      - name: Verify the preceding build and same-volume Bun cache
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(cat apps/web/.next/ci-build-sha)" = "$GITHUB_SHA"
+          test -f apps/web/out/index.html
+          test -n "$BUN_INSTALL_CACHE_DIR"
+          probe="$(mktemp "$BUN_INSTALL_CACHE_DIR/.hardlink-probe.XXXXXX")"
+          linked="$GITHUB_WORKSPACE/.hardlink-probe-$GITHUB_RUN_ID"
+          trap 'rm -f -- "$probe" "$linked"' EXIT
+          ln "$probe" "$linked"
+          printf 'Bun cache hardlink succeeds: %s\n' "$BUN_INSTALL_CACHE_DIR"
+
+      # Keep the invocation identical to deploy-gh-pages.yml.
+      - name: Package Pages artifact
+        run: |
+          started=$SECONDS
+          tar --dereference --hard-dereference \
+            --directory "$GITHUB_WORKSPACE/apps/web/out" \
+            -cf "$RUNNER_TEMP/artifact.tar" \
+            --exclude=.git --exclude=.github --exclude='.[^/]*' .
+          printf 'Pages archive: %s bytes; packing: %s seconds\n' \
+            "$(stat -c '%s' "$RUNNER_TEMP/artifact.tar")" "$((SECONDS - started))"
+
+      - name: Upload benchmark Pages artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error

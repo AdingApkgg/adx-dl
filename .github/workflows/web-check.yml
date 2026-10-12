@@ -105,3 +105,7 @@ jobs:
         env:
           CIRCLE_NODE_TOTAL: ${{ runner.environment == 'self-hosted' && '9' || '' }}
         run: bun run build
+
+      # Attest this successful build before the separate archive benchmark.
+      - name: Record build provenance
+        run: printf '%s\n' "$GITHUB_SHA" > apps/web/.next/ci-build-sha
