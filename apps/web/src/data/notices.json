@@ -1,6 +1,30 @@
 {
   "notices": [
     {
+      "id": "2026-10-magical-charts",
+      "level": "featured",
+      "publishedAt": "2026-10-13",
+      "expiresAt": null,
+      "title": {
+        "zh": "maimai DX MAGiCAL 谱面已上线",
+        "en": "maimai DX MAGiCAL charts are here",
+        "ja": "maimai DX MAGiCAL の譜面を追加しました"
+      },
+      "body": {
+        "zh": "新版本 MAGiCAL 的谱面已经收录，目前共 29 首（含宴谱），之后会随新曲陆续补充。\n在曲库里按版本筛选 MAGiCAL 就能看到全部，每首都可以在线预览后再下载。",
+        "en": "Charts from the new MAGiCAL version are now in the archive — 29 so far, utage included, with more added as new songs arrive.\nFilter the catalog by the MAGiCAL version to see them all; every chart can be previewed in the browser before you download it.",
+        "ja": "新バージョン MAGiCAL の譜面を収録しました。現在 29 曲（宴譜面を含む）で、新曲に合わせて順次追加していきます。\n曲一覧でバージョン「MAGiCAL」を選ぶとすべて表示され、ダウンロード前にブラウザでプレビューできます。"
+      },
+      "link": {
+        "href": "/charts?version=27",
+        "label": {
+          "zh": "查看 MAGiCAL 谱面",
+          "en": "Browse MAGiCAL charts",
+          "ja": "MAGiCAL の譜面を見る"
+        }
+      }
+    },
+    {
       "id": "2026-09-notices-launched",
       "level": "normal",
       "publishedAt": "2026-09-23",
