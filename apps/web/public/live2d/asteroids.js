@@ -238,6 +238,11 @@ function Asteroids() {
   this.bullets = [];
   this.enemies = [];
   this.dying = [];
+  // adx: shot elements are hidden rather than removed. Most of the page is
+  // owned by React, which throws NotFoundError when it later unmounts a node
+  // someone else already detached — so the game only hides them, and puts
+  // them back when it ends.
+  this.killed = [];
   this.totalEnemies = 0;
   this.particles = [];
 
@@ -254,6 +259,7 @@ function Asteroids() {
         el.prefix !== "g_vml_" &&
         hasOnlyTextualChildren(el) &&
         el.className !== "ASTEROIDSYEAH" &&
+        !el.asteroidsKilled &&
         el.offsetHeight > 0
       ) {
         el.aSize = size(el);
@@ -480,7 +486,19 @@ function Asteroids() {
     this.points = document.getElementById("ASTEROIDS-POINTS");
   }
   setScore();
+  // adx: keys typed into a text field belong to the field — only Escape (to
+  // quit) is still read there.
+  const isEditable = function (target) {
+    return (
+      !!target &&
+      (target.isContentEditable ||
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT")
+    );
+  };
   const eventKeydown = function (event) {
+    if (isEditable(event.target) && event.key !== "Escape") return;
     that.keysPressed[event.key] = true;
     switch (event.key) {
       case " ":
@@ -510,6 +528,7 @@ function Asteroids() {
   };
   document.addEventListener("keydown", eventKeydown, false);
   const eventKeypress = function (event) {
+    if (isEditable(event.target)) return;
     if (
       [
         "ArrowUp",
@@ -532,6 +551,7 @@ function Asteroids() {
   };
   document.addEventListener("keypress", eventKeypress, false);
   const eventKeyup = function (event) {
+    if (isEditable(event.target) && event.key !== "Escape") return;
     that.keysPressed[event.key] = false;
     if (
       [
@@ -743,10 +763,13 @@ function Asteroids() {
     }
     if (this.dying.length) {
       for (let i = this.dying.length - 1; i >= 0; i--) {
-        try {
-          if (this.dying[i].parentNode) window.ASTEROIDS.enemiesKilled++;
-          this.dying[i].parentNode.removeChild(this.dying[i]);
-        } catch (e) { }
+        const victim = this.dying[i];
+        if (!victim.asteroidsKilled) {
+          victim.asteroidsKilled = true;
+          this.killed.push({ el: victim, visibility: victim.style.visibility });
+          victim.style.visibility = "hidden";
+          window.ASTEROIDS.enemiesKilled++;
+        }
       }
       setScore();
       this.dying = [];
@@ -790,6 +813,16 @@ function Asteroids() {
     removeStylesheet("ASTEROIDSYEAHSTYLES");
     document.body.classList.remove("ASTEROIDSYEAH");
     this.gameContainer.parentNode.removeChild(this.gameContainer);
+    for (const { el, visibility } of this.killed) {
+      el.style.visibility = visibility;
+      el.asteroidsKilled = false;
+    }
+    this.killed = [];
+    for (const enemy of this.enemies) enemy.classList.remove("ASTEROIDSYEAHENEMY");
+    // adx: the mascot reads this list to tell whether a game is running.
+    const players = window.ASTEROIDSPLAYERS || [];
+    const index = players.indexOf(this);
+    if (index !== -1) players.splice(index, 1);
   }
 }
 

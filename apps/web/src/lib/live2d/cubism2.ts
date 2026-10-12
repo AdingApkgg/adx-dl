@@ -84,6 +84,23 @@ export interface TapResult {
   hitArea: string | null;
 }
 
+/** Everything one model needs, built off to the side and swapped in whole. */
+interface LoadedModel {
+  model: any;
+  settings: ModelJson;
+  base: string;
+  textures: WebGLTexture[];
+  physics: any[];
+  motionMgr: any;
+  /** Per model: the one on screen keeps its own while the next one loads. */
+  matrix: Float32Array<ArrayBuffer>;
+}
+
+/** Redraws at most this often; motions and physics are time-based, so fewer frames only means less GPU work. */
+const FRAME_INTERVAL_MS = 1000 / 30;
+/** Alpha (0–255) above which a pixel counts as part of the character for hit testing. */
+const HIT_ALPHA = 16;
+
 export class Cubism2Mascot {
   private canvas: HTMLCanvasElement;
   private gl: WebGLRenderingContext;
@@ -91,12 +108,15 @@ export class Cubism2Mascot {
   private settings: ModelJson | null = null;
   private base = "";
   private motionMgr: any = null;
-  /** file → Promise<motion>：并发未命中也只 fetch 一次。 */
+  /** url → Promise<motion>：并发未命中也只 fetch 一次。 */
   private motionCache = new Map<string, Promise<any>>();
+  /** Motion files that failed once: skipped for the rest of the session instead of refetched every frame. */
+  private failedMotions = new Set<string>();
   private physics: any[] = [];
   private textures: WebGLTexture[] = [];
   private matrix = new Float32Array(16);
   private raf = 0;
+  private lastDraw = 0;
   private dead = false;
   /** 防止 isFinished 期间每帧重复触发动作加载。 */
   private motionPending = false;
@@ -109,6 +129,7 @@ export class Cubism2Mascot {
     e.preventDefault();
     if (this.raf) cancelAnimationFrame(this.raf);
     this.raf = 0;
+    this.settleRequests();
   };
 
   constructor(canvas: HTMLCanvasElement) {
@@ -123,8 +144,10 @@ export class Cubism2Mascot {
     canvas.addEventListener("webglcontextlost", this.onContextLost);
   }
 
-  /** 拍照请求：tick 内 draw 之后取帧回调。 */
-  private photoRequest: ((dataUrl: string) => void) | null = null;
+  /** Pending photo callbacks, all answered by the next drawn frame. */
+  private photoRequests: ((dataUrl: string) => void)[] = [];
+  /** The latest hit-test probe; a newer one supersedes it. */
+  private hitProbe: { x: number; y: number; resolve: (hit: boolean) => void } | null = null;
 
   async load(src: string): Promise<void> {
     await loadCore();
@@ -132,49 +155,92 @@ export class Cubism2Mascot {
     const w = core();
     w.Live2D.init();
     w.Live2D.setGL(this.gl);
-    await this.loadModelAssets(src);
-    if (!this.dead && !this.raf) this.startLoop();
+    const loaded = await this.loadModelAssets(src);
+    if (!loaded) return;
+    this.commit(loaded);
+    if (!this.raf) this.startLoop();
   }
 
-  /** 热切换模型（换装/换人）：同一 canvas/GL，卸旧载新。 */
+  /**
+   * 热切换模型（换装/换人）：同一 canvas/GL。The new model is built while the
+   * old one keeps animating and swapped in only once complete, so the loop
+   * never draws a half-loaded model, and a failed load (rejected here) leaves
+   * the old one in place.
+   */
   async switchModel(src: string): Promise<void> {
     if (this.dead) return;
-    this.model = null; // tick 以 !model 跳过渲染
-    this.settings = null;
-    this.motionPending = false;
-    this.motionCache.clear();
-    this.physics = [];
+    const loaded = await this.loadModelAssets(src);
+    if (!loaded) return;
     for (const t of this.textures) this.gl.deleteTexture(t);
-    this.textures = [];
-    await this.loadModelAssets(src);
+    this.motionCache.clear();
+    this.motionPending = false;
+    this.commit(loaded);
   }
 
-  /** 截取当前帧（透明背景 PNG dataURL）。 */
+  private commit(loaded: LoadedModel): void {
+    this.model = loaded.model;
+    this.settings = loaded.settings;
+    this.base = loaded.base;
+    this.textures = loaded.textures;
+    this.physics = loaded.physics;
+    this.motionMgr = loaded.motionMgr;
+    this.matrix = loaded.matrix;
+    this.model.setMatrix(this.matrix);
+  }
+
+  /** 截取当前帧（透明背景 PNG dataURL）；"" when nothing can be drawn. */
   takePhoto(): Promise<string> {
+    if (!this.model || !this.raf) return Promise.resolve("");
     return new Promise((resolve) => {
-      this.photoRequest = resolve;
+      this.photoRequests.push(resolve);
     });
   }
 
-  private async loadModelAssets(src: string): Promise<void> {
+  /**
+   * Whether the character is drawn at (x, y), CSS px relative to the canvas.
+   * Answered from the next drawn frame by reading that one pixel's alpha, so
+   * the transparent parts of the canvas can let clicks through to the page.
+   */
+  probe(x: number, y: number): Promise<boolean> {
+    if (!this.model || !this.raf) return Promise.resolve(false);
+    this.hitProbe?.resolve(false);
+    return new Promise((resolve) => {
+      this.hitProbe = { x, y, resolve };
+    });
+  }
+
+  /** Answers every outstanding request with "nothing", e.g. once the loop has stopped for good. */
+  private settleRequests(): void {
+    for (const resolve of this.photoRequests) resolve("");
+    this.photoRequests = [];
+    this.hitProbe?.resolve(false);
+    this.hitProbe = null;
+  }
+
+  private deleteTextures(textures: WebGLTexture[]): void {
+    for (const t of textures) this.gl.deleteTexture(t);
+  }
+
+  /** Builds a model without touching the one on screen; null if the engine died meanwhile. */
+  private async loadModelAssets(src: string): Promise<LoadedModel | null> {
     const w = core();
-    this.base = src.slice(0, src.lastIndexOf("/") + 1);
+    const base = src.slice(0, src.lastIndexOf("/") + 1);
     const settings = (await (await fetch(src)).json()) as ModelJson;
-    if (this.dead) return;
-    this.settings = settings;
+    if (this.dead) return null;
 
     // --- model ---
-    const moc = await fetchBuf(this.base + settings.model);
-    if (this.dead) return;
-    this.model = w.Live2DModelWebGL.loadModel(moc);
+    const moc = await fetchBuf(base + settings.model);
+    if (this.dead) return null;
+    const model = w.Live2DModelWebGL.loadModel(moc);
     // 关键：先快照 moc 默认参数作为基线。否则循环首帧 loadParam 会载入
     // 未初始化(全零)参数，部件形变整体错乱（官方框架加载后同样先 saveParam）。
-    this.model.saveParam();
+    model.saveParam();
 
     // --- textures ---
     const gl = this.gl;
-    const images = await Promise.all(settings.textures.map((t) => loadImage(this.base + t)));
-    if (this.dead) return;
+    const images = await Promise.all(settings.textures.map((t) => loadImage(base + t)));
+    if (this.dead) return null;
+    const textures: WebGLTexture[] = [];
     images.forEach((img, i) => {
       const tex = gl.createTexture();
       if (!tex) return;
@@ -185,14 +251,14 @@ export class Cubism2Mascot {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.generateMipmap(gl.TEXTURE_2D);
-      this.model.setTexture(i, tex);
-      this.textures.push(tex);
+      model.setTexture(i, tex);
+      textures.push(tex);
     });
 
     // --- model matrix：contain-fit 到画布（L2Dwidget 式，忽略 json layout —
     // 那是旧框架 viewMatrix 语义，直接当 clip 变换会放大裁切）。带纵横比补偿，
     // 模型像素保持正方；水平居中、垂直贴顶（看板娘露头身，底边裁脚）。---
-    const cw = this.model.getCanvasWidth();
+    const cw = model.getCanvasWidth();
     const aspect = this.canvas.width / this.canvas.height; // 物理像素比即可
     // x 方向铺满：sx=2/cw；y 保持正方形像素：sy = sx * aspect
     const sx = 2 / cw;
@@ -200,14 +266,17 @@ export class Cubism2Mascot {
     const tx = -(sx * cw) / 2; // 水平居中
     const ty = 1; // 模型顶(y_m=0)贴 clip 顶(+1)
     // 列主序：x' = sx·x + tx，y' = -sy·y + ty（模型画布 y 向下 → clip y 向上）
-    this.matrix.set([sx, 0, 0, 0, 0, -sy, 0, 0, 0, 0, 1, 0, tx, ty, 0, 1]);
-    this.model.setMatrix(this.matrix);
+    const matrix = new Float32Array([sx, 0, 0, 0, 0, -sy, 0, 0, 0, 0, 1, 0, tx, ty, 0, 1]);
 
     // --- physics ---
+    const physics: any[] = [];
     if (settings.physics) {
       try {
-        const pj = (await (await fetch(this.base + settings.physics)).json()) as PhysicsJson;
-        if (this.dead) return;
+        const pj = (await (await fetch(base + settings.physics)).json()) as PhysicsJson;
+        if (this.dead) {
+          this.deleteTextures(textures);
+          return null;
+        }
         const PH = w.PhysicsHair;
         const srcType = (t: string) =>
           t === "x" ? PH.Src.SRC_TO_X : t === "y" ? PH.Src.SRC_TO_Y : PH.Src.SRC_TO_G_ANGLE;
@@ -217,38 +286,45 @@ export class Cubism2Mascot {
           for (const sp of h.src) p.addSrcParam(srcType(sp.ptype), sp.id, sp.scale, sp.weight);
           for (const tp of h.targets)
             p.addTargetParam(PH.Target.TARGET_FROM_ANGLE, tp.id, tp.scale, tp.weight);
-          this.physics.push(p);
+          physics.push(p);
         }
       } catch {
         /* physics 失败不致命 */
       }
     }
 
-    this.motionMgr = new w.MotionQueueManager();
+    return { model, settings, base, textures, physics, matrix, motionMgr: new w.MotionQueueManager() };
   }
 
   /** 播放某组里的随机动作（不存在则忽略）。 */
   async startRandomMotion(group: string): Promise<void> {
-    const entries = this.settings?.motions?.[group];
+    // Keyed by full URL: models reuse file names like motions/idle_01.mtn.
+    const entries = this.settings?.motions?.[group]?.filter(
+      (m) => !this.failedMotions.has(this.base + m.file)
+    );
     if (!entries?.length || this.dead || this.motionPending) return;
     this.motionPending = true;
     const e = entries[Math.floor(Math.random() * entries.length)]!;
+    const motionMgr = this.motionMgr;
+    const url = this.base + e.file;
     try {
-      let motionP = this.motionCache.get(e.file);
+      let motionP = this.motionCache.get(url);
       if (!motionP) {
-        motionP = fetchBuf(this.base + e.file).then((buf) => {
+        motionP = fetchBuf(url).then((buf) => {
           const m = core().Live2DMotion.loadMotion(buf);
           m.setFadeIn(e.fade_in ?? 500);
           m.setFadeOut(e.fade_out ?? 500);
           return m;
         });
-        this.motionCache.set(e.file, motionP);
-        motionP.catch(() => this.motionCache.delete(e.file)); // 失败可重试
+        this.motionCache.set(url, motionP);
       }
       const motion = await motionP;
-      if (!this.dead) this.motionMgr.startMotion(motion, false);
+      // Skip if the model was switched while this motion loaded.
+      if (!this.dead && this.motionMgr === motionMgr) motionMgr.startMotion(motion, false);
     } catch {
-      /* 单个动作失败不致命 */
+      // 单个动作失败不致命 — but retrying it would refetch on every frame.
+      this.failedMotions.add(url);
+      this.motionCache.delete(url);
     } finally {
       this.motionPending = false;
     }
@@ -323,11 +399,18 @@ export class Cubism2Mascot {
   private startLoop(): void {
     const gl = this.gl;
     const w = core();
-    const tick = () => {
+    const tick = (now: number) => {
       if (this.dead) return;
       this.raf = requestAnimationFrame(tick);
       const m = this.model;
       if (!m) return;
+      // Nothing to see while another element (the chart preview) is fullscreen.
+      if (document.fullscreenElement) {
+        this.settleRequests();
+        return;
+      }
+      if (now - this.lastDraw < FRAME_INTERVAL_MS - 1) return;
+      this.lastDraw = now;
 
       const timeMSec = w.UtSystem.getUserTimeMSec();
 
@@ -359,14 +442,28 @@ export class Cubism2Mascot {
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       m.draw();
-      if (this.photoRequest) {
-        const cb = this.photoRequest;
-        this.photoRequest = null;
+      // Both read the frame just drawn, before it is composited and cleared —
+      // no need for preserveDrawingBuffer.
+      if (this.hitProbe) {
+        const { x, y, resolve } = this.hitProbe;
+        this.hitProbe = null;
+        const rect = this.canvas.getBoundingClientRect();
+        const px = Math.floor((x / rect.width) * this.canvas.width);
+        const py = this.canvas.height - 1 - Math.floor((y / rect.height) * this.canvas.height);
+        const pixel = new Uint8Array(4);
+        gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+        resolve((pixel[3] ?? 0) > HIT_ALPHA);
+      }
+      if (this.photoRequests.length) {
+        const requests = this.photoRequests;
+        this.photoRequests = [];
+        let url = "";
         try {
-          cb(this.canvas.toDataURL("image/png")); // draw 同帧内取，无需 preserveDrawingBuffer
+          url = this.canvas.toDataURL("image/png"); // draw 同帧内取，无需 preserveDrawingBuffer
         } catch {
-          cb("");
+          /* tainted or lost: answer with "" */
         }
+        for (const resolve of requests) resolve(url);
       }
     };
     this.raf = requestAnimationFrame(tick);
@@ -376,9 +473,14 @@ export class Cubism2Mascot {
     this.dead = true;
     this.canvas.removeEventListener("webglcontextlost", this.onContextLost);
     if (this.raf) cancelAnimationFrame(this.raf);
-    for (const t of this.textures) this.gl.deleteTexture(t);
+    this.raf = 0;
+    this.settleRequests();
+    this.deleteTextures(this.textures);
     this.textures = [];
     this.motionCache.clear();
     this.model = null;
+    // Free the context now: hiding and re-showing the mascot creates a new
+    // canvas each time, and browsers cap live WebGL contexts per page.
+    this.gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
 }

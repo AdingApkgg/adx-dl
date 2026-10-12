@@ -35,7 +35,7 @@ const copies: Record<Locale, Live2DCopy> = {
     },
     settings: {
       title: "看板娘",
-      description: "右下角的 Live2D 看板娘。仅在宽屏且未开启简化兼容模式时出现。",
+      description: "右下角的 Live2D 看板娘。仅在宽屏、使用鼠标且未开启简化兼容模式时出现。",
       enable: "显示",
       disable: "隐藏",
     },
@@ -54,7 +54,7 @@ const copies: Record<Locale, Live2DCopy> = {
     settings: {
       title: "Live2D mascot",
       description:
-        "The Live2D mascot in the bottom-right corner. She only appears on wide screens with simple compatibility mode off.",
+        "The Live2D mascot in the bottom-right corner. She only appears on wide screens with a mouse, with simple compatibility mode off.",
       enable: "Show",
       disable: "Hide",
     },
@@ -73,7 +73,7 @@ const copies: Record<Locale, Live2DCopy> = {
     settings: {
       title: "看板娘",
       description:
-        "右下に表示される Live2D の看板娘です。ワイド画面で、簡易互換モードがオフのときだけ表示されます。",
+        "右下に表示される Live2D の看板娘です。ワイド画面でマウスを使い、簡易互換モードがオフのときだけ表示されます。",
       enable: "表示",
       disable: "非表示",
     },

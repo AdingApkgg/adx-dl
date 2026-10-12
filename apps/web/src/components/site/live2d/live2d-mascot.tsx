@@ -46,6 +46,11 @@ function readStored(key: string): string | null {
   }
 }
 
+type AsteroidsWindow = Window & {
+  Asteroids?: new () => unknown;
+  ASTEROIDSPLAYERS?: unknown[];
+};
+
 function writeStored(key: string, value: string): void {
   try {
     window.localStorage.setItem(key, value);
@@ -62,7 +67,11 @@ function writeStored(key: string, value: string): void {
  */
 export default function Live2DMascot({ locale, width = 230, height = 320, className }: Live2DMascotProps) {
   const copy = getLive2DCopy(locale);
-  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  // The canvas is created per engine (below), not rendered by React: the
+  // engine releases its WebGL context on destroy, and a canvas React keeps
+  // around — across a dev double-invoke or any re-run of the effect — would
+  // hand the next engine that already-lost context.
+  const canvasHostRef = React.useRef<HTMLDivElement>(null);
   const engineRef = React.useRef<Cubism2Mascot | null>(null);
   const [list, setList] = React.useState<ModelList | null>(null);
   // Hidden and click-through until the first model has drawn: if the model CDN
@@ -75,6 +84,22 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
   // later switches go through switchModel, so it must not depend on the state.
   const selectionRef = React.useRef({ group: 0, costume: 0 });
   const switching = React.useRef(false);
+  const rectRef = React.useRef<DOMRect | null>(null);
+
+  // ---- 工具栏显隐 ----
+  // Shown while the pointer is on her or on the toolbar, and for 0.6s after it
+  // leaves either, so it can cross the transparent canvas between the two.
+  const [toolsOpen, setToolsOpen] = React.useState(false);
+  const toolsCloseTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openTools = React.useCallback(() => {
+    if (toolsCloseTimer.current) clearTimeout(toolsCloseTimer.current);
+    toolsCloseTimer.current = null;
+    setToolsOpen(true);
+  }, []);
+  const closeToolsSoon = React.useCallback(() => {
+    if (toolsCloseTimer.current) clearTimeout(toolsCloseTimer.current);
+    toolsCloseTimer.current = setTimeout(() => setToolsOpen(false), 600);
+  }, []);
 
   // ---- 气泡（带优先级）----
   const [tip, setTip] = React.useState<string | null>(null);
@@ -99,6 +124,7 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
     () => () => {
       if (tipTimer.current) clearTimeout(tipTimer.current);
       if (followupTimer.current) clearTimeout(followupTimer.current);
+      if (toolsCloseTimer.current) clearTimeout(toolsCloseTimer.current);
     },
     []
   );
@@ -138,15 +164,29 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
   // ---- 引擎生命周期 ----
   React.useEffect(() => {
     if (!list) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const scale = Math.min(Math.max(window.devicePixelRatio || 1, 2), 3);
+    const host = canvasHostRef.current;
+    if (!host) return;
+    const canvas = document.createElement("canvas");
+    canvas.id = "waifu-canvas";
+    Object.assign(canvas.style, {
+      display: "block",
+      width: "100%",
+      height: "100%",
+      background: "transparent",
+      cursor: "pointer",
+      pointerEvents: "none",
+    });
+    host.appendChild(canvas);
+    // Device pixels up to 2× — sharper than that is invisible at 230×320 and
+    // only multiplies the per-frame fill cost.
+    const scale = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
     canvas.width = Math.round(width * scale);
     canvas.height = Math.round(height * scale);
     let engine: Cubism2Mascot | null = null;
     try {
       engine = new Cubism2Mascot(canvas);
     } catch {
+      canvas.remove();
       return;
     }
     engineRef.current = engine;
@@ -160,12 +200,41 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
           console.warn("[waifu] model load failed:", e);
         });
 
+    // The canvas is fixed to the corner, so its rect only changes on resize
+    // (and once, when the entrance animation settles — see onAnimationComplete).
+    // Reading it on every mousemove forced a layout per event.
+    rectRef.current = null;
+    const rect = () => {
+      rectRef.current ??= canvas.getBoundingClientRect();
+      return rectRef.current;
+    };
+    const onResize = () => {
+      rectRef.current = null;
+    };
+    // The canvas only takes the pointer over pixels she is actually drawn on;
+    // everywhere else in her box, clicks reach the page underneath.
+    let probing = false;
+    const setHit = (hit: boolean) => {
+      canvas.style.pointerEvents = hit ? "auto" : "none";
+    };
     const onMove = (e: MouseEvent) => {
-      const r = canvas.getBoundingClientRect();
+      const r = rect();
       engineRef.current?.setGaze(
         (e.clientX - (r.left + r.width / 2)) / (window.innerWidth * 0.5),
         -(e.clientY - (r.top + r.height * 0.3)) / (window.innerHeight * 0.5)
       );
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      if (x < 0 || y < 0 || x >= r.width || y >= r.height) {
+        setHit(false);
+        return;
+      }
+      if (probing || !engineRef.current) return;
+      probing = true;
+      void engineRef.current.probe(x, y).then((hit) => {
+        probing = false;
+        setHit(hit);
+      });
     };
     // 点击看板娘：动作插播；文案由全局 click 监听统一处理
     const onTap = (e: MouseEvent) => {
@@ -173,14 +242,18 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
       engineRef.current?.tap(e.clientX - r.left, e.clientY - r.top, r.width, r.height);
     };
     window.addEventListener("mousemove", onMove, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
     canvas.addEventListener("click", onTap);
+    canvas.addEventListener("pointerenter", openTools);
+    canvas.addEventListener("pointerleave", closeToolsSoon);
     return () => {
       window.removeEventListener("mousemove", onMove);
-      canvas.removeEventListener("click", onTap);
+      window.removeEventListener("resize", onResize);
       engine?.destroy();
       engineRef.current = null;
+      canvas.remove();
     };
-  }, [list, width, height]);
+  }, [list, width, height, openTools, closeToolsSoon]);
 
   // ---- 换装/换人 ----
   const applyModel = React.useCallback(
@@ -197,6 +270,10 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
         writeStored(WAIFU_LS.group, String(g));
         writeStored(WAIFU_LS.costume, String(c));
         if (msg) showTip(msg, 5000, 2);
+      } catch (e) {
+        // The engine keeps the current model when a switch fails.
+        console.warn("[waifu] model switch failed:", e);
+        showTip("呜…新衣服没能拿过来，过会儿再试试吧", 4000, 2);
       } finally {
         switching.current = false;
       }
@@ -223,7 +300,10 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
   // ---- 拍照 ----
   const takePhoto = React.useCallback(async () => {
     const url = await engineRef.current?.takePhoto();
-    if (!url) return;
+    if (!url) {
+      showTip("相机好像出了点问题…", 4000, 2);
+      return;
+    }
     const a = document.createElement("a");
     a.href = url;
     a.download = "waifu.png";
@@ -233,10 +313,22 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
 
   // ---- 打飞机彩蛋 ----
   const startAsteroids = React.useCallback(() => {
-    const s = document.createElement("script");
-    s.src = "/live2d/asteroids.js";
-    document.body.appendChild(s);
-    showTip("准备好了吗？方向键移动，空格发射！", 5000, 2);
+    const w = window as AsteroidsWindow;
+    // One game at a time: every extra instance added another ship and
+    // another set of key handlers.
+    if (w.ASTEROIDSPLAYERS?.length) {
+      showTip("已经在玩啦，按 Esc 可以退出哦", 4000, 2);
+      return;
+    }
+    if (w.Asteroids) {
+      // The script ran before; start a new round without loading it again.
+      w.ASTEROIDSPLAYERS = [new w.Asteroids()];
+    } else {
+      const s = document.createElement("script");
+      s.src = "/live2d/asteroids.js";
+      document.body.appendChild(s);
+    }
+    showTip("准备好了吗？方向键移动，空格发射！Esc 退出", 5000, 2);
   }, [showTip]);
 
   // ---- 一言（正文 + 出处补充两连）----
@@ -302,7 +394,8 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
     document.addEventListener("click", onClick);
     document.addEventListener("copy", onCopy);
     document.addEventListener("visibilitychange", onVis);
-    // 控制台检测：console.log("%c", trap) + toString 陷阱 —— DevTools 渲染日志时才触发
+    // 控制台检测：%c 的样式参数是个 toString 陷阱 —— DevTools 渲染这条日志时
+    // 才会调用它。The line itself says hello rather than logging a blank.
     let warned = false;
     const trap = {
       toString: () => {
@@ -310,10 +403,10 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
           warned = true;
           showTip(tipsRef.current?.message.console, 6000, 3);
         }
-        return "";
+        return "color: #888";
       },
     };
-    console.log("%c", trap);
+    console.log("%c(｡･ω･｡) 看板娘在这里看着你哦", trap);
     return () => {
       document.removeEventListener("mouseover", onOver);
       document.removeEventListener("click", onClick);
@@ -338,11 +431,17 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
   ];
 
   return (
+    // The box itself never takes the pointer: only the drawn character (the
+    // canvas, toggled by the hit probe) and the toolbar do. A pointer-events
+    // box here blocked every page element under the 230×320 corner.
     <motion.div
-      className={`group/waifu ${ready ? "pointer-events-auto" : "pointer-events-none invisible"} ${className ?? ""}`}
+      className={`pointer-events-none ${ready ? "" : "invisible"} ${className ?? ""}`}
       initial={{ opacity: 0, y: 40 }}
       animate={ready ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
       transition={{ type: "spring", stiffness: 120, damping: 18, delay: 0.15 }}
+      onAnimationComplete={() => {
+        rectRef.current = null;
+      }}
       style={{ width, height, position: "relative", userSelect: "none", lineHeight: 0 }}
     >
       <AnimatePresence>
@@ -353,7 +452,7 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 500, damping: 28 }}
-            className="absolute -top-4 left-1/2 z-10 w-max max-w-[220px] -translate-x-1/2 rounded-xl border border-border/70 bg-popover/95 px-3 py-1.5 text-center text-xs text-popover-foreground shadow-md ring-1 ring-foreground/5 backdrop-blur"
+            className="pointer-events-none absolute -top-4 left-1/2 z-10 w-max max-w-[220px] -translate-x-1/2 rounded-xl border border-border/70 bg-popover/95 px-3 py-1.5 text-center text-xs text-popover-foreground shadow-md ring-1 ring-foreground/5 backdrop-blur"
             style={{ lineHeight: 1.6 }}
           >
             {tip}
@@ -361,12 +460,18 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
         )}
       </AnimatePresence>
 
-      {/* 工具栏：悬停看板娘（或键盘聚焦到按钮）时出现 */}
+      {/* 工具栏：悬停看板娘（或键盘聚焦到按钮）时出现。While hidden it is
+          transparent AND click-through, so a click near her edge can't hit an
+          unseen button; it stays focusable, so keyboard focus still reveals it. */}
       <div
         role="toolbar"
         aria-label={copy.toolbar}
         aria-orientation="vertical"
-        className="absolute -left-7 top-10 z-10 flex flex-col gap-1 opacity-0 transition-opacity duration-300 focus-within:opacity-100 group-hover/waifu:opacity-100"
+        onPointerEnter={openTools}
+        onPointerLeave={closeToolsSoon}
+        className={`absolute -left-7 top-10 z-10 flex flex-col gap-1 transition-opacity duration-300 focus-within:pointer-events-auto focus-within:opacity-100 ${
+          toolsOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+        }`}
       >
         {tools.map((t) => (
           <button
@@ -384,11 +489,7 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
       </div>
 
       {/* Decorative: a click (wired in the engine effect) only plays a motion. */}
-      <canvas
-        id="waifu-canvas"
-        ref={canvasRef}
-        style={{ width: "100%", height: "100%", background: "transparent", cursor: "pointer" }}
-      />
+      <div ref={canvasHostRef} style={{ width: "100%", height: "100%" }} />
     </motion.div>
   );
 }

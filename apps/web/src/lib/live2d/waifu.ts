@@ -9,7 +9,10 @@
 
 import { stripLocalePrefix } from "@/lib/i18n";
 
-export const WAIFU_CDN = "https://registry.npmmirror.com/weblive2d/latest/files/";
+// Pinned, not `latest`: a new publish could reorder model_list (restoring a
+// visitor's saved group/costume index to a different character) or drop a
+// model, with nothing changing in this repo. Bump deliberately.
+export const WAIFU_CDN = "https://registry.npmmirror.com/weblive2d/1.0.12/files/";
 
 export interface ModelList {
   models: (string | string[])[];
