@@ -343,8 +343,8 @@ function MusicPlayerSurface({
     duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
 
   const playerBottom = bottomBars > 0
-    ? "calc(var(--batch-download-bar-height, 5rem) + max(1rem, env(safe-area-inset-bottom)) + 0.75rem)"
-    : "max(1rem, env(safe-area-inset-bottom))";
+    ? "calc(var(--batch-download-bar-height, 5rem) + var(--floating-bottom) + 0.75rem)"
+    : "var(--floating-bottom)";
 
   const setPlaybackIntent = React.useCallback((nextIntent: boolean) => {
     playIntentRef.current = nextIntent;

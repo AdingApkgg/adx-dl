@@ -40,7 +40,8 @@ export function NoticesHeaderButton({
       asChild
       className={cn(
         HEADER_ACTION_CLASS,
-        "relative",
+        // Phones reach notices from the bottom tab bar.
+        "relative max-sm:hidden",
         active && "bg-secondary text-secondary-foreground dark:bg-secondary"
       )}
     >

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { CheckIcon, GlobeIcon } from "lucide-react";
 
 import { storePreferredLocale } from "@/app/locale-preference";
-import { HEADER_PHONE_ROW_CLASS } from "@/components/site/header-actions";
 import { EASE_OUT, motion, springSoft } from "@astrodx/ui/motion";
 import { Button } from "@astrodx/ui/components/button";
 import {
@@ -79,7 +78,7 @@ export function LanguageSwitcher({ locale, pathname }: LanguageSwitcherProps) {
         <MotionButton
           variant="outline"
           size="icon-sm"
-          className={`gap-1 sm:w-auto sm:px-2.5 ${HEADER_PHONE_ROW_CLASS}`}
+          className="gap-1 sm:w-auto sm:px-2.5"
           aria-label={dictionary.nav.languageLabel}
           title={dictionary.nav.languageLabel}
           whileHover="hover"

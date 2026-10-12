@@ -66,16 +66,19 @@
    cross-page chrome exactly like the header: without their own names they get
    snapshotted with the root/page group and visibly blink on every navigation. */
 ::view-transition-group(music-player),
-::view-transition-group(download-dock) {
+::view-transition-group(download-dock),
+::view-transition-group(mobile-tabbar) {
   animation: none;
   z-index: 50;
 }
 ::view-transition-old(music-player),
-::view-transition-old(download-dock) {
+::view-transition-old(download-dock),
+::view-transition-old(mobile-tabbar) {
   display: none;
 }
 ::view-transition-new(music-player),
-::view-transition-new(download-dock) {
+::view-transition-new(download-dock),
+::view-transition-new(mobile-tabbar) {
   animation: none;
 }
 
@@ -184,6 +187,27 @@ html[data-reduced-motion] [data-marquee="on"] {
   }
 }
 
+/* Phones get a bottom tab bar (mobile-tab-bar.tsx). Everything else pinned to
+   the lower edge — music player, download dock, batch bar — rests on
+   --floating-bottom instead of the viewport edge, so they stack above the bar
+   rather than under it; the footer pads by --mobile-tabbar-reserve so the
+   page's last lines can scroll clear of it. Pure CSS so the very first paint
+   is already right. The bar hides itself while a text field has focus (the
+   on-screen keyboard is up) and says so with data-mobile-tabbar="hidden",
+   which hands the edge back. */
+:root {
+  --mobile-tabbar-height: 3.5rem;
+  --mobile-tabbar-reserve: 0rem;
+  --floating-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 39.9375rem) {
+  :root:not([data-mobile-tabbar="hidden"]) {
+    --mobile-tabbar-reserve: calc(var(--mobile-tabbar-height) + env(safe-area-inset-bottom));
+    --floating-bottom: calc(var(--mobile-tabbar-reserve) + 0.75rem);
+  }
+}
+
 /* data-music-player mirrors the persisted player preference (stamped by the
    boot script in root-layout-shell.tsx before first paint, then kept in sync
    by the preferences store). The surface rules hide the server-rendered
@@ -220,6 +244,7 @@ html[data-compatibility="simple"] .site-shell-background {
   background-image: none;
 }
 html[data-compatibility="simple"] header,
+html[data-compatibility="simple"] [data-mobile-tabbar-root],
 html[data-compatibility="simple"] [data-music-player-surface],
 html[data-compatibility="simple"] [data-slot="sheet-content"],
 html[data-compatibility="simple"] [data-slot="dropdown-menu-content"] {

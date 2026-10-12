@@ -41,7 +41,7 @@ export function SiteFooter({
       {/* The expanded music player is fixed to the bottom on small screens, so
           the last few footer rows sat underneath it. Same reserve the download
           dock already honours. */}
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pt-8 pb-[calc(2rem+var(--music-player-mobile-reserve,0rem))] md:px-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pt-8 pb-[calc(2rem+var(--music-player-mobile-reserve,0rem)+var(--mobile-tabbar-reserve,0rem))] md:px-6">
         <p className="max-w-2xl text-sm text-muted-foreground">
           {dictionary.footer.description}
         </p>
