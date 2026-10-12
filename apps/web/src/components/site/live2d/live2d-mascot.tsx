@@ -14,6 +14,7 @@ import * as React from "react";
 import type { Locale } from "@/lib/i18n";
 import { Cubism2Mascot } from "@/lib/live2d/cubism2";
 import { setMascotHidden } from "@/lib/live2d/mascot-preference";
+import { isMediaActive, subscribeMediaActivity } from "@/lib/media-coordination";
 import {
   fetchHitokoto,
   fetchModelList,
@@ -190,6 +191,12 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
       return;
     }
     engineRef.current = engine;
+    // Stand down while the chart preview plays: its canvas renders every
+    // frame and is timing-sensitive, and she would otherwise keep a WebGL
+    // loop running right next to it. She freezes on her last frame.
+    const syncSuspended = () => engine?.setSuspended(isMediaActive("chart-preview"));
+    syncSuspended();
+    const unsubscribeActivity = subscribeMediaActivity(syncSuspended);
     const { group: g, costume: c } = selectionRef.current;
     const path = groupCostumes(list, g)[c] ?? groupCostumes(list, 0)[0];
     if (path)
@@ -247,6 +254,7 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
     canvas.addEventListener("pointerenter", openTools);
     canvas.addEventListener("pointerleave", closeToolsSoon);
     return () => {
+      unsubscribeActivity();
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("resize", onResize);
       engine?.destroy();
@@ -346,7 +354,8 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
   // ---- 空闲吐槽：default 消息池(含节日) 与一言轮换 ----
   React.useEffect(() => {
     const timer = setInterval(() => {
-      if (document.hidden || tipTimer.current) return;
+      // Quiet while the tab is hidden, a bubble is up, or a chart is playing.
+      if (document.hidden || tipTimer.current || isMediaActive("chart-preview")) return;
       const tips = tipsRef.current;
       if (tips && Math.random() < 0.7) {
         showTip(stripTags(pick(idlePool(tips))), 6000, 1);

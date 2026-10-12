@@ -118,6 +118,8 @@ export class Cubism2Mascot {
   private raf = 0;
   private lastDraw = 0;
   private dead = false;
+  /** Loop stopped on purpose (see setSuspended); distinct from dead. */
+  private suspended = false;
   /** 防止 isFinished 期间每帧重复触发动作加载。 */
   private motionPending = false;
   /** 注视目标与当前值（-1..1），loop 内做平滑插值。 */
@@ -158,7 +160,24 @@ export class Cubism2Mascot {
     const loaded = await this.loadModelAssets(src);
     if (!loaded) return;
     this.commit(loaded);
-    if (!this.raf) this.startLoop();
+    if (!this.raf && !this.suspended) this.startLoop();
+  }
+
+  /**
+   * Stops the render loop entirely — no frames, no rAF callbacks — until
+   * resumed. The last drawn frame stays on screen. Used while the chart
+   * preview plays, which needs every frame it can get.
+   */
+  setSuspended(suspended: boolean): void {
+    if (this.suspended === suspended || this.dead) return;
+    this.suspended = suspended;
+    if (suspended) {
+      if (this.raf) cancelAnimationFrame(this.raf);
+      this.raf = 0;
+      this.settleRequests();
+    } else if (this.model && !this.raf) {
+      this.startLoop();
+    }
   }
 
   /**

@@ -5,6 +5,7 @@ import { useGameStore, playbackTimeRef, audioMasterTimeMsRef } from "./store/gam
 import { useGameSettingsStore, FULLSCREEN_QUALITY_MP } from "./store/settings-store";
 import { MainRenderer, ANSWER_SOUND_BASE_OFFSET_MS } from "@lxns-network/maimai-chart-engine";
 import { useAudio } from "./hooks/use-audio";
+import { useMediaActivity } from "./hooks/use-media-activity";
 import { useMusicPlayer } from "./hooks/use-music-player";
 import { useWakeLock } from "./hooks/use-wake-lock";
 import { beatsToMs, msToBeats } from "./lib/time-conversion";
@@ -102,6 +103,8 @@ export function ChartCanvas({
   const isFullscreen = useGameStore((s) => s.isFullscreen);
   const isPlaying = useGameStore((s) => s.isPlaying);
   useWakeLock(isPlaying);
+  // Lets the rest of the site (the Live2D mascot) stand down while the chart renders.
+  useMediaActivity("chart-preview", isPlaying);
   const chartData = useGameStore((s) => s.chartData);
   const totalMeasures = useGameStore((s) => s.timeline.totalMeasures);
   const beatsPerMeasure = useGameStore((s) => s.timeline.beatsPerMeasure);
