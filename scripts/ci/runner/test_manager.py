@@ -39,15 +39,17 @@ class ManagerTests(unittest.TestCase):
         self.assertNotIn("privileged", runner)
         self.assertNotIn("/var/run/docker.sock", str(runner["volumes"]))
         export_hook = str(manager.ROOT / "runner" / "next-export-links.cjs") + ":/etc/gha-runner/next-export-links.cjs:ro"
-        # Only this public CI helper may be mounted from the manager directory;
+        cache_helper = str(manager.ROOT / "runner" / "next-build-cache.py") + ":/etc/gha-runner/next-build-cache.py:ro"
+        # Only these public CI helpers may be mounted from the manager directory;
         # never admit a host home directory, SSH files or other private paths.
         for mount in runner["volumes"]:
             if mount.startswith("/home/i"):
-                self.assertEqual(mount, export_hook)
+                self.assertIn(mount, {export_hook, cache_helper})
         self.assertEqual(runner["mem_limit"], "8g")
         self.assertEqual(runner["cpus"], 32)
         self.assertEqual(runner["security_opt"], ["no-new-privileges:true"])
         self.assertIn(str(manager.ROOT / "runner" / "next-export-links.cjs") + ":/etc/gha-runner/next-export-links.cjs:ro", runner["volumes"])
+        self.assertIn(cache_helper, runner["volumes"])
         self.assertEqual(daemon["mem_limit"], "4g")
         self.assertEqual(daemon["cpus"], 16)
         self.assertNotIn("token", str(config).lower())

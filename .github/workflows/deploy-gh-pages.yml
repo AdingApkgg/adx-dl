@@ -121,7 +121,13 @@ jobs:
         run: bun run enrich:details
 
       # Next.js build cache (module graph, compiled pages) across runs.
+      - name: Restore local Next.js cache
+        id: local_next_cache
+        if: runner.environment == 'self-hosted'
+        run: python3 /etc/gha-runner/next-build-cache.py restore
+
       - name: Cache Next.js build
+        if: runner.environment != 'self-hosted'
         uses: actions/cache@v6
         with:
           path: apps/web/.next/cache
@@ -171,6 +177,10 @@ jobs:
           rm -rf -- apps/web/.next/server
           printf 'Intermediate cleanup: %s seconds\n' "$((SECONDS - started))"
           cat /sys/fs/cgroup/memory.events /sys/fs/cgroup/io.pressure
+
+      - name: Persist local Next.js cache
+        if: always() && runner.environment == 'self-hosted' && steps.local_next_cache.outcome == 'success'
+        run: python3 /etc/gha-runner/next-build-cache.py save
 
       # Official v5 Linux tar recipe, without verbose per-file stdout.
       # Inline so scheduled builds can still check out an older pages-live.

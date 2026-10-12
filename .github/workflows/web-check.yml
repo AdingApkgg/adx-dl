@@ -80,7 +80,13 @@ jobs:
         working-directory: apps/web
         run: bun run enrich:details
 
+      - name: Restore local Next.js cache
+        id: local_next_cache
+        if: runner.environment == 'self-hosted'
+        run: python3 /etc/gha-runner/next-build-cache.py restore
+
       - name: Cache Next.js build
+        if: runner.environment != 'self-hosted'
         uses: actions/cache@v6
         with:
           path: apps/web/.next/cache
@@ -138,3 +144,9 @@ jobs:
       # Attest this successful build before the separate archive benchmark.
       - name: Record build provenance
         run: printf '%s\n' "$GITHUB_SHA" > apps/web/.next/ci-build-sha
+
+      # Compiler caches can survive unsuccessful builds, as in a local project.
+      # They never attest that an export succeeded; Next validates their inputs.
+      - name: Persist local Next.js cache
+        if: always() && runner.environment == 'self-hosted' && steps.local_next_cache.outcome == 'success'
+        run: python3 /etc/gha-runner/next-build-cache.py save
