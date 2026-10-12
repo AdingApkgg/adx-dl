@@ -143,7 +143,34 @@ jobs:
         # Next 16 默认按宿主机 CPU 数创建 worker；自托管构建限制为 8 个。
         env:
           CIRCLE_NODE_TOTAL: ${{ runner.environment == 'self-hosted' && '9' || '' }}
-        run: bun run build
+          ASTRODX_CI_EXPORT_LINKS: ${{ runner.environment == 'self-hosted' && '1' || '' }}
+          NODE_OPTIONS: ${{ runner.environment == 'self-hosted' && '--require /etc/gha-runner/next-export-links.cjs' || '' }}
+        run: |
+          if [ -r /sys/fs/cgroup/memory.events ]; then
+            printf 'Before build: memory events\n'
+            cat /sys/fs/cgroup/memory.events
+          fi
+          bun run build
+
+      # Keep this inline: scheduled builds may check out an older pages-live.
+      - name: Inspect export and trim static build intermediates
+        if: runner.environment == 'self-hosted'
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          events = [event for line in Path("apps/web/.next/trace").read_text().splitlines() for event in json.loads(line)]
+          for name in ("next-build", "static-generation", "output-export-full-static-export"):
+              durations = [event["duration"] / 1_000_000 for event in events if event["name"] == name]
+              if durations:
+                  print(f"Next trace {name}: {max(durations):.3f} seconds")
+          PY
+          test -f apps/web/out/index.html
+          du -sh apps/web/.next/server apps/web/out
+          started=$SECONDS
+          rm -rf -- apps/web/.next/server
+          printf 'Intermediate cleanup: %s seconds\n' "$((SECONDS - started))"
+          cat /sys/fs/cgroup/memory.events /sys/fs/cgroup/io.pressure
 
       # Official v5 Linux tar recipe, without verbose per-file stdout.
       # Inline so scheduled builds can still check out an older pages-live.
