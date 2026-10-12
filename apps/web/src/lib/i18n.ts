@@ -17,6 +17,8 @@ export type SiteDictionary = {
    * places that had each hardcoded a different name.
    */
   siteName: string;
+  /** The header's name when it has the room; `siteName` stays the short brand used in titles and SEO. */
+  siteNameLong: string;
   nav: {
     home: string;
     browse: string;
@@ -835,6 +837,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
   zh: {
     localeLabel: "中文",
     siteName: "ADX 谱面资源",
+    siteNameLong: "AstroDX 谱面资源",
     nav: {
       home: "首页",
       browse: "曲库",
@@ -1624,6 +1627,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
   en: {
     localeLabel: "English",
     siteName: "ADX Chart Archive",
+    siteNameLong: "AstroDX Chart Archive",
     nav: {
       home: "Home",
       browse: "Browse",
@@ -2462,6 +2466,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
   ja: {
     localeLabel: "日本語",
     siteName: "ADX 譜面アーカイブ",
+    siteNameLong: "AstroDX 譜面アーカイブ",
     nav: {
       home: "ホーム",
       browse: "曲一覧",

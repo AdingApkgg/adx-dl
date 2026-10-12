@@ -46,7 +46,7 @@ import {
   wikiUrl,
 } from "@/lib/resource-links";
 import { CompatibleImage, compatibleSourcesFromPng } from "@/components/site/compatible-image";
-import { HEADER_ACTION_CLASS } from "@/components/site/header-actions";
+import { HEADER_ACTION_CLASS, HEADER_PHONE_ROW_CLASS } from "@/components/site/header-actions";
 import { LanguageSwitcher } from "@/components/site/language-switcher";
 import { NoticesHeaderButton } from "@/components/site/notices-header-button";
 import { NoticesUnreadBadge, useUnreadNoticeCount } from "@/components/site/notices-unread-dot";
@@ -296,12 +296,17 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
       <div
         data-motion-sensitive=""
         className={cn(
-          "mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-4 md:px-6",
+          // Phones get two deliberate rows — brand alone on top, every control
+          // on a full-width row under it — instead of a row that wraps
+          // wherever it happens to run out. From sm up it is one row, and
+          // each breakpoint sheds content to keep it that way (see the
+          // comment on the trailing controls).
+          "mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 sm:flex-nowrap md:px-6",
           "transition-[padding] duration-300",
           compact ? "py-1.5" : "py-3"
         )}
       >
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:shrink">
           <Link href={primaryNav[0].href} className="group flex min-w-0 items-center gap-3">
             <motion.div
               animate={{ scale: compact ? 0.85 : 1 }}
@@ -321,7 +326,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             </motion.div>
             <div className="flex min-w-0 flex-col">
               <span className="truncate text-sm font-semibold tracking-wide text-primary">
-                {dictionary.siteName}
+                {dictionary.siteNameLong}
               </span>
               {/* Wraps mid-word on narrow phones — the badge and menu need the room more. */}
               {/* Decorative tagline collapses when compact; initial={false} keeps the
@@ -338,11 +343,11 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               </motion.span>
             </div>
           </Link>
-          <Badge variant="secondary" className="hidden sm:inline-flex">
+          <Badge variant="secondary" className="hidden xl:inline-flex">
             {dictionary.home.entriesBadge(totalEntries)}
           </Badge>
         </div>
-        <nav aria-label={dictionary.nav.primaryLabel} className="hidden items-center gap-2 md:flex">
+        <nav aria-label={dictionary.nav.primaryLabel} className="hidden shrink-0 items-center gap-2 lg:flex">
           {primaryNav.map((item) => {
             const active = isActive(item);
             return (
@@ -411,10 +416,17 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             </DropdownMenuContent>
           </DropdownMenu>
         </nav>
-        <div className="flex min-w-0 max-w-full shrink-0 flex-wrap items-center gap-2">
+        {/* How the header is laid out, narrowest first:
+              - below sm: its own full-width row under the brand, icons only;
+              - sm–lg: icons only, the primary nav lives in the menu;
+              - lg–xl: primary nav shown, these controls still icons only;
+              - xl up: these controls get their labels, the entry count shows.
+            Measured in en, the widest locale: labels need ~1165px, so they
+            can't come back any earlier than xl. */}
+        <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:shrink-0 sm:justify-start">
           {/* Search and random sit with the trailing controls rather than in the
               nav, and stay reachable at every width — so neither is repeated in
-              the mobile menu below. */}
+              the menu below. */}
           <Button
             variant="outline"
             size="sm"
@@ -425,7 +437,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
           >
             <Link href={searchItem.href} onClick={onSearchClick}>
               <SearchIcon aria-hidden="true" />
-              <span className="hidden md:inline">{searchItem.label}</span>
+              <span className="hidden xl:inline">{searchItem.label}</span>
             </Link>
           </Button>
           <Button
@@ -439,7 +451,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             className={HEADER_ACTION_CLASS}
           >
             <DicesIcon className={cn(randomBusy && "animate-spin")} aria-hidden="true" />
-            <span className="hidden md:inline">{dictionary.nav.randomLabel}</span>
+            <span className="hidden xl:inline">{dictionary.nav.randomLabel}</span>
           </Button>
           {/* The only visible way to change language used to be a gear icon
               labelled 设置 in Chinese — unreadable to exactly the visitors who
@@ -457,14 +469,14 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             pathname={pathname}
             dictionary={dictionary}
           />
-          {/* Mobile: the primary nav above is hidden below md, so every page must
-              stay reachable from this menu. */}
+          {/* Below lg the primary nav above is hidden, so every page must stay
+              reachable from this menu. */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
                 size="icon-sm"
-                className="md:hidden"
+                className={cn("lg:hidden", HEADER_PHONE_ROW_CLASS)}
                 aria-label={dictionary.nav.menuLabel}
                 title={dictionary.nav.menuLabel}
               >

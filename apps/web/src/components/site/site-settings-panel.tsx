@@ -132,7 +132,7 @@ export function SiteSettingsPanel({
           <Settings2Icon aria-hidden="true" />
           {/* The aria-label ("打开设置") stays the accessible name and contains
               this shorter visible one, so Label-in-Name still holds. */}
-          <span className="hidden md:inline">{dictionary.settings.title}</span>
+          <span className="hidden xl:inline">{dictionary.settings.title}</span>
         </Button>
       </SheetTrigger>
       <SheetContent closeLabel={dictionary.settings.close}>

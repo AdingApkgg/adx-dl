@@ -51,7 +51,7 @@ export function NoticesHeaderButton({
         aria-current={active ? "page" : undefined}
       >
         <MegaphoneIcon aria-hidden="true" />
-        <span className="hidden md:inline">{label}</span>
+        <span className="hidden xl:inline">{label}</span>
         {count > 0 ? (
           <span aria-hidden="true" className="absolute -top-1.5 -right-1.5 flex">
             {/* One soft ring that pulses a few times, then stops: enough to

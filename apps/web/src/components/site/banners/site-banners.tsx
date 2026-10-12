@@ -76,19 +76,21 @@ export function SiteBanners({ locale }: { locale: Locale }) {
                 {bannerNotice.notice.level === "urgent" ? null : (
                   <MegaphoneIcon aria-hidden="true" className="size-3.5 shrink-0 text-primary" />
                 )}
-                <span className="font-medium">
+                {/* One line at any width: the title truncates, the link and
+                    close button never wrap. */}
+                <span className="min-w-0 truncate font-medium">
                   {resolveText(bannerNotice.notice.title, locale).value}
                 </span>
                 <Link
                   href={`${buildLocalePath("/notices", locale)}#${bannerNotice.notice.id}`}
-                  className="underline underline-offset-4"
+                  className="shrink-0 whitespace-nowrap underline underline-offset-4"
                 >
                   {dictionary.notices.detail}
                 </Link>
                 <button
                   type="button"
                   aria-label={dictionary.notices.dismiss}
-                  className="rounded-sm p-1 transition-colors hover:text-foreground"
+                  className="shrink-0 rounded-sm p-1 transition-colors hover:text-foreground"
                   onClick={bannerNotice.dismiss}
                 >
                   <XIcon className="size-3.5" aria-hidden="true" />
