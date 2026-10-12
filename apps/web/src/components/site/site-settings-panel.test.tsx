@@ -28,6 +28,16 @@ describe("SiteSettingsContent", () => {
     expect(html).toContain("简化兼容模式");
     expect(html).toContain("检查浏览器兼容性");
   });
+  test("offers to show or hide the Live2D mascot, shown by default", () => {
+    const html = renderToStaticMarkup(
+      <SiteSettingsContent locale="en" pathname="/en/charts" dictionary={getDictionary("en")} />
+    );
+    const start = html.indexOf("Live2D mascot");
+    expect(start).toBeGreaterThan(-1);
+    const section = html.slice(start, html.indexOf("</section>", start));
+    expect(section).toMatch(/aria-pressed="true"[^>]*>(?:(?!<\/button>).)*<span>Show<\/span>/);
+    expect(section).toMatch(/aria-pressed="false"[^>]*>(?:(?!<\/button>).)*<span>Hide<\/span>/);
+  });
   test("renders appearance, format, immutable built-ins, and custom-route controls", () => {
     const html = renderToStaticMarkup(
       <SiteSettingsContent

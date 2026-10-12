@@ -62,23 +62,27 @@
   animation: none;
 }
 
-/* The floating bottom surfaces (global music player, download dock) are
-   cross-page chrome exactly like the header: without their own names they get
-   snapshotted with the root/page group and visibly blink on every navigation. */
+/* The floating bottom surfaces (global music player, download dock, phone
+   tab bar, Live2D mascot) are cross-page chrome exactly like the header: without their own
+   names they get snapshotted with the root/page group and visibly blink on
+   every navigation. */
 ::view-transition-group(music-player),
 ::view-transition-group(download-dock),
-::view-transition-group(mobile-tabbar) {
+::view-transition-group(mobile-tabbar),
+::view-transition-group(live2d-mascot) {
   animation: none;
   z-index: 50;
 }
 ::view-transition-old(music-player),
 ::view-transition-old(download-dock),
-::view-transition-old(mobile-tabbar) {
+::view-transition-old(mobile-tabbar),
+::view-transition-old(live2d-mascot) {
   display: none;
 }
 ::view-transition-new(music-player),
 ::view-transition-new(download-dock),
-::view-transition-new(mobile-tabbar) {
+::view-transition-new(mobile-tabbar),
+::view-transition-new(live2d-mascot) {
   animation: none;
 }
 
