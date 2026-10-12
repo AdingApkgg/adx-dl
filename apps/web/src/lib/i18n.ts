@@ -17,6 +17,8 @@ export type SiteDictionary = {
    * places that had each hardcoded a different name.
    */
   siteName: string;
+  /** The header's name when it has the room; `siteName` stays the short brand used in titles and SEO. */
+  siteNameLong: string;
   nav: {
     home: string;
     browse: string;
@@ -305,6 +307,10 @@ export type SiteDictionary = {
     downloadSuccess: string;
     downloadErrorPrefix: string;
     sourceLink: string;
+    /** Under the download button: where to learn how to install a chart. */
+    installHint: string;
+    installVideo: string;
+    installGuide: string;
     metadata: string;
     metadataDescription: string;
     difficulties: string;
@@ -729,12 +735,18 @@ export type SiteDictionary = {
     intro: string;
     empty: string;
     urgentBadge: string;
+    featuredBadge: string;
     endedBadge: string;
     untranslated: string;
     publishedOn: (date: string) => string;
     detail: string;
     dismiss: string;
     unreadLabel: (count: number) => string;
+    /** Home page strip: the eyebrow before the newest notice's title. */
+    stripLabel: string;
+    /** Home page strip: marks the newest notice when this visitor hasn't read it. */
+    newBadge: string;
+    viewAll: string;
   };
   /** The /ui design-system showcase. Developer-facing, not indexed, not in the nav. */
   ui: {
@@ -825,6 +837,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
   zh: {
     localeLabel: "中文",
     siteName: "ADX 谱面资源",
+    siteNameLong: "AstroDX 谱面资源",
     nav: {
       home: "首页",
       browse: "曲库",
@@ -1104,6 +1117,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       downloadSuccess: "下载已开始",
       downloadErrorPrefix: "下载失败：",
       sourceLink: "来源链接",
+      installHint: "不会装谱面？",
+      installVideo: "看三分钟视频教程",
+      installGuide: "图文导入指南",
       metadata: "谱面信息",
       metadataDescription: "直接解析自远端 AstroDX 目录资源。",
       difficulties: "难度列表",
@@ -1514,15 +1530,19 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       navLabel: "公告",
       title: "站点公告",
       description: "维护、变更与重要通知都会发布在这里。",
-      intro: "紧急通知会额外在页面顶部显示一次；关闭后不再打扰，内容仍留在本页。",
+      intro: "紧急和重点通知会额外在页面顶部显示；关闭后不再打扰，内容仍留在本页。",
       empty: "目前没有公告。",
       urgentBadge: "紧急",
+      featuredBadge: "重点",
       endedBadge: "已结束",
       untranslated: "本条暂无译文，显示的是中文原文。",
       publishedOn: (date) => `发布于 ${date}`,
       detail: "查看详情",
       dismiss: "关闭这条公告",
       unreadLabel: (count) => `公告，${count} 条未读`,
+      stripLabel: "公告",
+      newBadge: "新",
+      viewAll: "全部公告",
     },
     ui: {
       title: "设计系统",
@@ -1607,6 +1627,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
   en: {
     localeLabel: "English",
     siteName: "ADX Chart Archive",
+    siteNameLong: "AstroDX Chart Archive",
     nav: {
       home: "Home",
       browse: "Browse",
@@ -1906,6 +1927,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       downloadSuccess: "Download started",
       downloadErrorPrefix: "Download failed: ",
       sourceLink: "Source Link",
+      installHint: "Not sure how to install a chart?",
+      installVideo: "Watch the 3-minute video",
+      installGuide: "Read the import guide",
       metadata: "Chart Metadata",
       metadataDescription: "Parsed directly from the remote AstroDX directory resources.",
       difficulties: "Difficulties",
@@ -2338,15 +2362,19 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       title: "Site Notices",
       description: "Maintenance, changes and anything else worth knowing.",
       intro:
-        "Urgent notices also appear once at the top of the page; dismissing one keeps it out of your way but leaves it here.",
+        "Urgent and featured notices also appear at the top of the page; dismissing one keeps it out of your way but leaves it here.",
       empty: "No notices right now.",
       urgentBadge: "Urgent",
+      featuredBadge: "Featured",
       endedBadge: "Ended",
       untranslated: "No translation yet — showing the original Chinese.",
       publishedOn: (date) => `Published ${date}`,
       detail: "Read more",
       dismiss: "Dismiss this notice",
       unreadLabel: (count) => `Notices, ${count} unread`,
+      stripLabel: "Notice",
+      newBadge: "New",
+      viewAll: "All notices",
     },
     ui: {
       title: "Design System",
@@ -2438,6 +2466,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
   ja: {
     localeLabel: "日本語",
     siteName: "ADX 譜面アーカイブ",
+    siteNameLong: "AstroDX 譜面アーカイブ",
     nav: {
       home: "ホーム",
       browse: "曲一覧",
@@ -2727,6 +2756,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       downloadSuccess: "ダウンロードを開始しました",
       downloadErrorPrefix: "ダウンロード失敗: ",
       sourceLink: "配布元リンク",
+      installHint: "譜面の入れ方が分からないときは",
+      installVideo: "3 分の解説動画",
+      installGuide: "導入ガイド",
       metadata: "譜面情報",
       metadataDescription: "リモートの AstroDX ディレクトリのリソースから直接解析しています。",
       difficulties: "難易度",
@@ -3148,15 +3180,19 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       title: "サイトのお知らせ",
       description: "メンテナンスや変更など、知っておいてほしいことを掲載します。",
       intro:
-        "緊急のお知らせはページ上部にも一度だけ表示されます。閉じても本ページには残ります。",
+        "緊急・注目のお知らせはページ上部にも表示されます。閉じても本ページには残ります。",
       empty: "現在お知らせはありません。",
       urgentBadge: "緊急",
+      featuredBadge: "注目",
       endedBadge: "終了",
       untranslated: "このお知らせはまだ翻訳されていません。中国語の原文を表示しています。",
       publishedOn: (date) => `${date} 公開`,
       detail: "詳しく見る",
       dismiss: "このお知らせを閉じる",
       unreadLabel: (count) => `お知らせ、未読 ${count} 件`,
+      stripLabel: "お知らせ",
+      newBadge: "新着",
+      viewAll: "すべてのお知らせ",
     },
     ui: {
       title: "デザインシステム",

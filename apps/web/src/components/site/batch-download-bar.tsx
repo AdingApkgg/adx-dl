@@ -367,7 +367,7 @@ export function BatchDownloadBar({
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 80, opacity: 0 }}
       transition={{ duration: 0.25, ease: EASE_OUT }}
-      className="fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex justify-center px-4"
+      className="fixed inset-x-0 bottom-(--floating-bottom) z-40 flex justify-center px-4"
     >
       <div
         ref={barRef}

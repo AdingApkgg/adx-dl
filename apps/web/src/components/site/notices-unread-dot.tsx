@@ -14,11 +14,11 @@ import { cn } from "@astrodx/ui/lib/utils";
  * availability check a blocked-storage visitor would read as "everything
  * unread" and get a dot that can never be cleared.
  */
-export function unreadDotCount(list: Notice[] = notices): number {
+export function unreadDotCount(list: Notice[] = notices, today: string = todayUtc()): number {
   if (!isStorageAvailable()) {
     return 0;
   }
-  return unreadCount(list, readReadIds(list), todayUtc());
+  return unreadCount(list, readReadIds(list, today), today);
 }
 
 /**
@@ -69,8 +69,18 @@ export function useUnreadNoticeCount(): number {
   );
 }
 
-/** Purely decorative: the count itself reaches assistive tech via the nav item's aria-label. */
-export function NoticesUnreadDot({ className }: { className?: string }) {
+/** What the badge prints: a count up to 9, then "9+" so the pill never widens further. */
+export function formatUnreadCount(count: number): string {
+  return count > 9 ? "9+" : String(count);
+}
+
+/**
+ * The unread count as a small pill, or nothing when there is none.
+ *
+ * Purely decorative: the count reaches assistive tech through the aria-label
+ * of whatever link it sits in.
+ */
+export function NoticesUnreadBadge({ className }: { className?: string }) {
   const count = useUnreadNoticeCount();
 
   if (count === 0) {
@@ -80,7 +90,38 @@ export function NoticesUnreadDot({ className }: { className?: string }) {
   return (
     <span
       aria-hidden="true"
-      className={cn("size-2 shrink-0 rounded-full bg-primary", className)}
-    />
+      className={cn(
+        "inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-destructive-strong px-1 text-[10px] leading-none font-semibold text-white tabular-nums dark:text-neutral-950",
+        className
+      )}
+    >
+      {formatUnreadCount(count)}
+    </span>
+  );
+}
+
+function isNoticeUnread(id: string): boolean {
+  if (!isStorageAvailable()) return false;
+  return !readReadIds().includes(id);
+}
+
+/**
+ * A "new" tag for one specific notice, shown only while this visitor hasn't
+ * read it. Renders nothing on the server and with blocked storage, for the
+ * same reasons as the count above.
+ */
+export function NoticeNewBadge({ id, label }: { id: string; label: string }) {
+  const unread = React.useSyncExternalStore(
+    subscribeUnreadNoticeCount,
+    () => isNoticeUnread(id),
+    () => false
+  );
+
+  if (!unread) return null;
+
+  return (
+    <span className="shrink-0 rounded-full bg-destructive-strong px-1.5 py-0.5 text-[10px] leading-none font-semibold text-white dark:text-neutral-950">
+      {label}
+    </span>
   );
 }

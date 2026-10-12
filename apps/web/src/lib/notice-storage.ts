@@ -1,4 +1,10 @@
-import { notices as defaultNotices, pruneIds, type Notice } from "@/lib/notices";
+import {
+  notices as defaultNotices,
+  pruneIds,
+  staleNoticeIds,
+  todayUtc,
+  type Notice,
+} from "@/lib/notices";
 
 // Storage access is wrapped throughout: Safari private mode and blocked
 // site data both throw on access, and a visitor in that state must still get
@@ -51,7 +57,26 @@ export function addDismissedId(id: string, list: Notice[] = defaultNotices): voi
   writeIdList(DISMISSED_KEY, [...current, id]);
 }
 
-export function readReadIds(list: Notice[] = defaultNotices): string[] {
+/**
+ * The ids this visitor has read.
+ *
+ * A visitor with no read list at all is here for the first time: notices
+ * older than the grace window are recorded as read on the spot, so the badge
+ * counts only what is genuinely recent. Writing the (possibly empty) list is
+ * what marks the visitor as seen — this happens once, ever.
+ */
+export function readReadIds(list: Notice[] = defaultNotices, today: string = todayUtc()): string[] {
+  let firstVisit = false;
+  try {
+    firstVisit = window.localStorage.getItem(READ_KEY) === null;
+  } catch {
+    // Blocked storage — nothing can be seeded or remembered.
+  }
+  if (firstVisit) {
+    const seeded = staleNoticeIds(list, today);
+    writeIdList(READ_KEY, seeded);
+    return seeded;
+  }
   return readIdList(READ_KEY, list);
 }
 

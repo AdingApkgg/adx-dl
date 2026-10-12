@@ -333,8 +333,8 @@ export function DownloadDock({ locale }: { locale: Locale }) {
       ? Math.round(visible.reduce((sum, job) => sum + jobPercent(job), 0) / visible.length)
       : 0;
   const bottomOffset = bottomBars > 0
-    ? "calc(var(--batch-download-bar-height, 5rem) + max(1rem, env(safe-area-inset-bottom)) + var(--music-player-mobile-reserve, 0rem) + 0.75rem)"
-    : "calc(max(1rem, env(safe-area-inset-bottom)) + var(--music-player-mobile-reserve, 0rem))";
+    ? "calc(var(--batch-download-bar-height, 5rem) + var(--floating-bottom) + var(--music-player-mobile-reserve, 0rem) + 0.75rem)"
+    : "calc(var(--floating-bottom) + var(--music-player-mobile-reserve, 0rem))";
 
   return (
     <div

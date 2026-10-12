@@ -113,6 +113,22 @@ describe("read ids", () => {
     markRead(["b"], list);
     expect(readReadIds(list).sort()).toEqual(["a", "b"]);
   });
+
+  test("a first visit records notices older than the grace window as read", () => {
+    const old = { ...buildNotice("old"), publishedAt: "2026-08-01" };
+    const fresh = { ...buildNotice("fresh"), publishedAt: "2026-09-20" };
+    expect(readReadIds([old, fresh], "2026-09-23")).toEqual(["old"]);
+    // Recorded, not just returned: a later read sees the same list.
+    expect(window.localStorage.getItem("adx-notice-read")).toBe(JSON.stringify(["old"]));
+  });
+
+  test("seeding happens only once, even when it recorded nothing", () => {
+    const fresh = { ...buildNotice("fresh"), publishedAt: "2026-09-20" };
+    expect(readReadIds([fresh], "2026-09-23")).toEqual([]);
+    // Weeks later the same notice is old, but this visitor has been here
+    // before: it must stay unread rather than be silently marked read.
+    expect(readReadIds([fresh], "2026-12-01")).toEqual([]);
+  });
 });
 
 describe("isStorageAvailable", () => {
@@ -140,7 +156,12 @@ describe("unreadDotCount", () => {
   });
 
   test("working storage with nothing read returns the active-notice count", () => {
-    expect(unreadDotCount(list)).toBe(list.length);
+    // Within the first-visit grace window, so nothing is pre-marked read.
+    expect(unreadDotCount(list, "2026-09-05")).toBe(list.length);
+  });
+
+  test("a first-time visitor is not shown notices older than the grace window", () => {
+    expect(unreadDotCount(list, "2026-12-01")).toBe(0);
   });
 
   test("working storage with every notice already read returns 0", () => {
@@ -155,6 +176,12 @@ describe("unreadDotCount", () => {
 // ships, reusing this file's fake-window harness rather than mounting anything
 // (this repo has no DOM shim).
 describe("subscribeUnreadNoticeCount", () => {
+  // A returning visitor: the fixtures are older than the first-visit grace
+  // window, and seeding would pre-read them so markRead had nothing to change.
+  beforeEach(() => {
+    window.localStorage.setItem("adx-notice-read", "[]");
+  });
+
   test("notifies when markRead actually changes the read set", () => {
     let notifications = 0;
     const unsubscribe = subscribeUnreadNoticeCount(() => {
@@ -217,6 +244,9 @@ describe("getUnreadNoticeCountSnapshot", () => {
     // expired notices either way, so this is a superset that stays correct
     // regardless of which real notices happen to be active right now.
     const allIds = siteNotices.map((notice) => notice.id);
+    // A returning visitor who has read nothing: an existing (empty) read list
+    // skips first-visit seeding, which would otherwise pre-read old notices.
+    window.localStorage.setItem("adx-notice-read", "[]");
     // Sanity check the test is actually exercising something: if this ever
     // reads 0 already, the assertion below would pass vacuously.
     expect(getUnreadNoticeCountSnapshot()).toBeGreaterThan(0);

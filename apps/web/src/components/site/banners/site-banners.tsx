@@ -1,6 +1,6 @@
 "use client";
 
-import { WifiOffIcon, XIcon } from "lucide-react";
+import { MegaphoneIcon, WifiOffIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 
 import { AnimatePresence, EASE_OUT, motion, useReducedMotion } from "@astrodx/ui/motion";
@@ -9,7 +9,7 @@ import {
   storePreferredLocale,
   useLocaleSuggestion,
 } from "@/components/site/banners/use-locale-suggestion";
-import { useUrgentNotice } from "@/components/site/banners/use-urgent-notice";
+import { useBannerNotice } from "@/components/site/banners/use-banner-notice";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import { resolveText } from "@/lib/notices";
 import { pickBanner } from "@/lib/site-banners";
@@ -19,7 +19,7 @@ const BAR = "flex items-center justify-center gap-2 border-b border-border/60 px
 /**
  * The single top-of-page bar slot.
  *
- * Three independent facts compete for it (connectivity, an urgent notice, a
+ * Three independent facts compete for it (connectivity, an urgent or featured notice, a
  * language suggestion); `pickBanner` decides which one wins. One always-mounted
  * live region wraps them all so a transition is announced, and `polite` is
  * deliberate even for urgent notices: `assertive` interrupts whatever sentence
@@ -27,7 +27,7 @@ const BAR = "flex items-center justify-center gap-2 border-b border-border/60 px
  */
 export function SiteBanners({ locale }: { locale: Locale }) {
   const connection = useConnectionBanner();
-  const urgent = useUrgentNotice();
+  const bannerNotice = useBannerNotice();
   const suggestion = useLocaleSuggestion(locale === "zh");
   const prefersReducedMotion = useReducedMotion();
   const dictionary = getDictionary(locale);
@@ -35,7 +35,7 @@ export function SiteBanners({ locale }: { locale: Locale }) {
 
   const kind = pickBanner({
     connection: connection !== null,
-    notice: urgent !== null,
+    notice: bannerNotice !== null,
     locale: suggestion !== null,
   });
 
@@ -65,22 +65,33 @@ export function SiteBanners({ locale }: { locale: Locale }) {
               </p>
             ) : null}
 
-            {kind === "notice" && urgent ? (
-              <div className={`${BAR} bg-destructive/10 text-sm text-destructive-strong`}>
-                <span className="font-medium">
-                  {resolveText(urgent.notice.title, locale).value}
+            {kind === "notice" && bannerNotice ? (
+              <div
+                className={
+                  bannerNotice.notice.level === "urgent"
+                    ? `${BAR} bg-destructive/10 text-sm text-destructive-strong`
+                    : `${BAR} bg-primary/10 text-sm`
+                }
+              >
+                {bannerNotice.notice.level === "urgent" ? null : (
+                  <MegaphoneIcon aria-hidden="true" className="size-3.5 shrink-0 text-primary" />
+                )}
+                {/* One line at any width: the title truncates, the link and
+                    close button never wrap. */}
+                <span className="min-w-0 truncate font-medium">
+                  {resolveText(bannerNotice.notice.title, locale).value}
                 </span>
                 <Link
-                  href={`${buildLocalePath("/notices", locale)}#${urgent.notice.id}`}
-                  className="underline underline-offset-4"
+                  href={`${buildLocalePath("/notices", locale)}#${bannerNotice.notice.id}`}
+                  className="shrink-0 whitespace-nowrap underline underline-offset-4"
                 >
                   {dictionary.notices.detail}
                 </Link>
                 <button
                   type="button"
                   aria-label={dictionary.notices.dismiss}
-                  className="rounded-sm p-1 transition-colors hover:text-foreground"
-                  onClick={urgent.dismiss}
+                  className="shrink-0 rounded-sm p-1 transition-colors hover:text-foreground"
+                  onClick={bannerNotice.dismiss}
                 >
                   <XIcon className="size-3.5" aria-hidden="true" />
                 </button>

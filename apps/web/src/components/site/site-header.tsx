@@ -15,6 +15,7 @@ import {
   HardDriveIcon,
   HeartHandshakeIcon,
   HistoryIcon,
+  HouseIcon,
   InfoIcon,
   LayersIcon,
   LibraryBigIcon,
@@ -47,8 +48,10 @@ import {
 } from "@/lib/resource-links";
 import { CompatibleImage, compatibleSourcesFromPng } from "@/components/site/compatible-image";
 import { HEADER_ACTION_CLASS } from "@/components/site/header-actions";
+import { MobileTabBar } from "@/components/site/mobile-tab-bar";
 import { LanguageSwitcher } from "@/components/site/language-switcher";
-import { NoticesUnreadDot, useUnreadNoticeCount } from "@/components/site/notices-unread-dot";
+import { NoticesHeaderButton } from "@/components/site/notices-header-button";
+import { NoticesUnreadBadge, useUnreadNoticeCount } from "@/components/site/notices-unread-dot";
 import { useRandomChartNavigation } from "@/components/site/random-chart-button";
 import { SiteSettingsPanel } from "@/components/site/site-settings-panel";
 import {
@@ -88,7 +91,7 @@ type NavItem = {
   icon?: React.ReactNode;
   exact?: boolean;
   external?: boolean;
-  /** Rendered after the label in NavItemContent — currently only the notices item's unread dot. */
+  /** Rendered after the label in NavItemContent — currently only the notices item's unread count. */
   badge?: React.ReactNode;
   /** Overrides the rendered link's accessible name — currently only the notices item's unread count. */
   ariaLabel?: string;
@@ -122,6 +125,8 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
 
   // 0 until mounted (and forever, if storage is blocked) — see notices-unread-dot.tsx.
   const unread = useUnreadNoticeCount();
+
+  const noticesHref = switchLocale("/notices", locale);
 
   const primaryNav: NavItem[] = [
     {
@@ -214,10 +219,10 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
         icon: <MessageSquareIcon />,
       },
       {
-        href: switchLocale("/notices", locale),
+        href: noticesHref,
         label: dictionary.notices.navLabel,
         icon: <MegaphoneIcon />,
-        badge: <NoticesUnreadDot className="ml-auto" />,
+        badge: <NoticesUnreadBadge className="ml-auto" />,
         ariaLabel: unread > 0 ? dictionary.notices.unreadLabel(unread) : undefined,
       },
       {
@@ -280,9 +285,161 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
     return current === target || current.startsWith(`${target}/`);
   };
 
+  // The full site menu, shared by the header's hamburger (sm–lg) and the
+  // phone tab bar's "more" button (below sm), so the two can never drift.
+  const renderNavMenu = (side: "top" | "bottom") => (
+      <DropdownMenuContent
+        side={side}
+        align="end"
+        collisionPadding={8}
+        aria-label={dictionary.nav.primaryLabel}
+        // Radix measures the room left on the chosen side; the tab bar's menu
+        // opens upward from the bottom edge, the header's downward.
+        className="max-h-[min(36rem,var(--radix-dropdown-menu-content-available-height))] w-[min(30rem,calc(100vw-1rem))] overscroll-contain p-2"
+      >
+        <div className="grid grid-cols-2 items-start gap-2">
+          <div className="min-w-0">
+            <div
+              role="group"
+              aria-label={dictionary.nav.primaryLabel}
+              className="grid gap-0.5"
+            >
+              {primaryNav.map((item) => {
+                const active = isActive(item);
+                return (
+                  <DropdownMenuItem
+                    key={item.href}
+                    asChild
+                    className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug"
+                  >
+                    <Link
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      data-state={active ? "checked" : undefined}
+                    >
+                      <NavItemContent item={item} />
+                    </Link>
+                  </DropdownMenuItem>
+                );
+              })}
+              {/* The header's random button is hidden on phones; this menu is
+                  the tab bar's "more" there. */}
+              <DropdownMenuItem
+                disabled={randomBusy}
+                onSelect={navigateToRandomChart}
+                className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug sm:hidden"
+              >
+                <NavItemContent
+                  item={{
+                    href: "#random",
+                    label: dictionary.nav.randomLabel,
+                    icon: <DicesIcon />,
+                  }}
+                />
+              </DropdownMenuItem>
+            </div>
+            <DropdownMenuSeparator />
+            <div
+              role="group"
+              aria-label={dictionary.nav.moreLabel}
+              className="grid gap-0.5"
+            >
+              {/* Mixed group: /guide is an in-site page, the rest are
+                  external resources — only the latter get a new tab and
+                  the external arrow. */}
+              {secondaryNavGroups[0].map((item) => {
+                const active = isActive(item);
+                return (
+                  <DropdownMenuItem
+                    key={item.href}
+                    asChild
+                    className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug"
+                  >
+                    {item.external ? (
+                      <a href={item.href} target="_blank" rel="noreferrer">
+                        <NavItemContent item={item} showExternal />
+                      </a>
+                    ) : (
+                      <Link
+                        href={item.href}
+                        aria-current={active ? "page" : undefined}
+                        data-state={active ? "checked" : undefined}
+                      >
+                        <NavItemContent item={item} />
+                      </Link>
+                    )}
+                  </DropdownMenuItem>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="min-w-0">
+            <div
+              role="group"
+              aria-label={dictionary.community.navLabel}
+              className="grid gap-0.5"
+            >
+              {secondaryNavGroups[1].map((item) => {
+                const active = isActive(item);
+                return (
+                  <DropdownMenuItem
+                    key={item.href}
+                    asChild
+                    className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug"
+                  >
+                    <Link
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      aria-label={item.ariaLabel}
+                      data-state={active ? "checked" : undefined}
+                    >
+                      <NavItemContent item={item} />
+                    </Link>
+                  </DropdownMenuItem>
+                );
+              })}
+            </div>
+            <DropdownMenuSeparator />
+            <div
+              role="group"
+              aria-label={dictionary.footer.navLabel}
+              className="grid gap-0.5"
+            >
+              {secondaryNavGroups[2].map((item) => {
+                const active = isActive(item);
+                return (
+                  <DropdownMenuItem
+                    key={item.href}
+                    asChild
+                    className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug"
+                  >
+                    {item.external ? (
+                      <a href={item.href} target="_blank" rel="noreferrer">
+                        <NavItemContent item={item} showExternal />
+                      </a>
+                    ) : (
+                      <Link
+                        href={item.href}
+                        aria-current={active ? "page" : undefined}
+                        data-state={active ? "checked" : undefined}
+                      >
+                        <NavItemContent item={item} />
+                      </Link>
+                    )}
+                  </DropdownMenuItem>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </DropdownMenuContent>
+  );
+
   return (
     // view-transition-name pins the chrome during the branded page transition
     // (globals.css animates only the root snapshot around it).
+    <>
     <header
       style={{ viewTransitionName: "site-header" }}
       className={cn(
@@ -293,12 +450,15 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
       <div
         data-motion-sensitive=""
         className={cn(
-          "mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-4 md:px-6",
+          // One row at every width: each breakpoint sheds content to keep it
+          // that way (see the comment on the trailing controls). On phones
+          // the navigation lives in the bottom tab bar instead.
+          "mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 md:px-6",
           "transition-[padding] duration-300",
           compact ? "py-1.5" : "py-3"
         )}
       >
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 shrink items-center gap-3">
           <Link href={primaryNav[0].href} className="group flex min-w-0 items-center gap-3">
             <motion.div
               animate={{ scale: compact ? 0.85 : 1 }}
@@ -318,7 +478,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             </motion.div>
             <div className="flex min-w-0 flex-col">
               <span className="truncate text-sm font-semibold tracking-wide text-primary">
-                {dictionary.siteName}
+                {dictionary.siteNameLong}
               </span>
               {/* Wraps mid-word on narrow phones — the badge and menu need the room more. */}
               {/* Decorative tagline collapses when compact; initial={false} keeps the
@@ -335,11 +495,11 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               </motion.span>
             </div>
           </Link>
-          <Badge variant="secondary" className="hidden sm:inline-flex">
+          <Badge variant="secondary" className="hidden xl:inline-flex">
             {dictionary.home.entriesBadge(totalEntries)}
           </Badge>
         </div>
-        <nav aria-label={dictionary.nav.primaryLabel} className="hidden items-center gap-2 md:flex">
+        <nav aria-label={dictionary.nav.primaryLabel} className="hidden shrink-0 items-center gap-2 lg:flex">
           {primaryNav.map((item) => {
             const active = isActive(item);
             return (
@@ -362,21 +522,12 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={
-                  unread > 0
-                    ? `${dictionary.nav.moreLabel}: ${dictionary.notices.unreadLabel(unread)}`
-                    : dictionary.nav.moreLabel
-                }
                 className={cn(
-                  "relative",
                   secondaryNav.some(isActive) && "bg-secondary text-secondary-foreground"
                 )}
               >
                 <EllipsisIcon data-icon="inline-start" />
                 {dictionary.nav.moreLabel}
-                {/* Absolutely positioned so the dot's appearance/disappearance never
-                    changes this button's (and therefore the nav's) width. */}
-                <NoticesUnreadDot className="absolute top-0.5 right-0.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -417,21 +568,29 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             </DropdownMenuContent>
           </DropdownMenu>
         </nav>
-        <div className="flex min-w-0 max-w-full shrink-0 flex-wrap items-center gap-2">
-          {/* Search and random sit with the trailing controls rather than in the
-              nav, and stay reachable at every width — so neither is repeated in
-              the mobile menu below. */}
+        {/* How the header is laid out, narrowest first:
+              - below sm: language and settings only — search, random,
+                notices and the menu move to the bottom tab bar;
+              - sm–lg: icons only, the primary nav lives in the menu;
+              - lg–xl: primary nav shown, these controls still icons only;
+              - xl up: these controls get their labels, the entry count shows.
+            Measured in en, the widest locale: labels need ~1165px, so they
+            can't come back any earlier than xl. */}
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Search and random sit with the trailing controls rather than in
+              the nav, so neither is repeated in the menu (on phones the tab
+              bar takes over both). */}
           <Button
             variant="outline"
             size="sm"
             asChild
             aria-label={searchItem.label}
             title={searchItem.label}
-            className={HEADER_ACTION_CLASS}
+            className={cn(HEADER_ACTION_CLASS, "max-sm:hidden")}
           >
             <Link href={searchItem.href} onClick={onSearchClick}>
               <SearchIcon aria-hidden="true" />
-              <span className="hidden md:inline">{searchItem.label}</span>
+              <span className="hidden xl:inline">{searchItem.label}</span>
             </Link>
           </Button>
           <Button
@@ -442,174 +601,42 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             disabled={randomBusy}
             aria-label={dictionary.nav.randomLabel}
             title={dictionary.nav.randomLabel}
-            className={HEADER_ACTION_CLASS}
+            className={cn(HEADER_ACTION_CLASS, "max-sm:hidden")}
           >
             <DicesIcon className={cn(randomBusy && "animate-spin")} aria-hidden="true" />
-            <span className="hidden md:inline">{dictionary.nav.randomLabel}</span>
+            <span className="hidden xl:inline">{dictionary.nav.randomLabel}</span>
           </Button>
           {/* The only visible way to change language used to be a gear icon
               labelled 设置 in Chinese — unreadable to exactly the visitors who
               needed it. The switcher shows the current locale's short label so
               the control announces what it does before it is opened. */}
+          <NoticesHeaderButton
+            href={noticesHref}
+            label={dictionary.notices.navLabel}
+            unreadLabel={dictionary.notices.unreadLabel}
+            active={isActive({ href: noticesHref, label: dictionary.notices.navLabel })}
+          />
           <LanguageSwitcher locale={locale} pathname={pathname} />
           <SiteSettingsPanel
             locale={locale}
             pathname={pathname}
             dictionary={dictionary}
           />
-          {/* Mobile: the primary nav above is hidden below md, so every page must
-              stay reachable from this menu. */}
+          {/* Below lg the primary nav above is hidden, so every page must stay
+              reachable from this menu (below sm, from the tab bar's). */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
                 size="icon-sm"
-                className="relative md:hidden"
-                aria-label={
-                  unread > 0
-                    ? `${dictionary.nav.menuLabel}: ${dictionary.notices.unreadLabel(unread)}`
-                    : dictionary.nav.menuLabel
-                }
+                className="max-sm:hidden lg:hidden"
+                aria-label={dictionary.nav.menuLabel}
                 title={dictionary.nav.menuLabel}
               >
                 <MenuIcon />
-                {/* Absolutely positioned so the dot's appearance/disappearance never
-                    changes this button's fixed icon-size box. Tighter and smaller than
-                    the desktop trigger's dot: this button is a 28px square around a
-                    16px icon, so at `top-0.5 right-0.5` the 8px dot covered the right
-                    end of the menu glyph's top bar (measured on the live site). Pinned
-                    to the corner at 6px it clears every stroke by ~2.7px. */}
-                <NoticesUnreadDot className="absolute top-0 right-0 size-1.5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              collisionPadding={8}
-              aria-label={dictionary.nav.primaryLabel}
-              className="max-h-[min(36rem,calc(100dvh-5rem))] w-[min(30rem,calc(100vw-1rem))] overscroll-contain p-2"
-            >
-              <div className="grid grid-cols-2 items-start gap-2">
-                <div className="min-w-0">
-                  <div
-                    role="group"
-                    aria-label={dictionary.nav.primaryLabel}
-                    className="grid gap-0.5"
-                  >
-                    {primaryNav.map((item) => {
-                      const active = isActive(item);
-                      return (
-                        <DropdownMenuItem
-                          key={item.href}
-                          asChild
-                          className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug"
-                        >
-                          <Link
-                            href={item.href}
-                            aria-current={active ? "page" : undefined}
-                            data-state={active ? "checked" : undefined}
-                          >
-                            <NavItemContent item={item} />
-                          </Link>
-                        </DropdownMenuItem>
-                      );
-                    })}
-                  </div>
-                  <DropdownMenuSeparator />
-                  <div
-                    role="group"
-                    aria-label={dictionary.nav.moreLabel}
-                    className="grid gap-0.5"
-                  >
-                    {/* Mixed group: /guide is an in-site page, the rest are
-                        external resources — only the latter get a new tab and
-                        the external arrow. */}
-                    {secondaryNavGroups[0].map((item) => {
-                      const active = isActive(item);
-                      return (
-                        <DropdownMenuItem
-                          key={item.href}
-                          asChild
-                          className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug"
-                        >
-                          {item.external ? (
-                            <a href={item.href} target="_blank" rel="noreferrer">
-                              <NavItemContent item={item} showExternal />
-                            </a>
-                          ) : (
-                            <Link
-                              href={item.href}
-                              aria-current={active ? "page" : undefined}
-                              data-state={active ? "checked" : undefined}
-                            >
-                              <NavItemContent item={item} />
-                            </Link>
-                          )}
-                        </DropdownMenuItem>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="min-w-0">
-                  <div
-                    role="group"
-                    aria-label={dictionary.community.navLabel}
-                    className="grid gap-0.5"
-                  >
-                    {secondaryNavGroups[1].map((item) => {
-                      const active = isActive(item);
-                      return (
-                        <DropdownMenuItem
-                          key={item.href}
-                          asChild
-                          className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug"
-                        >
-                          <Link
-                            href={item.href}
-                            aria-current={active ? "page" : undefined}
-                            aria-label={item.ariaLabel}
-                            data-state={active ? "checked" : undefined}
-                          >
-                            <NavItemContent item={item} />
-                          </Link>
-                        </DropdownMenuItem>
-                      );
-                    })}
-                  </div>
-                  <DropdownMenuSeparator />
-                  <div
-                    role="group"
-                    aria-label={dictionary.footer.navLabel}
-                    className="grid gap-0.5"
-                  >
-                    {secondaryNavGroups[2].map((item) => {
-                      const active = isActive(item);
-                      return (
-                        <DropdownMenuItem
-                          key={item.href}
-                          asChild
-                          className="min-h-11 min-w-0 whitespace-normal px-3 py-2.5 leading-snug"
-                        >
-                          {item.external ? (
-                            <a href={item.href} target="_blank" rel="noreferrer">
-                              <NavItemContent item={item} showExternal />
-                            </a>
-                          ) : (
-                            <Link
-                              href={item.href}
-                              aria-current={active ? "page" : undefined}
-                              data-state={active ? "checked" : undefined}
-                            >
-                              <NavItemContent item={item} />
-                            </Link>
-                          )}
-                        </DropdownMenuItem>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </DropdownMenuContent>
+            {renderNavMenu("bottom")}
           </DropdownMenu>
         </div>
       </div>
@@ -623,6 +650,48 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
         />
       )}
     </header>
+    {/* A sibling, not a child: the header's backdrop-filter would make it the
+        containing block for anything position: fixed inside it. */}
+    <MobileTabBar
+      label={dictionary.nav.primaryLabel}
+      links={[
+        {
+          href: primaryNav[0].href,
+          label: dictionary.nav.home,
+          icon: <HouseIcon />,
+          active: isActive(primaryNav[0]),
+        },
+        {
+          href: chartsHref,
+          label: dictionary.nav.browse,
+          // Same glyph as the header's browse link, so a phone visitor who
+          // later sees the desktop header recognizes it.
+          icon: <DownloadIcon />,
+          active: isActive({ href: chartsHref, label: dictionary.nav.browse }),
+        },
+        {
+          href: searchItem.href,
+          label: dictionary.nav.searchLabel,
+          icon: <SearchIcon />,
+          active: false,
+          onClick: onSearchClick,
+        },
+        {
+          href: noticesHref,
+          label: dictionary.notices.navLabel,
+          icon: <MegaphoneIcon />,
+          active: isActive({ href: noticesHref, label: dictionary.notices.navLabel }),
+          noticeCount: true,
+          unreadLabel: dictionary.notices.unreadLabel,
+        },
+      ]}
+      menuLabel={dictionary.nav.moreLabel}
+      menuActive={[...primaryNav.slice(2), ...secondaryNav].some(
+        (item) => item.href !== noticesHref && isActive(item)
+      )}
+      menu={renderNavMenu("top")}
+    />
+    </>
   );
 }
 

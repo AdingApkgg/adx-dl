@@ -11,13 +11,15 @@ import { markRead } from "@/lib/notice-storage";
  * the page is statically exported and its content must be in the HTML.
  */
 export function NoticesReadMarker({ ids }: { ids: string[] }) {
-  // Join into a primitive: the parent hands over a fresh array on every render,
-  // which as a dependency would re-run the effect forever.
-  const key = ids.join(",");
+  // Serialize into a primitive: the parent hands over a fresh array on every
+  // render, which as a dependency would re-run the effect forever. JSON rather
+  // than a join, so no character an id might contain can split it wrongly.
+  const key = JSON.stringify(ids);
 
   React.useEffect(() => {
-    if (!key) return;
-    markRead(key.split(","));
+    const parsed: string[] = JSON.parse(key);
+    if (parsed.length === 0) return;
+    markRead(parsed);
   }, [key]);
 
   return null;

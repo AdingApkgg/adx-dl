@@ -12,6 +12,7 @@ import {
 import { Reveal, RevealGroup, RevealItem } from "@astrodx/ui/motion";
 import { buildPreviewHref } from "@/lib/chart-preview-route";
 import { AdxDownloadButton } from "@/components/site/adx-download-button";
+import { HomeNoticeStrip } from "@/components/site/home-notice-strip";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
 import {
@@ -273,6 +274,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
                 <span className={styles.brandMeta}>ASTRODX COMMUNITY LIBRARY</span>
               </span>
             </div>
+            <HomeNoticeStrip locale={locale} className="-mt-4 mb-5 md:-mt-6" />
             <span className={styles.eyebrow}>{home.badge}</span>
             <h1 className={styles.heroTitle}>
               <HomeHeroTitle title={home.heroTitle} noBreak={home.heroTitleNoBreak} />
@@ -779,6 +781,24 @@ export function ChartDetailPageView({
                 </Button>
               ) : null}
             </div>
+            <p className="text-xs text-muted-foreground">
+              {detail.installHint}{" "}
+              <a
+                href={CHART_IMPORT_VIDEO_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {detail.installVideo}
+              </a>
+              {" · "}
+              <Link
+                href={`${buildLocalePath("/guide", locale)}#import`}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {detail.installGuide}
+              </Link>
+            </p>
           </div>
         </div>
       </section>

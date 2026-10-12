@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { usePathLocale } from "@/app/use-path-locale";
+import { NoticesUnreadBadge, useUnreadNoticeCount } from "@/components/site/notices-unread-dot";
 import { SitePageViews } from "@/components/site/page-view-counter";
 import { SiteUptime } from "@/components/site/site-uptime";
 import { SITE_REPOSITORY as SOURCE_REPOSITORY } from "@/lib/community-links";
@@ -33,13 +34,14 @@ export function SiteFooter({
 }: SiteFooterProps) {
   const locale = usePathLocale(initialLocale, deriveLocaleFromPath);
   const dictionary = getDictionary(locale);
+  const unreadNotices = useUnreadNoticeCount();
 
   return (
     <footer className="mt-auto border-t border-border/60 bg-background/60">
       {/* The expanded music player is fixed to the bottom on small screens, so
           the last few footer rows sat underneath it. Same reserve the download
           dock already honours. */}
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pt-8 pb-[calc(2rem+var(--music-player-mobile-reserve,0rem))] md:px-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 pt-8 pb-[calc(2rem+var(--music-player-mobile-reserve,0rem)+var(--mobile-tabbar-reserve,0rem))] md:px-6">
         <p className="max-w-2xl text-sm text-muted-foreground">
           {dictionary.footer.description}
         </p>
@@ -95,8 +97,13 @@ export function SiteFooter({
           <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/comments", locale)}>
             {dictionary.guestbook.navLabel}
           </Link>
-          <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/notices", locale)}>
+          <Link
+            className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+            href={buildLocalePath("/notices", locale)}
+            aria-label={unreadNotices > 0 ? dictionary.notices.unreadLabel(unreadNotices) : undefined}
+          >
             {dictionary.notices.navLabel}
+            <NoticesUnreadBadge />
           </Link>
           <Link
             className="text-muted-foreground hover:text-foreground"
