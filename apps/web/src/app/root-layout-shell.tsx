@@ -4,6 +4,7 @@ import { PageTransition } from "@/app/page-transition";
 import { BrowserCompatibilityProvider } from "@/components/site/browser-compatibility-provider";
 import { SiteBanners } from "@/components/site/banners/site-banners";
 import { DownloadDock } from "@/components/site/downloads/download-dock";
+import { MascotWidget } from "@/components/site/live2d/mascot-widget";
 import { MusicPlayer } from "@/components/site/music-player/music-player";
 import { PageViewsProvider } from "@/components/site/page-view-counter";
 import { ServiceWorkerRegistrar } from "@/components/site/service-worker-registrar";
@@ -138,6 +139,9 @@ export async function RootLayoutShell({
                 <PageTransition>{children}</PageTransition>
                 <SiteFooter locale={locale} updatedDate={updatedDate} deriveLocaleFromPath={deriveLocaleFromPath} />
               </div>
+              {/* Live2D 看板娘 (bottom-right, wide screens only). Before the
+                  dock so its pinned view-transition group paints under it. */}
+              <MascotWidget locale={locale} />
               {/* Lives above the page subtree so an in-flight download keeps
                   rendering progress after a client-side navigation. */}
               <DownloadDock locale={locale} />
