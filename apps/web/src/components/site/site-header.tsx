@@ -48,7 +48,8 @@ import {
 import { CompatibleImage, compatibleSourcesFromPng } from "@/components/site/compatible-image";
 import { HEADER_ACTION_CLASS } from "@/components/site/header-actions";
 import { LanguageSwitcher } from "@/components/site/language-switcher";
-import { NoticesUnreadDot, useUnreadNoticeCount } from "@/components/site/notices-unread-dot";
+import { NoticesHeaderButton } from "@/components/site/notices-header-button";
+import { NoticesUnreadBadge, useUnreadNoticeCount } from "@/components/site/notices-unread-dot";
 import { useRandomChartNavigation } from "@/components/site/random-chart-button";
 import { SiteSettingsPanel } from "@/components/site/site-settings-panel";
 import {
@@ -88,7 +89,7 @@ type NavItem = {
   icon?: React.ReactNode;
   exact?: boolean;
   external?: boolean;
-  /** Rendered after the label in NavItemContent — currently only the notices item's unread dot. */
+  /** Rendered after the label in NavItemContent — currently only the notices item's unread count. */
   badge?: React.ReactNode;
   /** Overrides the rendered link's accessible name — currently only the notices item's unread count. */
   ariaLabel?: string;
@@ -122,6 +123,8 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
 
   // 0 until mounted (and forever, if storage is blocked) — see notices-unread-dot.tsx.
   const unread = useUnreadNoticeCount();
+
+  const noticesHref = switchLocale("/notices", locale);
 
   const primaryNav: NavItem[] = [
     {
@@ -214,10 +217,10 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
         icon: <MessageSquareIcon />,
       },
       {
-        href: switchLocale("/notices", locale),
+        href: noticesHref,
         label: dictionary.notices.navLabel,
         icon: <MegaphoneIcon />,
-        badge: <NoticesUnreadDot className="ml-auto" />,
+        badge: <NoticesUnreadBadge className="ml-auto" />,
         ariaLabel: unread > 0 ? dictionary.notices.unreadLabel(unread) : undefined,
       },
       {
@@ -362,21 +365,12 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={
-                  unread > 0
-                    ? `${dictionary.nav.moreLabel}: ${dictionary.notices.unreadLabel(unread)}`
-                    : dictionary.nav.moreLabel
-                }
                 className={cn(
-                  "relative",
                   secondaryNav.some(isActive) && "bg-secondary text-secondary-foreground"
                 )}
               >
                 <EllipsisIcon data-icon="inline-start" />
                 {dictionary.nav.moreLabel}
-                {/* Absolutely positioned so the dot's appearance/disappearance never
-                    changes this button's (and therefore the nav's) width. */}
-                <NoticesUnreadDot className="absolute top-0.5 right-0.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -451,6 +445,12 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               labelled 设置 in Chinese — unreadable to exactly the visitors who
               needed it. The switcher shows the current locale's short label so
               the control announces what it does before it is opened. */}
+          <NoticesHeaderButton
+            href={noticesHref}
+            label={dictionary.notices.navLabel}
+            unreadLabel={dictionary.notices.unreadLabel}
+            active={isActive({ href: noticesHref, label: dictionary.notices.navLabel })}
+          />
           <LanguageSwitcher locale={locale} pathname={pathname} />
           <SiteSettingsPanel
             locale={locale}
@@ -464,22 +464,11 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               <Button
                 variant="outline"
                 size="icon-sm"
-                className="relative md:hidden"
-                aria-label={
-                  unread > 0
-                    ? `${dictionary.nav.menuLabel}: ${dictionary.notices.unreadLabel(unread)}`
-                    : dictionary.nav.menuLabel
-                }
+                className="md:hidden"
+                aria-label={dictionary.nav.menuLabel}
                 title={dictionary.nav.menuLabel}
               >
                 <MenuIcon />
-                {/* Absolutely positioned so the dot's appearance/disappearance never
-                    changes this button's fixed icon-size box. Tighter and smaller than
-                    the desktop trigger's dot: this button is a 28px square around a
-                    16px icon, so at `top-0.5 right-0.5` the 8px dot covered the right
-                    end of the menu glyph's top bar (measured on the live site). Pinned
-                    to the corner at 6px it clears every stroke by ~2.7px. */}
-                <NoticesUnreadDot className="absolute top-0 right-0 size-1.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent

@@ -7,6 +7,7 @@ import { Badge } from "@astrodx/ui/components/badge";
 import { buildLocalePath, getDictionary, type Locale } from "@/lib/i18n";
 import {
   isActive,
+  isInternalNoticeHref,
   isSafeNoticeHref,
   notices,
   resolveText,
@@ -62,7 +63,7 @@ export function NoticesView({
             const active = isActive(notice, today);
             const label = notice.link ? resolveText(notice.link.label, locale).value : null;
             const linkSafe = notice.link ? isSafeNoticeHref(notice.link.href) : false;
-            const internal = linkSafe && (notice.link?.href.startsWith("/") ?? false);
+            const internal = linkSafe && notice.link !== null && isInternalNoticeHref(notice.link.href);
 
             return (
               <li
@@ -73,6 +74,9 @@ export function NoticesView({
                 <div className="flex flex-wrap items-center gap-2">
                   {notice.level === "urgent" ? (
                     <Badge variant="destructive">{copy.urgentBadge}</Badge>
+                  ) : null}
+                  {notice.level === "featured" ? (
+                    <Badge variant="secondary">{copy.featuredBadge}</Badge>
                   ) : null}
                   {active ? null : <Badge variant="outline">{copy.endedBadge}</Badge>}
                   <time dateTime={notice.publishedAt} className="text-xs text-muted-foreground">

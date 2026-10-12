@@ -2,9 +2,13 @@ import { describe, expect, test } from "bun:test";
 
 import {
   isActive,
+  isInternalNoticeHref,
   isSafeNoticeHref,
-  pickUrgentNotice,
+  latestNotice,
+  parseNotices,
+  pickBannerNotice,
   pruneIds,
+  staleNoticeIds,
   resolveText,
   sortNotices,
   todayUtc,
@@ -80,26 +84,126 @@ describe("sortNotices", () => {
   });
 });
 
-describe("pickUrgentNotice", () => {
+describe("pickBannerNotice", () => {
   const urgent = buildNotice({ id: "u1", level: "urgent", publishedAt: "2026-09-10" });
   const newerUrgent = buildNotice({ id: "u2", level: "urgent", publishedAt: "2026-09-20" });
+  const featured = buildNotice({ id: "f1", level: "featured", publishedAt: "2026-09-22" });
   const normal = buildNotice({ id: "n2", level: "normal", publishedAt: "2026-09-21" });
 
   test("picks the newest active urgent notice", () => {
-    expect(pickUrgentNotice([urgent, newerUrgent, normal], "2026-09-23", [])?.id).toBe("u2");
+    expect(pickBannerNotice([urgent, newerUrgent, normal], "2026-09-23", [], [])?.id).toBe("u2");
   });
 
   test("skips dismissed ids and falls through to the next one", () => {
-    expect(pickUrgentNotice([urgent, newerUrgent], "2026-09-23", ["u2"])?.id).toBe("u1");
+    expect(pickBannerNotice([urgent, newerUrgent], "2026-09-23", ["u2"], [])?.id).toBe("u1");
   });
 
   test("ignores expired urgent notices", () => {
     const expired = buildNotice({ id: "u3", level: "urgent", expiresAt: "2026-09-01" });
-    expect(pickUrgentNotice([expired], "2026-09-23", [])).toBeNull();
+    expect(pickBannerNotice([expired], "2026-09-23", [], [])).toBeNull();
   });
 
   test("never picks a normal notice", () => {
-    expect(pickUrgentNotice([normal], "2026-09-23", [])).toBeNull();
+    expect(pickBannerNotice([normal], "2026-09-23", [], [])).toBeNull();
+  });
+
+  test("urgent beats a newer featured notice", () => {
+    expect(pickBannerNotice([urgent, featured], "2026-09-23", [], [])?.id).toBe("u1");
+  });
+
+  test("an unread featured notice shows when no urgent one does", () => {
+    expect(pickBannerNotice([featured, normal], "2026-09-23", [], [])?.id).toBe("f1");
+  });
+
+  test("a featured notice is gone once read, an urgent one is not", () => {
+    expect(pickBannerNotice([featured], "2026-09-23", [], ["f1"])).toBeNull();
+    expect(pickBannerNotice([urgent], "2026-09-23", [], ["u1"])?.id).toBe("u1");
+  });
+
+  test("a featured notice is gone once dismissed", () => {
+    expect(pickBannerNotice([featured], "2026-09-23", ["f1"], [])).toBeNull();
+  });
+});
+
+describe("latestNotice", () => {
+  test("the newest active notice", () => {
+    const list = [
+      buildNotice({ id: "old", publishedAt: "2026-09-01" }),
+      buildNotice({ id: "new", publishedAt: "2026-09-10" }),
+    ];
+    expect(latestNotice(list, "2026-09-23")?.id).toBe("new");
+  });
+
+  test("null when every notice has expired", () => {
+    const list = [buildNotice({ id: "gone", expiresAt: "2026-09-01" })];
+    expect(latestNotice(list, "2026-09-23")).toBeNull();
+  });
+});
+
+describe("staleNoticeIds", () => {
+  test("only notices published before the 14-day grace window", () => {
+    const list = [
+      buildNotice({ id: "edge", publishedAt: "2026-09-09" }),
+      buildNotice({ id: "older", publishedAt: "2026-09-08" }),
+      buildNotice({ id: "fresh", publishedAt: "2026-09-20" }),
+    ];
+    expect(staleNoticeIds(list, "2026-09-23")).toEqual(["older"]);
+  });
+});
+
+describe("parseNotices", () => {
+  const valid = {
+    id: "ok-1",
+    level: "featured",
+    publishedAt: "2026-09-01",
+    expiresAt: null,
+    title: { zh: "标题", en: null, ja: null },
+    body: { zh: "正文", en: null, ja: null },
+    link: { href: "/charts", label: { zh: "去看看", en: null, ja: null } },
+  };
+
+  test("accepts a well-formed file", () => {
+    expect(parseNotices({ notices: [valid] })).toHaveLength(1);
+  });
+
+  test("rejects an id that would split or break a URL fragment", () => {
+    expect(() => parseNotices({ notices: [{ ...valid, id: "a,b" }] })).toThrow(/slug/);
+  });
+
+  test("rejects an unknown level", () => {
+    expect(() => parseNotices({ notices: [{ ...valid, level: "loud" }] })).toThrow(/level/);
+  });
+
+  test("rejects a missing zh title", () => {
+    const title = { zh: "", en: "Title", ja: null };
+    expect(() => parseNotices({ notices: [{ ...valid, title }] })).toThrow(/title/);
+  });
+
+  test("rejects a malformed date", () => {
+    expect(() => parseNotices({ notices: [{ ...valid, publishedAt: "9/1" }] })).toThrow(/publishedAt/);
+  });
+
+  test("rejects duplicate ids", () => {
+    expect(() => parseNotices({ notices: [valid, valid] })).toThrow(/duplicate/);
+  });
+
+  test("the real notices.json parses", async () => {
+    const raw = await import("@/data/notices.json");
+    expect(() => parseNotices(raw.default)).not.toThrow();
+  });
+});
+
+describe("isInternalNoticeHref", () => {
+  test("a site path is internal", () => {
+    expect(isInternalNoticeHref("/charts")).toBe(true);
+  });
+
+  test("a protocol-relative URL is another site", () => {
+    expect(isInternalNoticeHref("//evil.example/x")).toBe(false);
+  });
+
+  test("an absolute URL is external", () => {
+    expect(isInternalNoticeHref("https://example.com")).toBe(false);
   });
 });
 

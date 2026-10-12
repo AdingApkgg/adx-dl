@@ -1,7 +1,15 @@
 import noticesData from "@/data/notices.json";
 import { defaultLocale, type Locale } from "@/lib/i18n";
 
-export type NoticeLevel = "urgent" | "normal";
+/**
+ * How loudly a notice announces itself.
+ *
+ * - `urgent`: top-of-page banner until dismissed, even after it has been read.
+ * - `featured`: the same banner slot, but only once — read or dismissed, it is gone.
+ * - `normal`: list, unread badge and the home strip only.
+ */
+export const NOTICE_LEVELS = ["urgent", "featured", "normal"] as const;
+export type NoticeLevel = (typeof NOTICE_LEVELS)[number];
 export type LocalizedText = Record<Locale, string | null>;
 export type NoticeLink = { href: string; label: LocalizedText };
 
@@ -19,8 +27,65 @@ export type Notice = {
 
 export type ResolvedText = { value: string; translated: boolean };
 
+const ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isLocalizedText(value: unknown): value is LocalizedText {
+  if (!isRecord(value)) return false;
+  const own = value[defaultLocale];
+  if (typeof own !== "string" || own === "") return false;
+  return Object.values(value).every((text) => text === null || typeof text === "string");
+}
+
+function noticeProblem(value: unknown): string | null {
+  if (!isRecord(value)) return "not an object";
+  const { id, level, publishedAt, expiresAt, title, body, link } = value;
+  // Ids end up in a URL fragment and in localStorage — a strict slug keeps
+  // both unambiguous.
+  if (typeof id !== "string" || !ID_PATTERN.test(id)) return "id must be a lowercase slug";
+  if (!NOTICE_LEVELS.includes(level as NoticeLevel)) return `unknown level ${String(level)}`;
+  if (typeof publishedAt !== "string" || !DAY_PATTERN.test(publishedAt)) {
+    return "publishedAt must be YYYY-MM-DD";
+  }
+  if (expiresAt !== null && (typeof expiresAt !== "string" || !DAY_PATTERN.test(expiresAt))) {
+    return "expiresAt must be YYYY-MM-DD or null";
+  }
+  if (!isLocalizedText(title)) return `title needs a non-empty ${defaultLocale} text`;
+  if (!isLocalizedText(body)) return `body needs a non-empty ${defaultLocale} text`;
+  if (link !== null) {
+    if (!isRecord(link) || typeof link.href !== "string" || !isLocalizedText(link.label)) {
+      return "link must be null or { href, label }";
+    }
+  }
+  return null;
+}
+
+/**
+ * Checks the notice file's shape and throws on the first bad entry.
+ *
+ * Throwing rather than skipping: the file is build-time data, so a bad entry
+ * fails CI before it ships instead of silently vanishing from the site.
+ */
+export function parseNotices(raw: unknown): Notice[] {
+  const list = isRecord(raw) ? raw.notices : undefined;
+  if (!Array.isArray(list)) throw new Error("notices.json: expected { notices: [...] }");
+  const seen = new Set<string>();
+  for (const [index, entry] of list.entries()) {
+    const problem = noticeProblem(entry);
+    if (problem) throw new Error(`notices.json: entry ${index}: ${problem}`);
+    const { id } = entry as Notice;
+    if (seen.has(id)) throw new Error(`notices.json: duplicate id ${id}`);
+    seen.add(id);
+  }
+  return list as Notice[];
+}
+
 /** Build-time data. The JSON is the single source; dash edits it via a form. */
-export const notices: Notice[] = (noticesData as { notices: Notice[] }).notices;
+export const notices: Notice[] = parseNotices(noticesData);
 
 /**
  * The current UTC calendar day.
@@ -63,20 +128,49 @@ export function sortNotices(list: Notice[], today: string): Notice[] {
   });
 }
 
-/** The one urgent notice the top-of-page banner should show, if any. */
-export function pickUrgentNotice(
+/**
+ * The one notice the top-of-page banner should show, if any.
+ *
+ * Urgent beats featured. An urgent notice stays until dismissed; a featured
+ * one is also gone once read — it only exists to get a notice seen once.
+ */
+export function pickBannerNotice(
   list: Notice[],
   today: string,
-  dismissedIds: string[]
+  dismissedIds: string[],
+  readIds: string[]
 ): Notice | null {
-  const candidates = sortNotices(
-    list.filter(
-      (notice) =>
-        notice.level === "urgent" && isActive(notice, today) && !dismissedIds.includes(notice.id)
-    ),
+  const live = sortNotices(
+    list.filter((notice) => isActive(notice, today) && !dismissedIds.includes(notice.id)),
     today
   );
-  return candidates[0] ?? null;
+  return (
+    live.find((notice) => notice.level === "urgent") ??
+    live.find((notice) => notice.level === "featured" && !readIds.includes(notice.id)) ??
+    null
+  );
+}
+
+/** The newest active notice, for the home page strip. */
+export function latestNotice(list: Notice[], today: string): Notice | null {
+  const [first] = sortNotices(list, today);
+  return first && isActive(first, today) ? first : null;
+}
+
+/**
+ * How old a notice may be before a first-time visitor is spared it.
+ *
+ * Without this, a new visitor sees every active notice as unread, so the badge
+ * is lit on every first visit and stops meaning "something new".
+ */
+export const FIRST_VISIT_GRACE_DAYS = 14;
+
+/** Active notices a first-time visitor should treat as already read. */
+export function staleNoticeIds(list: Notice[], today: string): string[] {
+  const cutoff = new Date(`${today}T00:00:00Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - FIRST_VISIT_GRACE_DAYS);
+  const cutoffDay = todayUtc(cutoff);
+  return list.filter((notice) => notice.publishedAt < cutoffDay).map((notice) => notice.id);
 }
 
 export function unreadCount(list: Notice[], readIds: string[], today: string): number {
@@ -105,4 +199,14 @@ export function isSafeNoticeHref(href: string): boolean {
     href.startsWith("//") ||
     href.startsWith("/")
   );
+}
+
+/**
+ * Whether an (already safe) href stays on this site.
+ *
+ * `//host/...` starts with a slash but is another site: it must not be handed
+ * to `<Link>` or prefixed with a locale.
+ */
+export function isInternalNoticeHref(href: string): boolean {
+  return href.startsWith("/") && !href.startsWith("//");
 }

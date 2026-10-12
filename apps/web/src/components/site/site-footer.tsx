@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { usePathLocale } from "@/app/use-path-locale";
+import { NoticesUnreadBadge, useUnreadNoticeCount } from "@/components/site/notices-unread-dot";
 import { SitePageViews } from "@/components/site/page-view-counter";
 import { SiteUptime } from "@/components/site/site-uptime";
 import { SITE_REPOSITORY as SOURCE_REPOSITORY } from "@/lib/community-links";
@@ -33,6 +34,7 @@ export function SiteFooter({
 }: SiteFooterProps) {
   const locale = usePathLocale(initialLocale, deriveLocaleFromPath);
   const dictionary = getDictionary(locale);
+  const unreadNotices = useUnreadNoticeCount();
 
   return (
     <footer className="mt-auto border-t border-border/60 bg-background/60">
@@ -95,8 +97,13 @@ export function SiteFooter({
           <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/comments", locale)}>
             {dictionary.guestbook.navLabel}
           </Link>
-          <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/notices", locale)}>
+          <Link
+            className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+            href={buildLocalePath("/notices", locale)}
+            aria-label={unreadNotices > 0 ? dictionary.notices.unreadLabel(unreadNotices) : undefined}
+          >
             {dictionary.notices.navLabel}
+            <NoticesUnreadBadge />
           </Link>
           <Link
             className="text-muted-foreground hover:text-foreground"
