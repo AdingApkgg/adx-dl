@@ -11,6 +11,7 @@ fail() { printf '%s\n' "$1" >&2; exit "${2:-2}"; }
 [[ ${ACCEPTANCE_PROJECT:-} == "community-ci-${GITHUB_RUN_ID:?required}-${GITHUB_RUN_ATTEMPT:?required}" ]] || fail 'ACCEPTANCE_PROJECT_INVALID'
 [[ ${GITHUB_SHA:-} =~ ^[a-f0-9]{40}$ ]] || fail 'SOURCE_SHA_REQUIRED'
 export ACCEPTANCE_APP_IMAGE=${ACCEPTANCE_APP_IMAGE:-community:ci}
+export ACCEPTANCE_SEAWEED_IMAGE=${ACCEPTANCE_SEAWEED_IMAGE:-community-seaweed:ci}
 export ACCEPTANCE_BACKUP_IMAGE=${ACCEPTANCE_BACKUP_IMAGE:-community-backup:ci}
 export ACCEPTANCE_TEST_IMAGE=${ACCEPTANCE_TEST_IMAGE:-community-acceptance:ci}
 ROOT=$ACCEPTANCE_ROOT
@@ -64,11 +65,12 @@ case "$1" in
     mkdir -m 0700 "$ROOT/fixture" "$ROOT/state" "$ROOT/scratch" "$ROOT/evidence" "$ROOT/private-logs"
     app_id=$(docker image inspect --format '{{.Id}}' "$ACCEPTANCE_APP_IMAGE")
     backup_id=$(docker image inspect --format '{{.Id}}' "$ACCEPTANCE_BACKUP_IMAGE")
-    for image in "$ACCEPTANCE_APP_IMAGE" "$ACCEPTANCE_BACKUP_IMAGE"; do
+    seaweed_id=$(docker image inspect --format '{{.Id}}' "$ACCEPTANCE_SEAWEED_IMAGE")
+    for image in "$ACCEPTANCE_APP_IMAGE" "$ACCEPTANCE_BACKUP_IMAGE" "$ACCEPTANCE_SEAWEED_IMAGE"; do
       revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")
       [[ $revision == "$GITHUB_SHA" ]] || fail 'ACCEPTANCE_IMAGE_SOURCE_SHA_MISMATCH'
     done
-    printf '{"sourceSha":"%s","appImage":"%s","backupImage":"%s"}\n' "$GITHUB_SHA" "$app_id" "$backup_id" >"$ROOT/evidence/images.json"
+    printf '{"sourceSha":"%s","appImage":"%s","backupImage":"%s","seaweedImage":"%s"}\n' "$GITHUB_SHA" "$app_id" "$backup_id" "$seaweed_id" >"$ROOT/evidence/images.json"
     docker build -f "$SCRIPT_DIR/Dockerfile" \
       --build-arg "ACCEPTANCE_APP_IMAGE=$ACCEPTANCE_APP_IMAGE" \
       --build-arg "ACCEPTANCE_BACKUP_IMAGE=$ACCEPTANCE_BACKUP_IMAGE" \
@@ -86,7 +88,7 @@ case "$1" in
     code=0
     timeout --foreground --signal=TERM --kill-after=15 75 \
       docker run --rm --name "$PROJECT-prepare" --label "com.docker.compose.project=$PROJECT" --memory 256m --cpus 1 --pids-limit 64 \
-      -e ACCEPTANCE_ROOT -e ACCEPTANCE_PROJECT -e ACCEPTANCE_APP_IMAGE -e ACCEPTANCE_BACKUP_IMAGE -e ACCEPTANCE_TEST_IMAGE \
+      -e ACCEPTANCE_ROOT -e ACCEPTANCE_PROJECT -e ACCEPTANCE_APP_IMAGE -e ACCEPTANCE_BACKUP_IMAGE -e ACCEPTANCE_TEST_IMAGE -e ACCEPTANCE_SEAWEED_IMAGE \
       --mount "type=bind,src=$ROOT/fixture,dst=/acceptance-fixture" \
       --mount "type=bind,src=$ROOT/state,dst=/acceptance-state" \
       --mount "type=volume,src=${PROJECT}_source-storage,dst=/source-storage" \

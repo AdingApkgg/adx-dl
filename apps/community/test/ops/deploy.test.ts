@@ -82,7 +82,7 @@ describe("deploy.sh", () => {
       "git rev-parse HEAD",
       "docker compose config --quiet",
       "docker compose ps -q web",
-      "docker compose build web backup",
+      "docker compose build web backup seaweedfs",
       "docker compose run --rm migrate",
       "docker compose run --rm --no-deps storage-config",
       "docker compose up -d seaweedfs",
@@ -117,7 +117,7 @@ describe("deploy.sh", () => {
     expect(await commands(["docker"])).toEqual([
       "docker compose config --quiet",
       "docker compose ps -q web",
-      "docker compose build web backup",
+      "docker compose build web backup seaweedfs",
       "docker compose run --rm migrate",
     ]);
     expect(await commands(["curl"])).toEqual([]);

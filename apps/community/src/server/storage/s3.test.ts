@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { createS3Driver } from "./s3";
 import { parseStorageEnv } from "./env";
 import { StorageUnavailableError } from "./errors";
+import { createLogger } from "../../shared/log";
 const hash = "a".repeat(64);
 function config(endpoint: string) {
   return parseStorageEnv(
@@ -233,4 +234,76 @@ test("DELETE404 with missing or forbidden bucket remains a storage failure", asy
       server.close();
     }
   }
+});
+
+
+describe("S3 PUT failure diagnostics", () => {
+  const put = () => ({
+    bucket: "original" as const,
+    key: "private-object-do-not-log",
+    size: 8,
+    mime: "application/octet-stream",
+    sha256: hash,
+    body: new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(8));
+        controller.close();
+      },
+    }),
+  });
+  test("a timed-out PUT logs its deadline and still permits a later successful PUT", async () => {
+    let stall = true;
+    const server = await localServer((request, response) => {
+      request.resume();
+      request.on("end", () => {
+        if (!stall) response.end();
+      });
+    });
+    const lines: string[] = [];
+    try {
+      const driver = createS3Driver(config(server.endpoint), {
+        requestTimeoutMs: 100,
+        log: createLogger((line) => lines.push(line)),
+      });
+      await expect(driver.put(put())).rejects.toBeInstanceOf(StorageUnavailableError);
+      expect(lines).toHaveLength(1);
+      const record = JSON.parse(lines[0]);
+      expect(record.event).toBe("storage_put_failed");
+      expect(record.kind).toBe("deadline");
+      expect(record.elapsedMs).toBeGreaterThanOrEqual(90);
+      expect(record.upstreamStatus).toBeNull();
+      expect(lines[0]).not.toContain("private-object-do-not-log");
+      expect(lines[0]).not.toContain("local-test-secret");
+      stall = false;
+      await driver.put(put());
+      expect(lines).toHaveLength(1);
+    } finally {
+      server.close();
+    }
+  });
+  test("an upstream rejection logs only its status without provider text or credentials", async () => {
+    const server = await localServer((request, response) => {
+      request.resume();
+      request.on("end", () => {
+        response.writeHead(403, { "content-type": "application/xml" });
+        response.end("<Error><Code>AccessDenied</Code><Message>DO_NOT_LOG_PROVIDER_SECRET</Message></Error>");
+      });
+    });
+    const lines: string[] = [];
+    try {
+      const driver = createS3Driver(config(server.endpoint), {
+        log: createLogger((line) => lines.push(line)),
+      });
+      await expect(driver.put(put())).rejects.toBeInstanceOf(StorageUnavailableError);
+      expect(lines).toHaveLength(1);
+      const record = JSON.parse(lines[0]);
+      expect(record.kind).toBe("upstream");
+      expect(record.upstreamStatus).toBe(403);
+      expect(lines[0]).not.toContain("DO_NOT_LOG_PROVIDER_SECRET");
+      expect(lines[0]).not.toContain("private-object-do-not-log");
+      expect(lines[0]).not.toContain("local-test-secret");
+    } finally {
+      server.close();
+    }
+  });
 });

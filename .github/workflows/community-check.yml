@@ -70,6 +70,7 @@ jobs:
       ACCEPTANCE_SOURCE_SHA: ${{ github.sha }}
       ACCEPTANCE_APP_IMAGE: community:ci
       ACCEPTANCE_BACKUP_IMAGE: community-backup:ci
+      ACCEPTANCE_SEAWEED_IMAGE: community-seaweed:ci
       ACCEPTANCE_TEST_IMAGE: community-acceptance:ci
     steps:
       - name: Checkout
@@ -144,9 +145,18 @@ jobs:
       # 构建只在部署时才跑，构建坏了就要到部署时才发现（dash 踩过的坑）。
       - name: Docker build
         run: |
+          docker build --label "org.opencontainers.image.revision=$GITHUB_SHA" -f apps/community/ops/seaweed/Dockerfile -t community-seaweed:ci .
           docker build --label "org.opencontainers.image.revision=$GITHUB_SHA" -f apps/community/Dockerfile -t community:ci .
           docker build --label "org.opencontainers.image.revision=$GITHUB_SHA" -f apps/community/ops/backup/Dockerfile -t community-backup:ci .
           docker run --rm --network none --read-only --tmpfs /tmp community:ci bun -e 'import sharp from "sharp"; import {processAvatar} from "./src/media-worker/avatar.ts"; await sharp({create:{width:32,height:32,channels:3,background:"white"}}).png().toFile("/tmp/input.png"); const output=await processAvatar("/tmp/input.png","/tmp/output.jpg"); if(output.width!==512||output.size>524288)throw new Error("native recipe failed");'
+
+      - name: Seaweed supervision and TCP closure regressions
+        env:
+          SEAWEED_RUNTIME_TEST_IMAGE: community-seaweed:ci
+          SEAWEED_RUNTIME_TEST_APP_IMAGE: community:ci
+        run: |
+          bash apps/community/test/ops/seaweed-runtime.sh apps/community/ops/seaweed
+          bash apps/community/test/ops/seaweed-eof.sh apps/community/ops/seaweed
 
       # 复用以上镜像；没有生产密钥，DB/S3/账号和有界磁盘均为本轮临时 fixture。
       - name: Prepare isolated native acceptance

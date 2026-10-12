@@ -88,7 +88,7 @@ if [ -n "$serving" ]; then
     docker image tag "$image_id" "astrodx-community:rollback-$previous"
   fi
 fi
-docker compose build web backup
+docker compose build web backup seaweedfs
 
 echo "== 迁移"
 if ! docker compose run --rm migrate; then

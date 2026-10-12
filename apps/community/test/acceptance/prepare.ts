@@ -64,7 +64,7 @@ await env("restore", {
   STORAGE_TEST_FIXTURE_PATH: "/acceptance-fixture/s3.json", STORAGE_TEST_REAL_ROLES: "1", STORAGE_TEST_FRESH_RESTORE: "1",
 });
 const compose: Record<string, string> = { ACCEPTANCE_PG_PASSWORD: password };
-for (const key of ["ACCEPTANCE_ROOT", "ACCEPTANCE_PROJECT", "ACCEPTANCE_APP_IMAGE", "ACCEPTANCE_BACKUP_IMAGE", "ACCEPTANCE_TEST_IMAGE"]) {
+for (const key of ["ACCEPTANCE_ROOT", "ACCEPTANCE_PROJECT", "ACCEPTANCE_APP_IMAGE", "ACCEPTANCE_BACKUP_IMAGE", "ACCEPTANCE_TEST_IMAGE", "ACCEPTANCE_SEAWEED_IMAGE"]) {
   const value = process.env[key];
   if (!value) throw new Error("ACCEPTANCE_INPUT_REQUIRED");
   compose[key] = value;
