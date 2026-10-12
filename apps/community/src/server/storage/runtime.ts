@@ -15,7 +15,7 @@ export function createStorageContext(
   },
 ): StorageContext {
   const config = input.config ?? parseStorageEnv(input.source ?? process.env, input.role ?? "web");
-  const driver = input.driver ?? createS3Driver(config);
+  const driver = input.driver ?? createS3Driver(config, { log: input.log });
   return {
     db: input.db,
     boss: input.boss,

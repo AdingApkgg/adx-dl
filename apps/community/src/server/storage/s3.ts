@@ -1,4 +1,5 @@
 import { Readable } from "node:stream";
+import type { Logger } from "../../shared/log";
 import {
   CopyObjectCommand,
   DeleteObjectCommand,
@@ -19,6 +20,7 @@ type DriverOptions = {
   putLimit?: number;
   requestTimeoutMs?: number;
   now?: () => number;
+  log?: Pick<Logger, "warn">;
 };
 function metadata(value: {
   ContentLength?: number;
@@ -99,6 +101,7 @@ export function createS3Driver(config: StorageConfig, options: DriverOptions = {
   const raw: ObjectDriver = {
     put(input) {
       return request(true, input.signal, async (signal) => {
+        const started = performance.now();
         if (!Number.isSafeInteger(input.size) || input.size < 1 || !/^[a-f0-9]{64}$/.test(input.sha256))
           throw new TypeError("Invalid object input");
         const body = Readable.fromWeb(input.body as unknown as Parameters<typeof Readable.fromWeb>[0]);
@@ -121,6 +124,25 @@ export function createS3Driver(config: StorageConfig, options: DriverOptions = {
             }),
             { abortSignal: signal },
           );
+        } catch (error) {
+          const status = storageStatus(error);
+          const upstreamStatus = typeof status === "number" && Number.isInteger(status) && status >= 400 && status <= 599 ? status : null;
+          const code = typeof error === "object" && error ? (error as { code?: unknown }).code : undefined;
+          const network = typeof code === "string" && ["ECONNRESET", "ECONNREFUSED", "EPIPE", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN"].includes(code);
+          const kind = input.signal?.aborted ? "cancelled" : signal.aborted ? "deadline" : upstreamStatus !== null ? "upstream" : network ? "network" : "unknown";
+          // No key, endpoint, upstream message, headers or credentials leave this boundary.
+          // Diagnostic failures must not replace the original storage failure.
+          try {
+            options.log?.warn("storage_put_failed", {
+              role: config.role,
+              kind,
+              elapsedMs: Math.round(performance.now() - started),
+              upstreamStatus,
+            });
+          } catch {
+            // Keep the original error if the diagnostic sink is unavailable.
+          }
+          throw error;
         } finally {
           signal.removeEventListener("abort", abort);
           if (!body.destroyed) body.destroy();

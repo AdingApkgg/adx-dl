@@ -21,8 +21,12 @@ mini_pid=$!
 # BusyBox nc -lk forks a handler per connection. No HTTP parsing or credentials.
 nc -l -k -s 0.0.0.0 -p 8333 -e /opt/community-seaweed/forward-s3.sh &
 relay_pid=$!
-# Either child exiting is a service failure, even with exit status zero.
-# BusyBox ash treats explicit PID arguments as wait-all even with -n.
-# There are exactly two direct children here; wait for either without arguments.
-wait -n || true
+# Only these two service PIDs determine liveness. PID1 also adopts unrelated
+# orphan processes (for example a docker-exec timeout watchdog). BusyBox ash's
+# unqualified wait -n can return for their exits and shut down healthy services.
+# Polling owned PIDs also avoids ash's wait-all behavior with explicit wait -n PIDs.
+while kill -0 "$mini_pid" 2>/dev/null && kill -0 "$relay_pid" 2>/dev/null; do
+  sleep 1
+done
+# Either actual service exiting is a failure, even with exit status zero.
 exit 1

@@ -107,6 +107,9 @@ jobs:
           done
           exit 1
 
+      - name: Seaweed process supervision regression
+        run: bash apps/community/test/ops/seaweed-runtime.sh apps/community/ops/seaweed
+
       # 共享界面包的测试和社区站的交互测试（test/dom）用 vitest，它跑在 Node 上（vitest 5 要求 Node ^22.12 || ^24 || >=26）。
       # 要排在下面两步之前：社区站 check 的最后一步就是 vitest run。
       - name: Setup Node
