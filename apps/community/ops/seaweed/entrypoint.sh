@@ -18,8 +18,8 @@ weed mini -dir=/data -ip=127.0.0.1 -ip.bind=127.0.0.1 \
   -bucket=blobs,derived -admin.ui=false -webdav=false \
   -s3.port.iceberg=0 -s3.port.lance=0 &
 mini_pid=$!
-# BusyBox nc -lk forks a handler per connection. No HTTP parsing or credentials.
-nc -l -k -s 0.0.0.0 -p 8333 -e /opt/community-seaweed/forward-s3.sh &
+# Fork one transparent S3 relay per connection, including TCP half-closes.
+/opt/community-seaweed/forward-s3.sh &
 relay_pid=$!
 # Only these two service PIDs determine liveness. PID1 also adopts unrelated
 # orphan processes (for example a docker-exec timeout watchdog). BusyBox ash's

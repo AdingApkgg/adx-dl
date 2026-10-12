@@ -17,7 +17,7 @@ cleanup() {
 trap cleanup EXIT
 printf '%s\n' '{"identities":[{"name":"runtime-test","credentials":[{"accessKey":"runtime-test-only","secretKey":"runtime-test-secret-only"}],"actions":["Read:blobs"]}]}' > "$ROOT/s3.json"
 chmod 600 "$ROOT/s3.json"
-IMAGE=chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+IMAGE=${SEAWEED_RUNTIME_TEST_IMAGE:?pass the built community Seaweed image}
 probe() {
   local response
   response=$(docker exec "$name" wget -S -O /dev/null -T 2 http://127.0.0.1:8333/ 2>&1 || true)
@@ -46,7 +46,7 @@ for role in relay mini; do
     done
     echo ORPHAN_EXIT_IGNORED
   fi
-  process=nc
+  process=socat
   [[ $role == mini ]] && process=weed
   docker exec "$name" sh -c '
     wanted=$1
