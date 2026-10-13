@@ -37,6 +37,8 @@ describe("SiteSettingsContent", () => {
     const section = html.slice(start, html.indexOf("</section>", start));
     expect(section).toMatch(/aria-pressed="true"[^>]*>(?:(?!<\/button>).)*<span>Show<\/span>/);
     expect(section).toMatch(/aria-pressed="false"[^>]*>(?:(?!<\/button>).)*<span>Hide<\/span>/);
+    // Phones and touch screens never get the corner; the page is their way in.
+    expect(section).toContain('href="/en/live2d"');
   });
   test("renders appearance, format, immutable built-ins, and custom-route controls", () => {
     const html = renderToStaticMarkup(

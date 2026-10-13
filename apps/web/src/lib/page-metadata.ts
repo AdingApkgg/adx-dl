@@ -470,6 +470,36 @@ function buildUiSeoTitle(locale: Locale): string {
  * nav: it documents the design system for whoever maintains the site, and a
  * chart archive's search presence should not be diluted with a component list.
  */
+const live2dPageMetadata: Record<Locale, { title: string; description: string }> = {
+  zh: {
+    title: "Live2D 看板娘",
+    description: "ADX 谱面资源的 Live2D 看板娘：换装、换人、一言与拍照，手机和触屏设备也能使用。",
+  },
+  en: {
+    title: "Live2D Mascot",
+    description:
+      "The ADX Chart Archive's Live2D mascot: outfits, characters, random quotes and photos, on phones and touch screens too.",
+  },
+  ja: {
+    title: "Live2D 看板娘",
+    description:
+      "ADX 譜面アーカイブの Live2D 看板娘。着替え・キャラ切替・ひとこと・撮影ができ、スマホやタッチ端末でも使えます。",
+  },
+};
+
+// A plaything rather than content: kept out of the index like /ui.
+export function buildLive2DPageMetadata(locale: Locale): Metadata {
+  const page = live2dPageMetadata[locale];
+  return buildPageMetadata({
+    locale,
+    pathname: "/live2d",
+    title: page.title,
+    description: page.description,
+    keywords: ["AstroDX", siteName(locale), "Live2D", "看板娘", "mascot"],
+    indexable: false,
+  });
+}
+
 export function buildUiPageMetadata(locale: Locale): Metadata {
   const dictionary = getDictionary(locale);
   return buildPageMetadata({

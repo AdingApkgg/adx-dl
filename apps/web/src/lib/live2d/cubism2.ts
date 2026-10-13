@@ -84,6 +84,21 @@ export interface TapResult {
   hitArea: string | null;
 }
 
+/**
+ * model matrix：contain-fit 到画布（L2Dwidget 式，忽略 json layout — 那是旧框架
+ * viewMatrix 语义，直接当 clip 变换会放大裁切）。带纵横比补偿，模型像素保持正方；
+ * 水平居中、垂直贴顶（看板娘露头身，底边裁脚）。
+ */
+function fitMatrix(modelCanvasWidth: number, aspect: number): Float32Array<ArrayBuffer> {
+  // x 方向铺满：sx=2/cw；y 保持正方形像素：sy = sx * aspect
+  const sx = 2 / modelCanvasWidth;
+  const sy = sx * aspect;
+  const tx = -(sx * modelCanvasWidth) / 2; // 水平居中
+  const ty = 1; // 模型顶(y_m=0)贴 clip 顶(+1)
+  // 列主序：x' = sx·x + tx，y' = -sy·y + ty（模型画布 y 向下 → clip y 向上）
+  return new Float32Array([sx, 0, 0, 0, 0, -sy, 0, 0, 0, 0, 1, 0, tx, ty, 0, 1]);
+}
+
 /** Everything one model needs, built off to the side and swapped in whole. */
 interface LoadedModel {
   model: any;
@@ -92,8 +107,6 @@ interface LoadedModel {
   textures: WebGLTexture[];
   physics: any[];
   motionMgr: any;
-  /** Per model: the one on screen keeps its own while the next one loads. */
-  matrix: Float32Array<ArrayBuffer>;
 }
 
 /** Redraws at most this often; motions and physics are time-based, so fewer frames only means less GPU work. */
@@ -114,7 +127,10 @@ export class Cubism2Mascot {
   private failedMotions = new Set<string>();
   private physics: any[] = [];
   private textures: WebGLTexture[] = [];
+  /** Rebuilt per commit and per resize, so the model on screen never shares one with the next. */
   private matrix = new Float32Array(16);
+  /** Drawing-buffer size to switch to on the next drawn frame (see resize). */
+  private pendingSize: { width: number; height: number } | null = null;
   private raf = 0;
   private lastDraw = 0;
   private dead = false;
@@ -203,8 +219,33 @@ export class Cubism2Mascot {
     this.textures = loaded.textures;
     this.physics = loaded.physics;
     this.motionMgr = loaded.motionMgr;
-    this.matrix = loaded.matrix;
+    this.fitModel();
+  }
+
+  private fitModel(): void {
+    if (!this.model) return;
+    this.matrix = fitMatrix(this.model.getCanvasWidth(), this.canvas.width / this.canvas.height);
     this.model.setMatrix(this.matrix);
+  }
+
+  /**
+   * Changes the drawing-buffer size (device px) without rebuilding anything —
+   * the same engine follows her from the corner onto the mascot page. Applied
+   * inside the next drawn frame: resizing clears the buffer, and doing it right
+   * before a draw means no blank frame ever reaches the screen. Until then the
+   * old frame is just scaled with the element.
+   */
+  resize(width: number, height: number): void {
+    if (this.dead || width < 1 || height < 1) return;
+    if (!this.pendingSize && width === this.canvas.width && height === this.canvas.height) return;
+    if (!this.model) {
+      // Nothing drawn yet, so nothing to lose: apply now.
+      this.canvas.width = width;
+      this.canvas.height = height;
+      this.pendingSize = null;
+      return;
+    }
+    this.pendingSize = { width, height };
   }
 
   /** 截取当前帧（透明背景 PNG dataURL）；"" when nothing can be drawn. */
@@ -274,18 +315,7 @@ export class Cubism2Mascot {
       textures.push(tex);
     });
 
-    // --- model matrix：contain-fit 到画布（L2Dwidget 式，忽略 json layout —
-    // 那是旧框架 viewMatrix 语义，直接当 clip 变换会放大裁切）。带纵横比补偿，
-    // 模型像素保持正方；水平居中、垂直贴顶（看板娘露头身，底边裁脚）。---
-    const cw = model.getCanvasWidth();
-    const aspect = this.canvas.width / this.canvas.height; // 物理像素比即可
-    // x 方向铺满：sx=2/cw；y 保持正方形像素：sy = sx * aspect
-    const sx = 2 / cw;
-    const sy = sx * aspect;
-    const tx = -(sx * cw) / 2; // 水平居中
-    const ty = 1; // 模型顶(y_m=0)贴 clip 顶(+1)
-    // 列主序：x' = sx·x + tx，y' = -sy·y + ty（模型画布 y 向下 → clip y 向上）
-    const matrix = new Float32Array([sx, 0, 0, 0, 0, -sy, 0, 0, 0, 0, 1, 0, tx, ty, 0, 1]);
+    // --- model matrix: fitted in commit() to the canvas size at that moment ---
 
     // --- physics ---
     const physics: any[] = [];
@@ -312,7 +342,7 @@ export class Cubism2Mascot {
       }
     }
 
-    return { model, settings, base, textures, physics, matrix, motionMgr: new w.MotionQueueManager() };
+    return { model, settings, base, textures, physics, motionMgr: new w.MotionQueueManager() };
   }
 
   /** 播放某组里的随机动作（不存在则忽略）。 */
@@ -430,6 +460,13 @@ export class Cubism2Mascot {
       }
       if (now - this.lastDraw < FRAME_INTERVAL_MS - 1) return;
       this.lastDraw = now;
+
+      if (this.pendingSize) {
+        this.canvas.width = this.pendingSize.width;
+        this.canvas.height = this.pendingSize.height;
+        this.pendingSize = null;
+        this.fitModel();
+      }
 
       const timeMSec = w.UtSystem.getUserTimeMSec();
 

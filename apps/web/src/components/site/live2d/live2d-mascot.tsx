@@ -13,6 +13,7 @@ import {
 import * as React from "react";
 import type { Locale } from "@/lib/i18n";
 import { Cubism2Mascot } from "@/lib/live2d/cubism2";
+import type { MascotPlacement } from "@/lib/live2d/mascot-page";
 import { setMascotHidden } from "@/lib/live2d/mascot-preference";
 import { isMediaActive, subscribeMediaActivity } from "@/lib/media-coordination";
 import {
@@ -31,13 +32,21 @@ import {
   welcomeMessage,
 } from "@/lib/live2d/waifu";
 import { getLive2DCopy } from "./live2d-copy";
+import { setMascotActions, setMascotStatus } from "./mascot-store";
 
 export interface Live2DMascotProps {
   locale: Locale;
-  width?: number;
-  height?: number;
+  /**
+   * "dock": the corner, click-through except over her, hover toolbar.
+   * "stage": the mascot page, where she owns her box and the page renders the
+   * controls. Switching keeps the same engine and model — she just moves.
+   */
+  placement: MascotPlacement;
   className?: string;
 }
+
+/** Device pixels up to 2× — sharper is invisible at this size and only multiplies the per-frame fill cost. */
+const pixelScale = () => Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
 
 function readStored(key: string): string | null {
   try {
@@ -65,14 +74,21 @@ function writeStored(key: string, value: string): void {
  * 42 套明日奈换装 + 11 组换人（npmmirror CDN）、工具栏（一言/打飞机/换人/换装/
  * 拍照/信息/退出）、时段+节日问候、悬停吐槽、复制/控制台/切页彩蛋、退出记忆。
  * 渲染层为自实现 Cubism 2 引擎。Ported from AdingApkgg/i.
+ *
+ * Fills its parent: MascotWidget sizes and places the box for each placement.
  */
-export default function Live2DMascot({ locale, width = 230, height = 320, className }: Live2DMascotProps) {
+export default function Live2DMascot({ locale, placement, className }: Live2DMascotProps) {
   const copy = getLive2DCopy(locale);
+  const onStage = placement === "stage";
+  // Event handlers wired once per engine read the placement through this.
+  const placementRef = React.useRef(placement);
+  placementRef.current = placement;
   // The canvas is created per engine (below), not rendered by React: the
   // engine releases its WebGL context on destroy, and a canvas React keeps
   // around — across a dev double-invoke or any re-run of the effect — would
   // hand the next engine that already-lost context.
   const canvasHostRef = React.useRef<HTMLDivElement>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const engineRef = React.useRef<Cubism2Mascot | null>(null);
   const [list, setList] = React.useState<ModelList | null>(null);
   // Hidden and click-through until the first model has drawn: if the model CDN
@@ -121,14 +137,15 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
     }, ms);
   }, []);
 
-  React.useEffect(
-    () => () => {
+  React.useEffect(() => {
+    setMascotStatus("loading");
+    return () => {
       if (tipTimer.current) clearTimeout(tipTimer.current);
       if (followupTimer.current) clearTimeout(followupTimer.current);
       if (toolsCloseTimer.current) clearTimeout(toolsCloseTimer.current);
-    },
-    []
-  );
+      setMascotStatus("idle");
+    };
+  }, []);
 
   // ---- 初始化：拉 model_list + tips，恢复上次的换人/换装 ----
   React.useEffect(() => {
@@ -143,7 +160,7 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
         setCostume(selection.costume);
         setList(l);
       })
-      .catch(() => {});
+      .catch(() => setMascotStatus("failed"));
     void fetchTips()
       .then((t) => {
         tipsRef.current = t;
@@ -175,22 +192,33 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
       height: "100%",
       background: "transparent",
       cursor: "pointer",
-      pointerEvents: "none",
+      // On the stage she owns her box (and touch has no hover to probe with).
+      pointerEvents: placementRef.current === "stage" ? "auto" : "none",
     });
     host.appendChild(canvas);
-    // Device pixels up to 2× — sharper than that is invisible at 230×320 and
-    // only multiplies the per-frame fill cost.
-    const scale = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
-    canvas.width = Math.round(width * scale);
-    canvas.height = Math.round(height * scale);
+    const hostRect = host.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.round(hostRect.width * pixelScale()));
+    canvas.height = Math.max(1, Math.round(hostRect.height * pixelScale()));
     let engine: Cubism2Mascot | null = null;
     try {
       engine = new Cubism2Mascot(canvas);
     } catch {
       canvas.remove();
+      setMascotStatus("failed");
       return;
     }
     engineRef.current = engine;
+    canvasRef.current = canvas;
+    // The box grows when she moves onto the mascot page (and follows that
+    // page's layout); the drawing buffer follows it instead of the engine
+    // being rebuilt, so the model never reloads mid-move.
+    const resizeObserver = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      rectRef.current = null;
+      const { width, height } = entry.contentRect;
+      engineRef.current?.resize(Math.round(width * pixelScale()), Math.round(height * pixelScale()));
+    });
+    resizeObserver.observe(host);
     // Stand down while the chart preview plays: its canvas renders every
     // frame and is timing-sensitive, and she would otherwise keep a WebGL
     // loop running right next to it. She freezes on her last frame.
@@ -202,14 +230,20 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
     if (path)
       void engine
         .load(modelSrc(path))
-        .then(() => setReady(true))
+        .then(() => {
+          // Not for an engine torn down meanwhile (she left the page mid-load).
+          if (engineRef.current !== engine) return;
+          setReady(true);
+          setMascotStatus("ready");
+        })
         .catch((e) => {
           console.warn("[waifu] model load failed:", e);
+          if (engineRef.current === engine) setMascotStatus("failed");
         });
 
-    // The canvas is fixed to the corner, so its rect only changes on resize
-    // (and once, when the entrance animation settles — see onAnimationComplete).
-    // Reading it on every mousemove forced a layout per event.
+    // Cached: reading it on every mousemove forced a layout per event. In the
+    // corner it only changes on resize (and once, when the entrance animation
+    // settles — see onAnimationComplete); on the stage she scrolls with the page.
     rectRef.current = null;
     const rect = () => {
       rectRef.current ??= canvas.getBoundingClientRect();
@@ -230,6 +264,7 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
         (e.clientX - (r.left + r.width / 2)) / (window.innerWidth * 0.5),
         -(e.clientY - (r.top + r.height * 0.3)) / (window.innerHeight * 0.5)
       );
+      if (placementRef.current === "stage") return;
       const x = e.clientX - r.left;
       const y = e.clientY - r.top;
       if (x < 0 || y < 0 || x >= r.width || y >= r.height) {
@@ -250,18 +285,31 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
     };
     window.addEventListener("mousemove", onMove, { passive: true });
     window.addEventListener("resize", onResize, { passive: true });
+    window.addEventListener("scroll", onResize, { passive: true });
     canvas.addEventListener("click", onTap);
     canvas.addEventListener("pointerenter", openTools);
     canvas.addEventListener("pointerleave", closeToolsSoon);
     return () => {
       unsubscribeActivity();
+      resizeObserver.disconnect();
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onResize);
       engine?.destroy();
       engineRef.current = null;
+      canvasRef.current = null;
       canvas.remove();
     };
-  }, [list, width, height, openTools, closeToolsSoon]);
+  }, [list, openTools, closeToolsSoon]);
+
+  // ---- 换位置：角落 ↔ 看板娘页 ----
+  React.useEffect(() => {
+    rectRef.current = null;
+    const canvas = canvasRef.current;
+    // In the corner the hit probe takes over again on the next mousemove.
+    if (canvas) canvas.style.pointerEvents = placement === "stage" ? "auto" : "none";
+    if (placement === "stage") setToolsOpen(false);
+  }, [placement]);
 
   // ---- 换装/换人 ----
   const applyModel = React.useCallback(
@@ -350,6 +398,18 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
       followupTimer.current = setTimeout(() => showTip(followup, 4000, 1), 6000);
     }
   }, [showTip]);
+
+  // ---- 给看板娘页的按钮用 ----
+  React.useEffect(() => {
+    setMascotActions({
+      hitokoto: () => void showHitokoto(),
+      switchModel: switchGroup,
+      switchTexture: switchCostume,
+      photo: () => void takePhoto(),
+      asteroids: startAsteroids,
+    });
+    return () => setMascotActions(null);
+  }, [showHitokoto, switchGroup, switchCostume, takePhoto, startAsteroids]);
 
   // ---- 空闲吐槽：default 消息池(含节日) 与一言轮换 ----
   React.useEffect(() => {
@@ -451,7 +511,7 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
       onAnimationComplete={() => {
         rectRef.current = null;
       }}
-      style={{ width, height, position: "relative", userSelect: "none", lineHeight: 0 }}
+      style={{ width: "100%", height: "100%", position: "relative", userSelect: "none", lineHeight: 0 }}
     >
       <AnimatePresence>
         {tip && (
@@ -471,7 +531,9 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
 
       {/* 工具栏：悬停看板娘（或键盘聚焦到按钮）时出现。While hidden it is
           transparent AND click-through, so a click near her edge can't hit an
-          unseen button; it stays focusable, so keyboard focus still reveals it. */}
+          unseen button; it stays focusable, so keyboard focus still reveals it.
+          Corner only: the mascot page has its own labelled controls. */}
+      {onStage ? null : (
       <div
         role="toolbar"
         aria-label={copy.toolbar}
@@ -496,6 +558,7 @@ export default function Live2DMascot({ locale, width = 230, height = 320, classN
           </button>
         ))}
       </div>
+      )}
 
       {/* Decorative: a click (wired in the engine effect) only plays a motion. */}
       <div ref={canvasHostRef} style={{ width: "100%", height: "100%" }} />

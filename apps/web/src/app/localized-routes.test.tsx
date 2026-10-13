@@ -249,6 +249,27 @@ describe("localized routes", () => {
     expect(jaHtml).toContain("カラーパレット");
   });
 
+  test("localized live2d routes render en and ja", async () => {
+    const { default: LocalizedLive2DPage, generateMetadata } = await import("./[locale]/live2d/page");
+
+    const enHtml = renderToStaticMarkup(
+      await LocalizedLive2DPage({ params: Promise.resolve({ locale: "en" }) })
+    );
+    expect(enHtml).toContain("Live2D Mascot");
+    expect(enHtml).toContain("Change outfit");
+    expect(enHtml).toContain("live2d-stage-slot");
+
+    const jaHtml = renderToStaticMarkup(
+      await LocalizedLive2DPage({ params: Promise.resolve({ locale: "ja" }) })
+    );
+    expect(jaHtml).toContain("看板娘");
+    expect(jaHtml).toContain("着替え");
+
+    const jaMetadata = await generateMetadata({ params: Promise.resolve({ locale: "ja" }) });
+    expect(jaMetadata.alternates?.canonical).toBe("https://adxdls.saop.cc/ja/live2d");
+    expect(jaMetadata.robots).toMatchObject({ index: false });
+  });
+
   test("localized notices routes render en and ja", async () => {
     const { default: LocalizedNoticesPage } = await import("./[locale]/notices/page");
 

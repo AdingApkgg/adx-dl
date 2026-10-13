@@ -28,6 +28,7 @@ import {
   PlayCircleIcon,
   ScaleIcon,
   SearchIcon,
+  SparklesIcon,
   UploadIcon,
   UsersIcon,
 } from "lucide-react";
@@ -50,6 +51,7 @@ import { CompatibleImage, compatibleSourcesFromPng } from "@/components/site/com
 import { HEADER_ACTION_CLASS } from "@/components/site/header-actions";
 import { MobileTabBar } from "@/components/site/mobile-tab-bar";
 import { LanguageSwitcher } from "@/components/site/language-switcher";
+import { getLive2DCopy } from "@/components/site/live2d/live2d-copy";
 import { NoticesHeaderButton } from "@/components/site/notices-header-button";
 import { NoticesUnreadBadge, useUnreadNoticeCount } from "@/components/site/notices-unread-dot";
 import { useRandomChartNavigation } from "@/components/site/random-chart-button";
@@ -61,6 +63,7 @@ import {
   switchLocale,
   type Locale,
 } from "@/lib/i18n";
+import { MASCOT_PAGE_PATH } from "@/lib/live2d/mascot-page";
 import { Badge } from "@astrodx/ui/components/badge";
 import { Button } from "@astrodx/ui/components/button";
 import {
@@ -246,6 +249,11 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
         href: switchLocale("/music", locale),
         label: dictionary.music.navLabel,
         icon: <Music2Icon />,
+      },
+      {
+        href: switchLocale(MASCOT_PAGE_PATH, locale),
+        label: getLive2DCopy(locale).page.navLabel,
+        icon: <SparklesIcon />,
       },
       {
         href: switchLocale("/links", locale),

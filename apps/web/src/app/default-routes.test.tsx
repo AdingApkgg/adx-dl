@@ -274,6 +274,24 @@ describe("default zh routes", () => {
     expect(html).toContain('href="/charts/song-1"');
   });
 
+  test("live2d route renders the zh mascot page around an empty stage", async () => {
+    const { default: Live2DPage, metadata } = await import("./(default)/live2d/page");
+
+    const html = renderToStaticMarkup(<Live2DPage />);
+
+    expect(html).toContain("<h1");
+    expect(html).toContain("看板娘");
+    // The stage is only a slot: the site-wide mascot is placed over it.
+    expect(html).toContain("live2d-stage-slot");
+    expect(html).not.toContain("waifu-canvas");
+    expect(html).toContain("看板娘正在赶来…");
+    // Controls wait for her to load; the corner toggle works right away.
+    expect(html).toContain("一言");
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*<span>换装<\/span>/);
+    expect(html).toContain('aria-pressed="true"');
+    expect(metadata.robots).toMatchObject({ index: false });
+  });
+
   test("notices route renders the zh notices list", async () => {
     const { default: NoticesPage } = await import("./(default)/notices/page");
 
