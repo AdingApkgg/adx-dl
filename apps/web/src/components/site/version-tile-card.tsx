@@ -1,11 +1,11 @@
 "use client";
 
-import * as React from "react";
 import { CheckIcon } from "lucide-react";
 
 import { AnimatePresence, motion, springSoft } from "@astrodx/ui/motion";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { CompatibleImage } from "@/components/site/compatible-image";
+import { ScrollingLabel } from "@/components/site/scrolling-label";
 import { Card } from "@astrodx/ui/components/card";
 import { versionShortName } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
@@ -168,66 +168,5 @@ export function VersionTileCard({
         ) : null}
       </div>
     </Card>
-  );
-}
-
-/**
- * A single-line label that gently auto-scrolls to reveal its full text when it
- * overflows the tile, then returns — so long version names ("maimai DX BUDDiES
- * PLUS") aren't clipped on a narrow two-column mobile layout. Only overflowing
- * labels animate; the full name is always in the `title`, and reduced-motion
- * users get the static (non-scrolling) label via the CSS guard in globals.css.
- */
-function ScrollingLabel({
-  text,
-  className,
-  containerClassName,
-}: {
-  text: string;
-  className?: string;
-  containerClassName?: string;
-}) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const textRef = React.useRef<HTMLSpanElement>(null);
-  const [shift, setShift] = React.useState(0);
-
-  React.useEffect(() => {
-    const container = containerRef.current;
-    const textEl = textRef.current;
-    if (!container || !textEl) {
-      return;
-    }
-    const measure = () => {
-      setShift(Math.max(0, Math.ceil(textEl.scrollWidth - container.clientWidth)));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [text]);
-
-  const scrolling = shift > 1;
-  // Scale the cycle to the travel distance (~28px/s over the ~60% of the cycle
-  // spent moving) with a floor so short overflows don't whip past.
-  const duration = Math.max(6, Math.round((shift / 28) * 3 + 3));
-
-  return (
-    <div ref={containerRef} className={cn("overflow-hidden", containerClassName)} title={text}>
-      <span
-        ref={textRef}
-        data-marquee={scrolling ? "on" : undefined}
-        className={cn("inline-block whitespace-nowrap", className)}
-        style={
-          scrolling
-            ? ({
-                animation: `marquee-reveal ${duration}s ease-in-out infinite`,
-                "--marquee-shift": `-${shift}px`,
-              } as React.CSSProperties)
-            : undefined
-        }
-      >
-        {text}
-      </span>
-    </div>
   );
 }
