@@ -235,7 +235,7 @@ export const uploadSessions = pgTable(
     check("upload_sessions_size_check", sql`${t.expectedSize} between 1 and 480000000`),
     check(
       "upload_sessions_parts_check",
-      sql`${t.partSize} = 4194304 and ${t.partCount} between 1 and 115 and ${t.partCount} = (${t.expectedSize} + ${t.partSize} - 1) / ${t.partSize}`,
+      sql`${t.partSize} in (1048576, 4194304) and ${t.partCount} between 1 and 115 and ${t.partCount} = (${t.expectedSize} + ${t.partSize} - 1) / ${t.partSize}`,
     ),
     check("upload_sessions_purpose_check", sql`${t.purpose} in ('avatar','chart-source')`),
     check(

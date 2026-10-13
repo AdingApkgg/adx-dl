@@ -38,3 +38,20 @@ test("role services publish only existing web port and never share peer S3 or pu
   ).toBe(false);
   expect(c.services["media-worker"].stop_grace_period).toBe("135s");
 });
+
+
+test("backup staging and frozen originals share one mount with separate directories", async () => {
+  const c = Bun.YAML.parse(await readFile(new URL("../../compose.yaml", import.meta.url), "utf8")) as any;
+  for (const service of ["backup", "storage-init"]) {
+    const config = c.services[service];
+    const stage = config.environment.STORAGE_STAGING_DIR;
+    const bundle = config.environment.STORAGE_BUNDLE_ROOT;
+    const mounts = config.volumes.map((v: any) => typeof v === "string" ? { source: v.split(":")[0], target: v.split(":")[1] } : v);
+    const covering = (path: string) => mounts.filter((m: any) => path === m.target || path.startsWith(m.target + "/")).sort((a: any, b: any) => b.target.length - a.target.length)[0];
+    const stageMount = covering(stage), bundleMount = covering(bundle);
+    expect(stageMount).toBeDefined();
+    expect(bundleMount).toBe(stageMount); // Same filesystem device alone does not permit cross-mount hard links.
+    expect(stage).not.toBe(bundle);
+    expect(stage.startsWith(bundle + "/") || bundle.startsWith(stage + "/")).toBe(false);
+  }
+});

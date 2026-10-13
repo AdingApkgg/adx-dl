@@ -71,6 +71,13 @@
       "when": 1791731441587,
       "tag": "0009_lazy_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791906023763,
+      "tag": "0010_upload_part_sizes",
+      "breakpoints": true
     }
   ]
 }

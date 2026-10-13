@@ -93,6 +93,8 @@ test("binary HTTP length, hash, CSRF, ownership and sibling limits", async () =>
     },
     crypto.randomUUID(),
   );
+  // Simulate a persisted legacy session; the HTTP admission ceiling remains 4 MiB.
+  await f.ctx.db.update(uploadSessions).set({ partSize: 4194304, partCount: 1 }).where(eq(uploadSessions.id, upload.id));
   const path = `/api/v1/uploads/${upload.id.toUpperCase()}/parts/0`;
   const headers = {
     cookie: f.browser.cookieHeader(),
@@ -266,6 +268,8 @@ test("real Bun and Node development adapter transport accepts 4MiB parts and pre
     { purpose: "avatar", name: "a", size: data.length, sha256: hash(data) },
     crypto.randomUUID(),
   );
+  // Simulate a persisted legacy session; the HTTP admission ceiling remains 4 MiB.
+  await f.ctx.db.update(uploadSessions).set({ partSize: 4194304, partCount: 1 }).where(eq(uploadSessions.id, upload.id));
   const path = `/api/v1/uploads/${upload.id}/parts/0`;
   const headers = {
     cookie: f.browser.cookieHeader(),

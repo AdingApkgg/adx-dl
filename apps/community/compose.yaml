@@ -332,8 +332,8 @@ services:
       STORAGE_BACKUP_SECRET_ACCESS_KEY: ${STORAGE_BACKUP_SECRET_ACCESS_KEY:?run fill-secrets}
       STORAGE_JOURNAL_DIR: /storage-journal
       STORAGE_JOURNAL_KEY_FILE: /storage-key/key
-      STORAGE_STAGING_DIR: /staging
-      STORAGE_BUNDLE_ROOT: /bundles
+      STORAGE_STAGING_DIR: /backup-workspace/staging
+      STORAGE_BUNDLE_ROOT: /backup-workspace/bundles
       STORAGE_COMMUNITY_DUMP_BOUND: ${STORAGE_COMMUNITY_DUMP_BOUND:?set verified dump bound}
       STORAGE_UMAMI_DUMP_BOUND: ${STORAGE_UMAMI_DUMP_BOUND:?set verified dump bound}
       PGHOST: postgres
@@ -352,8 +352,7 @@ services:
           subpath: .capacity
       - storage-journal:/storage-journal
       - storage-journal-key:/storage-key:ro
-      - storage-staging:/staging
-      - storage-bundles:/bundles
+      - storage-staging:/backup-workspace
       - type: bind
         source: ${STORAGE_MEDIA_SCRATCH_DIR:?provision private bounded filesystem first}
         target: /media-tmp
@@ -371,8 +370,7 @@ services:
     <<: *backup
     command: ["bun", "ops/backup/initialize.ts"]
     volumes:
-      - storage-staging:/staging
-      - storage-bundles:/bundles
+      - storage-staging:/backup-workspace
       - storage-state:/storage-state
       - storage-journal:/storage-journal
       - storage-journal-key:/storage-key
@@ -388,4 +386,3 @@ volumes:
   storage-journal:
   storage-journal-key:
   storage-staging:
-  storage-bundles:
