@@ -23,6 +23,7 @@ import { StorageUnavailableError } from "./errors";
 import { createS3Driver } from "./s3";
 import { initUpload, getUpload, cancelUpload } from "./uploads";
 import { putUploadPart } from "./parts";
+import { AVATAR_RULE } from "./rules";
 const hash = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 const bytes = new Uint8Array([1, 2, 3]);
 let ctx: StorageContext;
@@ -328,7 +329,7 @@ test.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)(
   "parts arrive out of order; S3 IO holds no business transaction locks",
   async () => {
     const id = await owner();
-    const full = new Uint8Array(4194305);
+    const full = new Uint8Array(AVATAR_RULE.partSize + 1);
     const upload = await initUpload(
       ctx,
       id,
@@ -360,16 +361,16 @@ test.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)(
       id,
       upload.id,
       1,
-      full.subarray(4194304),
-      hash(full.subarray(4194304)),
+      full.subarray(upload.partSize),
+      hash(full.subarray(upload.partSize)),
     );
     await putUploadPart(
       checking,
       id,
       upload.id,
       0,
-      full.subarray(0, 4194304),
-      hash(full.subarray(0, 4194304)),
+      full.subarray(0, upload.partSize),
+      hash(full.subarray(0, upload.partSize)),
     );
     expect((await getUpload(ctx, id, upload.id)).receivedParts.map((p) => p.index)).toEqual([0, 1]);
   },

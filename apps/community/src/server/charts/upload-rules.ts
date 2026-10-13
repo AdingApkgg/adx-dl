@@ -5,7 +5,7 @@ import type { DbTransaction } from "../storage/contracts";
 
 export const chartUploadRule = {
   purpose: "chart-source", minSize: 1, maxSize: 67_108_864,
-  quota: 268_435_456, partSize: 4_194_304,
+  quota: 268_435_456, partSize: 1_048_576,
   allowedMime: ["application/zip"], recipe: "chart-preview-v1",
   maxPixels: 16_000_000, maxDimension: 8192,
   maxOutputSize: 50_331_648, outputMime: "application/vnd.astrodx.chart-preview",

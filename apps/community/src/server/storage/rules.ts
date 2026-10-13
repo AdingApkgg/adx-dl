@@ -4,6 +4,7 @@ import { chartUploadRule } from "../charts/upload-rules";
 export const STORAGE_LIMITS = {
   maxSize: 480_000_000,
   maxParts: 115,
+  // Admission ceiling also accepts persisted 4 MiB sessions.
   partSize: 4_194_304,
   activeUploadsPerUser: 2,
   activeUploadsGlobal: 100,
@@ -41,7 +42,8 @@ export const AVATAR_RULE = {
   minSize: 1,
   maxSize: 8_388_608,
   quota: 33_554_432,
-  partSize: STORAGE_LIMITS.partSize,
+  // Keep each new request below slow-tunnel response deadlines.
+  partSize: 1_048_576,
   allowedMime: ["image/jpeg", "image/png", "image/webp", "image/avif"],
   recipe: "avatar-v1",
   maxPixels: 16_000_000,

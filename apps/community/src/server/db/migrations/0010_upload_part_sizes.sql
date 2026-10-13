@@ -1,0 +1,2 @@
+ALTER TABLE "upload_sessions" DROP CONSTRAINT "upload_sessions_parts_check";--> statement-breakpoint
+ALTER TABLE "upload_sessions" ADD CONSTRAINT "upload_sessions_parts_check" CHECK ("upload_sessions"."part_size" in (1048576, 4194304) and "upload_sessions"."part_count" between 1 and 115 and "upload_sessions"."part_count" = ("upload_sessions"."expected_size" + "upload_sessions"."part_size" - 1) / "upload_sessions"."part_size");

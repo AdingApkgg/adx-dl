@@ -13,7 +13,7 @@
 
 2026-10-11 用户明确采用按实际使用增长的容量政策：20/2/2 GiB 是原件/派生/临时对象的应用上限，不为尚未使用的额度预留物理磁盘。部署 preflight 与实际 exporter 共用当前 manifest 的需求公式：仅缺失或未验证的暂存字节、本次全部原件 payload、两份显式 dump 上限和既有 metadata overhead；不假设 restic 去重。对象 filesystem additional=0，已存在对象及缓存已反映在 statfs 可用空间中，不再收费一次。同 filesystem 合并需求并保留不变的5 GiB底线；每次实际导出仍重复容量/hash/drain/journal检查。
 
-暂存与 bundle 同 filesystem 以硬链接冻结原件；只复用真实 SHA256/大小吻合的只读文件。历史71 GiB/340 GiB是满额度极端规划示例，不是上线最低门槛。旧g510可用空间观测没有在本轮更新，不能据此判断当前够不够。已验证stage缓存尚无淘汰，增长优化留待需要时实施；本轮不增加GC/协调机制，剩余空间不足仍拒绝本次工作。
+暂存与 bundle 位于同一个 `storage-staging` 卷挂载下的 `/backup-workspace/staging` 和 `/backup-workspace/bundles`，以硬链接冻结原件；两个 Docker 挂载点即使 `stat.dev` 相同也会报 `EXDEV`，不能把它们分开挂载。只复用真实 SHA256/大小吻合的只读文件。历史71 GiB/340 GiB是满额度极端规划示例，不是上线最低门槛。旧g510可用空间观测没有在本轮更新，不能据此判断当前够不够。已验证stage缓存尚无淘汰，增长优化留待需要时实施；本轮不增加GC/协调机制，剩余空间不足仍拒绝本次工作。
 
 纯同步 owner-bound coordinator handle 在任何暂停副作用之前创建。关闭新写入后，实际角色进程关闭新工作并排空完整 handler/native child/driver PUT DELETE COPY；协调器必须验证当前 web/media/control 身份与维护 owner。随后再次检查所有 durable physical claims 和 DELETE started/uncertain markers，过期 lease 和本地 active=0 均不证明远端 IO 静止。缺少角色 ACK 或不确定 IO 使本次备份失败。
 
@@ -43,3 +43,8 @@ Task10 opt-in `fresh-restore.test.ts` 在新 PG/SeaweedFS volumes 上实际执�
 `media_revoked` version 1 has two authenticated variants. Null `userId` and `fileId` record a global publication generation. Paired identities record the exact former account/file/output association with the new avatar revision. Replay clears only a matching older association; individual revisions never become purge generations. Shared references and later saves survive. Half-null identities or invalid generation/identifier ranges fail closed.
 
 Task11 实际入口现由 `runtime.ts` 分配每次独占0700目录并调用真实三角色数据库协调器。`community-full` 的 forget 使用 `--group-by host,tags`，避免不同目录各自形成永久保留组。部署接线和显式首次初始化见 [运行手册](../seaweed/README.md)；本地集成不等于生产容量/Cloudflare验收。
+
+
+既有部署切换此布局前，停留在没有活跃备份的状态，将 `storage-staging` 卷根目录下已经验证的哈希缓存及 `last-success.json` 原子移入新 `staging` 子目录；不复制原件，不删除旧快照。新 `bundles` 子目录仍由每次运行创建私有 run 目录并正常清理。旧 `storage-bundles` 卷不再被新配置挂载，保留它用于回滚，勿在配置切换时删除卷。
+
+回滚旧 Compose 时，也应把已验证缓存和 `last-success.json` 从新 `staging` 子目录原子移回卷根目录，先确认目的路径没有冲突；只保留旧 `storage-bundles` 卷不能恢复旧缓存路径。
