@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
+import { isMascotPagePath, mascotPlacement } from "./mascot-page";
 import { readMascotHidden } from "./mascot-preference";
 import {
   groupCostumes,
@@ -125,4 +126,23 @@ test("the dismissed flag survives denied storage and unknown values", () => {
   expect(readMascotHidden({ getItem: () => null })).toBe(false);
   expect(readMascotHidden({ getItem: () => "0" })).toBe(false);
   expect(readMascotHidden({ getItem: () => "1" })).toBe(true);
+});
+
+describe("mascot placement", () => {
+  test("the mascot page is recognized in every locale tree", () => {
+    for (const pathname of ["/live2d", "/live2d/", "/en/live2d", "/ja/live2d"]) {
+      expect(isMascotPagePath(pathname)).toBe(true);
+    }
+    for (const pathname of ["/", "/en", "/charts", "/live2d-api", "/en/charts/live2d"]) {
+      expect(isMascotPagePath(pathname)).toBe(false);
+    }
+  });
+
+  test("the mascot page always gets her; elsewhere only an allowed corner does", () => {
+    expect(mascotPlacement({ onMascotPage: true, cornerAllowed: true })).toBe("stage");
+    // Phones, touch screens, simple mode and a dismissed corner still see her there.
+    expect(mascotPlacement({ onMascotPage: true, cornerAllowed: false })).toBe("stage");
+    expect(mascotPlacement({ onMascotPage: false, cornerAllowed: true })).toBe("dock");
+    expect(mascotPlacement({ onMascotPage: false, cornerAllowed: false })).toBeNull();
+  });
 });

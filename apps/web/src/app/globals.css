@@ -68,9 +68,19 @@
    every navigation. */
 ::view-transition-group(music-player),
 ::view-transition-group(download-dock),
-::view-transition-group(mobile-tabbar),
-::view-transition-group(live2d-mascot) {
+::view-transition-group(mobile-tabbar) {
   animation: none;
+  z-index: 50;
+}
+/* The mascot keeps the browser's default group morph instead: she moves
+   between the corner and the mascot page's stage (mascot-widget.tsx), and the
+   morph carries her from one box to the other — the live new image, scaled,
+   since the old snapshot is hidden below. On every other navigation the two
+   boxes are the same and the morph moves nothing. Timed like the page motion;
+   the reduced-motion and simple-mode rules below still turn it off. */
+::view-transition-group(live2d-mascot) {
+  animation-duration: 0.45s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   z-index: 50;
 }
 ::view-transition-old(music-player),
@@ -84,6 +94,32 @@
 ::view-transition-new(mobile-tabbar),
 ::view-transition-new(live2d-mascot) {
   animation: none;
+}
+
+/* The mascot page's stage slot (mascot-stage.tsx) and the mascot placed on it
+   (mascot-widget.tsx). Anchor positioning resolves in the same layout as the
+   route change, so the view transition above captures her already on the
+   stage. Until the slot mounts (a loading state), the fallbacks keep her in
+   the corner of the first screen — where she was. Engines without anchor
+   positioning get the same corner here and a measured box from script. */
+.live2d-stage-slot {
+  anchor-name: --live2d-stage;
+}
+.live2d-staged {
+  top: calc(100vh - 20rem);
+  left: calc(100% - 230px);
+  width: 230px;
+  height: 20rem;
+}
+@supports (anchor-name: --live2d-stage) {
+  .live2d-staged {
+    position-anchor: --live2d-stage;
+    position-visibility: always;
+    top: anchor(top, calc(100% - 20rem));
+    left: anchor(left, calc(100% - 230px));
+    width: anchor-size(width, 230px);
+    height: anchor-size(height, 20rem);
+  }
 }
 
 /* Theme-toggle radial wipe: theme-toggle.tsx wraps setTheme in
