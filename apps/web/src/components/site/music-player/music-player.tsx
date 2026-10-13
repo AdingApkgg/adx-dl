@@ -17,12 +17,13 @@ import {
   Volume2Icon,
   VolumeXIcon,
 } from "lucide-react";
-import { Popover as PopoverPrimitive } from "radix-ui";
+import { Popover as PopoverPrimitive, Slider as SliderPrimitive } from "radix-ui";
 import useSWR from "swr";
 import { useShallow } from "zustand/react/shallow";
 
 import { motion, useReducedMotion } from "@astrodx/ui/motion";
 import { CompatibleImage } from "@/components/site/compatible-image";
+import { ScrollingLabel } from "@/components/site/scrolling-label";
 import { useDownloadsStore } from "@/components/site/downloads/downloads-store";
 import { Button } from "@astrodx/ui/components/button";
 import {
@@ -163,6 +164,126 @@ function PlayerArtwork({
       loading="lazy"
       className={cn("object-cover", className)}
     />
+  );
+}
+
+/**
+ * How far into the track, drawn as a ring around a round control (the bar's
+ * play button, the collapsed bubble). Reads at a glance where the old 2px
+ * line along the bar's bottom edge did not — and on phones that line sat
+ * under the bar's rounded corners.
+ */
+function ProgressRing({
+  progress,
+  className,
+}: {
+  progress: number;
+  className?: string;
+}) {
+  const radius = 15;
+  const circumference = 2 * Math.PI * radius;
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      aria-hidden="true"
+      className={cn("pointer-events-none absolute inset-0 size-full -rotate-90", className)}
+    >
+      <circle cx="16" cy="16" r={radius} fill="none" strokeWidth="2" stroke="currentColor" opacity={0.2} />
+      {progress > 0 ? (
+        <circle
+          cx="16"
+          cy="16"
+          r={radius}
+          fill="none"
+          strokeWidth="2"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - progress)}
+          data-motion-sensitive
+          className="transition-[stroke-dashoffset] duration-300 ease-linear"
+        />
+      ) : null}
+    </svg>
+  );
+}
+
+/**
+ * Seek and volume. Radix rather than <input type="range">: the native control
+ * draws differently in every engine (and thumb styling there is vendor
+ * pseudo-elements), so these match the rest of the site's controls instead.
+ * The track thickens on hover and the thumb grows, to show it can be grabbed.
+ */
+function PlayerSlider({
+  value,
+  max,
+  step,
+  disabled,
+  onValueChange,
+  label,
+  valueText,
+  className,
+}: {
+  value: number;
+  max: number;
+  step: number;
+  disabled?: boolean;
+  onValueChange: (value: number) => void;
+  label: string;
+  valueText?: string;
+  className?: string;
+}) {
+  return (
+    <SliderPrimitive.Root
+      value={[Math.min(Math.max(value, 0), max)]}
+      min={0}
+      max={max}
+      step={step}
+      disabled={disabled}
+      onValueChange={([next]) => {
+        if (next !== undefined) onValueChange(next);
+      }}
+      className={cn(
+        "group/slider relative flex h-5 touch-none select-none items-center data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50",
+        className
+      )}
+    >
+      <SliderPrimitive.Track
+        data-motion-sensitive
+        className="relative h-1 grow overflow-hidden rounded-full bg-foreground/12 transition-[height] duration-150 group-hover/slider:h-1.5"
+      >
+        <SliderPrimitive.Range className="absolute h-full rounded-full bg-primary" />
+      </SliderPrimitive.Track>
+      <SliderPrimitive.Thumb
+        aria-label={label}
+        aria-valuetext={valueText}
+        data-motion-sensitive
+        className="block size-3 rounded-full border-2 border-primary bg-background shadow-sm transition-transform duration-150 outline-none group-hover/slider:scale-125 focus-visible:scale-125 focus-visible:ring-3 focus-visible:ring-ring/50"
+      />
+    </SliderPrimitive.Root>
+  );
+}
+
+/**
+ * The playing track's marker in the list: bars that bounce while it plays and
+ * hold still while paused, so the list says which of the two it is.
+ */
+function NowPlayingBars({ playing }: { playing: boolean }) {
+  return (
+    <span aria-hidden="true" className="flex h-3.5 items-end gap-[3px]">
+      {[0, 0.25, 0.5].map((delay, index) => (
+        <span
+          key={delay}
+          data-motion-sensitive
+          className="h-full w-[3px] origin-bottom rounded-full bg-current"
+          style={
+            playing
+              ? { animation: `music-eq 0.9s ease-in-out ${delay}s infinite` }
+              : { transform: `scaleY(${[0.45, 0.8, 0.6][index]})` }
+          }
+        />
+      ))}
+    </span>
   );
 }
 
@@ -1108,13 +1229,8 @@ function MusicPlayerSurface({
                 className="size-full"
               />
             </motion.span>
-            {isPlaying && !reducedMotion ? (
-              <motion.span
-                aria-hidden="true"
-                className="absolute inset-0 rounded-full ring-2 ring-inset ring-primary/70"
-                animate={{ opacity: [0.25, 0.85, 0.25] }}
-                transition={{ duration: 1.8, repeat: Infinity }}
-              />
+            {currentTrack && duration > 0 ? (
+              <ProgressRing progress={progress} className="text-primary" />
             ) : null}
             {/* The note badge is what says "music player" even while idle. */}
             <span
@@ -1131,34 +1247,23 @@ function MusicPlayerSurface({
           animate={{ y: 0, opacity: 1 }}
           className="pointer-events-auto relative isolate overflow-hidden rounded-2xl border border-border/70 bg-popover/95 shadow-xl ring-1 ring-foreground/5 backdrop-blur-xl"
         >
-          <div
-            aria-hidden="true"
-            data-motion-sensitive
-            className="absolute inset-x-0 bottom-0 h-0.5 origin-left bg-primary transition-transform duration-200"
-            style={{ transform: `scaleX(${progress})` }}
-          />
-          <div className="flex min-h-16 items-center gap-2 p-2">
-            <div className="relative size-12 shrink-0 overflow-hidden rounded-xl bg-muted ring-1 ring-border/60">
+          <div className="flex min-h-16 items-center gap-1 p-2">
+            <div className="relative mr-1 size-12 shrink-0 overflow-hidden rounded-xl bg-muted ring-1 ring-border/60">
               <PlayerArtwork
                 track={currentTrack}
                 versionId={versionId}
                 alt=""
                 className="size-full"
               />
-              {isPlaying && !reducedMotion ? (
-                <motion.span
-                  aria-hidden="true"
-                  className="absolute inset-0 rounded-xl ring-2 ring-inset ring-primary/70"
-                  animate={{ opacity: [0.25, 0.85, 0.25] }}
-                  transition={{ duration: 1.8, repeat: Infinity }}
-                />
-              ) : null}
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium" title={displayTitle}>
-                {displayTitle}
-              </p>
+              {/* Scrolls to show a long title while it plays; ellipsized otherwise. */}
+              <ScrollingLabel
+                text={displayTitle}
+                active={isPlaying}
+                className="text-sm font-medium"
+              />
               <p
                 aria-live={notice || error ? "polite" : undefined}
                 className="truncate text-xs text-muted-foreground"
@@ -1168,6 +1273,7 @@ function MusicPlayerSurface({
               </p>
             </div>
 
+            {/* 44px target; the filled disc sits inside the progress ring. */}
             <Button
               type="button"
               variant="ghost"
@@ -1176,15 +1282,18 @@ function MusicPlayerSurface({
               disabled={!hydrated || !currentTrack || restorePending}
               aria-label={showPause ? copy.pause : copy.play}
               title={showPause ? copy.pause : copy.play}
-              className="size-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/85 hover:text-primary-foreground"
+              className="group/play relative size-11 rounded-full text-primary hover:bg-transparent"
             >
-              {restorePending ? (
-                <LoaderCircleIcon data-motion-sensitive className="animate-spin" />
-              ) : showPause ? (
-                <PauseIcon className="fill-current" />
-              ) : (
-                <PlayIcon className="fill-current" />
-              )}
+              {currentTrack && duration > 0 ? <ProgressRing progress={progress} /> : null}
+              <span className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-colors group-hover/play:bg-primary/85 [&>svg]:size-4">
+                {restorePending ? (
+                  <LoaderCircleIcon data-motion-sensitive className="animate-spin" />
+                ) : showPause ? (
+                  <PauseIcon className="fill-current" />
+                ) : (
+                  <PlayIcon className="fill-current" />
+                )}
+              </span>
             </Button>
             <Button
               type="button"
@@ -1241,7 +1350,7 @@ function MusicPlayerSurface({
         >
           <div className="border-b border-border/60 p-4">
             <div className="flex items-start gap-3 pr-8">
-              <div className="size-14 shrink-0 overflow-hidden rounded-xl bg-muted ring-1 ring-border/60">
+              <div className="size-16 shrink-0 overflow-hidden rounded-xl bg-muted shadow-md ring-1 ring-border/60">
                 <PlayerArtwork
                   track={currentTrack}
                   versionId={versionId}
@@ -1250,8 +1359,8 @@ function MusicPlayerSurface({
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="truncate font-semibold" title={displayTitle}>
-                  {displayTitle}
+                <h2 className="font-semibold">
+                  <ScrollingLabel text={displayTitle} active={isPlaying} />
                 </h2>
                 <p
                   className="truncate text-sm text-muted-foreground"
@@ -1311,23 +1420,21 @@ function MusicPlayerSurface({
           </div>
 
           <div className="border-b border-border/60 px-4 py-3">
-            <input
-              type="range"
-              min={0}
-              max={Math.max(duration, 0)}
+            <PlayerSlider
+              value={currentTime}
+              // Radix needs max > min; a zero duration means nothing to seek.
+              max={duration > 0 ? duration : 1}
               step={0.1}
-              value={Math.min(currentTime, Math.max(duration, 0))}
-              onChange={(event) => seekTo(Number(event.target.value))}
+              onValueChange={seekTo}
               disabled={!currentTrack || duration <= 0}
-              aria-label={copy.seek}
-              aria-valuetext={`${formatPlaybackTime(currentTime)} / ${formatPlaybackTime(duration)}`}
-              className="h-1.5 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+              label={copy.seek}
+              valueText={`${formatPlaybackTime(currentTime)} / ${formatPlaybackTime(duration)}`}
             />
-            <div className="mt-1 flex justify-between text-[0.7rem] tabular-nums text-muted-foreground">
+            <div className="flex justify-between text-[0.7rem] tabular-nums text-muted-foreground">
               <span>{formatPlaybackTime(currentTime)}</span>
               <span>{formatPlaybackTime(duration)}</span>
             </div>
-            <div className="mt-2 flex items-center justify-center gap-2">
+            <div className="mt-1 flex items-center justify-center gap-3">
               <Button
                 type="button"
                 variant="ghost"
@@ -1346,7 +1453,7 @@ function MusicPlayerSurface({
                 disabled={!currentTrack || restorePending}
                 aria-label={showPause ? copy.pause : copy.play}
                 title={showPause ? copy.pause : copy.play}
-                className="size-11 rounded-full"
+                className="size-12 rounded-full shadow-md [&_svg:not([class*='size-'])]:size-5"
               >
                 {restorePending ? (
                   <LoaderCircleIcon data-motion-sensitive className="animate-spin" />
@@ -1366,16 +1473,6 @@ function MusicPlayerSurface({
                 title={copy.next}
               >
                 <SkipForwardIcon className="fill-current" />
-              </Button>
-              <Button
-                type="button"
-                variant={mode === "sequence" ? "ghost" : "secondary"}
-                size="icon-lg"
-                onClick={cycleMode}
-                aria-label={copy.modeHint[mode]}
-                title={copy.modeHint[mode]}
-              >
-                <PlaybackModeIcon mode={mode} />
               </Button>
             </div>
           </div>
@@ -1426,16 +1523,27 @@ function MusicPlayerSurface({
                         onClick={() => playTrack(track)}
                         aria-current={selected ? "true" : undefined}
                         className={cn(
-                          "group/track flex min-h-11 w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                          "group/track flex min-h-11 w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
                           selected && "bg-primary/10 text-primary"
                         )}
                       >
-                        <span className="flex size-7 shrink-0 items-center justify-center text-xs tabular-nums text-muted-foreground">
-                          {selected && isPlaying ? (
-                            <Music2Icon className="size-4" aria-hidden="true" />
-                          ) : (
-                            index + 1
-                          )}
+                        <span className="w-5 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                          {index + 1}
+                        </span>
+                        {/* Covers make a long version list scannable; the
+                            current track wears the now-playing bars. */}
+                        <span className="relative size-10 shrink-0 overflow-hidden rounded-md bg-muted ring-1 ring-border/60">
+                          <PlayerArtwork
+                            track={track}
+                            versionId={versionId}
+                            alt=""
+                            className="size-full"
+                          />
+                          {selected ? (
+                            <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white">
+                              <NowPlayingBars playing={isPlaying} />
+                            </span>
+                          ) : null}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium">
@@ -1453,7 +1561,7 @@ function MusicPlayerSurface({
             )}
           </div>
 
-          <div className="flex items-center gap-2 border-t border-border/60 px-4 py-3">
+          <div className="flex items-center gap-2 border-t border-border/60 px-3 py-2.5">
             <Button
               type="button"
               variant="ghost"
@@ -1464,25 +1572,41 @@ function MusicPlayerSurface({
             >
               {muted || volume === 0 ? <VolumeXIcon /> : <Volume2Icon />}
             </Button>
-            <input
-              type="range"
-              min={0}
+            <PlayerSlider
+              value={muted ? 0 : volume}
               max={1}
               step={0.05}
-              value={muted ? 0 : volume}
-              onChange={(event) => {
-                setVolume(Number(event.target.value));
+              onValueChange={(next) => {
+                setVolume(next);
                 setMuted(false);
               }}
-              aria-label={copy.volume}
-              className="h-1.5 flex-1 cursor-pointer accent-primary"
+              label={copy.volume}
+              valueText={`${Math.round((muted ? 0 : volume) * 100)}%`}
+              className="min-w-0 flex-1"
             />
-            <span className="min-w-10 text-right text-xs tabular-nums text-muted-foreground">
+            <span className="w-9 text-right text-xs tabular-nums text-muted-foreground">
               {Math.round((muted ? 0 : volume) * 100)}%
             </span>
-            <span className="max-w-24 truncate text-xs text-muted-foreground">
+            {/* Play mode: one labelled control (it used to be an unlabelled
+                icon up in the transport plus loose text here). Tinted while
+                it is anything but plain sequential play. */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={cycleMode}
+              aria-label={copy.modeHint[mode]}
+              title={copy.modeHint[mode]}
+              className={cn(
+                "shrink-0 rounded-full px-2.5 text-xs",
+                mode === "sequence"
+                  ? "text-muted-foreground"
+                  : "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary"
+              )}
+            >
+              <PlaybackModeIcon mode={mode} />
               {copy.mode[mode]}
-            </span>
+            </Button>
           </div>
 
           <PopoverPrimitive.Arrow className="fill-border" />

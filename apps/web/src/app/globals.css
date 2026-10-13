@@ -148,6 +148,19 @@ html[data-theme-wipe] ::view-transition-new(root) {
    `--marquee-shift` (negative px, set inline per element) is how far to travel;
    the dwell keyframes hold each end still so it reads as a gentle reveal, not a
    constant crawl. Applied only to elements the JS marks as actually overflowing. */
+/* The music player's now-playing bars (music-player.tsx): each bar bounces
+   from its foot, staggered per bar. data-motion-sensitive on the bars hands
+   them to the shared reduced-motion guards. */
+@keyframes music-eq {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
 @keyframes marquee-reveal {
   0%,
   12% {
