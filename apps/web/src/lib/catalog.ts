@@ -17,6 +17,7 @@ import type { CatalogSearchIndexEntry } from "@/lib/catalog-search";
 import { buildPackableAliasIndex, type PackableAliasIndex } from "@/lib/maidata-aliases";
 import { entrySlug } from "@/lib/route-slug";
 import { MAIMAI_VERSIONS } from "@/lib/version-image";
+import { createSnapshotReader } from "@/lib/catalog-snapshot";
 
 export type { Catalog, CatalogDifficulty, CatalogEntry } from "@/lib/catalog-shared";
 
@@ -24,10 +25,14 @@ export type { Catalog, CatalogDifficulty, CatalogEntry } from "@/lib/catalog-sha
 // data/catalog at the repo root (two levels up from the app's cwd during build).
 const catalogPath = path.resolve(process.cwd(), "..", "..", "data", "catalog", "index.json");
 
-export const readCatalog = cache(async (): Promise<Catalog> => {
+const loadCatalog = createSnapshotReader(async (): Promise<Catalog> => {
   const raw = await fs.readFile(catalogPath, "utf-8");
   return JSON.parse(raw) as Catalog;
-});
+}, process.env.NODE_ENV === "production");
+
+// React cache deduplicates one render; the snapshot also shares immutable input
+// across all pages in this static-build worker. Dev reads remain fresh.
+export const readCatalog = cache(loadCatalog);
 
 export async function readCatalogEntries(): Promise<CatalogEntry[]> {
   const catalog = await readCatalog();
@@ -66,15 +71,19 @@ export async function readRelatedEntries(
   return [...picked.values()].slice(0, limit);
 }
 
+const routeIndexes = new WeakMap<Catalog, Map<string, CatalogEntry>>();
 const readEntryByRouteSlugMap = cache(async () => {
-  const entries = await readCatalogEntries();
+  const catalog = await readCatalog();
+  const existing = routeIndexes.get(catalog);
+  if (existing) return existing;
   const map = new Map<string, CatalogEntry>();
 
   // The canonical slug (the numeric maimai shortid) is the only chart route.
-  for (const entry of entries) {
+  for (const entry of catalog.entries) {
     map.set(entrySlug(entry), entry);
   }
 
+  routeIndexes.set(catalog, map);
   return map;
 });
 

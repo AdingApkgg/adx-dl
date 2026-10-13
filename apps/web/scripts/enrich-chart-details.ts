@@ -169,15 +169,93 @@ function analyseMaidata(text: string): ChartDetails {
   };
 }
 
-async function contentLength(url: string): Promise<number | null> {
+type FetchResource = (url: string, init?: RequestInit) => Promise<Response>;
+
+async function contentLength(url: string, fetchResource: FetchResource): Promise<number | null> {
   try {
-    const response = await fetchWithRetry(url, { method: "HEAD" });
+    const response = await fetchResource(url, { method: "HEAD" });
     if (!response.ok) return null;
     const header = response.headers.get("content-length");
     const bytes = header ? Number(header) : Number.NaN;
     return Number.isFinite(bytes) && bytes > 0 ? bytes : null;
   } catch {
     return null;
+  }
+}
+
+export async function enrichEntries(
+  entries: RawEntry[],
+  options: { concurrency: number; skipCharts: boolean; skipSizes: boolean },
+  fetchResource: FetchResource = fetchWithRetry,
+) {
+  let done = 0;
+  let failed = 0;
+  await mapPool(entries, options.concurrency, async (entry) => {
+    const chartWork = async (): Promise<number | undefined> => {
+      if (options.skipCharts) return;
+      const url = entry.files?.maidata;
+      if (!url) return;
+      try {
+        const response = await fetchResource(url);
+        if (!response.ok) throw new Error(`${response.status}`);
+        const text = await response.text();
+        const details = analyseMaidata(text);
+        // The maidata host serves gzipped, so a HEAD's content-length would be
+        // the compressed size — and fetch hides it entirely. Measure the real
+        // payload here, where we already have the bytes in hand.
+        const maidataBytes = new TextEncoder().encode(text).length;
+
+        for (const difficulty of entry.difficulties) {
+          const slotDetails = details.perSlot.get(difficulty.slot);
+          if (!slotDetails || slotDetails.notes.total === 0) {
+            delete difficulty.notes;
+            delete difficulty.duration_ms;
+            continue;
+          }
+          difficulty.notes = slotDetails.notes;
+          difficulty.duration_ms = slotDetails.durationMs;
+        }
+        entry.duration_ms = details.durationMs || null;
+        entry.bpm_min = details.bpmMin;
+        entry.bpm_max = details.bpmMax;
+        if (details.titleEn) entry.title_en = details.titleEn;
+        if (details.artistEn) entry.artist_en = details.artistEn;
+        return maidataBytes;
+      } catch (error) {
+        failed += 1;
+        console.warn(`[enrich] maidata failed for ${entry.short_id}: ${String(error)}`);
+      }
+    };
+    // Each entry's independent HEAD requests overlap its maidata GET/analysis.
+    // Limits per asset kind stay at the previous entry-pool concurrency.
+    const sizeKeys = ["audio", "background", "pv"] as const;
+    const sizeWork = async () => {
+      if (options.skipSizes) return;
+      const bytes: Record<string, number> = {};
+      await Promise.all(
+        sizeKeys.map(async (key) => {
+          const url = entry.files?.[key];
+          if (!url) return;
+          const size = await contentLength(url, fetchResource);
+          if (size !== null) bytes[key] = size;
+        })
+      );
+      return bytes;
+    };
+    const [maidataBytes, bytes] = await Promise.all([chartWork(), sizeWork()]);
+    if (bytes) {
+      const maidata = maidataBytes ?? entry.file_bytes?.maidata;
+      if (maidata) bytes.maidata = maidata;
+      if (Object.keys(bytes).length > 0) entry.file_bytes = bytes;
+      else delete entry.file_bytes;
+    }
+    done += 1;
+    if (done % 200 === 0) console.log(`[enrich] entries ${done}/${entries.length}`);
+  });
+  if (!options.skipCharts) console.log(`[enrich] charts: ${entries.length - failed}/${entries.length} analysed`);
+  if (!options.skipSizes) {
+    const sized = entries.filter((entry) => entry.file_bytes).length;
+    console.log(`[enrich] sizes: ${sized}/${entries.length} entries measured`);
   }
 }
 
@@ -202,80 +280,12 @@ async function main() {
     else delete entry.artist_romaji;
   }
   console.log(`[enrich] romaji: ${romajiCount}/${entries.length} titles transliterated`);
-
-  const maidataBytes = new Map<RawEntry, number>();
-
-  if (!options.skipCharts) {
-    let done = 0;
-    let failed = 0;
-    await mapPool(entries, options.concurrency, async (entry) => {
-      const url = entry.files?.maidata;
-      if (!url) return;
-      try {
-        const response = await fetchWithRetry(url);
-        if (!response.ok) throw new Error(`${response.status}`);
-        const text = await response.text();
-        const details = analyseMaidata(text);
-        // The maidata host serves gzipped, so a HEAD's content-length would be
-        // the compressed size — and fetch hides it entirely. Measure the real
-        // payload here, where we already have the bytes in hand.
-        maidataBytes.set(entry, new TextEncoder().encode(text).length);
-
-        for (const difficulty of entry.difficulties) {
-          const slotDetails = details.perSlot.get(difficulty.slot);
-          if (!slotDetails || slotDetails.notes.total === 0) {
-            delete difficulty.notes;
-            delete difficulty.duration_ms;
-            continue;
-          }
-          difficulty.notes = slotDetails.notes;
-          difficulty.duration_ms = slotDetails.durationMs;
-        }
-        entry.duration_ms = details.durationMs || null;
-        entry.bpm_min = details.bpmMin;
-        entry.bpm_max = details.bpmMax;
-        if (details.titleEn) entry.title_en = details.titleEn;
-        if (details.artistEn) entry.artist_en = details.artistEn;
-      } catch (error) {
-        failed += 1;
-        console.warn(`[enrich] maidata failed for ${entry.short_id}: ${String(error)}`);
-      } finally {
-        done += 1;
-        if (done % 200 === 0) console.log(`[enrich] charts ${done}/${entries.length}`);
-      }
-    });
-    console.log(`[enrich] charts: ${entries.length - failed}/${entries.length} analysed`);
-  }
-
-  if (!options.skipSizes) {
-    let done = 0;
-    // One HEAD per distinct media URL. The keys mirror `entry.files` so the UI
-    // can size an .adx (maidata + audio + background) with and without the PV.
-    // maidata is absent here on purpose — the chart pass above measured it.
-    const sizeKeys = ["audio", "background", "pv"] as const;
-    await mapPool(entries, options.concurrency, async (entry) => {
-      const bytes: Record<string, number> = {};
-      const maidata = maidataBytes.get(entry) ?? entry.file_bytes?.maidata;
-      if (maidata) bytes.maidata = maidata;
-      await Promise.all(
-        sizeKeys.map(async (key) => {
-          const url = entry.files?.[key];
-          if (!url) return;
-          const size = await contentLength(url);
-          if (size !== null) bytes[key] = size;
-        })
-      );
-      if (Object.keys(bytes).length > 0) entry.file_bytes = bytes;
-      else delete entry.file_bytes;
-      done += 1;
-      if (done % 200 === 0) console.log(`[enrich] sizes ${done}/${entries.length}`);
-    });
-    const sized = entries.filter((entry) => entry.file_bytes).length;
-    console.log(`[enrich] sizes: ${sized}/${entries.length} entries measured`);
-  }
+  const started = performance.now();
+  await enrichEntries(entries, options);
+  console.log(`[enrich] network/analysis: ${((performance.now() - started) / 1000).toFixed(3)} seconds`);
 
   await writeFile(CATALOG_PATH, `${JSON.stringify(catalog, null, 2)}\n`, "utf8");
   console.log(`[enrich] wrote ${CATALOG_PATH}`);
 }
 
-await main();
+if (import.meta.main) await main();
