@@ -36,7 +36,7 @@
 - Modify shared/charts.ts, server/db/schema/charts.ts, storage.ts and migration metadata; server/api/charts.ts, app.ts, charts/service.ts, assets.ts, deletion.ts; storage/deletion.ts, references.ts; ops/backup/journal.ts, restore.ts and focused tests.
 
 **Interfaces:**
-- Produces `ChartPublicationDto = { versionId,title,artist,publishedAt,updatedAt }`; `ChartDto.publication: ChartPublicationDto | null` (optional transitional typing permitted only for test fixtures).
+- Produces `ChartPublicationDto = { versionId,title,artist,publishedAt,updatedAt }`; private detail/list DTOs emit `publication: ChartPublicationDto | null` and `publicationPending: boolean`. Publication is the persisted target snapshot; pending means its sequence has not crossed the independent durable checkpoint. UI must not call pending publish/withdraw successful. Optional transitional typing permitted only for existing test fixtures.
 - Produces `PublicChartDto = { id,title,artist,versionId,ordinal,summary,sourceSize,publishedAt,updatedAt,author: {id,name,image}|null }` and `PublicChartsPageDto = {items,nextCursor}`; no storage keys/sourceFileId.
 - Produces publish/withdraw routes exactly as spec; PUT body `{expectedRevision,versionId,confirmOriginalArchive:true}`, DELETE `{expectedRevision}`. GET catalog/detail and GET/HEAD asset/download paths as spec.
 - Existing service signatures stay compatible; published versions return `CHART_PUBLISHED_VERSION` on deletion, whole-chart deletion withdraws atomically.
@@ -61,7 +61,7 @@
 - Preview accepts optional `assetUrl` resolver with private default, stable callback, public errors never redirect to login.
 - SSR loaders use apiContext/QueryClient/API only, return no-store headers, fresh data per navigation. Detail metadata derives only publication snapshot; invalid/missing pages 404 noindex. No new sitemap unless existing one needs integration.
 
-- [ ] **Step 1:** Read web chart-card/grid and detail/preview UI as reference, existing community loaders/DOM fixtures. Add failing DOM tests: explicit selected version and ZIP warning/confirmation; lost response reads publication; conflict refresh; published version cannot delete; withdrawal; catalog card links/fallbacks/pagination; public preview uses public URLs with no private fallback.
+- [ ] **Step 1:** Read web chart-card/grid and detail/preview UI as reference, existing community loaders/DOM fixtures. Add failing DOM tests: explicit selected version and ZIP warning/confirmation; lost response reads publication and requires `publicationPending === false` before success; failed pending publish/withdraw keeps a safe retry; conflict refresh; published version cannot delete; withdrawal; catalog card links/fallbacks/pagination; public preview uses public URLs with no private fallback.
 - [ ] **Step 2:** Run DOM tests remotely; expected failure for missing UI.
 - [ ] **Step 3:** Implement translated author controls and public pages. Square cover, responsive 2/3/4/6 columns, clear title/artist/author/difficulty; accessible labels and keyboard links. Current public snapshot survives private edits; no misleading success on 409. Download original ZIP via safe server route. Add discoverable home/header links; retain private CRUD flows.
 - [ ] **Step 4:** Run focused DOM tests plus existing chart editor/preview/header tests; remote i18n/typegen/typecheck and build. Expected all pass.
