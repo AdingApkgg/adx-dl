@@ -179,6 +179,107 @@ async function acceptance() {
     const source = `/api/v1/files/${draft.versions[0].sourceFileId}/content`;
     await denied(anonymous, source, 401); await denied(other, source, 404);
   });
+  let publicChart;
+  const publicBase = () => `/api/v1/charts/${draft.id}`;
+  const publicAssets = () => ["maidata", "audio", "cover"].map(role => `${publicBase()}/versions/${draft.currentVersionId}/assets/${role}`);
+  await step("private_draft_not_public_and_explicit_version_confirmation", async () => {
+    await denied(anonymous, publicBase(), 404);
+    assert.equal(await page.getByRole("button", { name: "确认发布", exact: true }).isEnabled(), false);
+    await page.getByLabel("公开版本", { exact: true }).selectOption(draft.currentVersionId);
+    assert.equal(await page.getByRole("button", { name: "确认发布", exact: true }).isEnabled(), false);
+    await page.getByLabel("我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。", { exact: true }).check();
+    const [published] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === `${publicBase().replace('/charts/', '/me/charts/')}/publication` && r.request().method() === "PUT", { timeout: 60000 }),
+      page.getByRole("button", { name: "确认发布", exact: true }).click(),
+    ]);
+    assert.equal(published.status(), 200);
+    assert.equal((await published.json()).publicationPending, false);
+    publicChart = await json(anonymous, publicBase());
+    assert.equal(publicChart.versionId, draft.currentVersionId);
+    assert.equal(publicChart.title, draft.title);
+    assert.equal(JSON.stringify(publicChart).includes("sourceFileId"), false);
+  });
+  await step("newer_private_version_and_metadata_do_not_replace_snapshot", async () => {
+    const newer = storedZip([["maidata.txt", Buffer.from("&title=New private version\n&inote_4=(120){4}1,2,E\n")]]);
+    await page.getByLabel("选择 ZIP", { exact: true }).setInputFiles({ name: "private-newer.zip", mimeType: "application/zip", buffer: newer });
+    await page.getByRole("button", { name: "保存私有草稿", exact: true }).waitFor({ timeout: 90000 });
+    const [saved] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === `/api/v1/me/charts/${draft.id}/versions` && r.request().method() === "POST"),
+      page.getByRole("button", { name: "保存私有草稿", exact: true }).click(),
+    ]);
+    assert.equal(saved.status(), 201);
+    const latest = await saved.json();
+    assert.notEqual(latest.currentVersionId, draft.currentVersionId);
+    await denied(anonymous, `${publicBase()}/versions/${latest.currentVersionId}/assets/maidata`, 404);
+    await page.getByLabel("标题", { exact: true }).fill("Private metadata edited");
+    const [edited] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === `/api/v1/me/charts/${draft.id}` && r.request().method() === "PATCH"),
+      page.getByRole("button", { name: "保存标题和曲师", exact: true }).click(),
+    ]);
+    assert.equal(edited.status(), 200);
+    assert.deepEqual(await json(anonymous, publicBase()), publicChart);
+  });
+  await step("anonymous_home_catalog_detail_lazy_native_preview_exact_zip", async () => {
+    const visitor = await anonymous.newPage(), requested = [];
+    visitor.on("request", r => requested.push(new URL(r.url()).pathname));
+    visitor.on("pageerror", e => diagnostics.push({ type: "pageerror", message: sanitized(e.message) }));
+    await visitor.goto(origin.href);
+    await visitor.getByRole("link", { name: "浏览公开谱面", exact: true }).click();
+    await visitor.getByRole("link", { name: /CI private draft/ }).click();
+    await visitor.getByRole("heading", { level: 1, name: "CI private draft", exact: true }).waitFor();
+    assert.equal(requested.some(p => p.endsWith("/assets/audio") || p.endsWith("/assets/maidata")), false);
+    assert.equal(requested.some(p => p.includes("/api/v1/me/charts")), false);
+    await visitor.getByRole("button", { name: "加载预览", exact: true }).click();
+    await visitor.waitForFunction(() => [...document.querySelectorAll("button")].some(b => b.textContent === "播放" && !b.disabled));
+    assert.ok(requested.includes(publicAssets()[0])); assert.ok(requested.includes(publicAssets()[1]));
+    assert.equal(await visitor.locator("canvas").count(), 1);
+    await visitor.getByRole("button", { name: "播放", exact: true }).click();
+    await visitor.getByRole("button", { name: "暂停", exact: true }).waitFor();
+    await visitor.getByRole("button", { name: "暂停", exact: true }).click();
+    if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-desktop.png"), fullPage: true });
+    const [download] = await Promise.all([visitor.waitForEvent("download"), visitor.getByRole("link", { name: "下载原始 ZIP", exact: true }).click()]);
+    assert.deepEqual(await readFile(await download.path()), zip);
+    await visitor.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await visitor.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-mobile.png"), fullPage: true });
+    for (const [path, bytes] of [[publicAssets()[0], maidata], [publicAssets()[1], audio]]) {
+      const result = await anonymous.request.get(new URL(path, origin).href);
+      assert.equal(result.status(), 200); assert.deepEqual(await result.body(), bytes);
+    }
+    const range = await anonymous.request.get(new URL(publicAssets()[1], origin).href, { headers: { Range: "bytes=44-75" } });
+    assert.equal(range.status(), 206); assert.deepEqual(await range.body(), audio.subarray(44,76));
+    await visitor.close();
+  });
+  await step("locale_ssr_and_router_data_errors_cache_noindex", async () => {
+    for (const prefix of ["", "/en", "/ja"]) {
+      for (const suffix of ["", ".data"]) {
+        const response = await anonymous.request.get(new URL(`${prefix}/charts/${draft.id}${suffix}`, origin).href);
+        assert.equal(response.status(), 200); assert.equal(response.headers()["cache-control"], "private, no-store");
+        assert.ok((await response.text()).includes("CI private draft"));
+        for (const id of ["invalid", "12345678-1234-4234-8234-123456789012"]) {
+          const missing = await anonymous.request.get(new URL(`${prefix}/charts/${id}${suffix}`, origin).href);
+          assert.equal(missing.status(), 404); assert.equal(missing.headers()["cache-control"], "private, no-store");
+          if (!suffix) assert.match(await missing.text(), /name="robots" content="noindex"/);
+        }
+      }
+    }
+  });
+  await step("withdrawal_reauthorizes_all_old_asset_and_download_requests", async () => {
+    await page.getByRole("button", { name: "撤回公开", exact: true }).click();
+    const [withdrawn] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname.endsWith("/publication") && r.request().method() === "DELETE", { timeout: 60000 }),
+      page.getByRole("button", { name: "确认撤回", exact: true }).click(),
+    ]);
+    assert.equal(withdrawn.status(), 200); assert.equal((await withdrawn.json()).publicationPending, false);
+    for (const path of [publicBase(), `${publicBase()}/download`, ...publicAssets()]) {
+      for (const options of [{ method: "GET" }, { method: "HEAD" }, { method: "GET", headers: { Range: "bytes=0-1" } }, { method: "GET", headers: { "If-None-Match": "*" } }, { method: "GET", headers: { Range: "bytes=0-1", "If-Range": '"old"' } }]) {
+        const result = await anonymous.request.fetch(new URL(path, origin).href, options);
+        assert.equal(result.status(), 404); assert.equal(result.headers()["cache-control"], "private, no-store");
+      }
+    }
+    assert.equal((await json(anonymous, "/api/v1/charts")).items.some(c => c.id === draft.id), false);
+    assert.equal((await json(owner, `/api/v1/me/charts/${draft.id}`)).versions.length, 2);
+  });
   await step("explicit_delete_releases_private_draft", async () => {
     await page.getByRole("button", { name: "删除草稿", exact: true }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "删除草稿", exact: true }).click();
@@ -188,6 +289,37 @@ async function acceptance() {
     const list = await json(owner, "/api/v1/me/charts");
     assert.equal(list.items.length, 0); assert.equal(list.usage.usedBytes, 0); assert.equal(list.usage.reservedBytes, 0);
     await denied(owner, asset, 404); await denied(owner, `/api/v1/me/charts/${draft.id}`, 404);
+  });
+  await step("missing_optional_media_and_unsupported_difficulty", async () => {
+    const optionalZip = storedZip([["maidata.txt", Buffer.from("&title=Optional media absent\n&inote_4=(120){4}1,9,nonsense,E\n")]]);
+    await page.goto(new URL("/me/charts/new", origin).href);
+    await page.getByLabel("选择 ZIP", { exact: true }).setInputFiles({ name: "optional.zip", mimeType: "application/zip", buffer: optionalZip });
+    await page.getByRole("button", { name: "保存私有草稿", exact: true }).waitFor({ timeout: 90000 });
+    const [saved] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === "/api/v1/me/charts" && r.request().method() === "POST"),
+      page.getByRole("button", { name: "保存私有草稿", exact: true }).click(),
+    ]);
+    assert.equal(saved.status(), 201); const optional = await saved.json();
+    await page.waitForURL(url => url.pathname === `/me/charts/${optional.id}`);
+    await page.getByLabel("公开版本", { exact: true }).selectOption(optional.currentVersionId);
+    await page.getByLabel("我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。", { exact: true }).check();
+    const [published] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname.endsWith("/publication") && r.request().method() === "PUT", { timeout: 60000 }),
+      page.getByRole("button", { name: "确认发布", exact: true }).click(),
+    ]);
+    assert.equal(published.status(), 200);
+    const visitor = await anonymous.newPage(), requests = [];
+    visitor.on("request", r => requests.push(new URL(r.url()).pathname));
+    await visitor.setViewportSize({ width: 390, height: 844 });
+    await visitor.goto(new URL(`/charts/${optional.id}`, origin).href);
+    await visitor.getByRole("heading", { name: "Optional media absent", exact: true }).waitFor();
+    assert.equal(await visitor.getByRole("button", { name: "加载预览", exact: true }).isEnabled(), false);
+    assert.equal(requests.some(path => path.includes("/assets/")), false);
+    if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-optional-media.png"), fullPage: true });
+    for (const role of ["audio", "cover"]) await denied(anonymous, `/api/v1/charts/${optional.id}/versions/${optional.currentVersionId}/assets/${role}`, 404);
+    const download = await anonymous.request.get(new URL(`/api/v1/charts/${optional.id}/download`, origin).href);
+    assert.equal(download.status(), 200); assert.deepEqual(await download.body(), optionalZip);
+    await visitor.close();
   });
   await step("avatar_upload_save_and_public_jpeg", async () => {
     assert.equal((await page.goto(new URL("/settings/profile", origin).href)).status(), 200);
@@ -210,7 +342,7 @@ let deadline;
 try {
   if (evidenceDirectory) await mkdir(evidenceDirectory, { recursive: true, mode: 0o700 });
   await Promise.race([acceptance(), new Promise((_, reject) => {
-    deadline = setTimeout(() => reject(new Error("ACCEPTANCE_OVERALL_TIMEOUT")), 240000);
+    deadline = setTimeout(() => reject(new Error("ACCEPTANCE_OVERALL_TIMEOUT")), 420000);
   })]);
   const result = { status: "passed", steps, elapsedMs: Date.now() - startedAt, browser: "chromium", syntheticAccounts: true };
   if (evidenceDirectory) await writeFile(join(evidenceDirectory, "browser-result.json"), JSON.stringify(result, null, 2) + "\n", { mode: 0o600 });

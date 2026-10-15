@@ -92,6 +92,18 @@ services:
       - ${ACCEPTANCE_ROOT:?required}/scratch:/media-tmp
       - *capacity
 
+  control:
+    <<: *runtime
+    image: ${ACCEPTANCE_APP_IMAGE:?required}
+    profiles: [browser]
+    command: ["bun", "./src/worker/main.ts"]
+    env_file: ["${ACCEPTANCE_ROOT:?required}/fixture/control.env"]
+    volumes:
+      - ${ACCEPTANCE_ROOT:?required}/state/ui/restore:/storage-state:ro
+      - ${ACCEPTANCE_ROOT:?required}/state/ui/journal:/storage-journal
+      - ${ACCEPTANCE_ROOT:?required}/state/ui/keys:/storage-keys:ro
+      - *capacity
+
   restore-postgres:
     profiles: [restore]
     image: postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336

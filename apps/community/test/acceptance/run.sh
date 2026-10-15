@@ -104,7 +104,7 @@ case "$1" in
     [[ ! -f $ROOT/state/up.attempted ]] || fail 'ACCEPTANCE_UP_ALREADY_ATTEMPTED'
     : >"$ROOT/state/up.attempted"
     base_and_bootstrap
-    compose --profile browser up -d web media >"$ROOT/private-logs/runtime.log" 2>&1
+    compose --profile browser up -d web media control >"$ROOT/private-logs/runtime.log" 2>&1
     for ((attempt=0; attempt<180; attempt++)); do
       if curl --fail --silent --output /dev/null --max-time 2 http://127.0.0.1:41909/readyz; then
         printf 'ACTUAL_WEB_MEDIA_READY http://127.0.0.1:41909\n'
@@ -118,7 +118,7 @@ case "$1" in
     assert_owner
     [[ ! -f $ROOT/state/restore.attempted ]] || fail 'FRESH_RESTORE_ALREADY_ATTEMPTED'
     : >"$ROOT/state/restore.attempted"
-    compose --profile browser stop web media >"$ROOT/private-logs/stop-browser.log" 2>&1
+    compose --profile browser stop web media control >"$ROOT/private-logs/stop-browser.log" 2>&1
     base_and_bootstrap
     compose --profile restore up -d --wait --wait-timeout 75 restore-postgres restore-seaweedfs >"$ROOT/private-logs/restore-services.log" 2>&1
     run_named 110 restore restore-ready bun ./test/acceptance/bootstrap.ts restore-ready

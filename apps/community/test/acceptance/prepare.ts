@@ -35,6 +35,7 @@ const common: Record<string, string> = {
   NAPCAT_HTTP_URL: "http://127.0.0.1:9", NAPCAT_WS_URL: "ws://127.0.0.1:9",
   NAPCAT_ACCESS_TOKEN: randomBytes(32).toString("hex"), NAPCAT_BOT_QQ: "10001",
   STORAGE_S3_ENDPOINT: "http://seaweedfs:8333", STORAGE_TEMP_DIR: "/media-tmp", STORAGE_CAPACITY_DIR: "/storage-capacity",
+  STORAGE_INTERNAL_MEDIA_SECRET: randomBytes(32).toString("hex"),
   STORAGE_RECIPE_BUILD: RECIPE_BUILD, STORAGE_RESTORE_STATE_DIR: "/storage-state", STORAGE_INTERNAL_PORT: "3001",
   NO_PROXY: "localhost,127.0.0.1,postgres,redis,seaweedfs,web,restore-postgres,restore-seaweedfs",
 };
@@ -44,11 +45,16 @@ async function env(name: string, values: Record<string, string>) {
   await chown(`${fixture}/${name}.env`, owner.uid, owner.gid);
 }
 await env("web", {
-  ...common, STORAGE_INTERNAL_MEDIA_SECRET: randomBytes(32).toString("hex"),
+  ...common,
   STORAGE_WEB_ACCESS_KEY_ID: roles.STORAGE_WEB_ACCESS_KEY_ID!, STORAGE_WEB_SECRET_ACCESS_KEY: roles.STORAGE_WEB_SECRET_ACCESS_KEY!,
 });
 await env("media", {
   ...common, STORAGE_MEDIA_ACCESS_KEY_ID: roles.STORAGE_MEDIA_ACCESS_KEY_ID!, STORAGE_MEDIA_SECRET_ACCESS_KEY: roles.STORAGE_MEDIA_SECRET_ACCESS_KEY!,
+});
+await env("control", {
+  ...common, STORAGE_CONTROL_ACCESS_KEY_ID: roles.STORAGE_CONTROL_ACCESS_KEY_ID!, STORAGE_CONTROL_SECRET_ACCESS_KEY: roles.STORAGE_CONTROL_SECRET_ACCESS_KEY!,
+  STORAGE_INTERNAL_MEDIA_URL: "http://web:3001", CLOUDFLARE_ZONE_ID: "00000000000000000000000000000000", CLOUDFLARE_PURGE_TOKEN: "isolated-no-network-fixture",
+  STORAGE_JOURNAL_DIR: "/storage-journal", STORAGE_JOURNAL_KEY_FILE: "/storage-keys/journal-key",
 });
 await env("bootstrap", {
   ...common, TEST_DATABASE_URL: common.DATABASE_URL!, TEST_REDIS_URL: "redis://redis:6379",

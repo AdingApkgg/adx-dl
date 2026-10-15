@@ -1,3 +1,4 @@
+import { publicRestoreFixture } from "../../test/acceptance/public-restore-fixture";
 import { expect, test } from "bun:test";
 import { mkdir, readFile, writeFile, rename, stat, unlink, readdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -91,6 +92,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
       config: sourceControlConfig,
       driver: createS3Driver(sourceControlConfig),
     };
+    const publicCharts = await publicRestoreFixture(f, sourceWeb, sourceMedia, sourceControl, journal);
     const good = await f.upload(await readFile("/fixtures/safe.png")),
       deleted = await f.upload(await readFile("/fixtures/safe.jpeg")),
       removed = await f.upload(await readFile("/fixtures/oriented.jpg")),
@@ -262,7 +264,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
     }
     if (roleProcesses.length)
       console.log("proof: actual coordinated snapshot complete; normal roles stopped and reaped");
-    expect(manifest.originals).toHaveLength(4);
+    expect(manifest.originals).toHaveLength(4 + publicCharts.additionalOriginals);
     expect(manifest.dumps.community.size).toBeGreaterThan(1000);
     expect(manifest.dumps.umami.size).toBeGreaterThan(1000);
     const snapshots = Bun.spawn(["restic", "snapshots", "--json"], {
@@ -312,6 +314,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
       ),
     ).toHaveLength(1);
     console.log("proof: restic restored; committing later source facts");
+    await publicCharts.commitLaterFacts();
     const handlers = createDeletionHandlers(sourceControl);
     await requestDeletion({ db: f.ctx.db, boss: testSender, handlers }, deleted.userId, {
       deleteContent: true,
@@ -386,7 +389,8 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
           throw new Error("Must not start");
         },
         revoke: async () => {},
-        verifyInvariants: async () => {},
+        verifyInvariants: async () => {
+        await publicCharts.verify(targetWeb);},
       }),
     ).rejects.toThrow();
     expect(sourceStopped).toBe(true);
@@ -449,7 +453,8 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
           throw new Error("must not start");
         },
         revoke: async () => {},
-        verifyInvariants: async () => {},
+        verifyInvariants: async () => {
+        await publicCharts.verify(targetWeb);},
       });
     const invalidHead = Buffer.from(validHeadBytes);
     invalidHead[invalidHead.length - 5] ^= 1;
@@ -495,7 +500,8 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
         throw new Error("Must not start");
       },
       revoke: async () => {},
-      verifyInvariants: async () => {},
+      verifyInvariants: async () => {
+        await publicCharts.verify(targetWeb);},
     };
     await expect(restoreOriginals(uncertainOptions)).rejects.toThrow("STORAGE_BACKEND_UNAVAILABLE");
     expect((await stat(join(stateDirectory, ".restore.lock"))).isFile()).toBe(true);
@@ -624,6 +630,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
           drainUrl: "http://127.0.0.1:3001/internal/media/drain",
         }),
       verifyInvariants: async () => {
+        await publicCharts.verify(targetWeb);
         expect(await target.db.select().from(user).where(eq(user.id, deleted.userId))).toHaveLength(
           0,
         );
@@ -769,6 +776,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
       purgeObservations: purgeRequests.map((p) => ({ at: p.at })),
       sourceStopped,
       freshVolumes: true,
+      publicChartPermissionReplay: ["withdrawal", "replacement-missing-latest-closed", "chart-deletion", "anonymous-exact-version-retention"],
     };
     await writeFile(join(root, "result.json"), JSON.stringify(evidence, null, 2));
     console.log(
@@ -784,6 +792,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
     await cf.stop(true);
     await target.pool.end();
     await f.ctx.db.delete(blobBlocks).where(eq(blobBlocks.sha256, blockedImage.slice(7, -4)));
+    await publicCharts.cleanup();
     await f.cleanup();
     const clean = new Client({ connectionString: journal.databaseUrl });
     await clean.connect();
