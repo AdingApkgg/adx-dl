@@ -26,6 +26,12 @@ export function createPublicStreamLimiter(limits = { global: 16, perIp: 2 }) {
     try {
       request.signal.throwIfAborted();
       const response = await operation();
+      // The HTTP adapter suppresses HEAD bodies without consuming the stream.
+      // Cancel error bodies here so a failed metadata HEAD cannot leak a ZIP slot.
+      if (request.method === "HEAD") {
+        try { await response.body?.cancel(); } finally { release(); }
+        return new Response(null, { status: response.status, headers: response.headers });
+      }
       if (!response.body) {
         release();
         return response;

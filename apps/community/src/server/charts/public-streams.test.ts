@@ -15,3 +15,18 @@ test("a full catalog page fits the asset pool without consuming either ZIP slot"
   const retry = await zip("same-ip", request, open);
   await retry.body!.cancel();
 });
+
+test("HEAD error bodies are canceled before the HTTP adapter suppresses them and never consume ZIP slots", async () => {
+  const limit = createPublicStreamLimiter();
+  let canceled = 0;
+  for (let i = 0; i < 4; i++) {
+    const response = await limit("same-ip", new Request("https://example.test", { method: "HEAD" }), async () =>
+      new Response(new ReadableStream({ cancel() { canceled++; } }), { status: 503 }),
+    );
+    expect(response.status).toBe(503);
+    expect(response.body).toBeNull();
+  }
+  expect(canceled).toBe(4);
+  const response = await limit("same-ip", new Request("https://example.test"), async () => new Response("ready"));
+  expect(await response.text()).toBe("ready");
+});
