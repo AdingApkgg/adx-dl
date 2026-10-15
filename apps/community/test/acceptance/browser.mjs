@@ -139,6 +139,77 @@ async function acceptance() {
     assert.ok(first.id && second.id); assert.notEqual(first.id, second.id);
     assert.equal((await json(owner, "/api/v1/me/charts")).items.length, 0);
   });
+  for (const mode of ["adx", "parts"]) await step(`real_browser_${mode}_upload_save_reload`, async () => {
+    const title = `Browser ${mode} upload`;
+    const score = Buffer.from(`&title=${title}\n&artist=Synthetic fixture\n&inote_4=(120){4}1,2,3,E\n`);
+    const original = storedZip([["maidata.txt", score], ["track.wav", audio], ["bg.png", image]]);
+    let uploadStarts = 0, workers = 0;
+    const observe = request => { if (request.method() === "POST" && new URL(request.url()).pathname === "/api/v1/uploads") uploadStarts++; };
+    const observeWorker = () => { workers++; };
+    page.on("request", observe); page.on("worker", observeWorker);
+    try {
+      await page.goto(new URL("/me/charts/new", origin).href);
+      if (mode === "adx") {
+        await page.getByLabel("选择 ADX / ZIP", { exact: true }).setInputFiles({ name: "browser-chart.adx", mimeType: "application/octet-stream", buffer: original });
+      } else {
+        for (const [label, name, mimeType, buffer] of [
+          ["谱面文件（必选）", "my-score.txt", "text/plain", score],
+          ["音乐（可选）", "my-song.wav", "audio/wav", audio],
+          ["曲绘（可选）", "my-cover.png", "image/png", image],
+          ["背景视频（可选，仅保留原件）", "my-video.mp4", "video/mp4", Buffer.from("synthetic original-only video")],
+        ]) await page.getByLabel(label, { exact: true }).setInputFiles({ name, mimeType, buffer });
+        await page.getByRole("button", { name: "移除 背景视频（可选，仅保留原件）", exact: true }).click();
+        assert.equal(await page.getByText("my-score.txt", { exact: true }).count(), 1);
+        await page.getByLabel("背景视频（可选，仅保留原件）", { exact: true }).setInputFiles({ name: "my-video.mp4", mimeType: "video/mp4", buffer: Buffer.from("synthetic original-only video") });
+        assert.equal(uploadStarts, 0, "selection must remain local before assembly");
+        await page.getByRole("button", { name: "组装并上传", exact: true }).click();
+      }
+      await page.getByRole("button", { name: "保存私有草稿", exact: true }).waitFor({ timeout: 90000 });
+      assert.equal(uploadStarts, 1); if (mode === "parts") assert.ok(workers > 0, "real browser packaging Worker must run");
+      assert.equal((await json(owner, "/api/v1/me/charts")).items.length, 0);
+      const [saved] = await Promise.all([
+        page.waitForResponse(r => new URL(r.url()).pathname === "/api/v1/me/charts" && r.request().method() === "POST"),
+        page.getByRole("button", { name: "保存私有草稿", exact: true }).click(),
+      ]);
+      assert.equal(saved.status(), 201); const chart = await saved.json();
+      await page.waitForURL(url => url.pathname === `/me/charts/${chart.id}`);
+      assert.equal((await page.reload()).status(), 200);
+      await page.getByRole("heading", { level: 1, name: title, exact: true }).waitFor();
+      const current = await json(owner, `/api/v1/me/charts/${chart.id}`);
+      assert.equal(current.currentVersionId, chart.currentVersionId);
+      const base = `/api/v1/me/charts/${chart.id}/versions/${chart.currentVersionId}/assets`;
+      for (const [role, expected] of [["maidata", score], ["audio", audio]]) {
+        const assetResponse = await owner.request.get(new URL(`${base}/${role}`, origin).href);
+        assert.equal(assetResponse.status(), 200); assert.deepEqual(await assetResponse.body(), expected);
+      }
+      const sourceResponse = await owner.request.get(new URL(`/api/v1/files/${chart.versions[0].sourceFileId}/content`, origin).href);
+      assert.equal(sourceResponse.status(), 200); const source = await sourceResponse.body();
+      if (mode === "adx") assert.deepEqual(source, original);
+      else {
+        // Browser Worker writes STORED entries; verify every canonical path and untouched source byte.
+        const entries = new Map(); let offset = 0;
+        while (source.readUInt32LE(offset) === 0x04034b50) {
+          assert.equal(source.readUInt16LE(offset + 8), 0);
+          const size = source.readUInt32LE(offset + 18), names = source.readUInt16LE(offset + 26), extra = source.readUInt16LE(offset + 28);
+          const start = offset + 30 + names + extra;
+          entries.set(source.subarray(offset + 30, offset + 30 + names).toString(), source.subarray(start, start + size));
+          offset = start + size;
+        }
+        assert.deepEqual([...entries.keys()].sort(), ["bg.png", "maidata.txt", "pv.mp4", "track.wav"]);
+        for (const [name, expected] of [["maidata.txt", score], ["track.wav", audio], ["bg.png", image], ["pv.mp4", Buffer.from("synthetic original-only video")]]) assert.deepEqual(entries.get(name), expected);
+      }
+      await page.getByRole("button", { name: "加载预览", exact: true }).click();
+      await page.waitForFunction(() => [...document.querySelectorAll("button")].some(b => b.textContent === "播放" && !b.disabled));
+      assert.equal(await page.locator("canvas").count(), 1);
+      assert.equal(await page.getByRole("alert").count(), 0);
+      if (evidenceDirectory) await page.screenshot({ path: join(evidenceDirectory, `upload-${mode}.png`), fullPage: true });
+      await page.getByRole("button", { name: "关闭预览", exact: true }).click();
+      await page.getByRole("button", { name: "删除草稿", exact: true }).click();
+      await page.getByRole("alertdialog").getByRole("button", { name: "删除草稿", exact: true }).click();
+      await page.waitForURL(url => url.pathname === "/me/charts");
+      assert.equal((await json(owner, "/api/v1/me/charts")).items.length, 0);
+    } finally { page.off("request", observe); page.off("worker", observeWorker); }
+  });
   await step("upload_processed_before_explicit_save", async () => {
     const response = await page.goto(new URL("/me/charts/new", origin).href);
     assert.equal(response.status(), 200);
