@@ -150,6 +150,9 @@ jobs:
           docker build --label "org.opencontainers.image.revision=$GITHUB_SHA" -f apps/community/ops/backup/Dockerfile -t community-backup:ci .
           docker run --rm --network none --read-only --tmpfs /tmp community:ci bun -e 'import sharp from "sharp"; import {processAvatar} from "./src/media-worker/avatar.ts"; await sharp({create:{width:32,height:32,channels:3,background:"white"}}).png().toFile("/tmp/input.png"); const output=await processAvatar("/tmp/input.png","/tmp/output.jpg"); if(output.width!==512||output.size>524288)throw new Error("native recipe failed");'
 
+      - name: Role heartbeats under real WAL flush delay
+        run: bash apps/community/test/ops/runtime-role-wal.sh
+
       - name: Seaweed supervision and TCP closure regressions
         env:
           SEAWEED_RUNTIME_TEST_IMAGE: community-seaweed:ci
