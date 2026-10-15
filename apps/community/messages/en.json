@@ -315,7 +315,7 @@
   "public_chart_unavailable": "Public charts are temporarily unavailable. Try again later.",
   "public_chart_preview": "Public chart preview",
   "chart_parts_title": "Assemble individual files",
-  "chart_parts_hint": "A score is required; audio and cover are optional. Select files, then assemble and upload. Supports TXT, MP3/OGG/WAV and JPG/PNG/WebP. Optional MP4/WebM video is kept in the original package only and is not previewed on the web.",
+  "chart_parts_hint": "Required TXT score: up to 1 MiB. Optional MP3/OGG/WAV audio: up to 32 MiB; JPG/PNG/WebP cover: up to 8 MiB. Optional MP4/WebM video is retained in the original only, without web preview. Files must not be empty; the total package limit is 64 MiB. Select files, then assemble and upload.",
   "chart_part_maidata": "Score file (required)",
   "chart_part_audio": "Audio (optional)",
   "chart_part_cover": "Cover (optional)",
@@ -323,5 +323,8 @@
   "chart_parts_upload": "Assemble and upload",
   "chart_parts_resume": "Assemble and resume",
   "chart_parts_clear": "Clear selected files",
-  "chart_error_parts_type": "Choose a TXT score, MP3/OGG/WAV audio, JPG/PNG/WebP cover, or MP4/WebM video."
+  "chart_error_parts_type": "Choose a TXT score, MP3/OGG/WAV audio, JPG/PNG/WebP cover, or MP4/WebM video.",
+  "chart_part_remove": "Remove",
+  "chart_error_part_empty": "A selected asset is empty. Choose a non-empty file.",
+  "chart_error_part_size": "An asset exceeds its per-file limit: score 1 MiB, audio 32 MiB, cover 8 MiB, video 64 MiB. Reduce or replace that asset."
 }

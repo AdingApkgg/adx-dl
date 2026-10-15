@@ -109,3 +109,10 @@ test("loose parts reject missing score, wrong role type and oversized source bef
   Object.defineProperty(large, "size", { value: 64 * 1024 * 1024 + 1 });
   expect(() => chartInput.packChartParts({ maidata: new File(["text"], "score.txt"), video: large })).toThrow();
 });
+
+
+test("an empty loose asset has an actionable empty-file error rather than a size-limit error", () => {
+  let failure: unknown;
+  try { chartInput.packChartParts({ maidata: new File([], "empty.txt") }); } catch (error) { failure = error; }
+  expect(failure).toMatchObject({ code: "CHART_PART_EMPTY" });
+});

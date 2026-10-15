@@ -123,7 +123,12 @@ export function ChartUpload({ userId, onSave }: { userId: string; onSave: (file:
             const file = event.target.files?.[0]; event.target.value = "";
             if (file) { setParts((current) => ({ ...current, [role]: file })); setError(undefined); }
           }} />
-          {parts[role] ? <p className="break-all text-sm text-muted-foreground">{parts[role].name}</p> : null}
+          {parts[role] ? <div className="mt-1 flex items-start gap-2">
+            <p className="min-w-0 flex-1 break-all text-sm text-muted-foreground">{parts[role].name}</p>
+            <Button variant="outline" aria-label={`${m.chart_part_remove()} ${label}`} onClick={() => {
+              setParts((current) => { const next = { ...current }; delete next[role]; return next; }); setError(undefined);
+            }}>{m.chart_part_remove()}</Button>
+          </div> : null}
         </div>)}
       </div>
       <div className="flex flex-wrap gap-2">

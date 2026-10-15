@@ -81,7 +81,11 @@ test("separate score/audio/cover/video wait for explicit assembly then upload on
   fireEvent.change(screen.getByLabelText("音乐（可选）"), { target: { files: [new File(["audio-bytes"], "music.ogg")] } });
   fireEvent.change(screen.getByLabelText("曲绘（可选）"), { target: { files: [new File(["cover-bytes"], "picture.png")] } });
   fireEvent.change(screen.getByLabelText(/背景视频/), { target: { files: [new File(["video-bytes"], "movie.mp4")] } });
+  fireEvent.click(screen.getByRole("button", { name: /移除.*背景视频/ }));
+  expect(screen.queryByText("movie.mp4")).toBeNull();
+  for (const name of ["my-score.txt", "music.ogg", "picture.png"]) expect(screen.getByText(name)).toBeTruthy();
   expect(fetcher).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText(/背景视频/), { target: { files: [new File(["video-bytes"], "movie.mp4")] } });
   fireEvent.click(submit);
   await waitFor(() => expect(screen.getByRole("button", { name: "保存私有草稿" })).toBeTruthy());
   const contents = unzipSync(uploaded!);

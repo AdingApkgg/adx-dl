@@ -24,6 +24,7 @@ test("built Node server streams known lengths, backpressures, cancels private di
     output = randomBytes(524288),
     sha = hash(original),
     outSha = hash(output);
+  let holdPublic = false;
   let active = 0,
     canceled = 0,
     sent = 0;
@@ -50,6 +51,10 @@ test("built Node server streams known lengths, backpressures, cancels private di
     });
     function send() {
       if (res.destroyed) return;
+      if (bytes === output && holdPublic && offset > 0) {
+        timer = setTimeout(send, 2);
+        return;
+      }
       const next = Math.min(offset + 16384, bytes.length);
       const ok = res.write(bytes.subarray(offset, next));
       sent += next - offset;
@@ -178,6 +183,8 @@ test("built Node server streams known lengths, backpressures, cancels private di
     const reader = cut.body!.getReader();
     await reader.read();
     await reader.cancel();
+    // Keep this response in flight even if the revocation transaction takes longer than EOF.
+    holdPublic = true;
     const streaming = await fetch(publicUrl);
     const publicReader = streaming.body!.getReader();
     await publicReader.read();
@@ -196,6 +203,7 @@ test("built Node server streams known lengths, backpressures, cancels private di
     });
     expect(drained.status).toBe(200);
     await publicReader.cancel().catch(() => {});
+    holdPublic = false;
     expect((await fetch(publicUrl)).status).toBe(404);
     for (let i = 0; i < 50 && active; i++) await Bun.sleep(20);
     expect(active).toBe(0);

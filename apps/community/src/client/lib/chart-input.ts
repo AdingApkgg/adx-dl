@@ -45,7 +45,8 @@ export function packChartParts(parts: ChartParts, signal?: AbortSignal): Promise
     const extension = file.name.split(".").pop()!.toLowerCase();
     if (!(extensions as readonly string[]).includes(extension))
       throw new ApiError(422, "CHART_PART_TYPE_INVALID", "Unsupported file type for this chart asset");
-    if (!file.size || file.size > limit) throw new ApiError(422, "CHART_ASSET_TOO_LARGE", "Invalid chart asset size");
+    if (!file.size) throw new ApiError(422, "CHART_PART_EMPTY", "Choose a non-empty asset");
+    if (file.size > limit) throw new ApiError(422, "CHART_PART_TOO_LARGE", "Chart asset exceeds its per-file limit");
     total += file.size;
     if (total > CHART_ZIP_LIMIT) throw new ApiError(422, "FILE_TOO_LARGE", "Chart package is too large");
     entries.push({ file, path: `${stem}.${extension}` });

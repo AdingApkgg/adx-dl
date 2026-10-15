@@ -315,7 +315,7 @@
   "public_chart_unavailable": "公開譜面を現在利用できません。後でもう一度お試しください。",
   "public_chart_preview": "公開譜面プレビュー",
   "chart_parts_title": "個別ファイルを組み合わせる",
-  "chart_parts_hint": "譜面は必須、音楽とカバーは任意です。選択後に組み合わせてアップロードしてください。TXT、MP3/OGG/WAV、JPG/PNG/WebP に対応。任意の MP4/WebM 動画は元パッケージにのみ保存され、Web プレビューでは再生されません。",
+  "chart_parts_hint": "必須の TXT 譜面は最大 1 MiB。任意の MP3/OGG/WAV 音楽は最大 32 MiB、JPG/PNG/WebP カバーは最大 8 MiB。任意の MP4/WebM 動画は元データにのみ保存され、Web では再生されません。空ファイルは使えません。パッケージ全体は最大 64 MiB です。選択後に組み合わせてアップロードしてください。",
   "chart_part_maidata": "譜面ファイル（必須）",
   "chart_part_audio": "音楽（任意）",
   "chart_part_cover": "カバー（任意）",
@@ -323,5 +323,8 @@
   "chart_parts_upload": "組み合わせてアップロード",
   "chart_parts_resume": "組み合わせて再開",
   "chart_parts_clear": "選択したファイルをクリア",
-  "chart_error_parts_type": "TXT 譜面、MP3/OGG/WAV 音楽、JPG/PNG/WebP カバー、MP4/WebM 動画を選択してください。"
+  "chart_error_parts_type": "TXT 譜面、MP3/OGG/WAV 音楽、JPG/PNG/WebP カバー、MP4/WebM 動画を選択してください。",
+  "chart_part_remove": "削除",
+  "chart_error_part_empty": "空の素材が選択されています。空でないファイルを選び直してください。",
+  "chart_error_part_size": "素材が単一ファイルの上限を超えています。譜面 1 MiB、音楽 32 MiB、カバー 8 MiB、動画 64 MiB。素材を小さくするか選び直してください。"
 }

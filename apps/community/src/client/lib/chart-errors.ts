@@ -3,6 +3,8 @@ import { errorCodeOf, errorMessage } from "./auth-errors";
 import { storageErrorMessage } from "./storage-errors";
 export function chartErrorMessage(error: unknown): string {
   const code = errorCodeOf(error);
+  if (code === "CHART_PART_EMPTY") return m.chart_error_part_empty();
+  if (code === "CHART_PART_TOO_LARGE") return m.chart_error_part_size();
   if (code === "CHART_PART_TYPE_INVALID") return m.chart_error_parts_type();
   if (code === "CHART_FOLDER_UNSUPPORTED") return m.chart_error_folder_unsupported();
   if (code === "REAUTH_REQUIRED" || code === "SESSION_NOT_FRESH") return errorMessage(error) ?? m.error_unknown();

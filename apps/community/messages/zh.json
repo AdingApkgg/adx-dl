@@ -315,7 +315,7 @@
   "public_chart_unavailable": "公开谱面暂时不可用，请稍后重试。",
   "public_chart_preview": "公开谱面预览",
   "chart_parts_title": "零散文件组装",
-  "chart_parts_hint": "谱面必选，音乐和曲绘可选；选好后点击组装并上传。支持 TXT、MP3/OGG/WAV、JPG/PNG/WebP。可附 MP4/WebM 视频，仅随原件保留，暂不在网页预览。",
+  "chart_parts_hint": "谱面 TXT 必选（最大 1 MiB）；音乐 MP3/OGG/WAV 可选（最大 32 MiB）；曲绘 JPG/PNG/WebP 可选（最大 8 MiB）。可附 MP4/WebM 视频，仅保留原件，不在网页预览。素材不能为空，总包最大 64 MiB；选好后点击组装并上传。",
   "chart_part_maidata": "谱面文件（必选）",
   "chart_part_audio": "音乐（可选）",
   "chart_part_cover": "曲绘（可选）",
@@ -323,5 +323,8 @@
   "chart_parts_upload": "组装并上传",
   "chart_parts_resume": "组装并续传",
   "chart_parts_clear": "清空所选文件",
-  "chart_error_parts_type": "请选择 TXT 谱面、MP3/OGG/WAV 音乐、JPG/PNG/WebP 曲绘或 MP4/WebM 视频。"
+  "chart_error_parts_type": "请选择 TXT 谱面、MP3/OGG/WAV 音乐、JPG/PNG/WebP 曲绘或 MP4/WebM 视频。",
+  "chart_part_remove": "移除",
+  "chart_error_part_empty": "选择的素材是空文件，请更换为非空文件。",
+  "chart_error_part_size": "某个素材超过单文件上限：谱面 1 MiB、音乐 32 MiB、曲绘 8 MiB、视频 64 MiB。请缩小或更换该素材。"
 }
