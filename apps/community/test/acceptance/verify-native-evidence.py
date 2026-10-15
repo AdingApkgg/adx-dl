@@ -48,13 +48,19 @@ def audit(rows, start, end, *, events=(), lifecycle=None, max_gap=3):
     nominal = [row for row in selected if row["time"] <= end]
     errors, gaps = [], []
     counters = {"failedPgProbes": 0, "nonThreeRoleSamples": 0, "missingRoleSamples": 0,
-                "missingContainerSamples": 0, "incompleteCgroupSamples": 0}
+                "missingContainerSamples": 0, "incompleteCgroupSamples": 0, "failedOrMissingHttpReadySamples": 0}
+    http_observed = any("httpReady" in row for row in selected)
     expected = None
     peak, ages = {name: 0 for name in SERVICES}, []
     if not selected:
         errors.append("no_observation_samples")
     for index, row in enumerate(selected):
         tick = row.get("tick", index)
+        if http_observed:
+            ready = row.get("httpReady", {})
+            if ready.get("ok") is not True or ready.get("status") != 200:
+                counters["failedOrMissingHttpReadySamples"] += 1
+                errors.append(f"http_ready_failed_or_missing:{tick}")
         if index:
             gap = row["time"] - selected[index - 1]["time"]
             gaps.append(gap)
@@ -150,7 +156,7 @@ def audit(rows, start, end, *, events=(), lifecycle=None, max_gap=3):
         "peakMemoryBytes": peak, "applicationFailuresWithinWindow": in_window,
         "applicationFailuresAfterWindowBeforeShutdown": after_window,
         "coverageGaps": coverage, "errors": errors,
-        "continuousHttpReadinessMeasured": False,
+        "continuousHttpReadinessMeasured": http_observed and bool(selected),
     }
 
 

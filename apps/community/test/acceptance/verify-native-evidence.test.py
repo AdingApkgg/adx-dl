@@ -61,6 +61,17 @@ class RawEvidenceTests(unittest.TestCase):
                 self.assertEqual(result["checkedSampleCount"], 177)
                 self.assertEqual(result["skippedWithinWindow"], 0)
 
+    def test_recorded_http_readiness_failure_or_gap_is_not_ignored(self):
+        rows = copy.deepcopy(self.rows)
+        for row in rows:
+            row["httpReady"] = {"ok": True, "status": 200}
+        self.assertTrue(self.check(rows)["continuousHttpReadinessMeasured"])
+        self.assertEqual(self.check(rows)["status"], "passed")
+        rows[100]["httpReady"]["ok"] = False
+        self.assertEqual(self.check(rows)["status"], "failed")
+        rows[100].pop("httpReady")
+        self.assertEqual(self.check(rows)["status"], "failed")
+
     def test_large_gap_is_failure_not_silently_discarded(self):
         self.assertEqual(self.check(self.rows[:100] + self.rows[105:])["status"], "failed")
 

@@ -1,0 +1,83 @@
+{
+  "status": "passed",
+  "totalSampleCount": 525,
+  "windowSampleCount": 516,
+  "checkedSampleCount": 516,
+  "outsideCheckedIntervalSampleCount": 9,
+  "skippedWithinWindow": 0,
+  "windowStart": "2026-10-15T20:55:11.214830+00:00",
+  "windowEnd": "2026-10-15T21:03:13.934596+00:00",
+  "windowSampleSpanSeconds": 481.895873,
+  "maxSampleGapSeconds": 1.205129,
+  "windowSampleChecksPassed": true,
+  "counts": {
+    "failedPgProbes": 0,
+    "nonThreeRoleSamples": 0,
+    "missingRoleSamples": 0,
+    "missingContainerSamples": 0,
+    "incompleteCgroupSamples": 0,
+    "failedOrMissingHttpReadySamples": 0
+  },
+  "maxRoleHeartbeatAgeSeconds": 1.614167,
+  "peakMemoryBytes": {
+    "postgres": 200753152,
+    "redis": 39395328,
+    "seaweedfs": 98779136,
+    "web": 166060032,
+    "media": 87318528,
+    "control": 59944960
+  },
+  "applicationFailuresWithinWindow": [],
+  "applicationFailuresAfterWindowBeforeShutdown": [],
+  "coverageGaps": [],
+  "errors": [],
+  "continuousHttpReadinessMeasured": true,
+  "lifecycle": {
+    "ready": {
+      "at": 1792097711.21483,
+      "ok": true
+    },
+    "browserExit": 0,
+    "lastReadwriteExit": 0,
+    "finalHealth": {
+      "at": 1792098193.9347265,
+      "ok": true
+    },
+    "windowEnd": 1792098193.9345956,
+    "shutdownRequestedAt": 1792098193.9432955,
+    "stopExit": 0,
+    "appsStoppedAt": 1792098194.4918003,
+    "applicationLogsCollectedThroughShutdown": true,
+    "logsCollectedAt": 1792098194.6123142
+  },
+  "roleLogSummary": {
+    "web": {
+      "logLines": 7098,
+      "diagnosticJsonLines": 6011,
+      "maxQueryMs": 1312.9832049999968,
+      "maxLoopDelayMs": 422.238924,
+      "queryErrors": []
+    },
+    "media": {
+      "logLines": 3939,
+      "diagnosticJsonLines": 3938,
+      "maxQueryMs": 1312.9754050000338,
+      "maxLoopDelayMs": 56.077061000000015,
+      "queryErrors": []
+    },
+    "control": {
+      "logLines": 3887,
+      "diagnosticJsonLines": 3864,
+      "maxQueryMs": 1313.4354060000041,
+      "maxLoopDelayMs": 25.801457,
+      "queryErrors": []
+    }
+  },
+  "finalHealthToShutdownSeconds": 0.008569002151489258,
+  "waitSamples": 2419,
+  "waitSamplesWithWalWait": 69,
+  "pgSlowLogEntries": 9,
+  "sourceSha": "91affcf914301ab4e08047b14cb3c168b3fa8e93",
+  "acceptanceScope": "bounded isolated lifecycle only; historical production availability risk remains open",
+  "historicalRoleLossResolved": false
+}
