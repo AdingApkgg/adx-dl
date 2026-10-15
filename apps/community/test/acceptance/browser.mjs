@@ -222,6 +222,7 @@ async function acceptance() {
   await step("anonymous_home_catalog_detail_lazy_native_preview_exact_zip", async () => {
     const visitor = await anonymous.newPage(), requested = [];
     visitor.on("request", r => requested.push(new URL(r.url()).pathname));
+    visitor.on("console", message => { if (message.type() === "error") diagnostics.push({ type: "error", message: sanitized(message.text()) }); });
     visitor.on("pageerror", e => diagnostics.push({ type: "pageerror", message: sanitized(e.message) }));
     await visitor.goto(origin.href);
     await visitor.getByRole("link", { name: "浏览公开谱面", exact: true }).click();
@@ -317,6 +318,8 @@ async function acceptance() {
     assert.equal(published.status(), 200);
     const visitor = await anonymous.newPage(), requests = [];
     visitor.on("request", r => requests.push(new URL(r.url()).pathname));
+    visitor.on("pageerror", e => diagnostics.push({ type: "pageerror", message: sanitized(e.message) }));
+    visitor.on("console", message => { if (message.type() === "error") diagnostics.push({ type: "error", message: sanitized(message.text()) }); });
     await visitor.setViewportSize({ width: 390, height: 844 });
     await visitor.goto(new URL(`/charts/${optional.id}`, origin).href);
     await visitor.getByRole("heading", { name: "Optional media absent", exact: true }).waitFor();
@@ -344,6 +347,7 @@ async function acceptance() {
     const bytes = await jpeg.body(); assert.equal(bytes.readUInt16BE(0), 0xffd8); assert.ok(bytes.length <= 524288);
   });
   assert.equal(diagnostics.filter(row => row.type === "pageerror").length, 0, "uncaught browser errors");
+  assert.equal(diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length, 0, "hydration errors");
 }
 let deadline;
 try {
@@ -351,7 +355,7 @@ try {
   await Promise.race([acceptance(), new Promise((_, reject) => {
     deadline = setTimeout(() => reject(new Error("ACCEPTANCE_OVERALL_TIMEOUT")), 420000);
   })]);
-  const result = { status: "passed", steps, elapsedMs: Date.now() - startedAt, browser: "chromium", syntheticAccounts: true };
+  const result = { status: "passed", steps, elapsedMs: Date.now() - startedAt, browser: "chromium", syntheticAccounts: true, pageErrors: diagnostics.filter(row => row.type === "pageerror").length, hydrationErrors: diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length };
   if (evidenceDirectory) await writeFile(join(evidenceDirectory, "browser-result.json"), JSON.stringify(result, null, 2) + "\n", { mode: 0o600 });
   console.log("ACCEPTANCE_BROWSER_PASSED");
 } catch (error) {

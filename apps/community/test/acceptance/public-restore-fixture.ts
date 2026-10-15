@@ -5,6 +5,7 @@ import { strToU8, zipSync } from "fflate";
 import type { StorageContext } from "../../src/server/storage/contracts";
 import type { ingestFixture } from "../storage/ingest-fixture";
 import { charts, chartVersions, chartPublications, files, user, profiles, uploadSessions } from "../../src/server/db/schema";
+import { representationResponse } from "../../src/server/storage/files";
 import { initUpload, completeUpload } from "../../src/server/storage/uploads";
 import { putUploadPart } from "../../src/server/storage/parts";
 import { ingestUpload } from "../../src/media-worker/ingest";
@@ -90,7 +91,9 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
         const [file] = await target.db.select().from(files).where(eq(files.id, versions[0].sourceFileId!));
         expect(file.ownerId).toBeNull(); expect(file.originalName).toBe("removed");
         const download = await resolvePublicChartDownload(target, row.chart.id);
-        expect(download).toBeDefined();
+        const response = await representationResponse(target, download, new Request("http://127.0.0.1/restored-chart/download"));
+        expect(response.status).toBe(200);
+        expect(Buffer.from(await response.arrayBuffer())).toEqual(Buffer.from(row.original.bytes));
       }
     },
     async cleanup() {
