@@ -35,7 +35,7 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
     const [ready] = await source.db.select().from(uploadSessions).where(eq(uploadSessions.id, dto.id));
     return { id: ready.fileId!, bytes };
   }
-  const rows = [];
+  const rows: { kind: "withdraw" | "replace" | "delete" | "retain"; owner: string; original: Awaited<ReturnType<typeof upload>>; chart: Awaited<ReturnType<typeof createChart>> }[] = [];
   for (const kind of ["withdraw", "replace", "delete", "retain"] as const) {
     const owner = await f.owner(), original = await upload(owner, `Restore ${kind}`);
     await source.db.insert(profiles).values({ userId: owner, bio: "private-identity-must-disappear" });
