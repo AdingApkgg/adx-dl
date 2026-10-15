@@ -1,5 +1,6 @@
 import { createStorageIOTracker } from "@/server/storage/maintenance";
 import { startStorageRole } from "@/server/storage/runtime-role";
+import { superviseStorageRole } from "@/server/storage/process-supervision";
 import { exportJournal, retainJournal, verifyLatestJournal } from "../../ops/backup/journal";
 import { journalConfig } from "../../ops/backup/runtime";
 import { assertNormalStorageStartup } from "../../ops/backup/restore";
@@ -55,6 +56,28 @@ const tracker = createStorageIOTracker();
 const controller = new AbortController();
 const storage = createStorageContext({ db, boss: async () => boss, log, role: "control", tracker, signal: controller.signal });
 const role = await startStorageRole({databaseUrl:env.databaseUrl,role:"control",tracker});
+let napcatEvents: { stop(): void } | null = null;
+let stopping: Promise<void> | undefined;
+function shutdown(signal: string): Promise<void> {
+  if (stopping) return stopping;
+  stopping = (async () => {
+  log.info("worker_stopping", { signal });
+  napcatEvents?.stop();
+  tracker.pause();
+  controller.abort();
+  // graceful：等正在执行的任务做完，最多 30 秒。
+  await boss.stop({ graceful: true, timeout: 65_000 });
+  await tracker.pauseAndDrain(AbortSignal.timeout(5000));
+  await role.stop();
+  redis.close();
+  await pool.end();
+  process.exit(process.exitCode === 1 ? 1 : 0);
+  })();
+  return stopping;
+}
+
+superviseStorageRole(role.failure, () => shutdown("STORAGE_ROLE_LOST"), 70000);
+
 const deletionHandlers = createDeletionHandlers(storage);
 await registerMediaPurgeWorker(storage, boss);
 await registerStorageWorkers(storage, boss);
@@ -73,7 +96,6 @@ await boss.work(SESSION_CLEANUP_QUEUE, async () => {
 await boss.schedule(USER_PURGE_SWEEP_QUEUE, PURGE_SWEEP_CRON, {}, { tz: PURGE_SWEEP_TZ, missed: "once" });
 await boss.schedule(SESSION_CLEANUP_QUEUE, SESSION_CLEANUP_CRON, {}, { tz: SESSION_CLEANUP_TZ, missed: "once" });
 
-let napcatEvents: { stop(): void } | null = null;
 if (env.qq.sender === "napcat") {
   const napcat = createOneBotClient({ httpUrl: env.qq.httpUrl, accessToken: env.qq.accessToken });
   await boss.work(NAPCAT_HEALTH_QUEUE, async () => {
@@ -93,25 +115,5 @@ if (env.qq.sender === "napcat") {
 }
 
 log.info("worker_started", { queues: QUEUES.length, qqSender: env.qq.sender });
-
-let stopping = false;
-async function shutdown(signal: string) {
-  if (stopping) {
-    return;
-  }
-  stopping = true;
-  log.info("worker_stopping", { signal });
-  napcatEvents?.stop();
-  tracker.pause();
-  controller.abort();
-  // graceful：等正在执行的任务做完，最多 30 秒。
-  await boss.stop({ graceful: true, timeout: 65_000 });
-  await tracker.pauseAndDrain(AbortSignal.timeout(5000));
-  await role.stop();
-  redis.close();
-  await pool.end();
-  process.exit(0);
-}
-
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("SIGINT", () => void shutdown("SIGINT"));

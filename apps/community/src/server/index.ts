@@ -3,6 +3,7 @@ import type { Socket } from "node:net";
 import { createStorageContext } from "./storage/runtime";
 import { createStorageIOTracker } from "./storage/maintenance";
 import { startStorageRole, assertMediaProcess } from "./storage/runtime-role";
+import { superviseStorageRole } from "./storage/process-supervision";
 import { createMediaDrain } from "./storage/drain";
 import { STORAGE_QUEUES } from "./jobs/queues";
 import { assertNormalStorageStartup } from "../../ops/backup/restore";
@@ -83,6 +84,28 @@ const storage = createStorageContext({db,boss:getBoss,log,role:"web",tracker,sig
 if(storage.config.role!=="web") throw new Error("STORAGE_WEB_REQUIRED");
 const mediaDrain = createMediaDrain({db,secret:storage.config.internalMediaSecret});
 const role = await startStorageRole({databaseUrl:env.databaseUrl,role:"web",tracker});
+let publicServer: ServerType | undefined;
+let internalServer: ServerType | undefined;
+const sockets = new Set<Socket>();
+const observe = (server: ServerType) => {
+ server.on("connection",socket=>{sockets.add(socket);socket.once("close",()=>sockets.delete(socket));});
+};
+let stopping: Promise<void> | undefined;
+function shutdown(): Promise<void> {
+ if (stopping) return stopping;
+ stopping = (async () => {
+ tracker.pause();controller.abort();mediaDrain.shutdown();
+ const closed=[publicServer,internalServer].map(server=>server ? new Promise<void>(resolve=>server.close(()=>resolve())) : Promise.resolve());
+ for(const socket of sockets)socket.destroy();
+ await Promise.all(closed);
+ await tracker.pauseAndDrain(AbortSignal.timeout(30000));
+ await role.stop();
+ redis.close();await stopSender();await pool.end();
+ })();
+ return stopping;
+}
+superviseStorageRole(role.failure, shutdown, 35000);
+
 const app = createApp({
   mediaDrain,
   log,
@@ -120,12 +143,6 @@ const app = createApp({
 });
 
 // Node owns the public listener. Never default-export Hono.fetch to the Bun CLI.
-let publicServer: ServerType | undefined;
-let internalServer: ServerType | undefined;
-const sockets = new Set<Socket>();
-const observe = (server: ServerType) => {
- server.on("connection",socket=>{sockets.add(socket);socket.once("close",()=>sockets.delete(socket));});
-};
 const honoApp = await createHonoServer<AppEnv>({
   app,
   defaultLogger: false,
@@ -173,17 +190,6 @@ const honoApp = await createHonoServer<AppEnv>({
     return context;
   },
  });
-let stopping=false;
-async function shutdown() {
- if(stopping)return;stopping=true;
- tracker.pause();controller.abort();mediaDrain.shutdown();
- const closed=[publicServer,internalServer].map(server=>server ? new Promise<void>(resolve=>server.close(()=>resolve())) : Promise.resolve());
- for(const socket of sockets)socket.destroy();
- await Promise.all(closed);
- await tracker.pauseAndDrain(AbortSignal.timeout(30000));
- await role.stop();
- redis.close();await stopSender();await pool.end();
-}
 process.once("SIGTERM",()=>void shutdown());
 process.once("SIGINT",()=>void shutdown());
 export default import.meta.env.DEV ? honoApp : undefined;
