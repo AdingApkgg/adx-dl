@@ -1,6 +1,6 @@
 # 自制谱公开发布与浏览：隔离验收
 
-日期：2026-10-16（Asia/Shanghai）。状态：第 1 轮修复已补齐完整有界原生生命周期证据，待独立复核；仅作为本地功能开发验收。功能与实际恢复断言通过；历史日志记录过主动清理前的三角色自主退出，直接触发为客户端心跳查询读超时，底层延迟原因仍未定位，属于公开功能生产发布前必须另行复核的风险。功能仅在本地分支实现与隔离构建机验证，未推送、合并或部署生产。
+日期：2026-10-16（Asia/Shanghai）。状态：整分支审查未发现 Critical/Important；最终两项 Minor 工具修正已完成，待定向复核。完整有界原生生命周期证据仅作为本地功能开发验收。功能与实际恢复断言通过；历史日志记录过主动清理前的三角色自主退出，直接触发为客户端心跳查询读超时，底层延迟原因仍未定位，属于公开功能生产发布前必须另行复核的风险。功能仅在本地分支实现与隔离构建机验证，未推送、合并或部署生产。
 
 ## 源码与环境
 
@@ -21,7 +21,7 @@
 
 ## 自动检查
 
-产品代码最终变更已纳入 `3725518` 的一体检查；该提交到最终源码的差异仅为 acceptance 浏览器/恢复夹具与说明、launcher readiness 校验，`apps/community/src`、共享包、应用 Dockerfile、backup/Seaweed 产品代码差异为空。
+精确提交 `3529ecea70ad48caf6f09e94a2efd361186a5ba1`（tree `c97cf199000df7dd548d17502b897feb20a99472`）已在构建机重新执行完整 lint、类型检查、Bun、DOM、生产构建和 built HTTP，全部退出 0；以下全套结果来自这次新鲜检查。最终修正只改 acceptance 浏览器超时、离线验证器和文档，未重复无关全套。该提交及最终修正的 `apps/community/src`、共享包、应用 Dockerfile、backup/Seaweed 产品代码仍与原生镜像源码 `91affcf` 相同。
 
 | 检查 | 结果 |
 | --- | --- |
@@ -33,6 +33,23 @@
 | 全部 built HTTP | 53 pass / 0 fail，282 断言，7 文件 |
 | 最终 `91affcf` 夹具 TypeScript/typegen | 通过 |
 | 下载并发池定向回归 | 4 pass / 0 fail，131 断言；包含两种池及 HEAD 取消失败 |
+
+整分支审查已检查未截断的全部 lint 输出，并将 33 个诊断位置与审查基线 `9bff56b` 的源码逐项比较；全部为基线已有表达式，无本分支新增诊断位置。下表是源码/规则比对，不宣称重新执行过基线 lint；未做无关风格清理。
+
+| 严重度 / 规则 | `apps/community` 下的位置 | 数量 |
+| --- | --- | ---: |
+| warning / useOptionalChain | `src/server/charts/assets.ts`、`service.ts` | 4 |
+| warning / noUnusedImports | `src/server/storage/deletion.ts`、`uploads.ts` | 2 |
+| info / useTemplate | `ops/backup/fresh-restore.test.ts` | 3 |
+| info / useTemplate | `src/server/storage/settlement.test.ts`、`upload-part-policy.test.ts` | 2 |
+| info / useTemplate | `test/acceptance/bootstrap.ts`、`browser.mjs`、`prepare.ts` | 4 |
+| info / useTemplate | `test/ops/storage-compose.test.ts` | 3 |
+| info / useTemplate | `test/storage/images/generators/generate-baseline.mjs` | 6 |
+| info / useTemplate | `test/storage/images/generators/generate-sharp.mjs` | 9 |
+
+源码传输日志存在目标机时钟差导致的 tar future-mtime 警告；原有 `scripts/remote/verify.sh` 未修改，源码身份核对和检查均成功。这是既有运行噪声，不声称修复时钟，也没有屏蔽 tar 错误。
+
+最终两项工具修正：浏览器内层总超时由 420 秒恢复为 240 秒，低于 CI 外层 300 秒，保留 60 秒用于失败 JSON、最多 5 秒截图和清理；验证器要求 `0 <= start - ready.at <= max_gap`（默认 3 秒），拒绝只选取较晚的健康片段。带早段 PG 失败与角色退出的晚起点回归先复现错误通过，再修复为拒绝；远程全部 **9 项验证器回归通过**，Node 浏览器脚本语法和 CI 截止时间契约检查通过。原始 516 样本的真实生命周期回执用新验证器重新审计仍通过，原始回执不改写。此范围无需重建应用或重复原生恢复。
 
 本轮 HTTP 测试通过真实 built server、PG 与 S3 driver 的 HTTP 端点，注入对象元数据错误和 503，验证原始 ZIP/maidata、hash block、两条下载并发上限、429/Retry-After、断连取消与恢复准入。错误注入使用受控对象 HTTP 服务；真实 Seaweed 上的健康上传/读取另由原生浏览器与恢复演练证明。临时改名隔离库的 publication 表产生真实查询错误，列表/详情 SSR 与 React Router `.data` 均返回 503、`private, no-store`，HTML 有 noindex。
 

@@ -353,7 +353,7 @@ let deadline;
 try {
   if (evidenceDirectory) await mkdir(evidenceDirectory, { recursive: true, mode: 0o700 });
   await Promise.race([acceptance(), new Promise((_, reject) => {
-    deadline = setTimeout(() => reject(new Error("ACCEPTANCE_OVERALL_TIMEOUT")), 420000);
+    deadline = setTimeout(() => reject(new Error("ACCEPTANCE_OVERALL_TIMEOUT")), 240000);
   })]);
   const result = { status: "passed", steps, elapsedMs: Date.now() - startedAt, browser: "chromium", syntheticAccounts: true, pageErrors: diagnostics.filter(row => row.type === "pageerror").length, hydrationErrors: diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length };
   if (evidenceDirectory) await writeFile(join(evidenceDirectory, "browser-result.json"), JSON.stringify(result, null, 2) + "\n", { mode: 0o600 });

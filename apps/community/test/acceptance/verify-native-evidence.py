@@ -130,6 +130,8 @@ def audit(rows, start, end, *, events=(), lifecycle=None, max_gap=3):
             coverage.append("explicit_http_readiness_missing")
         elif stamp(lifecycle["ready"]["at"]) > start:
             errors.append("observation_precedes_declared_ready")
+        elif start - stamp(lifecycle["ready"]["at"]) > max_gap:
+            errors.append("observation_starts_too_late_after_ready")
         final = lifecycle.get("finalHealth", {})
         if not final.get("ok") or "at" not in final:
             coverage.append("final_health_missing_or_failed")

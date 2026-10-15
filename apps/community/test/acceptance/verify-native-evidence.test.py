@@ -96,6 +96,15 @@ class RawEvidenceTests(unittest.TestCase):
         self.assertEqual(sum(e["event"] == "query_error" for e in failures), 3)
         self.assertEqual(sum(e["event"] == "STORAGE_ROLE_LOST" for e in failures), 3)
 
+    def test_late_start_cannot_hide_an_earlier_post_ready_failure(self):
+        rows = copy.deepcopy(self.rows)
+        rows[100]["pg"]["code"] = 1
+        event = {"time": rows[100]["time"], "event": "STORAGE_ROLE_LOST"}
+        result = verify.audit(rows, rows[120]["time"], self.end,
+                              events=[event], lifecycle=self.lifecycle)
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("observation_starts_too_late_after_ready", result["errors"])
+
     def test_missing_or_stale_final_health_and_tail_coverage_prevents_pass(self):
         for field in ("finalHealth", "ready", "applicationLogsCollectedThroughShutdown"):
             with self.subTest(field=field):
