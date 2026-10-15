@@ -14,7 +14,7 @@
 # 只是拿来源文件用的，不会拖慢关心层缓存的其它步骤。
 FROM node:22-slim AS realnode
 
-FROM oven/bun:1.4.2 AS builder
+FROM oven/bun:1.4.3 AS builder
 WORKDIR /repo
 
 # 必须放在 bun install / bun run build 之前，且落在 /usr/local/bin——bun 官方
@@ -53,7 +53,7 @@ WORKDIR /repo/apps/dash
 RUN bun run build
 RUN bun run build:server
 
-FROM oven/bun:1.4.2-slim AS runner
+FROM oven/bun:1.4.3-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
