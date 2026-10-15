@@ -106,7 +106,8 @@ case "$1" in
     base_and_bootstrap
     compose --profile browser up -d web media control >"$ROOT/private-logs/runtime.log" 2>&1
     for ((attempt=0; attempt<180; attempt++)); do
-      if curl --fail --silent --output /dev/null --max-time 2 http://127.0.0.1:41909/readyz; then
+      if curl --fail --silent --output /dev/null --max-time 2 http://127.0.0.1:41909/readyz &&
+        [[ $(compose exec -T postgres psql -U community -d community_acceptance_ui_test -Atqc "select count(*) from storage_runtime_roles r where r.role='control' and r.heartbeat_at>clock_timestamp()-interval '3 seconds' and exists(select 1 from pg_locks l where l.pid=r.backend_pid and l.objid=714102033 and l.granted)") == 1 ]]; then
         printf 'ACTUAL_WEB_MEDIA_READY http://127.0.0.1:41909\n'
         exit 0
       fi

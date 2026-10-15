@@ -185,7 +185,7 @@ async function acceptance() {
   await step("private_draft_not_public_and_explicit_version_confirmation", async () => {
     await denied(anonymous, publicBase(), 404);
     assert.equal(await page.getByRole("button", { name: "确认发布", exact: true }).isEnabled(), false);
-    await page.getByLabel("公开版本", { exact: true }).selectOption(draft.currentVersionId);
+    await page.getByRole("combobox", { name: /公开版本/ }).selectOption(draft.currentVersionId);
     assert.equal(await page.getByRole("button", { name: "确认发布", exact: true }).isEnabled(), false);
     await page.getByLabel("我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。", { exact: true }).check();
     const [published] = await Promise.all([
@@ -246,6 +246,13 @@ async function acceptance() {
       const result = await anonymous.request.get(new URL(path, origin).href);
       assert.equal(result.status(), 200); assert.deepEqual(await result.body(), bytes);
     }
+    const cover = await anonymous.request.get(new URL(publicAssets()[2], origin).href);
+    assert.equal(cover.status(), 200); assert.match(cover.headers()["content-type"], /^image\//);
+    assert.ok((await cover.body()).length > 0);
+    const zipHead = await anonymous.request.head(new URL(`${publicBase()}/download`, origin).href);
+    assert.equal(zipHead.status(), 200); assert.equal(zipHead.headers()["content-length"], String(zip.length));
+    const cached = await anonymous.request.get(new URL(`${publicBase()}/download`, origin).href, { headers: { "If-None-Match": zipHead.headers().etag } });
+    assert.equal(cached.status(), 304); assert.equal(cached.headers()["cache-control"], "private, no-store");
     const range = await anonymous.request.get(new URL(publicAssets()[1], origin).href, { headers: { Range: "bytes=44-75" } });
     assert.equal(range.status(), 206); assert.deepEqual(await range.body(), audio.subarray(44,76));
     await visitor.close();
@@ -301,7 +308,7 @@ async function acceptance() {
     ]);
     assert.equal(saved.status(), 201); const optional = await saved.json();
     await page.waitForURL(url => url.pathname === `/me/charts/${optional.id}`);
-    await page.getByLabel("公开版本", { exact: true }).selectOption(optional.currentVersionId);
+    await page.getByRole("combobox", { name: /公开版本/ }).selectOption(optional.currentVersionId);
     await page.getByLabel("我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。", { exact: true }).check();
     const [published] = await Promise.all([
       page.waitForResponse(r => new URL(r.url()).pathname.endsWith("/publication") && r.request().method() === "PUT", { timeout: 60000 }),
