@@ -2,10 +2,11 @@ import { test, expect } from "bun:test";
 import { createServer, get } from "node:http";
 import { once } from "node:events";
 import { createHash, randomBytes } from "node:crypto";
+import { makeSignature } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
-import { blobs, files, derivedObjects, blobDerivatives, user, storagePolicies, charts, chartVersions, chartPublications, blobBlocks } from "../../src/server/db/schema";
+import { blobs, files, derivedObjects, blobDerivatives, user, storagePolicies, charts, chartVersions, chartPublications, blobBlocks, session, profiles } from "../../src/server/db/schema";
 import { testDbHandle } from "../../src/server/testing/test-db";
-import { startBuiltServer } from "./server";
+import { startBuiltServer, HTTP_TEST_AUTH_SECRET } from "./server";
 import { chartManifestBytes } from "../../src/server/charts/artifact";
 import { CHART_PREVIEW_MIME } from "../../src/server/charts/recipe";
 import type { ChartImportSummary, ChartPreviewManifest } from "../../src/shared/charts";
@@ -51,6 +52,13 @@ test("built anonymous charts: real S3 HTTP metadata/failures/hash blocks, bounde
     const [chart] = await db.insert(charts).values({ ownerId: owner, title: summary.title }).returning();
     const [version] = await db.insert(chartVersions).values({ chartId: chart.id, ordinal: 1, sourceFileId: file.id, previewDerivativeId: recipe.id, maidataMd5Base64: summary.maidataMd5Base64, summary }).returning();
     await db.insert(chartPublications).values({ chartId: chart.id, versionId: version.id, title: summary.title, artist: summary.artist, publishedAt: new Date(), updatedAt: new Date() });
+    const token = crypto.randomUUID();
+    await db.insert(profiles).values({ userId: owner, onboardedAt: new Date() });
+    await db.insert(session).values({ userId: owner, token, expiresAt: new Date(Date.now() + 86400000) });
+    const cookie = `adxc.session_token=${encodeURIComponent(`${token}.${await makeSignature(token, HTTP_TEST_AUTH_SECRET)}`)}`;
+    const privatePage = await fetch(server.url(`/me/charts/${chart.id}`), { headers: { cookie } });
+    expect(privatePage.status).toBe(200);
+    expect(await privatePage.text()).toContain("公开发布");
     const base = `/api/v1/charts/${chart.id}`, urls = [`${base}/download`, `${base}/versions/${version.id}/assets/maidata`];
     for (const path of urls) {
       const response = await fetch(server.url(path)); expect(response.status).toBe(200); expect(response.headers.get("cache-control")).toBe("private, no-store");

@@ -34,7 +34,7 @@ test("HEAD error bodies are canceled before the HTTP adapter suppresses them and
 for (const limits of [{ global: 16, perIp: 2 }, { global: 128, perIp: 32 }])
   test(`HEAD status/cache and cancellation failure leave the ${limits.perIp}-slot pool usable`, async () => {
     const limit = createPublicStreamLimiter(limits);
-    const headers = { "cache-control": "private, no-store", etag: '\"fixture\"' };
+    const headers = { "cache-control": "private, no-store", etag: '"fixture"' };
     for (let i = 0; i < limits.perIp + 1; i++) {
       const response = await limit("ip", new Request("https://example.test", { method: "HEAD" }), async () =>
         new Response(new ReadableStream({ cancel() { return Promise.reject(new Error("cancel failure")); } }), { status: 503, headers }),

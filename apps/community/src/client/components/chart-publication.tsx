@@ -7,7 +7,7 @@ import { localizeHref } from "@/paraglide/runtime.js";
 import { ApiError } from "@/shared/api-client";
 import type { ChartDto } from "@/shared/charts";
 import { accountErrorRedirect } from "../lib/account-errors";
-import { getBrowserApi } from "../lib/browser";
+import { getRenderApi } from "../lib/browser";
 import { chartErrorMessage } from "../lib/chart-errors";
 import { chartsApi } from "../queries/charts";
 import { ChartSummary } from "./chart-summary";
@@ -36,7 +36,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
   const [status, setStatus] = useState("");
   const [error, setError] = useState<unknown>();
   const selected = chart.versions.find((version) => version.id === versionId);
-  const api = chartsApi(getBrowserApi());
+  const api = chartsApi(getRenderApi());
   const accept = async (actual: ChartDto, target: Intent, allowSuccess: boolean) => {
     await refresh(actual);
     if (allowSuccess && matches(actual, target)) {
