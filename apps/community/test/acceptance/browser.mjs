@@ -187,13 +187,18 @@ async function acceptance() {
       if (mode === "adx") assert.deepEqual(source, original);
       else {
         // Browser Worker writes STORED entries; verify every canonical path and untouched source byte.
-        const entries = new Map(); let offset = 0;
-        while (source.readUInt32LE(offset) === 0x04034b50) {
-          assert.equal(source.readUInt16LE(offset + 8), 0);
-          const size = source.readUInt32LE(offset + 18), names = source.readUInt16LE(offset + 26), extra = source.readUInt16LE(offset + 28);
-          const start = offset + 30 + names + extra;
-          entries.set(source.subarray(offset + 30, offset + 30 + names).toString(), source.subarray(start, start + size));
-          offset = start + size;
+        const entries = new Map();
+        const end = source.length - 22;
+        assert.equal(source.readUInt32LE(end), 0x06054b50);
+        let offset = source.readUInt32LE(end + 16);
+        for (let index = 0; index < source.readUInt16LE(end + 10); index++) {
+          assert.equal(source.readUInt32LE(offset), 0x02014b50);
+          assert.equal(source.readUInt16LE(offset + 10), 0);
+          const size = source.readUInt32LE(offset + 20), names = source.readUInt16LE(offset + 28);
+          const local = source.readUInt32LE(offset + 42);
+          const start = local + 30 + source.readUInt16LE(local + 26) + source.readUInt16LE(local + 28);
+          entries.set(source.subarray(offset + 46, offset + 46 + names).toString(), source.subarray(start, start + size));
+          offset += 46 + names + source.readUInt16LE(offset + 30) + source.readUInt16LE(offset + 32);
         }
         assert.deepEqual([...entries.keys()].sort(), ["bg.png", "maidata.txt", "pv.mp4", "track.wav"]);
         for (const [name, expected] of [["maidata.txt", score], ["track.wav", audio], ["bg.png", image], ["pv.mp4", Buffer.from("synthetic original-only video")]]) assert.deepEqual(entries.get(name), expected);
