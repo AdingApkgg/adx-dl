@@ -7,6 +7,7 @@ import { chartAssetResponse, resolveChartAsset } from "../charts/assets";
 import { appendChartVersion, createChart, deleteChart, deleteChartVersion, getChart, listCharts, updateChart } from "../charts/service";
 import { StorageUnavailableError } from "../storage/errors";
 
+import { publishChart, withdrawChart } from "../charts/publication";
 const expected = z.number().int().min(1).max(2147483647);
 const create = z.object({ fileId: z.string() }).strict();
 const append = create.extend({ expectedRevision: expected }).strict();
@@ -32,6 +33,13 @@ export const chartRoutes = new Hono<AppEnv>()
     currentAuth(c);
     await next();
   })
+  .put("/:id/publication", async c => c.json(await publishChart(
+    storage(c), currentAuth(c).user.id, c.req.param("id"),
+    await body(c, z.object({ expectedRevision: expected, versionId: z.string(), confirmOriginalArchive: z.literal(true) }).strict()),
+  )))
+  .delete("/:id/publication", async c => c.json(await withdrawChart(
+    storage(c), currentAuth(c).user.id, c.req.param("id"), (await body(c, remove)).expectedRevision,
+  )))
   .post("/", async c => c.json(await createChart(storage(c), currentAuth(c).user.id, (await body(c, create)).fileId), 201))
   .get("/", async c => {
     const raw = c.req.query("limit");

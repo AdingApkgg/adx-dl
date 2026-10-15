@@ -116,3 +116,37 @@ test.each([0, 0.5])("AudioContext start accounts for the engine lead-in, seek an
   await waitFor(() => expect(start).toHaveBeenCalledTimes(2));
   expect(start).toHaveBeenNthCalledWith(2, 0, 1 + first);
 });
+
+test("public preview uses public-only asset URLs and a 401 never redirects or tries private assets", async () => {
+  fixture();
+  const assign = vi.spyOn(window.location, "assign").mockImplementation(() => {});
+  const fetcher = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => Response.json({ error: { code: "UNAUTHORIZED", message: "Denied" } }, { status: 401 }));
+  vi.stubGlobal("fetch", fetcher);
+  const { publicChartAssetUrl } = await import("@/client/queries/public-charts");
+  render(<PrivateChartPreview id="public" versionId="selected" summary={summary} assetUrl={publicChartAssetUrl} />);
+  fireEvent.click(screen.getByRole("button", { name: "加载预览" }));
+  await screen.findByRole("alert");
+  expect(fetcher.mock.calls).toHaveLength(1);
+  expect(fetcher.mock.calls[0]?.[0]).toBe("/api/v1/charts/public/versions/selected/assets/maidata");
+  expect(assign).not.toHaveBeenCalled();
+  assign.mockRestore();
+});
+
+test("public cover/audio/maidata all stay on the explicit public version and stable resolver does not restart playback", async () => {
+  fixture();
+  vi.stubGlobal("Image", class { src = ""; decode = async () => {}; });
+  const fetcher = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(new Uint8Array([1, 2, 3])));
+  vi.stubGlobal("fetch", fetcher);
+  const { publicChartAssetUrl } = await import("@/client/queries/public-charts");
+  const publicSummary = { ...summary, hasCover: true };
+  const { rerender } = render(<PrivateChartPreview id="public" versionId="selected" summary={publicSummary} assetUrl={publicChartAssetUrl} />);
+  fireEvent.click(screen.getByRole("button", { name: "加载预览" }));
+  await waitFor(() => expect((screen.getByRole("button", { name: "播放" }) as HTMLButtonElement).disabled).toBe(false));
+  expect(fetcher.mock.calls.map(row => row[0])).toEqual([
+    "/api/v1/charts/public/versions/selected/assets/maidata",
+    "/api/v1/charts/public/versions/selected/assets/cover",
+    "/api/v1/charts/public/versions/selected/assets/audio",
+  ]);
+  rerender(<PrivateChartPreview id="public" versionId="selected" summary={publicSummary} assetUrl={publicChartAssetUrl} />);
+  expect(fetcher).toHaveBeenCalledTimes(3);
+});

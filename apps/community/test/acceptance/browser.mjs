@@ -139,10 +139,86 @@ async function acceptance() {
     assert.ok(first.id && second.id); assert.notEqual(first.id, second.id);
     assert.equal((await json(owner, "/api/v1/me/charts")).items.length, 0);
   });
+  for (const mode of ["adx", "parts"]) await step(`real_browser_${mode}_upload_save_reload`, async () => {
+    const title = `Browser ${mode} upload`;
+    const score = Buffer.from(`&title=${title}\n&artist=Synthetic fixture\n&inote_4=(120){4}1,2,3,E\n`);
+    const original = storedZip([["maidata.txt", score], ["track.wav", audio], ["bg.png", image]]);
+    let uploadStarts = 0, workers = 0;
+    const observe = request => { if (request.method() === "POST" && new URL(request.url()).pathname === "/api/v1/uploads") uploadStarts++; };
+    const observeWorker = () => { workers++; };
+    page.on("request", observe); page.on("worker", observeWorker);
+    try {
+      await page.goto(new URL("/me/charts/new", origin).href);
+      if (mode === "adx") {
+        await page.getByLabel("选择 ADX / ZIP", { exact: true }).setInputFiles({ name: "browser-chart.adx", mimeType: "application/octet-stream", buffer: original });
+      } else {
+        for (const [label, name, mimeType, buffer] of [
+          ["谱面文件（必选）", "my-score.txt", "text/plain", score],
+          ["音乐（可选）", "my-song.wav", "audio/wav", audio],
+          ["曲绘（可选）", "my-cover.png", "image/png", image],
+          ["背景视频（可选，仅保留原件）", "my-video.mp4", "video/mp4", Buffer.from("synthetic original-only video")],
+        ]) await page.getByLabel(label, { exact: true }).setInputFiles({ name, mimeType, buffer });
+        await page.getByRole("button", { name: "移除 背景视频（可选，仅保留原件）", exact: true }).click();
+        assert.equal(await page.getByText("my-score.txt", { exact: true }).count(), 1);
+        await page.getByLabel("背景视频（可选，仅保留原件）", { exact: true }).setInputFiles({ name: "my-video.mp4", mimeType: "video/mp4", buffer: Buffer.from("synthetic original-only video") });
+        assert.equal(uploadStarts, 0, "selection must remain local before assembly");
+        await page.getByRole("button", { name: "组装并上传", exact: true }).click();
+      }
+      await page.getByRole("button", { name: "保存私有草稿", exact: true }).waitFor({ timeout: 90000 });
+      assert.equal(uploadStarts, 1); if (mode === "parts") assert.ok(workers > 0, "real browser packaging Worker must run");
+      assert.equal((await json(owner, "/api/v1/me/charts")).items.length, 0);
+      const [saved] = await Promise.all([
+        page.waitForResponse(r => new URL(r.url()).pathname === "/api/v1/me/charts" && r.request().method() === "POST"),
+        page.getByRole("button", { name: "保存私有草稿", exact: true }).click(),
+      ]);
+      assert.equal(saved.status(), 201); const chart = await saved.json();
+      await page.waitForURL(url => url.pathname === `/me/charts/${chart.id}`);
+      assert.equal((await page.reload()).status(), 200);
+      await page.getByRole("heading", { level: 1, name: title, exact: true }).waitFor();
+      const current = await json(owner, `/api/v1/me/charts/${chart.id}`);
+      assert.equal(current.currentVersionId, chart.currentVersionId);
+      const base = `/api/v1/me/charts/${chart.id}/versions/${chart.currentVersionId}/assets`;
+      for (const [role, expected] of [["maidata", score], ["audio", audio]]) {
+        const assetResponse = await owner.request.get(new URL(`${base}/${role}`, origin).href);
+        assert.equal(assetResponse.status(), 200); assert.deepEqual(await assetResponse.body(), expected);
+      }
+      const sourceResponse = await owner.request.get(new URL(`/api/v1/files/${chart.versions[0].sourceFileId}/content`, origin).href);
+      assert.equal(sourceResponse.status(), 200); const source = await sourceResponse.body();
+      if (mode === "adx") assert.deepEqual(source, original);
+      else {
+        // Browser Worker writes STORED entries; verify every canonical path and untouched source byte.
+        const entries = new Map();
+        const end = source.length - 22;
+        assert.equal(source.readUInt32LE(end), 0x06054b50);
+        let offset = source.readUInt32LE(end + 16);
+        for (let index = 0; index < source.readUInt16LE(end + 10); index++) {
+          assert.equal(source.readUInt32LE(offset), 0x02014b50);
+          assert.equal(source.readUInt16LE(offset + 10), 0);
+          const size = source.readUInt32LE(offset + 20), names = source.readUInt16LE(offset + 28);
+          const local = source.readUInt32LE(offset + 42);
+          const start = local + 30 + source.readUInt16LE(local + 26) + source.readUInt16LE(local + 28);
+          entries.set(source.subarray(offset + 46, offset + 46 + names).toString(), source.subarray(start, start + size));
+          offset += 46 + names + source.readUInt16LE(offset + 30) + source.readUInt16LE(offset + 32);
+        }
+        assert.deepEqual([...entries.keys()].sort(), ["bg.png", "maidata.txt", "pv.mp4", "track.wav"]);
+        for (const [name, expected] of [["maidata.txt", score], ["track.wav", audio], ["bg.png", image], ["pv.mp4", Buffer.from("synthetic original-only video")]]) assert.deepEqual(entries.get(name), expected);
+      }
+      await page.getByRole("button", { name: "加载预览", exact: true }).click();
+      await page.waitForFunction(() => [...document.querySelectorAll("button")].some(b => b.textContent === "播放" && !b.disabled));
+      assert.equal(await page.locator("canvas").count(), 1);
+      assert.equal(await page.getByRole("alert").count(), 0);
+      if (evidenceDirectory) await page.screenshot({ path: join(evidenceDirectory, `upload-${mode}.png`), fullPage: true });
+      await page.getByRole("button", { name: "关闭预览", exact: true }).click();
+      await page.getByRole("button", { name: "删除草稿", exact: true }).click();
+      await page.getByRole("alertdialog").getByRole("button", { name: "删除草稿", exact: true }).click();
+      await page.waitForURL(url => url.pathname === "/me/charts");
+      assert.equal((await json(owner, "/api/v1/me/charts")).items.length, 0);
+    } finally { page.off("request", observe); page.off("worker", observeWorker); }
+  });
   await step("upload_processed_before_explicit_save", async () => {
     const response = await page.goto(new URL("/me/charts/new", origin).href);
     assert.equal(response.status(), 200);
-    await page.getByLabel("选择 ZIP", { exact: true }).setInputFiles({ name: "ci-chart.zip", mimeType: "application/zip", buffer: zip });
+    await page.getByLabel("选择 ADX / ZIP", { exact: true }).setInputFiles({ name: "ci-chart.zip", mimeType: "application/zip", buffer: zip });
     await page.getByRole("button", { name: "保存私有草稿", exact: true }).waitFor({ state: "visible", timeout: 90000 });
     assert.equal((await json(owner, "/api/v1/me/charts")).items.length, 0, "processing alone must not create a draft");
     assert.equal(await page.getByRole("alert").count(), 0);
@@ -179,6 +255,115 @@ async function acceptance() {
     const source = `/api/v1/files/${draft.versions[0].sourceFileId}/content`;
     await denied(anonymous, source, 401); await denied(other, source, 404);
   });
+  let publicChart;
+  const publicBase = () => `/api/v1/charts/${draft.id}`;
+  const publicAssets = () => ["maidata", "audio", "cover"].map(role => `${publicBase()}/versions/${draft.currentVersionId}/assets/${role}`);
+  await step("private_draft_not_public_and_explicit_version_confirmation", async () => {
+    await denied(anonymous, publicBase(), 404);
+    assert.equal(await page.getByRole("button", { name: "确认发布", exact: true }).isEnabled(), false);
+    await page.getByRole("combobox", { name: /公开版本/ }).selectOption(draft.currentVersionId);
+    assert.equal(await page.getByRole("button", { name: "确认发布", exact: true }).isEnabled(), false);
+    await page.getByLabel("我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。", { exact: true }).check();
+    const [published] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === `${publicBase().replace('/charts/', '/me/charts/')}/publication` && r.request().method() === "PUT", { timeout: 60000 }),
+      page.getByRole("button", { name: "确认发布", exact: true }).click(),
+    ]);
+    assert.equal(published.status(), 200);
+    assert.equal((await published.json()).publicationPending, false);
+    publicChart = await json(anonymous, publicBase());
+    assert.equal(publicChart.versionId, draft.currentVersionId);
+    assert.equal(publicChart.title, draft.title);
+    assert.equal(JSON.stringify(publicChart).includes("sourceFileId"), false);
+  });
+  await step("newer_private_version_and_metadata_do_not_replace_snapshot", async () => {
+    const newer = storedZip([["maidata.txt", Buffer.from("&title=New private version\n&inote_4=(120){4}1,2,E\n")]]);
+    await page.getByLabel("选择 ADX / ZIP", { exact: true }).setInputFiles({ name: "private-newer.zip", mimeType: "application/zip", buffer: newer });
+    await page.getByRole("button", { name: "保存私有草稿", exact: true }).waitFor({ timeout: 90000 });
+    const [saved] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === `/api/v1/me/charts/${draft.id}/versions` && r.request().method() === "POST"),
+      page.getByRole("button", { name: "保存私有草稿", exact: true }).click(),
+    ]);
+    assert.equal(saved.status(), 201);
+    const latest = await saved.json();
+    assert.notEqual(latest.currentVersionId, draft.currentVersionId);
+    await denied(anonymous, `${publicBase()}/versions/${latest.currentVersionId}/assets/maidata`, 404);
+    await page.getByLabel("标题", { exact: true }).fill("Private metadata edited");
+    const [edited] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === `/api/v1/me/charts/${draft.id}` && r.request().method() === "PATCH"),
+      page.getByRole("button", { name: "保存标题和曲师", exact: true }).click(),
+    ]);
+    assert.equal(edited.status(), 200);
+    assert.deepEqual(await json(anonymous, publicBase()), publicChart);
+  });
+  await step("anonymous_home_catalog_detail_lazy_native_preview_exact_zip", async () => {
+    const visitor = await anonymous.newPage(), requested = [];
+    visitor.on("request", r => requested.push(new URL(r.url()).pathname));
+    visitor.on("console", message => { if (message.type() === "error") diagnostics.push({ type: "error", message: sanitized(message.text()) }); });
+    visitor.on("pageerror", e => diagnostics.push({ type: "pageerror", message: sanitized(e.message) }));
+    await visitor.goto(origin.href);
+    await visitor.getByRole("link", { name: "浏览公开谱面", exact: true }).click();
+    await visitor.getByRole("link", { name: /CI private draft/ }).click();
+    await visitor.getByRole("heading", { level: 1, name: "CI private draft", exact: true }).waitFor();
+    assert.equal(requested.some(p => p.endsWith("/assets/audio") || p.endsWith("/assets/maidata")), false);
+    assert.equal(requested.some(p => p.includes("/api/v1/me/charts")), false);
+    await visitor.getByRole("button", { name: "加载预览", exact: true }).click();
+    await visitor.waitForFunction(() => [...document.querySelectorAll("button")].some(b => b.textContent === "播放" && !b.disabled));
+    assert.ok(requested.includes(publicAssets()[0])); assert.ok(requested.includes(publicAssets()[1]));
+    assert.equal(await visitor.locator("canvas").count(), 1);
+    await visitor.getByRole("button", { name: "播放", exact: true }).click();
+    await visitor.getByRole("button", { name: "暂停", exact: true }).waitFor();
+    await visitor.getByRole("button", { name: "暂停", exact: true }).click();
+    if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-desktop.png"), fullPage: true });
+    const [download] = await Promise.all([visitor.waitForEvent("download"), visitor.getByRole("link", { name: "下载原始 ZIP", exact: true }).click()]);
+    assert.deepEqual(await readFile(await download.path()), zip);
+    await visitor.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await visitor.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-mobile.png"), fullPage: true });
+    for (const [path, bytes] of [[publicAssets()[0], maidata], [publicAssets()[1], audio]]) {
+      const result = await anonymous.request.get(new URL(path, origin).href);
+      assert.equal(result.status(), 200); assert.deepEqual(await result.body(), bytes);
+    }
+    const cover = await anonymous.request.get(new URL(publicAssets()[2], origin).href);
+    assert.equal(cover.status(), 200); assert.match(cover.headers()["content-type"], /^image\//);
+    assert.ok((await cover.body()).length > 0);
+    const zipHead = await anonymous.request.head(new URL(`${publicBase()}/download`, origin).href);
+    assert.equal(zipHead.status(), 200); assert.equal(zipHead.headers()["content-length"], String(zip.length));
+    const cached = await anonymous.request.get(new URL(`${publicBase()}/download`, origin).href, { headers: { "If-None-Match": zipHead.headers().etag } });
+    assert.equal(cached.status(), 304); assert.equal(cached.headers()["cache-control"], "private, no-store");
+    const range = await anonymous.request.get(new URL(publicAssets()[1], origin).href, { headers: { Range: "bytes=44-75" } });
+    assert.equal(range.status(), 206); assert.deepEqual(await range.body(), audio.subarray(44,76));
+    await visitor.close();
+  });
+  await step("locale_ssr_and_router_data_errors_cache_noindex", async () => {
+    for (const prefix of ["", "/en", "/ja"]) {
+      for (const suffix of ["", ".data"]) {
+        const response = await anonymous.request.get(new URL(`${prefix}/charts/${draft.id}${suffix}`, origin).href);
+        assert.equal(response.status(), 200); assert.equal(response.headers()["cache-control"], "private, no-store");
+        assert.ok((await response.text()).includes("CI private draft"));
+        for (const id of ["invalid", "12345678-1234-4234-8234-123456789012"]) {
+          const missing = await anonymous.request.get(new URL(`${prefix}/charts/${id}${suffix}`, origin).href);
+          assert.equal(missing.status(), 404); assert.equal(missing.headers()["cache-control"], "private, no-store");
+          if (!suffix) assert.match(await missing.text(), /name="robots" content="noindex"/);
+        }
+      }
+    }
+  });
+  await step("withdrawal_reauthorizes_all_old_asset_and_download_requests", async () => {
+    await page.getByRole("button", { name: "撤回公开", exact: true }).click();
+    const [withdrawn] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname.endsWith("/publication") && r.request().method() === "DELETE", { timeout: 60000 }),
+      page.getByRole("button", { name: "确认撤回", exact: true }).click(),
+    ]);
+    assert.equal(withdrawn.status(), 200); assert.equal((await withdrawn.json()).publicationPending, false);
+    for (const path of [publicBase(), `${publicBase()}/download`, ...publicAssets()]) {
+      for (const options of [{ method: "GET" }, { method: "HEAD" }, { method: "GET", headers: { Range: "bytes=0-1" } }, { method: "GET", headers: { "If-None-Match": "*" } }, { method: "GET", headers: { Range: "bytes=0-1", "If-Range": '"old"' } }]) {
+        const result = await anonymous.request.fetch(new URL(path, origin).href, options);
+        assert.equal(result.status(), 404); assert.equal(result.headers()["cache-control"], "private, no-store");
+      }
+    }
+    assert.equal((await json(anonymous, "/api/v1/charts")).items.some(c => c.id === draft.id), false);
+    assert.equal((await json(owner, `/api/v1/me/charts/${draft.id}`)).versions.length, 2);
+  });
   await step("explicit_delete_releases_private_draft", async () => {
     await page.getByRole("button", { name: "删除草稿", exact: true }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "删除草稿", exact: true }).click();
@@ -188,6 +373,39 @@ async function acceptance() {
     const list = await json(owner, "/api/v1/me/charts");
     assert.equal(list.items.length, 0); assert.equal(list.usage.usedBytes, 0); assert.equal(list.usage.reservedBytes, 0);
     await denied(owner, asset, 404); await denied(owner, `/api/v1/me/charts/${draft.id}`, 404);
+  });
+  await step("missing_optional_media_and_unsupported_difficulty", async () => {
+    const optionalZip = storedZip([["maidata.txt", Buffer.from("&title=Optional media absent\n&inote_4=(120){4}1,9,nonsense,E\n")]]);
+    await page.goto(new URL("/me/charts/new", origin).href);
+    await page.getByLabel("选择 ADX / ZIP", { exact: true }).setInputFiles({ name: "optional.zip", mimeType: "application/zip", buffer: optionalZip });
+    await page.getByRole("button", { name: "保存私有草稿", exact: true }).waitFor({ timeout: 90000 });
+    const [saved] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === "/api/v1/me/charts" && r.request().method() === "POST"),
+      page.getByRole("button", { name: "保存私有草稿", exact: true }).click(),
+    ]);
+    assert.equal(saved.status(), 201); const optional = await saved.json();
+    await page.waitForURL(url => url.pathname === `/me/charts/${optional.id}`);
+    await page.getByRole("combobox", { name: /公开版本/ }).selectOption(optional.currentVersionId);
+    await page.getByLabel("我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。", { exact: true }).check();
+    const [published] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname.endsWith("/publication") && r.request().method() === "PUT", { timeout: 60000 }),
+      page.getByRole("button", { name: "确认发布", exact: true }).click(),
+    ]);
+    assert.equal(published.status(), 200);
+    const visitor = await anonymous.newPage(), requests = [];
+    visitor.on("request", r => requests.push(new URL(r.url()).pathname));
+    visitor.on("pageerror", e => diagnostics.push({ type: "pageerror", message: sanitized(e.message) }));
+    visitor.on("console", message => { if (message.type() === "error") diagnostics.push({ type: "error", message: sanitized(message.text()) }); });
+    await visitor.setViewportSize({ width: 390, height: 844 });
+    await visitor.goto(new URL(`/charts/${optional.id}`, origin).href);
+    await visitor.getByRole("heading", { name: "Optional media absent", exact: true }).waitFor();
+    assert.equal(await visitor.getByRole("button", { name: "加载预览", exact: true }).isEnabled(), false);
+    assert.equal(requests.some(path => path.startsWith(`/api/v1/charts/${optional.id}/versions/`) && path.includes("/assets/")), false);
+    if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-optional-media.png"), fullPage: true });
+    for (const role of ["audio", "cover"]) await denied(anonymous, `/api/v1/charts/${optional.id}/versions/${optional.currentVersionId}/assets/${role}`, 404);
+    const download = await anonymous.request.get(new URL(`/api/v1/charts/${optional.id}/download`, origin).href);
+    assert.equal(download.status(), 200); assert.deepEqual(await download.body(), optionalZip);
+    await visitor.close();
   });
   await step("avatar_upload_save_and_public_jpeg", async () => {
     assert.equal((await page.goto(new URL("/settings/profile", origin).href)).status(), 200);
@@ -205,6 +423,7 @@ async function acceptance() {
     const bytes = await jpeg.body(); assert.equal(bytes.readUInt16BE(0), 0xffd8); assert.ok(bytes.length <= 524288);
   });
   assert.equal(diagnostics.filter(row => row.type === "pageerror").length, 0, "uncaught browser errors");
+  assert.equal(diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length, 0, "hydration errors");
 }
 let deadline;
 try {
@@ -212,7 +431,7 @@ try {
   await Promise.race([acceptance(), new Promise((_, reject) => {
     deadline = setTimeout(() => reject(new Error("ACCEPTANCE_OVERALL_TIMEOUT")), 240000);
   })]);
-  const result = { status: "passed", steps, elapsedMs: Date.now() - startedAt, browser: "chromium", syntheticAccounts: true };
+  const result = { status: "passed", steps, elapsedMs: Date.now() - startedAt, browser: "chromium", syntheticAccounts: true, pageErrors: diagnostics.filter(row => row.type === "pageerror").length, hydrationErrors: diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length };
   if (evidenceDirectory) await writeFile(join(evidenceDirectory, "browser-result.json"), JSON.stringify(result, null, 2) + "\n", { mode: 0o600 });
   console.log("ACCEPTANCE_BROWSER_PASSED");
 } catch (error) {

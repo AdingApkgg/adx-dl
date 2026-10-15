@@ -10,6 +10,8 @@ export default [
     route("onboarding", "routes/onboarding.tsx"),
     route("settings/account", "routes/settings-account.tsx"),
     route("settings/profile", "routes/settings-profile.tsx"),
+    route("charts", "routes/public-charts.tsx"),
+    route("charts/:id", "routes/public-chart-detail.tsx"),
     route("me/charts", "routes/charts.tsx"),
     route("me/charts/new", "routes/chart-new.tsx"),
     route("me/charts/:id", "routes/chart-detail.tsx"),

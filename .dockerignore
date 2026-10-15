@@ -47,3 +47,6 @@
 
 # Local authenticated development storage configuration.
 **/.storage-dev
+
+# Disposable acceptance secrets, journals and bounded scratch never enter build contexts.
+/public-acceptance

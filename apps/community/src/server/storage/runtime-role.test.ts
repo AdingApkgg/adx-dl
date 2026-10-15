@@ -175,10 +175,26 @@ test("terminated PostgreSQL ownership drains and exits the actual role process",
       console.log("paused="+tracker.status().paused);
       await role.stop();console.log("drained");
     },2000);
+    console.log("supervisor-ready");
   `],{stdout:"pipe",stderr:"pipe"});
-  const out=new Response(child.stdout).text(),err=new Response(child.stderr).text();
+  const ready=Promise.withResolvers<void>();
+  const out=(async()=>{
+    let text="";
+    const decoder=new TextDecoder();
+    for await(const bytes of child.stdout) {
+      text+=decoder.decode(bytes,{stream:true});
+      if(text.startsWith("supervisor-ready\n"))ready.resolve();
+    }
+    return text+decoder.decode();
+  })();
+  const err=new Response(child.stderr).text();
   const timer=setTimeout(()=>child.kill("SIGKILL"),5000);
   try {
+    // The ownership row is published before startStorageRole's initial tick returns.
+    // Wait for the actual supervisor, rather than terminating an initializing process.
+    await Promise.race([ready.promise,child.exited.then(async()=>{
+      throw new Error(`ROLE_CHILD_EXITED_BEFORE_READY: ${await err}`);
+    })]);
     let pid:number|undefined;
     for(let i=0;i<80 && !pid;i++) {
       const result=await pool.query("select backend_pid from storage_runtime_roles where role='media' and heartbeat_at>clock_timestamp()-interval '2 seconds'");
@@ -188,7 +204,7 @@ test("terminated PostgreSQL ownership drains and exits the actual role process",
     expect(pid).toBeDefined();
     await pool.query("select pg_terminate_backend($1)",[pid]);
     expect(await child.exited).toBe(1);
-    expect(await out).toBe("paused=true\ndrained\n");
+    expect(await out).toBe("supervisor-ready\npaused=true\ndrained\n");
     expect(await err).toBe("STORAGE_ROLE_LOST\n");
   } finally {
     clearTimeout(timer);child.kill();await child.exited;

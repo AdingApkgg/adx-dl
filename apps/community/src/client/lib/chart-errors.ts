@@ -3,12 +3,16 @@ import { errorCodeOf, errorMessage } from "./auth-errors";
 import { storageErrorMessage } from "./storage-errors";
 export function chartErrorMessage(error: unknown): string {
   const code = errorCodeOf(error);
+  if (code === "CHART_PART_EMPTY") return m.chart_error_part_empty();
+  if (code === "CHART_PART_TOO_LARGE") return m.chart_error_part_size();
+  if (code === "CHART_PART_TYPE_INVALID") return m.chart_error_parts_type();
   if (code === "CHART_FOLDER_UNSUPPORTED") return m.chart_error_folder_unsupported();
   if (code === "REAUTH_REQUIRED" || code === "SESSION_NOT_FRESH") return errorMessage(error) ?? m.error_unknown();
   const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
   if (status === 403 && code !== "ACCOUNT_PENDING_DELETION") return m.chart_error_forbidden();
   if (status === 404) return m.chart_error_not_found();
   if (code === "CHART_CHANGED") return m.chart_error_changed();
+  if (code === "CHART_PUBLISHED_VERSION") return m.chart_error_published();
   if (code === "CHART_CURRENT_VERSION") return m.chart_error_current();
   if (code === "CHART_DRAFT_LIMIT" || code === "CHART_VERSION_LIMIT") return m.chart_error_limit();
   if (code === "CHART_FILE_ASSIGNED" || code === "CHART_FILE_NOT_READY") return m.chart_error_file();

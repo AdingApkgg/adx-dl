@@ -26,9 +26,9 @@ describe.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH && !process.env.STORAGE_T
   let f: Awaited<ReturnType<typeof ingestFixture>>;
   beforeAll(async()=>{await resetTestDatabase();f=await ingestFixture();f.mediaCtx.config.recipeBuild=RECIPE_BUILD;},30_000);
   afterAll(async()=>{await f?.cleanup();},30_000);
-  async function upload(bytes: Uint8Array) {
+  async function upload(bytes: Uint8Array, name = "fixture.zip") {
     const userId = await f.owner();
-    const dto = await initUpload(f.ctx,userId,{purpose:"chart-source",name:"fixture.zip",size:bytes.length,sha256:hash(bytes)},crypto.randomUUID());
+    const dto = await initUpload(f.ctx,userId,{purpose:"chart-source",name,size:bytes.length,sha256:hash(bytes)},crypto.randomUUID());
     for(let index=0;index<dto.partCount;index++) {
       const part = bytes.subarray(index*dto.partSize,(index+1)*dto.partSize);
       await putUploadPart(f.ctx,userId,dto.id,index,part,hash(part));
@@ -64,6 +64,17 @@ describe.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH && !process.env.STORAGE_T
     expect(await rebuildDerivedIntent(f.mediaCtx,intent)).toBe(true);
     expect(await f.mediaCtx.driver.head({bucket:"derived",key:output.key})).toMatchObject({size:output.size,sha256:output.outputSha256,mime:output.mime});
   },30_000);
+  test("ADX filename with ZIP bytes passes the real ingest/import/finalize chain unchanged", async () => {
+    const bytes = zipSync({ "maidata.txt": strToU8("&title=ADX import\n&inote_4=(120){4}1,2,E\n") }, { level: 0 });
+    const u = await upload(bytes, "single-chart.adx");
+    await ingestUpload(f.mediaCtx, u.data);
+    await handleChartImport(f.mediaCtx, u.data);
+    await finalizeUpload(f.mediaCtx, u.data);
+    expect(await getFile(f.ctx, u.userId, u.dto.fileId!)).toMatchObject({
+      name: "single-chart.adx", purpose: "chart-source", size: bytes.length,
+      state: "ready", chart: { title: "ADX import" },
+    });
+  }, 30_000);
   test("format rejection and cancellation terminalize without a ready File or double quota release",async()=>{
     const malformed = await upload(zipSync({"readme.bin":strToU8("no maidata")},{level:0}));
     await ingestUpload(f.mediaCtx,malformed.data); await handleChartImport(f.mediaCtx,malformed.data);
@@ -110,7 +121,7 @@ describe.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH && !process.env.STORAGE_T
       .toMatchObject({usedBytes:0,reservedBytes:0,activeUploads:0});
   });
   test("a running chart child observes cancellation, is reaped, and frees the shared native slot", async()=>{
-    const bytes = zipSync({"maidata.txt":strToU8(`&inote_4=(120){4}${"1,".repeat(99_000)}E`)},{level:0});
+    const bytes = zipSync({"maidata.txt":strToU8(`&inote_4=(120){64}${"1,".repeat(99_000)}E`)},{level:0});
     const u = await upload(bytes);
     await ingestUpload(f.mediaCtx,u.data);
     const source = (await claimRecipe(f.mediaCtx,u.data,"chart-source"))!;
@@ -121,6 +132,11 @@ describe.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH && !process.env.STORAGE_T
     try {
       const input = join(directory,"input.zip"), output = join(directory,"preview");
       await Bun.write(input,bytes);
+      // Cancellation must race a valid import, not a duration-limit rejection.
+      const valid = await processChart(input,output);
+      expect(valid.summary.difficulties[0].noteCount).toBe(99_000);
+      expect(valid.summary.difficulties[0].durationMs).toBeLessThan(3_600_000);
+      await rm(output);
       const child = processChart(input,output,watcher.signal,state=>{
         states.push(state);
         if(state === "started") canceling = (async()=>{

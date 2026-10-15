@@ -24,6 +24,7 @@ test("built Node server streams known lengths, backpressures, cancels private di
     output = randomBytes(524288),
     sha = hash(original),
     outSha = hash(output);
+  let holdPublic = false, publicCanceled = 0;
   let active = 0,
     canceled = 0,
     sent = 0;
@@ -46,10 +47,17 @@ test("built Node server streams known lengths, backpressures, cancels private di
     res.on("close", () => {
       clearTimeout(timer);
       active--;
-      if (offset < bytes.length) canceled++;
+      if (offset < bytes.length) {
+        canceled++;
+        if (bytes === output) publicCanceled++;
+      }
     });
     function send() {
       if (res.destroyed) return;
+      if (bytes === output && holdPublic && offset > 0) {
+        timer = setTimeout(send, 2);
+        return;
+      }
       const next = Math.min(offset + 16384, bytes.length);
       const ok = res.write(bytes.subarray(offset, next));
       sent += next - offset;
@@ -178,28 +186,37 @@ test("built Node server streams known lengths, backpressures, cancels private di
     const reader = cut.body!.getReader();
     await reader.read();
     await reader.cancel();
+    // Keep this response in flight even if the revocation transaction takes longer than EOF.
+    const publicCanceledBefore = publicCanceled;
+    const internal = Number(new URL(server.origin).port) + 10000;
+    holdPublic = true;
     const streaming = await fetch(publicUrl);
     const publicReader = streaming.body!.getReader();
-    await publicReader.read();
-    await db
-      .update(mediaPublications)
-      .set({ state: "revoking", generation: 2 })
-      .where(eq(mediaPublications.outputSha256, outSha));
-    const internal = Number(new URL(server.origin).port) + 10000;
-    const drained = await fetch(`http://127.0.0.1:${internal}/internal/media/drain`, {
-      method: "POST",
-      headers: {
-        authorization: "Bearer http-test-internal-media-secret-0123456789",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ hash: outSha, generation: 2 }),
-    });
-    expect(drained.status).toBe(200);
-    await publicReader.cancel().catch(() => {});
+    try {
+      await publicReader.read();
+      await db
+        .update(mediaPublications)
+        .set({ state: "revoking", generation: 2 })
+        .where(eq(mediaPublications.outputSha256, outSha));
+      const drained = await fetch(`http://127.0.0.1:${internal}/internal/media/drain`, {
+        method: "POST",
+        headers: {
+          authorization: "Bearer http-test-internal-media-secret-0123456789",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ hash: outSha, generation: 2 }),
+      });
+      expect(drained.status).toBe(200);
+      for (let i = 0; i < 50 && (active || publicCanceled === publicCanceledBefore); i++) await Bun.sleep(20);
+      // No client cancellation or release may supply this proof of server-side drain.
+      expect(publicCanceled).toBe(publicCanceledBefore + 1);
+      expect(active).toBe(0);
+      expect(canceled).toBeGreaterThanOrEqual(3);
+    } finally {
+      await publicReader.cancel().catch(() => {});
+      holdPublic = false;
+    }
     expect((await fetch(publicUrl)).status).toBe(404);
-    for (let i = 0; i < 50 && active; i++) await Bun.sleep(20);
-    expect(active).toBe(0);
-    expect(canceled).toBeGreaterThanOrEqual(3);
     expect((await fetch(server.url("/internal/media/drain"), { method: "POST" })).status).toBe(404);
     expect((await fetch(server.url("/api/v1/me"), {method:"PATCH",headers:{cookie,origin:server.origin,"content-type":"application/json"},body:JSON.stringify({name:"x".repeat(65536)})})).status).toBe(413);
     const rawAlias=await new Promise<number>((resolve,reject)=>{const u=new URL(server.origin);get({hostname:u.hostname,port:u.port,path:`/media/../media/${outSha}.jpg`},res=>{res.resume();resolve(res.statusCode!);}).on("error",reject);});

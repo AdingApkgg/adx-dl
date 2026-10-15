@@ -1,0 +1,24 @@
+{
+  "status": "passed",
+  "steps": [
+    "synthetic_accounts",
+    "real_browser_adx_upload_save_reload",
+    "real_browser_parts_upload_save_reload",
+    "upload_processed_before_explicit_save",
+    "save_and_reload_private_draft",
+    "private_audio_range_and_owner_isolation",
+    "private_draft_not_public_and_explicit_version_confirmation",
+    "newer_private_version_and_metadata_do_not_replace_snapshot",
+    "anonymous_home_catalog_detail_lazy_native_preview_exact_zip",
+    "locale_ssr_and_router_data_errors_cache_noindex",
+    "withdrawal_reauthorizes_all_old_asset_and_download_requests",
+    "explicit_delete_releases_private_draft",
+    "missing_optional_media_and_unsupported_difficulty",
+    "avatar_upload_save_and_public_jpeg"
+  ],
+  "elapsedMs": 80083,
+  "browser": "chromium",
+  "syntheticAccounts": true,
+  "pageErrors": 0,
+  "hydrationErrors": 0
+}

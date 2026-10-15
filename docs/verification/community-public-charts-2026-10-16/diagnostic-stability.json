@@ -1,0 +1,88 @@
+{
+  "status": "failed",
+  "totalSampleCount": 332,
+  "windowSampleCount": 311,
+  "checkedSampleCount": 311,
+  "outsideCheckedIntervalSampleCount": 21,
+  "skippedWithinWindow": 0,
+  "windowStart": "2026-10-15T20:23:15.191839+00:00",
+  "windowEnd": "2026-10-15T20:29:19.684511+00:00",
+  "windowSampleSpanSeconds": 364.492673,
+  "maxSampleGapSeconds": 1.241912,
+  "windowSampleChecksPassed": true,
+  "counts": {
+    "failedPgProbes": 0,
+    "nonThreeRoleSamples": 0,
+    "missingRoleSamples": 0,
+    "missingContainerSamples": 0,
+    "incompleteCgroupSamples": 0
+  },
+  "maxRoleHeartbeatAgeSeconds": 1.777788,
+  "peakMemoryBytes": {
+    "postgres": 196472832,
+    "redis": 58617856,
+    "seaweedfs": 91389952,
+    "web": 134746112,
+    "media": 63148032,
+    "control": 83824640
+  },
+  "applicationFailuresWithinWindow": [],
+  "applicationFailuresAfterWindowBeforeShutdown": [
+    {
+      "time": "2026-10-15T20:29:59.327Z",
+      "role": "web",
+      "event": "query_error",
+      "code": null,
+      "type": "Error",
+      "message": "Query read timeout"
+    },
+    {
+      "time": "2026-10-15T20:29:59.327963157Z",
+      "event": "STORAGE_ROLE_LOST"
+    },
+    {
+      "time": "2026-10-15T20:29:59.328Z",
+      "role": "media",
+      "event": "query_error",
+      "code": null,
+      "type": "Error",
+      "message": "Query read timeout"
+    },
+    {
+      "time": "2026-10-15T20:29:59.328426438Z",
+      "event": "STORAGE_ROLE_LOST"
+    },
+    {
+      "time": "2026-10-15T20:29:59.330Z",
+      "role": "control",
+      "event": "query_error",
+      "code": null,
+      "type": "Error",
+      "message": "Query read timeout"
+    },
+    {
+      "time": "2026-10-15T20:29:59.330755441Z",
+      "event": "STORAGE_ROLE_LOST"
+    }
+  ],
+  "coverageGaps": [
+    "explicit_http_readiness_missing",
+    "final_health_missing_or_failed",
+    "samples_do_not_cover_ready_through_shutdown"
+  ],
+  "errors": [
+    "application_failure_before_intentional_shutdown"
+  ],
+  "continuousHttpReadinessMeasured": false,
+  "source": "91affcf914301ab4e08047b14cb3c168b3fa8e93",
+  "boundaryKind": "first_complete_three_role_sample_not_exact_http_readiness",
+  "totalSamplingSpanSeconds": 389.558962,
+  "knownSuccessfulHttpReadinessChecksDuringReadWrite": 60,
+  "exactStartupHttpReadinessTimestamp": null,
+  "idleSeconds": 300,
+  "productionTimeoutsChanged": false,
+  "intentionalShutdownRequestedAt": "2026-10-15T20:30:11.236Z",
+  "immediateFailureTrigger": "three client query read timers expired at approximately 2000 ms",
+  "underlyingLatencyCause": "unresolved; PG/backend sampling ended before the failure",
+  "pgLogSnapshotAt": "2026-10-15T20:29:56.376Z"
+}

@@ -96,6 +96,11 @@ export async function startStorageRole({
   }
   try {
     await client.connect();
+    // This dedicated session writes only ephemeral role liveness/acknowledgments.
+    // Advisory locks fence ownership; a database restart invalidates the session.
+    // Do not make each heartbeat wait for WAL flush, or a slow disk kills healthy roles.
+    // Business, permission-journal and backup connections retain synchronous commits.
+    await client.query("set synchronous_commit=off");
     const lock = await client.query("select pg_try_advisory_lock($1) as acquired", [
       roleKeys[role],
     ]);

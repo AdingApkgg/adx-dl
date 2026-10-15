@@ -1,3 +1,7 @@
+import { permissionFact, retentionFact } from "../../src/shared/chart-journal";
+import { type ChartRestorePending, replayChartPermission, replayDeletedUserCharts } from "./chart-replay";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
+import { fileURLToPath } from "node:url";
 import { lstat, mkdir, readFile, readdir, open, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { Client } from "pg";
@@ -228,22 +232,35 @@ export async function verifyRestoreBundle(directory: string): Promise<FullManife
   return m;
 }
 /** Replay minimum facts offline. Never run normal queue claims; current legitimate shared references survive. */
-export async function replayJournal(c: Client, records: JournalRecord[], head: JournalHead) {
+export async function replayJournal(
+  c: Client,
+  records: JournalRecord[],
+  head: JournalHead,
+  options: { onChartPending?: (diagnostic: ChartRestorePending) => void } = {},
+) {
   if (!records.every(validJournalRecord)) throw new Error("STORAGE_JOURNAL_INVALID");
+  const latestPermission = new Map<string, number>();
+  for (const r of records) {
+    const facts = r.kind === "chart_permission" ? [permissionFact.parse(r.payload)]
+      : r.kind === "user_deleted" && r.payload ? retentionFact.parse(r.payload).retained : [];
+    for (const fact of facts) {
+      latestPermission.set(fact.chartId, Math.max(latestPermission.get(fact.chartId) ?? 0, r.sequence));
+    }
+  }
+  const pending: ChartRestorePending[] = [];
   await c.query("begin");
   try {
     await c.query("select pg_advisory_xact_lock($1::bigint)", [714102026]);
     for (const r of records) {
+      const reportPending = (diagnostic: ChartRestorePending) => {
+        if (latestPermission.get(diagnostic.chartId) === r.sequence) pending.push(diagnostic);
+      };
       if (r.kind === "user_deleted") {
-        // Private chart metadata never becomes anonymously readable when the owner is purged.
-        await c.query("update chart_versions set deleted_at=coalesce(deleted_at,$2) where chart_id in(select id from charts where owner_id=$1)", [r.userId, r.createdAt]);
-        await c.query("update charts set deleted_at=coalesce(deleted_at,$2),updated_at=$2 where owner_id=$1", [r.userId, r.createdAt]);
-        await c.query(
-          "update files set state='deleted',deleted_at=coalesce(deleted_at,$2),retained_until=$2::timestamptz+interval '30 days',original_name='removed' where owner_id=$1 and state<>'deleted'",
-          [r.userId, r.createdAt],
-        );
+        await replayDeletedUserCharts(c, r, reportPending);
         await c.query("delete from user_avatars where user_id=$1", [r.userId]);
         await c.query('delete from "user" where id=$1', [r.userId]);
+      } else if (r.kind === "chart_permission") {
+        await replayChartPermission(c, r, r.payload, reportPending);
       } else if (r.kind === "file_deleted") {
         await c.query(
           'update "user" set image=null where id in(select user_id from user_avatars where file_id=$1)',
@@ -305,8 +322,8 @@ export async function replayJournal(c: Client, records: JournalRecord[], head: J
         }
       }
       await c.query(
-        "insert into storage_tombstones(sequence,kind,user_id,file_id,sha256,generation,created_at) overriding system value values($1,$2,$3,$4,$5,$6,$7) on conflict(sequence) do nothing",
-        [r.sequence, r.kind, r.userId, r.fileId, r.sha256, r.generation, r.createdAt],
+        "insert into storage_tombstones(sequence,kind,user_id,file_id,sha256,generation,created_at,payload) overriding system value values($1,$2,$3,$4,$5,$6,$7,$8) on conflict(sequence) do nothing",
+        [r.sequence, r.kind, r.userId, r.fileId, r.sha256, r.generation, r.createdAt, r.payload ? JSON.stringify(r.payload) : null],
       );
     }
     // Unbacked tmp cannot be resurrected. All roles are stopped, so these old leases own no future IO.
@@ -398,6 +415,10 @@ export async function replayJournal(c: Client, records: JournalRecord[], head: J
       [head.sequence],
     );
     await c.query("commit");
+    for (const diagnostic of pending) {
+      if (options.onChartPending) options.onChartPending(diagnostic);
+      else console.warn(JSON.stringify(diagnostic));
+    }
     return affected;
   } catch (e) {
     await c.query("rollback").catch(() => {});
@@ -481,6 +502,8 @@ export async function restoreOriginals(options: RestoreOptions) {
     const c = new Client({ connectionString: options.databaseUrl, connectionTimeoutMillis: 5000 });
     await c.connect();
     try {
+      // Restored dumps can predate additive publication and journal columns. Upgrade while closed.
+      await migrate(drizzle(c), { migrationsFolder: fileURLToPath(new URL("../../src/server/db/migrations", import.meta.url)) });
       await replayJournal(c, latest.records, latest.head);
       await options.rebuild();
       const targets = await currentRestoreRevocations(c);

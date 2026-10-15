@@ -1,7 +1,8 @@
+import { recordPermission, awaitChartJournal } from "./publication-journal";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import type { ChartDto, ChartImportSummary, ChartListItemDto, ChartsPageDto, ChartVersionDto } from "@/shared/charts";
-import { blobBlocks, blobDerivatives, blobs, chartVersions, charts, derivedObjects, files, user } from "../db/schema";
+import { blobBlocks, blobDerivatives, blobs, chartPublications, chartVersions, charts, derivedObjects, files, storageJournalProgress, user } from "../db/schema";
 import type { DbTransaction, StorageContext } from "../storage/contracts";
 import { StorageError } from "../storage/errors";
 import { deleteFileInTransaction } from "../storage/files";
@@ -24,7 +25,7 @@ function changed(chart: Chart, expected: number) {
   if (chart.revision !== expected) throw new StorageError(409, "CHART_CHANGED");
   if (chart.revision >= 2147483647) throw new StorageError(409, "CHART_CHANGED");
 }
-async function ownChart(db: ReferenceDb, userId: string, id: string, includeDeleted = false, lock = false) {
+export async function ownChart(db: ReferenceDb, userId: string, id: string, includeDeleted = false, lock = false) {
   requireId(id);
   const query = db.select({ chart: charts }).from(charts)
     .innerJoin(user, eq(user.id, charts.ownerId))
@@ -34,7 +35,7 @@ async function ownChart(db: ReferenceDb, userId: string, id: string, includeDele
   if (!row) throw notFound();
   return row.chart;
 }
-async function dto(db: ReferenceDb, chart: Chart): Promise<ChartDto> {
+async function dto(db: DbTransaction, chart: Chart): Promise<ChartDto> {
   if (!chart.currentVersionId || chart.deletedAt) throw notFound();
   const rows = await db.select({ version: chartVersions, size: files.size }).from(chartVersions)
     .innerJoin(files, eq(files.id, chartVersions.sourceFileId))
@@ -45,7 +46,11 @@ async function dto(db: ReferenceDb, chart: Chart): Promise<ChartDto> {
     sourceSize: size, summary: version.summary, createdAt: version.createdAt.toISOString(),
   }));
   if (!versions.some(v => v.id === chart.currentVersionId)) throw notFound();
-  return { id: chart.id, title: chart.title, artist: chart.artist, revision: chart.revision,
+  const [publication] = await db.select().from(chartPublications).where(eq(chartPublications.chartId, chart.id));
+  const [progress] = await db.select().from(storageJournalProgress).where(eq(storageJournalProgress.id, "global"));
+  return { publicationPending: chart.publicationSequence > (progress?.exportedSequence ?? 0),
+    publication: publication ? publicationDto(publication) : null,
+    id: chart.id, title: chart.title, artist: chart.artist, revision: chart.revision,
     currentVersionId: chart.currentVersionId, versions, createdAt: chart.createdAt.toISOString(),
     updatedAt: chart.updatedAt.toISOString() };
 }
@@ -109,7 +114,10 @@ export async function createChart(ctx: StorageContext, userId: string, fileId: s
   });
 }
 export async function getChart(ctx: StorageContext, userId: string, id: string): Promise<ChartDto> {
-  return dto(ctx.db, await ownChart(ctx.db, userId, id));
+  // Chart revision/sequence, publication and checkpoint must describe one database snapshot.
+  return ctx.db.transaction(async tx => dto(tx, await ownChart(tx, userId, id)), {
+    isolationLevel: "repeatable read", accessMode: "read only",
+  });
 }
 type Cursor = { at: string; id: string };
 function decodeCursor(value: string): Cursor {
@@ -128,14 +136,18 @@ export async function listCharts(ctx: StorageContext, userId: string, input: { c
   return ctx.db.transaction(async tx => {
   const [owner] = await tx.select({ id: user.id }).from(user).where(and(eq(user.id, userId), eq(user.status, "active")));
   if (!owner) throw new StorageError(403, "ACCOUNT_INACTIVE");
-  const rows = await tx.select({ chart: charts, summary: chartVersions.summary }).from(charts)
+  const rows = await tx.select({ chart: charts, publication: chartPublications, summary: chartVersions.summary }).from(charts)
+    .leftJoin(chartPublications, eq(chartPublications.chartId, charts.id))
     .innerJoin(user, eq(user.id, charts.ownerId))
     .innerJoin(chartVersions, and(eq(chartVersions.id, charts.currentVersionId), eq(chartVersions.chartId, charts.id)))
     .where(and(eq(charts.ownerId, userId), eq(user.status, "active"), isNull(charts.deletedAt), isNull(chartVersions.deletedAt),
       ...(cursor ? [or(lt(charts.updatedAt, new Date(cursor.at)), and(eq(charts.updatedAt, new Date(cursor.at)), lt(charts.id, cursor.id)))] : [])))
     .orderBy(desc(charts.updatedAt), desc(charts.id)).limit(limit + 1);
+  const [progress] = await tx.select().from(storageJournalProgress).where(eq(storageJournalProgress.id, "global"));
   const page = rows.slice(0, limit);
-  const items: ChartListItemDto[] = page.map(({ chart, summary }) => ({ id: chart.id,
+  const items: ChartListItemDto[] = page.map(({ chart, summary, publication }) => ({
+    publicationPending: chart.publicationSequence > (progress?.exportedSequence ?? 0),
+    publication: publication ? publicationDto(publication) : null, id: chart.id,
     title: chart.title, artist: chart.artist, revision: chart.revision, currentVersionId: chart.currentVersionId!,
     summary, updatedAt: chart.updatedAt.toISOString() }));
   const last = page.at(-1)?.chart;
@@ -170,7 +182,7 @@ export async function updateChart(ctx: StorageContext, userId: string, id: strin
     return dto(tx, saved);
   });
 }
-async function verifyHistoricalSource(tx: DbTransaction, userId: string, version: typeof chartVersions.$inferSelect) {
+export async function verifyHistoricalSource(tx: DbTransaction, userId: string, version: typeof chartVersions.$inferSelect) {
   if (!version.sourceFileId) throw new StorageError(409, "CHART_FILE_NOT_READY");
   const [row] = await tx.select({ file: files, blob: blobs, recipe: blobDerivatives, output: derivedObjects }).from(files)
     .innerJoin(blobs, eq(blobs.id, files.blobId))
@@ -186,6 +198,7 @@ async function verifyHistoricalSource(tx: DbTransaction, userId: string, version
     if (validateChartPreviewManifest(row.output.properties.chartPreview, row.output.size).summary.maidataMd5Base64 !== version.maidataMd5Base64)
       throw new Error("mismatched chart summary");
   } catch { throw new StorageError(409, "CHART_FILE_NOT_READY"); }
+  return row;
 }
 export async function appendChartVersion(ctx: StorageContext, userId: string, id: string, input: { fileId: string; expectedRevision: number }): Promise<ChartDto> {
   id = id.toLowerCase();
@@ -224,6 +237,7 @@ export async function deleteChartVersion(ctx: StorageContext, userId: string, id
     if (!version) throw notFound();
     if (version.deletedAt || chart.deletedAt) return;
     changed(chart, expectedRevision);
+    if ((await tx.select().from(chartPublications).where(and(eq(chartPublications.chartId, id), eq(chartPublications.versionId, versionId)))).length) throw new StorageError(409, "CHART_PUBLISHED_VERSION");
     if (chart.currentVersionId === versionId) throw new StorageError(409, "CHART_CURRENT_VERSION");
     const now = await storageTime(tx);
     await tx.update(chartVersions).set({ deletedAt: now }).where(eq(chartVersions.id, versionId));
@@ -235,19 +249,29 @@ export async function deleteChartVersion(ctx: StorageContext, userId: string, id
 export async function deleteChart(ctx: StorageContext, userId: string, id: string, expectedRevision: number) {
   id = id.toLowerCase();
   revision(expectedRevision);
-  await withStorageTransaction(ctx.db, async tx => {
+  const sequence = await withStorageTransaction(ctx.db, async tx => {
     await lockUploadAccounting(tx, userId);
     const chart = await ownChart(tx, userId, id, true, true);
-    if (chart.deletedAt) return;
+    if (chart.deletedAt) return chart.publicationSequence;
     changed(chart, expectedRevision);
     const now = await storageTime(tx);
+    const [publication] = await tx.select().from(chartPublications).where(eq(chartPublications.chartId, id));
+    const sequence = publication ? await recordPermission(tx, id, chart.revision + 1, null, now) : chart.publicationSequence;
+    await tx.delete(chartPublications).where(eq(chartPublications.chartId, id));
     const versions = await tx.select().from(chartVersions).where(and(eq(chartVersions.chartId, id), isNull(chartVersions.deletedAt)))
       .orderBy(chartVersions.sourceFileId).for("update");
-    await tx.update(charts).set({ deletedAt: now, revision: chart.revision + 1, updatedAt: now }).where(eq(charts.id, id));
+    await tx.update(charts).set({ deletedAt: now, revision: chart.revision + 1, updatedAt: now, publicationSequence: sequence }).where(eq(charts.id, id));
     await tx.update(chartVersions).set({ deletedAt: now }).where(and(eq(chartVersions.chartId, id), isNull(chartVersions.deletedAt)));
     for (const version of versions) {
       if (!version.sourceFileId) throw new StorageError(503, "STORAGE_INCONSISTENT");
       await deleteFileInTransaction(tx, userId, version.sourceFileId);
     }
+    return sequence;
   });
+  await awaitChartJournal(ctx, sequence);
+}
+
+export function publicationDto(p: typeof chartPublications.$inferSelect) {
+  return { versionId: p.versionId, title: p.title, artist: p.artist,
+    publishedAt: p.publishedAt.toISOString(), updatedAt: p.updatedAt.toISOString() };
 }
