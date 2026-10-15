@@ -38,7 +38,7 @@
 
 指定 Linux 构建机上，使用真实 Chromium、构建后的服务和媒体进程、PG/Redis、认证 S3 与 512 MiB ext4 测试盘。三种输入均真实上传、处理 ready、主动保存、刷新重开并加载 Canvas/音频预览。ADX 使用通用 MIME，下载原件逐字节一致；零散文件选择后没有上传请求，点击组装后才上传，解包检查四种 canonical 路径与未改写的原始字节。视频夹具仅用于原件保留，不证明视频可播放。ZIP 沿用完整上传、私有草稿、公开快照、下载与撤回验收。
 
-[浏览器结果](community-chart-inputs-2026-10-16/browser-result.json)：14 步通过，69.741 秒，pageErrors=0、hydrationErrors=0。截图：[ADX](community-chart-inputs-2026-10-16/upload-adx.png)、[零散素材](community-chart-inputs-2026-10-16/upload-parts.png)。测试身份为自有合成身份；没有验证真实 OAuth、实体设备或主观音频效果。
+[首次浏览器结果](community-chart-inputs-2026-10-16/browser-before-role-fix.json)：14 步通过，69.741 秒，pageErrors=0、hydrationErrors=0。截图：[ADX](community-chart-inputs-2026-10-16/upload-adx.png)、[零散素材](community-chart-inputs-2026-10-16/upload-parts.png)。测试身份为自有合成身份；没有验证真实 OAuth、实体设备或主观音频效果。
 
 ## 历史检查边界
 
@@ -48,3 +48,15 @@
 实际 Worker 字节测试在 Bun 中运行，DOM 使用 Worker 替身，二者不等同于真实浏览器 Worker 或实体设备验收；本轮没有宣称新增了这类浏览器/设备证据。既有公开谱面报告中的历史角色心跳掉线原因仍未解决，生产发布前的可用性复核门槛保持不变。
 
 上述历史边界保留原检查轮次的事实；真实浏览器不足已由本次追加验收补齐。历史角色丢失根因仍开放，发布保留全部保护条件、回滚镜像并复查生产状态。
+
+## 发布门槛追加修复
+
+本轮首次三入口浏览器通过后，持续观察确实失败，不能视为通过：Web/媒体的 heartbeat UPDATE 在 2 秒客户端 deadline 后丢失角色。同期 200ms PostgreSQL 采样直接记录该后台停在 `IO/WalSync`，另一个等待 `LWLock/WALWrite`。这是本次失败的直接机制；不据此推断所有历史事件或底层存储延迟的原因。
+
+`3c3ba1b` 仅在 `startStorageRole` 的角色专用连接上设置异步提交。该连接只写临时运行角色、心跳与排空确认；权限仍以实际 advisory session、进程身份和新鲜心跳校验。谱面、权限日志、维护租约、业务连接和备份协调连接不改，2 秒 query/statement deadline 与 2.5 秒 readiness 门槛不改。它消除每次 heartbeat 主动等待 WAL flush；不能保证任何 WAL 缓冲锁或磁盘访问都永不超时。
+
+新增隔离真实 WAL 故障注入：仅对明确选定的 PostgreSQL 后台、真实 `pg_wal` 文件的一次 fsync/fdatasync 延迟 3 秒。先用独立业务连接校准 `synchronous_commit=on`、`fsync=on`、实际 `WalSync` 等待与至少 2.9 秒的提交耗时；旧角色代码确实进入同一延迟并超时丢失角色。修复后业务提交仍耗时约 3 秒，角色没有主动调用该 WAL sync、心跳保持新鲜，会话终止仍立即停止接收操作并使 readiness 失败。最终故障注入 1 项、15 断言通过，纳入 CI。测试不修改生产 PostgreSQL 或全局持久化设置。
+
+首次 PR CI 另发现已存在的启动测试竞争：角色表行早于初始化结束写入，测试可能在 supervisor 安装前终止连接。新增实际子进程就绪握手，保留原停止接收、排空、exit=1 与诊断断言。200ms 初始查询延迟下，旧测试稳定 RED，修复后 GREEN，完整角色测试 8 项通过。干净 CI 缺少镜像时只拉取固定 digest，不依赖开发机缓存。
+
+修复后原生镜像源 `3c3ba1b277c81a866bda0f97f005443f2b5da3dc` 已重新完成[全部 14 步真实 Chromium 验收](community-chart-inputs-2026-10-16/browser-result.json)：80.083 秒，页面与 hydration 错误均为 0。连续健康、CI 和部署验收单独核对，不由浏览器结果推定。
