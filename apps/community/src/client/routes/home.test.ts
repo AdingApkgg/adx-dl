@@ -103,7 +103,7 @@ describe("首页 loader：当前用户取不到", () => {
 
       expect(dataByKey(data).meta).toEqual(META);
       expect(dataByKey(data)).not.toHaveProperty("me");
-      expect(links(html)).toEqual([{ href: loginHref("/"), text: m.home_sign_in() }, { href: "/privacy", text: m.privacy_link() }]);
+      expect(links(html)).toEqual([{ href: loginHref("/"), text: m.home_sign_in() }, { href: "/charts", text: m.public_charts_browse() }, { href: "/me/charts", text: m.charts_title() }, { href: "/privacy", text: m.privacy_link() }]);
       expect(html).toContain(m.home_api_version({ version: 1 }));
     });
   }
@@ -117,7 +117,7 @@ describe("首页渲染：登录入口", () => {
   test("未登录：登录后回到首页，并有公开隐私入口", async () => {
     const html = await renderHome(false);
 
-    expect(links(html)).toEqual([{ href: loginHref("/"), text: m.home_sign_in() }, { href: "/privacy", text: m.privacy_link() }]);
+    expect(links(html)).toEqual([{ href: loginHref("/"), text: m.home_sign_in() }, { href: "/charts", text: m.public_charts_browse() }, { href: "/me/charts", text: m.charts_title() }, { href: "/privacy", text: m.privacy_link() }]);
     expect(loginHref("/")).toBe("/login?next=%2F");
     expect(html).not.toContain(m.home_signed_in_as({ name: "阿丁" }));
   });
@@ -132,7 +132,7 @@ describe("首页渲染：登录入口", () => {
       { href: "/u/abc2345678", text: m.home_my_page() },
       { href: "/settings/profile", text: m.home_profile_settings() },
       { href: "/settings/account", text: m.home_account_settings() },
-      { href: "/privacy", text: m.privacy_link() },
+      { href: "/charts", text: m.public_charts_browse() }, { href: "/me/charts", text: m.charts_title() }, { href: "/privacy", text: m.privacy_link() },
     ]);
   });
 

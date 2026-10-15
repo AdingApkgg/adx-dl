@@ -1,0 +1,107 @@
+import { Alert } from "@astrodx/ui/components/alert";
+import { Button } from "@astrodx/ui/components/button";
+import { useState } from "react";
+import { Link, useLocation } from "react-router";
+import { m } from "@/paraglide/messages.js";
+import { localizeHref } from "@/paraglide/runtime.js";
+import { ApiError } from "@/shared/api-client";
+import type { ChartDto } from "@/shared/charts";
+import { accountErrorRedirect } from "../lib/account-errors";
+import { getBrowserApi } from "../lib/browser";
+import { chartErrorMessage } from "../lib/chart-errors";
+import { chartsApi } from "../queries/charts";
+import { ChartSummary } from "./chart-summary";
+import { PrivateChartPreview } from "./private-chart-preview";
+
+type Intent = { versionId: string; title: string; artist: string } | null;
+function matches(chart: ChartDto, intent: Intent) {
+  if (chart.publicationPending !== false) return false;
+  return intent === null ? chart.publication === null : chart.publication?.versionId === intent.versionId &&
+    chart.publication.title === intent.title && chart.publication.artist === intent.artist;
+}
+export function ChartPublication({ chart, busy, setBusy, refresh }: {
+  chart: ChartDto; busy: boolean; setBusy: (busy: boolean) => void;
+  refresh: (chart: ChartDto) => Promise<void>;
+}) {
+  const location = useLocation();
+  const fail = (error: unknown) => {
+    const target = accountErrorRedirect(error, `${location.pathname}${location.search}`);
+    if (target) window.location.assign(target);
+  };
+  const [versionId, setVersionId] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [reconcile, setReconcile] = useState(false);
+  const [intent, setIntent] = useState<Intent>(null);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState<unknown>();
+  const selected = chart.versions.find((version) => version.id === versionId);
+  const api = chartsApi(getBrowserApi());
+  const accept = async (actual: ChartDto, target: Intent, allowSuccess: boolean) => {
+    await refresh(actual);
+    if (allowSuccess && matches(actual, target)) {
+      setReconcile(false); setWithdrawing(false); setConfirmed(false);
+      setStatus(target ? m.chart_publication_saved() : m.chart_publication_withdrawn());
+      return true;
+    }
+    setReconcile(actual.publicationPending !== false);
+    setStatus(actual.publicationPending !== false ? m.chart_publication_pending() : m.chart_publication_retry());
+    return false;
+  };
+  async function mutate(target: Intent) {
+    setBusy(true); setError(undefined); setStatus(""); setIntent(target);
+    try {
+      const actual = target ? await api.publish(chart.id, chart.revision, target.versionId) : await api.withdraw(chart.id, chart.revision);
+      if (!await accept(actual, target, true)) setError(new ApiError(409, "CHART_CHANGED", "Publication changed"));
+    } catch (failure) {
+      // A lost response can follow a committed mutation. Read before offering an explicit retry.
+      setReconcile(true);
+      try {
+        const actual = await api.get(chart.id);
+        const conflict = failure instanceof ApiError && failure.status < 500;
+        if (await accept(actual, target, !conflict)) return;
+      } catch { setStatus(m.chart_publication_pending()); }
+      setError(failure); fail(failure);
+    } finally { setBusy(false); }
+  }
+  async function check() {
+    setBusy(true); setError(undefined);
+    try { await accept(await api.get(chart.id), intent, true); }
+    catch (failure) { setError(failure); fail(failure); }
+    finally { setBusy(false); }
+  }
+  return <section aria-label={m.chart_publication()} className="space-y-3 rounded-lg border p-4">
+    <h2 className="font-semibold">{m.chart_publication()}</h2>
+    <p className="text-sm">{m.chart_publication_hint()}</p>
+    {chart.publication ? <div className="space-y-1 text-sm">
+      <p>{m.chart_publication_current({ title: chart.publication.title, artist: chart.publication.artist })}</p>
+      <p>{m.chart_publication_version_id({ id: chart.publication.versionId })}</p>
+      <Link className="underline" to={localizeHref(`/charts/${chart.id}`)}>{m.chart_publication_view()}</Link>
+    </div> : <p>{m.chart_publication_private()}</p>}
+    <label className="block">{m.chart_publication_version()}
+      <select value={versionId} disabled={busy || reconcile || chart.publicationPending === true} onChange={(event) => { setVersionId(event.target.value); setConfirmed(false); setStatus(""); }} className="ml-2 rounded border p-2">
+        <option value="">{m.chart_publication_choose()}</option>
+        {chart.versions.map((version) => <option key={version.id} value={version.id}>{m.chart_version({ number: String(version.ordinal) })}</option>)}
+      </select>
+    </label>
+    {selected ? <div className="space-y-2 rounded border p-3">
+      <p className="break-words font-semibold">{chart.title} · {chart.artist || "—"}</p>
+      <p>{m.chart_version({ number: String(selected.ordinal) })} · {(selected.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p>
+      <ChartSummary summary={selected.summary} />
+      <PrivateChartPreview key={selected.id} id={chart.id} versionId={selected.id} summary={selected.summary} />
+    </div> : null}
+    <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} disabled={busy || !selected || reconcile || chart.publicationPending === true} onChange={(event) => setConfirmed(event.target.checked)} />{m.chart_publication_archive()}</label>
+    <div className="flex flex-wrap gap-2">
+      <Button disabled={busy || !selected || !confirmed || reconcile || chart.publicationPending === true} onClick={() => void mutate({ versionId, title: chart.title, artist: chart.artist })}>{m.chart_publication_confirm()}</Button>
+      {chart.publication ? <Button variant="outline" disabled={busy || reconcile || chart.publicationPending === true} onClick={() => setWithdrawing(true)}>{m.chart_publication_withdraw()}</Button> : null}
+      {reconcile || chart.publicationPending === true ? <Button variant="outline" disabled={busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
+    </div>
+    {withdrawing ? <div role="alertdialog" aria-label={m.chart_publication_withdraw()} className="space-y-2 rounded border p-3">
+      <p>{m.chart_publication_withdraw_hint()}</p>
+      <Button disabled={busy || reconcile || chart.publicationPending === true} onClick={() => void mutate(null)}>{m.chart_publication_withdraw_confirm()}</Button>{" "}
+      <Button variant="outline" disabled={busy} onClick={() => setWithdrawing(false)}>{m.avatar_cancel()}</Button>
+    </div> : null}
+    {status ? <p role="status">{status}</p> : null}
+    {error ? <Alert role="alert" variant="destructive">{chartErrorMessage(error)}</Alert> : null}
+  </section>;
+}

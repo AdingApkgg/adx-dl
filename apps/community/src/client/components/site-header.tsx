@@ -15,6 +15,7 @@ export function SiteHeader() {
         <Link to={localizeHref("/")} className="mr-auto truncate font-semibold tracking-tight">
           {m.site_name()}
         </Link>
+        <Link to={localizeHref("/charts")} className="px-2 text-sm underline-offset-4 hover:underline">{m.public_charts_title()}</Link>
         <LanguageMenu />
         <SettingsSheet />
         <AccountMenu />

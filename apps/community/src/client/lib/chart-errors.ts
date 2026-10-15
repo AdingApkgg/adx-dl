@@ -9,6 +9,7 @@ export function chartErrorMessage(error: unknown): string {
   if (status === 403 && code !== "ACCOUNT_PENDING_DELETION") return m.chart_error_forbidden();
   if (status === 404) return m.chart_error_not_found();
   if (code === "CHART_CHANGED") return m.chart_error_changed();
+  if (code === "CHART_PUBLISHED_VERSION") return m.chart_error_published();
   if (code === "CHART_CURRENT_VERSION") return m.chart_error_current();
   if (code === "CHART_DRAFT_LIMIT" || code === "CHART_VERSION_LIMIT") return m.chart_error_limit();
   if (code === "CHART_FILE_ASSIGNED" || code === "CHART_FILE_NOT_READY") return m.chart_error_file();

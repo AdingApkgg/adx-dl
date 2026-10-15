@@ -96,6 +96,12 @@ function HomeContent() {
           )}
         </CardContent>
       </Card>
+      <section className="space-y-2 rounded-lg border p-4">
+        <h2 className="font-semibold">{m.public_charts_title()}</h2>
+        <p className="text-sm text-muted-foreground">{m.public_charts_description()}</p>
+        <Button asChild><Link to={localizeHref("/charts")}>{m.public_charts_browse()}</Link></Button>
+        {" "}<Link to={localizeHref("/me/charts")} className={textLinkClass}>{m.charts_title()}</Link>
+      </section>
       <p className="text-muted-foreground">{m.home_description()}</p>
       <Link to={localizeHref("/privacy")} className={textLinkClass}>
         {m.privacy_link()}

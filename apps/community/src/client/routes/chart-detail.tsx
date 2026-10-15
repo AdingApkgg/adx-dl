@@ -9,6 +9,7 @@ import { localizeHref } from "@/paraglide/runtime.js";
 import { ApiError } from "@/shared/api-client";
 import type { ChartDto } from "@/shared/charts";
 import { apiContext, queryClientContext } from "@/shared/router-context";
+import { ChartPublication } from "../components/chart-publication";
 import { ChartSummary } from "../components/chart-summary";
 import { ChartUpload } from "../components/chart-upload";
 import { PageTitle, textLinkClass } from "../components/page-title";
@@ -114,14 +115,15 @@ function Detail({ id }: { id: string }) {
       }} className="mt-1 block w-full rounded border p-2" /></label>
       <Button disabled={pending} type="submit">{m.chart_save_metadata()}</Button>
     </form>
+    <ChartPublication chart={chart} busy={pending} setBusy={setPending} refresh={refresh} />
     {current ? <><ChartSummary summary={current.summary} /><PrivateChartPreview key={current.id} id={id} versionId={current.id} summary={current.summary} /></> : null}
-    <section className="space-y-3"><h2 className="font-semibold">{m.chart_versions()}</h2>
+    <section aria-label={m.chart_versions()} className="space-y-3"><h2 className="font-semibold">{m.chart_versions()}</h2>
       <ul className="space-y-2">{chart.versions.map((version) => <li key={version.id} className="flex flex-wrap items-center gap-3 rounded border p-3">
         <span>{m.chart_version({ number: String(version.ordinal) })} · {(version.sourceSize / (1024 * 1024)).toFixed(2)} MiB</span>
         <time dateTime={version.createdAt} className="text-sm">{version.createdAt.slice(0, 10)}</time>
         {version.id === chart.currentVersionId ? <span className="text-sm">{m.chart_current()}</span> : <>
           <Button variant="outline" disabled={pending} onClick={() => void patch({ expectedRevision: chart.revision, currentVersionId: version.id })}>{m.chart_activate()}</Button>
-          <Button variant="outline" disabled={pending} onClick={() => setDeleting(version.id)}>{m.chart_delete_version()}</Button>
+          <Button variant="outline" disabled={pending || chart.publication?.versionId === version.id || chart.publicationPending === true} title={chart.publication?.versionId === version.id ? m.chart_error_published() : undefined} onClick={() => setDeleting(version.id)}>{m.chart_delete_version()}</Button>
         </>}
       </li>)}</ul>
     </section>

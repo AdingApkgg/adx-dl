@@ -20,14 +20,14 @@ class HashWorker {
   terminate() {}
 }
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
-function setup(handler: (path: string, method: string, body: Record<string, unknown>) => Promise<Response> | Response) {
+function setup(handler: (path: string, method: string, body: Record<string, unknown>) => Promise<Response> | Response, start = initial) {
   const requests: { path: string; method: string; body: Record<string, unknown> }[] = [];
   vi.stubGlobal("Worker", HashWorker);
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = { path: new URL(String(input)).pathname, method: init?.method ?? "GET", body: typeof init?.body === "string" ? JSON.parse(init.body) : {} };
     requests.push(request); return handler(request.path, request.method, request.body);
   }));
-  const client = makeQueryClient(); client.setQueryData(["me"], { id: "alice", status: "active" }); client.setQueryData(chartQuery(api, "chart").queryKey, initial);
+  const client = makeQueryClient(); client.setQueryData(["me"], { id: "alice", status: "active" }); client.setQueryData(chartQuery(api, "chart").queryKey, start);
   render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/me/charts/chart"]}><Page params={{ id: "chart" }} loaderData={{ dehydratedState: dehydrate(client) }} /></MemoryRouter></QueryClientProvider>);
   return requests;
 }
@@ -66,20 +66,20 @@ test("rejected replacement leaves the current version untouched and never saves 
   });
   fireEvent.change(screen.getByLabelText("选择 ZIP"), { target: { files: [new File(["bad"], "bad.zip", { type: "application/zip" })] } });
   await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("未通过校验"));
-  expect(within(screen.getByText(/^版本 2/).closest("li")!).getByText("当前版本")).toBeTruthy();
+  expect(within(within(screen.getByRole("region", { name: "历史版本" })).getByText(/^版本 2/).closest("li")!).getByText("当前版本")).toBeTruthy();
   expect(requests.some((row) => row.path === "/api/v1/me/charts/chart/versions")).toBe(false);
   expect(screen.queryByRole("button", { name: "保存私有草稿" })).toBeNull();
 });
 test("current version has no delete action and historical deletion requires confirmation with its revision", async () => {
-  const requests = setup((path, method) => method === "DELETE" ? new Response(null, { status: 204 }) : Response.json({ ...initial, revision: 3, versions: [initial.versions[0]!] }));
-  const current = screen.getByText(/^版本 2/).closest("li")!;
+  const requests = setup((_path, method) => method === "DELETE" ? new Response(null, { status: 204 }) : Response.json({ ...initial, revision: 3, versions: [initial.versions[0]!] }));
+  const current = within(screen.getByRole("region", { name: "历史版本" })).getByText(/^版本 2/).closest("li")!;
   expect(within(current).queryByRole("button", { name: "删除版本" })).toBeNull();
-  fireEvent.click(within(screen.getByText(/^版本 1/).closest("li")!).getByRole("button", { name: "删除版本" }));
+  fireEvent.click(within(within(screen.getByRole("region", { name: "历史版本" })).getByText(/^版本 1/).closest("li")!).getByRole("button", { name: "删除版本" }));
   expect(requests.filter((row) => row.method === "DELETE")).toHaveLength(0);
   fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "删除草稿" }));
   await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   expect(requests.filter((row) => row.method === "DELETE")).toEqual([{ path: "/api/v1/me/charts/chart/versions/v1", method: "DELETE", body: { expectedRevision: 2 } }]);
-  expect(screen.queryByText(/^版本 1/)).toBeNull();
+  expect(within(screen.getByRole("region", { name: "历史版本" })).queryByText(/^版本 1/)).toBeNull();
 });
 
 test("an expired editor session redirects to login after the failed save", async () => {
@@ -98,4 +98,112 @@ test("editor permission failure keeps the input and displays denial without forc
   await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("你没有访问这份私有谱面的权限。"));
   expect((screen.getByRole("textbox", { name: "标题" }) as HTMLInputElement).value).toBe("Unsaved");
   expect(assign).not.toHaveBeenCalled();
+});
+
+test("publishing requires an explicit version and confirmation before any PUT", async () => {
+  const requests = setup(() => Response.json({ ...initial, publication: null, publicationPending: false }));
+  const section = screen.getByRole("region", { name: "公开发布" });
+  const publish = within(section).getByRole("button", { name: "确认发布" }) as HTMLButtonElement;
+  expect(publish.disabled).toBe(true);
+  fireEvent.change(within(section).getByLabelText("公开版本"), { target: { value: "v1" } });
+  expect(publish.disabled).toBe(true);
+  expect(within(section).getByText(/原始 ZIP.*全部文件/)).toBeTruthy();
+  expect(requests.some((row) => row.method === "PUT")).toBe(false);
+});
+
+function choosePublication() {
+  const section = screen.getByRole("region", { name: "公开发布" });
+  fireEvent.change(within(section).getByLabelText("公开版本"), { target: { value: "v1" } });
+  fireEvent.click(within(section).getByRole("checkbox"));
+  fireEvent.click(within(section).getByRole("button", { name: "确认发布" }));
+  return section;
+}
+const publication = { versionId: "v1", title: "Original", artist: "Artist", publishedAt: initial.createdAt, updatedAt: initial.updatedAt };
+test("lost publication response reconciles durable snapshot without replaying PUT", async () => {
+  let actual = { ...initial, publication: null, publicationPending: false } as ChartDto;
+  const requests = setup((_path, method) => {
+    if (method === "PUT") { actual = { ...initial, revision: 3, publication, publicationPending: false }; throw new TypeError("Lost"); }
+    return Response.json(actual);
+  });
+  choosePublication();
+  await screen.findByText("公开快照已保存。");
+  expect(requests.filter(row => row.method === "PUT")).toEqual([{ path: "/api/v1/me/charts/chart/publication", method: "PUT", body: { expectedRevision: 2, versionId: "v1", confirmOriginalArchive: true } }]);
+  expect(requests.filter(row => row.method === "GET").length).toBeGreaterThan(0);
+});
+test.each([true, undefined])("pending or missing durable flag (%s) cannot report success and requires a read before explicit retry", async (publicationPending) => {
+  let actual: ChartDto = { ...initial, publication, publicationPending };
+  const requests = setup((_path, method) => {
+    if (method === "PUT") throw new TypeError("Lost before durable journal");
+    return Response.json(actual);
+  });
+  const section = choosePublication();
+  await within(section).findByRole("button", { name: "检查发布状态" });
+  await waitFor(() => expect((within(section).getByRole("button", { name: "检查发布状态" }) as HTMLButtonElement).disabled).toBe(false));
+  expect(screen.queryByText("公开快照已保存。")).toBeNull();
+  expect((within(section).getByRole("button", { name: "确认发布" }) as HTMLButtonElement).disabled).toBe(true);
+  actual = { ...initial, revision: 3, publication: null, publicationPending: false };
+  fireEvent.click(within(section).getByRole("button", { name: "检查发布状态" }));
+  await waitFor(() => expect((within(section).getByRole("button", { name: "确认发布" }) as HTMLButtonElement).disabled).toBe(false));
+  expect((within(section).getByLabelText("公开版本") as HTMLSelectElement).value).toBe("v1");
+  expect(requests.filter(row => row.method === "PUT")).toHaveLength(1);
+  fireEvent.click(within(section).getByRole("button", { name: "确认发布" }));
+  await waitFor(() => expect(requests.filter(row => row.method === "PUT")).toHaveLength(2));
+  expect(requests.filter(row => row.method === "PUT")[1]?.body.expectedRevision).toBe(3);
+});
+test("publication conflict retains selected version and unsaved editor text without success", async () => {
+  const actual = { ...initial, title: "Other title", revision: 3, publication: null, publicationPending: false };
+  setup((_path, method) => method === "PUT" ? Response.json({ error: { code: "CHART_CHANGED", message: "Changed" } }, { status: 409 }) : Response.json(actual));
+  fireEvent.change(screen.getByRole("textbox", { name: "标题" }), { target: { value: "Unsaved title" } });
+  const section = choosePublication();
+  await waitFor(() => expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Other title"));
+  expect((screen.getByRole("textbox", { name: "标题" }) as HTMLInputElement).value).toBe("Unsaved title");
+  expect((within(section).getByLabelText("公开版本") as HTMLSelectElement).value).toBe("v1");
+  expect(screen.queryByText("公开快照已保存。")).toBeNull();
+});
+test("later concurrent publication returned from mutation is never mistaken for requested snapshot", async () => {
+  setup(() => Response.json({ ...initial, revision: 4, publication: { ...publication, title: "Concurrent title" }, publicationPending: false }));
+  choosePublication();
+  await screen.findByText("当前公开：Concurrent title · Artist");
+  expect(screen.queryByText("公开快照已保存。")).toBeNull();
+});
+test("published historical version cannot be deleted and withdrawal uses revision plus confirmation", async () => {
+  const requests = setup((_path, method) => Response.json(method === "DELETE" ? { ...initial, revision: 4, publication: null, publicationPending: false } : { ...initial, revision: 3, publication, publicationPending: false }), { ...initial, revision: 3, publication, publicationPending: false });
+  expect((within(screen.getByText(/^版本 1 ·/).closest("li")!).getByRole("button", { name: "删除版本" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "撤回公开" }));
+  expect(requests.filter(row => row.method === "DELETE")).toHaveLength(0);
+  fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "确认撤回" }));
+  await screen.findByText("已撤回公开。");
+  expect(requests.filter(row => row.method === "DELETE")).toEqual([{ path: "/api/v1/me/charts/chart/publication", method: "DELETE", body: { expectedRevision: 3 } }]);
+});
+test("failed withdrawal with pending journal does not report withdrawal or replay DELETE", async () => {
+  const requests = setup((_path, method) => {
+    if (method === "DELETE") throw new TypeError("Journal unavailable");
+    return Response.json({ ...initial, revision: 4, publication: null, publicationPending: true });
+  }, { ...initial, revision: 3, publication, publicationPending: false });
+  fireEvent.click(screen.getByRole("button", { name: "撤回公开" }));
+  fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "确认撤回" }));
+  await screen.findByRole("button", { name: "检查发布状态" });
+  expect(screen.queryByText("已撤回公开。")).toBeNull();
+  expect(requests.filter(row => row.method === "DELETE")).toHaveLength(1);
+});
+
+test("a pending 2xx publication is not success until explicit GET confirms the exact durable target", async () => {
+  const requests = setup((_path, method) => Response.json({ ...initial, revision: 3, publication, publicationPending: method === "PUT" }));
+  const section = choosePublication();
+  await within(section).findByRole("button", { name: "检查发布状态" });
+  await waitFor(() => expect((within(section).getByRole("button", { name: "检查发布状态" }) as HTMLButtonElement).disabled).toBe(false));
+  expect(screen.queryByText("公开快照已保存。")).toBeNull();
+  fireEvent.click(within(section).getByRole("button", { name: "检查发布状态" }));
+  await screen.findByText("公开快照已保存。");
+  expect(requests.filter(row => row.method === "PUT")).toHaveLength(1);
+});
+test("lost withdrawal response reads durable absence without replaying DELETE", async () => {
+  const requests = setup((_path, method) => {
+    if (method === "DELETE") throw new TypeError("Response lost");
+    return Response.json({ ...initial, revision: 4, publication: null, publicationPending: false });
+  }, { ...initial, revision: 3, publication, publicationPending: false });
+  fireEvent.click(screen.getByRole("button", { name: "撤回公开" }));
+  fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "确认撤回" }));
+  await screen.findByText("已撤回公开。");
+  expect(requests.filter(row => row.method === "DELETE")).toHaveLength(1);
 });

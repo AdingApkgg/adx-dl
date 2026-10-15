@@ -69,6 +69,7 @@ describe("页头的服务端渲染", () => {
       const html = await renderHeader(path, null);
 
       expect(links(html)[0], path).toEqual({ href: home, text: m.site_name({}, { locale }) });
+      expect(links(html)[1], path).toEqual({ href: `${home === "/" ? "" : home.replace(/\/$/, "")}/charts`, text: m.public_charts_title({}, { locale }) });
       const language = m[`language_${locale}`]();
       expect(html, path).toContain(`aria-label="${m.nav_language({ language }, { locale })}"`);
     }
@@ -78,13 +79,13 @@ describe("页头的服务端渲染", () => {
     const zh = await renderHeader("/u/abc2345678?tab=2", null);
     const en = await renderHeader("/en/u/abc2345678", null);
 
-    expect(links(zh)[1]).toEqual({ href: "/login?next=%2Fu%2Fabc2345678%3Ftab%3D2", text: m.nav_sign_in() });
-    expect(links(en)[1]).toEqual({ href: "/en/login?next=%2Fen%2Fu%2Fabc2345678", text: m.nav_sign_in({}, { locale: "en" }) });
+    expect(links(zh)[2]).toEqual({ href: "/login?next=%2Fu%2Fabc2345678%3Ftab%3D2", text: m.nav_sign_in() });
+    expect(links(en)[2]).toEqual({ href: "/en/login?next=%2Fen%2Fu%2Fabc2345678", text: m.nav_sign_in({}, { locale: "en" }) });
   });
 
   test("没登录、已经在登录页上：不再显示'登录'按钮", async () => {
     for (const path of ["/login?next=%2F", "/en/login", "/login/", "/en/login/"]) {
-      expect(links(await renderHeader(path, null)), path).toHaveLength(1);
+      expect(links(await renderHeader(path, null)), path).toHaveLength(2);
     }
   });
 
@@ -95,7 +96,7 @@ describe("页头的服务端渲染", () => {
       expect(html).toContain(`aria-label="${m.nav_account_menu({ name: "阿丁" })}"`);
       expect(html).toContain(">阿</text>");
       expect(html).not.toContain(m.nav_sign_in());
-      expect(links(html)).toHaveLength(1);
+      expect(links(html)).toHaveLength(2);
     }
   });
 
@@ -105,6 +106,6 @@ describe("页头的服务端渲染", () => {
 
     expect(html).not.toContain(m.nav_sign_in());
     expect(html).not.toContain(m.nav_account_menu({ name: "阿丁" }));
-    expect(links(html)).toHaveLength(1);
+    expect(links(html)).toHaveLength(2);
   });
 });
