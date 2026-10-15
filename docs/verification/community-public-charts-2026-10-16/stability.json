@@ -1,0 +1,45 @@
+{
+  "source": "91affcf914301ab4e08047b14cb3c168b3fa8e93",
+  "status": "passed",
+  "sampleCount": 204,
+  "observedSeconds": 238.731,
+  "idleSeconds": 120,
+  "continuousReadWriteIterations": 30,
+  "roleSessionsStable": true,
+  "allRoleLocksRetained": true,
+  "maxRoleHeartbeatAgeSeconds": 1.619779,
+  "containers": {
+    "postgres": {
+      "peakMemoryBytes": 196472832,
+      "oomEvents": 0,
+      "restarts": 0
+    },
+    "redis": {
+      "peakMemoryBytes": 56115200,
+      "oomEvents": 0,
+      "restarts": 0
+    },
+    "seaweedfs": {
+      "peakMemoryBytes": 78696448,
+      "oomEvents": 0,
+      "restarts": 0
+    },
+    "web": {
+      "peakMemoryBytes": 171671552,
+      "oomEvents": 0,
+      "restarts": 0
+    },
+    "media": {
+      "peakMemoryBytes": 107126784,
+      "oomEvents": 0,
+      "restarts": 0
+    },
+    "control": {
+      "peakMemoryBytes": 61345792,
+      "oomEvents": 0,
+      "restarts": 0
+    }
+  },
+  "priorFailureRootCause": "unresolved; not reproduced in this instrumented run",
+  "productionTimeoutsChanged": false
+}

@@ -1,0 +1,52 @@
+{
+  "source": "91affcf914301ab4e08047b14cb3c168b3fa8e93",
+  "status": "passed",
+  "testOnlyDiagnosticPreload": true,
+  "sampleCountAfterReadiness": 311,
+  "observedSecondsAfterReadiness": 364.493,
+  "idleSeconds": 300,
+  "continuousReadWriteIterations": 60,
+  "roleSessionsStable": true,
+  "allRoleLocksRetained": true,
+  "maxRoleHeartbeatAgeSeconds": 1.777788,
+  "maxRoleQueryMs": 1335.5061679999926,
+  "maxReportedLoopDelayMs": 318.77786000000003,
+  "roleQueryErrors": 0,
+  "clockDeltaWarnings": 0,
+  "maintenanceOwnerAlwaysNull": true,
+  "restoreStateAlwaysOpen": true,
+  "containers": {
+    "postgres": {
+      "peakMemoryBytes": 196472832,
+      "oomEvents": 0,
+      "restarts": 0
+    },
+    "redis": {
+      "peakMemoryBytes": 58617856,
+      "oomEvents": 0,
+      "restarts": 0
+    },
+    "seaweedfs": {
+      "peakMemoryBytes": 91389952,
+      "oomEvents": 0,
+      "restarts": 0
+    },
+    "web": {
+      "peakMemoryBytes": 134746112,
+      "oomEvents": 0,
+      "restarts": 0
+    },
+    "media": {
+      "peakMemoryBytes": 63148032,
+      "oomEvents": 0,
+      "restarts": 0
+    },
+    "control": {
+      "peakMemoryBytes": 83824640,
+      "oomEvents": 0,
+      "restarts": 0
+    }
+  },
+  "priorFailureRootCause": "unresolved; not reproduced in this bounded diagnostic run",
+  "productionTimeoutsChanged": false
+}
