@@ -91,7 +91,7 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
         const [file] = await target.db.select().from(files).where(eq(files.id, versions[0].sourceFileId!));
         expect(file.ownerId).toBeNull(); expect(file.originalName).toBe("removed");
         const download = await resolvePublicChartDownload(target, row.chart.id);
-        const response = await representationResponse(target, download, new Request("http://127.0.0.1/restored-chart/download"));
+        const response = await representationResponse(target, download, new Request("http://127.0.0.1/restored-chart/download"), AbortSignal.timeout(10000));
         expect(response.status).toBe(200);
         expect(Buffer.from(await response.arrayBuffer())).toEqual(Buffer.from(row.original.bytes));
       }

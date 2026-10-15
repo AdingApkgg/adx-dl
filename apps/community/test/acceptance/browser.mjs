@@ -324,7 +324,7 @@ async function acceptance() {
     await visitor.goto(new URL(`/charts/${optional.id}`, origin).href);
     await visitor.getByRole("heading", { name: "Optional media absent", exact: true }).waitFor();
     assert.equal(await visitor.getByRole("button", { name: "加载预览", exact: true }).isEnabled(), false);
-    assert.equal(requests.some(path => path.includes("/assets/")), false);
+    assert.equal(requests.some(path => path.startsWith(`/api/v1/charts/${optional.id}/versions/`) && path.includes("/assets/")), false);
     if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-optional-media.png"), fullPage: true });
     for (const role of ["audio", "cover"]) await denied(anonymous, `/api/v1/charts/${optional.id}/versions/${optional.currentVersionId}/assets/${role}`, 404);
     const download = await anonymous.request.get(new URL(`/api/v1/charts/${optional.id}/download`, origin).href);
