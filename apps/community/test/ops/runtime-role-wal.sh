@@ -19,7 +19,7 @@ mkdir "$root/markers"
 chmod 0777 "$root/markers"
 cc -shared -fPIC -O2 -Wall -Wextra -Werror -o "$root/wal-delay.so" apps/community/test/ops/wal-delay.c -ldl
 chmod 0444 "$root/wal-delay.so"
-docker run -d --pull=never --network none --name "$name" --label "astrodx.test-owner=$name" \
+docker run -d --pull=missing --network none --name "$name" --label "astrodx.test-owner=$name" \
  --cpus 1 --memory 512m --pids-limit 128 -e POSTGRES_USER=community -e POSTGRES_PASSWORD=wal-fixture-only \
  -e POSTGRES_DB=community_role_wal_test -e LD_PRELOAD=/test-wal-delay.so \
  -v "$root/wal-delay.so:/test-wal-delay.so:ro" -v "$root/markers:/wal-delay" \
@@ -28,7 +28,7 @@ for i in $(seq 1 120); do
  if docker exec -e PGPASSWORD=wal-fixture-only "$name" psql -h 127.0.0.1 -U community -d community_role_wal_test -Atqc 'select 1' >/dev/null 2>&1; then break; fi
  sleep .25
 done
-docker run --rm --pull=never --network "container:$name" --user "$(id -u):$(id -g)" --cpus 2 --memory 1g --pids-limit 256 \
+docker run --rm --pull=missing --network "container:$name" --user "$(id -u):$(id -g)" --cpus 2 --memory 1g --pids-limit 256 \
  -e HOME=/tmp -e STORAGE_TEST_WAL_DELAY=isolated-backend-only \
  -e TEST_DATABASE_URL=postgres://community:wal-fixture-only@127.0.0.1:5432/community_role_wal_test \
  -v "$repo:/repo:ro" -v "$root/markers:/wal-delay" -w /repo/apps/community \
