@@ -1,45 +1,43 @@
 {
-  "source": "91affcf914301ab4e08047b14cb3c168b3fa8e93",
-  "status": "passed",
-  "sampleCount": 204,
-  "observedSeconds": 238.731,
-  "idleSeconds": 120,
-  "continuousReadWriteIterations": 30,
-  "roleSessionsStable": true,
-  "allRoleLocksRetained": true,
-  "maxRoleHeartbeatAgeSeconds": 1.619779,
-  "containers": {
-    "postgres": {
-      "peakMemoryBytes": 196472832,
-      "oomEvents": 0,
-      "restarts": 0
-    },
-    "redis": {
-      "peakMemoryBytes": 56115200,
-      "oomEvents": 0,
-      "restarts": 0
-    },
-    "seaweedfs": {
-      "peakMemoryBytes": 78696448,
-      "oomEvents": 0,
-      "restarts": 0
-    },
-    "web": {
-      "peakMemoryBytes": 171671552,
-      "oomEvents": 0,
-      "restarts": 0
-    },
-    "media": {
-      "peakMemoryBytes": 107126784,
-      "oomEvents": 0,
-      "restarts": 0
-    },
-    "control": {
-      "peakMemoryBytes": 61345792,
-      "oomEvents": 0,
-      "restarts": 0
-    }
+  "status": "incomplete",
+  "totalSampleCount": 204,
+  "windowSampleCount": 177,
+  "checkedSampleCount": 177,
+  "outsideCheckedIntervalSampleCount": 27,
+  "skippedWithinWindow": 0,
+  "windowStart": "2026-10-15T20:16:09.299401+00:00",
+  "windowEnd": "2026-10-15T20:19:36.294491+00:00",
+  "windowSampleSpanSeconds": 206.99509,
+  "maxSampleGapSeconds": 1.216381,
+  "windowSampleChecksPassed": true,
+  "counts": {
+    "failedPgProbes": 0,
+    "nonThreeRoleSamples": 0,
+    "missingRoleSamples": 0,
+    "missingContainerSamples": 0,
+    "incompleteCgroupSamples": 0
   },
-  "priorFailureRootCause": "unresolved; not reproduced in this instrumented run",
+  "maxRoleHeartbeatAgeSeconds": 1.619779,
+  "peakMemoryBytes": {
+    "postgres": 196472832,
+    "redis": 56115200,
+    "seaweedfs": 78696448,
+    "web": 171671552,
+    "media": 107126784,
+    "control": 61345792
+  },
+  "applicationFailuresWithinWindow": [],
+  "applicationFailuresAfterWindowBeforeShutdown": [],
+  "coverageGaps": [
+    "timestamped_http_readiness_and_intentional_shutdown_not_recorded"
+  ],
+  "errors": [],
+  "continuousHttpReadinessMeasured": false,
+  "source": "91affcf914301ab4e08047b14cb3c168b3fa8e93",
+  "boundaryKind": "first_complete_three_role_sample_not_exact_http_readiness",
+  "totalSamplingSpanSeconds": 238.730577,
+  "knownSuccessfulHttpReadinessChecksDuringReadWrite": 30,
+  "exactStartupHttpReadinessTimestamp": null,
+  "idleSeconds": 120,
   "productionTimeoutsChanged": false
 }

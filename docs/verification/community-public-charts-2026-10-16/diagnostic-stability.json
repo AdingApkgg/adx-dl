@@ -1,52 +1,88 @@
 {
-  "source": "91affcf914301ab4e08047b14cb3c168b3fa8e93",
-  "status": "passed",
-  "testOnlyDiagnosticPreload": true,
-  "sampleCountAfterReadiness": 311,
-  "observedSecondsAfterReadiness": 364.493,
-  "idleSeconds": 300,
-  "continuousReadWriteIterations": 60,
-  "roleSessionsStable": true,
-  "allRoleLocksRetained": true,
-  "maxRoleHeartbeatAgeSeconds": 1.777788,
-  "maxRoleQueryMs": 1335.5061679999926,
-  "maxReportedLoopDelayMs": 318.77786000000003,
-  "roleQueryErrors": 0,
-  "clockDeltaWarnings": 0,
-  "maintenanceOwnerAlwaysNull": true,
-  "restoreStateAlwaysOpen": true,
-  "containers": {
-    "postgres": {
-      "peakMemoryBytes": 196472832,
-      "oomEvents": 0,
-      "restarts": 0
-    },
-    "redis": {
-      "peakMemoryBytes": 58617856,
-      "oomEvents": 0,
-      "restarts": 0
-    },
-    "seaweedfs": {
-      "peakMemoryBytes": 91389952,
-      "oomEvents": 0,
-      "restarts": 0
-    },
-    "web": {
-      "peakMemoryBytes": 134746112,
-      "oomEvents": 0,
-      "restarts": 0
-    },
-    "media": {
-      "peakMemoryBytes": 63148032,
-      "oomEvents": 0,
-      "restarts": 0
-    },
-    "control": {
-      "peakMemoryBytes": 83824640,
-      "oomEvents": 0,
-      "restarts": 0
-    }
+  "status": "failed",
+  "totalSampleCount": 332,
+  "windowSampleCount": 311,
+  "checkedSampleCount": 311,
+  "outsideCheckedIntervalSampleCount": 21,
+  "skippedWithinWindow": 0,
+  "windowStart": "2026-10-15T20:23:15.191839+00:00",
+  "windowEnd": "2026-10-15T20:29:19.684511+00:00",
+  "windowSampleSpanSeconds": 364.492673,
+  "maxSampleGapSeconds": 1.241912,
+  "windowSampleChecksPassed": true,
+  "counts": {
+    "failedPgProbes": 0,
+    "nonThreeRoleSamples": 0,
+    "missingRoleSamples": 0,
+    "missingContainerSamples": 0,
+    "incompleteCgroupSamples": 0
   },
-  "priorFailureRootCause": "unresolved; not reproduced in this bounded diagnostic run",
-  "productionTimeoutsChanged": false
+  "maxRoleHeartbeatAgeSeconds": 1.777788,
+  "peakMemoryBytes": {
+    "postgres": 196472832,
+    "redis": 58617856,
+    "seaweedfs": 91389952,
+    "web": 134746112,
+    "media": 63148032,
+    "control": 83824640
+  },
+  "applicationFailuresWithinWindow": [],
+  "applicationFailuresAfterWindowBeforeShutdown": [
+    {
+      "time": "2026-10-15T20:29:59.327Z",
+      "role": "web",
+      "event": "query_error",
+      "code": null,
+      "type": "Error",
+      "message": "Query read timeout"
+    },
+    {
+      "time": "2026-10-15T20:29:59.327963157Z",
+      "event": "STORAGE_ROLE_LOST"
+    },
+    {
+      "time": "2026-10-15T20:29:59.328Z",
+      "role": "media",
+      "event": "query_error",
+      "code": null,
+      "type": "Error",
+      "message": "Query read timeout"
+    },
+    {
+      "time": "2026-10-15T20:29:59.328426438Z",
+      "event": "STORAGE_ROLE_LOST"
+    },
+    {
+      "time": "2026-10-15T20:29:59.330Z",
+      "role": "control",
+      "event": "query_error",
+      "code": null,
+      "type": "Error",
+      "message": "Query read timeout"
+    },
+    {
+      "time": "2026-10-15T20:29:59.330755441Z",
+      "event": "STORAGE_ROLE_LOST"
+    }
+  ],
+  "coverageGaps": [
+    "explicit_http_readiness_missing",
+    "final_health_missing_or_failed",
+    "samples_do_not_cover_ready_through_shutdown"
+  ],
+  "errors": [
+    "application_failure_before_intentional_shutdown"
+  ],
+  "continuousHttpReadinessMeasured": false,
+  "source": "91affcf914301ab4e08047b14cb3c168b3fa8e93",
+  "boundaryKind": "first_complete_three_role_sample_not_exact_http_readiness",
+  "totalSamplingSpanSeconds": 389.558962,
+  "knownSuccessfulHttpReadinessChecksDuringReadWrite": 60,
+  "exactStartupHttpReadinessTimestamp": null,
+  "idleSeconds": 300,
+  "productionTimeoutsChanged": false,
+  "intentionalShutdownRequestedAt": "2026-10-15T20:30:11.236Z",
+  "immediateFailureTrigger": "three client query read timers expired at approximately 2000 ms",
+  "underlyingLatencyCause": "unresolved; PG/backend sampling ended before the failure",
+  "pgLogSnapshotAt": "2026-10-15T20:29:56.376Z"
 }
