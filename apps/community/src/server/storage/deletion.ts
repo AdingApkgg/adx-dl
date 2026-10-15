@@ -1,3 +1,4 @@
+import { retentionFact } from "@/shared/chart-journal";
 import { awaitChartJournal } from "../charts/publication-journal";
 import { publicationDto } from "../charts/service";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -321,12 +322,12 @@ export function createStorageDeletionHandler(
         .limit(1);
       const [fact] = await tx.insert(storageTombstones).values({
         kind: "user_deleted", userId, createdAt: now,
-        payload: retained.length || revocations.length ? {
+        payload: retained.length || revocations.length ? retentionFact.parse({
           version: 1,
           retained: retained.map(({ chart, publication }) => ({
             version: 1, chartId: chart.id, revision: chart.revision, publication: publicationDto(publication),
           })),
-        } : undefined,
+        }) : undefined,
       }).returning();
       if (retained.length) await tx.update(charts).set({ publicationSequence: fact.sequence })
         .where(inArray(charts.id, retained.map(r => r.chart.id)));

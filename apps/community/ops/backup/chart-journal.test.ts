@@ -27,3 +27,26 @@ test("versioned chart permission facts are accepted and malformed snapshots fail
     } as never),
   ).toBe(false);
 });
+
+test("permission and retained-user metadata use Unicode code-point bounds", async () => {
+  const { permissionFact, retentionFact } = await import("../../src/shared/chart-journal");
+  const fact = {
+    version: 1,
+    chartId: crypto.randomUUID(),
+    revision: 1,
+    publication: {
+      versionId: crypto.randomUUID(),
+      title: "😀".repeat(120),
+      artist: "🎵".repeat(120),
+      publishedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+  };
+  expect(permissionFact.safeParse(fact).success).toBe(true);
+  expect(retentionFact.safeParse({ version: 1, retained: [fact] }).success).toBe(true);
+  for (const field of ["title", "artist"]) {
+    const invalid = { ...fact, publication: { ...fact.publication, [field]: "😀".repeat(121) } };
+    expect(permissionFact.safeParse(invalid).success).toBe(false);
+    expect(retentionFact.safeParse({ version: 1, retained: [invalid] }).success).toBe(false);
+  }
+});

@@ -1,10 +1,12 @@
 import { z } from "zod";
 const date = z.string().datetime();
+// Match service validation and PostgreSQL char_length independently of UTF-16 units.
+const chartText = z.string().refine((value) => [...value].length <= 120);
 const publication = z
   .object({
     versionId: z.string().uuid(),
-    title: z.string().min(1).max(120),
-    artist: z.string().max(120),
+    title: chartText.refine((value) => value.length > 0),
+    artist: chartText,
     publishedAt: date,
     updatedAt: date,
   })

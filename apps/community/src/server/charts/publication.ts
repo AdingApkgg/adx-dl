@@ -17,7 +17,7 @@ import { StorageError, StorageUnavailableError } from "../storage/errors";
 import { withStorageTransaction } from "../storage/transactions";
 import { lockUploadAccounting, storageTime } from "../storage/usage";
 import { UUID_PATTERN } from "../uuid";
-import { dto, ownChart, publicationDto, verifyHistoricalSource } from "./service";
+import { getChart, ownChart, publicationDto, verifyHistoricalSource } from "./service";
 import { validateChartPreviewManifest, chartArtifactDataStart } from "./artifact";
 import { CHART_PREVIEW_MIME } from "./recipe";
 import { recordPermission, awaitChartJournal } from "./publication-journal";
@@ -106,7 +106,7 @@ export async function publishChart(
     return { chart: saved, sequence };
   });
   await awaitChartJournal(ctx, result.sequence);
-  return dto(ctx.db, result.chart);
+  return getChart(ctx, userId, id);
 }
 export async function withdrawChart(
   ctx: StorageContext,
@@ -134,7 +134,7 @@ export async function withdrawChart(
     return { chart: saved, sequence };
   });
   await awaitChartJournal(ctx, result.sequence);
-  return dto(ctx.db, result.chart);
+  return getChart(ctx, userId, id);
 }
 // One authorization query for each request, including validators and HEAD. No File permission is changed.
 function query(ctx: StorageContext) {

@@ -60,38 +60,48 @@ export async function replayDeletedUserCharts(
   const retained = r.payload ? retentionFact.parse(r.payload).retained : [];
 
   for (const fact of retained) {
-    // Only this historical owner's association can become anonymous. Later unrelated ownership never qualifies.
-    const owns = await c.query(
-      "select 1 from charts where id=$1 and (owner_id=$2 or owner_id is null)",
-      [fact.chartId, r.userId],
+    // A backup predating the selected version still needs a stable anonymous recovery anchor.
+    await c.query(
+      `insert into charts(id,owner_id,title,artist,revision,publication_sequence)
+       values($1,null,$2,$3,$4,$5) on conflict(id) do nothing`,
+      [fact.chartId, fact.publication.title, fact.publication.artist, fact.revision, r.sequence],
     );
-    if (!owns.rowCount) {
-      reportPending?.({
-        code: "CHART_PUBLICATION_RESTORE_PENDING",
-        chartId: fact.chartId,
-        versionId: fact.publication.versionId,
-      });
+    const chart = await c.query(
+      "select owner_id,publication_sequence from charts where id=$1 for update",
+      [fact.chartId],
+    );
+    const row = chart.rows[0];
+    // Never overwrite a later permission or adopt another owner's historical association.
+    if (
+      (row.owner_id !== null && row.owner_id !== r.userId) ||
+      Number(row.publication_sequence) > r.sequence
+    )
       continue;
-    }
-    await replayChartPermission(c, r, fact, reportPending);
-    const p = await c.query(
-      "select version_id from chart_publications where chart_id=$1 and version_id=$2",
-      [fact.chartId, fact.publication.versionId],
-    );
-    if (!p.rowCount) continue;
-
+    const version = await c.query("select id from chart_versions where chart_id=$1 and id=$2", [
+      fact.chartId,
+      fact.publication.versionId,
+    ]);
+    // Retention does not depend on derived bytes being ready. Keep the exact version/source
+    // reference so rebuild and a replay of this fact can reopen it; all other history is private.
     await c.query(
       "update charts set current_version_id=$2,title=$3,artist=$4,owner_id=null where id=$1",
-      [fact.chartId, fact.publication.versionId, fact.publication.title, fact.publication.artist],
+      [
+        fact.chartId,
+        version.rowCount ? fact.publication.versionId : null,
+        fact.publication.title,
+        fact.publication.artist,
+      ],
     );
+    await c.query("delete from chart_publications where chart_id=$1", [fact.chartId]);
     await c.query("delete from chart_versions where chart_id=$1 and id<>$2", [
       fact.chartId,
       fact.publication.versionId,
     ]);
     await c.query(
-      "update files set owner_id=null,original_name='removed' where id in(select source_file_id from chart_versions where chart_id=$1)",
-      [fact.chartId],
+      "update files set owner_id=null,original_name='removed' where (owner_id=$2 or owner_id is null) and id in(select source_file_id from chart_versions where chart_id=$1)",
+      [fact.chartId, r.userId],
     );
+    await replayChartPermission(c, r, fact, reportPending);
   }
   await c.query(
     "delete from chart_publications where chart_id in(select id from charts where owner_id=$1)",

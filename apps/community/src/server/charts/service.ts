@@ -35,7 +35,7 @@ export async function ownChart(db: ReferenceDb, userId: string, id: string, incl
   if (!row) throw notFound();
   return row.chart;
 }
-export async function dto(db: ReferenceDb, chart: Chart): Promise<ChartDto> {
+async function dto(db: DbTransaction, chart: Chart): Promise<ChartDto> {
   if (!chart.currentVersionId || chart.deletedAt) throw notFound();
   const rows = await db.select({ version: chartVersions, size: files.size }).from(chartVersions)
     .innerJoin(files, eq(files.id, chartVersions.sourceFileId))
@@ -114,7 +114,10 @@ export async function createChart(ctx: StorageContext, userId: string, fileId: s
   });
 }
 export async function getChart(ctx: StorageContext, userId: string, id: string): Promise<ChartDto> {
-  return dto(ctx.db, await ownChart(ctx.db, userId, id));
+  // Chart revision/sequence, publication and checkpoint must describe one database snapshot.
+  return ctx.db.transaction(async tx => dto(tx, await ownChart(tx, userId, id)), {
+    isolationLevel: "repeatable read", accessMode: "read only",
+  });
 }
 type Cursor = { at: string; id: string };
 function decodeCursor(value: string): Cursor {

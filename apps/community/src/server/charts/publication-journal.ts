@@ -1,3 +1,4 @@
+import { permissionFact } from "@/shared/chart-journal";
 import { eq } from "drizzle-orm";
 import type { ChartPublicationDto } from "@/shared/charts";
 import { storageJournalProgress, storageTombstones } from "../db/schema";
@@ -12,12 +13,13 @@ export async function recordPermission(
   createdAt: Date,
   userId?: string,
 ) {
+  const payload = permissionFact.parse({ version: 1, chartId, revision, publication });
   const [r] = await tx
     .insert(storageTombstones)
     .values({
       kind: "chart_permission",
       userId,
-      payload: { version: 1, chartId, revision, publication },
+      payload,
       createdAt,
     })
     .returning({ sequence: storageTombstones.sequence });

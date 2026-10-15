@@ -814,3 +814,364 @@ test("lost-response read-back cannot report a publication successful before its 
     publication: { versionId: chart.currentVersionId },
   });
 });
+
+// A dedicated real PostgreSQL connection pauses a SELECT after its server snapshot,
+// while a separate connection commits the conflicting write. No sleeps or product hooks.
+async function interleavedChartRead<T>(
+  run: (ctx: typeof fixture.ctx) => Promise<T>,
+  between: () => Promise<void>,
+) {
+  const { Client } = await import("pg");
+  const { drizzle } = await import("drizzle-orm/node-postgres");
+  const schema = await import("../db/schema");
+  const client = new Client({ connectionString: testDatabaseUrl() });
+  await client.connect();
+  const execute = client.query.bind(client) as (
+    config: unknown,
+    values?: unknown,
+  ) => Promise<unknown>;
+  let fired = false;
+  client.query = (async (config: string | { text: string }, values?: unknown) => {
+    const result = await execute(config, values);
+    const text = typeof config === "string" ? config : config.text;
+    if (!fired && text.includes('from "charts"') && text.includes('inner join "user"')) {
+      fired = true;
+      await between();
+    }
+    return result;
+  }) as typeof client.query;
+  try {
+    const result = await run({
+      ...fixture.ctx,
+      db: drizzle({ client, schema, casing: "snake_case" }),
+    });
+    expect(fired).toBe(true);
+    return result;
+  } finally {
+    await client.end();
+  }
+}
+for (const change of ["withdraw", "replace"] as const) {
+  test(`GET publication snapshot stays coherent across a failed concurrent ${change}`, async () => {
+    const { getChart, appendChartVersion } = await import("./service");
+    const { publishChart, withdrawChart } = await import("./publication");
+    const ctx = fixture.ctx,
+      owner = await readyOwner(ctx);
+    let chart = await createChart(ctx, owner, (await chartFile(owner)).file.id);
+    chart = await publishChart(ctx, owner, chart.id, {
+      expectedRevision: chart.revision,
+      versionId: chart.currentVersionId,
+      confirmOriginalArchive: true,
+    });
+    const selected = chart.currentVersionId;
+    chart = await appendChartVersion(ctx, owner, chart.id, {
+      fileId: (await chartFile(owner)).file.id,
+      expectedRevision: chart.revision,
+    });
+    const failed = {
+      ...ctx,
+      exportChartJournal: async () => {
+        throw new Error("offline");
+      },
+    };
+    const read = await interleavedChartRead(
+      (c) => getChart(c, owner, chart.id),
+      async () => {
+        await expect(
+          change === "withdraw"
+            ? withdrawChart(failed, owner, chart.id, chart.revision)
+            : publishChart(failed, owner, chart.id, {
+                expectedRevision: chart.revision,
+                versionId: chart.currentVersionId,
+                confirmOriginalArchive: true,
+              }),
+        ).rejects.toMatchObject({ status: 503 });
+      },
+    );
+    expect(read).toMatchObject({
+      revision: chart.revision,
+      publication: { versionId: selected },
+      publicationPending: false,
+    });
+    expect(await getChart(ctx, owner, chart.id)).toMatchObject({
+      revision: chart.revision + 1,
+      publicationPending: true,
+    });
+    await ctx.exportChartJournal!();
+  });
+}
+for (const action of ["publish", "withdraw"] as const) {
+  test(`${action} response rereads a coherent snapshot after its barrier and a later pending mutation`, async () => {
+    const { getChart } = await import("./service");
+    const { publishChart, withdrawChart } = await import("./publication");
+    const ctx = fixture.ctx,
+      owner = await readyOwner(ctx);
+    let chart = await createChart(ctx, owner, (await chartFile(owner)).file.id);
+    if (action === "withdraw")
+      chart = await publishChart(ctx, owner, chart.id, {
+        expectedRevision: chart.revision,
+        versionId: chart.currentVersionId,
+        confirmOriginalArchive: true,
+      });
+    const failed = {
+      ...ctx,
+      exportChartJournal: async () => {
+        throw new Error("offline");
+      },
+    };
+    const racing = {
+      ...ctx,
+      exportChartJournal: async () => {
+        await ctx.exportChartJournal!();
+        const current = await getChart(ctx, owner, chart.id);
+        await expect(
+          action === "publish"
+            ? withdrawChart(failed, owner, chart.id, current.revision)
+            : publishChart(failed, owner, chart.id, {
+                expectedRevision: current.revision,
+                versionId: current.currentVersionId,
+                confirmOriginalArchive: true,
+              }),
+        ).rejects.toMatchObject({ status: 503 });
+      },
+    };
+    const response =
+      action === "publish"
+        ? await publishChart(racing, owner, chart.id, {
+            expectedRevision: chart.revision,
+            versionId: chart.currentVersionId,
+            confirmOriginalArchive: true,
+          })
+        : await withdrawChart(racing, owner, chart.id, chart.revision);
+    expect(response).toMatchObject({
+      revision: chart.revision + 2,
+      publicationPending: true,
+      publication: action === "publish" ? null : { versionId: chart.currentVersionId },
+    });
+    await ctx.exportChartJournal!();
+  });
+}
+
+for (const missing of ["derivative", "version"] as const) {
+  test(`retention replay preserves an anonymous recovery anchor when the authorized ${missing} is missing`, async () => {
+    const { publishChart, getPublicChart } = await import("./publication");
+    const { appendChartVersion } = await import("./service");
+    const { requestDeletion, purgeUser } = await import("../services/user-deletion");
+    const { createDeletionHandlers } = await import("../storage/deletion");
+    const { retainsFile } = await import("../storage/references");
+    const { user, storageTombstones, storageJournalProgress } = await import("../db/schema");
+    const { replayJournal } = await import("../../../ops/backup/restore");
+    const { Client } = await import("pg");
+    const ctx = fixture.ctx,
+      owner = await readyOwner(ctx),
+      selected = await chartFile(owner),
+      secret = await chartFile(owner);
+    let chart = await createChart(ctx, owner, selected.file.id);
+    const selectedId = chart.currentVersionId;
+    chart = await publishChart(ctx, owner, chart.id, {
+      expectedRevision: chart.revision,
+      versionId: selectedId,
+      confirmOriginalArchive: true,
+    });
+    chart = await appendChartVersion(ctx, owner, chart.id, {
+      expectedRevision: chart.revision,
+      fileId: secret.file.id,
+    });
+    const [oldChart] = await ctx.db.select().from(charts).where(eq(charts.id, chart.id));
+    const [oldUser] = await ctx.db.select().from(user).where(eq(user.id, owner));
+    const versions = await ctx.db
+      .select()
+      .from(chartVersions)
+      .where(eq(chartVersions.chartId, chart.id));
+    const deps = { db: ctx.db, boss: ctx.boss, handlers: createDeletionHandlers(ctx) };
+    await requestDeletion(deps, owner, { deleteContent: false });
+    await ctx.db
+      .update(user)
+      .set({ deletionPurgeAt: new Date(0) })
+      .where(eq(user.id, owner));
+    await purgeUser(deps, owner);
+    const [head] = await ctx.db.select().from(storageJournalProgress);
+    const records = (
+      await ctx.db.select().from(storageTombstones).orderBy(storageTombstones.sequence)
+    )
+      .filter((r) => r.sequence > oldChart.publicationSequence)
+      .map((r) => ({
+        ...r,
+        payload: r.payload ?? undefined,
+        createdAt: r.createdAt.toISOString(),
+      }));
+    await ctx.db.insert(user).values(oldUser);
+    await ctx.db.delete(chartPublications).where(eq(chartPublications.chartId, chart.id));
+    await ctx.db
+      .update(charts)
+      .set({ ...oldChart, currentVersionId: null })
+      .where(eq(charts.id, chart.id));
+    for (const version of versions)
+      await ctx.db.insert(chartVersions).values(version).onConflictDoNothing();
+    for (const source of [selected, secret])
+      await ctx.db.update(files).set(source.file).where(eq(files.id, source.file.id));
+    if (missing === "version")
+      await ctx.db.delete(chartVersions).where(eq(chartVersions.id, selectedId));
+    else
+      await ctx.db
+        .update(blobDerivatives)
+        .set({ state: "pending" })
+        .where(eq(blobDerivatives.id, selected.recipe.id));
+    const client = new Client({ connectionString: testDatabaseUrl() });
+    await client.connect();
+    const replay = (diagnostics: unknown[]) =>
+      replayJournal(
+        client,
+        records,
+        {
+          sequence: head.exportedSequence,
+          hash: head.chainHash!,
+          capturedAt: head.exportedAt!.toISOString(),
+        },
+        { onChartPending: (d) => diagnostics.push(d) },
+      );
+    try {
+      const pending: unknown[] = [];
+      await replay(pending);
+      expect(pending).toEqual([
+        { code: "CHART_PUBLICATION_RESTORE_PENDING", chartId: chart.id, versionId: selectedId },
+      ]);
+      await expect(getPublicChart(ctx, chart.id)).rejects.toMatchObject({ status: 404 });
+      expect((await ctx.db.select().from(charts).where(eq(charts.id, chart.id)))[0]).toMatchObject({
+        ownerId: null,
+        currentVersionId: missing === "version" ? null : selectedId,
+      });
+      expect(await ctx.db.select().from(user).where(eq(user.id, owner))).toHaveLength(0);
+      expect(
+        await ctx.db
+          .select()
+          .from(chartVersions)
+          .where(eq(chartVersions.id, chart.currentVersionId)),
+      ).toHaveLength(0);
+      if (missing === "derivative") {
+        expect(await retainsFile(ctx.db, selected.file.id)).toBe(true);
+        expect(
+          (await ctx.db.select().from(files).where(eq(files.id, selected.file.id)))[0],
+        ).toMatchObject({ ownerId: null, state: "ready", originalName: "removed" });
+      }
+      // A second replay must not delete the already anonymous anchor or its live source.
+      await replay([]);
+      if (missing === "version") {
+        await ctx.db
+          .update(files)
+          .set({ ...selected.file, ownerId: null, originalName: "removed" })
+          .where(eq(files.id, selected.file.id));
+        await ctx.db.insert(chartVersions).values(versions.find((v) => v.id === selectedId)!);
+      } else
+        await ctx.db
+          .update(blobDerivatives)
+          .set({ state: "ready" })
+          .where(eq(blobDerivatives.id, selected.recipe.id));
+      const recovered: unknown[] = [];
+      await replay(recovered);
+      expect(recovered).toEqual([]);
+      expect(await getPublicChart(ctx, chart.id)).toMatchObject({
+        versionId: selectedId,
+        author: null,
+      });
+      expect(await retainsFile(ctx.db, selected.file.id)).toBe(true);
+      expect(
+        (await ctx.db.select().from(chartVersions).where(eq(chartVersions.chartId, chart.id))).map(
+          (v) => v.id,
+        ),
+      ).toEqual([selectedId]);
+    } finally {
+      await client.end();
+    }
+  });
+}
+
+test("invalid permission payload is rejected before it can enter the journal outbox", async () => {
+  const { recordPermission } = await import("./publication-journal");
+  const { storageTombstones } = await import("../db/schema");
+  const chartId = crypto.randomUUID();
+  let rejected = false;
+  const rollback = new Error("test rollback");
+  await fixture.ctx.db
+    .transaction(async (tx) => {
+      try {
+        await recordPermission(
+          tx,
+          chartId,
+          1,
+          {
+            versionId: crypto.randomUUID(),
+            title: "😀".repeat(121),
+            artist: "",
+            publishedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          new Date(),
+        );
+      } catch {
+        rejected = true;
+      }
+      expect(
+        await tx
+          .select()
+          .from(storageTombstones)
+          .where(sql`${storageTombstones.payload}->>'chartId'=${chartId}`),
+      ).toHaveLength(0);
+      throw rollback;
+    })
+    .catch((error) => {
+      if (error !== rollback) throw error;
+    });
+  expect(rejected).toBe(true);
+});
+
+test("non-BMP metadata exports at 61 and 120 code points and does not block subsequent withdrawals or retained-user facts", async () => {
+  const { publishChart, withdrawChart } = await import("./publication");
+  const { updateChart } = await import("./service");
+  const { requestDeletion, purgeUser } = await import("../services/user-deletion");
+  const { createDeletionHandlers } = await import("../storage/deletion");
+  const { user, storageJournalProgress } = await import("../db/schema");
+  const ctx = fixture.ctx,
+    owner = await readyOwner(ctx),
+    other = await readyOwner(ctx);
+  let target = await createChart(ctx, other, (await chartFile(other)).file.id);
+  target = await publishChart(ctx, other, target.id, {
+    expectedRevision: target.revision,
+    versionId: target.currentVersionId,
+    confirmOriginalArchive: true,
+  });
+  let chart = await createChart(ctx, owner, (await chartFile(owner)).file.id);
+  for (const count of [61, 120]) {
+    chart = await updateChart(ctx, owner, chart.id, {
+      expectedRevision: chart.revision,
+      title: "😀".repeat(count),
+      artist: "🎵".repeat(count),
+    });
+    chart = await publishChart(ctx, owner, chart.id, {
+      expectedRevision: chart.revision,
+      versionId: chart.currentVersionId,
+      confirmOriginalArchive: true,
+    });
+    expect(chart.publicationPending).toBe(false);
+  }
+  await expect(
+    updateChart(ctx, owner, chart.id, {
+      expectedRevision: chart.revision,
+      title: "😀".repeat(121),
+    }),
+  ).rejects.toMatchObject({ status: 400 });
+  const [published] = await ctx.db.select().from(storageJournalProgress);
+  expect(await withdrawChart(ctx, other, target.id, target.revision)).toMatchObject({
+    publication: null,
+    publicationPending: false,
+  });
+  const deps = { db: ctx.db, boss: ctx.boss, handlers: createDeletionHandlers(ctx) };
+  await requestDeletion(deps, owner, { deleteContent: false });
+  await ctx.db
+    .update(user)
+    .set({ deletionPurgeAt: new Date(0) })
+    .where(eq(user.id, owner));
+  expect(await purgeUser(deps, owner)).toBe("purged");
+  const [retained] = await ctx.db.select().from(storageJournalProgress);
+  expect(retained.exportedSequence).toBeGreaterThan(published.exportedSequence);
+});
