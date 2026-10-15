@@ -1,5 +1,6 @@
 import { createStorageIOTracker } from "../server/storage/maintenance";
 import { startStorageRole } from "../server/storage/runtime-role";
+import { superviseStorageRole } from "../server/storage/process-supervision";
 import { rebuildMissingDerived } from "../server/storage/backup";
 import { assertMediaScratch } from "../server/storage/health";
 import { assertNormalStorageStartup } from "../../ops/backup/restore";
@@ -72,17 +73,12 @@ if (import.meta.main) {
   });
   await assertMediaScratch(ctx.config.tempDir);
   const role = await startStorageRole({databaseUrl:url,role:"media",tracker});
-  await boss.start();
-  await registerMediaWorkers(ctx);
-  let stopping = false;
+  let stopping: Promise<void> | undefined;
   let rebuilding: Promise<unknown> | undefined;
-  const repairTimer = setInterval(() => {
-    if(stopping || rebuilding || tracker.status().paused || tracker.status().active) return;
-    rebuilding=tracker.run(() => rebuildMissingDerived(ctx,1)).catch(error=>log.error("storage_rebuild_failed",describeError(error))).finally(()=>{rebuilding=undefined;});
-  },1000);
-  const stop = async () => {
-    if (stopping) return;
-    stopping = true;
+  let repairTimer: ReturnType<typeof setInterval> | undefined;
+  const stop = (): Promise<void> => {
+    if (stopping) return stopping;
+    stopping = (async () => {
     clearInterval(repairTimer);
     tracker.pause();
     controller.abort();
@@ -91,7 +87,16 @@ if (import.meta.main) {
     await tracker.pauseAndDrain(AbortSignal.timeout(5000));
     await role.stop();
     await pool.end();
+  })();
+    return stopping;
   };
+  superviseStorageRole(role.failure, stop, 130000);
+  await boss.start();
+  await registerMediaWorkers(ctx);
+  repairTimer = setInterval(() => {
+    if(stopping || rebuilding || tracker.status().paused || tracker.status().active) return;
+    rebuilding=tracker.run(() => rebuildMissingDerived(ctx,1)).catch(error=>log.error("storage_rebuild_failed",describeError(error))).finally(()=>{rebuilding=undefined;});
+  },1000);
   process.on("SIGTERM", () => void stop());
   process.on("SIGINT", () => void stop());
   log.info("media_worker_started", { recipeBuild: RECIPE_BUILD });

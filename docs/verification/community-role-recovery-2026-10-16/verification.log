@@ -1,0 +1,190 @@
+verify.sh: i@localhost-1.tailac9c6f.ts.net run 20261016-002619-wt-c2638e5 (tree a4a4d12fe950)
+bun test v1.4.2 (744846f84)
+
+src/server/storage/process-supervision.test.ts:
+(pass) lost role drains once then exits nonzero so the container can restart [15.08ms]
+(pass) healthy role leaves normal process exit untouched [4.07ms]
+(pass) loss before supervision attaches still drains and exits [14.56ms]
+(pass) stalled drain has a bounded nonzero exit [204.17ms]
+(pass) rejected drain exits without exposing private database errors [4.22ms]
+
+src/server/storage/runtime-role.test.ts:
+(pass) actual role process ownership fences duplicates, waits active IO, resumes only matching gate and rejects replacement [1574.14ms]
+(pass) finished async parent cannot inherit tracker admission and start untracked nested IO during pause [0.37ms]
+(pass) actual advisory session termination freezes role admission and invalidates readiness [42.51ms]
+(pass) normal role shutdown does not report session loss [7.05ms]
+(pass) stopping during a heartbeat waits for it without destroying the normal cleanup connection [521.91ms]
+(pass) conditional heartbeat miss pauses the current owner then retries without reporting loss [1016.52ms]
+(pass) replaced role ownership freezes admission and reports session loss [510.33ms]
+(pass) terminated PostgreSQL ownership drains and exits the actual role process [54.27ms]
+
+src/server/storage/maintenance.test.ts:
+(pass) bounded owner cannot extend deadline; snapshot drains actual transactions; failed snapshot releases exclusive connection [131.83ms]
+(pass) stale release cannot clear another owner; fixed duration capped to five minutes [4.52ms]
+(pass) snapshot timeout destroys the actual dedicated backend, releases exclusion and never extends lease [717.71ms]
+
+src/server/storage/drain-lifecycle.test.ts:
+(pass) web shutdown aborts in-flight media and permanently closes registration [0.21ms]
+
+ 17 pass
+ 0 fail
+ 55 expect() calls
+Ran 17 tests across 4 files. [5.02s]
+$ paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy url baseLocale --output-structure message-modules --emit-ts-declarations
+[info] [paraglide-js] Compiling inlang project ...
+[success] [paraglide-js] Successfully compiled inlang project.
+$ react-router typegen
+[success] [paraglide-js] Compilation complete (message-modules)
+$ bun x --bun react-router build
+[info] [paraglide-js] Compilation skipped — inputs unchanged (message-modules)
+Using Vite Environment API
+vite v8.3.1 building client environment for production...
+[info] [paraglide-js] Compilation skipped — inputs unchanged (message-modules)
+transforming...
+✓ 3009 modules transformed.
+rendering chunks...
+computing gzip size...
+build/client/assets/chart-folder-CRWKnhmf.js                             5.89 kB
+build/client/assets/file-hash-DcSoxCHm.js                                6.11 kB
+build/client/assets/noto-sans-greek-ext-wght-normal-12T8GTDR.woff2      10.76 kB
+build/client/assets/noto-sans-vietnamese-wght-normal-DLTJy58D.woff2     14.45 kB
+build/client/assets/noto-sans-cyrillic-wght-normal-B2hlT84T.woff2       20.08 kB
+build/client/assets/noto-sans-greek-wght-normal-Ymb6dZNd.woff2          21.77 kB
+build/client/.vite/manifest.json                                        26.33 kB │ gzip:  2.90 kB
+build/client/assets/noto-sans-latin-wght-normal-BYSzYMf3.woff2          35.82 kB
+build/client/assets/noto-sans-cyrillic-ext-wght-normal-DSNfmdVt.woff2   70.68 kB
+build/client/assets/noto-sans-devanagari-wght-normal-Cv-Vwajv.woff2     99.23 kB
+build/client/assets/noto-sans-latin-ext-wght-normal-W1qJv59z.woff2     167.96 kB
+build/client/assets/app-B84X6oXq.css                                    69.29 kB │ gzip: 12.28 kB
+build/client/assets/queryOptions-Dfvzj6n2.js                             0.03 kB │ gzip:  0.05 kB
+build/client/assets/home-client-loader-Bg3diNr4.js                       0.05 kB │ gzip:  0.07 kB
+build/client/assets/locale-client-loader-Bg3diNr4.js                     0.05 kB │ gzip:  0.07 kB
+build/client/assets/settings-account-client-loader-Bg3diNr4.js           0.05 kB │ gzip:  0.07 kB
+build/client/assets/settings-account-client-middleware-Zr-X_2gJ.js       0.05 kB │ gzip:  0.07 kB
+build/client/assets/locale-3qd8rtW7.js                                   0.07 kB │ gzip:  0.08 kB
+build/client/assets/not-found-B1nKXrpa.js                                0.09 kB │ gzip:  0.11 kB
+build/client/assets/next-path-CRTwZXyE.js                                0.12 kB │ gzip:  0.10 kB
+build/client/assets/locale-uRIUT191.js                                   0.14 kB │ gzip:  0.12 kB
+build/client/assets/chart_difficulties-XsWSwisW.js                       0.19 kB │ gzip:  0.18 kB
+build/client/assets/user_page_id-D0jdSwmr.js                             0.19 kB │ gzip:  0.17 kB
+build/client/assets/charts_title-CG9O6puW.js                             0.20 kB │ gzip:  0.19 kB
+build/client/assets/chart_new-ZxlzcnDB.js                                0.22 kB │ gzip:  0.21 kB
+build/client/assets/privacy_link-CnktyFdB.js                             0.22 kB │ gzip:  0.22 kB
+build/client/assets/site_name-Bs0f1Vnz.js                                0.23 kB │ gzip:  0.22 kB
+build/client/assets/me-8iFQlMB7.js                                       0.23 kB │ gzip:  0.20 kB
+build/client/assets/toast_passkey_added-DHnfW60j.js                      0.24 kB │ gzip:  0.24 kB
+build/client/assets/nickname-ChoPXrXx.js                                 0.25 kB │ gzip:  0.20 kB
+build/client/assets/account-errors-BChnObwS.js                           0.33 kB │ gzip:  0.27 kB
+build/client/assets/use-hydrated-CjzZ5Tvd.js                             0.34 kB │ gzip:  0.28 kB
+build/client/assets/settings_profile_title-C1SjAHa2.js                   0.36 kB │ gzip:  0.29 kB
+build/client/assets/page-title-B3nIeyc9.js                               0.40 kB │ gzip:  0.27 kB
+build/client/assets/analytics-DGe4d-8H.js                                0.41 kB │ gzip:  0.29 kB
+build/client/assets/jsx-runtime-IICjP95_.js                              0.42 kB │ gzip:  0.29 kB
+build/client/assets/alert-DzpZvptg.js                                    0.48 kB │ gzip:  0.32 kB
+build/client/assets/require-user-4RrmPSWD.js                             0.49 kB │ gzip:  0.29 kB
+build/client/assets/locale-D12JuFZA.js                                   0.51 kB │ gzip:  0.35 kB
+build/client/assets/login-options-Dm8rlksc.js                            0.61 kB │ gzip:  0.49 kB
+build/client/assets/dist-SPzZRfD_.js                                     0.73 kB │ gzip:  0.49 kB
+build/client/assets/avatar_uploading-DrFslVu5.js                         0.75 kB │ gzip:  0.46 kB
+build/client/assets/seo-BL7Pqd8u.js                                      0.81 kB │ gzip:  0.42 kB
+build/client/assets/avatar-Nn9h2hLF.js                                   1.02 kB │ gzip:  0.66 kB
+build/client/assets/chart-new-CDWHBcw0.js                                1.14 kB │ gzip:  0.61 kB
+build/client/assets/label-Cq-Ak6s5.js                                    1.64 kB │ gzip:  0.88 kB
+build/client/assets/card-DG2SBgb1.js                                     1.67 kB │ gzip:  0.64 kB
+build/client/assets/error-card-DIeWtAGy.js                               2.58 kB │ gzip:  1.38 kB
+build/client/assets/root-CXgAzF0u.js                                     3.13 kB │ gzip:  1.51 kB
+build/client/assets/profile-CG18vIyR.js                                  3.30 kB │ gzip:  1.66 kB
+build/client/assets/runtime-CkTchidG.js                                  3.44 kB │ gzip:  1.48 kB
+build/client/assets/user-profile-BTvJJ50Z.js                             3.53 kB │ gzip:  1.76 kB
+build/client/assets/charts-BX0F1oCX.js                                   3.84 kB │ gzip:  1.84 kB
+build/client/assets/react-dom-sFhfRZD1.js                                3.85 kB │ gzip:  1.39 kB
+build/client/assets/account-deletion-Bcf-0s_w.js                         3.95 kB │ gzip:  1.95 kB
+build/client/assets/home-B-rE0Bz9.js                                     4.23 kB │ gzip:  2.03 kB
+build/client/assets/file-upload-CJrKiCbD.js                              4.66 kB │ gzip:  2.11 kB
+build/client/assets/qq-code-form-5WgbqmoP.js                             4.93 kB │ gzip:  2.27 kB
+build/client/assets/storage-CkbQVS8w.js                                  5.03 kB │ gzip:  2.34 kB
+build/client/assets/onboarding-Bew8d8V_.js                               5.28 kB │ gzip:  2.62 kB
+build/client/assets/auth-errors-D9Mlbhk-.js                              7.99 kB │ gzip:  3.39 kB
+build/client/assets/login-C-BkmgqU.js                                    8.71 kB │ gzip:  3.83 kB
+build/client/assets/charts-BuB6SAc-.js                                   9.35 kB │ gzip:  4.26 kB
+build/client/assets/settings-profile-D4IRtZqV.js                         9.58 kB │ gzip:  3.92 kB
+build/client/assets/useQuery-CCB-iRmZ.js                                 9.85 kB │ gzip:  3.60 kB
+build/client/assets/lib-B1rhDpE0.js                                     10.86 kB │ gzip:  4.36 kB
+build/client/assets/chart-upload-D7lfl4YZ.js                            12.33 kB │ gzip:  5.13 kB
+build/client/assets/chart-detail-B79MqCsC.js                            15.63 kB │ gzip:  6.11 kB
+build/client/assets/settings-account-Dx8Ps4_v.js                        15.72 kB │ gzip:  5.74 kB
+build/client/assets/privacy-DuqeNbUm.js                                 19.74 kB │ gzip:  8.25 kB
+build/client/assets/utils-ClvgYzxi.js                                   21.08 kB │ gzip:  8.27 kB
+build/client/assets/browser-J02STbfA.js                                 30.19 kB │ gzip:  9.42 kB
+build/client/assets/errorBoundaries-5DjNWmQS.js                         33.40 kB │ gzip: 11.72 kB
+build/client/assets/sonner-B-CpdRPO.js                                  40.49 kB │ gzip: 11.84 kB
+build/client/assets/auth-client-N8Yeo2qw.js                             44.42 kB │ gzip: 15.36 kB
+build/client/assets/components-Yn3eBt1g.js                              66.43 kB │ gzip: 21.32 kB
+build/client/assets/locale-main-CgaJPTA1.js                            103.10 kB │ gzip: 34.97 kB
+build/client/assets/button-B7hfNKQ9.js                                 159.41 kB │ gzip: 51.43 kB
+build/client/assets/src-4IesNQOY.js                                    173.45 kB │ gzip: 51.63 kB
+build/client/assets/entry.client-C_2WAQZc.js                           211.11 kB │ gzip: 66.30 kB
+
+✓ built in 1.90s
+vite v8.3.1 building ssr environment for production...
+[info] [paraglide-js] Compilation skipped — inputs unchanged (message-modules)
+transforming...
+✓ 2885 modules transformed.
+rendering chunks...
+
+✓ 9 assets cleaned from React Router server build.
+build/client/assets/app-B84X6oXq.css
+build/client/assets/noto-sans-cyrillic-ext-wght-normal-DSNfmdVt.woff2
+build/client/assets/noto-sans-cyrillic-wght-normal-B2hlT84T.woff2
+build/client/assets/noto-sans-devanagari-wght-normal-Cv-Vwajv.woff2
+build/client/assets/noto-sans-greek-ext-wght-normal-12T8GTDR.woff2
+build/client/assets/noto-sans-greek-wght-normal-Ymb6dZNd.woff2
+build/client/assets/noto-sans-vietnamese-wght-normal-DLTJy58D.woff2
+build/client/assets/noto-sans-latin-ext-wght-normal-W1qJv59z.woff2
+build/client/assets/noto-sans-latin-wght-normal-BYSzYMf3.woff2
+
+computing gzip size...
+build/server/assets/chart-folder-CRWKnhmf.js                               5.89 kB
+build/server/assets/file-hash-DcSoxCHm.js                                  6.11 kB
+build/server/.vite/manifest.json                                           9.54 kB │ gzip:   1.35 kB
+build/server/assets/noto-sans-greek-ext-wght-normal-12T8GTDR.woff2        10.76 kB
+build/server/assets/noto-sans-vietnamese-wght-normal-DLTJy58D.woff2       14.45 kB
+build/server/assets/noto-sans-cyrillic-wght-normal-B2hlT84T.woff2         20.08 kB
+build/server/assets/noto-sans-greek-wght-normal-Ymb6dZNd.woff2            21.77 kB
+build/server/assets/noto-sans-latin-wght-normal-BYSzYMf3.woff2            35.82 kB
+build/server/assets/noto-sans-cyrillic-ext-wght-normal-DSNfmdVt.woff2     70.68 kB
+build/server/assets/noto-sans-devanagari-wght-normal-Cv-Vwajv.woff2       99.23 kB
+build/server/assets/noto-sans-latin-ext-wght-normal-W1qJv59z.woff2       167.96 kB
+build/server/assets/app-B84X6oXq.css                                      69.29 kB │ gzip:  12.28 kB
+build/server/assets/client-COg8A-gc.js                                     0.07 kB │ gzip:   0.08 kB
+build/server/assets/log-D18Ewj2G.js                                        0.08 kB │ gzip:   0.08 kB
+build/server/assets/export-BHxMGIB5.js                                     0.09 kB │ gzip:   0.09 kB
+build/server/assets/runtime-CxinTArf.js                                    0.10 kB │ gzip:   0.09 kB
+build/server/assets/runtime-role-BN3UZNSW.js                               0.11 kB │ gzip:   0.10 kB
+build/server/assets/restore-Bqv7aOaC.js                                    0.11 kB │ gzip:   0.10 kB
+build/server/assets/router-context-18azLjue.js                             0.29 kB │ gzip:   0.16 kB
+build/server/assets/rolldown-runtime-D7D4PA-g.js                           0.36 kB │ gzip:   0.25 kB
+build/server/assets/hasher-CktcPtiw.js                                     0.51 kB │ gzip:   0.34 kB
+build/server/assets/query-client-Del7F6lP.js                               0.52 kB │ gzip:   0.32 kB
+build/server/assets/process-supervision-DKs1J_ws.js                        0.58 kB │ gzip:   0.35 kB
+build/server/assets/sender-onF6vGaV.js                                     0.64 kB │ gzip:   0.37 kB
+build/server/assets/google-timeout-CtD4UAn7.js                             0.72 kB │ gzip:   0.51 kB
+build/server/assets/login-options-CxEGAK4M.js                              1.11 kB │ gzip:   0.53 kB
+build/server/assets/codes-Pdz10wEN.js                                      1.53 kB │ gzip:   0.70 kB
+build/server/assets/runtime-DRKDelA7.js                                    2.52 kB │ gzip:   1.12 kB
+build/server/assets/client-Bg0Pof2b.js                                     4.02 kB │ gzip:   1.63 kB
+build/server/assets/maintenance-CtwoShSy.js                                5.56 kB │ gzip:   1.97 kB
+build/server/assets/env-DRHCLJLS.js                                        6.02 kB │ gzip:   2.36 kB
+build/server/assets/runtime-role-Cc6FASRZ.js                               6.37 kB │ gzip:   2.18 kB
+build/server/index.js                                                      6.84 kB │ gzip:   2.59 kB
+build/server/assets/node-DwMVLAK3.js                                      11.02 kB │ gzip:   3.72 kB
+build/server/assets/runtime-DxF6_yh3.js                                   17.86 kB │ gzip:   5.34 kB
+build/server/assets/auth-CmnKMe-m.js                                      24.00 kB │ gzip:   7.39 kB
+build/server/assets/restore-CmOTrJmS.js                                   30.46 kB │ gzip:   9.28 kB
+build/server/assets/app-By_zR4wv.js                                      209.09 kB │ gzip:  54.08 kB
+build/server/assets/src-DCxdlV6s.js                                      305.79 kB │ gzip:  75.33 kB
+build/server/assets/server-build.js                                    1,226.66 kB │ gzip: 256.44 kB
+
+✓ built in 1.12s
+verify.sh: kept /home/i/astrodx-verify/runs/20261016-002619-wt-c2638e5
+verify.sh: passed

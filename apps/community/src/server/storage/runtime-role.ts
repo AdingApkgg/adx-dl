@@ -28,6 +28,7 @@ export async function startStorageRole({
 }) {
   const client = connection(databaseUrl),
     processId = crypto.randomUUID();
+  const failureController = new AbortController();
   let stopped = false,
     lost = false,
     lastHealthy = 0,
@@ -35,13 +36,16 @@ export async function startStorageRole({
   let timer: ReturnType<typeof setTimeout> | undefined;
   tracker.pause();
   const lose = () => {
+    if (lost) return;
     lost = true;
     tracker.pause();
+    if (!stopped) failureController.abort(failure());
   };
   client.on("error", lose);
   client.on("end", lose);
   async function tick() {
-    if (stopped || lost) throw failure();
+    if (stopped) return;
+    if (lost) throw failure();
     const gate = await client.query(
       "select owner_id from storage_maintenance where id='global' and lease_until>clock_timestamp()",
     );
@@ -57,7 +61,7 @@ export async function startStorageRole({
           /* Durable uncertain claims cannot acknowledge. */
         }
       }
-    } else tracker.resume();
+    }
     // Never publish a stale owner after a gate transition while the durable check was in flight.
     const result = await client.query(
       `update storage_runtime_roles set heartbeat_at=clock_timestamp(),pause_owner=$3,
@@ -66,10 +70,20 @@ export async function startStorageRole({
    and $3::uuid is not distinct from (select owner_id from storage_maintenance where id='global' and lease_until>clock_timestamp()) returning role`,
       [role, processId, owner, acknowledged],
     );
+    if (stopped) return;
+    if (lost) throw failure();
     if (result.rowCount !== 1) {
       tracker.pause();
+      // A backup gate can change between the read and conditional heartbeat.
+      // Retry that transition without replacing the coordinator's process IDs.
+      const ownership = await client.query(
+        "select 1 from storage_runtime_roles where role=$1 and process_id=$2 and backend_pid=pg_backend_pid()",
+        [role, processId],
+      );
+      if (ownership.rowCount !== 1) throw failure();
       return;
     }
+    if (!owner) tracker.resume();
     lastHealthy = Date.now();
   }
   async function poll() {
@@ -100,6 +114,7 @@ export async function startStorageRole({
   }
   return {
     processId,
+    failure: failureController.signal,
     ready() {
       if (stopped || lost || Date.now() - lastHealthy > 2500) throw failure();
     },
