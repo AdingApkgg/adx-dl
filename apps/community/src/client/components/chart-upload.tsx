@@ -7,7 +7,7 @@ import type { FileDto } from "@/shared/storage";
 import { getBrowserApi } from "../lib/browser";
 import { accountErrorRedirect } from "../lib/account-errors";
 import { chartErrorMessage } from "../lib/chart-errors";
-import { packChartFolder } from "../lib/chart-input";
+import { packChartFolder, packChartParts, type ChartParts } from "../lib/chart-input";
 import { createUploadController, readUploadRecords, type UploadController, type UploadRecord, type UploadSnapshot } from "../lib/file-upload";
 import { storageApi } from "../queries/storage";
 import { ChartSummary } from "./chart-summary";
@@ -20,6 +20,7 @@ export function ChartUpload({ userId, onSave }: { userId: string; onSave: (file:
   const lifecycle = useRef(0);
   const [state, setState] = useState<UploadSnapshot>({ phase: "idle", progress: 0 });
   const [packing, setPacking] = useState(false);
+  const [parts, setParts] = useState<ChartParts>({});
   const [pending, setPending] = useState(false);
   const [records, setRecords] = useState<UploadRecord[]>([]);
   const [resume, setResume] = useState<UploadRecord | null>(null);
@@ -46,15 +47,15 @@ export function ChartUpload({ userId, onSave }: { userId: string; onSave: (file:
     return () => { lifecycle.current++; packaging.current?.abort(); upload.dispose(); controller.current = null; };
   }, [userId, location.pathname, location.search]);
   const busy = packing || pending || ["hashing", "uploading", "processing"].includes(state.phase);
-  async function choose(files: File[], folder: boolean) {
-    if (!files.length) return;
+  async function choose(selection: { file: File } | { folder: File[] } | { parts: ChartParts }) {
     setError(undefined);
     const owner = lifecycle.current;
     const aborter = new AbortController();
     packaging.current?.abort(); packaging.current = aborter;
     try {
-      setPacking(folder);
-      const file = folder ? await packChartFolder(files, aborter.signal) : files[0]!;
+      setPacking(!("file" in selection));
+      const file = "parts" in selection ? await packChartParts(selection.parts, aborter.signal) :
+        "folder" in selection ? await packChartFolder(selection.folder, aborter.signal) : selection.file;
       if (aborter.signal.aborted || owner !== lifecycle.current) return;
       setPacking(false);
       const record = resume; setResume(null);
@@ -66,7 +67,7 @@ export function ChartUpload({ userId, onSave }: { userId: string; onSave: (file:
   }
   async function discard() {
     const owner = lifecycle.current;
-    packaging.current?.abort(); setPacking(false); setResume(null); setError(undefined);
+    packaging.current?.abort(); setPacking(false); setParts({}); setResume(null); setError(undefined);
     setPending(true);
     try {
       if (state.file) {
@@ -87,6 +88,7 @@ export function ChartUpload({ userId, onSave }: { userId: string; onSave: (file:
       if (state.uploadId) controller.current?.forget(state.uploadId);
       setRecords((rows) => rows.filter((row) => row.uploadId !== state.uploadId));
       setState({ phase: "idle", progress: 0 });
+      setParts({});
     } catch (failure) { if (owner === lifecycle.current) handleError(failure); }
     finally { if (owner === lifecycle.current) setPending(false); }
   }
@@ -98,14 +100,37 @@ export function ChartUpload({ userId, onSave }: { userId: string; onSave: (file:
     <p className="text-sm text-muted-foreground">{m.chart_upload_hint()}</p>
     <div className="space-y-3">
       <div><label htmlFor={`${id}-zip`} className="block text-sm">{resume ? m.avatar_resume({ name: resume.name }) : m.chart_choose_zip()}</label>
-        <input id={`${id}-zip`} type="file" accept=".zip,application/zip" disabled={busy} onChange={(event) => {
-          const files = Array.from(event.target.files ?? []); event.target.value = ""; void choose(files, false);
+        <input id={`${id}-zip`} type="file" accept=".adx,.zip,application/zip" disabled={busy} onChange={(event) => {
+          const files = Array.from(event.target.files ?? []); event.target.value = ""; if (files[0]) void choose({ file: files[0] });
         }} /></div>
       <div><label htmlFor={`${id}-folder`} className="block text-sm">{m.chart_choose_folder()}</label>
         <input id={`${id}-folder`} type="file" {...{ webkitdirectory: "", directory: "" }} multiple disabled={busy} onChange={(event) => {
-          const files = Array.from(event.target.files ?? []); event.target.value = ""; void choose(files, true);
+          const files = Array.from(event.target.files ?? []); event.target.value = ""; if (files.length) void choose({ folder: files });
         }} /></div>
     </div>
+    <fieldset disabled={busy} className="space-y-3 rounded-lg border p-3">
+      <legend className="px-1 text-sm font-medium">{m.chart_parts_title()}</legend>
+      <p className="text-sm text-muted-foreground">{m.chart_parts_hint()}</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {([
+          ["maidata", m.chart_part_maidata(), ".txt"],
+          ["audio", m.chart_part_audio(), ".mp3,.ogg,.wav"],
+          ["cover", m.chart_part_cover(), ".jpg,.jpeg,.png,.webp"],
+          ["video", m.chart_part_video(), ".mp4,.webm"],
+        ] as const).map(([role, label, accept]) => <div key={role} className="min-w-0">
+          <label htmlFor={`${id}-${role}`} className="block text-sm">{label}</label>
+          <input id={`${id}-${role}`} type="file" accept={accept} className="max-w-full" onChange={(event) => {
+            const file = event.target.files?.[0]; event.target.value = "";
+            if (file) { setParts((current) => ({ ...current, [role]: file })); setError(undefined); }
+          }} />
+          {parts[role] ? <p className="break-all text-sm text-muted-foreground">{parts[role].name}</p> : null}
+        </div>)}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={busy || !parts.maidata} onClick={() => void choose({ parts })}>{resume ? m.chart_parts_resume() : m.chart_parts_upload()}</Button>
+        <Button variant="outline" disabled={busy || !Object.keys(parts).length} onClick={() => { setParts({}); setError(undefined); }}>{m.chart_parts_clear()}</Button>
+      </div>
+    </fieldset>
     {records.length && !busy ? <div className="flex flex-wrap gap-2">{records.map((record) => <Button key={record.uploadId} variant="outline" onClick={() => setResume(record)}>
       {m.avatar_resume({ name: record.name })}
     </Button>)}</div> : null}

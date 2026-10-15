@@ -142,7 +142,7 @@ async function acceptance() {
   await step("upload_processed_before_explicit_save", async () => {
     const response = await page.goto(new URL("/me/charts/new", origin).href);
     assert.equal(response.status(), 200);
-    await page.getByLabel("选择 ZIP", { exact: true }).setInputFiles({ name: "ci-chart.zip", mimeType: "application/zip", buffer: zip });
+    await page.getByLabel("选择 ADX / ZIP", { exact: true }).setInputFiles({ name: "ci-chart.zip", mimeType: "application/zip", buffer: zip });
     await page.getByRole("button", { name: "保存私有草稿", exact: true }).waitFor({ state: "visible", timeout: 90000 });
     assert.equal((await json(owner, "/api/v1/me/charts")).items.length, 0, "processing alone must not create a draft");
     assert.equal(await page.getByRole("alert").count(), 0);
@@ -201,7 +201,7 @@ async function acceptance() {
   });
   await step("newer_private_version_and_metadata_do_not_replace_snapshot", async () => {
     const newer = storedZip([["maidata.txt", Buffer.from("&title=New private version\n&inote_4=(120){4}1,2,E\n")]]);
-    await page.getByLabel("选择 ZIP", { exact: true }).setInputFiles({ name: "private-newer.zip", mimeType: "application/zip", buffer: newer });
+    await page.getByLabel("选择 ADX / ZIP", { exact: true }).setInputFiles({ name: "private-newer.zip", mimeType: "application/zip", buffer: newer });
     await page.getByRole("button", { name: "保存私有草稿", exact: true }).waitFor({ timeout: 90000 });
     const [saved] = await Promise.all([
       page.waitForResponse(r => new URL(r.url()).pathname === `/api/v1/me/charts/${draft.id}/versions` && r.request().method() === "POST"),
@@ -301,7 +301,7 @@ async function acceptance() {
   await step("missing_optional_media_and_unsupported_difficulty", async () => {
     const optionalZip = storedZip([["maidata.txt", Buffer.from("&title=Optional media absent\n&inote_4=(120){4}1,9,nonsense,E\n")]]);
     await page.goto(new URL("/me/charts/new", origin).href);
-    await page.getByLabel("选择 ZIP", { exact: true }).setInputFiles({ name: "optional.zip", mimeType: "application/zip", buffer: optionalZip });
+    await page.getByLabel("选择 ADX / ZIP", { exact: true }).setInputFiles({ name: "optional.zip", mimeType: "application/zip", buffer: optionalZip });
     await page.getByRole("button", { name: "保存私有草稿", exact: true }).waitFor({ timeout: 90000 });
     const [saved] = await Promise.all([
       page.waitForResponse(r => new URL(r.url()).pathname === "/api/v1/me/charts" && r.request().method() === "POST"),

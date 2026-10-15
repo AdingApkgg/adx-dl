@@ -64,7 +64,7 @@ test("rejected replacement leaves the current version untouched and never saves 
     if (path === "/api/v1/uploads/u") return Response.json({ id: "u", state: "receiving", partSize: 4194304, partCount: 1, receivedParts: [{ index: 0, size: 3, sha256: "a".repeat(64) }] });
     throw new Error(`Unexpected ${path}`);
   });
-  fireEvent.change(screen.getByLabelText("选择 ZIP"), { target: { files: [new File(["bad"], "bad.zip", { type: "application/zip" })] } });
+  fireEvent.change(screen.getByLabelText("选择 ADX / ZIP"), { target: { files: [new File(["bad"], "bad.zip", { type: "application/zip" })] } });
   await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("未通过校验"));
   expect(within(within(screen.getByRole("region", { name: "历史版本" })).getByText(/^版本 2/).closest("li")!).getByText("当前版本")).toBeTruthy();
   expect(requests.some((row) => row.path === "/api/v1/me/charts/chart/versions")).toBe(false);

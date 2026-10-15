@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { unzipSync } from "fflate";
 import { chartFolderEntries, packChartFolder } from "./chart-input";
+import * as chartInput from "./chart-input";
 const file = (name: string) => {
   const input = new File(["x"], name);
   Object.defineProperty(input, "webkitRelativePath", { value: name });
@@ -78,3 +79,33 @@ test("real folder Worker produces STORED entries with the original names and byt
     expect(offset).toBe(end);
   } finally { clearTimeout(timer); aborter.abort(); }
 }, 15_000);
+
+
+test("loose chart parts package canonical names and original bytes deterministically in the real Worker", async () => {
+  const parts = {
+    maidata: new File(["&title=Loose\n&inote_4=(120){4}1,2,E\n"], "my score.txt"),
+    audio: new File([new Uint8Array([79, 103, 103, 83, 0, 255])], "song.OGG"),
+    cover: new File([new Uint8Array([137, 80, 78, 71])], "art.PNG"),
+    video: new File([new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112])], "movie.mp4"),
+  };
+  const first = await chartInput.packChartParts(parts);
+  const second = await chartInput.packChartParts(parts);
+  expect(first.name).toBe("chart.zip");
+  const bytes = new Uint8Array(await first.arrayBuffer());
+  expect(bytes).toEqual(new Uint8Array(await second.arrayBuffer()));
+  const entries = unzipSync(bytes);
+  expect(Object.keys(entries)).toEqual(["bg.png", "maidata.txt", "pv.mp4", "track.ogg"]);
+  expect(new TextDecoder().decode(entries["maidata.txt"])).toBe("&title=Loose\n&inote_4=(120){4}1,2,E\n");
+  expect([...entries["track.ogg"]!]).toEqual([79, 103, 103, 83, 0, 255]);
+  expect([...entries["bg.png"]!]).toEqual([137, 80, 78, 71]);
+  expect([...entries["pv.mp4"]!]).toEqual([0, 0, 0, 24, 102, 116, 121, 112]);
+});
+
+test("loose parts reject missing score, wrong role type and oversized source before packaging", () => {
+  expect(() => chartInput.packChartParts({ audio: new File(["audio"], "song.mp3") })).toThrow();
+  expect(() => chartInput.packChartParts({ maidata: new File(["text"], "score.exe") })).toThrow();
+  expect(() => chartInput.packChartParts({ maidata: new File(["text"], "score.txt"), audio: new File(["x"], "song.flac") })).toThrow();
+  const large = new File(["x"], "movie.mp4");
+  Object.defineProperty(large, "size", { value: 64 * 1024 * 1024 + 1 });
+  expect(() => chartInput.packChartParts({ maidata: new File(["text"], "score.txt"), video: large })).toThrow();
+});
