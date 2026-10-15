@@ -51,6 +51,7 @@ test("built anonymous charts: real S3 HTTP metadata/failures/hash blocks, bounde
     const [file] = await db.insert(files).values({ ownerId: owner, blobId: blob.id, originalName: "private-name.zip", purpose: "chart-source", size: original.length, state: "ready" }).returning();
     const [chart] = await db.insert(charts).values({ ownerId: owner, title: summary.title }).returning();
     const [version] = await db.insert(chartVersions).values({ chartId: chart.id, ordinal: 1, sourceFileId: file.id, previewDerivativeId: recipe.id, maidataMd5Base64: summary.maidataMd5Base64, summary }).returning();
+    await db.update(charts).set({ currentVersionId: version.id }).where(eq(charts.id, chart.id));
     await db.insert(chartPublications).values({ chartId: chart.id, versionId: version.id, title: summary.title, artist: summary.artist, publishedAt: new Date(), updatedAt: new Date() });
     const token = crypto.randomUUID();
     await db.insert(profiles).values({ userId: owner, onboardedAt: new Date() });

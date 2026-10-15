@@ -64,7 +64,9 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
         if (kind === "retain") {
           const handlers = createDeletionHandlers(deletion);
           await requestDeletion({ db: source.db, boss: testSender, handlers }, owner, { deleteContent: false });
-          await purgeUser({ db: source.db, handlers }, owner);
+          // Advance only this synthetic account beyond its seven-day cooling-off boundary.
+          await source.db.update(user).set({ deletionPurgeAt: new Date(Date.now() - 1000) }).where(eq(user.id, owner));
+          expect(await purgeUser({ db: source.db, handlers }, owner)).toBe("purged");
         }
       }
       await exportJournal(journal);
