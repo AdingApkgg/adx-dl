@@ -1,6 +1,10 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { awaitChartJournal } from "../charts/publication-journal";
+import { publicationDto } from "../charts/service";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { fromDrizzle, type PgBoss } from "pg-boss";
 import {
+  charts,
+  chartPublications,
   blobs,
   blobBlocks,
   blobDerivatives,
@@ -237,6 +241,13 @@ export function createStorageDeletionHandler(
   return {
     name: "storage",
     beforeTransaction: ready,
+    afterPurge: async (userId) => {
+      const [fact] = await ctx.db.select().from(storageTombstones)
+        .where(and(eq(storageTombstones.kind, "user_deleted"), eq(storageTombstones.userId, userId)))
+        .orderBy(desc(storageTombstones.sequence)).limit(1);
+      // Public-content purges cross the same barrier on first execution and post-commit retry.
+      if (fact?.payload && "retained" in fact.payload) await awaitChartJournal(ctx, fact.sequence);
+    },
     hasContent: async () => false,
     prepare: async (userId, tx) => {
       await lockDeletionAccounting(tx, userId);
@@ -302,7 +313,23 @@ export function createStorageDeletionHandler(
         }
       }
       await tx.delete(uploadSessions).where(eq(uploadSessions.ownerId, userId));
-      await tx.insert(storageTombstones).values({ kind: "user_deleted", userId, createdAt: now });
+      const retained = await tx.select({ chart: charts, publication: chartPublications }).from(charts)
+        .innerJoin(chartPublications, eq(chartPublications.chartId, charts.id))
+        .where(and(eq(charts.ownerId, userId), isNull(charts.deletedAt)));
+      const revocations = await tx.select({ sequence: storageTombstones.sequence }).from(storageTombstones)
+        .where(and(eq(storageTombstones.kind, "chart_permission"), eq(storageTombstones.userId, userId)))
+        .limit(1);
+      const [fact] = await tx.insert(storageTombstones).values({
+        kind: "user_deleted", userId, createdAt: now,
+        payload: retained.length || revocations.length ? {
+          version: 1,
+          retained: retained.map(({ chart, publication }) => ({
+            version: 1, chartId: chart.id, revision: chart.revision, publication: publicationDto(publication),
+          })),
+        } : undefined,
+      }).returning();
+      if (retained.length) await tx.update(charts).set({ publicationSequence: fact.sequence })
+        .where(inArray(charts.id, retained.map(r => r.chart.id)));
       await boss().send(STORAGE_CLEANUP_QUEUE, {}, { db: fromDrizzle(tx, sql) });
     },
   };

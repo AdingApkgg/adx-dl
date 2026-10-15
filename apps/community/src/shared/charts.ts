@@ -36,7 +36,12 @@ export type ChartVersionDto = {
   summary: ChartImportSummary;
   createdAt: string;
 };
+export type ChartPublicationDto = { versionId: string; title: string; artist: string; publishedAt: string; updatedAt: string };
+export type PublicChartDto = ChartPublicationDto & { id: string; ordinal: number; summary: ChartImportSummary; sourceSize: number; author: { id: string; name: string; image: string | null } | null };
+export type PublicChartsPageDto = { items: PublicChartDto[]; nextCursor: string | null };
 export type ChartDto = {
+  publicationPending?: boolean; // Always supplied by the server; false is required for a durable success.
+  publication?: ChartPublicationDto | null; // Transitional fixture typing; every server DTO supplies this field.
   id: string;
   title: string;
   artist: string;
@@ -63,6 +68,6 @@ export const CHART_IMPORT_ERROR_CODES = [
 export type ChartImportErrorCode = (typeof CHART_IMPORT_ERROR_CODES)[number];
 export const CHART_BUSINESS_ERROR_CODES = [
   "CHART_CHANGED", "CHART_FILE_NOT_READY", "CHART_FILE_ASSIGNED", "CHART_CURRENT_VERSION",
-  "CHART_DRAFT_LIMIT", "CHART_VERSION_LIMIT",
+  "CHART_DRAFT_LIMIT", "CHART_VERSION_LIMIT", "CHART_PUBLISHED_VERSION",
 ] as const;
 export type ChartBusinessErrorCode = (typeof CHART_BUSINESS_ERROR_CODES)[number];

@@ -191,7 +191,7 @@ test("real setAvatar same-hash replacement and removal facts clear only older ex
     [replacement.file.id, 3],
   ]);
   expect(rows.filter((r) => r.userId === null)).toHaveLength(0);
-  const records = rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
+  const records = rows.map((r) => ({ ...r, payload: r.payload ?? undefined, createdAt: r.createdAt.toISOString() }));
   const c = new Client({ connectionString: process.env.TEST_DATABASE_URL });
   await c.connect();
   try {

@@ -110,7 +110,7 @@ describe.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH && !process.env.STORAGE_T
       .toMatchObject({usedBytes:0,reservedBytes:0,activeUploads:0});
   });
   test("a running chart child observes cancellation, is reaped, and frees the shared native slot", async()=>{
-    const bytes = zipSync({"maidata.txt":strToU8(`&inote_4=(120){4}${"1,".repeat(99_000)}E`)},{level:0});
+    const bytes = zipSync({"maidata.txt":strToU8(`&inote_4=(120){64}${"1,".repeat(99_000)}E`)},{level:0});
     const u = await upload(bytes);
     await ingestUpload(f.mediaCtx,u.data);
     const source = (await claimRecipe(f.mediaCtx,u.data,"chart-source"))!;
@@ -121,6 +121,11 @@ describe.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH && !process.env.STORAGE_T
     try {
       const input = join(directory,"input.zip"), output = join(directory,"preview");
       await Bun.write(input,bytes);
+      // Cancellation must race a valid import, not a duration-limit rejection.
+      const valid = await processChart(input,output);
+      expect(valid.summary.difficulties[0].noteCount).toBe(99_000);
+      expect(valid.summary.difficulties[0].durationMs).toBeLessThan(3_600_000);
+      await rm(output);
       const child = processChart(input,output,watcher.signal,state=>{
         states.push(state);
         if(state === "started") canceling = (async()=>{

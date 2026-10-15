@@ -17,6 +17,7 @@ import { USER_PURGE_QUEUE, type UserPurgeData } from "../jobs/queues";
 export type DeletionHandler = {
   name: string;
   beforeTransaction?(): Promise<void>;
+  afterPurge?(userId: string): Promise<void>;
   prepare?(userId: string, tx: DbTransaction): Promise<void>;
   restore?(userId: string, tx: DbTransaction): Promise<void>;
   hasContent(userId: string, db: Db): Promise<boolean>;
@@ -176,7 +177,7 @@ export type PurgeResult = "purged" | "skipped";
 // 看着这几个前提，哪天变了测试会失败。
 export async function purgeUser(deps: Pick<DeletionDeps, "db" | "handlers">, userId: string): Promise<PurgeResult> {
   for (const handler of deps.handlers) await handler.beforeTransaction?.();
-  return deps.db.transaction(async (tx) => {
+  const result: PurgeResult = await deps.db.transaction(async (tx) => {
     await lockStorageMutation(tx);
     const state = await lockDeletionState(tx, userId);
     if (state?.status !== "pending_deletion" || !state.due) {
@@ -189,4 +190,7 @@ export async function purgeUser(deps: Pick<DeletionDeps, "db" | "handlers">, use
     await tx.delete(user).where(eq(user.id, userId));
     return "purged";
   });
+  // Also run on retry after a committed deletion whose export response was lost.
+  for (const handler of deps.handlers) await handler.afterPurge?.(userId);
+  return result;
 }

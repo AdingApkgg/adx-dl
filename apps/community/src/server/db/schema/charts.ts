@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { type AnyPgColumn, check, foreignKey, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { type AnyPgColumn, bigint, check, foreignKey, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import type { ChartImportSummary } from "@/shared/charts";
 import { user } from "./auth";
 import { blobDerivatives, files } from "./storage";
@@ -7,7 +7,8 @@ const tz = { withTimezone: true } as const;
 
 export const charts = pgTable("charts", {
   id: uuid().primaryKey().default(sql`uuidv7()`),
-  ownerId: text().notNull().references(() => user.id, { onDelete: "cascade" }),
+  ownerId: text().references(() => user.id, { onDelete: "set null" }),
+  publicationSequence: bigint({ mode: "number" }).notNull().default(0),
   title: text().notNull(),
   artist: text().notNull().default(""),
   // Nullable solely during the atomic chart + first-version insertion.
@@ -43,4 +44,16 @@ export const chartVersions = pgTable("chart_versions", {
   check("chart_versions_ordinal_check", sql`${t.ordinal} > 0`),
   check("chart_versions_live_source_check", sql`${t.deletedAt} is not null or ${t.sourceFileId} is not null`),
   check("chart_versions_md5_check", sql`${t.maidataMd5Base64} ~ '^[A-Za-z0-9+/]{22}==$'`),
+]);
+
+export const chartPublications = pgTable("chart_publications", {
+  chartId: uuid().primaryKey().references(() => charts.id, { onDelete: "cascade" }),
+  versionId: uuid().notNull(),
+  title: text().notNull(),
+  artist: text().notNull(),
+  publishedAt: timestamp(tz).notNull(),
+  updatedAt: timestamp(tz).notNull(),
+}, t => [
+  foreignKey({ name: "chart_publication_version_fk", columns: [t.chartId, t.versionId], foreignColumns: [chartVersions.chartId, chartVersions.id] }),
+  index("chart_publications_updated_idx").on(t.updatedAt, t.chartId),
 ]);

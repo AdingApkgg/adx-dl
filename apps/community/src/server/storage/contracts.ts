@@ -77,6 +77,8 @@ export type StorageContext = {
   /** Executable process lifecycle; tests/library callers may omit it. */
   lifecycle?: { signal: AbortSignal; run<T>(operation: () => Promise<T>): Promise<T> };
   /** Web publication notification, after commit only. Task11 must configure real web/control publishers. */
+  /** Optional exporter injection for isolated integrations; checkpoint still must prove durability. */
+  exportChartJournal?: () => Promise<void>;
   onMediaPublished?: (hash: string, generation: number) => Promise<void>;
 };
 export type StorageJobData = { uploadId: string; generation: number };
