@@ -59,12 +59,12 @@ function ProfileContent() {
       <PageTitle>{m.settings_profile_title()}</PageTitle>
       <div className="flex items-center gap-4">
         <Avatar image={profile.image} id={me.id} name={profile.name} size={64} />
-        <p className="text-sm text-muted-foreground">{m.user_page_id({ id: me.id })}</p>
+        <p className="text-sm text-muted-foreground">{m.user_page_id({ id: me.publicId ?? me.id })}</p>
       </div>
       <AvatarUpload userId={me.id} image={profile.image} revision={profile.avatarRevision} />
       <ProfileForm initialName={profile.name} initialBio={profile.bio} />
       <p className="text-sm">
-        <Link to={localizeHref(`/u/${me.id}`)} className={textLinkClass}>
+        <Link to={localizeHref(`/u/${me.publicId ?? me.id}`)} className={textLinkClass}>
           {m.profile_view_page()}
         </Link>{" "}
         ·{" "}

@@ -1,3 +1,4 @@
+import { exportTestUserIds } from "../testing/user-public-ids";
 import { beforeAll, describe, expect, test } from "bun:test";
 import { eq, sql } from "drizzle-orm";
 
@@ -42,6 +43,7 @@ async function pendingUser(app: ReturnType<typeof setup>["app"]) {
   const profile = googleProfile();
   await signInWithGoogle(browser, profile);
   const userId = await currentUserId(browser);
+  await exportTestUserIds();
   const options = await browser.request("GET", "/api/auth/passkey/generate-register-options");
   const registered = await browser.request("POST", "/api/auth/passkey/verify-registration", {
     body: { response: await new SoftAuthenticator(TEST_PUBLIC_ORIGIN, RP_ID).createCredential(options.json) },

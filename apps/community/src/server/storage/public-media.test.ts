@@ -1,3 +1,4 @@
+import { exportTestUserIds } from "../testing/user-public-ids";
 import { beforeAll, afterAll, expect, test } from "bun:test";
 import { getRequestListener } from "@hono/node-server";
 import { createServer, get as rawHttpGet } from "node:http";
@@ -527,6 +528,7 @@ test("real BetterAuth direct API/internalAdapter/provider updates cannot bypass 
     snapshot,
   );
   expect(await publication(f.derived.outputSha256)).toEqual(pub);
+  await exportTestUserIds();
   expect((await browser.request("GET", "/api/v1/me")).json.image).toBe(
     `/media/${f.derived.outputSha256}.jpg`,
   );

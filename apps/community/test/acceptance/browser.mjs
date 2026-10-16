@@ -139,6 +139,28 @@ async function acceptance() {
     assert.ok(first.id && second.id); assert.notEqual(first.id, second.id);
     assert.equal((await json(owner, "/api/v1/me/charts")).items.length, 0);
   });
+  await step("numeric_user_profiles_and_legacy_redirects", async () => {
+    const first = await json(owner, "/api/v1/me"), second = await json(other, "/api/v1/me");
+    assert.equal(first.publicId, "1"); assert.equal(second.publicId, "2");
+    const canonical = await json(anonymous, "/api/v1/users/1");
+    assert.equal(canonical.id, first.id); assert.equal(canonical.publicId, "1");
+    assert.deepEqual(await json(anonymous, `/api/v1/users/${first.id}`), canonical);
+    for (const [prefix, suffix] of [["", ""], ["/en", "/?tab=charts"], ["/ja", "?view=all"]]) {
+      const response = await anonymous.request.get(new URL(`${prefix}/u/${first.id}${suffix}`, origin).href, { maxRedirects: 0 });
+      assert.equal(response.status(), 302);
+      assert.equal(response.headers()["cache-control"], "private, no-store");
+      assert.equal(response.headers().location, `${prefix}/u/1${suffix.includes("?") ? suffix.slice(suffix.indexOf("?")) : ""}`);
+    }
+    await page.goto(new URL(`/u/${first.id}`, origin).href);
+    await page.waitForURL(url => url.pathname === "/u/1");
+    await page.getByRole("heading", { name: first.name, exact: true }).waitFor();
+    assert.equal(await page.locator('link[rel="canonical"]').getAttribute("href"), new URL("/u/1", origin).href);
+    assert.equal(await page.getByText("ID：1", { exact: true }).count(), 1);
+    await page.goto(new URL("/settings/profile", origin).href);
+    assert.equal(await page.getByRole("link", { name: "查看我的主页", exact: true }).getAttribute("href"), "/u/1");
+    for (const id of ["0", "01", "-1", "1e3", "9223372036854775808", "9999999"])
+      await json(anonymous, `/api/v1/users/${id}`, 404);
+  });
   for (const mode of ["adx", "parts"]) await step(`real_browser_${mode}_upload_save_reload`, async () => {
     const title = `Browser ${mode} upload`;
     const score = Buffer.from(`&title=${title}\n&artist=Synthetic fixture\n&inote_4=(120){4}1,2,3,E\n`);
@@ -281,6 +303,7 @@ async function acceptance() {
     assert.equal(JSON.stringify(publicChart).includes("sourceFileId"), false);
   });
   await step("numeric_number_one_and_authorized_legacy_uuid_redirects", async () => {
+    assert.equal((await json(anonymous, "/api/v1/charts/1")).author.publicId, "1");
     assert.deepEqual(await json(anonymous, `/api/v1/charts/${draft.id}`), publicChart);
     for (const prefix of ["", "/en", "/ja"]) for (const spelling of [`charts/${draft.id}`, `charts/${draft.id}/`, `Charts/${draft.id}`]) {
       const legacy = await anonymous.request.get(new URL(`${prefix}/${spelling}?from=legacy`, origin).href, { maxRedirects: 0 });

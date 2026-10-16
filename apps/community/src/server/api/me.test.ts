@@ -33,6 +33,7 @@ describe("GET /api/v1/me", () => {
     expect(res.status).toBe(200);
     expect(res.json).toEqual({
       id: await currentUserId(browser),
+      publicId: expect.stringMatching(/^[1-9][0-9]*$/),
       name: "阿丁",
       image: null,
       status: "active",

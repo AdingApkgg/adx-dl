@@ -9,7 +9,7 @@ import type { PublicChartDto, PublicChartsPageDto } from "@/shared/charts";
 import { apiContext } from "@/shared/router-context";
 const chart: PublicChartDto = {
   id: "public", publicId: "42", versionId: "selected", ordinal: 2, title: "Published title", artist: "Snapshot artist", sourceSize: 1024,
-  publishedAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-11T00:00:00.000Z", author: { id: "alice", name: "Alice", image: null },
+  publishedAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-11T00:00:00.000Z", author: { publicId: "1", id: "alice", name: "Alice", image: null },
   summary: { title: "Private title must not become metadata", artist: "Private artist", maidataMd5Base64: "hash", difficulties: [{ difficulty: 4, level: "12+", noteCount: 3, durationMs: 5000, previewSupported: true }, { difficulty: 5, level: null, noteCount: null, durationMs: null, previewSupported: false }], warnings: [], audio: null, hasCover: false },
 };
 const Catalog = PublicCharts as unknown as ComponentType<{ loaderData: PublicChartsPageDto }>;
@@ -37,7 +37,7 @@ test("public detail exposes original download, selected version, author and sile
   render(<MemoryRouter><Detail loaderData={chart} /></MemoryRouter>);
   expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Published title");
   expect(screen.getByRole("link", { name: "下载原始 ZIP" }).getAttribute("href")).toBe("/api/v1/charts/42/download");
-  expect(screen.getByRole("link", { name: /作者：Alice/ }).getAttribute("href")).toBe("/u/alice");
+  expect(screen.getByRole("link", { name: /作者：Alice/ }).getAttribute("href")).toBe("/u/1");
   expect(screen.getByText("公开版本 ID：selected")).toBeTruthy();
   expect(screen.getByText("未附带（可静音预览）")).toBeTruthy();
   expect((screen.getByRole("option", { name: /难度 5/ }) as HTMLOptionElement).disabled).toBe(true);

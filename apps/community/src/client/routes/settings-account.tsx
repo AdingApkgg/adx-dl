@@ -336,13 +336,14 @@ function SettingsContent() {
         </Button>
       </div>
 
-      <DeleteAccountSection userId={me.id} here={here} onDeleted={setDeletedAt} />
+      <DeleteAccountSection userId={me.id} publicId={me.publicId} here={here} onDeleted={setDeletedAt} />
     </main>
   );
 }
 
 type DeleteAccountSectionProps = {
   userId: string;
+  publicId?: string | null;
   /** 重新登录后回到的地址。 */
   here: string;
   onDeleted(purgeAt: string): void;
@@ -350,13 +351,14 @@ type DeleteAccountSectionProps = {
 
 // 注销账号（spec 第 10.6 节）。"同时删除内容"默认不勾（spec 选的 B：默认匿名保留）；要照着输入自己的用户 id
 // 才能点（用户决定），服务端同样校验。
-export function DeleteAccountSection({ userId, here, onDeleted }: DeleteAccountSectionProps) {
+export function DeleteAccountSection({ userId, publicId, here, onDeleted }: DeleteAccountSectionProps) {
   const queryClient = useQueryClient();
   const [deleteContent, setDeleteContent] = useState(false);
   const [confirmId, setConfirmId] = useState("");
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
-  const confirmed = confirmId.trim() === userId;
+  const displayId = publicId ?? userId;
+  const confirmed = confirmId.trim() === displayId;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -368,7 +370,7 @@ export function DeleteAccountSection({ userId, here, onDeleted }: DeleteAccountS
     setFailure(null);
     try {
       const result = await okJson(
-        await getBrowserApi().api.v1.me.deletion.$post({ json: { deleteContent, confirmId: userId } })
+        await getBrowserApi().api.v1.me.deletion.$post({ json: { deleteContent, confirmId: displayId } })
       );
       clearUploadRecords(userId);
       onDeleted(result.purgeAt);
@@ -410,7 +412,7 @@ export function DeleteAccountSection({ userId, here, onDeleted }: DeleteAccountS
             {m.settings_delete_content()}
           </label>
           <label className="grid gap-2 text-sm font-medium">
-            {m.settings_delete_confirm({ id: userId })}
+            {m.settings_delete_confirm({ id: displayId })}
             <Input
               name="confirmId"
               value={confirmId}

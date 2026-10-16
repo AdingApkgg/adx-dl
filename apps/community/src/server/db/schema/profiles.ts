@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { bigint, check, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
 
@@ -21,3 +22,15 @@ export const profiles = pgTable("profiles", {
     .$onUpdate(() => new Date())
     .notNull(),
 });
+
+// No FK: deleting an account must never make its public URL available to another user.
+// Migration 0013 installs the transactional registration trigger and durable journal outbox.
+export const userPublicIds = pgTable("user_public_ids", {
+  userId: text().primaryKey(),
+  publicId: bigint({ mode: "bigint" }).notNull().generatedAlwaysAsIdentity(),
+  journalSequence: bigint({ mode: "number" }).notNull().default(0),
+}, (t) => [
+  uniqueIndex("user_public_ids_public_id_uidx").on(t.publicId),
+  check("user_public_ids_positive_check", sql`${t.publicId} > 0`),
+  check("user_public_ids_sequence_check", sql`${t.journalSequence} >= 0`),
+]);

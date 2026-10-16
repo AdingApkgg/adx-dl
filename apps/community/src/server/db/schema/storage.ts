@@ -1,4 +1,5 @@
 import type { ChartJournalPayload } from "@/shared/chart-journal";
+import type { UserPublicIdFact } from "@/shared/user-journal";
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
@@ -443,22 +444,22 @@ export const storageTombstones = pgTable(
   "storage_tombstones",
   {
     sequence: bigint({ mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
-    kind: text({ enum: ["user_deleted", "file_deleted", "hash_blocked", "media_revoked", "chart_permission"] }).notNull(),
+    kind: text({ enum: ["user_deleted", "file_deleted", "hash_blocked", "media_revoked", "chart_permission", "user_public_id"] }).notNull(),
     userId: text(),
     fileId: uuid(),
     sha256: text(),
     generation: bigint({ mode: "number" }),
-    payload: jsonb().$type<ChartJournalPayload>(),
+    payload: jsonb().$type<ChartJournalPayload | UserPublicIdFact>(),
     createdAt: createdAt(),
   },
   (t) => [
     check(
       "storage_tombstones_kind_check",
-      sql`${t.kind} in ('user_deleted','file_deleted','hash_blocked','media_revoked','chart_permission')`,
+      sql`${t.kind} in ('user_deleted','file_deleted','hash_blocked','media_revoked','chart_permission','user_public_id')`,
     ),
     check(
       "storage_tombstones_subject_check",
-      sql`(${t.kind} = 'chart_permission' and ${t.payload} is not null) or (${t.kind} = 'user_deleted' and ${t.userId} is not null) or (${t.kind} = 'file_deleted' and ${t.fileId} is not null) or (${t.kind} in ('hash_blocked','media_revoked') and ${t.sha256} is not null)`,
+      sql`(${t.kind} = 'user_public_id' and ${t.userId} is not null and ${t.payload} is not null) or (${t.kind} = 'chart_permission' and ${t.payload} is not null) or (${t.kind} = 'user_deleted' and ${t.userId} is not null) or (${t.kind} = 'file_deleted' and ${t.fileId} is not null) or (${t.kind} in ('hash_blocked','media_revoked') and ${t.sha256} is not null)`,
     ),
     check("storage_tombstones_hash_check", sql`${t.sha256} is null or ${t.sha256} ~ '^[0-9a-f]{64}$'`),
     check(

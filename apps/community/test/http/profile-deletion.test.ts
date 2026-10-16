@@ -3,7 +3,8 @@ import { makeSignature } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
 import { shortId } from "../../src/server/auth/short-id";
-import { profiles, session, user } from "../../src/server/db/schema";
+import { exportTestUserIds } from "../../src/server/testing/user-public-ids";
+import { profiles, session, user, userPublicIds } from "../../src/server/db/schema";
 import { testDbHandle } from "../../src/server/testing/test-db";
 import { HTTP_TEST_AUTH_SECRET, type RunningServer, startBuiltServer } from "./server";
 
@@ -35,7 +36,9 @@ async function seedUser(name: string, options: { pending?: boolean; bio?: string
   const token = crypto.randomUUID().replaceAll("-", "");
   await db.insert(session).values({ token, userId: id, expiresAt: new Date(Date.now() + 30 * DAY_MS) });
   const signed = `${token}.${await makeSignature(token, HTTP_TEST_AUTH_SECRET)}`;
-  return { id, cookie: `${SESSION_COOKIE}=${encodeURIComponent(signed)}` };
+  await exportTestUserIds();
+  const [identity] = await db.select().from(userPublicIds).where(eq(userPublicIds.userId, id));
+  return { id, publicId: identity.publicId.toString(), cookie: `${SESSION_COOKIE}=${encodeURIComponent(signed)}` };
 }
 
 let server: RunningServer;
@@ -63,7 +66,7 @@ describe("隐私说明的登录状态", () => {
 
 describe("个人主页", () => {
   test("允许收录：标题、描述是昵称和简介，显示用户 ID；不缓存", async () => {
-    const { id } = await seedUser("主页测试", { bio: "写谱的\n也打歌" });
+    const { publicId: id } = await seedUser("主页测试", { bio: "写谱的\n也打歌" });
 
     const res = await fetch(server.url(`/u/${id}`));
     const html = await res.text();
@@ -80,7 +83,7 @@ describe("个人主页", () => {
   });
 
   test("正在注销：显示'该用户正在注销'，不收录，也不出现昵称", async () => {
-    const { id } = await seedUser("要走的人", { pending: true });
+    const { publicId: id } = await seedUser("要走的人", { pending: true });
 
     const res = await fetch(server.url(`/u/${id}`));
     const html = await res.text();

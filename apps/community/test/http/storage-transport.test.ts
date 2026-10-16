@@ -1,3 +1,4 @@
+import { exportTestUserIds } from "../../src/server/testing/user-public-ids";
 import { test, expect } from "bun:test";
 import { createServer, get } from "node:http";
 import { once } from "node:events";
@@ -91,6 +92,7 @@ test("built Node server streams known lengths, backpressures, cancels private di
         email: `${owner}@placeholder.invalid`,
         image: `/media/${outSha}.jpg`,
       });
+    await exportTestUserIds();
     await db
       .insert(session)
       .values({ userId: owner, token, expiresAt: new Date(Date.now() + 86400000) });

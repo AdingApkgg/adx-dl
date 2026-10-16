@@ -18,7 +18,7 @@ describe("userQuery", () => {
   });
 
   test("找到了：返回接口给的资料", async () => {
-    const body = { id: "abc2345678", status: "pending_deletion" as const };
+    const body = { publicId: "1", id: "abc2345678", status: "pending_deletion" as const };
 
     expect(await makeQueryClient().query(userQuery(fakeApi(() => Response.json(body)), "abc2345678"))).toEqual(body);
   });
