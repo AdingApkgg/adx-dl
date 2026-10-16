@@ -336,5 +336,11 @@
   "public_chart_link_close": "リンクを閉じる",
   "public_chart_actions": "譜面の操作",
   "public_chart_preview_action": "譜面をプレビュー",
-  "public_chart_preview_unavailable": "このバージョンはオンラインプレビューに対応していません。元の ZIP はダウンロードできます。"
+  "public_chart_preview_unavailable": "このバージョンはオンラインプレビューに対応していません。元の ZIP はダウンロードできます。",
+  "chart_publication_status_public": "公開中",
+  "chart_publication_status_private": "非公開の下書き",
+  "chart_publication_status_pending": "公開状態を確認中",
+  "chart_publication_published_version": "現在公開中：バージョン {number}",
+  "chart_publication_private_changes": "非公開の下書きは公開中の内容と異なります。編集内容は自動的に公開されません。",
+  "chart_publication_update": "公開内容の更新を確定"
 }

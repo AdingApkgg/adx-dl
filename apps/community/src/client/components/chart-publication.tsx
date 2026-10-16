@@ -1,3 +1,4 @@
+import { Badge } from "@astrodx/ui/components/badge";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { useState } from "react";
@@ -35,6 +36,9 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
   const [intent, setIntent] = useState<Intent>(null);
   const [status, setStatus] = useState("");
   const [error, setError] = useState<unknown>();
+  const uncertain = reconcile || chart.publicationPending !== false;
+  const publishedVersion = chart.versions.find(version => version.id === chart.publication?.versionId);
+  const privateChanges = !uncertain && chart.publication && (chart.currentVersionId !== chart.publication.versionId || chart.title !== chart.publication.title || chart.artist !== chart.publication.artist);
   const selected = chart.versions.find((version) => version.id === versionId);
   const api = chartsApi(getRenderApi());
   const accept = async (actual: ChartDto, target: Intent, allowSuccess: boolean) => {
@@ -71,15 +75,22 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
     finally { setBusy(false); }
   }
   return <section aria-label={m.chart_publication()} className="space-y-3 rounded-lg border p-4">
-    <h2 className="font-semibold">{m.chart_publication()}</h2>
+    <div className="flex flex-wrap items-center gap-2">
+      <h2 className="font-semibold">{m.chart_publication()}</h2>
+      <Badge variant={uncertain ? "outline" : chart.publication ? "default" : "secondary"}>
+        {uncertain ? m.chart_publication_status_pending() : chart.publication ? m.chart_publication_status_public() : m.chart_publication_status_private()}
+      </Badge>
+    </div>
     <p className="text-sm">{m.chart_publication_hint()}</p>
-    {chart.publication ? <div className="space-y-1 text-sm">
+    {chart.publication && !uncertain ? <div className="space-y-1 text-sm">
       <p>{m.chart_publication_current({ title: chart.publication.title, artist: chart.publication.artist })}</p>
-      <p>{m.chart_publication_version_id({ id: chart.publication.versionId })}</p>
+      {publishedVersion ? <p>{m.chart_publication_published_version({ number: String(publishedVersion.ordinal) })}</p> : null}
+      <p className="break-all text-xs text-muted-foreground">{m.chart_publication_version_id({ id: chart.publication.versionId })}</p>
       <Link className="underline" to={localizeHref(`/charts/${chart.id}`)}>{m.chart_publication_view()}</Link>
-    </div> : <p>{m.chart_publication_private()}</p>}
+    </div> : !uncertain ? <p>{m.chart_publication_private()}</p> : null}
+    {privateChanges ? <p className="rounded-md border bg-muted/50 p-3 text-sm">{m.chart_publication_private_changes()}</p> : null}
     <label className="block">{m.chart_publication_version()}
-      <select value={versionId} disabled={busy || reconcile || chart.publicationPending === true} onChange={(event) => { setVersionId(event.target.value); setConfirmed(false); setStatus(""); }} className="ml-2 rounded border p-2">
+      <select value={versionId} disabled={busy || reconcile || uncertain} onChange={(event) => { setVersionId(event.target.value); setConfirmed(false); setStatus(""); }} className="ml-2 rounded border p-2">
         <option value="">{m.chart_publication_choose()}</option>
         {chart.versions.map((version) => <option key={version.id} value={version.id}>{m.chart_version({ number: String(version.ordinal) })}</option>)}
       </select>
@@ -90,15 +101,15 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
       <ChartSummary summary={selected.summary} />
       <PrivateChartPreview key={selected.id} id={chart.id} versionId={selected.id} summary={selected.summary} />
     </div> : null}
-    <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} disabled={busy || !selected || reconcile || chart.publicationPending === true} onChange={(event) => setConfirmed(event.target.checked)} />{m.chart_publication_archive()}</label>
+    <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} disabled={busy || !selected || reconcile || uncertain} onChange={(event) => setConfirmed(event.target.checked)} />{m.chart_publication_archive()}</label>
     <div className="flex flex-wrap gap-2">
-      <Button disabled={busy || !selected || !confirmed || reconcile || chart.publicationPending === true} onClick={() => void mutate({ versionId, title: chart.title, artist: chart.artist })}>{m.chart_publication_confirm()}</Button>
-      {chart.publication ? <Button variant="outline" disabled={busy || reconcile || chart.publicationPending === true} onClick={() => setWithdrawing(true)}>{m.chart_publication_withdraw()}</Button> : null}
-      {reconcile || chart.publicationPending === true ? <Button variant="outline" disabled={busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
+      <Button disabled={busy || !selected || !confirmed || reconcile || uncertain} onClick={() => void mutate({ versionId, title: chart.title, artist: chart.artist })}>{chart.publication ? m.chart_publication_update() : m.chart_publication_confirm()}</Button>
+      {chart.publication ? <Button variant="outline" disabled={busy || reconcile || uncertain} onClick={() => setWithdrawing(true)}>{m.chart_publication_withdraw()}</Button> : null}
+      {reconcile || uncertain ? <Button variant="outline" disabled={busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
     </div>
     {withdrawing ? <div role="alertdialog" aria-label={m.chart_publication_withdraw()} className="space-y-2 rounded border p-3">
       <p>{m.chart_publication_withdraw_hint()}</p>
-      <Button disabled={busy || reconcile || chart.publicationPending === true} onClick={() => void mutate(null)}>{m.chart_publication_withdraw_confirm()}</Button>{" "}
+      <Button disabled={busy || reconcile || uncertain} onClick={() => void mutate(null)}>{m.chart_publication_withdraw_confirm()}</Button>{" "}
       <Button variant="outline" disabled={busy} onClick={() => setWithdrawing(false)}>{m.avatar_cancel()}</Button>
     </div> : null}
     {status ? <p role="status">{status}</p> : null}

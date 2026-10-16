@@ -255,7 +255,7 @@ async function acceptance() {
     const source = `/api/v1/files/${draft.versions[0].sourceFileId}/content`;
     await denied(anonymous, source, 401); await denied(other, source, 404);
   });
-  let publicChart;
+  let publicChart, publicVisitor;
   const publicBase = () => `/api/v1/charts/${draft.id}`;
   const publicAssets = () => ["maidata", "audio", "cover"].map(role => `${publicBase()}/versions/${draft.currentVersionId}/assets/${role}`);
   await step("private_draft_not_public_and_explicit_version_confirmation", async () => {
@@ -271,6 +271,8 @@ async function acceptance() {
     assert.equal(published.status(), 200);
     assert.equal((await published.json()).publicationPending, false);
     publicChart = await json(anonymous, publicBase());
+    await page.getByText("已公开", { exact: true }).waitFor();
+    await page.getByText(`当前公开：版本 ${publicChart.ordinal}`, { exact: true }).waitFor();
     assert.equal(publicChart.versionId, draft.currentVersionId);
     assert.equal(publicChart.title, draft.title);
     assert.equal(JSON.stringify(publicChart).includes("sourceFileId"), false);
@@ -294,18 +296,49 @@ async function acceptance() {
     ]);
     assert.equal(edited.status(), 200);
     assert.deepEqual(await json(anonymous, publicBase()), publicChart);
+    await page.getByText("私有草稿与公开内容不同；编辑不会自动发布。", { exact: true }).waitFor();
+    assert.equal(await page.getByRole("button", { name: "确认更新公开内容", exact: true }).isEnabled(), false);
   });
   await step("anonymous_home_catalog_detail_lazy_native_preview_exact_zip", async () => {
     const visitor = await anonymous.newPage(), requested = [];
     visitor.on("request", r => requested.push(new URL(r.url()).pathname));
     visitor.on("console", message => { if (message.type() === "error") diagnostics.push({ type: "error", message: sanitized(message.text()) }); });
     visitor.on("pageerror", e => diagnostics.push({ type: "pageerror", message: sanitized(e.message) }));
-    await visitor.goto(origin.href);
+    publicVisitor = visitor;
+    await visitor.setViewportSize({ width: 1440, height: 900 });
+    const home = await visitor.goto(origin.href);
+    assert.equal(home.headers()["cache-control"], "private, no-store");
+    const latest = visitor.getByRole("region", { name: "最新公开谱面", exact: true });
+    await latest.getByRole("link", { name: /CI private draft/ }).waitFor();
+    assert.ok(await latest.locator("ul").first().evaluate(el => el.getBoundingClientRect().width > 1000));
+    if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-home-desktop.png"), fullPage: true });
+    for (const width of [320, 390]) {
+      await visitor.setViewportSize({ width, height: 844 });
+      assert.equal(await visitor.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    }
+    if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-home-mobile.png"), fullPage: true });
+    await visitor.setViewportSize({ width: 1440, height: 900 });
     await visitor.getByRole("link", { name: "浏览公开谱面", exact: true }).click();
     await visitor.getByRole("link", { name: /CI private draft/ }).click();
     await visitor.getByRole("heading", { level: 1, name: "CI private draft", exact: true }).waitFor();
     assert.equal(requested.some(p => p.endsWith("/assets/audio") || p.endsWith("/assets/maidata")), false);
     assert.equal(requested.some(p => p.includes("/api/v1/me/charts")), false);
+    await visitor.getByRole("link", { name: "预览谱面", exact: true }).click();
+    assert.equal(await visitor.evaluate(() => document.activeElement?.id), "chart-preview");
+    assert.equal(requested.some(p => p.endsWith("/assets/audio") || p.endsWith("/assets/maidata")), false);
+    await anonymous.grantPermissions(["clipboard-read", "clipboard-write"], { origin: origin.origin });
+    await visitor.evaluate(() => Object.defineProperty(navigator, "share", { value: undefined, configurable: true }));
+    await visitor.getByRole("button", { name: "分享谱面", exact: true }).click();
+    await visitor.getByText("公开链接已复制。", { exact: true }).waitFor();
+    assert.equal(await visitor.evaluate(() => navigator.clipboard.readText()), new URL(`/charts/${draft.id}`, origin).href);
+    await visitor.evaluate(() => Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true }));
+    await visitor.getByRole("button", { name: "分享谱面", exact: true }).click();
+    const manual = visitor.getByRole("textbox", { name: "公开谱面链接", exact: true });
+    await manual.waitFor();
+    assert.equal(await manual.inputValue(), new URL(`/charts/${draft.id}`, origin).href);
+    assert.equal(await visitor.evaluate(() => document.activeElement?.getAttribute("aria-label")), "公开谱面链接");
+    assert.equal(await visitor.getByText("公开链接已复制。", { exact: true }).count(), 0);
+    await visitor.getByRole("button", { name: "关闭链接", exact: true }).click();
     await visitor.getByRole("button", { name: "加载预览", exact: true }).click();
     await visitor.waitForFunction(() => [...document.querySelectorAll("button")].some(b => b.textContent === "播放" && !b.disabled));
     assert.ok(requested.includes(publicAssets()[0])); assert.ok(requested.includes(publicAssets()[1]));
@@ -332,7 +365,6 @@ async function acceptance() {
     assert.equal(cached.status(), 304); assert.equal(cached.headers()["cache-control"], "private, no-store");
     const range = await anonymous.request.get(new URL(publicAssets()[1], origin).href, { headers: { Range: "bytes=44-75" } });
     assert.equal(range.status(), 206); assert.deepEqual(await range.body(), audio.subarray(44,76));
-    await visitor.close();
   });
   await step("locale_ssr_and_router_data_errors_cache_noindex", async () => {
     for (const prefix of ["", "/en", "/ja"]) {
@@ -362,6 +394,11 @@ async function acceptance() {
       }
     }
     assert.equal((await json(anonymous, "/api/v1/charts")).items.some(c => c.id === draft.id), false);
+    await publicVisitor.getByRole("banner").getByRole("link", { name: "AstroDX 自制谱社区", exact: true }).click();
+    await publicVisitor.waitForURL(url => url.pathname === "/");
+    await publicVisitor.getByText("还没有公开谱面。", { exact: true }).waitFor();
+    assert.equal(await publicVisitor.getByRole("link", { name: /CI private draft/ }).count(), 0);
+    await publicVisitor.close();
     assert.equal((await json(owner, `/api/v1/me/charts/${draft.id}`)).versions.length, 2);
   });
   await step("explicit_delete_releases_private_draft", async () => {
@@ -400,6 +437,8 @@ async function acceptance() {
     await visitor.goto(new URL(`/charts/${optional.id}`, origin).href);
     await visitor.getByRole("heading", { name: "Optional media absent", exact: true }).waitFor();
     assert.equal(await visitor.getByRole("button", { name: "加载预览", exact: true }).isEnabled(), false);
+    assert.equal(await visitor.getByRole("link", { name: "预览谱面", exact: true }).count(), 0);
+    await visitor.getByText("此版本暂不支持在线预览，仍可下载原始 ZIP。", { exact: true }).waitFor();
     assert.equal(requests.some(path => path.startsWith(`/api/v1/charts/${optional.id}/versions/`) && path.includes("/assets/")), false);
     if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-optional-media.png"), fullPage: true });
     for (const role of ["audio", "cover"]) await denied(anonymous, `/api/v1/charts/${optional.id}/versions/${optional.currentVersionId}/assets/${role}`, 404);

@@ -12,7 +12,7 @@ const api = createApiClient("https://community.test");
 vi.mock("@/client/lib/browser", () => ({ getBrowserApi: () => api, getRenderApi: () => api }));
 const Page = ChartDetail as unknown as ComponentType<{ params: { id: string }; loaderData: { dehydratedState: ReturnType<typeof dehydrate> } }>;
 const summary = { title: "Original", artist: "Artist", maidataMd5Base64: "md5", difficulties: [{ difficulty: 4 as const, level: "12", noteCount: 3, durationMs: 5000, previewSupported: true }], warnings: [], audio: null, hasCover: false };
-const initial: ChartDto = { id: "chart", title: "Original", artist: "Artist", revision: 2, currentVersionId: "v2", createdAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-11T00:00:00.000Z",
+const initial: ChartDto = { publication: null, publicationPending: false, id: "chart", title: "Original", artist: "Artist", revision: 2, currentVersionId: "v2", createdAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-11T00:00:00.000Z",
   versions: [2, 1].map((ordinal) => ({ id: `v${ordinal}`, ordinal, sourceFileId: `f${ordinal}`, sourceSize: 3, summary, createdAt: "2026-10-11T00:00:00.000Z" })) };
 class HashWorker {
   onmessage: ((event: { data: unknown }) => void) | null = null; onerror = null;
@@ -103,7 +103,7 @@ test("editor permission failure keeps the input and displays denial without forc
 test("publishing requires an explicit version and confirmation before any PUT", async () => {
   const requests = setup(() => Response.json({ ...initial, publication: null, publicationPending: false }));
   const section = screen.getByRole("region", { name: "公开发布" });
-  const publish = within(section).getByRole("button", { name: "确认发布" }) as HTMLButtonElement;
+  const publish = within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }) as HTMLButtonElement;
   expect(publish.disabled).toBe(true);
   fireEvent.change(within(section).getByLabelText("公开版本"), { target: { value: "v1" } });
   expect(publish.disabled).toBe(true);
@@ -115,7 +115,7 @@ function choosePublication() {
   const section = screen.getByRole("region", { name: "公开发布" });
   fireEvent.change(within(section).getByLabelText("公开版本"), { target: { value: "v1" } });
   fireEvent.click(within(section).getByRole("checkbox"));
-  fireEvent.click(within(section).getByRole("button", { name: "确认发布" }));
+  fireEvent.click(within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }));
   return section;
 }
 const publication = { versionId: "v1", title: "Original", artist: "Artist", publishedAt: initial.createdAt, updatedAt: initial.updatedAt };
@@ -140,13 +140,13 @@ test.each([true, undefined])("pending or missing durable flag (%s) cannot report
   await within(section).findByRole("button", { name: "检查发布状态" });
   await waitFor(() => expect((within(section).getByRole("button", { name: "检查发布状态" }) as HTMLButtonElement).disabled).toBe(false));
   expect(screen.queryByText("公开快照已保存。")).toBeNull();
-  expect((within(section).getByRole("button", { name: "确认发布" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }) as HTMLButtonElement).disabled).toBe(true);
   actual = { ...initial, revision: 3, publication: null, publicationPending: false };
   fireEvent.click(within(section).getByRole("button", { name: "检查发布状态" }));
-  await waitFor(() => expect((within(section).getByRole("button", { name: "确认发布" }) as HTMLButtonElement).disabled).toBe(false));
+  await waitFor(() => expect((within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }) as HTMLButtonElement).disabled).toBe(false));
   expect((within(section).getByLabelText("公开版本") as HTMLSelectElement).value).toBe("v1");
   expect(requests.filter(row => row.method === "PUT")).toHaveLength(1);
-  fireEvent.click(within(section).getByRole("button", { name: "确认发布" }));
+  fireEvent.click(within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }));
   await waitFor(() => expect(requests.filter(row => row.method === "PUT")).toHaveLength(2));
   expect(requests.filter(row => row.method === "PUT")[1]?.body.expectedRevision).toBe(3);
 });
@@ -206,4 +206,74 @@ test("lost withdrawal response reads durable absence without replaying DELETE", 
   fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "确认撤回" }));
   await screen.findByText("已撤回公开。");
   expect(requests.filter(row => row.method === "DELETE")).toHaveLength(1);
+});
+
+test("published state names the published ordinal and distinguishes private changes before an explicit update", async () => {
+  const start = { ...initial, revision: 3, publication, publicationPending: false };
+  let actual = start;
+  const requests = setup((_path, method, body) => {
+    if (method === "PUT") actual = { ...start, revision: 4, publication: { ...publication, versionId: String(body.versionId) } };
+    return Response.json(actual);
+  }, start);
+  const section = screen.getByRole("region", { name: "公开发布" });
+  expect(within(section).getByText("已公开", { exact: true })).toBeTruthy();
+  expect(within(section).getByText("当前公开：版本 1")).toBeTruthy();
+  expect(within(section).getByText("私有草稿与公开内容不同；编辑不会自动发布。")).toBeTruthy();
+  const update = within(section).getByRole("button", { name: "确认更新公开内容" }) as HTMLButtonElement;
+  expect(update.disabled).toBe(true);
+  fireEvent.change(within(section).getByLabelText("公开版本"), { target: { value: "v2" } });
+  expect(update.disabled).toBe(true);
+  expect(requests.filter(row => row.method === "PUT")).toHaveLength(0);
+  fireEvent.click(within(section).getByRole("checkbox"));
+  fireEvent.click(update);
+  await within(section).findByText("公开快照已保存。");
+  expect(requests.filter(row => row.method === "PUT")).toEqual([{ path: "/api/v1/me/charts/chart/publication", method: "PUT", body: { expectedRevision: 3, versionId: "v2", confirmOriginalArchive: true } }]);
+  expect(within(section).getByText("当前公开：版本 2")).toBeTruthy();
+  expect(within(section).queryByText("私有草稿与公开内容不同；编辑不会自动发布。")).toBeNull();
+});
+test("a private metadata change is distinguished from the published snapshot even on the same version", () => {
+  const start = { ...initial, currentVersionId: "v1", title: "Saved private edit", publication, publicationPending: false };
+  setup(() => Response.json(start), start);
+  const section = screen.getByRole("region", { name: "公开发布" });
+  expect(within(section).getByText("当前公开：Original · Artist")).toBeTruthy();
+  expect(within(section).getByText("私有草稿与公开内容不同；编辑不会自动发布。")).toBeTruthy();
+});
+test("an unchanged published version does not claim unpublished changes", () => {
+  const start = { ...initial, currentVersionId: "v1", publication, publicationPending: false };
+  setup(() => Response.json(start), start);
+  const section = screen.getByRole("region", { name: "公开发布" });
+  expect(within(section).getByText("已公开", { exact: true })).toBeTruthy();
+  expect(within(section).queryByText("私有草稿与公开内容不同；编辑不会自动发布。")).toBeNull();
+});
+test.each([true, undefined])("uncertain publication durability (%s) is labelled pending and only allows checking state", (publicationPending) => {
+  const start = { ...initial, publication, publicationPending };
+  setup(() => Response.json(start), start);
+  const section = screen.getByRole("region", { name: "公开发布" });
+  expect(within(section).getByText("公开状态待确认", { exact: true })).toBeTruthy();
+  expect(within(section).queryByText("已公开", { exact: true })).toBeNull();
+  expect(within(section).queryByText("当前公开：版本 1")).toBeNull();
+  expect((within(section).getByLabelText("公开版本") as HTMLSelectElement).disabled).toBe(true);
+  expect((within(section).getByRole("button", { name: "确认更新公开内容" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(within(section).getByRole("button", { name: "检查发布状态" })).toBeTruthy();
+});
+
+test.each(["publish", "withdraw"])("%s response and follow-up read both lost: publication remains uncertain without replay", async action => {
+  const start = action === "withdraw" ? { ...initial, publication, publicationPending: false } : initial;
+  const requests = setup(() => { throw new TypeError("Response lost"); }, start);
+  const section = screen.getByRole("region", { name: "公开发布" });
+  if (action === "publish") choosePublication();
+  else {
+    fireEvent.click(within(section).getByRole("button", { name: "撤回公开" }));
+    fireEvent.click(within(within(section).getByRole("alertdialog")).getByRole("button", { name: "确认撤回" }));
+  }
+  await within(section).findByText("公开状态待确认", { exact: true });
+  await waitFor(() => expect((within(section).getByRole("button", { name: "检查发布状态" }) as HTMLButtonElement).disabled).toBe(false));
+  expect(within(section).queryByText("已公开", { exact: true })).toBeNull();
+  expect(within(section).queryByText("私有草稿", { exact: true })).toBeNull();
+  expect(within(section).queryByText("当前公开：版本 1")).toBeNull();
+  expect(within(section).queryByText("公开快照已保存。")).toBeNull();
+  expect(within(section).queryByText("已撤回公开。")).toBeNull();
+  expect((within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }) as HTMLButtonElement).disabled).toBe(true);
+  expect(requests.filter(row => row.method === (action === "publish" ? "PUT" : "DELETE"))).toHaveLength(1);
+  expect(requests.filter(row => row.method === "GET")).toHaveLength(1);
 });

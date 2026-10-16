@@ -336,5 +336,11 @@
   "public_chart_link_close": "Close link",
   "public_chart_actions": "Chart actions",
   "public_chart_preview_action": "Preview chart",
-  "public_chart_preview_unavailable": "Online preview is unavailable for this version. You can still download the original ZIP."
+  "public_chart_preview_unavailable": "Online preview is unavailable for this version. You can still download the original ZIP.",
+  "chart_publication_status_public": "Published",
+  "chart_publication_status_private": "Private draft",
+  "chart_publication_status_pending": "Publication unconfirmed",
+  "chart_publication_published_version": "Currently public: version {number}",
+  "chart_publication_private_changes": "Your private draft differs from the public chart. Edits are not published automatically.",
+  "chart_publication_update": "Confirm public update"
 }

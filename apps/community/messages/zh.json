@@ -336,5 +336,11 @@
   "public_chart_link_close": "关闭链接",
   "public_chart_actions": "谱面操作",
   "public_chart_preview_action": "预览谱面",
-  "public_chart_preview_unavailable": "此版本暂不支持在线预览，仍可下载原始 ZIP。"
+  "public_chart_preview_unavailable": "此版本暂不支持在线预览，仍可下载原始 ZIP。",
+  "chart_publication_status_public": "已公开",
+  "chart_publication_status_private": "私有草稿",
+  "chart_publication_status_pending": "公开状态待确认",
+  "chart_publication_published_version": "当前公开：版本 {number}",
+  "chart_publication_private_changes": "私有草稿与公开内容不同；编辑不会自动发布。",
+  "chart_publication_update": "确认更新公开内容"
 }
