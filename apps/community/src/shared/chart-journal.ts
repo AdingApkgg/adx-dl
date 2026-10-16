@@ -12,6 +12,15 @@ const publication = z
     updatedAt: date,
   })
   .strict();
+export const moderationFact = z.object({
+  revision: z.number().int().min(1).max(2147483647),
+  actorId: z.string().min(1).max(128),
+  actorPublicId: z.string().refine(isPublicChartId),
+  reason: z.string().refine(value => value.trim().length > 0 && [...value].length <= 500),
+  createdAt: date,
+  publication,
+  author: z.object({ publicId: z.string().refine(isPublicChartId), name: z.string().min(1).max(120) }).strict().nullable(),
+}).strict();
 export const permissionFact = z
   .object({
     version: z.literal(1),
@@ -20,6 +29,7 @@ export const permissionFact = z
     publicId: z.string().refine(isPublicChartId).optional(),
     revision: z.number().int().min(1).max(2147483647),
     publication: publication.nullable(),
+    moderation: moderationFact.optional(),
   })
   .strict();
 export const retentionFact = z

@@ -331,6 +331,9 @@ export async function replayJournal(
         [r.sequence, r.kind, r.userId, r.fileId, r.sha256, r.generation, r.createdAt, r.payload ? JSON.stringify(r.payload) : null],
       );
     }
+    // A dump is captured inside its own backup. Its running token owns no target job.
+    // Preserve earlier completed evidence, but never interpret restored in-flight work as live.
+    await c.query("update storage_backup_status set status='unknown',run_id=gen_random_uuid(),finished_at=null where status='running'");
     // Unbacked tmp cannot be resurrected. All roles are stopped, so these old leases own no future IO.
     await c.query(
       "update upload_sessions set state='cancelled',generation=generation+1,reserved_bytes=0,error_code='UPLOAD_CANCELLED',updated_at=clock_timestamp() where state in('receiving','processing')",

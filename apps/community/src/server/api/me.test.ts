@@ -36,6 +36,7 @@ describe("GET /api/v1/me", () => {
       publicId: expect.stringMatching(/^[1-9][0-9]*$/),
       name: "阿丁",
       image: null,
+      isAdmin: false,
       status: "active",
       createdAt: expect.any(String),
       deletionPurgeAt: null,

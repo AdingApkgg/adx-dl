@@ -66,3 +66,22 @@ export const chartPublicIds = pgTable("chart_public_ids", {
   uniqueIndex("chart_public_ids_public_id_uidx").on(t.publicId),
   check("chart_public_ids_positive_check", sql`${t.publicId} > 0`),
 ]);
+
+/** Immutable first takedown; no FK may remove the decision when an account/chart is deleted. */
+export const chartModerations = pgTable("chart_moderations", {
+  chartId: uuid().primaryKey(),
+  publicId: bigint({ mode: "bigint" }).notNull(),
+  revision: integer().notNull(),
+  actorId: text().notNull(),
+  actorPublicId: bigint({ mode: "bigint" }).notNull(),
+  reason: text().notNull(),
+  publication: jsonb().$type<import("@/shared/charts").ChartPublicationDto>().notNull(),
+  author: jsonb().$type<{ publicId: string; name: string } | null>(),
+  createdAt: timestamp(tz).notNull(),
+  journalSequence: bigint({ mode: "number" }).notNull().default(0),
+}, t => [
+  uniqueIndex("chart_moderations_public_id_uidx").on(t.publicId),
+  check("chart_moderations_reason_check", sql`char_length(${t.reason}) between 1 and 500`),
+  check("chart_moderations_revision_check", sql`${t.revision} > 0`),
+  check("chart_moderations_identity_check", sql`${t.publicId} > 0 and ${t.actorPublicId} > 0 and ${t.journalSequence} >= 0`),
+]);

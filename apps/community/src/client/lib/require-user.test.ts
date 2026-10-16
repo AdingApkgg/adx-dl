@@ -77,6 +77,7 @@ describe("requireUser", () => {
     const user: Awaited<ReturnType<typeof requireUser>> = {
       id: "abc2345678",
       publicId: "1",
+      isAdmin: false,
       name: "阿丁",
       image: null,
       status: "active",

@@ -36,6 +36,7 @@ describe("parseEnv", () => {
   test("解析完整配置，并填上默认值", () => {
     expect(parseEnv(complete)).toEqual({
       nodeEnv: "development",
+      adminPublicIds: [],
       port: 3000,
       host: "127.0.0.1",
       publicOrigin: "https://community.example.com",
@@ -189,4 +190,12 @@ describe("parseEnv", () => {
     expect(() => parseEnv({ ...complete, HTTPS_PROXY: "host.docker.internal:20171" })).toThrow(/HTTPS_PROXY/);
     expect(() => parseEnv({ ...complete, HTTPS_PROXY: "http://proxy:8080/path" })).toThrow(/HTTPS_PROXY/);
   });
+});
+
+
+test("dashboard admin configuration defaults closed and accepts only permanent positive numeric IDs", () => {
+  expect(parseEnv(complete).adminPublicIds).toEqual([]);
+  expect(parseEnv({ ...complete, COMMUNITY_ADMIN_PUBLIC_IDS: "1, 9007199254740993" }).adminPublicIds).toEqual(["1", "9007199254740993"]);
+  for (const value of ["0", "01", "-1", "1e3", "1,", "9223372036854775808", "first-user"])
+    expect(() => parseEnv({ ...complete, COMMUNITY_ADMIN_PUBLIC_IDS: value })).toThrow(/COMMUNITY_ADMIN_PUBLIC_IDS/);
 });
