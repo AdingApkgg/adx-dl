@@ -57,3 +57,12 @@ export const chartPublications = pgTable("chart_publications", {
   foreignKey({ name: "chart_publication_version_fk", columns: [t.chartId, t.versionId], foreignColumns: [chartVersions.chartId, chartVersions.id] }),
   index("chart_publications_updated_idx").on(t.updatedAt, t.chartId),
 ]);
+
+// Permanent URL identity: deliberately no chart FK, so account/content deletion never recycles it.
+export const chartPublicIds = pgTable("chart_public_ids", {
+  chartId: uuid().primaryKey(),
+  publicId: bigint({ mode: "bigint" }).notNull().generatedAlwaysAsIdentity(),
+}, t => [
+  uniqueIndex("chart_public_ids_public_id_uidx").on(t.publicId),
+  check("chart_public_ids_positive_check", sql`${t.publicId} > 0`),
+]);

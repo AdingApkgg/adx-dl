@@ -502,6 +502,21 @@ export async function restoreOriginals(options: RestoreOptions) {
     const c = new Client({ connectionString: options.databaseUrl, connectionTimeoutMillis: 5000 });
     await c.connect();
     try {
+      // A dump before numeric IDs must not assign an old snapshot a number already issued later.
+      // Migration seeds all durable reservations, even charts absent from this snapshot, before backfill.
+      const identities = new Map<string, string>();
+      for (const record of latest.records) {
+        const facts = record.kind === "chart_permission" ? [permissionFact.parse(record.payload)]
+          : record.kind === "user_deleted" && record.payload ? retentionFact.parse(record.payload).retained : [];
+        for (const fact of facts) if (fact.publicId) {
+          const prior = identities.get(fact.chartId);
+          if (prior && prior !== fact.publicId) throw new Error("CHART_PUBLIC_ID_CONFLICT");
+          identities.set(fact.chartId, fact.publicId);
+        }
+      }
+      await c.query("select set_config('astrodx.restore_chart_public_ids',$1,false)", [
+        JSON.stringify([...identities].map(([chartId, publicId]) => ({ chartId, publicId }))),
+      ]);
       // Restored dumps can predate additive publication and journal columns. Upgrade while closed.
       await migrate(drizzle(c), { migrationsFolder: fileURLToPath(new URL("../../src/server/db/migrations", import.meta.url)) });
       await replayJournal(c, latest.records, latest.head);

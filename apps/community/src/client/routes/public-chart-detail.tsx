@@ -1,7 +1,7 @@
 import { DownloadIcon, PlayCircleIcon } from "lucide-react";
 import { ShareChartButton } from "../components/share-chart-button";
 import { Button } from "@astrodx/ui/components/button";
-import { data, Link } from "react-router";
+import { data, Link, redirect } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { getLocale, localizeHref } from "@/paraglide/runtime.js";
 import { ApiError } from "@/shared/api-client";
@@ -18,11 +18,19 @@ import { publicHeaders } from "./public-charts";
 import type { Route } from "./+types/public-chart-detail";
 export function headers() { return publicHeaders; }
 export function shouldRevalidate() { return true; }
-export async function loader({ context, params }: Route.LoaderArgs) {
-  try { return data(await publicChartsApi(context.get(apiContext)).get(params.id), { headers: publicHeaders }); }
+export async function loader({ context, params, request }: Route.LoaderArgs) {
+  let chart;
+  try { chart = await publicChartsApi(context.get(apiContext)).get(params.id); }
   catch (error) {
     throw data(null, { status: error instanceof ApiError && error.status < 500 ? error.status : 503, headers: publicHeaders });
   }
+  // Authorize first on every visit. A cached permanent redirect must not outlive withdrawal.
+  if (params.id !== chart.publicId) {
+    const target = new URL(request.url);
+    target.pathname = target.pathname.replace(/\/charts\/[^/]+$/, `/charts/${chart.publicId}`);
+    return redirect(target.pathname + target.search, { status: 302, headers: publicHeaders });
+  }
+  return data(chart, { headers: publicHeaders });
 }
 export function meta({ loaderData: chart, matches, location }: Route.MetaArgs) {
   if (!chart) return [{ title: `${m.public_charts_title()} - ${m.site_name()}` }, { name: "robots", content: "noindex" }];
@@ -48,14 +56,14 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
         <p className="text-sm text-muted-foreground">{m.public_chart_download_hint()}</p>
         <div role="group" aria-label={m.public_chart_actions()} className="flex flex-wrap items-start gap-3">
           {canPreview ? <Button asChild variant="secondary" className="min-h-11"><a href="#chart-preview"><PlayCircleIcon aria-hidden="true" />{m.public_chart_preview_action()}</a></Button> : null}
-          <Button asChild className="min-h-11"><a href={publicChartDownloadUrl(chart.id)} download><DownloadIcon aria-hidden="true" />{m.public_chart_download()}</a></Button>
+          <Button asChild className="min-h-11"><a href={publicChartDownloadUrl(chart.publicId)} download><DownloadIcon aria-hidden="true" />{m.public_chart_download()}</a></Button>
           <ShareChartButton key={chart.id} title={chart.title} />
         </div>
         {!canPreview ? <p className="text-sm text-muted-foreground">{m.public_chart_preview_unavailable()}</p> : null}
       </div>
     </div>
     <ChartSummary summary={chart.summary} />
-    <PrivateChartPreview sectionId="chart-preview" key={`${chart.id}/${chart.versionId}`} id={chart.id} versionId={chart.versionId} summary={chart.summary} assetUrl={publicChartAssetUrl} />
+    <PrivateChartPreview sectionId="chart-preview" key={`${chart.id}/${chart.versionId}`} id={chart.publicId} versionId={chart.versionId} summary={chart.summary} assetUrl={publicChartAssetUrl} />
   </main>;
 }
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) { return <ErrorCard error={error} />; }

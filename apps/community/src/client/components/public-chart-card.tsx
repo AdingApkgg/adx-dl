@@ -31,13 +31,13 @@ function PublicDifficultyPill({ row }: { row: ChartDifficultySummary }) {
 export function PublicCover({ chart }: { chart: PublicChartDto }) {
   const [failed, setFailed] = useState(false);
   return <div className="relative aspect-square overflow-hidden border-b border-border/60 bg-muted">
-    {chart.summary.hasCover && !failed ? <img src={publicChartAssetUrl(chart.id, chart.versionId, "cover")} alt="" loading="lazy" decoding="async" width={512} height={512} className="h-full w-full object-cover" onError={() => setFailed(true)} /> :
+    {chart.summary.hasCover && !failed ? <img src={publicChartAssetUrl(chart.publicId, chart.versionId, "cover")} alt="" loading="lazy" decoding="async" width={512} height={512} className="h-full w-full object-cover" onError={() => setFailed(true)} /> :
       <div className="flex h-full items-center justify-center p-3 text-center text-sm text-muted-foreground">{m.chart_cover()} · {m.chart_missing()}</div>}
   </div>;
 }
 export function PublicChartCard({ chart, headingLevel = 2 }: { chart: PublicChartDto; headingLevel?: 2 | 3 }) {
   const Heading = headingLevel === 3 ? "h3" : "h2";
-  return <Link to={localizeHref(`/charts/${chart.id}`)} className="group flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card/80 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+  return <Link to={localizeHref(`/charts/${chart.publicId}`)} className="group flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card/80 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
     <PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} />
     <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3 sm:p-4">
       <Heading className="line-clamp-1 font-semibold leading-snug" title={chart.title}>{chart.title}</Heading>

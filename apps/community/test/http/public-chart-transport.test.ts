@@ -4,7 +4,7 @@ import { once } from "node:events";
 import { createHash, randomBytes } from "node:crypto";
 import { makeSignature } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
-import { blobs, files, derivedObjects, blobDerivatives, user, storagePolicies, charts, chartVersions, chartPublications, blobBlocks, session, profiles } from "../../src/server/db/schema";
+import { blobs, files, derivedObjects, blobDerivatives, user, storagePolicies, charts, chartPublicIds, chartVersions, chartPublications, blobBlocks, session, profiles } from "../../src/server/db/schema";
 import { testDbHandle } from "../../src/server/testing/test-db";
 import { startBuiltServer, HTTP_TEST_AUTH_SECRET } from "./server";
 import { chartManifestBytes } from "../../src/server/charts/artifact";
@@ -52,6 +52,7 @@ test("built anonymous charts: real S3 HTTP metadata/failures/hash blocks, bounde
     const [chart] = await db.insert(charts).values({ ownerId: owner, title: summary.title }).returning();
     const [version] = await db.insert(chartVersions).values({ chartId: chart.id, ordinal: 1, sourceFileId: file.id, previewDerivativeId: recipe.id, maidataMd5Base64: summary.maidataMd5Base64, summary }).returning();
     await db.update(charts).set({ currentVersionId: version.id }).where(eq(charts.id, chart.id));
+    await db.insert(chartPublicIds).values({ chartId: chart.id });
     await db.insert(chartPublications).values({ chartId: chart.id, versionId: version.id, title: summary.title, artist: summary.artist, publishedAt: new Date(), updatedAt: new Date() });
     const token = crypto.randomUUID();
     await db.insert(profiles).values({ userId: owner, onboardedAt: new Date() });

@@ -50,3 +50,14 @@ test("permission and retained-user metadata use Unicode code-point bounds", asyn
     expect(retentionFact.safeParse({ version: 1, retained: [invalid] }).success).toBe(false);
   }
 });
+
+
+test("permission journal accepts canonical bigint public IDs and rejects malformed IDs without losing legacy support", async () => {
+  const { permissionFact } = await import("../../src/shared/chart-journal");
+  const fact = { version: 1, chartId: crypto.randomUUID(), revision: 1, publication: null };
+  expect(permissionFact.safeParse(fact).success).toBe(true);
+  for (const publicId of ["1", "9007199254740993", "9223372036854775807"])
+    expect(permissionFact.safeParse({ ...fact, publicId }).success).toBe(true);
+  for (const publicId of ["0", "01", "-1", "+1", "1e3", "1.0", "9223372036854775808", "1".repeat(100), 1, null])
+    expect(permissionFact.safeParse({ ...fact, publicId }).success).toBe(false);
+});

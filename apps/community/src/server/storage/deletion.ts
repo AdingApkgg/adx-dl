@@ -6,6 +6,7 @@ import { fromDrizzle, type PgBoss } from "pg-boss";
 import {
   charts,
   chartPublications,
+  chartPublicIds,
   blobs,
   blobBlocks,
   blobDerivatives,
@@ -314,7 +315,8 @@ export function createStorageDeletionHandler(
         }
       }
       await tx.delete(uploadSessions).where(eq(uploadSessions.ownerId, userId));
-      const retained = await tx.select({ chart: charts, publication: chartPublications }).from(charts)
+      const retained = await tx.select({ chart: charts, identity: chartPublicIds, publication: chartPublications }).from(charts)
+        .leftJoin(chartPublicIds, eq(chartPublicIds.chartId, charts.id))
         .innerJoin(chartPublications, eq(chartPublications.chartId, charts.id))
         .where(and(eq(charts.ownerId, userId), isNull(charts.deletedAt)));
       const revocations = await tx.select({ sequence: storageTombstones.sequence }).from(storageTombstones)
@@ -324,7 +326,8 @@ export function createStorageDeletionHandler(
         kind: "user_deleted", userId, createdAt: now,
         payload: retained.length || revocations.length ? retentionFact.parse({
           version: 1,
-          retained: retained.map(({ chart, publication }) => ({
+          retained: retained.map(({ chart, identity, publication }) => ({
+            ...(identity ? { publicId: identity.publicId.toString() } : {}),
             version: 1, chartId: chart.id, revision: chart.revision, publication: publicationDto(publication),
           })),
         }) : undefined,

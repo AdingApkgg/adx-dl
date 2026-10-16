@@ -86,7 +86,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
       <p>{m.chart_publication_current({ title: chart.publication.title, artist: chart.publication.artist })}</p>
       {publishedVersion ? <p>{m.chart_publication_published_version({ number: String(publishedVersion.ordinal) })}</p> : null}
       <p className="break-all text-xs text-muted-foreground">{m.chart_publication_version_id({ id: chart.publication.versionId })}</p>
-      <Link className="underline" to={localizeHref(`/charts/${chart.id}`)}>{m.chart_publication_view()}</Link>
+      <Link className="underline" to={localizeHref(`/charts/${chart.publicId ?? chart.id}`)}>{m.chart_publication_view()}</Link>
     </div> : !uncertain ? <p>{m.chart_publication_private()}</p> : null}
     {privateChanges ? <p className="rounded-md border bg-muted/50 p-3 text-sm">{m.chart_publication_private_changes()}</p> : null}
     <label className="block">{m.chart_publication_version()}

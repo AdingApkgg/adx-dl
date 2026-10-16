@@ -15,6 +15,7 @@ export async function replayChartPermission(
   reportPending?: ReportPending,
 ) {
   const p = permissionFact.parse(payload);
+  await reservePublicChartId(c, p.chartId, p.publicId);
   const chart = await c.query("select publication_sequence from charts where id=$1 for update", [
     p.chartId,
   ]);
@@ -60,6 +61,7 @@ export async function replayDeletedUserCharts(
   const retained = r.payload ? retentionFact.parse(r.payload).retained : [];
 
   for (const fact of retained) {
+    await reservePublicChartId(c, fact.chartId, fact.publicId);
     // A backup predating the selected version still needs a stable anonymous recovery anchor.
     await c.query(
       `insert into charts(id,owner_id,title,artist,revision,publication_sequence)
@@ -118,4 +120,16 @@ export async function replayDeletedUserCharts(
     "update files set state='deleted',deleted_at=coalesce(deleted_at,$2),retained_until=$2::timestamptz+interval '30 days',original_name='removed' where owner_id=$1 and state<>'deleted'",
     [r.userId, r.createdAt],
   );
+}
+
+/** Restore runs offline under its advisory lock. A missing chart still consumes its permanent URL. */
+async function reservePublicChartId(c: Client, chartId: string, publicId?: string) {
+  if (!publicId) return; // Legacy facts never overwrite an allocated identity.
+  const current = await c.query("select public_id::text as id from chart_public_ids where chart_id=$1", [chartId]);
+  if (current.rowCount && current.rows[0].id !== publicId) throw new Error("CHART_PUBLIC_ID_CONFLICT");
+  if (!current.rowCount)
+    await c.query("insert into chart_public_ids(chart_id,public_id) overriding system value values($1,$2)", [chartId, publicId]);
+  // Never lower a restored sequence, including unused values consumed by rolled-back publications.
+  await c.query(`select setval('chart_public_ids_public_id_seq',
+    greatest((select last_value from chart_public_ids_public_id_seq),$1::bigint),true)`, [publicId]);
 }

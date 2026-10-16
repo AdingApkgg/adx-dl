@@ -6,6 +6,7 @@ import {
   blobBlocks,
   blobDerivatives,
   charts,
+  chartPublicIds,
   chartVersions,
   chartPublications,
   derivedObjects,
@@ -16,6 +17,7 @@ import type { StorageContext } from "../storage/contracts";
 import { StorageError, StorageUnavailableError } from "../storage/errors";
 import { withStorageTransaction } from "../storage/transactions";
 import { lockUploadAccounting, storageTime } from "../storage/usage";
+import { isPublicChartId } from "@/shared/chart-public-id";
 import { UUID_PATTERN } from "../uuid";
 import { getChart, ownChart, publicationDto, verifyHistoricalSource } from "./service";
 import { validateChartPreviewManifest, chartArtifactDataStart } from "./artifact";
@@ -84,6 +86,9 @@ export async function publishChart(
     } catch {
       throw new StorageUnavailableError();
     }
+    // The locked chart serializes its first publication; no private operation allocates a number.
+    if (!(await tx.select().from(chartPublicIds).where(eq(chartPublicIds.chartId, id))).length)
+      await tx.insert(chartPublicIds).values({ chartId: id });
     const now = await storageTime(tx);
     const value = {
       chartId: id,
@@ -141,6 +146,7 @@ function query(ctx: StorageContext) {
   return ctx.db
     .select({
       chart: charts,
+      publicId: chartPublicIds.publicId,
       p: chartPublications,
       v: chartVersions,
       file: files,
@@ -153,6 +159,7 @@ function query(ctx: StorageContext) {
     })
     .from(chartPublications)
     .innerJoin(charts, eq(charts.id, chartPublications.chartId))
+    .innerJoin(chartPublicIds, eq(chartPublicIds.chartId, charts.id))
     .leftJoin(user, eq(user.id, charts.ownerId))
     .innerJoin(
       chartVersions,
@@ -193,6 +200,7 @@ type Row = Awaited<ReturnType<typeof query>>[number];
 function publicDto(r: Row): PublicChartDto {
   return {
     id: r.chart.id,
+    publicId: r.publicId.toString(),
     ...publicationDto(r.p),
     ordinal: r.v.ordinal,
     summary: r.v.summary,
@@ -201,8 +209,10 @@ function publicDto(r: Row): PublicChartDto {
   };
 }
 async function resolved(ctx: StorageContext, id: string) {
-  if (!UUID_PATTERN.test(id)) throw missing();
-  const [r] = await query(ctx).where(and(allowed(), eq(charts.id, id)));
+  const identity = UUID_PATTERN.test(id) ? eq(charts.id, id.toLowerCase())
+    : isPublicChartId(id) ? eq(chartPublicIds.publicId, BigInt(id)) : null;
+  if (!identity) throw missing();
+  const [r] = await query(ctx).where(and(allowed(), identity));
   if (!r) throw missing();
   try {
     const m = validateChartPreviewManifest(r.output.properties.chartPreview, r.output.size);

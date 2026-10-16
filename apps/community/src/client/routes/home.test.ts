@@ -160,7 +160,7 @@ test("home header uses the published decorative avatar",async()=> {
 });
 
 const PUBLIC_CHART: PublicChartDto = {
-  id: "public-chart", versionId: "published", ordinal: 1, title: "Published song", artist: "Public artist", sourceSize: 100,
+  id: "public-chart", publicId: "42", versionId: "published", ordinal: 1, title: "Published song", artist: "Public artist", sourceSize: 100,
   publishedAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-11T00:00:00.000Z", author: null,
   summary: { title: "Unpublished import title", artist: "", maidataMd5Base64: "hash", difficulties: [], warnings: [], audio: null, hasCover: false },
 };
@@ -170,7 +170,7 @@ test("homepage SSR fetches at most six current public charts without caching and
   expect(requests).toEqual([[{ query: { limit: "6" } }, { init: { cache: "no-store" } }]]);
   expect(data.publicCharts?.items).toEqual([PUBLIC_CHART]);
   const html = renderLoaderData(data);
-  expect(html).toContain('href="/charts/public-chart"');
+  expect(html).toContain('href="/charts/42"');
   expect(html).toContain('<h3');
   expect(html).toContain("Published song");
   expect(html).not.toContain("Unpublished import title");
