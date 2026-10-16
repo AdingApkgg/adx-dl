@@ -1,7 +1,11 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, or, sql } from "drizzle-orm";
+
+import { isPublicUserId } from "@/shared/user-public-id";
+import { isShortId } from "../auth/short-id";
+import { StorageUnavailableError } from "../storage/errors";
 
 import type { Db } from "../db/client";
-import { profiles, user, userAvatars } from "../db/schema";
+import { profiles, user, userAvatars, userPublicIds, storageJournalProgress } from "../db/schema";
 
 /** 自己的资料：昵称在 user 表，简介和引导页状态在 profiles 表（没有这一行时按默认值）。 */
 export type MyProfile = {
@@ -58,13 +62,21 @@ export async function updateMyProfile(db: Db, userId: string, update: ProfileUpd
  * 昵称、简介在冷静期里就不再公开。
  */
 export type PublicProfile =
-  | { id: string; status: "active"; name: string; image: string | null; bio: string; createdAt: Date }
-  | { id: string; status: "pending_deletion" };
+  | { id: string; publicId: string; status: "active"; name: string; image: string | null; bio: string; createdAt: Date }
+  | { id: string; publicId: string; status: "pending_deletion" };
 
 export async function getPublicProfile(db: Db, id: string): Promise<PublicProfile | null> {
+  const identity = or(
+    isShortId(id) ? eq(user.id, id) : undefined,
+    isPublicUserId(id) ? eq(userPublicIds.publicId, BigInt(id)) : undefined,
+  );
+  if (!identity) return null;
   const [row] = await db
     .select({
       id: user.id,
+      publicId: userPublicIds.publicId,
+      journalSequence: userPublicIds.journalSequence,
+      exportedSequence: storageJournalProgress.exportedSequence,
       status: user.status,
       name: user.name,
       image: user.image,
@@ -73,12 +85,16 @@ export async function getPublicProfile(db: Db, id: string): Promise<PublicProfil
     })
     .from(user)
     .leftJoin(profiles, eq(profiles.userId, user.id))
-    .where(eq(user.id, id));
+    .innerJoin(userPublicIds, eq(userPublicIds.userId, user.id))
+    .leftJoin(storageJournalProgress, eq(storageJournalProgress.id, "global"))
+    .where(identity);
+  // No numeric URL is served before its reservation is durable outside the database.
+  if (row && row.journalSequence > (row.exportedSequence ?? 0)) throw new StorageUnavailableError();
   if (!row) {
     return null;
   }
   if (row.status === "pending_deletion") {
-    return { id: row.id, status: "pending_deletion" };
+    return { id: row.id, publicId: row.publicId.toString(), status: "pending_deletion" };
   }
-  return { id: row.id, status: "active", name: row.name, image: row.image, bio: row.bio ?? "", createdAt: row.createdAt };
+  return { id: row.id, publicId: row.publicId.toString(), status: "active", name: row.name, image: row.image, bio: row.bio ?? "", createdAt: row.createdAt };
 }

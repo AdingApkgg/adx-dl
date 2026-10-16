@@ -1,3 +1,6 @@
+import { eq } from "drizzle-orm";
+import { storageJournalProgress, userPublicIds } from "../db/schema";
+import { awaitChartJournal as awaitIdentityJournal } from "../charts/publication-journal";
 import { notifyCurrentUserAvatar } from "../storage/deletion";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -39,10 +42,20 @@ export const meRoutes = new Hono<AppEnv>()
     currentAuth(c);
     await next();
   })
-  .get("/", (c) => {
+  .get("/", async (c) => {
     const { user } = currentAuth(c);
+    const services = c.get("services");
+    const [identity] = await services.db.select({
+      publicId: userPublicIds.publicId, journalSequence: userPublicIds.journalSequence,
+      exportedSequence: storageJournalProgress.exportedSequence,
+    }).from(userPublicIds)
+      .leftJoin(storageJournalProgress, eq(storageJournalProgress.id, "global"))
+      .where(eq(userPublicIds.userId, user.id));
+    if (identity && identity.journalSequence > (identity.exportedSequence ?? 0) && services.storage)
+      await awaitIdentityJournal(services.storage, identity.journalSequence);
     return c.json({
       id: user.id,
+      publicId: identity?.publicId.toString() ?? null,
       name: user.name,
       image: user.image ?? null,
       status: user.status,
@@ -115,7 +128,10 @@ export const meRoutes = new Hono<AppEnv>()
       }
       const { deleteContent, confirmId } = c.req.valid("json");
       if (confirmId !== user.id) {
-        return jsonError(c, 400, "DELETION_CONFIRM_MISMATCH", "Type your user ID to confirm");
+        const [identity] = await c.get("services").db.select({ publicId: userPublicIds.publicId })
+          .from(userPublicIds).where(eq(userPublicIds.userId, user.id));
+        if (confirmId !== identity?.publicId.toString())
+          return jsonError(c, 400, "DELETION_CONFIRM_MISMATCH", "Type your user ID to confirm");
       }
       const services = c.get("services");
       const result = await requestDeletion(

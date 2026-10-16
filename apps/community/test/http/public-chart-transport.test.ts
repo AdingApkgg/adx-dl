@@ -1,3 +1,4 @@
+import { exportTestUserIds } from "../../src/server/testing/user-public-ids";
 import { test, expect } from "bun:test";
 import { createServer, get } from "node:http";
 import { once } from "node:events";
@@ -44,6 +45,7 @@ test("built anonymous charts: real S3 HTTP metadata/failures/hash blocks, bounde
   let renamed = false;
   try {
     const owner = crypto.randomUUID(); await db.insert(user).values({ id: owner, name: "Transport", email: `${owner}@placeholder.invalid` });
+    await exportTestUserIds();
     const [policy] = await db.insert(storagePolicies).values({ name: crypto.randomUUID(), endpoint, region: "us-east-1", originalBucket: "blobs", derivedBucket: "derived", credentialsRef: "STORAGE_WEB" }).returning();
     const [blob] = await db.insert(blobs).values({ policyId: policy.id, sha256: hash(original), key: `sha256/${hash(original)}`, size: original.length, detectedMime: "application/zip", state: "ready", verifiedAt: new Date() }).returning();
     const [out] = await db.insert(derivedObjects).values({ policyId: policy.id, outputSha256: hash(artifact), key: `sha256/${hash(artifact)}`, size: artifact.length, mime: CHART_PREVIEW_MIME, state: "ready", properties: { chartPreview: manifest } }).returning();

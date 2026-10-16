@@ -1,7 +1,7 @@
 import { Button } from "@astrodx/ui/components/button";
 import { Card, CardContent } from "@astrodx/ui/components/card";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
-import { data, Link } from "react-router";
+import { data, Link, redirect } from "react-router";
 
 import { m } from "@/paraglide/messages.js";
 import { getLocale, localizeHref } from "@/paraglide/runtime.js";
@@ -17,6 +17,9 @@ import type { Route } from "./+types/user-profile";
 
 // 描述里的简介最多这么多个字符（搜索结果和分享卡片只显示前面一段），换行换成空格。
 const DESCRIPTION_MAX = 160;
+const profileHeaders = { "Cache-Control": "private, no-store" };
+export function headers() { return profileHeaders; }
+export function shouldRevalidate() { return true; }
 
 function summarize(bio: string): string {
   const flat = bio.replace(/\s+/g, " ").trim();
@@ -25,7 +28,7 @@ function summarize(bio: string): string {
 }
 
 // 个人主页（spec 第 10.5 节）：公开，允许收录；不存在的 id 是 404 页。
-export async function loader({ context, params }: Route.LoaderArgs) {
+export async function loader({ context, params, request }: Route.LoaderArgs) {
   const queryClient = context.get(queryClientContext);
   const api = context.get(apiContext);
   const [profile] = await Promise.all([
@@ -36,12 +39,17 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   if (!profile) {
     throw data(null, { status: 404 });
   }
+  if (params.id !== profile.publicId) {
+    const target = new URL(request.url);
+    target.pathname = target.pathname.replace(/\/u\/[^/]+\/?$/i, `/u/${profile.publicId}`);
+    return redirect(target.pathname + target.search, { status: 302, headers: profileHeaders });
+  }
   // meta 用的标题和描述：注销中的用户不再公开昵称和简介，也不让搜索引擎收录。
   const head =
     profile.status === "active"
       ? { title: profile.name, description: summarize(profile.bio) || m.user_page_description({ name: profile.name }), index: true }
       : { title: m.user_page_pending_title(), description: m.user_page_pending_body(), index: false };
-  return { dehydratedState: dehydrate(queryClient), head };
+  return data({ dehydratedState: dehydrate(queryClient), head }, { headers: profileHeaders });
 }
 
 export function meta({ loaderData, matches, location }: Route.MetaArgs) {
@@ -77,7 +85,7 @@ function UserContent({ id }: { id: string }) {
     return (
       <main className="space-y-4">
         <PageTitle description={m.user_page_pending_body()}>{m.user_page_pending_title()}</PageTitle>
-        <p className="text-sm text-muted-foreground">{m.user_page_id({ id: profile.id })}</p>
+        <p className="text-sm text-muted-foreground">{m.user_page_id({ id: profile.publicId })}</p>
       </main>
     );
   }
@@ -89,7 +97,7 @@ function UserContent({ id }: { id: string }) {
         <div className="min-w-0 flex-1 space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight break-words">{profile.name}</h1>
           {/* 昵称可以重名：用户 id 和昵称一起显示，别人冒充不了（spec 第 10.5 节）。 */}
-          <p className="text-sm text-muted-foreground">{m.user_page_id({ id: profile.id })}</p>
+          <p className="text-sm text-muted-foreground">{m.user_page_id({ id: profile.publicId })}</p>
           {/* 注册日期按 UTC 取年月日：服务端和浏览器算出来一样，hydrate 前后文字不变，搜索引擎也看得到。 */}
           <p className="text-sm text-muted-foreground">{m.user_page_joined({ date: profile.createdAt.slice(0, 10) })}</p>
         </div>

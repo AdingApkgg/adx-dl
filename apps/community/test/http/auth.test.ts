@@ -1,3 +1,4 @@
+import { exportTestUserIds } from "../../src/server/testing/user-public-ids";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { makeSignature } from "better-auth/crypto";
 import { RedisClient } from "bun";
@@ -20,6 +21,7 @@ async function seedSessionDueForRenewal(name: string) {
   const { db } = testDbHandle();
   const id = shortId();
   await db.insert(user).values({ id, name, email: `${id}@placeholder.invalid` });
+  await exportTestUserIds();
   const token = crypto.randomUUID().replaceAll("-", "");
   const now = Date.now();
   await db.insert(session).values({

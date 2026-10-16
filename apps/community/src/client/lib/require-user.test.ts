@@ -76,6 +76,7 @@ describe("requireUser", () => {
   test("已登录：原样返回这个用户，并留在本次请求的 QueryClient 里", async () => {
     const user: Awaited<ReturnType<typeof requireUser>> = {
       id: "abc2345678",
+      publicId: "1",
       name: "阿丁",
       image: null,
       status: "active",

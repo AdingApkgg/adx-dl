@@ -12,8 +12,10 @@ import { apiContext, queryClientContext } from "@/shared/router-context";
 import UserProfile, { loader, meta } from "./user-profile";
 
 const ID = "abc2345678";
+const PUBLIC_ID = "1";
 const ACTIVE = {
   id: ID,
+  publicId: PUBLIC_ID,
   status: "active",
   name: "阿丁",
   image: null,
@@ -23,7 +25,7 @@ const ACTIVE = {
 const VIEWER = { id: "xyz2345678", name: "路人", image: null, status: "active", createdAt: ACTIVE.createdAt, deletionPurgeAt: null };
 
 type LoaderArgs = Parameters<typeof loader>[0];
-type LoaderData = Awaited<ReturnType<typeof loader>>;
+type LoaderData = Exclude<Awaited<ReturnType<typeof loader>>, Response>["data"];
 type MetaArgs = Parameters<typeof meta>[0];
 
 // 只实现个人主页 loader 会调用的两个接口：/api/v1/users/:id 和 /api/v1/me。
@@ -47,8 +49,10 @@ function contextFor(user: object | null, viewer: object | null = null) {
   return context;
 }
 
-function visit(user: object | null, viewer: object | null = null): Promise<LoaderData> {
-  return loader({ context: contextFor(user, viewer), params: { id: ID } } as unknown as LoaderArgs);
+async function visit(user: object | null, viewer: object | null = null): Promise<LoaderData> {
+  const result = await loader({ context: contextFor(user, viewer), params: { id: PUBLIC_ID }, request: new Request(`https://community.test/u/${PUBLIC_ID}`) } as unknown as LoaderArgs);
+  if (result instanceof Response) throw result;
+  return result.data;
 }
 
 function render(data: LoaderData): string {
@@ -58,10 +62,10 @@ function render(data: LoaderData): string {
       { client: makeQueryClient() },
       createElement(
         MemoryRouter,
-        { initialEntries: [`/u/${ID}`] },
+        { initialEntries: [`/u/${PUBLIC_ID}`] },
         createElement(UserProfile as unknown as ComponentType<{ loaderData: LoaderData; params: { id: string } }>, {
           loaderData: data,
-          params: { id: ID },
+          params: { id: PUBLIC_ID },
         })
       )
     )
@@ -70,7 +74,7 @@ function render(data: LoaderData): string {
 
 function metaOf(data: LoaderData) {
   const matches = [{ id: "root", loaderData: { origin: "https://community.test" } }];
-  return meta({ loaderData: data, matches, location: { pathname: `/u/${ID}` } } as unknown as MetaArgs);
+  return meta({ loaderData: data, matches, location: { pathname: `/u/${PUBLIC_ID}` } } as unknown as MetaArgs);
 }
 
 describe("个人主页 loader", () => {
@@ -84,7 +88,7 @@ describe("个人主页 loader", () => {
     const data = await visit(ACTIVE);
 
     const byKey = Object.fromEntries(data.dehydratedState.queries.map((query) => [query.queryKey.join("/"), query.state.data]));
-    expect(byKey[`users/${ID}`]).toEqual(ACTIVE);
+    expect(byKey[`users/${PUBLIC_ID}`]).toEqual(ACTIVE);
     expect(byKey.me).toBeNull();
   });
 });
@@ -95,7 +99,7 @@ describe("个人主页渲染", () => {
 
     expect(html).toContain('<svg width="80"');
     expect(html).toMatch(/<h1\b[^>]*>阿丁<\/h1>/);
-    expect(html).toContain(m.user_page_id({ id: ID }));
+    expect(html).toContain(m.user_page_id({ id: PUBLIC_ID }));
     expect(html).toContain("white-space:pre-line");
     expect(html).toContain("写谱的\n也打歌");
     expect(html).toContain(m.user_page_joined({ date: "2026-09-29" }));
@@ -116,10 +120,10 @@ describe("个人主页渲染", () => {
 
   // spec 第 10.5 节：正在注销的用户，主页显示"该用户正在注销"。
   test("正在注销：只显示'该用户正在注销'和用户 ID", async () => {
-    const html = render(await visit({ id: ID, status: "pending_deletion" }));
+    const html = render(await visit({ id: ID, publicId: PUBLIC_ID, status: "pending_deletion" }));
 
     expect(html).toContain(m.user_page_pending_title());
-    expect(html).toContain(m.user_page_id({ id: ID }));
+    expect(html).toContain(m.user_page_id({ id: PUBLIC_ID }));
     expect(html).not.toContain("<svg");
   });
 });
@@ -132,7 +136,7 @@ describe("个人主页 meta", () => {
     expect(tags).toContainEqual({ name: "description", content: "写谱的 也打歌" });
     expect(tags).toContainEqual({ property: "og:title", content: "阿丁" });
     expect(tags).not.toContainEqual({ name: "robots", content: "noindex" });
-    expect(tags).toContainEqual({ tagName: "link", rel: "canonical", href: `https://community.test/u/${ID}` });
+    expect(tags).toContainEqual({ tagName: "link", rel: "canonical", href: `https://community.test/u/${PUBLIC_ID}` });
   });
 
   test("没写简介：用默认的描述；简介太长只取前 160 个字符", async () => {
@@ -147,7 +151,7 @@ describe("个人主页 meta", () => {
   });
 
   test("正在注销：不收录，不出现昵称", async () => {
-    const tags = metaOf(await visit({ id: ID, status: "pending_deletion" }));
+    const tags = metaOf(await visit({ id: ID, publicId: PUBLIC_ID, status: "pending_deletion" }));
 
     expect(tags).toContainEqual({ name: "robots", content: "noindex" });
     expect(tags).toContainEqual({ title: `${m.user_page_pending_title()} - ${m.site_name()}` });
@@ -157,4 +161,14 @@ describe("个人主页 meta", () => {
 test("active public profile uses the published decorative image",async()=> {
   const html=render(await visit({...ACTIVE,image:"/media/profile.jpg"}));
   expect(html).toContain('src="/media/profile.jpg"');expect(html).toContain('alt="" aria-hidden="true"');
+});
+
+test("legacy aliases redirect to numeric ID after lookup, keeping locale/query and no-store", async () => {
+  for (const path of [`/u/${ID}`, `/en/u/${ID}?tab=charts`, `/ja/U/${ID}/`]) {
+    const response = await loader({ context: contextFor(ACTIVE), params: { id: ID }, request: new Request(`https://community.test${path}`) } as unknown as LoaderArgs);
+    expect(response).toBeInstanceOf(Response);
+    expect((response as Response).status).toBe(302);
+    expect((response as Response).headers.get("location")).toBe(path.replace(/\/u\/[^/?]+\/?/i, `/u/${PUBLIC_ID}`));
+    expect((response as Response).headers.get("cache-control")).toBe("private, no-store");
+  }
 });

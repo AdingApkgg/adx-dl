@@ -6,6 +6,8 @@ import { type ApiClient, okJson } from "@/shared/api-client";
 export function userQuery(api: ApiClient, id: string) {
   return queryOptions({
     queryKey: ["users", id] as const,
+    // Re-authorize old aliases and pending/deleted accounts on every navigation.
+    staleTime: 0,
     queryFn: async () => {
       // id 来自网址：路由参数已经解码，Hono 客户端又把路径参数原样拼进地址、不转义。URL 解析器把 "\" 当成
       // "/"，"..\me\profile" 就会请求到 /api/v1/me/profile，"?" 会带出查询串；服务端渲染时这个请求还带着

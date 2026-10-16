@@ -20,7 +20,7 @@ import type { QqCodeStore } from "./qq/codes";
 import type { QqHasher } from "./qq/hasher";
 import { qqLogin } from "./qq/plugin";
 import type { QqSender } from "./qq/sender";
-import { shortId } from "./short-id";
+import { userShortId } from "./short-id";
 import type { TurnstileVerifier } from "./turnstile";
 
 export type AuthDeps = {
@@ -141,7 +141,7 @@ export function createAuth(deps: AuthDeps) {
       disableCSRFCheck: false,
       database: {
         // user 用 10 位短 id；其余表返回 false，由数据库的 uuidv7() 生成。
-        generateId: ({ model }) => (model === "user" ? shortId() : false),
+        generateId: ({ model }) => (model === "user" ? userShortId() : false),
         // 读会话时用一条 SQL 连带取出用户（schema 里的 relations 就是为它准备的）。
         joins: true,
       },
@@ -205,7 +205,7 @@ export function createAuth(deps: AuthDeps) {
           // 让这一次建号失败（500），用户重试即可。spec 写的"插入冲突时重试"做不到：失败时 Better Auth 的
           // 流程已经中断。唯一性由主键保证。
           before: async (data) => {
-            const id = shortId();
+            const id = userShortId();
             return {
               data: {
                 ...data,

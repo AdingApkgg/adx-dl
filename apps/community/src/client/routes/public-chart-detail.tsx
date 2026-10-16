@@ -48,7 +48,7 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
       <div className="overflow-hidden rounded-xl border"><PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} /></div>
       <div className="min-w-0 space-y-3 break-words">
         <PageTitle description={chart.artist}>{chart.title}</PageTitle>
-        {chart.author ? <Link to={localizeHref(`/u/${chart.author.id}`)} className="flex items-center gap-2 underline">
+        {chart.author ? <Link to={localizeHref(`/u/${chart.author.publicId ?? chart.author.id}`)} className="flex items-center gap-2 underline">
           <Avatar image={chart.author.image} id={chart.author.id} name={chart.author.name} size={32} />{m.public_chart_author({ name: chart.author.name })}
         </Link> : <p>{m.public_chart_author({ name: m.public_chart_anonymous() })}</p>}
         <p>{m.chart_version({ number: String(chart.ordinal) })} · {(chart.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p>

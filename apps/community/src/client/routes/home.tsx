@@ -84,7 +84,7 @@ function HomeContent({ publicCharts }: { publicCharts: PublicChartsPageDto | nul
           {me ? (
             <>
               <Avatar image={me.image} id={me.id} name={me.name} size={32} /> {m.home_signed_in_as({ name: me.name })} ·{" "}
-              <Link to={localizeHref(`/u/${me.id}`)} className={textLinkClass}>
+              <Link to={localizeHref(`/u/${me.publicId ?? me.id}`)} className={textLinkClass}>
                 {m.home_my_page()}
               </Link>{" "}
               ·{" "}

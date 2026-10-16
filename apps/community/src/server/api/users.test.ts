@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 
+import { exportTestUserIds } from "../testing/user-public-ids";
 import { createApp } from "../app";
 import { shortId } from "../auth/short-id";
 import { user } from "../db/schema";
@@ -25,11 +26,13 @@ describe("GET /api/v1/users/:id", () => {
     const id = await currentUserId(owner);
     await owner.request("PATCH", "/api/v1/me/profile", { body: { bio: "写谱的\n也打歌" } });
 
+    await exportTestUserIds();
     const res = await app.request(`/api/v1/users/${id}`);
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       id,
+      publicId: expect.stringMatching(/^[1-9][0-9]*$/),
       status: "active",
       name: "阿丁",
       image: null,
@@ -43,6 +46,7 @@ describe("GET /api/v1/users/:id", () => {
     const owner = new Browser(app);
     await signInWithGoogle(owner, googleProfile());
 
+    await exportTestUserIds();
     const res = await app.request(`/api/v1/users/${await currentUserId(owner)}`);
 
     expect(((await res.json()) as { bio: string }).bio).toBe("");
@@ -57,17 +61,19 @@ describe("GET /api/v1/users/:id", () => {
     await owner.request("PATCH", "/api/v1/me/profile", { body: { bio: "再见" } });
     await testDbHandle().db.update(user).set({ status: "pending_deletion" }).where(eq(user.id, id));
 
+    await exportTestUserIds();
     const res = await app.request(`/api/v1/users/${id}`);
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ id, status: "pending_deletion" });
+    expect(await res.json()).toEqual({ id, publicId: expect.stringMatching(/^[1-9][0-9]*$/), status: "pending_deletion" });
   });
 
   test("格式对但不存在的 id、格式不对的 id：都是 404", async () => {
     const app = newApp();
 
     for (const id of [shortId(), "ABC2345678", "abc234567", "abc234567o", "%27%20or%201%3D1"]) {
-      const res = await app.request(`/api/v1/users/${id}`);
+      await exportTestUserIds();
+    const res = await app.request(`/api/v1/users/${id}`);
       expect(res.status, id).toBe(404);
       expect(await res.json(), id).toEqual({ error: { code: "NOT_FOUND", message: "User not found" } });
     }

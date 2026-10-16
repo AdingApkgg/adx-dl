@@ -1,3 +1,4 @@
+import { userPublicIdFact, type UserPublicIdFact } from "../../src/shared/user-journal";
 import { permissionFact, retentionFact, type ChartJournalPayload } from "../../src/shared/chart-journal";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { lstat, mkdir, open, readFile, rename, readdir, unlink, link } from "node:fs/promises";
@@ -8,8 +9,8 @@ export type JournalConfig = { directory: string; keyFile: string; databaseUrl: s
 export type JournalHead = { sequence: number; hash: string; capturedAt: string };
 export type JournalRecord = {
   sequence: number;
-  kind: "user_deleted" | "file_deleted" | "hash_blocked" | "media_revoked" | "chart_permission";
-  payload?: ChartJournalPayload;
+  kind: "user_deleted" | "file_deleted" | "hash_blocked" | "media_revoked" | "chart_permission" | "user_public_id";
+  payload?: ChartJournalPayload | UserPublicIdFact;
   userId: string | null;
   fileId: string | null;
   sha256: string | null;
@@ -29,6 +30,9 @@ export function validJournalRecord(r: JournalRecord): boolean {
     typeof r.fileId === "string" &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r.fileId);
   const hash = typeof r.sha256 === "string" && /^[a-f0-9]{64}$/.test(r.sha256);
+  if (r.kind === "user_public_id")
+    return userId && r.fileId === null && r.sha256 === null && r.generation === null &&
+      userPublicIdFact.safeParse(r.payload).success;
   if (r.kind === "chart_permission")
     return (r.userId === null || userId) && r.fileId === null && r.sha256 === null &&
       r.generation === null && permissionFact.safeParse(r.payload).success;
@@ -312,7 +316,7 @@ function record(r: Record<string, unknown>): JournalRecord {
   // Never add payload:null to legacy records: their exact JSON bytes are already hash chained.
   if (r.payload != null) {
     result.payload = result.kind === "chart_permission"
-      ? permissionFact.parse(r.payload) : retentionFact.parse(r.payload);
+      ? permissionFact.parse(r.payload) : result.kind === "user_public_id" ? userPublicIdFact.parse(r.payload) : retentionFact.parse(r.payload);
   }
   if (!validJournalRecord(result)) throw fail();
   return result;

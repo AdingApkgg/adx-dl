@@ -1,10 +1,10 @@
 import { expect } from "bun:test";
 import { createHash } from "node:crypto";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { strToU8, zipSync } from "fflate";
 import type { StorageContext } from "../../src/server/storage/contracts";
 import type { ingestFixture } from "../storage/ingest-fixture";
-import { charts, chartPublicIds, storageTombstones, chartVersions, chartPublications, files, user, profiles, uploadSessions } from "../../src/server/db/schema";
+import { charts, chartPublicIds, userPublicIds, storageTombstones, chartVersions, chartPublications, files, user, profiles, uploadSessions } from "../../src/server/db/schema";
 import { representationResponse } from "../../src/server/storage/files";
 import { initUpload, completeUpload } from "../../src/server/storage/uploads";
 import { putUploadPart } from "../../src/server/storage/parts";
@@ -36,9 +36,12 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
     const [ready] = await source.db.select().from(uploadSessions).where(eq(uploadSessions.id, dto.id));
     return { id: ready.fileId!, bytes };
   }
+  const userNumbers = new Map<string, string>();
   const rows: { kind: "withdraw" | "replace" | "delete" | "retain" | "legacy"; owner: string; original: Awaited<ReturnType<typeof upload>>; chart: Awaited<ReturnType<typeof createChart>> }[] = [];
   for (const kind of ["withdraw", "replace", "delete", "retain", "legacy"] as const) {
     const owner = await f.owner(), original = await upload(owner, `Restore ${kind}`);
+    const [identity] = await source.db.select().from(userPublicIds).where(eq(userPublicIds.userId, owner));
+    userNumbers.set(owner, identity.publicId.toString());
     await source.db.insert(profiles).values({ userId: owner, bio: "private-identity-must-disappear" });
     let chart = await createChart(source, owner, original.id);
     if (kind === "legacy") {
@@ -82,12 +85,21 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
       }
       // This chart and its number do not exist in the old snapshot, but its URL must stay reserved.
       const lateOwner = await f.owner(), lateOriginal = await upload(lateOwner, "Late withdrawn number");
+      const [identity] = await source.db.select().from(userPublicIds).where(eq(userPublicIds.userId, lateOwner));
+      userNumbers.set(lateOwner, identity.publicId.toString());
       lateChart = await createChart(source, lateOwner, lateOriginal.id);
       lateChart = await publishChart(source, lateOwner, lateChart.id, { expectedRevision: lateChart.revision, versionId: lateChart.currentVersionId, confirmOriginalArchive: true });
       lateChart = await withdrawChart(source, lateOwner, lateChart.id, lateChart.revision);
       await exportJournal(journal);
     },
     async verify(target: StorageContext) {
+      for (const [owner, number] of userNumbers) {
+        const [identity] = await target.db.select().from(userPublicIds).where(eq(userPublicIds.userId, owner));
+        expect(identity.publicId.toString()).toBe(number);
+      }
+      const maximum = [...userNumbers.values()].map(BigInt).reduce((a, b) => a > b ? a : b);
+      const sequence = await target.db.execute(sql`select last_value from user_public_ids_public_id_seq`);
+      expect(BigInt(String(sequence.rows[0].last_value))).toBeGreaterThanOrEqual(maximum);
       expect(lateChart?.publicId).toMatch(/^[1-9][0-9]*$/);
       const [reserved] = await target.db.select().from(chartPublicIds).where(eq(chartPublicIds.chartId, lateChart!.id));
       expect(reserved.publicId.toString()).toBe(lateChart!.publicId!);

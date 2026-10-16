@@ -1,3 +1,5 @@
+import { userPublicIdFact } from "../../src/shared/user-journal";
+import { checkRestoredUserIds, numberRestoredUsers, replayUserPublicId } from "./user-replay";
 import { permissionFact, retentionFact } from "../../src/shared/chart-journal";
 import { type ChartRestorePending, replayChartPermission, replayDeletedUserCharts, numberRestoredPublications } from "./chart-replay";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
@@ -256,7 +258,9 @@ export async function replayJournal(
       const reportPending = (diagnostic: ChartRestorePending) => {
         if (latestPermission.get(diagnostic.chartId) === r.sequence) pending.push(diagnostic);
       };
-      if (r.kind === "user_deleted") {
+      if (r.kind === "user_public_id") {
+        await replayUserPublicId(c, r);
+      } else if (r.kind === "user_deleted") {
         await replayDeletedUserCharts(c, r, reportPending);
         await c.query("delete from user_avatars where user_id=$1", [r.userId]);
         await c.query('delete from "user" where id=$1', [r.userId]);
@@ -415,7 +419,9 @@ export async function replayJournal(
       "select setval(pg_get_serial_sequence('storage_tombstones','sequence'),greatest($1,coalesce((select max(sequence) from storage_tombstones),0),1),true)",
       [head.sequence],
     );
+    await checkRestoredUserIds(c, head.sequence);
     await numberRestoredPublications(c, head.sequence);
+    await numberRestoredUsers(c);
     await c.query("commit");
     for (const diagnostic of pending) {
       if (options.onChartPending) options.onChartPending(diagnostic);
@@ -520,10 +526,20 @@ export async function restoreOriginals(options: RestoreOptions) {
       await c.query("select set_config('astrodx.restore_chart_public_ids',$1,false)", [
         JSON.stringify([...identities].map(([chartId, publicId]) => ({ chartId, publicId }))),
       ]);
+      const userIdentities = new Map<string, string>();
+      for (const record of latest.records) if (record.kind === "user_public_id") {
+        const { publicId } = userPublicIdFact.parse(record.payload);
+        if (!record.userId || (userIdentities.has(record.userId) && userIdentities.get(record.userId) !== publicId))
+          throw new Error("USER_PUBLIC_ID_CONFLICT");
+        userIdentities.set(record.userId, publicId);
+      }
+      await c.query("select set_config('astrodx.restore_user_public_ids',$1,false)", [
+        JSON.stringify([...userIdentities].map(([userId, publicId]) => ({ userId, publicId }))),
+      ]);
       // Restored dumps can predate additive publication and journal columns. Upgrade while closed.
       await migrate(drizzle(c), { migrationsFolder: fileURLToPath(new URL("../../src/server/db/migrations", import.meta.url)) });
       await replayJournal(c, latest.records, latest.head);
-      const allocations = await c.query("select 1 from storage_tombstones where sequence>$1 and kind='chart_permission' and payload ? 'publicId' limit 1", [latest.head.sequence]);
+      const allocations = await c.query("select 1 from storage_tombstones where sequence>$1 and (kind='user_public_id' or (kind='chart_permission' and payload ? 'publicId')) limit 1", [latest.head.sequence]);
       if (allocations.rowCount) {
         const unchanged = await verifyLatestJournal(options.journal, manifest.journal);
         if (unchanged.head.hash !== latest.head.hash || unchanged.head.sequence !== latest.head.sequence) throw fail();

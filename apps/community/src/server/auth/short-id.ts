@@ -20,3 +20,10 @@ const SHORT_ID_PATTERN = new RegExp(`^[${SHORT_ID_ALPHABET}]{10}$`);
 export function isShortId(value: string): boolean {
   return SHORT_ID_PATTERN.test(value);
 }
+
+/** New internal identities always include a letter; old all-digit aliases still resolve. */
+export function userShortId(): string {
+  let id: string;
+  do { id = shortId(); } while (/^[0-9]+$/.test(id));
+  return id;
+}

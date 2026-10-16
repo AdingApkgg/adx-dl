@@ -12,6 +12,7 @@ import {
   derivedObjects,
   files,
   user,
+  userPublicIds,
 } from "../db/schema";
 import type { StorageContext } from "../storage/contracts";
 import { StorageError, StorageUnavailableError } from "../storage/errors";
@@ -154,6 +155,9 @@ function query(ctx: StorageContext) {
       recipe: blobDerivatives,
       output: derivedObjects,
       authorId: user.id,
+      authorPublicId: sql<bigint | null>`case when ${userPublicIds.journalSequence} <=
+        (select exported_sequence from storage_journal_progress where id='global')
+        then ${userPublicIds.publicId} else null end`,
       authorName: user.name,
       authorImage: user.image,
     })
@@ -161,6 +165,7 @@ function query(ctx: StorageContext) {
     .innerJoin(charts, eq(charts.id, chartPublications.chartId))
     .innerJoin(chartPublicIds, eq(chartPublicIds.chartId, charts.id))
     .leftJoin(user, eq(user.id, charts.ownerId))
+    .leftJoin(userPublicIds, eq(userPublicIds.userId, user.id))
     .innerJoin(
       chartVersions,
       and(eq(chartVersions.id, chartPublications.versionId), eq(chartVersions.chartId, charts.id)),
@@ -205,7 +210,7 @@ function publicDto(r: Row): PublicChartDto {
     ordinal: r.v.ordinal,
     summary: r.v.summary,
     sourceSize: r.file.size,
-    author: r.authorId ? { id: r.authorId, name: r.authorName!, image: r.authorImage } : null,
+    author: r.authorId ? { id: r.authorId, publicId: r.authorPublicId?.toString() ?? null, name: r.authorName!, image: r.authorImage } : null,
   };
 }
 async function resolved(ctx: StorageContext, id: string) {

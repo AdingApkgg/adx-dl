@@ -37,7 +37,7 @@ export type ChartVersionDto = {
   createdAt: string;
 };
 export type ChartPublicationDto = { versionId: string; title: string; artist: string; publishedAt: string; updatedAt: string };
-export type PublicChartDto = ChartPublicationDto & { id: string; publicId: string; ordinal: number; summary: ChartImportSummary; sourceSize: number; author: { id: string; name: string; image: string | null } | null };
+export type PublicChartDto = ChartPublicationDto & { id: string; publicId: string; ordinal: number; summary: ChartImportSummary; sourceSize: number; author: { id: string; publicId: string | null; name: string; image: string | null } | null };
 export type PublicChartsPageDto = { items: PublicChartDto[]; nextCursor: string | null };
 export type ChartDto = {
   publicId?: string | null; // Server always supplies this; private drafts have no public number.

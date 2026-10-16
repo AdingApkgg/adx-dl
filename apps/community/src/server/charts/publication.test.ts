@@ -647,7 +647,12 @@ test("restoring before final deletion retains only the latest permission and rem
   )
     .filter((r) => r.sequence > oldChart.publicationSequence)
     .map((r) => ({ ...r, createdAt: r.createdAt.toISOString(), payload: r.payload ?? undefined }));
-  await ctx.db.insert(user).values(oldUser);
+  await ctx.db.transaction(async tx => {
+    // A physical PG snapshot loads user data before its post-data registration trigger.
+    // Reproduce that restore operation; ordinary registrations must never reuse this identity.
+    await tx.execute(sql`set local session_replication_role=replica`);
+    await tx.insert(user).values(oldUser);
+  });
   await ctx.db.update(charts).set(oldChart).where(eq(charts.id, c.id));
   for (const v of versions)
     await ctx.db
@@ -1004,7 +1009,12 @@ for (const missing of ["derivative", "version"] as const) {
         payload: r.payload ?? undefined,
         createdAt: r.createdAt.toISOString(),
       }));
-    await ctx.db.insert(user).values(oldUser);
+    await ctx.db.transaction(async tx => {
+    // A physical PG snapshot loads user data before its post-data registration trigger.
+    // Reproduce that restore operation; ordinary registrations must never reuse this identity.
+    await tx.execute(sql`set local session_replication_role=replica`);
+    await tx.insert(user).values(oldUser);
+  });
     await ctx.db.delete(chartPublications).where(eq(chartPublications.chartId, chart.id));
     await ctx.db
       .update(charts)

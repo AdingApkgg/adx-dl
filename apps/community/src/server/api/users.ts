@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import type { AppEnv } from "../app-env";
+import { isPublicUserId } from "@/shared/user-public-id";
 import { isShortId } from "../auth/short-id";
 import { jsonError } from "../errors";
 import { getPublicProfile } from "../services/profile";
@@ -9,7 +10,7 @@ import { getPublicProfile } from "../services/profile";
 export const userRoutes = new Hono<AppEnv>().get("/:id", async (c) => {
   const id = c.req.param("id");
   // 格式不对的 id 不去查库，和查不到一样返回 404。
-  const profile = isShortId(id) ? await getPublicProfile(c.get("services").db, id) : null;
+  const profile = (isShortId(id) || isPublicUserId(id)) ? await getPublicProfile(c.get("services").db, id) : null;
   if (!profile) {
     return jsonError(c, 404, "NOT_FOUND", "User not found");
   }

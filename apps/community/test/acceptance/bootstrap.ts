@@ -3,6 +3,7 @@ import { makeSignature } from "better-auth/crypto";
 import { Client } from "pg";
 import { resetTestDatabase, testDbHandle, assertTestDatabaseUrl } from "../../src/server/testing/test-db";
 import { testSender } from "../../src/server/testing/test-boss";
+import { userShortId } from "../../src/server/auth/short-id";
 import { user, session, profiles } from "../../src/server/db/schema";
 import { initializeStorageState } from "../../ops/backup/initialize";
 import { createS3Driver } from "../../src/server/storage/s3";
@@ -53,7 +54,7 @@ try {
   if (!secret) throw new Error("ACCEPTANCE_AUTH_SECRET_REQUIRED");
   const owner = await stat("/acceptance-fixture");
   for (const [name, file] of [["Acceptance owner", "session-cookie"], ["Other acceptance owner", "other-session-cookie"]]) {
-    const id = crypto.randomUUID();
+    const id = userShortId();
     const token = crypto.randomUUID();
     await handle.db.insert(user).values({ id, name, email: `${id}@placeholder.invalid` });
     await handle.db.insert(profiles).values({ userId: id, bio: "Synthetic isolated acceptance account", onboardedAt: new Date() });
