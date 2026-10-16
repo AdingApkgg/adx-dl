@@ -11,8 +11,8 @@ import { chartAssetUrl } from "../queries/charts";
 
 type Player = { play(): Promise<void>; pause(): void; seek(seconds: number): void; dispose(): void };
 
-export function PrivateChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl }: {
-  id: string; versionId: string; summary: ChartImportSummary; assetUrl?: typeof chartAssetUrl;
+export function PrivateChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectionId }: {
+  id: string; versionId: string; summary: ChartImportSummary; assetUrl?: typeof chartAssetUrl; sectionId?: string;
 }) {
   const previewTitle = assetUrl === chartAssetUrl ? m.chart_preview() : m.public_chart_preview();
   const [difficulty, setDifficulty] = useState<ChartDifficulty | undefined>(() => summary.difficulties.find((row) => row.previewSupported)?.difficulty);
@@ -152,7 +152,7 @@ export function PrivateChartPreview({ id, versionId, summary, assetUrl = chartAs
     });
     return () => { cleanup(); player.current = null; };
   }, [id, versionId, difficulty, opened, duration, summary.audio, summary.hasCover, assetUrl]);
-  return <section aria-label={previewTitle} className="space-y-3 rounded-lg border p-4">
+  return <section id={sectionId} tabIndex={sectionId ? -1 : undefined} aria-label={previewTitle} className="scroll-mt-24 space-y-3 rounded-lg border p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
     <h2 className="font-semibold">{previewTitle}</h2>
     <p className="text-sm text-muted-foreground">{m.chart_preview_hint()}</p>
     <label className="block text-sm">{m.chart_difficulties()}

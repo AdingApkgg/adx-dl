@@ -328,5 +328,13 @@
   "chart_error_part_empty": "选择的素材是空文件，请更换为非空文件。",
   "chart_error_part_size": "某个素材超过单文件上限：谱面 1 MiB、音乐 32 MiB、曲绘 8 MiB、视频 64 MiB。请缩小或更换该素材。",
   "public_charts_latest": "最新公开谱面",
-  "public_charts_unavailable": "暂时无法加载公开谱面，请稍后重试。"
+  "public_charts_unavailable": "暂时无法加载公开谱面，请稍后重试。",
+  "public_chart_share": "分享谱面",
+  "public_chart_link_copied": "公开链接已复制。",
+  "public_chart_link": "公开谱面链接",
+  "public_chart_copy_manually": "请选择并复制下面的公开链接。",
+  "public_chart_link_close": "关闭链接",
+  "public_chart_actions": "谱面操作",
+  "public_chart_preview_action": "预览谱面",
+  "public_chart_preview_unavailable": "此版本暂不支持在线预览，仍可下载原始 ZIP。"
 }

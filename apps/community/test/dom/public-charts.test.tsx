@@ -89,3 +89,19 @@ test("public card difficulty pills name the playable difficulty without relying 
   expect(link.textContent).toContain("12+");
   expect(link.textContent).toContain("暂不支持预览");
 });
+
+test("public detail has a visible preview shortcut and sharing without eager preview assets", () => {
+  const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+  render(<MemoryRouter><Detail loaderData={chart} /></MemoryRouter>);
+  expect(screen.getByRole("link", { name: "预览谱面", exact: true }).getAttribute("href")).toBe("#chart-preview");
+  expect(document.getElementById("chart-preview")?.getAttribute("tabindex")).toBe("-1");
+  expect(screen.getByRole("button", { name: "分享谱面", exact: true })).toBeTruthy();
+  expect(fetcher).not.toHaveBeenCalled();
+});
+test("detail without supported difficulties explains the limit and keeps download and sharing available", () => {
+  render(<MemoryRouter><Detail loaderData={{ ...chart, summary: { ...chart.summary, difficulties: chart.summary.difficulties.map(row => ({ ...row, previewSupported: false })) } }} /></MemoryRouter>);
+  expect(screen.queryByRole("link", { name: "预览谱面", exact: true })).toBeNull();
+  expect(screen.getByText("此版本暂不支持在线预览，仍可下载原始 ZIP。")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "分享谱面", exact: true })).toBeTruthy();
+  expect(screen.getByRole("link", { name: "下载原始 ZIP" })).toBeTruthy();
+});

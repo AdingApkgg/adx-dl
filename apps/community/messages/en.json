@@ -328,5 +328,13 @@
   "chart_error_part_empty": "A selected asset is empty. Choose a non-empty file.",
   "chart_error_part_size": "An asset exceeds its per-file limit: score 1 MiB, audio 32 MiB, cover 8 MiB, video 64 MiB. Reduce or replace that asset.",
   "public_charts_latest": "Latest public charts",
-  "public_charts_unavailable": "Public charts could not be loaded. Please try again later."
+  "public_charts_unavailable": "Public charts could not be loaded. Please try again later.",
+  "public_chart_share": "Share chart",
+  "public_chart_link_copied": "Public link copied.",
+  "public_chart_link": "Public chart link",
+  "public_chart_copy_manually": "Select and copy the public link below.",
+  "public_chart_link_close": "Close link",
+  "public_chart_actions": "Chart actions",
+  "public_chart_preview_action": "Preview chart",
+  "public_chart_preview_unavailable": "Online preview is unavailable for this version. You can still download the original ZIP."
 }
