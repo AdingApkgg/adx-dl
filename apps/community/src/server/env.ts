@@ -13,6 +13,7 @@ export type CommunityEnv = {
   host: string;
   /** 浏览器看到的站点地址，如 https://community.example.com。CSRF 校验和 Better Auth 都用它。 */
   publicOrigin: string;
+  adminPublicIds: readonly string[];
   /** 公开展示在隐私说明中的联系邮箱，生产环境必填。 */
   publicContactEmail: string | null;
   databaseUrl: string;
@@ -60,6 +61,7 @@ const schema = z.object({
     .regex(/^https?:\/\/[^/]+$/, "必须是 scheme://host[:port]，不带路径")
     // 还得和浏览器 Origin 头的写法一字不差，即 new URL(值).origin。
     .refine(isCanonicalOrigin, "必须是规范写法：主机名小写，不写默认端口，不带查询串和用户名"),
+  COMMUNITY_ADMIN_PUBLIC_IDS: z.string().default("").refine(value => value === "" || value.split(",").every(id => /^[1-9][0-9]{0,18}$/.test(id.trim()) && BigInt(id.trim()) <= 9223372036854775807n), "必须是逗号分隔的正整数用户编号"),
   PUBLIC_CONTACT_EMAIL: z.email({ error: "必须是有效的邮箱地址" }).optional(),
   DATABASE_URL: z.string().regex(/^postgres(ql)?:\/\//, "必须以 postgres:// 或 postgresql:// 开头"),
   REDIS_URL: z.string().regex(/^rediss?:\/\//, "必须以 redis:// 或 rediss:// 开头"),
@@ -158,6 +160,7 @@ export function parseEnv(source: Record<string, string | undefined>): CommunityE
     NODE_ENV: read("NODE_ENV"),
     PORT: read("PORT"),
     HOST: read("HOST"),
+    COMMUNITY_ADMIN_PUBLIC_IDS: read("COMMUNITY_ADMIN_PUBLIC_IDS"),
     PUBLIC_ORIGIN: read("PUBLIC_ORIGIN")?.replace(/\/+$/, ""),
     PUBLIC_CONTACT_EMAIL: read("PUBLIC_CONTACT_EMAIL"),
     DATABASE_URL: read("DATABASE_URL"),
@@ -204,6 +207,7 @@ export function parseEnv(source: Record<string, string | undefined>): CommunityE
     port: env.PORT,
     host: env.HOST,
     publicOrigin: env.PUBLIC_ORIGIN,
+    adminPublicIds: env.COMMUNITY_ADMIN_PUBLIC_IDS.split(",").map(id => id.trim()).filter(Boolean),
     publicContactEmail: env.PUBLIC_CONTACT_EMAIL ?? null,
     databaseUrl: env.DATABASE_URL,
     redisUrl: env.REDIS_URL,

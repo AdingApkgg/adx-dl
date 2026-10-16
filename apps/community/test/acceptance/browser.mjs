@@ -133,10 +133,11 @@ async function acceptance() {
   const image = png(), audio = wav();
   const maidata = Buffer.from("&title=CI private draft\n&artist=Synthetic fixture\n&inote_4=(120){4}1,2,3,E\n");
   const zip = storedZip([["maidata.txt", maidata], ["track.wav", audio], ["bg.png", image]]);
-  let draft, asset;
+  let draft, asset, optionalDraft;
   await step("synthetic_accounts", async () => {
     const first = await json(owner, "/api/v1/me"), second = await json(other, "/api/v1/me");
     assert.ok(first.id && second.id); assert.notEqual(first.id, second.id);
+    assert.equal(first.publicId, "1"); assert.equal(first.isAdmin, true); assert.equal(second.isAdmin, false);
     assert.equal((await json(owner, "/api/v1/me/charts")).items.length, 0);
   });
   await step("numeric_user_profiles_and_legacy_redirects", async () => {
@@ -459,7 +460,7 @@ async function acceptance() {
       page.waitForResponse(r => new URL(r.url()).pathname === "/api/v1/me/charts" && r.request().method() === "POST"),
       page.getByRole("button", { name: "保存私有草稿", exact: true }).click(),
     ]);
-    assert.equal(saved.status(), 201); const optional = await saved.json();
+    assert.equal(saved.status(), 201); const optional = await saved.json(); optionalDraft = optional;
     await page.waitForURL(url => url.pathname === `/me/charts/${optional.id}`);
     await page.getByRole("combobox", { name: /公开版本/ }).selectOption(optional.currentVersionId);
     await page.getByLabel("我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。", { exact: true }).check();
@@ -501,6 +502,125 @@ async function acceptance() {
     const jpeg = await anonymous.request.get(new URL(avatar.image, origin).href, { timeout: 10000 });
     assert.equal(jpeg.status(), 200); assert.equal(jpeg.headers()["content-type"], "image/jpeg");
     const bytes = await jpeg.body(); assert.equal(bytes.readUInt16BE(0), 0xffd8); assert.ok(bytes.length <= 524288);
+  });
+  await step("dashboard_real_browser_permissions_navigation_and_unknown_backup", async () => {
+    assert.ok(optionalDraft?.id, "the optional-media chart must remain available for dashboard moderation");
+    const first = await json(owner, "/api/v1/me"), second = await json(other, "/api/v1/me");
+    assert.equal(first.publicId, "1"); assert.equal(first.isAdmin, true); assert.equal(second.isAdmin, false);
+    await page.getByRole("button", { name: `账号菜单：${first.name}`, exact: true }).click();
+    await page.getByRole("menuitem", { name: "社区管理后台", exact: true }).click();
+    await page.waitForURL(url => url.pathname === "/dash");
+    await page.getByRole("heading", { level: 1, name: "社区管理后台", exact: true }).waitFor();
+    await page.getByText("管理员 #1", { exact: true }).waitFor();
+    assert.match(await page.locator('meta[name="robots"]').getAttribute("content"), /noindex/);
+    const navigation = page.getByRole("navigation", { name: "社区管理后台", exact: true });
+    assert.equal(await navigation.getByRole("link").count(), 4);
+    if (evidenceDirectory) await page.screenshot({ path: join(evidenceDirectory, "dash-desktop.png"), fullPage: true });
+    await navigation.getByRole("link", { name: "用户列表", exact: true }).click();
+    await page.waitForURL(url => url.pathname === "/dash/users");
+    await page.getByRole("link", { name: `${first.name} · #1`, exact: true }).waitFor();
+    await page.getByRole("link", { name: `${second.name} · #2`, exact: true }).waitFor();
+    const users = await json(owner, "/api/v1/dash/users");
+    for (const user of users.items) for (const field of ["email", "qq", "ipAddress", "token", "sessions"])
+      assert.equal(Object.hasOwn(user, field), false, `admin user DTO must omit ${field}`);
+    await navigation.getByRole("link", { name: "运行与备份状态", exact: true }).click();
+    await page.waitForURL(url => url.pathname === "/dash/status");
+    await page.getByRole("heading", { name: "备份记录", exact: true }).waitFor();
+    const status = await json(owner, "/api/v1/dash/status");
+    assert.equal(status.backup.status, "unknown", "no backup coordinator has run in this isolated browser fixture");
+    const backupState = page.getByText("最近一次已记录备份", { exact: true }).locator("..");
+    await backupState.getByText("暂无记录或状态未知", { exact: true }).waitFor();
+    await page.getByText("显示备份协调器实际记录的状态。升级前的历史记录可能为空；备份成功不等于已完成恢复验收。", { exact: true }).waitFor();
+    const regular = await other.newPage();
+    assert.equal((await regular.goto(new URL("/dash", origin).href)).status(), 403);
+    await regular.getByRole("heading", { name: "无后台访问权限", exact: true }).waitFor();
+    await regular.getByRole("button", { name: `账号菜单：${second.name}`, exact: true }).click();
+    assert.equal(await regular.getByRole("menuitem", { name: "社区管理后台", exact: true }).count(), 0);
+    await regular.close();
+    for (const path of ["/dash", "/dash/users.data", "/api/v1/dash/access"]) {
+      const response = await other.request.get(new URL(path, origin).href, { maxRedirects: 0 });
+      assert.equal(response.status(), 403);
+      assert.equal(response.headers()["cache-control"], "private, no-store");
+      assert.equal(response.headers()["x-robots-tag"], "noindex, nofollow");
+    }
+    const redirected = await anonymous.request.get(new URL("/dash", origin).href, { maxRedirects: 0 });
+    assert.equal(redirected.status(), 302);
+    assert.equal(redirected.headers().location, "/login?next=%2Fdash");
+    assert.equal(redirected.headers()["cache-control"], "private, no-store");
+    assert.equal(redirected.headers()["x-robots-tag"], "noindex, nofollow");
+    const visitor = await anonymous.newPage();
+    await visitor.goto(new URL("/dash", origin).href);
+    assert.equal(new URL(visitor.url()).pathname, "/login");
+    assert.equal(new URL(visitor.url()).searchParams.get("next"), "/dash");
+    await visitor.close();
+  });
+  await step("dashboard_explicit_takedown_immutable_audit_and_public_revocation", async () => {
+    const listing = await json(owner, "/api/v1/dash/charts");
+    const before = listing.items.find(chart => chart.id === optionalDraft.id);
+    assert.ok(before); assert.equal(before.publicId, "2"); assert.equal(before.status, "public");
+    await page.getByRole("navigation", { name: "社区管理后台", exact: true }).getByRole("link", { name: "公开谱面管理", exact: true }).click();
+    await page.waitForURL(url => url.pathname === "/dash/charts");
+    const row = page.getByRole("article").filter({ has: page.getByRole("heading", { name: /Optional media absent/ }) });
+    await row.getByRole("button", { name: "下架谱面", exact: true }).click();
+    const confirm = row.getByRole("button", { name: "确认下架", exact: true });
+    assert.equal(await confirm.isEnabled(), false);
+    const reason = "Isolated browser acceptance moderation";
+    await row.getByRole("textbox", { name: "下架原因（必填，最多 500 字）", exact: true }).fill(reason);
+    assert.equal(await confirm.isEnabled(), false, "a reason alone is not explicit confirmation");
+    await row.getByRole("checkbox", { name: "我确认下架谱面 #2，并记录上述原因。", exact: true }).check();
+    const [response] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === `/api/v1/dash/charts/${optionalDraft.id}/moderation` && r.request().method() === "POST", { timeout: 60000 }),
+      confirm.click(),
+    ]);
+    assert.equal(response.status(), 200);
+    assert.deepEqual(response.request().postDataJSON(), { expectedRevision: before.revision, reason });
+    const moderated = await response.json();
+    assert.equal(moderated.status, "moderated"); assert.equal(moderated.pending, false);
+    assert.equal(moderated.moderation.reason, reason); assert.equal(moderated.moderation.actorPublicId, "1");
+    await row.getByText("已下架", { exact: true }).waitFor();
+    await row.getByText(reason, { exact: true }).waitFor();
+    assert.equal(await row.getByRole("button", { name: "下架谱面", exact: true }).count(), 0);
+    assert.equal(await row.getByRole("link", { name: "Optional media absent", exact: true }).count(), 0);
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, `dashboard fits ${width}px`);
+    }
+    if (evidenceDirectory) await page.screenshot({ path: join(evidenceDirectory, "dash-mobile.png"), fullPage: true });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    for (const spelling of [optionalDraft.id, "2"]) {
+      const base = `/api/v1/charts/${spelling}`;
+      for (const path of [base, `${base}/download`, `${base}/versions/${optionalDraft.currentVersionId}/assets/maidata`, `/charts/${spelling}`]) {
+        for (const options of [{ method: "GET" }, { method: "HEAD" }, { method: "GET", headers: { Range: "bytes=0-1" } }, { method: "GET", headers: { "If-None-Match": "*" } }]) {
+          const result = await anonymous.request.fetch(new URL(path, origin).href, options);
+          assert.equal(result.status(), 404, `${path}: moderated public access`);
+          assert.equal(result.headers()["cache-control"], "private, no-store");
+        }
+      }
+    }
+    assert.equal((await json(anonymous, "/api/v1/charts")).items.some(chart => chart.id === optionalDraft.id), false);
+    const privateChart = await json(owner, `/api/v1/me/charts/${optionalDraft.id}`);
+    assert.ok(privateChart.versions.length > 0, "moderation preserves the author's private draft");
+    const edited = await owner.request.patch(new URL(`/api/v1/me/charts/${optionalDraft.id}`, origin).href, {
+      headers: { origin: origin.origin }, data: { expectedRevision: privateChart.revision, title: "Private edit after moderation", artist: "Private post-moderation artist" },
+    });
+    assert.equal(edited.status(), 200); const editedChart = await edited.json();
+    const retry = await owner.request.post(new URL(`/api/v1/dash/charts/${optionalDraft.id}/moderation`, origin).href, {
+      headers: { origin: origin.origin }, data: { expectedRevision: editedChart.revision, reason: "A retry must not replace the original reason" }, timeout: 60000,
+    });
+    assert.equal(retry.status(), 200);
+    assert.deepEqual((await retry.json()).moderation, moderated.moderation, "the first moderation audit is immutable");
+    const refreshed = (await json(owner, "/api/v1/dash/charts")).items.find(chart => chart.id === optionalDraft.id);
+    assert.equal(refreshed.title, before.title); assert.equal(refreshed.artist, before.artist);
+    assert.deepEqual(refreshed.moderation, moderated.moderation);
+    await page.reload();
+    await page.getByRole("heading", { name: /Optional media absent/ }).waitFor();
+    assert.equal(await page.getByText("Private edit after moderation", { exact: true }).count(), 0);
+    assert.equal(await page.getByText("Private post-moderation artist", { exact: true }).count(), 0);
+    const republished = await owner.request.put(new URL(`/api/v1/me/charts/${optionalDraft.id}/publication`, origin).href, {
+      headers: { origin: origin.origin }, data: { expectedRevision: editedChart.revision, versionId: editedChart.currentVersionId, confirmOriginalArchive: true },
+    });
+    assert.equal(republished.status(), 409); assert.equal((await republished.json()).error.code, "CHART_MODERATED");
+    await denied(anonymous, "/api/v1/charts/2", 404);
   });
   assert.equal(diagnostics.filter(row => row.type === "pageerror").length, 0, "uncaught browser errors");
   assert.equal(diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length, 0, "hydration errors");

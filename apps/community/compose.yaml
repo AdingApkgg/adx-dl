@@ -69,6 +69,7 @@ services:
       - storage-state:/storage-state:ro
     environment:
       <<: [*app-env, *storage-env]
+      COMMUNITY_ADMIN_PUBLIC_IDS: ${COMMUNITY_ADMIN_PUBLIC_IDS:-}
       STORAGE_WEB_ACCESS_KEY_ID: ${STORAGE_WEB_ACCESS_KEY_ID:?run fill-secrets}
       STORAGE_WEB_SECRET_ACCESS_KEY: ${STORAGE_WEB_SECRET_ACCESS_KEY:?run fill-secrets}
       STORAGE_INTERNAL_MEDIA_SECRET: ${STORAGE_INTERNAL_MEDIA_SECRET:?run fill-secrets}

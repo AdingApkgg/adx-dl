@@ -6,6 +6,7 @@ import {
   blobBlocks,
   blobDerivatives,
   charts,
+  chartModerations,
   chartPublicIds,
   chartVersions,
   chartPublications,
@@ -43,6 +44,8 @@ export async function publishChart(
   const result = await withStorageTransaction(ctx.db, async (tx) => {
     await lockUploadAccounting(tx, userId);
     const chart = await ownChart(tx, userId, id, false, true);
+    if ((await tx.select().from(chartModerations).where(eq(chartModerations.chartId, id))).length)
+      throw new StorageError(409, "CHART_MODERATED");
     const [p] = await tx.select().from(chartPublications).where(eq(chartPublications.chartId, id));
     if (
       p?.versionId === input.versionId.toLowerCase() &&
@@ -184,6 +187,7 @@ function query(ctx: StorageContext) {
 function allowed() {
   return and(
     isNull(charts.deletedAt),
+    sql`not exists(select 1 from ${chartModerations} where chart_id=${charts.id})`,
     isNull(chartVersions.deletedAt),
     isNull(files.deletedAt),
     eq(files.state, "ready"),

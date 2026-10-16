@@ -71,6 +71,7 @@ export function AccountMenu() {
             <DropdownMenuItem asChild>
               <Link to={localizeHref("/me/charts")}>{m.charts_title()}</Link>
             </DropdownMenuItem>
+            {me.isAdmin ? <DropdownMenuItem asChild><Link to={localizeHref("/dash")}>{m.dash_title()}</Link></DropdownMenuItem> : null}
             <DropdownMenuItem asChild>
               <Link to={localizeHref(`/u/${me.publicId ?? me.id}`)}>{m.nav_my_page()}</Link>
             </DropdownMenuItem>

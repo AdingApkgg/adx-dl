@@ -16,6 +16,21 @@ export async function replayChartPermission(
 ) {
   const p = permissionFact.parse(payload);
   await reservePublicChartId(c, p.chartId, p.publicId);
+  // Decisions survive missing charts and every later/older publication/retention fact.
+  if (p.moderation) {
+    if (!p.publicId) throw new Error("CHART_MODERATION_ID_MISSING");
+    const m = p.moderation;
+    await c.query(`insert into chart_moderations(chart_id,public_id,revision,actor_id,actor_public_id,reason,publication,author,created_at,journal_sequence)
+      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) on conflict(chart_id) do nothing`,
+      [p.chartId,p.publicId,m.revision,m.actorId,m.actorPublicId,m.reason,JSON.stringify(m.publication),m.author === null ? null : JSON.stringify(m.author),m.createdAt,r.sequence]);
+  }
+  const blocked = await c.query("select 1 from chart_moderations where chart_id=$1", [p.chartId]);
+  if (blocked.rowCount) {
+    await c.query("delete from chart_publications where chart_id=$1", [p.chartId]);
+    await c.query("update charts set publication_sequence=greatest(publication_sequence,$2),revision=greatest(revision,$3) where id=$1", [p.chartId,r.sequence,p.revision]);
+    return;
+  }
+
   const chart = await c.query("select publication_sequence from charts where id=$1 for update", [
     p.chartId,
   ]);
@@ -62,6 +77,10 @@ export async function replayDeletedUserCharts(
 
   for (const fact of retained) {
     await reservePublicChartId(c, fact.chartId, fact.publicId);
+    if (fact.moderation || (await c.query("select 1 from chart_moderations where chart_id=$1", [fact.chartId])).rowCount) {
+      await replayChartPermission(c, r, fact, reportPending);
+      continue;
+    }
     // A backup predating the selected version still needs a stable anonymous recovery anchor.
     await c.query(
       `insert into charts(id,owner_id,title,artist,revision,publication_sequence)
@@ -139,6 +158,7 @@ export async function numberRestoredPublications(c: Client, durableSequence: num
   const pending = await c.query(`select ch.id from chart_publications p join charts ch on ch.id=p.chart_id
     left join chart_public_ids i on i.chart_id=ch.id
     where i.chart_id is null and ch.publication_sequence <= $1 and ch.deleted_at is null
+    and not exists(select 1 from chart_moderations m where m.chart_id=ch.id)
     order by p.published_at,ch.id for update of ch`, [durableSequence]);
   // Do not publish any unverified snapshot outbox as a side effect of assigning restored URLs.
   if ((await c.query("select 1 from storage_tombstones where sequence>$1 and ($2::boolean or (kind='chart_permission' and payload ? 'publicId')) limit 1", [durableSequence, !!pending.rowCount])).rowCount)

@@ -1,3 +1,4 @@
+import { dashAccess } from "../services/dash";
 import { eq } from "drizzle-orm";
 import { storageJournalProgress, userPublicIds } from "../db/schema";
 import { awaitChartJournal as awaitIdentityJournal } from "../charts/publication-journal";
@@ -54,6 +55,7 @@ export const meRoutes = new Hono<AppEnv>()
     if (identity && identity.journalSequence > (identity.exportedSequence ?? 0) && services.storage)
       await awaitIdentityJournal(services.storage, identity.journalSequence);
     return c.json({
+      isAdmin: Boolean(await dashAccess(services, user.id)),
       id: user.id,
       publicId: identity?.publicId.toString() ?? null,
       name: user.name,

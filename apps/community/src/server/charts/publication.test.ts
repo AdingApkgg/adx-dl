@@ -1373,3 +1373,115 @@ test("replay refuses an unverified snapshot numeric permission even when no char
     await expect(replayJournal(client, [], { sequence: head.exportedSequence, hash: head.chainHash ?? "0".repeat(64), capturedAt: head.exportedAt?.toISOString() ?? "1970-01-01T00:00:00.000Z" })).rejects.toThrow("STORAGE_RESTORE_CLOSED");
   } finally { await client.end(); await ctx.exportChartJournal!(); }
 });
+
+test("dashboard moderation requires recent login, a public snapshot and matching revision", async () => {
+  const { dashRoutes } = await import("../api/dash");
+  const { userPublicIds, chartModerations } = await import("../db/schema");
+  const { HTTPException } = await import("hono/http-exception");
+  const { publishChart } = await import("./publication");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx), admin = await readyOwner(ctx);
+  const draft = await createChart(ctx, owner, (await chartFile(owner)).file.id);
+  let chart = await createChart(ctx, owner, (await chartFile(owner)).file.id);
+  chart = await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const [identity] = await ctx.db.select().from(userPublicIds).where(eq(userPublicIds.userId, admin));
+  let createdAt = new Date(Date.now() - 11 * 60000);
+  const app = new Hono<AppEnv>();
+  app.use("*", async (c, next) => {
+    c.set("services", { db: ctx.db, storage: ctx, adminPublicIds: [identity.publicId.toString()] } as never);
+    c.set("auth", { user: { id: admin }, session: { createdAt } } as never);
+    await next();
+  });
+  app.route("/dash", dashRoutes);
+  app.onError((e, c) => c.json({ code: e instanceof StorageError ? e.code : "ERROR" }, e instanceof StorageError || e instanceof HTTPException ? (e.status as 400) : 500));
+  const moderate = (id: string, body: unknown) => app.request(`/dash/charts/${id}/moderation`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const input = { expectedRevision: chart.revision, reason: "Public archive violates rules" };
+  const stale = await moderate(chart.id, input);
+  expect(stale.status).toBe(403);
+  expect(await stale.json()).toMatchObject({ error: { code: "REAUTH_REQUIRED" } });
+  createdAt = new Date();
+  for (const invalid of [{ ...input, reason: " " }, { ...input, reason: "😀".repeat(501) }, { ...input, expectedRevision: 0 }, { ...input, confirm: false }])
+    expect((await moderate(chart.id, invalid)).status).toBe(400);
+  expect((await moderate(draft.id, { ...input, expectedRevision: draft.revision })).status).toBe(409);
+  expect((await moderate(chart.id, { ...input, expectedRevision: chart.revision - 1 })).status).toBe(409);
+  expect(await ctx.db.select().from(chartModerations).where(eq(chartModerations.chartId, chart.id))).toHaveLength(0);
+  expect((await moderate(chart.id, input)).status).toBe(200);
+});
+
+test("dashboard moderation commits one immutable public snapshot and closes every public representation before its journal barrier recovers", async () => {
+  const { moderateChart, dashCharts, dashPage } = await import("../services/dash");
+  const { publishChart, getPublicChart, listPublicCharts } = await import("./publication");
+  const { updateChart, getChart } = await import("./service");
+  const { user, userPublicIds, chartModerations, storageTombstones, storageJournalProgress } = await import("../db/schema");
+  const { publicChartRoutes } = await import("../api/public-charts");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx), admin = await readyOwner(ctx);
+  let chart = await createChart(ctx, owner, (await chartFile(owner, { title: "Public original" })).file.id);
+  chart = await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const [actorId] = await ctx.db.select().from(userPublicIds).where(eq(userPublicIds.userId, admin));
+  const actor = { id: admin, publicId: actorId.publicId.toString() };
+  const before = chart.revision;
+  await expect(moderateChart({ ...ctx, exportChartJournal: async () => { throw new Error("offline"); } }, actor, chart.id, { expectedRevision: before, reason: "  First decision  " })).rejects.toMatchObject({ status: 503 });
+  const [first] = await ctx.db.select().from(chartModerations).where(eq(chartModerations.chartId, chart.id));
+  const [progress] = await ctx.db.select().from(storageJournalProgress);
+  expect(first).toMatchObject({ revision: before + 1, reason: "First decision", actorId: admin, actorPublicId: actorId.publicId, publication: { title: "Public original" } });
+  expect(first.journalSequence).toBeGreaterThan(progress.exportedSequence);
+  expect(await ctx.db.select().from(chartPublications).where(eq(chartPublications.chartId, chart.id))).toHaveLength(0);
+  const pending = await dashCharts(ctx.db, dashPage({ cursor: String(BigInt(chart.publicId!) - 1n), limit: "1" }));
+  expect(pending.items[0]).toMatchObject({ id: chart.id, status: "moderated", pending: true, title: "Public original" });
+  await expect(getPublicChart(ctx, chart.publicId!)).rejects.toMatchObject({ status: 404 });
+  expect((await listPublicCharts(ctx, { limit: 50 })).items.some(row => row.id === chart.id)).toBe(false);
+  const app = new Hono<AppEnv>();
+  app.use("*", async (c, next) => { c.set("services", { storage: ctx } as never); await next(); });
+  app.route("/charts", publicChartRoutes);
+  app.onError((e, c) => c.json({ code: e instanceof StorageError ? e.code : "ERROR" }, e instanceof StorageError ? (e.status as 400) : 500));
+  for (const id of [chart.id, chart.publicId!]) for (const suffix of ["", "/download", `/versions/${chart.currentVersionId}/assets/maidata`]) for (const method of ["GET", "HEAD"]) {
+    const denied = await app.request(`/charts/${id}${suffix}`, { method, headers: { range: "bytes=0-3", "if-none-match": "*" } });
+    expect(denied.status).toBe(404);
+    expect(denied.headers.get("cache-control")).toBe("private, no-store");
+  }
+  chart = await getChart(ctx, owner, chart.id);
+  chart = await updateChart(ctx, owner, chart.id, { expectedRevision: chart.revision, title: "PRIVATE DRAFT SECRET", artist: "PRIVATE ARTIST SECRET" });
+  await ctx.db.update(user).set({ name: "PRIVATE NEW AUTHOR NAME" }).where(eq(user.id, owner));
+  await expect(publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true })).rejects.toMatchObject({ status: 409, code: "CHART_MODERATED" });
+  await ctx.db.update(user).set({ status: "pending_deletion" }).where(eq(user.id, owner));
+  const retried = await moderateChart(ctx, actor, chart.id.toUpperCase(), { expectedRevision: 1, reason: "Attempt to replace first decision" });
+  expect(retried).toMatchObject({ title: "Public original", status: "moderated", pending: false, moderation: { reason: "First decision" }, author: { name: "test" } });
+  expect(JSON.stringify(retried)).not.toContain("PRIVATE");
+  const [unchanged] = await ctx.db.select().from(chartModerations).where(eq(chartModerations.chartId, chart.id));
+  expect(unchanged).toEqual(first);
+  const facts = await ctx.db.select().from(storageTombstones).where(sql`${storageTombstones.kind}='chart_permission' and ${storageTombstones.payload}->>'chartId'=${chart.id} and ${storageTombstones.payload} ? 'moderation'`);
+  expect(facts).toHaveLength(1);
+  expect(facts[0].payload).toMatchObject({ publication: null, moderation: { reason: "First decision", publication: { title: "Public original" } } });
+});
+
+test("restore preserves a moderation with no chart and older permission or anonymous retention cannot resurrect it", async () => {
+  const { moderateChart } = await import("../services/dash");
+  const { publishChart } = await import("./publication");
+  const { userPublicIds, chartModerations, storageTombstones } = await import("../db/schema");
+  const { replayChartPermission, replayDeletedUserCharts } = await import("../../../ops/backup/chart-replay");
+  const { Client } = await import("pg");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx), admin = await readyOwner(ctx);
+  let chart = await createChart(ctx, owner, (await chartFile(owner, { title: "Restore public snapshot" })).file.id);
+  chart = await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const publication = chart.publication!;
+  const [actor] = await ctx.db.select().from(userPublicIds).where(eq(userPublicIds.userId, admin));
+  await moderateChart(ctx, { id: admin, publicId: actor.publicId.toString() }, chart.id, { expectedRevision: chart.revision, reason: "Permanent takedown" });
+  const [fact] = await ctx.db.select().from(storageTombstones).where(sql`${storageTombstones.kind}='chart_permission' and ${storageTombstones.payload}->>'chartId'=${chart.id} and ${storageTombstones.payload} ? 'moderation'`);
+  const record = { ...fact, createdAt: fact.createdAt.toISOString(), payload: fact.payload ?? undefined };
+  const c = new Client({ connectionString: testDatabaseUrl() }); await c.connect();
+  try {
+    await c.query("begin");
+    await c.query("update charts set current_version_id=null where id=$1", [chart.id]);
+    await c.query("delete from chart_versions where chart_id=$1", [chart.id]);
+    await c.query("delete from charts where id=$1", [chart.id]);
+    await c.query("delete from chart_moderations where chart_id=$1", [chart.id]);
+    await replayChartPermission(c, record, fact.payload);
+    expect((await c.query("select reason from chart_moderations where chart_id=$1", [chart.id])).rows).toEqual([{ reason: "Permanent takedown" }]);
+    const oldFact = { version: 1 as const, chartId: chart.id, publicId: chart.publicId!, revision: 2, publication };
+    await replayChartPermission(c, { ...record, sequence: fact.sequence - 1 }, oldFact);
+    await replayDeletedUserCharts(c, { ...record, sequence: fact.sequence + 1, kind: "user_deleted", userId: owner, payload: { version: 1, retained: [oldFact] } });
+    expect((await c.query("select 1 from chart_publications where chart_id=$1", [chart.id])).rowCount).toBe(0);
+    expect((await c.query("select 1 from charts where id=$1", [chart.id])).rowCount).toBe(0);
+    expect((await c.query("select reason from chart_moderations where chart_id=$1", [chart.id])).rows).toEqual([{ reason: "Permanent takedown" }]);
+  } finally { await c.query("rollback"); await c.end(); }
+  expect((await ctx.db.select().from(chartModerations).where(eq(chartModerations.chartId, chart.id)))[0].reason).toBe("Permanent takedown");
+});

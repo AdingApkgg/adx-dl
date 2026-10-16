@@ -3,6 +3,7 @@ import { errorCodeOf, errorMessage } from "./auth-errors";
 import { storageErrorMessage } from "./storage-errors";
 export function chartErrorMessage(error: unknown): string {
   const code = errorCodeOf(error);
+  if (code === "CHART_MODERATED") return m.chart_error_moderated();
   if (code === "CHART_PART_EMPTY") return m.chart_error_part_empty();
   if (code === "CHART_PART_TOO_LARGE") return m.chart_error_part_size();
   if (code === "CHART_PART_TYPE_INVALID") return m.chart_error_parts_type();

@@ -45,7 +45,7 @@ async function env(name: string, values: Record<string, string>) {
   await chown(`${fixture}/${name}.env`, owner.uid, owner.gid);
 }
 await env("web", {
-  ...common,
+  ...common, COMMUNITY_ADMIN_PUBLIC_IDS: "1",
   STORAGE_WEB_ACCESS_KEY_ID: roles.STORAGE_WEB_ACCESS_KEY_ID!, STORAGE_WEB_SECRET_ACCESS_KEY: roles.STORAGE_WEB_SECRET_ACCESS_KEY!,
 });
 await env("media", {

@@ -129,6 +129,7 @@ const app = createApp({
   rateLimitStore,
   auth,
   services: {
+    adminPublicIds: env.adminPublicIds,
     storage,
     db,
     boss: getBoss,

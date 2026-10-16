@@ -13,6 +13,8 @@ export type ApiServices = {
   /** Task11 supplies validated role runtime; ordinary pages need no storage config. */
   storage?: import("../storage/contracts").StorageContext;
   db: Db;
+  adminPublicIds?: readonly string[];
+  dashChecks?: Record<string, () => Promise<void>>;
   /** pg-boss 的发送端。第一次调用时才启动（失败的启动不缓存），所以是返回 Promise 的函数。 */
   boss: () => Promise<PgBoss>;
   loginOptions: () => Promise<LoginOptions>;

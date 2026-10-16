@@ -79,7 +79,7 @@ export function createApp(deps: AppDeps) {
     },
   } : storage;
   const services: ApiServices = {
-    ...deps.services, storage: configuredStorage, auth: deps.auth, log: deps.log,
+    ...deps.services, dashChecks: deps.checks, storage: configuredStorage, auth: deps.auth, log: deps.log,
     deletionHandlers: configuredStorage ? createDeletionHandlers(configuredStorage, deps.services.deletionHandlers.filter(h => h.name !== "storage")) : deps.services.deletionHandlers,
   };
   // Redis 宕掉时每个请求都会在限流这一步出错：三条限流规则共用一个限了频的日志（1a 评审 R14）。
@@ -88,6 +88,16 @@ export function createApp(deps: AppDeps) {
   app.use("*", requestId());
   app.use("*", clientIp());
   app.use("*", requestLog(deps.log));
+  // Cover dashboard documents, single-fetch data and API denials before auth can redirect or reject.
+  app.use("*", async (c, next) => {
+    const privateDash = /^\/(?:(?:zh|en|ja)\/)?dash(?:\/|\.data$|$)/.test(c.req.path)
+      || /^\/api\/v1\/dash(?:\/|$)/.test(c.req.path);
+    await next();
+    if (privateDash) {
+      c.res.headers.set("Cache-Control", "private, no-store");
+      c.res.headers.set("X-Robots-Tag", "noindex, nofollow");
+    }
+  });
   app.use("/api/v1/me/charts/*", async (c, next) => {
     c.header("cache-control", "private, no-store");
     c.header("x-content-type-options", "nosniff");

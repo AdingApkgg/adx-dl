@@ -568,3 +568,21 @@ export const storageRuntimeRoles = pgTable("storage_runtime_roles", {
  check("storage_runtime_roles_role_check", sql`${t.role} in ('web','media','control')`),
  check("storage_runtime_roles_check", sql`${t.acknowledgedAt} is null or ${t.pauseOwner} is not null`),
 ]);
+
+/** Observational backup state, written only by the actual backup coordinator. */
+export const storageBackupStatus = pgTable("storage_backup_status", {
+  id: text().primaryKey().default("global"),
+  runId: uuid().notNull(),
+  status: text({ enum: ["unknown", "running", "succeeded", "failed"] }).notNull(),
+  startedAt: timestamp(tz).notNull(),
+  finishedAt: timestamp(tz),
+  lastSuccessAt: timestamp(tz),
+  manifestSha256: text(),
+  originalCount: integer(),
+  bytes: bigint({ mode: "number" }),
+}, t => [
+  check("storage_backup_status_singleton_check", sql`${t.id} = 'global'`),
+  check("storage_backup_status_state_check", sql`${t.status} in ('unknown','running','succeeded','failed')`),
+  check("storage_backup_status_hash_check", sql`${t.manifestSha256} is null or ${t.manifestSha256} ~ '^[0-9a-f]{64}$'`),
+  check("storage_backup_status_counts_check", sql`(${t.originalCount} is null or ${t.originalCount} >= 0) and (${t.bytes} is null or ${t.bytes} between 0 and 9007199254740991)`),
+]);

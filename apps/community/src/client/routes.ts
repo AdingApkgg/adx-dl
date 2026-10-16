@@ -16,6 +16,12 @@ export default [
     route("me/charts/new", "routes/chart-new.tsx"),
     route("me/charts/:id", "routes/chart-detail.tsx"),
     route("u/:id", "routes/user-profile.tsx"),
+    route("dash", "routes/dash.tsx", [
+      index("routes/dash-overview.tsx"),
+      route("users", "routes/dash-users.tsx"),
+      route("charts", "routes/dash-charts.tsx"),
+      route("status", "routes/dash-status.tsx"),
+    ]),
     route("account-deletion", "routes/account-deletion.tsx"),
     route("*", "routes/not-found.tsx"),
   ]),

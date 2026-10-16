@@ -4,6 +4,7 @@ import type { AppEnv } from "../app-env";
 import { fileRoutes } from "./files";
 import { avatarRoutes } from "./avatar";
 import { uploadRoutes } from "./uploads";
+import { dashRoutes } from "./dash";
 import { meRoutes } from "./me";
 import { userRoutes } from "./users";
 import { publicChartRoutes } from "./public-charts";
@@ -14,6 +15,7 @@ export const apiV1 = new Hono<AppEnv>()
   .get("/meta", (c) => c.json({ name: "astrodx-community", apiVersion: 1 as const }))
   // 登录页的配置：Turnstile 站点密钥、QQ 登录能不能用。不要求登录。
   .get("/login-options", async (c) => c.json(await c.get("services").loginOptions()))
+  .route("/dash", dashRoutes)
   .route("/uploads", uploadRoutes)
   .route("/files", fileRoutes)
   .route("/me/avatar", avatarRoutes)
