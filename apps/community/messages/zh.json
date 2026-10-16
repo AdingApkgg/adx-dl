@@ -326,5 +326,7 @@
   "chart_error_parts_type": "请选择 TXT 谱面、MP3/OGG/WAV 音乐、JPG/PNG/WebP 曲绘或 MP4/WebM 视频。",
   "chart_part_remove": "移除",
   "chart_error_part_empty": "选择的素材是空文件，请更换为非空文件。",
-  "chart_error_part_size": "某个素材超过单文件上限：谱面 1 MiB、音乐 32 MiB、曲绘 8 MiB、视频 64 MiB。请缩小或更换该素材。"
+  "chart_error_part_size": "某个素材超过单文件上限：谱面 1 MiB、音乐 32 MiB、曲绘 8 MiB、视频 64 MiB。请缩小或更换该素材。",
+  "public_charts_latest": "最新公开谱面",
+  "public_charts_unavailable": "暂时无法加载公开谱面，请稍后重试。"
 }

@@ -5,8 +5,11 @@ import { Link } from "react-router";
 
 import { m } from "@/paraglide/messages.js";
 import { getLocale, localizeHref } from "@/paraglide/runtime.js";
+import type { PublicChartsPageDto } from "@/shared/charts";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
+import { PUBLIC_CHART_GRID_CLASS, PublicChartCard } from "../components/public-chart-card";
+import { publicChartsApi } from "../queries/public-charts";
 import { Avatar } from "../components/avatar";
 import { PageTitle, textLinkClass } from "../components/page-title";
 import { getBrowserApi, getBrowserQueryClient, getRenderApi } from "../lib/browser";
@@ -22,8 +25,11 @@ import type { Route } from "./+types/home";
 export async function loader({ context }: Route.LoaderArgs) {
   const queryClient = context.get(queryClientContext);
   const api = context.get(apiContext);
-  await Promise.all([queryClient.query(metaQuery(api)), queryClient.query(meQuery(api)).catch(() => undefined)]);
-  return { dehydratedState: dehydrate(queryClient) };
+  const [publicCharts] = await Promise.all([
+    publicChartsApi(api).list(undefined, 6).catch(() => null),
+    queryClient.query(metaQuery(api)), queryClient.query(meQuery(api)).catch(() => undefined),
+  ]);
+  return { dehydratedState: dehydrate(queryClient), publicCharts };
 }
 
 // 站内切换：缓存里有就直接用，哪怕已经过期（staleTime: "static"），跳转不用等请求；
@@ -31,11 +37,12 @@ export async function loader({ context }: Route.LoaderArgs) {
 // me 和 loader 一样：取不到就渲染成"未登录"，组件挂载后 useQuery 会重试。
 export async function clientLoader() {
   const queryClient = getBrowserQueryClient();
-  await Promise.all([
+  const [publicCharts] = await Promise.all([
+    publicChartsApi(getBrowserApi()).list(undefined, 6).catch(() => null),
     queryClient.query({ ...metaQuery(getBrowserApi()), staleTime: "static" }),
     queryClient.query({ ...meQuery(getBrowserApi()), staleTime: "static" }).catch(() => undefined),
   ]);
-  return { dehydratedState: null };
+  return { dehydratedState: null, publicCharts };
 }
 
 export function meta({ matches, location }: Route.MetaArgs) {
@@ -59,16 +66,16 @@ export function meta({ matches, location }: Route.MetaArgs) {
 export default function Home({ loaderData }: Route.ComponentProps) {
   return (
     <HydrationBoundary state={loaderData.dehydratedState ?? undefined}>
-      <HomeContent />
+      <HomeContent publicCharts={loaderData.publicCharts} />
     </HydrationBoundary>
   );
 }
 
-function HomeContent() {
+function HomeContent({ publicCharts }: { publicCharts: PublicChartsPageDto | null }) {
   const { data } = useQuery(metaQuery(getRenderApi()));
   const { data: me } = useQuery(meQuery(getRenderApi()));
 
-  // 内容不变，只是排版（spec 第 7.5 节）。登录状态这一行和页头的账号区重复，按 spec 保留。
+  // Public results come from the current navigation, not the account QueryClient cache.
   return (
     <main className="space-y-6">
       <PageTitle>{m.site_name()}</PageTitle>
@@ -96,11 +103,16 @@ function HomeContent() {
           )}
         </CardContent>
       </Card>
-      <section className="space-y-2 rounded-lg border p-4">
-        <h2 className="font-semibold">{m.public_charts_title()}</h2>
+      <section aria-labelledby="latest-public-charts" className="space-y-4">
+        <h2 id="latest-public-charts" className="text-xl font-semibold">{m.public_charts_latest()}</h2>
         <p className="text-sm text-muted-foreground">{m.public_charts_description()}</p>
         <Button asChild><Link to={localizeHref("/charts")}>{m.public_charts_browse()}</Link></Button>
         {" "}<Link to={localizeHref("/me/charts")} className={textLinkClass}>{m.charts_title()}</Link>
+        {publicCharts?.items.length ? <ul className={PUBLIC_CHART_GRID_CLASS}>
+          {publicCharts.items.map(chart => <li key={chart.id}><PublicChartCard chart={chart} headingLevel={3} /></li>)}
+        </ul> : <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+          {publicCharts === null ? m.public_charts_unavailable() : m.public_charts_empty()}
+        </p>}
       </section>
       <p className="text-muted-foreground">{m.home_description()}</p>
       <Link to={localizeHref("/privacy")} className={textLinkClass}>

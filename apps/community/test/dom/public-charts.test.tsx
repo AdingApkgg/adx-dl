@@ -80,3 +80,12 @@ test("detail metadata derives only published snapshot and catalog cursor pages a
   expect(JSON.stringify(head)).not.toContain("Private");
   expect(catalogMeta({ loaderData: { items: [chart] }, matches, location: { pathname: "/charts", search: "?cursor=next" } } as unknown as Parameters<typeof catalogMeta>[0])).toContainEqual({ name: "robots", content: "noindex" });
 });
+
+test("public card difficulty pills name the playable difficulty without relying on color", () => {
+  render(<MemoryRouter><Catalog loaderData={{ items: [chart], nextCursor: null }} /></MemoryRouter>);
+  const link = screen.getByRole("link", { name: /Published title/ });
+  expect(link.textContent).toContain("EXPERT");
+  expect(link.textContent).toContain("MASTER");
+  expect(link.textContent).toContain("12+");
+  expect(link.textContent).toContain("暂不支持预览");
+});

@@ -326,5 +326,7 @@
   "chart_error_parts_type": "Choose a TXT score, MP3/OGG/WAV audio, JPG/PNG/WebP cover, or MP4/WebM video.",
   "chart_part_remove": "Remove",
   "chart_error_part_empty": "A selected asset is empty. Choose a non-empty file.",
-  "chart_error_part_size": "An asset exceeds its per-file limit: score 1 MiB, audio 32 MiB, cover 8 MiB, video 64 MiB. Reduce or replace that asset."
+  "chart_error_part_size": "An asset exceeds its per-file limit: score 1 MiB, audio 32 MiB, cover 8 MiB, video 64 MiB. Reduce or replace that asset.",
+  "public_charts_latest": "Latest public charts",
+  "public_charts_unavailable": "Public charts could not be loaded. Please try again later."
 }

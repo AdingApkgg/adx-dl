@@ -11,7 +11,8 @@ import { PageTitle, textLinkClass } from "../components/page-title";
 import { PrivateChartPreview } from "../components/private-chart-preview";
 import { canonicalLink, localeAlternates, openGraph, originFrom } from "../lib/seo";
 import { publicChartAssetUrl, publicChartDownloadUrl, publicChartsApi } from "../queries/public-charts";
-import { PublicCover, publicHeaders } from "./public-charts";
+import { PublicCover } from "../components/public-chart-card";
+import { publicHeaders } from "./public-charts";
 import type { Route } from "./+types/public-chart-detail";
 export function headers() { return publicHeaders; }
 export function shouldRevalidate() { return true; }

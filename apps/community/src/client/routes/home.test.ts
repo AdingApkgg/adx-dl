@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server.edge";
 import { MemoryRouter, RouterContextProvider } from "react-router";
 
 import { m } from "@/paraglide/messages.js";
+import type { PublicChartDto } from "@/shared/charts";
 import type { ApiClient } from "@/shared/api-client";
 import { makeQueryClient } from "@/shared/query-client";
 import { apiContext, queryClientContext } from "@/shared/router-context";
@@ -18,14 +19,18 @@ const META = { name: "astrodx-community", apiVersion: 1 };
 type LoaderArgs = Parameters<typeof loader>[0];
 type LoaderData = Awaited<ReturnType<typeof loader>>;
 /** 让某个接口返回这个错误状态码（限流 429、服务端出错 5xx）。 */
-type Failures = { meStatus?: number; metaStatus?: number };
+type Failures = { meStatus?: number; metaStatus?: number; chartsStatus?: number; publicCharts?: PublicChartDto[]; onChartsRequest?: (query: unknown, options: unknown) => void };
 
-// 只实现首页 loader 会调用的两个接口（/api/v1/meta 和 /api/v1/me）。QueryClient 用真的
+// 只实现首页 loader 会调用的 meta、me 和公开谱面列表接口。QueryClient 用真的
 // （和服务端每个请求一份的那个一样）。
-function contextFor(signedIn: boolean, { meStatus, metaStatus }: Failures = {}) {
+function contextFor(signedIn: boolean, { meStatus, metaStatus, chartsStatus, publicCharts = [], onChartsRequest }: Failures = {}) {
   const api = {
     api: {
       v1: {
+        charts: { $get: async (args: unknown, options: unknown) => {
+          onChartsRequest?.(args, options);
+          return chartsStatus ? new Response(null, { status: chartsStatus }) : Response.json({ items: publicCharts, nextCursor: null });
+        } },
         meta: { $get: async () => (metaStatus ? new Response(null, { status: metaStatus }) : Response.json(META)) },
         me: {
           $get: async () => {
@@ -91,7 +96,7 @@ function links(html: string): { href: string | undefined; text: string }[] {
   }));
 }
 
-// 首页只有 /api/v1/meta 是必须的。当前用户取不到（429 限流、5xx）时页面照常渲染成"未登录"：
+// 首页只有 /api/v1/meta 是必须的。公开列表和当前用户取不到（429 限流、5xx）时页面照常渲染成"未登录"：
 // 不进错误边界；没进 dehydrate 的 me，浏览器里的 useQuery 会在 hydrate 之后重试。
 describe("首页 loader：当前用户取不到", () => {
   // 500 会被查询客户端重试一次（间隔约 1 秒）才算失败，429 这类 4xx 不重试。
@@ -152,4 +157,41 @@ test("home header uses the published decorative avatar",async()=> {
   const me=data.dehydratedState.queries.find(q=>q.queryKey[0]==="me")!;
   me.state.data={...USER,image:"/media/home.jpg"};
   const html=renderLoaderData(data);expect(html).toContain('src="/media/home.jpg"');expect(html).toContain('alt="" aria-hidden="true"');
+});
+
+const PUBLIC_CHART: PublicChartDto = {
+  id: "public-chart", versionId: "published", ordinal: 1, title: "Published song", artist: "Public artist", sourceSize: 100,
+  publishedAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-11T00:00:00.000Z", author: null,
+  summary: { title: "Unpublished import title", artist: "", maidataMd5Base64: "hash", difficulties: [], warnings: [], audio: null, hasCover: false },
+};
+test("homepage SSR fetches at most six current public charts without caching and renders snapshot cards", async () => {
+  const requests: unknown[] = [];
+  const data = await visit(false, { publicCharts: [PUBLIC_CHART], onChartsRequest: (...args) => requests.push(args) });
+  expect(requests).toEqual([[{ query: { limit: "6" } }, { init: { cache: "no-store" } }]]);
+  expect(data.publicCharts?.items).toEqual([PUBLIC_CHART]);
+  const html = renderLoaderData(data);
+  expect(html).toContain('href="/charts/public-chart"');
+  expect(html).toContain('<h3');
+  expect(html).toContain("Published song");
+  expect(html).not.toContain("Unpublished import title");
+  expect(html).not.toContain("还没有公开谱面。");
+});
+test("homepage distinguishes public API failure from an empty catalog while preserving sign-in and browsing", async () => {
+  const data = await visit(false, { chartsStatus: 503 });
+  expect(data.publicCharts).toBeNull();
+  const html = renderLoaderData(data);
+  expect(html).toContain("暂时无法加载公开谱面，请稍后重试。");
+  expect(html).not.toContain("还没有公开谱面。");
+  expect(links(html)).toContainEqual({ href: "/charts", text: m.public_charts_browse() });
+  expect(links(html)).toContainEqual({ href: loginHref("/"), text: m.home_sign_in() });
+});
+test("homepage reads a fresh public list after withdrawal even with the same request context", async () => {
+  const items = [PUBLIC_CHART];
+  const context = contextFor(false, { publicCharts: items });
+  const args = { context } as unknown as LoaderArgs;
+  expect((await loader(args)).publicCharts?.items).toHaveLength(1);
+  items.length = 0;
+  const current = await loader(args);
+  expect(current.publicCharts?.items).toEqual([]);
+  expect(renderLoaderData(current)).toContain("还没有公开谱面。");
 });

@@ -326,5 +326,7 @@
   "chart_error_parts_type": "TXT 譜面、MP3/OGG/WAV 音楽、JPG/PNG/WebP カバー、MP4/WebM 動画を選択してください。",
   "chart_part_remove": "削除",
   "chart_error_part_empty": "空の素材が選択されています。空でないファイルを選び直してください。",
-  "chart_error_part_size": "素材が単一ファイルの上限を超えています。譜面 1 MiB、音楽 32 MiB、カバー 8 MiB、動画 64 MiB。素材を小さくするか選び直してください。"
+  "chart_error_part_size": "素材が単一ファイルの上限を超えています。譜面 1 MiB、音楽 32 MiB、カバー 8 MiB、動画 64 MiB。素材を小さくするか選び直してください。",
+  "public_charts_latest": "最近公開された譜面",
+  "public_charts_unavailable": "公開譜面を読み込めませんでした。しばらくしてから再度お試しください。"
 }
