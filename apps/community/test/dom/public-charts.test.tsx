@@ -57,9 +57,9 @@ test("SSR loaders use only public API, no-store, and fetch fresh state for every
   }));
   const ctx = context();
   const args = { context: ctx, params: { id: "42" } } as unknown as Parameters<typeof detailLoader>[0];
-  expect((await detailLoader(args)).data.title).toBe("Published title");
+  expect(((await detailLoader(args)) as { data: PublicChartDto }).data.title).toBe("Published title");
   current = { ...chart, title: "Updated snapshot" };
-  expect((await detailLoader(args)).data.title).toBe("Updated snapshot");
+  expect(((await detailLoader(args)) as { data: PublicChartDto }).data.title).toBe("Updated snapshot");
   const result = await catalogLoader({ context: ctx, url: new URL("https://community.test/charts") } as unknown as Parameters<typeof catalogLoader>[0]);
   expect(result.init?.headers).toMatchObject({ "Cache-Control": "private, no-store" });
   expect(catalogHeaders()).toMatchObject({ "Cache-Control": "private, no-store" });
@@ -107,9 +107,9 @@ test("detail without supported difficulties explains the limit and keeps downloa
 });
 
 
-test("legacy UUID detail is authorized before a no-store redirect preserving locale and query", async () => {
+test.each(["/en/charts/12345678-1234-4234-8234-123456789012/", "/en/Charts/12345678-1234-4234-8234-123456789012"])("legacy UUID %s redirects without looping while preserving locale and query", async path => {
   vi.stubGlobal("fetch", async () => Response.json(chart));
-  const args = { context: context(), params: { id: "12345678-1234-4234-8234-123456789012" }, request: new Request("https://community.test/en/charts/12345678-1234-4234-8234-123456789012?from=share") } as unknown as Parameters<typeof detailLoader>[0];
+  const args = { context: context(), params: { id: "12345678-1234-4234-8234-123456789012" }, request: new Request(`https://community.test${path}?from=share`) } as unknown as Parameters<typeof detailLoader>[0];
   const response = await detailLoader(args);
   expect(response).toBeInstanceOf(Response);
   expect((response as Response).status).toBe(302);

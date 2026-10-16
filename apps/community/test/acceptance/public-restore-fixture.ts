@@ -4,14 +4,14 @@ import { eq, inArray } from "drizzle-orm";
 import { strToU8, zipSync } from "fflate";
 import type { StorageContext } from "../../src/server/storage/contracts";
 import type { ingestFixture } from "../storage/ingest-fixture";
-import { charts, chartVersions, chartPublications, files, user, profiles, uploadSessions } from "../../src/server/db/schema";
+import { charts, chartPublicIds, storageTombstones, chartVersions, chartPublications, files, user, profiles, uploadSessions } from "../../src/server/db/schema";
 import { representationResponse } from "../../src/server/storage/files";
 import { initUpload, completeUpload } from "../../src/server/storage/uploads";
 import { putUploadPart } from "../../src/server/storage/parts";
 import { ingestUpload } from "../../src/media-worker/ingest";
 import { handleChartImport } from "../../src/media-worker/chart-import";
 import { finalizeUpload } from "../../src/media-worker/finalize";
-import { createChart, appendChartVersion, deleteChart } from "../../src/server/charts/service";
+import { createChart, appendChartVersion, deleteChart, getChart, publicationDto } from "../../src/server/charts/service";
 import { publishChart, withdrawChart, getPublicChart, resolvePublicChartDownload } from "../../src/server/charts/publication";
 import { createDeletionHandlers } from "../../src/server/storage/deletion";
 import { requestDeletion, purgeUser } from "../../src/server/services/user-deletion";
@@ -36,12 +36,21 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
     const [ready] = await source.db.select().from(uploadSessions).where(eq(uploadSessions.id, dto.id));
     return { id: ready.fileId!, bytes };
   }
-  const rows: { kind: "withdraw" | "replace" | "delete" | "retain"; owner: string; original: Awaited<ReturnType<typeof upload>>; chart: Awaited<ReturnType<typeof createChart>> }[] = [];
-  for (const kind of ["withdraw", "replace", "delete", "retain"] as const) {
+  const rows: { kind: "withdraw" | "replace" | "delete" | "retain" | "legacy"; owner: string; original: Awaited<ReturnType<typeof upload>>; chart: Awaited<ReturnType<typeof createChart>> }[] = [];
+  for (const kind of ["withdraw", "replace", "delete", "retain", "legacy"] as const) {
     const owner = await f.owner(), original = await upload(owner, `Restore ${kind}`);
     await source.db.insert(profiles).values({ userId: owner, bio: "private-identity-must-disappear" });
     let chart = await createChart(source, owner, original.id);
-    chart = await publishChart(source, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId!, confirmOriginalArchive: true });
+    if (kind === "legacy") {
+      const now = new Date();
+      const publication = { chartId: chart.id, versionId: chart.currentVersionId, title: chart.title, artist: chart.artist, publishedAt: now, updatedAt: now };
+      await source.db.insert(chartPublications).values(publication);
+      const [fact] = await source.db.insert(storageTombstones).values({ kind: "chart_permission", payload: { version: 1, chartId: chart.id, revision: 2, publication: publicationDto(publication) } }).returning();
+      await source.db.update(charts).set({ revision: 2, publicationSequence: fact.sequence }).where(eq(charts.id, chart.id));
+      await source.exportChartJournal();
+      chart = await getChart(source, owner, chart.id);
+      expect(chart.publicId).toBeNull();
+    } else chart = await publishChart(source, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId!, confirmOriginalArchive: true });
     if (kind === "retain") {
       const draft = await upload(owner, "Never public retention draft");
       chart = await appendChartVersion(source, owner, chart.id, { expectedRevision: chart.revision, fileId: draft.id });
@@ -49,8 +58,9 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
     rows.push({ kind, owner, original, chart });
   }
   let missingVersion = "";
+  let lateChart: Awaited<ReturnType<typeof createChart>> | undefined;
   return {
-    additionalOriginals: 5,
+    additionalOriginals: 6,
     async commitLaterFacts() {
       for (const row of rows) {
         const { chart, owner, kind } = row;
@@ -70,10 +80,28 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
           expect(await purgeUser({ db: source.db, handlers }, owner)).toBe("purged");
         }
       }
+      // This chart and its number do not exist in the old snapshot, but its URL must stay reserved.
+      const lateOwner = await f.owner(), lateOriginal = await upload(lateOwner, "Late withdrawn number");
+      lateChart = await createChart(source, lateOwner, lateOriginal.id);
+      lateChart = await publishChart(source, lateOwner, lateChart.id, { expectedRevision: lateChart.revision, versionId: lateChart.currentVersionId, confirmOriginalArchive: true });
+      lateChart = await withdrawChart(source, lateOwner, lateChart.id, lateChart.revision);
       await exportJournal(journal);
     },
     async verify(target: StorageContext) {
+      expect(lateChart?.publicId).toMatch(/^[1-9][0-9]*$/);
+      const [reserved] = await target.db.select().from(chartPublicIds).where(eq(chartPublicIds.chartId, lateChart!.id));
+      expect(reserved.publicId.toString()).toBe(lateChart!.publicId!);
+      await expect(getPublicChart(target, lateChart!.publicId!)).rejects.toMatchObject({ status: 404 });
       for (const row of rows) {
+        if (row.kind === "legacy") {
+          const visible = await getPublicChart(target, row.chart.id);
+          expect(visible.publicId).toMatch(/^[1-9][0-9]*$/);
+          expect(BigInt(visible.publicId)).toBeGreaterThan(BigInt(lateChart!.publicId!));
+          expect(await getPublicChart(target, visible.publicId)).toEqual(visible);
+          continue;
+        }
+        const [identity] = await target.db.select().from(chartPublicIds).where(eq(chartPublicIds.chartId, row.chart.id));
+        expect(identity.publicId.toString()).toBe(row.chart.publicId!);
         if (row.kind !== "retain") {
           await expect(getPublicChart(target, row.chart.id)).rejects.toMatchObject({ status: 404 });
           await expect(resolvePublicChartDownload(target, row.chart.id)).rejects.toMatchObject({ status: 404 });
@@ -97,7 +125,7 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
       }
     },
     async cleanup() {
-      const ids = rows.map(row => row.chart.id);
+      const ids = [...rows.map(row => row.chart.id), ...(lateChart ? [lateChart.id] : [])];
       await source.db.delete(chartPublications).where(inArray(chartPublications.chartId, ids));
       await source.db.update(charts).set({ currentVersionId: null }).where(inArray(charts.id, ids));
       await source.db.delete(chartVersions).where(inArray(chartVersions.chartId, ids));

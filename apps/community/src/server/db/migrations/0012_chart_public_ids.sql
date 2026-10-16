@@ -27,7 +27,7 @@ WITH history AS (
     WHERE kind='user_deleted'
 )
 INSERT INTO chart_public_ids(chart_id)
-SELECT h.chart_id FROM history h WHERE NOT EXISTS(SELECT 1 FROM chart_public_ids i WHERE i.chart_id=h.chart_id)
+SELECT h.chart_id FROM history h WHERE nullif(current_setting('astrodx.restore_chart_public_ids',true),'') IS NULL AND NOT EXISTS(SELECT 1 FROM chart_public_ids i WHERE i.chart_id=h.chart_id)
 GROUP BY h.chart_id ORDER BY min(h.first_at),h.chart_id;
 --> statement-breakpoint
 -- Export these identity assignments through the existing durable permission barrier before serving them.

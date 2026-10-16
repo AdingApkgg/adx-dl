@@ -4,6 +4,7 @@ import { Button } from "@astrodx/ui/components/button";
 import { data, Link, redirect } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { getLocale, localizeHref } from "@/paraglide/runtime.js";
+import type { PublicChartDto } from "@/shared/charts";
 import { ApiError } from "@/shared/api-client";
 import { apiContext } from "@/shared/router-context";
 import { Avatar } from "../components/avatar";
@@ -19,7 +20,7 @@ import type { Route } from "./+types/public-chart-detail";
 export function headers() { return publicHeaders; }
 export function shouldRevalidate() { return true; }
 export async function loader({ context, params, request }: Route.LoaderArgs) {
-  let chart;
+  let chart: PublicChartDto;
   try { chart = await publicChartsApi(context.get(apiContext)).get(params.id); }
   catch (error) {
     throw data(null, { status: error instanceof ApiError && error.status < 500 ? error.status : 503, headers: publicHeaders });
@@ -27,7 +28,7 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   // Authorize first on every visit. A cached permanent redirect must not outlive withdrawal.
   if (params.id !== chart.publicId) {
     const target = new URL(request.url);
-    target.pathname = target.pathname.replace(/\/charts\/[^/]+$/, `/charts/${chart.publicId}`);
+    target.pathname = target.pathname.replace(/\/charts\/[^/]+\/?$/i, `/charts/${chart.publicId}`);
     return redirect(target.pathname + target.search, { status: 302, headers: publicHeaders });
   }
   return data(chart, { headers: publicHeaders });
