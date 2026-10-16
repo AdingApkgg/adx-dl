@@ -141,7 +141,7 @@ export async function numberRestoredPublications(c: Client, durableSequence: num
     where i.chart_id is null and ch.publication_sequence <= $1 and ch.deleted_at is null
     order by p.published_at,ch.id for update of ch`, [durableSequence]);
   // Do not publish any unverified snapshot outbox as a side effect of assigning restored URLs.
-  if ((await c.query("select 1 from storage_tombstones where sequence>$1 limit 1", [durableSequence])).rowCount)
+  if ((await c.query("select 1 from storage_tombstones where sequence>$1 and ($2::boolean or (kind='chart_permission' and payload ? 'publicId')) limit 1", [durableSequence, !!pending.rowCount])).rowCount)
     throw new Error("STORAGE_RESTORE_CLOSED");
   if (!pending.rowCount) return;
   for (const row of pending.rows) {
