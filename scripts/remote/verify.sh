@@ -90,14 +90,18 @@ if [ "\$host_command" = 1 ]; then
   (cd "\$dir" && bash -c "\$cmd")
   status=\$?
 else
+# One bind mount keeps the cache and run directory on the same mount inside
+# the container. Separate binds return EXDEV from link(2), so Bun falls back
+# to copying every dependency and can stall the shared VM disk journal.
+# This trusted-code container can see other verification runs under this root.
 # Host network so the image reaches the proxy on 127.0.0.1:11090 that
 # /etc/environment sets; the ssh session already carries those variables.
 docker run --rm --pull=never --network host \
   --user "\$(id -u):\$(id -g)" \
   --cpus 16 --memory 16g --pids-limit 4096 \
-  -e HOME=/tmp -e CI=1 -e BUN_INSTALL_CACHE_DIR=/cache \
+  -e HOME=/tmp -e CI=1 -e BUN_INSTALL_CACHE_DIR=/workspace/bun-cache \
   -e http_proxy -e https_proxy -e HTTP_PROXY -e HTTPS_PROXY -e no_proxy -e NO_PROXY \
-  -v "\$dir:/repo" -v "\$root/bun-cache:/cache" -w /repo \
+  -v "\$root:/workspace" -w "/workspace/runs/\$run" \
   --entrypoint sh '$IMAGE' -c "\$cmd"
 status=\$?
 fi
