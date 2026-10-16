@@ -808,8 +808,12 @@ test("lost-response read-back cannot report a publication successful before its 
     publicationPending: true,
     publication: { versionId: chart.currentVersionId },
   });
+  const pendingNumber = (await getChart(ctx, id, chart.id)).publicId;
+  expect(pendingNumber).toMatch(/^[1-9][0-9]*$/);
+  await expect(getPublicChart(ctx, pendingNumber!)).rejects.toMatchObject({ status: 404 });
   await expect(getPublicChart(ctx, chart.id)).rejects.toMatchObject({ status: 404 });
   expect(await publishChart(ctx, id, chart.id, input)).toMatchObject({
+    publicId: pendingNumber,
     publicationPending: false,
     publication: { versionId: chart.currentVersionId },
   });
@@ -1174,4 +1178,188 @@ test("non-BMP metadata exports at 61 and 120 code points and does not block subs
   expect(await purgeUser(deps, owner)).toBe("purged");
   const [retained] = await ctx.db.select().from(storageJournalProgress);
   expect(retained.exportedSequence).toBeGreaterThan(published.exportedSequence);
+});
+
+
+test("public number is allocated only once at first publication and survives withdrawal and account deletion", async () => {
+  const { publishChart, withdrawChart } = await import("./publication");
+  const { getChart } = await import("./service");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx), source = await chartFile(owner);
+  let chart = await createChart(ctx, owner, source.file.id);
+  expect(chart).toHaveProperty("publicId", null);
+  const firstAttempts = await Promise.allSettled([0, 1].map(() => publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true })));
+  expect(firstAttempts.some(r => r.status === "fulfilled")).toBe(true);
+  await ctx.exportChartJournal!();
+  chart = await getChart(ctx, owner, chart.id);
+  const number = (chart as typeof chart & { publicId: string }).publicId;
+  expect((await ctx.db.execute(sql`select count(*)::int as n from chart_public_ids where chart_id=${chart.id}::uuid`)).rows).toEqual([{ n: 1 }]);
+  expect(number).toMatch(/^[1-9][0-9]*$/);
+  const attempts = await Promise.allSettled([0, 1].map(() => publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true })));
+  expect(attempts.every(r => r.status === "fulfilled")).toBe(true);
+  chart = await withdrawChart(ctx, owner, chart.id, chart.revision);
+  expect(chart).toHaveProperty("publicId", number);
+  chart = await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  expect(chart).toHaveProperty("publicId", number);
+  expect(await getChart(ctx, owner, chart.id)).toHaveProperty("publicId", number);
+  const { user } = await import("../db/schema");
+  const { createDeletionHandlers } = await import("../storage/deletion");
+  const { requestDeletion, purgeUser } = await import("../services/user-deletion");
+  const deps = { db: ctx.db, boss: ctx.boss, handlers: createDeletionHandlers(ctx) };
+  await requestDeletion(deps, owner, { deleteContent: true });
+  await ctx.db.update(user).set({ deletionPurgeAt: new Date(0) }).where(eq(user.id, owner));
+  expect(await purgeUser(deps, owner)).toBe("purged");
+  const retained = await ctx.db.execute(sql`select public_id::text as id from chart_public_ids where chart_id=${chart.id}::uuid`);
+  expect(retained.rows).toEqual([{ id: number }]);
+});
+
+test("journal replay reserves a missing chart number, advances allocation, and rejects remapping", async () => {
+  const { replayChartPermission } = await import("../../../ops/backup/chart-replay");
+  const { Client } = await import("pg");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx), source = await chartFile(owner);
+  const chart = await createChart(ctx, owner, source.file.id);
+  const client = new Client({ connectionString: testDatabaseUrl() }); await client.connect();
+  const missingChart = crypto.randomUUID();
+  const fact = { version: 1 as const, chartId: missingChart, revision: 2, publicId: "9007199254740993", publication: null };
+  const record = { sequence: 1000000, kind: "chart_permission" as const, userId: null, fileId: null, sha256: null, generation: null, createdAt: new Date().toISOString(), payload: fact };
+  try {
+    await replayChartPermission(client, record, fact);
+    expect((await client.query("select public_id::text as id from chart_public_ids where chart_id=$1", [missingChart])).rows).toEqual([{ id: "9007199254740993" }]);
+    const next = await client.query("insert into chart_public_ids(chart_id) values($1) returning public_id::text as id", [chart.id]);
+    expect(next.rows[0].id).toBe("9007199254740994");
+    await replayChartPermission(client, record, fact);
+    expect((await client.query("select nextval('chart_public_ids_public_id_seq')::text as id")).rows[0].id).toBe("9007199254740995");
+    await expect(replayChartPermission(client, record, { ...fact, publicId: "9007199254740996" })).rejects.toThrow();
+    await expect(replayChartPermission(client, record, { ...fact, chartId: chart.id })).rejects.toThrow();
+    const legacy = { ...fact }; delete (legacy as { publicId?: string }).publicId;
+    await replayChartPermission(client, record, legacy);
+    expect((await client.query("select public_id::text as id from chart_public_ids where chart_id=$1", [missingChart])).rows[0].id).toBe("9007199254740993");
+  } finally { await client.end(); }
+});
+
+
+test("numeric-ID migration backfills first publication order from 1 without numbering private drafts", async () => {
+  const { Client } = await import("pg");
+  const { readFile } = await import("node:fs/promises");
+  const owner = await readyOwner(fixture.ctx);
+  const chartsToMigrate = [];
+  for (let i = 0; i < 3; i++) chartsToMigrate.push(await createChart(fixture.ctx, owner, (await chartFile(owner)).file.id));
+  const [withdrawn, published, privateDraft] = chartsToMigrate;
+  const c = new Client({ connectionString: testDatabaseUrl() }); await c.connect();
+  try {
+    await c.query("begin");
+    await c.query("drop table chart_public_ids");
+    await c.query("delete from chart_publications");
+    await c.query("create temp table storage_tombstones (like public.storage_tombstones including all) on commit drop");
+    await c.query(`insert into chart_publications(chart_id,version_id,title,artist,published_at,updated_at) values($1,$2,'Published','','2020-01-01','2020-01-01')`, [published.id, published.currentVersionId]);
+    const snapshot = { versionId: withdrawn.currentVersionId, title: "Withdrawn", artist: "", publishedAt: "2019-01-01T00:00:00.000Z", updatedAt: "2019-01-01T00:00:00.000Z" };
+    await c.query("insert into storage_tombstones(kind,payload) values('chart_permission',$1)", [JSON.stringify({ version: 1, chartId: withdrawn.id, revision: 2, publication: snapshot })]);
+    const migration = await readFile(new URL("../db/migrations/0012_chart_public_ids.sql", import.meta.url), "utf8");
+    await c.query(migration);
+    expect((await c.query("select chart_id,public_id::text as id from chart_public_ids order by public_id")).rows).toEqual([{ chart_id: withdrawn.id, id: "1" }, { chart_id: published.id, id: "2" }]);
+    expect((await c.query("select 1 from chart_public_ids where chart_id=$1", [privateDraft.id])).rowCount).toBe(0);
+    const facts = (await c.query("select payload from storage_tombstones where payload ? 'publicId' order by (payload->>'publicId')::bigint")).rows;
+    expect(facts.map(r => r.payload.publicId)).toEqual(["1", "2"]);
+    expect(facts[0].payload.publication).toBeNull();
+    const { permissionFact } = await import("@/shared/chart-journal");
+    expect(facts.every(r => permissionFact.safeParse(r.payload).success)).toBe(true);
+    expect((await c.query("insert into chart_public_ids(chart_id) values($1) returning public_id::text as id", [privateDraft.id])).rows[0].id).toBe("3");
+  } finally { await c.query("rollback"); await c.end(); }
+});
+
+test("pre-numbering backup migration seeds durable journal mappings before assigning historical numbers", async () => {
+  const { Client } = await import("pg");
+  const { readFile } = await import("node:fs/promises");
+  const owner = await readyOwner(fixture.ctx), chart = await createChart(fixture.ctx, owner, (await chartFile(owner)).file.id), missing = crypto.randomUUID();
+  const c = new Client({ connectionString: testDatabaseUrl() }); await c.connect();
+  try {
+    await c.query("begin"); await c.query("drop table chart_public_ids");
+    await c.query("delete from chart_publications");
+    await c.query("create temp table storage_tombstones (like public.storage_tombstones including all) on commit drop");
+    await c.query(`insert into chart_publications(chart_id,version_id,title,artist,published_at,updated_at) values($1,$2,'Old snapshot','','2020-01-01','2020-01-01')`, [chart.id, chart.currentVersionId]);
+    await c.query("select set_config('astrodx.restore_chart_public_ids',$1,true)", [JSON.stringify([{ chartId: missing, publicId: "1" }, { chartId: chart.id, publicId: "2" }])]);
+    await c.query(await readFile(new URL("../db/migrations/0012_chart_public_ids.sql", import.meta.url), "utf8"));
+    expect((await c.query("select chart_id,public_id::text as id from chart_public_ids order by public_id")).rows).toEqual([{ chart_id: missing, id: "1" }, { chart_id: chart.id, id: "2" }]);
+    expect((await c.query("select count(*)::int as n from storage_tombstones")).rows[0].n).toBe(0);
+    expect((await c.query("select nextval('chart_public_ids_public_id_seq')::text as id")).rows[0].id).toBe("3");
+  } finally { await c.query("rollback"); await c.end(); }
+});
+
+
+test("numeric and UUID public routes resolve the same publication and reauthorize every representation", async () => {
+  const { publishChart, withdrawChart, getPublicChart, listPublicCharts } = await import("./publication");
+  const { publicChartRoutes } = await import("../api/public-charts");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx), source = await chartFile(owner);
+  let chart = await createChart(ctx, owner, source.file.id);
+  chart = await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const number = chart.publicId!;
+  expect(await getPublicChart(ctx, number)).toEqual(await getPublicChart(ctx, chart.id));
+  expect(await getPublicChart(ctx, chart.id.toUpperCase())).toHaveProperty("publicId", number);
+  expect((await listPublicCharts(ctx, { limit: 50 })).items.find(c => c.id === chart.id)).toHaveProperty("publicId", number);
+  for (const invalid of ["0", "01", "+1", "-1", "1e3", "1.0", "9223372036854775808", "1".repeat(200)])
+    await expect(getPublicChart(ctx, invalid)).rejects.toMatchObject({ status: 404 });
+  const app = new Hono<AppEnv>();
+  app.use("*", async (c, next) => { c.set("services", { storage: ctx } as never); c.set("clientIp", "numeric-route-test"); await next(); });
+  app.route("/charts", publicChartRoutes);
+  app.onError((e, c) => c.json({ code: e instanceof StorageError ? e.code : "ERROR" }, e instanceof StorageError ? (e.status as 400) : 500));
+  for (const id of [number, chart.id]) {
+    const asset = await app.request(`/charts/${id}/versions/${chart.currentVersionId}/assets/maidata`);
+    expect(asset.status).toBe(200); expect(await asset.text()).toContain("&inote_4");
+    const response = await app.request(`/charts/${id}/download`, { headers: { range: "bytes=0-3" } });
+    expect(response.status).toBe(206); expect(Buffer.from(await response.arrayBuffer())).toEqual(source.original.subarray(0,4));
+  }
+  chart = await withdrawChart(ctx, owner, chart.id, chart.revision);
+  for (const id of [number, chart.id]) for (const suffix of ["", "/download", `/versions/${chart.currentVersionId}/assets/maidata`]) for (const method of ["GET", "HEAD"]) {
+    const response = await app.request(`/charts/${id}${suffix}`, { method, headers: { range: "bytes=0-3", "if-none-match": "*" } });
+    expect(response.status).toBe(404); expect(response.headers.get("cache-control")).toBe("private, no-store");
+  }
+});
+
+
+test("restoring a legacy publication issues a durable number before a later restore with newer allocations", async () => {
+  const { publishChart, getPublicChart } = await import("./publication");
+  const { publicationDto } = await import("./service");
+  const { replayJournal } = await import("../../../ops/backup/restore");
+  const { storageTombstones, storageJournalProgress, chartPublicIds } = await import("../db/schema");
+  const { Client } = await import("pg");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx), a = await createChart(ctx, owner, (await chartFile(owner)).file.id);
+  const now = new Date();
+  const publication = { chartId: a.id, versionId: a.currentVersionId, title: a.title, artist: a.artist, publishedAt: now, updatedAt: now };
+  await ctx.db.insert(chartPublications).values(publication);
+  const [legacy] = await ctx.db.insert(storageTombstones).values({ kind: "chart_permission", payload: { version: 1, chartId: a.id, revision: 2, publication: publicationDto(publication) } }).returning();
+  await ctx.db.update(charts).set({ revision: 2, publicationSequence: legacy.sequence }).where(eq(charts.id, a.id));
+  await ctx.exportChartJournal!();
+  const client = new Client({ connectionString: testDatabaseUrl() }); await client.connect();
+  try {
+    const [head] = await ctx.db.select().from(storageJournalProgress);
+    await replayJournal(client, [{ ...legacy, createdAt: legacy.createdAt.toISOString(), payload: legacy.payload! }], { sequence: head.exportedSequence, hash: head.chainHash!, capturedAt: head.exportedAt!.toISOString() });
+    const [identity] = await ctx.db.select().from(chartPublicIds).where(eq(chartPublicIds.chartId, a.id));
+    expect(identity?.publicId.toString()).toMatch(/^[1-9][0-9]*$/);
+    await expect(getPublicChart(ctx, identity.publicId.toString())).rejects.toMatchObject({ status: 404 });
+    await ctx.exportChartJournal!();
+    expect(await getPublicChart(ctx, identity.publicId.toString())).toHaveProperty("id", a.id);
+    let b = await createChart(ctx, owner, (await chartFile(owner)).file.id);
+    b = await publishChart(ctx, owner, b.id, { expectedRevision: b.revision, versionId: b.currentVersionId, confirmOriginalArchive: true });
+    const facts = (await ctx.db.select().from(storageTombstones)).filter(r => r.kind === "chart_permission" && r.payload && "chartId" in r.payload && [a.id, b.id].includes(r.payload.chartId)).map(r => ({ ...r, createdAt: r.createdAt.toISOString(), payload: r.payload! }));
+    const [latest] = await ctx.db.select().from(storageJournalProgress);
+    await client.query("delete from chart_public_ids where chart_id=any($1::uuid[])", [[a.id,b.id]]); // Simulate restoring the same pre-numbering dump.
+    await replayJournal(client, facts, { sequence: latest.exportedSequence, hash: latest.chainHash!, capturedAt: latest.exportedAt!.toISOString() });
+    expect(await getPublicChart(ctx, identity.publicId.toString())).toHaveProperty("id", a.id);
+    expect(await getPublicChart(ctx, b.publicId!)).toHaveProperty("id", b.id);
+    expect((await ctx.db.select().from(storageJournalProgress))[0].exportedSequence).toBe(latest.exportedSequence);
+  } finally { await client.end(); }
+});
+
+
+test("replay refuses an unverified snapshot numeric permission even when no chart needs a number", async () => {
+  const { publishChart } = await import("./publication");
+  const { replayJournal } = await import("../../../ops/backup/restore");
+  const { storageJournalProgress } = await import("../db/schema");
+  const { Client } = await import("pg");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx), chart = await createChart(ctx, owner, (await chartFile(owner)).file.id);
+  const [head] = await ctx.db.select().from(storageJournalProgress);
+  await expect(publishChart({ ...ctx, exportChartJournal: async () => { throw new Error("offline"); } }, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true })).rejects.toMatchObject({ status: 503 });
+  const client = new Client({ connectionString: testDatabaseUrl() }); await client.connect();
+  try {
+    await expect(replayJournal(client, [], { sequence: head.exportedSequence, hash: head.chainHash ?? "0".repeat(64), capturedAt: head.exportedAt?.toISOString() ?? "1970-01-01T00:00:00.000Z" })).rejects.toThrow("STORAGE_RESTORE_CLOSED");
+  } finally { await client.end(); await ctx.exportChartJournal!(); }
 });

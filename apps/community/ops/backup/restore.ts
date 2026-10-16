@@ -1,5 +1,5 @@
 import { permissionFact, retentionFact } from "../../src/shared/chart-journal";
-import { type ChartRestorePending, replayChartPermission, replayDeletedUserCharts } from "./chart-replay";
+import { type ChartRestorePending, replayChartPermission, replayDeletedUserCharts, numberRestoredPublications } from "./chart-replay";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { fileURLToPath } from "node:url";
 import { lstat, mkdir, readFile, readdir, open, unlink } from "node:fs/promises";
@@ -12,6 +12,7 @@ import { hasPublicRepresentation } from "../../src/server/storage/references";
 import type { StorageContext } from "../../src/server/storage/contracts";
 import {
   durableFile,
+  exportJournal,
   verifyLatestJournal,
   validJournalRecord,
   globalMediaRevocation,
@@ -414,6 +415,7 @@ export async function replayJournal(
       "select setval(pg_get_serial_sequence('storage_tombstones','sequence'),greatest($1,coalesce((select max(sequence) from storage_tombstones),0),1),true)",
       [head.sequence],
     );
+    await numberRestoredPublications(c, head.sequence);
     await c.query("commit");
     for (const diagnostic of pending) {
       if (options.onChartPending) options.onChartPending(diagnostic);
@@ -495,6 +497,7 @@ export async function restoreOriginals(options: RestoreOptions) {
     safeRelease = true;
     const manifest = await verifyRestoreBundle(options.bundleDirectory);
     const latest = await verifyLatestJournal(options.journal, manifest.journal);
+    let restoreHead = latest.head;
     await assertRestoreOwner(options.stateDirectory, owner);
     safeRelease = false;
     await options.replaceDatabases(manifest);
@@ -502,9 +505,31 @@ export async function restoreOriginals(options: RestoreOptions) {
     const c = new Client({ connectionString: options.databaseUrl, connectionTimeoutMillis: 5000 });
     await c.connect();
     try {
+      // A dump before numeric IDs must not assign an old snapshot a number already issued later.
+      // Migration seeds all durable reservations, even charts absent from this snapshot, before backfill.
+      const identities = new Map<string, string>();
+      for (const record of latest.records) {
+        const facts = record.kind === "chart_permission" ? [permissionFact.parse(record.payload)]
+          : record.kind === "user_deleted" && record.payload ? retentionFact.parse(record.payload).retained : [];
+        for (const fact of facts) if (fact.publicId) {
+          const prior = identities.get(fact.chartId);
+          if (prior && prior !== fact.publicId) throw new Error("CHART_PUBLIC_ID_CONFLICT");
+          identities.set(fact.chartId, fact.publicId);
+        }
+      }
+      await c.query("select set_config('astrodx.restore_chart_public_ids',$1,false)", [
+        JSON.stringify([...identities].map(([chartId, publicId]) => ({ chartId, publicId }))),
+      ]);
       // Restored dumps can predate additive publication and journal columns. Upgrade while closed.
       await migrate(drizzle(c), { migrationsFolder: fileURLToPath(new URL("../../src/server/db/migrations", import.meta.url)) });
       await replayJournal(c, latest.records, latest.head);
+      const allocations = await c.query("select 1 from storage_tombstones where sequence>$1 and kind='chart_permission' and payload ? 'publicId' limit 1", [latest.head.sequence]);
+      if (allocations.rowCount) {
+        const unchanged = await verifyLatestJournal(options.journal, manifest.journal);
+        if (unchanged.head.hash !== latest.head.hash || unchanged.head.sequence !== latest.head.sequence) throw fail();
+        // New restored numbers are permission facts too: export from the TARGET database before OPEN.
+        restoreHead = await exportJournal({ ...options.journal, databaseUrl: options.databaseUrl });
+      }
       await options.rebuild();
       const targets = await currentRestoreRevocations(c);
       const recovery = await options.startRecovery();
@@ -520,11 +545,11 @@ export async function restoreOriginals(options: RestoreOptions) {
     }
     // Re-read live external latest head: a concurrent source deletion invalidates this restoration, even if earlier head was signed.
     const current = await verifyLatestJournal(options.journal, manifest.journal);
-    if (current.head.hash !== latest.head.hash || current.head.sequence !== latest.head.sequence)
+    if (current.head.hash !== restoreHead.hash || current.head.sequence !== restoreHead.sequence)
       throw fail();
-    await openRestoreState(options.stateDirectory, owner, latest.head);
+    await openRestoreState(options.stateDirectory, owner, restoreHead);
     safeRelease = true;
-    return { rtoMs: performance.now() - started, rpoMs: 86400000, head: latest.head };
+    return { rtoMs: performance.now() - started, rpoMs: 86400000, head: restoreHead };
   } finally {
     // Any later-phase failure can hide unresolved remote IO behind a generic error. No automatic takeover.
     if (safeRelease) await releaseRestoreOwner(options.stateDirectory, owner);

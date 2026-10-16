@@ -4,8 +4,8 @@ import type { ChartAssetRole, PublicChartDto, PublicChartsPageDto } from "@/shar
 export function publicChartsApi(api: ApiClient) {
   const routes = api.api.v1.charts;
   return {
-    list: async (cursor?: string): Promise<PublicChartsPageDto> =>
-      okJson(await routes.$get({ query: { ...(cursor ? { cursor } : {}) } }, { init: { cache: "no-store" } })),
+    list: async (cursor?: string, limit?: number): Promise<PublicChartsPageDto> =>
+      okJson(await routes.$get({ query: { ...(cursor ? { cursor } : {}), ...(limit !== undefined ? { limit: String(limit) } : {}) } }, { init: { cache: "no-store" } })),
     get: async (id: string): Promise<PublicChartDto> =>
       okJson(await routes[":id"].$get({ param: { id } }, { init: { cache: "no-store" } })),
   };

@@ -1,7 +1,7 @@
 import { permissionFact } from "@/shared/chart-journal";
 import { eq } from "drizzle-orm";
 import type { ChartPublicationDto } from "@/shared/charts";
-import { storageJournalProgress, storageTombstones } from "../db/schema";
+import { chartPublicIds, storageJournalProgress, storageTombstones } from "../db/schema";
 import type { StorageContext, DbTransaction } from "../storage/contracts";
 import { StorageUnavailableError } from "../storage/errors";
 import { STORAGE_JOURNAL_QUEUE } from "../jobs/queues";
@@ -13,7 +13,9 @@ export async function recordPermission(
   createdAt: Date,
   userId?: string,
 ) {
-  const payload = permissionFact.parse({ version: 1, chartId, revision, publication });
+  const [identity] = await tx.select().from(chartPublicIds).where(eq(chartPublicIds.chartId, chartId));
+  const payload = permissionFact.parse({ version: 1, chartId, revision, publication,
+    ...(identity ? { publicId: identity.publicId.toString() } : {}) });
   const [r] = await tx
     .insert(storageTombstones)
     .values({

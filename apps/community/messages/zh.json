@@ -326,5 +326,21 @@
   "chart_error_parts_type": "请选择 TXT 谱面、MP3/OGG/WAV 音乐、JPG/PNG/WebP 曲绘或 MP4/WebM 视频。",
   "chart_part_remove": "移除",
   "chart_error_part_empty": "选择的素材是空文件，请更换为非空文件。",
-  "chart_error_part_size": "某个素材超过单文件上限：谱面 1 MiB、音乐 32 MiB、曲绘 8 MiB、视频 64 MiB。请缩小或更换该素材。"
+  "chart_error_part_size": "某个素材超过单文件上限：谱面 1 MiB、音乐 32 MiB、曲绘 8 MiB、视频 64 MiB。请缩小或更换该素材。",
+  "public_charts_latest": "最新公开谱面",
+  "public_charts_unavailable": "暂时无法加载公开谱面，请稍后重试。",
+  "public_chart_share": "分享谱面",
+  "public_chart_link_copied": "公开链接已复制。",
+  "public_chart_link": "公开谱面链接",
+  "public_chart_copy_manually": "请选择并复制下面的公开链接。",
+  "public_chart_link_close": "关闭链接",
+  "public_chart_actions": "谱面操作",
+  "public_chart_preview_action": "预览谱面",
+  "public_chart_preview_unavailable": "此版本暂不支持在线预览，仍可下载原始 ZIP。",
+  "chart_publication_status_public": "已公开",
+  "chart_publication_status_private": "私有草稿",
+  "chart_publication_status_pending": "公开状态待确认",
+  "chart_publication_published_version": "当前公开：版本 {number}",
+  "chart_publication_private_changes": "私有草稿与公开内容不同；编辑不会自动发布。",
+  "chart_publication_update": "确认更新公开内容"
 }

@@ -48,3 +48,11 @@ Task11 实际入口现由 `runtime.ts` 分配每次独占0700目录并调用真�
 既有部署切换此布局前，停留在没有活跃备份的状态，将 `storage-staging` 卷根目录下已经验证的哈希缓存及 `last-success.json` 原子移入新 `staging` 子目录；不复制原件，不删除旧快照。新 `bundles` 子目录仍由每次运行创建私有 run 目录并正常清理。旧 `storage-bundles` 卷不再被新配置挂载，保留它用于回滚，勿在配置切换时删除卷。
 
 回滚旧 Compose 时，也应把已验证缓存和 `last-success.json` 从新 `staging` 子目录原子移回卷根目录，先确认目的路径没有冲突；只保留旧 `storage-bundles` 卷不能恢复旧缓存路径。
+
+## Permanent numeric chart URLs (migration 0012)
+
+`chart_public_ids` reserves a positive decimal ID on first publication. It intentionally has no chart foreign key: withdrawal, physical content/account deletion and recovery must never recycle a previously issued URL. JSON and permission facts represent IDs as strings to preserve the full PostgreSQL bigint range.
+
+For the first upgrade from a release before migration 0012, take and verify a full backup, stop the old web/control/media processes, apply the migration with the new application image, and export the journal with the new backup image before starting the new roles. The migration records existing assignments through the normal publication barrier. Earlier strict journal readers reject the added identity field, so do not restart an older control/backup reader after these facts have been exported; retain compatible readers for controlled recovery and fix forward. An ordinary in-place migration while old roles continue exporting is insufficient for this transition.
+
+Closed recovery seeds the latest journal's permanent mappings before upgrading an old dump. After replay it numbers any remaining durably published legacy charts, records their exact publication snapshots, and exports those new facts from the recovery TARGET database before opening with the new verified head. An unverified numeric publication in a snapshot stays closed. Existing unrelated media-recovery outboxes retain their original drain and evidence protocol; assigning a legacy number must never implicitly export unknown snapshot outboxes.

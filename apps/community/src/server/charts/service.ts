@@ -2,7 +2,7 @@ import { recordPermission, awaitChartJournal } from "./publication-journal";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import type { ChartDto, ChartImportSummary, ChartListItemDto, ChartsPageDto, ChartVersionDto } from "@/shared/charts";
-import { blobBlocks, blobDerivatives, blobs, chartPublications, chartVersions, charts, derivedObjects, files, storageJournalProgress, user } from "../db/schema";
+import { chartPublicIds, blobBlocks, blobDerivatives, blobs, chartPublications, chartVersions, charts, derivedObjects, files, storageJournalProgress, user } from "../db/schema";
 import type { DbTransaction, StorageContext } from "../storage/contracts";
 import { StorageError } from "../storage/errors";
 import { deleteFileInTransaction } from "../storage/files";
@@ -48,7 +48,8 @@ async function dto(db: DbTransaction, chart: Chart): Promise<ChartDto> {
   if (!versions.some(v => v.id === chart.currentVersionId)) throw notFound();
   const [publication] = await db.select().from(chartPublications).where(eq(chartPublications.chartId, chart.id));
   const [progress] = await db.select().from(storageJournalProgress).where(eq(storageJournalProgress.id, "global"));
-  return { publicationPending: chart.publicationSequence > (progress?.exportedSequence ?? 0),
+  const [identity] = await db.select().from(chartPublicIds).where(eq(chartPublicIds.chartId, chart.id));
+  return { publicId: identity?.publicId.toString() ?? null, publicationPending: chart.publicationSequence > (progress?.exportedSequence ?? 0),
     publication: publication ? publicationDto(publication) : null,
     id: chart.id, title: chart.title, artist: chart.artist, revision: chart.revision,
     currentVersionId: chart.currentVersionId, versions, createdAt: chart.createdAt.toISOString(),
@@ -136,7 +137,8 @@ export async function listCharts(ctx: StorageContext, userId: string, input: { c
   return ctx.db.transaction(async tx => {
   const [owner] = await tx.select({ id: user.id }).from(user).where(and(eq(user.id, userId), eq(user.status, "active")));
   if (!owner) throw new StorageError(403, "ACCOUNT_INACTIVE");
-  const rows = await tx.select({ chart: charts, publication: chartPublications, summary: chartVersions.summary }).from(charts)
+  const rows = await tx.select({ chart: charts, identity: chartPublicIds, publication: chartPublications, summary: chartVersions.summary }).from(charts)
+    .leftJoin(chartPublicIds, eq(chartPublicIds.chartId, charts.id))
     .leftJoin(chartPublications, eq(chartPublications.chartId, charts.id))
     .innerJoin(user, eq(user.id, charts.ownerId))
     .innerJoin(chartVersions, and(eq(chartVersions.id, charts.currentVersionId), eq(chartVersions.chartId, charts.id)))
@@ -145,7 +147,8 @@ export async function listCharts(ctx: StorageContext, userId: string, input: { c
     .orderBy(desc(charts.updatedAt), desc(charts.id)).limit(limit + 1);
   const [progress] = await tx.select().from(storageJournalProgress).where(eq(storageJournalProgress.id, "global"));
   const page = rows.slice(0, limit);
-  const items: ChartListItemDto[] = page.map(({ chart, summary, publication }) => ({
+  const items: ChartListItemDto[] = page.map(({ chart, identity, summary, publication }) => ({
+    publicId: identity?.publicId.toString() ?? null,
     publicationPending: chart.publicationSequence > (progress?.exportedSequence ?? 0),
     publication: publication ? publicationDto(publication) : null, id: chart.id,
     title: chart.title, artist: chart.artist, revision: chart.revision, currentVersionId: chart.currentVersionId!,

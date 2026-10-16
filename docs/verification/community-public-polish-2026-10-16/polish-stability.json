@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "checkedSampleCount": 130,
+  "windowSampleSpanSeconds": 119.723151,
+  "maxSampleGapSeconds": 0.959579,
+  "counts": {
+    "failedPgProbes": 0,
+    "nonThreeRoleSamples": 0,
+    "missingRoleSamples": 0,
+    "missingContainerSamples": 0,
+    "incompleteCgroupSamples": 0,
+    "failedOrMissingHttpReadySamples": 0
+  },
+  "maxRoleHeartbeatAgeSeconds": 0.497623,
+  "coverageGaps": [],
+  "continuousHttpReadinessMeasured": true,
+  "sourceSha": "176bc52792dc34acb45fed25a1e8680dad009e7f",
+  "observationSeconds": 120.937,
+  "intentionalShutdown": true,
+  "applicationLogsCollectedThroughShutdown": true
+}

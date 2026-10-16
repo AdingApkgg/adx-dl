@@ -15,6 +15,7 @@ export async function replayChartPermission(
   reportPending?: ReportPending,
 ) {
   const p = permissionFact.parse(payload);
+  await reservePublicChartId(c, p.chartId, p.publicId);
   const chart = await c.query("select publication_sequence from charts where id=$1 for update", [
     p.chartId,
   ]);
@@ -60,6 +61,7 @@ export async function replayDeletedUserCharts(
   const retained = r.payload ? retentionFact.parse(r.payload).retained : [];
 
   for (const fact of retained) {
+    await reservePublicChartId(c, fact.chartId, fact.publicId);
     // A backup predating the selected version still needs a stable anonymous recovery anchor.
     await c.query(
       `insert into charts(id,owner_id,title,artist,revision,publication_sequence)
@@ -118,4 +120,37 @@ export async function replayDeletedUserCharts(
     "update files set state='deleted',deleted_at=coalesce(deleted_at,$2),retained_until=$2::timestamptz+interval '30 days',original_name='removed' where owner_id=$1 and state<>'deleted'",
     [r.userId, r.createdAt],
   );
+}
+
+/** Restore runs offline under its advisory lock. A missing chart still consumes its permanent URL. */
+async function reservePublicChartId(c: Client, chartId: string, publicId?: string) {
+  if (!publicId) return; // Legacy facts never overwrite an allocated identity.
+  const current = await c.query("select public_id::text as id from chart_public_ids where chart_id=$1", [chartId]);
+  if (current.rowCount && current.rows[0].id !== publicId) throw new Error("CHART_PUBLIC_ID_CONFLICT");
+  if (!current.rowCount)
+    await c.query("insert into chart_public_ids(chart_id,public_id) overriding system value values($1,$2)", [chartId, publicId]);
+  // Never lower a restored sequence, including unused values consumed by rolled-back publications.
+  await c.query(`select setval('chart_public_ids_public_id_seq',
+    greatest((select last_value from chart_public_ids_public_id_seq),$1::bigint),true)`, [publicId]);
+}
+
+/** Called inside the closed restore replay transaction, after the final durable permission state. */
+export async function numberRestoredPublications(c: Client, durableSequence: number) {
+  const pending = await c.query(`select ch.id from chart_publications p join charts ch on ch.id=p.chart_id
+    left join chart_public_ids i on i.chart_id=ch.id
+    where i.chart_id is null and ch.publication_sequence <= $1 and ch.deleted_at is null
+    order by p.published_at,ch.id for update of ch`, [durableSequence]);
+  // Do not publish any unverified snapshot outbox as a side effect of assigning restored URLs.
+  if ((await c.query("select 1 from storage_tombstones where sequence>$1 and ($2::boolean or (kind='chart_permission' and payload ? 'publicId')) limit 1", [durableSequence, !!pending.rowCount])).rowCount)
+    throw new Error("STORAGE_RESTORE_CLOSED");
+  if (!pending.rowCount) return;
+  for (const row of pending.rows) {
+    const identity = await c.query("insert into chart_public_ids(chart_id) values($1) returning public_id::text as id", [row.id]);
+    const state = await c.query(`select ch.revision,p.* from chart_publications p join charts ch on ch.id=p.chart_id where ch.id=$1`, [row.id]);
+    const p = state.rows[0];
+    const payload = permissionFact.parse({ version: 1, chartId: row.id, publicId: identity.rows[0].id, revision: p.revision,
+      publication: { versionId: p.version_id, title: p.title, artist: p.artist, publishedAt: p.published_at.toISOString(), updatedAt: p.updated_at.toISOString() } });
+    const fact = await c.query("insert into storage_tombstones(kind,payload) values('chart_permission',$1) returning sequence", [JSON.stringify(payload)]);
+    await c.query("update charts set publication_sequence=$2 where id=$1", [row.id, fact.rows[0].sequence]);
+  }
 }
