@@ -45,6 +45,7 @@ describe("parseEnv", () => {
       redisUrl: "redis://redis:6379",
       betterAuthSecret: SECRET,
       google: { clientId: "google-id", clientSecret: "google-secret" },
+      awmc: null,
       turnstile: { siteKey: "site-key", secretKey: "turnstile-secret" },
       qqCodeHmacKey: SECRET,
       qq: { sender: "console" },
@@ -198,4 +199,12 @@ test("dashboard admin configuration defaults closed and accepts only permanent p
   expect(parseEnv({ ...complete, COMMUNITY_ADMIN_PUBLIC_IDS: "1, 9007199254740993" }).adminPublicIds).toEqual(["1", "9007199254740993"]);
   for (const value of ["0", "01", "-1", "1e3", "1,", "9223372036854775808", "first-user"])
     expect(() => parseEnv({ ...complete, COMMUNITY_ADMIN_PUBLIC_IDS: value })).toThrow(/COMMUNITY_ADMIN_PUBLIC_IDS/);
+});
+
+test("AWMC optional credentials are all-or-nothing and never enter validation errors", () => {
+  expect(parseEnv({ ...complete, AWMC_CLIENT_ID: "fixture-id", AWMC_CLIENT_SECRET: SECRET }).awmc).toEqual({ clientId: "fixture-id", clientSecret: SECRET });
+  for (const partial of [{ AWMC_CLIENT_ID: "fixture-id" }, { AWMC_CLIENT_SECRET: SECRET }]) {
+    expect(() => parseEnv({ ...complete, ...partial })).toThrow("AWMC_CLIENT_ID 和 AWMC_CLIENT_SECRET 必须同时设置");
+    try { parseEnv({ ...complete, ...partial }); } catch (error) { expect(String(error)).not.toContain(SECRET); }
+  }
 });

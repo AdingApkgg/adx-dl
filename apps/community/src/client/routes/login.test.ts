@@ -189,12 +189,12 @@ describe("登录页渲染", () => {
   test("已登录、reauth=1、Google 出错回来：错误提示看得到", async () => {
     const html = await renderLogin(true, "?next=%2Fsettings%2Faccount&reauth=1&error=state_mismatch");
 
-    expect(html).toContain(m.error_google_failed());
+    expect(html).toContain(m.error_social_failed());
   });
 
   test("已登录、没有 reauth、Google 出错回来（全局的 errorURL）：错误提示也看得到", async () => {
     const html = await renderLogin(true, "?error=state_mismatch");
 
-    expect(html).toContain(m.error_google_failed());
+    expect(html).toContain(m.error_social_failed());
   });
 });

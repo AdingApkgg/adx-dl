@@ -317,3 +317,7 @@ pg-boss 的表和队列还没建好时，web 的 `jobs` 就绪检查不过，`/r
 ### 慢速公网链路的上传分片
 
 新建头像和谱面上传会话协商 1 MiB 分片，使慢速隧道下的单次请求更容易在代理超时前完成。客户端按响应的 `partSize` 切片；已存在的 4 MiB 会话继续按保存的大小恢复。HTTP 接收上限仍为 4 MiB，文件大小、用户配额及预约计费不变。数据库迁移 `0010_upload_part_sizes` 只扩宽兼容约束，不改写已有会话。
+
+### AWMC login
+
+Set `AWMC_CLIENT_ID` and `AWMC_CLIENT_SECRET` together in the private server `.env`; unset both to hide the login/link entry. Register `${PUBLIC_ORIGIN}/api/auth/callback/awmc` at the AWMC client (production: `https://adxc.saop.cc/api/auth/callback/awmc`). Use authorization-code grant and `user:read`; keep password grant and skip-consent disabled. Endpoints are `https://bbs.wmc.pub/audapi/oauth2/authorize`, `/api/audapi-oauth2/token` and `/api/me`. The stable subject is `me.user_id`; nickname uses `me.username`. Provider email is ignored; accounts link only through explicit authenticated binding, and provider tokens are never stored. Token/user-info transport and parser failures are redacted before returning to the login page. Existing users explicitly link AWMC in account settings. No database migration or avatar import is required.

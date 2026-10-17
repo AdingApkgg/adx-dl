@@ -18,7 +18,7 @@ describe("错误文案", () => {
     expect(errorMessage({ code: "SESSION_NOT_FRESH" })).toBe(m.error_reauth_required());
     expect(errorMessage({ code: "SIGNUP_CAPTCHA_FAILED" })).toBe(m.error_captcha_failed());
     expect(errorMessage(new ApiError(400, "LAST_LOGIN_METHOD", "x"))).toBe(m.error_last_login_method());
-    expect(errorMessage("account_already_linked_to_different_user")).toBe(m.error_google_already_linked());
+    expect(errorMessage("account_already_linked_to_different_user")).toBe(m.error_social_already_linked());
   });
 
   test("1c 的错误码：资料、注销", () => {
@@ -44,8 +44,8 @@ describe("错误文案", () => {
     expect(errorMessage("access_denied")).toBeNull();
   });
 
-  test("Google 回调的其他错误（小写的错误码）统一提示 Google 登录失败；其余不认识的用通用文案", () => {
-    expect(errorMessage("state_mismatch")).toBe(m.error_google_failed());
+  test("OAuth 回调的其他错误（小写的错误码）统一提示第三方登录失败；其余不认识的用通用文案", () => {
+    expect(errorMessage("state_mismatch")).toBe(m.error_social_failed());
     expect(errorMessage({ code: "SOMETHING_NEW" })).toBe(m.error_unknown());
   });
 });
@@ -56,8 +56,8 @@ describe("错误文案", () => {
 describe("错误码是 Object.prototype 上的属性名", () => {
   // 全是小写字母和下划线的走 Google 回调那一支，其余的走通用文案。
   const cases: [string, () => string][] = [
-    ["constructor", m.error_google_failed],
-    ["__proto__", m.error_google_failed],
+    ["constructor", m.error_social_failed],
+    ["__proto__", m.error_social_failed],
     ["toString", m.error_unknown],
     ["hasOwnProperty", m.error_unknown],
     ["valueOf", m.error_unknown],

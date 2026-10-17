@@ -21,6 +21,7 @@ export type CommunityEnv = {
   /** Better Auth 签 Cookie 和令牌用的密钥。 */
   betterAuthSecret: string;
   google: { clientId: string; clientSecret: string };
+  awmc: { clientId: string; clientSecret: string } | null;
   turnstile: { siteKey: string; secretKey: string };
   /** QQ 验证码只以 HMAC(这把密钥, …) 的形式存进 Redis（spec 第 10.3 节）。 */
   qqCodeHmacKey: string;
@@ -68,6 +69,8 @@ const schema = z.object({
   BETTER_AUTH_SECRET: secretKey,
   GOOGLE_CLIENT_ID: z.string(),
   GOOGLE_CLIENT_SECRET: z.string(),
+  AWMC_CLIENT_ID: z.string().min(1).optional(),
+  AWMC_CLIENT_SECRET: z.string().min(32).optional(),
   TURNSTILE_SITE_KEY: z.string(),
   TURNSTILE_SECRET_KEY: z.string(),
   QQ_SENDER: z.enum(["napcat", "console"], { error: "只能是 napcat 或 console" }),
@@ -156,6 +159,10 @@ export function parseEnv(source: Record<string, string | undefined>): CommunityE
     }
   }
 
+  if (Boolean(read("AWMC_CLIENT_ID")) !== Boolean(read("AWMC_CLIENT_SECRET"))) {
+    problems.push("AWMC_CLIENT_ID 和 AWMC_CLIENT_SECRET 必须同时设置");
+  }
+
   const result = schema.safeParse({
     NODE_ENV: read("NODE_ENV"),
     PORT: read("PORT"),
@@ -168,6 +175,8 @@ export function parseEnv(source: Record<string, string | undefined>): CommunityE
     BETTER_AUTH_SECRET: read("BETTER_AUTH_SECRET"),
     GOOGLE_CLIENT_ID: read("GOOGLE_CLIENT_ID"),
     GOOGLE_CLIENT_SECRET: read("GOOGLE_CLIENT_SECRET"),
+    AWMC_CLIENT_ID: read("AWMC_CLIENT_ID"),
+    AWMC_CLIENT_SECRET: read("AWMC_CLIENT_SECRET"),
     TURNSTILE_SITE_KEY: read("TURNSTILE_SITE_KEY"),
     TURNSTILE_SECRET_KEY: read("TURNSTILE_SECRET_KEY"),
     QQ_SENDER: read("QQ_SENDER"),
@@ -213,6 +222,7 @@ export function parseEnv(source: Record<string, string | undefined>): CommunityE
     redisUrl: env.REDIS_URL,
     betterAuthSecret: env.BETTER_AUTH_SECRET,
     google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET },
+    awmc: env.AWMC_CLIENT_ID && env.AWMC_CLIENT_SECRET ? { clientId: env.AWMC_CLIENT_ID, clientSecret: env.AWMC_CLIENT_SECRET } : null,
     turnstile: { siteKey: env.TURNSTILE_SITE_KEY, secretKey: env.TURNSTILE_SECRET_KEY },
     qqCodeHmacKey: env.QQ_CODE_HMAC_KEY,
     qq: qqEnv(env),

@@ -94,7 +94,8 @@ function LoginContent() {
       <PageTitle description={reauth ? m.login_reauth_notice() : undefined}>{m.login_title()}</PageTitle>
       {callbackMessage ? <Alert variant="destructive">{callbackMessage}</Alert> : null}
 
-      <GoogleSignIn next={next} reauth={reauth} />
+      <SocialSignIn next={next} reauth={reauth} />
+      {options.awmc?.available ? <SocialSignIn next={next} reauth={reauth} provider="awmc" /> : null}
 
       <Card>
         <CardHeader>
@@ -134,15 +135,15 @@ function LoginContent() {
   );
 }
 
-function GoogleSignIn({ next, reauth }: { next: string; reauth: boolean }) {
+function SocialSignIn({ next, reauth, provider = "google" }: { next: string; reauth: boolean; provider?: "google" | "awmc" }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function signIn() {
     setPending(true);
     setError(null);
-    // 整页跳到 Google；回来时 Better Auth 按新老用户跳到不同的地址，出错时回到本页，并在地址后面接上 &error=。
-    const res = await authClient.signIn.social({ provider: "google", ...googleRedirects(next, reauth) });
+    // 跳转到授权提供方；Better Auth 区分新老用户，失败时带 error 返回登录页。
+    const res = await authClient.signIn.social({ provider, ...googleRedirects(next, reauth, provider) });
     if (res.error) {
       setPending(false);
       setError(errorMessage(res.error));
@@ -153,7 +154,7 @@ function GoogleSignIn({ next, reauth }: { next: string; reauth: boolean }) {
     <Card>
       <CardContent className="space-y-3">
         <Button type="button" variant="outline" size="lg" className="w-full" disabled={pending} onClick={signIn}>
-          {pending ? m.login_working() : m.login_google()}
+          {pending ? m.login_working() : provider === "awmc" ? m.login_awmc() : m.login_google()}
         </Button>
         {error ? <Alert variant="destructive">{error}</Alert> : null}
       </CardContent>

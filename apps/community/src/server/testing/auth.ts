@@ -14,6 +14,7 @@ import { testDbHandle } from "./test-db";
 import { testRedis } from "./test-redis";
 
 export type TestAuthOptions = {
+  awmc?: { clientId: string; clientSecret: string };
   rateLimitEnabled?: boolean;
   rateLimitStore?: RateLimitStore;
   /** 默认：令牌 "pass" 通过，"down" 当作 Cloudflare 不可用，其余不通过。 */
@@ -64,6 +65,7 @@ export function createTestAuth(options: TestAuthOptions = {}) {
     publicOrigin: TEST_PUBLIC_ORIGIN,
     secret: TEST_AUTH_SECRET,
     google: { clientId: TEST_GOOGLE_CLIENT_ID, clientSecret: "test-google-client-secret" },
+    awmc: options.awmc,
     rateLimitStore: options.rateLimitStore ?? createMemoryRateLimitStore(),
     rateLimitEnabled: options.rateLimitEnabled ?? false,
     verifyTurnstile: options.turnstile ?? fakeTurnstile,
