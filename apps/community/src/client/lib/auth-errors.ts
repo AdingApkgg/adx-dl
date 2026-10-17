@@ -22,7 +22,7 @@ const MESSAGES: Record<string, () => string> = {
   ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED: m.error_passkey_already_registered,
   CURRENT_SESSION: m.error_current_session,
   RATE_LIMITED: m.error_rate_limited,
-  account_already_linked_to_different_user: m.error_google_already_linked,
+  account_already_linked_to_different_user: m.error_social_already_linked,
   NICKNAME_INVALID: m.error_nickname_invalid,
   BIO_TOO_LONG: m.error_bio_too_long,
   ACCOUNT_PENDING_DELETION: m.error_account_pending_deletion,
@@ -73,7 +73,7 @@ export function errorMessage(error: unknown): string | null {
   }
   // Google 回调出错时 Better Auth 在地址里带小写的错误码（state_mismatch、unable_to_create_user 等）。
   if (code && /^[a-z_]+$/.test(code)) {
-    return m.error_google_failed();
+    return m.error_social_failed();
   }
   return m.error_unknown();
 }

@@ -7,6 +7,7 @@ import { account, passkey, session } from "../db/schema";
 
 export type LoginAccount =
   | { id: string; provider: "google"; email: string | null; createdAt: Date }
+  | { id: string; provider: "awmc"; createdAt: Date }
   | { id: string; provider: "qq"; nickname: string | null; maskedQq: string; createdAt: Date };
 
 export type LoginPasskey = { id: string; name: string | null; createdAt: Date | null; lastUsedAt: Date | null };
@@ -36,6 +37,7 @@ export async function listLogins(db: Db, userId: string): Promise<{ accounts: Lo
     if (row.providerId === "google") {
       return [{ id: row.id, provider: "google", email: row.providerEmail, createdAt: row.createdAt }];
     }
+    if (row.providerId === "awmc") return [{ id: row.id, provider: "awmc", createdAt: row.createdAt }];
     if (row.providerId === "qq") {
       return [
         {

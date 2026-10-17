@@ -21,11 +21,11 @@ export function signedInHref(next: string, method: LoginMethod, isNewUser: boole
   return withLoginMarker(isNewUser ? onboardingHref(next) : next, method);
 }
 
-/** 发起 Google 登录时交给 Better Auth 的三个回跳地址。出错回登录页的不带标记：那不算登录。 */
-export function googleRedirects(next: string, reauth: boolean) {
+/** 发起第三方登录时交给 Better Auth 的三个回跳地址。出错回登录页不带登录成功标记。 */
+export function googleRedirects(next: string, reauth: boolean, method: "google" | "awmc" = "google") {
   return {
-    callbackURL: signedInHref(next, "google", false),
-    newUserCallbackURL: signedInHref(next, "google", true),
+    callbackURL: signedInHref(next, method, false),
+    newUserCallbackURL: signedInHref(next, method, true),
     // 要带着 next 和 reauth：否则用户再登录会落到首页而不是原来要去的页面；"重新登录"的用户已登录，
     // 少了 reauth=1，loader 会直接把他跳走，错误提示也就看不到了。
     errorCallbackURL: loginHref(next, reauth ? { reauth: "1" } : {}),

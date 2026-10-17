@@ -1,7 +1,8 @@
 import { betterAuth, type BetterAuthRateLimitStorage } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, isAPIError } from "better-auth/api";
-import { bearer } from "better-auth/plugins";
+import { bearer, genericOAuth } from "better-auth/plugins";
+import { createAwmcProvider } from "./awmc";
 
 import { describeError } from "@/shared/describe-error";
 import type { Logger } from "@/shared/log";
@@ -30,6 +31,7 @@ export type AuthDeps = {
   publicOrigin: string;
   secret: string;
   google: { clientId: string; clientSecret: string };
+  awmc?: { clientId: string; clientSecret: string } | null;
   /** Better Auth 自带限流的计数存储。线上和 /api/* 的限流共用 Redis，测试用内存。 */
   rateLimitStore: RateLimitStore;
   /** Better Auth 自带的限流默认只在 NODE_ENV=production 时开；测试要测它就显式传 true。 */
@@ -123,7 +125,7 @@ export function createAuth(deps: AuthDeps) {
         // "平台绑定 + 通行密钥至少留一个"由 accountRules 自己数；Better Auth 只数平台绑定。
         allowUnlinkingAll: true,
         // 不加的话，绑定一个邮箱未验证的 Google 账号会失败。
-        trustedProviders: ["google"],
+        trustedProviders: ["google", ...(deps.awmc ? ["awmc"] : [])],
       },
       additionalFields: accountAdditionalFields,
     },
@@ -310,6 +312,7 @@ export function createAuth(deps: AuthDeps) {
     // 顺序有要求：accountRules 要排在 passkeyPlugin 后面（见 account-rules.ts）。
     plugins: [
       bearer({ requireSignature: true }),
+      ...(deps.awmc ? [genericOAuth({ config: [createAwmcProvider(deps.awmc)] })] : []),
       passkeyPlugin({
         publicOrigin: deps.publicOrigin,
         rpName: "AstroDX Community",

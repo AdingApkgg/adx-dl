@@ -208,7 +208,9 @@ function SettingsContent() {
                   ? item.email
                     ? m.settings_login_google({ email: item.email })
                     : "Google"
-                  : item.nickname
+                  : item.provider === "awmc"
+                    ? "AWMC"
+                    : item.nickname
                     ? m.settings_login_qq({ nickname: item.nickname, number: item.maskedQq })
                     : m.settings_login_qq_number({ number: item.maskedQq })}{" "}
                 <Button
@@ -257,6 +259,11 @@ function SettingsContent() {
             >
               {m.settings_link_google()}
             </Button>
+            {options.awmc?.available ? (
+              <Button type="button" variant="secondary" disabled={pending} onClick={() => run(() => authClient.linkSocial({
+                provider: "awmc", callbackURL: localizeHref("/settings/account"), errorCallbackURL: localizeHref("/settings/account"),
+              }))}>{m.settings_link_awmc()}</Button>
+            ) : null}
             {/* 不传 name：它会同时变成系统密码管理器里显示的账号名和存下来的标签。 */}
             <Button
               type="button"

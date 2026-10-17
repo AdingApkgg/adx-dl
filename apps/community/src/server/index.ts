@@ -66,6 +66,7 @@ const auth = createAuth({
   publicOrigin: env.publicOrigin,
   secret: env.betterAuthSecret,
   google: env.google,
+  awmc: env.awmc,
   rateLimitStore,
   rateLimitEnabled: env.nodeEnv === "production",
   verifyTurnstile,
@@ -135,6 +136,7 @@ const app = createApp({
     boss: getBoss,
     loginOptions: createLoginOptions({
       turnstileSiteKey: env.turnstile.siteKey,
+      awmc: Boolean(env.awmc),
       qq: env.qq,
       redis,
       onRedisError: throttledErrorLog(log, "login_options_redis_error"),

@@ -43,8 +43,9 @@ describe("登录方式的标记", () => {
     expect(withLoginMarker("/u/abc2345678#bio", "qq")).toBe("/u/abc2345678#login=qq");
   });
 
-  test("只认三种登录方式", () => {
+  test("只认已支持的登录方式", () => {
     expect(loginMarkerIn("#login=google")).toBe("google");
+    expect(loginMarkerIn("#login=awmc")).toBe("awmc");
     expect(loginMarkerIn("#login=qq")).toBe("qq");
     expect(loginMarkerIn("#login=passkey")).toBe("passkey");
     for (const hash of ["", "#", "#login=", "#login=email", "#login=qq&x=1", "#xlogin=qq"]) {

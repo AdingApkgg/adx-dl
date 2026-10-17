@@ -328,9 +328,9 @@ describe("账号设置页渲染：登录设备", () => {
 describe("账号设置页渲染：顶部提示", () => {
   // Google 绑定出错时 Better Auth 把用户送回 errorCallbackURL 并在后面接上 ?error=。
   test("?error= 显示 Google 绑定失败的原因", async () => {
-    expect(await renderPage({}, "?error=account_already_linked_to_different_user")).toContain(m.error_google_already_linked());
-    expect(await renderPage({}, "?error=state_mismatch")).toContain(m.error_google_failed());
-    expect(await renderPage({})).not.toContain(m.error_google_failed());
+    expect(await renderPage({}, "?error=account_already_linked_to_different_user")).toContain(m.error_social_already_linked());
+    expect(await renderPage({}, "?error=state_mismatch")).toContain(m.error_social_failed());
+    expect(await renderPage({})).not.toContain(m.error_social_failed());
   });
 });
 

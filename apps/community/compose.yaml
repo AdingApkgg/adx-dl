@@ -29,6 +29,8 @@ x-app-env: &app-env
   BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?先运行 ops/fill-secrets.sh}
   GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?在 .env 里填 Google OAuth 客户端}
   GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?在 .env 里填 Google OAuth 客户端}
+  AWMC_CLIENT_ID: ${AWMC_CLIENT_ID:-}
+  AWMC_CLIENT_SECRET: ${AWMC_CLIENT_SECRET:-}
   TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?在 .env 里填 Turnstile 的站点密钥}
   TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?在 .env 里填 Turnstile 的密钥}
   QQ_SENDER: napcat
