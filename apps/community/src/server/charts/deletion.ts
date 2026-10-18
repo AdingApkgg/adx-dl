@@ -35,8 +35,9 @@ export const chartDeletionHandler: DeletionHandler = {
       if (!options.deleteContent && p && !chart.deletedAt) {
         await tx
           .update(charts)
-          .set({ currentVersionId: p.versionId, title: p.title, artist: p.artist, updatedAt: now })
+          .set({ currentVersionId: p.versionId, title: p.title, artist: p.artist, description: p.description, credits: p.credits, tags: p.tags, updatedAt: now })
           .where(eq(charts.id, chart.id));
+        await tx.update(chartVersions).set({ releaseNote: p.releaseNote }).where(eq(chartVersions.id, p.versionId));
         await tx
           .delete(chartVersions)
           .where(and(eq(chartVersions.chartId, chart.id), ne(chartVersions.id, p.versionId)));

@@ -84,14 +84,14 @@ export function summarizeMaidata(bytes: Uint8Array): ChartImportSummary {
         } else if ("isHoldStart" in note && note.isHoldStart && "duration" in note) end += note.duration * 60000 / note.bpm;
         durationMs = Math.max(durationMs, end);
       }
-      difficulties.push({ difficulty, level: metadata.get(`lv_${difficulty}`)?.slice(0, 120) ?? null,
+      difficulties.push({ difficulty, designer: Array.from(metadata.get(`des_${difficulty}`) ?? metadata.get("des") ?? "").slice(0,120).join(""), level: metadata.get(`lv_${difficulty}`)?.slice(0, 120) ?? null,
         noteCount: previewSupported ? chart.notes.length : null,
         durationMs: previewSupported ? Math.ceil(durationMs) : null, previewSupported });
     } catch (error) {
       if (error instanceof ParseLimitError) fail("CHART_COMPLEXITY_EXCEEDED");
       // An unrecognized notation can still be privately archived; it never becomes a partial preview.
       warn({ code: "PREVIEW_UNSUPPORTED", difficulty });
-      difficulties.push({ difficulty, level: metadata.get(`lv_${difficulty}`)?.slice(0, 120) ?? null, noteCount: null, durationMs: null, previewSupported: false });
+      difficulties.push({ difficulty, designer: Array.from(metadata.get(`des_${difficulty}`) ?? metadata.get("des") ?? "").slice(0,120).join(""), level: metadata.get(`lv_${difficulty}`)?.slice(0, 120) ?? null, noteCount: null, durationMs: null, previewSupported: false });
     }
   }
   if (!difficulties.length) fail("CHART_DIFFICULTY_INVALID");

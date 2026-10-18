@@ -231,3 +231,31 @@ test("draft/active-version caps reject before binding another File; cursor pages
   chart = await appendChartVersion(ctx, id, chart.id, { fileId: candidate.file.id, expectedRevision: chart.revision });
   expect(chart.versions[0].ordinal).toBe(21);
 });
+
+test("private metadata and version notes obey Unicode limits, ownership and optimistic revision", async () => {
+  const ctx = fixture.ctx, ownerId = await owner(), otherId = await owner();
+  let chart = await createChart(ctx, ownerId, (await chartFile(ownerId, { title: "Private work" })).file.id);
+  const other = await createChart(ctx, otherId, (await chartFile(otherId)).file.id);
+  chart = await updateChart(ctx, ownerId, chart.id, { expectedRevision: chart.revision,
+    description: "😀".repeat(2000), credits: "Credit\nSource", tags: [" ＡＢＣ ", "abc"], releaseNote: { versionId: chart.currentVersionId, text: "First note" } });
+  expect(chart.description).toBe("😀".repeat(2000)); expect(chart.tags).toEqual([{ key: "abc", label: "ＡＢＣ" }]);
+  expect(chart.versions[0]?.releaseNote).toBe("First note"); expect(chart.publication).toBeNull();
+  await expect(updateChart(ctx, ownerId, chart.id, { expectedRevision: chart.revision - 1, description: "Stale tab" })).rejects.toMatchObject({ code: "CHART_CHANGED" });
+  await expect(updateChart(ctx, ownerId, chart.id, { expectedRevision: chart.revision, releaseNote: { versionId: other.currentVersionId, text: "Wrong chart" } })).rejects.toMatchObject({ status: 404 });
+  await expect(updateChart(ctx, ownerId, chart.id, { expectedRevision: chart.revision, description: "😀".repeat(2001) })).rejects.toMatchObject({ status: 400 });
+  await expect(updateChart(ctx, ownerId, chart.id, { expectedRevision: chart.revision, releaseNote: { versionId: chart.currentVersionId, text: "x".repeat(1001) } })).rejects.toMatchObject({ status: 400 });
+  expect((await getChart(ctx, ownerId, chart.id)).revision).toBe(chart.revision);
+});
+test("private list cursor binds owner and filters and cannot be reused for another scope", async () => {
+  const ctx = fixture.ctx, ownerId = await owner(), otherId = await owner();
+  await createChart(ctx, ownerId, (await chartFile(ownerId, { title: "Search first" })).file.id);
+  await createChart(ctx, ownerId, (await chartFile(ownerId, { title: "Search second" })).file.id);
+  const first = await listCharts(ctx, ownerId, { q: "Search", status: "draft", limit: 1 });
+  expect(first.items).toHaveLength(1); expect(first.nextCursor).not.toBeNull();
+  const second = await listCharts(ctx, ownerId, { q: "Search", status: "draft", limit: 1, cursor: first.nextCursor! });
+  expect(second.items).toHaveLength(1); expect(second.items[0]?.id).not.toBe(first.items[0]?.id);
+  for (const change of [{ q: "Other", status: "draft" }, { q: "Search", status: "published" }])
+    await expect(listCharts(ctx, ownerId, { ...change, cursor: first.nextCursor! })).rejects.toMatchObject({ status: 400 });
+  await expect(listCharts(ctx, otherId, { q: "Search", status: "draft", cursor: first.nextCursor! })).rejects.toMatchObject({ status: 400 });
+  await expect(listCharts(ctx, ownerId, { limit: 21 })).rejects.toMatchObject({ status: 400 });
+});

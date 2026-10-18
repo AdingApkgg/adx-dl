@@ -3,9 +3,10 @@ import { Input } from "@astrodx/ui/components/input";
 import { Share2Icon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
+import { localizeHref } from "@/paraglide/runtime.js";
 import { m } from "@/paraglide/messages.js";
 
-export function ShareChartButton({ title }: { title: string }) {
+export function ShareChartButton({ title, publicId }: { title: string; publicId: string }) {
   const { pathname } = useLocation();
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -18,7 +19,9 @@ export function ShareChartButton({ title }: { title: string }) {
 
   async function share() {
     if (busy) return;
-    const url = new URL(pathname, window.location.origin).href;
+    const locale = /^\/(en|ja)(?:\/|$)/.exec(pathname)?.[1];
+    const path = locale ? `/${locale}/charts/${publicId}` : localizeHref(`/charts/${publicId}`);
+    const url = new URL(path, window.location.origin).href;
     setBusy(true); setCopied(false); setManualUrl(null);
     try {
       if (typeof navigator.share === "function") {

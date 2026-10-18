@@ -7,6 +7,10 @@ export function publicChartsApi(api: ApiClient) {
   return {
     list: async (cursor?: string, limit?: number, filters: PublicChartSearchInput = {}): Promise<PublicChartsPageDto> =>
       okJson(await routes.$get({ query: { ...filters, ...(cursor ? { cursor } : {}), ...(limit !== undefined ? { limit: String(limit) } : {}) } }, { init: { cache: "no-store" } })),
+    tags: async (q = ""): Promise<{ key: string; label: string; count: number }[]> =>
+      okJson(await routes.tags.$get({ query: { q } }, { init: { cache: "no-store" } })),
+    related: async (id: string): Promise<PublicChartDto[]> =>
+      okJson(await routes[":id"].related.$get({ param: { id } }, { init: { cache: "no-store" } })),
     get: async (id: string): Promise<PublicChartDto> =>
       okJson(await routes[":id"].$get({ param: { id } }, { init: { cache: "no-store" } })),
   };

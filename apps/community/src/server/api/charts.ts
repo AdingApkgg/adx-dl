@@ -13,7 +13,8 @@ const create = z.object({ fileId: z.string() }).strict();
 const append = create.extend({ expectedRevision: expected }).strict();
 const remove = z.object({ expectedRevision: expected }).strict();
 const patch = z.object({ expectedRevision: expected, title: z.string().optional(), artist: z.string().optional(),
-  currentVersionId: z.string().optional() }).strict();
+  description: z.string().optional(), credits: z.string().optional(), tags: z.array(z.string()).max(64).optional(),
+  releaseNote: z.object({ versionId: z.string(), text: z.string() }).strict().optional(), currentVersionId: z.string().optional() }).strict();
 function storage(c: Context<AppEnv>) {
   const ctx = c.get("services").storage;
   if (!ctx) throw new StorageUnavailableError();
@@ -44,7 +45,7 @@ export const chartRoutes = new Hono<AppEnv>()
   .get("/", async c => {
     const raw = c.req.query("limit");
     return c.json(await listCharts(storage(c), currentAuth(c).user.id,
-      { cursor: c.req.query("cursor"), ...(raw !== undefined ? { limit: Number(raw) } : {}) }));
+      { q: c.req.query("q"), status: c.req.query("status"), cursor: c.req.query("cursor"), ...(raw !== undefined ? { limit: Number(raw) } : {}) }));
   })
   .get("/:id", async c => c.json(await getChart(storage(c), currentAuth(c).user.id, c.req.param("id"))))
   .patch("/:id", async c => c.json(await updateChart(storage(c), currentAuth(c).user.id, c.req.param("id"), await body(c, patch))))

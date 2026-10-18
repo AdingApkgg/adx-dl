@@ -48,7 +48,7 @@ export function PublicChartCard({ chart, headingLevel = 2 }: { chart: PublicChar
   const privateHistory = privateCursors.filter((cursor): cursor is string => typeof cursor === "string" && (cursor === "" || /^[A-Za-z0-9_-]{1,512}$/.test(cursor)))
     .map(cursor => location.pathname + (cursor ? `?cursor=${cursor}` : ""));
   const history = publicListCursors(favorites ? privateHistory : location.state?.publicChartCursors, href);
-  return <Link to={localizeHref(`/charts/${chart.publicId}`)} state={{ publicListHref: href, publicListCursors: history }} className="group flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card/80 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+  return <article className="flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card/80"><Link to={localizeHref(`/charts/${chart.publicId}`)} state={{ publicListHref: href, publicListCursors: history }} className="group flex flex-1 flex-col transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
     <PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} />
     <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3 sm:p-4">
       <Heading className="line-clamp-1 font-semibold leading-snug" title={chart.title}>{chart.title}</Heading>
@@ -58,5 +58,9 @@ export function PublicChartCard({ chart, headingLevel = 2 }: { chart: PublicChar
         <PublicDifficultyPill row={row} />
       </li>)}</ul>
     </div>
-  </Link>;
+  </Link><PublicChartTags tags={chart.tags} /></article>;
+}
+
+export function PublicChartTags({ tags }: { tags: PublicChartDto["tags"] }) {
+  return tags?.length ? <ul aria-label={m.chart_metadata_tags()} className="flex flex-wrap gap-2 p-3">{tags.map(tag => <li key={tag.key}><Link className="rounded-full border px-2 py-1 text-xs hover:underline" to={localizeHref(`/charts?${new URLSearchParams({ tag: tag.key })}`)}>{tag.label}</Link></li>)}</ul> : null;
 }

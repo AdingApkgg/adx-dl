@@ -1,3 +1,7 @@
+import type {FeaturedState,NoticePage,PublicNotice} from "@/shared/community-site";
+import {siteApi} from "../queries/community-site";
+import {SiteNoticeList} from "../components/site-notice-list";
+import {PublicChartSearchForm} from "../components/public-chart-browser";
 import { Button } from "@astrodx/ui/components/button";
 import { Card, CardContent } from "@astrodx/ui/components/card";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
@@ -25,11 +29,11 @@ import type { Route } from "./+types/home";
 export async function loader({ context }: Route.LoaderArgs) {
   const queryClient = context.get(queryClientContext);
   const api = context.get(apiContext);
-  const [publicCharts] = await Promise.all([
-    publicChartsApi(api).list(undefined, 6).catch(() => null),
+  const [publicCharts,featured,notices] = await Promise.all([
+    publicChartsApi(api).list(undefined, 8).catch(() => null), siteApi(api).featured().catch(()=>null),siteApi(api).notices().catch(()=>null),
     queryClient.query(metaQuery(api)), queryClient.query(meQuery(api)).catch(() => undefined),
   ]);
-  return { dehydratedState: dehydrate(queryClient), publicCharts };
+  return { dehydratedState: dehydrate(queryClient), publicCharts,featured,notices };
 }
 
 // 站内切换：缓存里有就直接用，哪怕已经过期（staleTime: "static"），跳转不用等请求；
@@ -37,12 +41,12 @@ export async function loader({ context }: Route.LoaderArgs) {
 // me 和 loader 一样：取不到就渲染成"未登录"，组件挂载后 useQuery 会重试。
 export async function clientLoader() {
   const queryClient = getBrowserQueryClient();
-  const [publicCharts] = await Promise.all([
-    publicChartsApi(getBrowserApi()).list(undefined, 6).catch(() => null),
+  const [publicCharts,featured,notices] = await Promise.all([
+    publicChartsApi(getBrowserApi()).list(undefined, 8).catch(() => null), siteApi(getBrowserApi()).featured().catch(()=>null),siteApi(getBrowserApi()).notices().catch(()=>null),
     queryClient.query({ ...metaQuery(getBrowserApi()), staleTime: "static" }),
     queryClient.query({ ...meQuery(getBrowserApi()), staleTime: "static" }).catch(() => undefined),
   ]);
-  return { dehydratedState: null, publicCharts };
+  return { dehydratedState: null, publicCharts,featured,notices };
 }
 
 export function meta({ matches, location }: Route.MetaArgs) {
@@ -66,12 +70,12 @@ export function meta({ matches, location }: Route.MetaArgs) {
 export default function Home({ loaderData }: Route.ComponentProps) {
   return (
     <HydrationBoundary state={loaderData.dehydratedState ?? undefined}>
-      <HomeContent publicCharts={loaderData.publicCharts} />
+      <HomeContent publicCharts={loaderData.publicCharts} featured={loaderData.featured} notices={loaderData.notices} />
     </HydrationBoundary>
   );
 }
 
-function HomeContent({ publicCharts }: { publicCharts: PublicChartsPageDto | null }) {
+function HomeContent({ publicCharts,featured,notices }: { publicCharts: PublicChartsPageDto | null;featured:FeaturedState|null;notices:NoticePage<PublicNotice>|null }) {
   const { data } = useQuery(metaQuery(getRenderApi()));
   const { data: me } = useQuery(meQuery(getRenderApi()));
 
@@ -79,6 +83,10 @@ function HomeContent({ publicCharts }: { publicCharts: PublicChartsPageDto | nul
   return (
     <main className="space-y-6">
       <PageTitle>{m.site_name()}</PageTitle>
+      <PublicChartSearchForm filters={{q:"",sort:"updated"}} base={localizeHref("/charts")}/>
+      <nav className="flex flex-wrap gap-3"><Link className={textLinkClass} to={localizeHref("/forum")}>{m.site_forum()}</Link><Link className={textLinkClass} to={localizeHref("/help")}>{m.site_help()}</Link><Link className={textLinkClass} to={localizeHref("/notices")}>{m.site_notices()}</Link></nav>
+      {notices?.items.length?<section className="space-y-3"><h2 className="text-xl font-semibold">{m.site_notices()}</h2><SiteNoticeList items={notices.items.slice(0,3)}/></section>:notices===null?<p role="status">{m.site_notices_unavailable()}</p>:null}
+      {featured?.items.length?<section className="space-y-3"><h2 className="text-xl font-semibold">{m.site_featured()}</h2><ul className={PUBLIC_CHART_GRID_CLASS}>{featured.items.map(chart=><li key={chart.id}><PublicChartCard chart={chart} headingLevel={3}/></li>)}</ul></section>:featured===null?<p role="status">{m.site_featured_unavailable()}</p>:null}
       <Card size="sm">
         <CardContent className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
           {me ? (

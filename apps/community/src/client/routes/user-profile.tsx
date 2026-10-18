@@ -11,7 +11,7 @@ import { getLocale, localizeHref } from "@/paraglide/runtime.js";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
 import { Avatar } from "../components/avatar";
-import { PublicChartBrowser } from "../components/public-chart-browser";
+import { PublicChartBrowser, PublicChartSearchForm } from "../components/public-chart-browser";
 import { publicChartsApi } from "../queries/public-charts";
 import { publicListBackState, publicListReturnState } from "../lib/public-chart-navigation";
 import { PageTitle } from "../components/page-title";
@@ -145,7 +145,8 @@ function UserContent({ id, works, worksFilters }: { id: string; works: PublicCha
       </Card>
       <section aria-labelledby="author-public-charts" className="space-y-4">
         <h2 id="author-public-charts" className="text-xl font-semibold">{m.user_public_charts()}</h2>
-        {works && worksFilters ? <PublicChartBrowser page={works} filters={worksFilters} base={localizeHref(`/u/${profile.publicId}`)} headingLevel={3} />
+        {works && worksFilters ? <><PublicChartSearchForm filters={worksFilters} base={localizeHref(`/u/${profile.publicId}`)} />
+          <PublicChartBrowser page={works} filters={worksFilters} base={localizeHref(`/u/${profile.publicId}`)} headingLevel={3} /></>
           : <p role="status" className="text-sm text-muted-foreground">{m.public_charts_unavailable()}</p>}
       </section>
     </main>

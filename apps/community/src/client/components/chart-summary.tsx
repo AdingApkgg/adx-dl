@@ -25,6 +25,8 @@ export function ChartSummary({ summary }: { summary: ChartImportSummary }) {
     <ul className="space-y-1">
       {summary.difficulties.map((difficulty) => <li key={difficulty.difficulty}>
         {m.chart_difficulty({ difficulty: String(difficulty.difficulty) })} · {difficulty.level ?? "—"}
+        {difficulty.designer ? ` · ${m.chart_metadata_designer()}: ${difficulty.designer}` : ""}
+        {difficulty.noteCount === null || difficulty.durationMs === null ? ` · ${m.chart_metadata_unknown()}` : ""}
         {difficulty.noteCount !== null ? ` · ${m.chart_notes({ count: String(difficulty.noteCount) })}` : ""}
         {difficulty.durationMs !== null ? ` · ${Math.ceil(difficulty.durationMs / 1000)} s` : ""}
         {!difficulty.previewSupported ? ` · ${m.chart_unsupported()}` : ""}

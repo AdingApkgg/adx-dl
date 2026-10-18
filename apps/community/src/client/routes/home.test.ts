@@ -159,7 +159,7 @@ test("home header uses the published decorative avatar",async()=> {
   const html=renderLoaderData(data);expect(html).toContain('src="/media/home.jpg"');expect(html).toContain('alt="" aria-hidden="true"');
 });
 
-const PUBLIC_CHART: PublicChartDto = {
+const PUBLIC_CHART: PublicChartDto = { description:'',credits:'',tags:[],releaseNote:'',
   id: "public-chart", publicId: "42", versionId: "published", ordinal: 1, title: "Published song", artist: "Public artist", sourceSize: 100,
   publishedAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-11T00:00:00.000Z", author: null,
   summary: { title: "Unpublished import title", artist: "", maidataMd5Base64: "hash", difficulties: [], warnings: [], audio: null, hasCover: false },

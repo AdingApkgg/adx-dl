@@ -1,7 +1,7 @@
 import { Badge } from "@astrodx/ui/components/badge";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
@@ -14,11 +14,11 @@ import { chartsApi } from "../queries/charts";
 import { ChartSummary } from "./chart-summary";
 import { PrivateChartPreview } from "./private-chart-preview";
 
-type Intent = { versionId: string; title: string; artist: string } | null;
+type Intent = { versionId: string; title: string; artist: string; description: string; credits: string; tags: ChartDto["tags"]; releaseNote: string } | null;
 function matches(chart: ChartDto, intent: Intent) {
   if (chart.publicationPending !== false) return false;
   return intent === null ? chart.publication === null : chart.publication?.versionId === intent.versionId &&
-    chart.publication.title === intent.title && chart.publication.artist === intent.artist;
+    chart.publication.title === intent.title && chart.publication.artist === intent.artist && chart.publication.description === intent.description && chart.publication.credits === intent.credits && JSON.stringify(chart.publication.tags) === JSON.stringify(intent.tags) && chart.publication.releaseNote === intent.releaseNote;
 }
 export function ChartPublication({ chart, busy, setBusy, refresh }: {
   chart: ChartDto; busy: boolean; setBusy: (busy: boolean) => void;
@@ -31,6 +31,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
   };
   const [versionId, setVersionId] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  useEffect(() => { setConfirmed(false); }, [chart.revision]);
   const [withdrawing, setWithdrawing] = useState(false);
   const [reconcile, setReconcile] = useState(false);
   const [intent, setIntent] = useState<Intent>(null);
@@ -38,7 +39,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
   const [error, setError] = useState<unknown>();
   const uncertain = reconcile || chart.publicationPending !== false;
   const publishedVersion = chart.versions.find(version => version.id === chart.publication?.versionId);
-  const privateChanges = !uncertain && chart.publication && (chart.currentVersionId !== chart.publication.versionId || chart.title !== chart.publication.title || chart.artist !== chart.publication.artist);
+  const privateChanges = !uncertain && chart.publication && (chart.currentVersionId !== chart.publication.versionId || chart.title !== chart.publication.title || chart.artist !== chart.publication.artist || chart.description !== chart.publication.description || chart.credits !== chart.publication.credits || JSON.stringify(chart.tags) !== JSON.stringify(chart.publication.tags) || publishedVersion?.releaseNote !== chart.publication.releaseNote);
   const selected = chart.versions.find((version) => version.id === versionId);
   const api = chartsApi(getRenderApi());
   const accept = async (actual: ChartDto, target: Intent, allowSuccess: boolean) => {
@@ -77,6 +78,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
   return <section aria-label={m.chart_publication()} className="space-y-3 rounded-lg border p-4">
     <div className="flex flex-wrap items-center gap-2">
       <h2 className="font-semibold">{m.chart_publication()}</h2>
+    <a href={localizeHref("/help/publication")} className="inline-flex min-h-11 items-center text-sm underline">{m.site_help_publication_title()}</a>
       <Badge variant={uncertain ? "outline" : chart.publication ? "default" : "secondary"}>
         {uncertain ? m.chart_publication_status_pending() : chart.publication ? m.chart_publication_status_public() : m.chart_publication_status_private()}
       </Badge>
@@ -95,15 +97,21 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
         {chart.versions.map((version) => <option key={version.id} value={version.id}>{m.chart_version({ number: String(version.ordinal) })}</option>)}
       </select>
     </label>
-    {selected ? <div className="space-y-2 rounded border p-3">
+    {selected ? <div className="grid gap-3 md:grid-cols-2">
+      {chart.publication ? <div className="space-y-2 rounded border p-3"><h3 className="font-semibold">{m.chart_metadata_current_snapshot()}</h3><p>{chart.publication.title} · {chart.publication.artist || "—"}</p>
+        {publishedVersion ? <><p>{m.chart_version({ number: String(publishedVersion.ordinal) })} · {(publishedVersion.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p><ChartSummary summary={publishedVersion.summary} /></> : <p>{m.chart_metadata_unknown()}</p>}
+        <SnapshotMetadata value={chart.publication} /></div> : null}
+      <div className="space-y-2 rounded border p-3"><h3 className="font-semibold">{m.chart_metadata_selected_snapshot()}</h3>
       <p className="break-words font-semibold">{chart.title} · {chart.artist || "—"}</p>
       <p>{m.chart_version({ number: String(selected.ordinal) })} · {(selected.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p>
       <ChartSummary summary={selected.summary} />
+      <SnapshotMetadata value={{ ...chart, releaseNote: selected.releaseNote }} />
+      <p className="text-xs text-muted-foreground">{m.chart_metadata_comparison_hint()}</p>
       <PrivateChartPreview key={selected.id} id={chart.id} versionId={selected.id} summary={selected.summary} />
-    </div> : null}
+    </div></div> : null}
     <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} disabled={busy || !selected || reconcile || uncertain} onChange={(event) => setConfirmed(event.target.checked)} />{m.chart_publication_archive()}</label>
     <div className="flex flex-wrap gap-2">
-      <Button disabled={busy || !selected || !confirmed || reconcile || uncertain} onClick={() => void mutate({ versionId, title: chart.title, artist: chart.artist })}>{chart.publication ? m.chart_publication_update() : m.chart_publication_confirm()}</Button>
+      <Button disabled={busy || !selected || !confirmed || reconcile || uncertain} onClick={() => void mutate({ versionId, title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits, tags: chart.tags, releaseNote: selected?.releaseNote ?? "" })}>{chart.publication ? m.chart_publication_update() : m.chart_publication_confirm()}</Button>
       {chart.publication ? <Button variant="outline" disabled={busy || reconcile || uncertain} onClick={() => setWithdrawing(true)}>{m.chart_publication_withdraw()}</Button> : null}
       {reconcile || uncertain ? <Button variant="outline" disabled={busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
     </div>
@@ -115,4 +123,8 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
     {status ? <p role="status">{status}</p> : null}
     {error ? <Alert role="alert" variant="destructive">{chartErrorMessage(error)}</Alert> : null}
   </section>;
+}
+
+function SnapshotMetadata({ value }: { value: { description: string; credits: string; tags: ChartDto["tags"]; releaseNote: string } }) {
+  return <dl className="space-y-2 break-words text-sm"><div><dt>{m.chart_metadata_description()}</dt><dd className="whitespace-pre-wrap">{value.description || "—"}</dd></div><div><dt>{m.chart_metadata_credits()}</dt><dd className="whitespace-pre-wrap">{value.credits || "—"}</dd></div><div><dt>{m.chart_metadata_tags()}</dt><dd>{value.tags.map(tag => tag.label).join(" · ") || "—"}</dd></div><div><dt>{m.chart_metadata_release_note()}</dt><dd className="whitespace-pre-wrap">{value.releaseNote || "—"}</dd></div></dl>;
 }

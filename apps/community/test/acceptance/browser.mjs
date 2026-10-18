@@ -331,7 +331,7 @@ async function acceptance() {
     await page.getByLabel("标题", { exact: true }).fill("Private metadata edited");
     const [edited] = await Promise.all([
       page.waitForResponse(r => new URL(r.url()).pathname === `/api/v1/me/charts/${draft.id}` && r.request().method() === "PATCH"),
-      page.getByRole("button", { name: "保存标题和曲师", exact: true }).click(),
+      page.getByRole("button", { name: "保存作品资料", exact: true }).click(),
     ]);
     assert.equal(edited.status(), 200);
     assert.deepEqual(await json(anonymous, publicBase()), publicChart);

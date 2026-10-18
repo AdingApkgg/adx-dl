@@ -23,3 +23,10 @@ test("favorite list return restores its private pagination and accepts no other 
   expect(state).not.toBeNull();
   expect(publicListBackState(state!)).toEqual({ socialPageScope: "/me/favorites:", socialCursors: ["", "page2"] });
 });
+
+test("tag filters are retained only within the same normalized public list scope", () => {
+  expect(publicListHref("/ja/charts?tag=abc&cursor=next")).toBe("/ja/charts?tag=abc&cursor=next");
+  expect(samePublicListScope("/charts?tag=abc", "/charts?tag=ABC&cursor=next")).toBe(true);
+  expect(samePublicListScope("/charts?tag=abc", "/charts?tag=other&cursor=next")).toBe(false);
+  expect(publicListHref("/charts?tag=a%2Fb")).toBeNull();
+});

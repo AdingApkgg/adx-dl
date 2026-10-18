@@ -9,7 +9,7 @@ export function publicListHref(value: unknown): string | null {
     if (url.origin !== "https://community.invalid" || url.hash) return null;
     const path = url.pathname.replace(/^\/(en|ja)(?=\/)/, "");
     if (path !== "/charts" && path !== "/me/favorites" && !(path.startsWith("/u/") && isPublicUserId(path.slice(3)))) return null;
-    if ([...url.searchParams.keys()].some(key => !["q", "difficulty", "sort", "author", "cursor"].includes(key))) return null;
+    if ([...url.searchParams.keys()].some(key => !["q", "difficulty", "sort", "author", "tag", "cursor"].includes(key))) return null;
     publicChartFiltersFromParams(url.searchParams);
     const cursor = url.searchParams.get("cursor");
     if (cursor && (cursor.length > 512 || !/^[A-Za-z0-9_-]+$/.test(cursor))) return null;

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeChartTags } from "./chart-metadata";
 import { isPublicChartId } from "./chart-public-id";
 const date = z.string().datetime();
 // Match service validation and PostgreSQL char_length independently of UTF-16 units.
@@ -8,6 +9,12 @@ const publication = z
     versionId: z.string().uuid(),
     title: chartText.refine((value) => value.length > 0),
     artist: chartText,
+    description: z.string().refine(value => [...value].length <= 2000).default(""),
+    credits: z.string().refine(value => [...value].length <= 1000).default(""),
+    releaseNote: z.string().refine(value => [...value].length <= 1000).default(""),
+    tags: z.array(z.object({ key: z.string(), label: z.string() }).strict()).max(8).refine(tags => {
+      try { return JSON.stringify(normalizeChartTags(tags.map(tag => tag.label))) === JSON.stringify(tags); } catch { return false; }
+    }).default([]),
     publishedAt: date,
     updatedAt: date,
   })

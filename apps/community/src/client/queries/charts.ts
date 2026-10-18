@@ -3,15 +3,15 @@ import { type ApiClient, expectOk, okJson } from "@/shared/api-client";
 import type { ChartAssetRole, ChartDto, ChartsPageDto } from "@/shared/charts";
 import { replayRequest } from "./storage";
 
-export type ChartPatch = { expectedRevision: number; title?: string; artist?: string; currentVersionId?: string };
+export type ChartPatch = { expectedRevision: number; title?: string; artist?: string; description?: string; credits?: string; tags?: string[]; releaseNote?: { versionId: string; text: string }; currentVersionId?: string };
 export function chartsApi(api: ApiClient) {
   const routes = api.api.v1.me.charts;
   const json = (body: unknown, signal?: AbortSignal) => ({ init: {
     headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal,
   } });
   return {
-    list: async (cursor?: string, signal?: AbortSignal): Promise<ChartsPageDto> =>
-      okJson(await routes.$get({ query: { ...(cursor ? { cursor } : {}) } }, { init: { signal } })),
+    list: async (cursor?: string, signal?: AbortSignal, filters: { q?: string; status?: string } = {}): Promise<ChartsPageDto> =>
+      okJson(await routes.$get({ query: { ...filters, ...(cursor ? { cursor } : {}) } }, { init: { signal } })),
     get: async (id: string, signal?: AbortSignal): Promise<ChartDto> =>
       okJson(await routes[":id"].$get({ param: { id } }, { init: { signal } })),
     create: (fileId: string): Promise<ChartDto> =>
@@ -34,9 +34,9 @@ export function chartsApi(api: ApiClient) {
     },
   };
 }
-export const chartsQuery = (api: ApiClient, cursor?: string) => queryOptions({
-  queryKey: ["me", "charts", "list", cursor ?? null] as const,
-  queryFn: ({ signal }) => chartsApi(api).list(cursor, signal),
+export const chartsQuery = (api: ApiClient, cursor?: string, filters: { q?: string; status?: string } = {}) => queryOptions({
+  queryKey: ["me", "charts", "list", filters, cursor ?? null] as const,
+  queryFn: ({ signal }) => chartsApi(api).list(cursor, signal, filters),
 });
 export const chartQuery = (api: ApiClient, id: string) => queryOptions({
   queryKey: ["me", "charts", id] as const,

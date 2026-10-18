@@ -13,3 +13,10 @@ test("filters reject invalid difficulty, sort, identity and oversized queries", 
   }
   expect(parsePublicChartFilters({ q: "🦀".repeat(120) }).q).toHaveLength(240);
 });
+
+test("one normalized public tag roundtrips and invalid tags never become cursor scope", () => {
+  const filters = parsePublicChartFilters({ tag: " ＡＢＣ ", q: "Designer", difficulty: "4" });
+  expect(filters.tag).toBe("abc");
+  expect(publicChartFiltersFromParams(publicChartSearchParams(filters))).toEqual(filters);
+  for (const tag of ["a/b", "https:example", "a\u0000", "a".repeat(21)]) expect(() => parsePublicChartFilters({ tag })).toThrow(RangeError);
+});

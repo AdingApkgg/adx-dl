@@ -1,8 +1,9 @@
 import { QueryClientProvider, dehydrate } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentType } from "react";
-import { MemoryRouter } from "react-router";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
+import { m } from "@/paraglide/messages.js";
 import ChartDetail from "@/client/routes/chart-detail";
 import { chartQuery } from "@/client/queries/charts";
 import { createApiClient } from "@/shared/api-client";
@@ -12,8 +13,8 @@ const api = createApiClient("https://community.test");
 vi.mock("@/client/lib/browser", () => ({ getBrowserApi: () => api, getRenderApi: () => api }));
 const Page = ChartDetail as unknown as ComponentType<{ params: { id: string }; loaderData: { dehydratedState: ReturnType<typeof dehydrate> } }>;
 const summary = { title: "Original", artist: "Artist", maidataMd5Base64: "md5", difficulties: [{ difficulty: 4 as const, level: "12", noteCount: 3, durationMs: 5000, previewSupported: true }], warnings: [], audio: null, hasCover: false };
-const initial: ChartDto = { publication: null, publicationPending: false, id: "chart", title: "Original", artist: "Artist", revision: 2, currentVersionId: "v2", createdAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-11T00:00:00.000Z",
-  versions: [2, 1].map((ordinal) => ({ id: `v${ordinal}`, ordinal, sourceFileId: `f${ordinal}`, sourceSize: 3, summary, createdAt: "2026-10-11T00:00:00.000Z" })) };
+const initial: ChartDto = { description: "", credits: "", tags: [], publication: null, publicationPending: false, id: "chart", title: "Original", artist: "Artist", revision: 2, currentVersionId: "v2", createdAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-11T00:00:00.000Z",
+  versions: [2, 1].map((ordinal) => ({ id: `v${ordinal}`, ordinal, sourceFileId: `f${ordinal}`, releaseNote: "", sourceSize: 3, summary, createdAt: "2026-10-11T00:00:00.000Z" })) };
 class HashWorker {
   onmessage: ((event: { data: unknown }) => void) | null = null; onerror = null;
   postMessage() { queueMicrotask(() => this.onmessage?.({ data: { hash: "a".repeat(64) } })); }
@@ -28,18 +29,19 @@ function setup(handler: (path: string, method: string, body: Record<string, unkn
     requests.push(request); return handler(request.path, request.method, request.body);
   }));
   const client = makeQueryClient(); client.setQueryData(["me"], { id: "alice", status: "active" }); client.setQueryData(chartQuery(api, "chart").queryKey, start);
-  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/me/charts/chart"]}><Page params={{ id: "chart" }} loaderData={{ dehydratedState: dehydrate(client) }} /></MemoryRouter></QueryClientProvider>);
+  const router = createMemoryRouter([{ path: "/me/charts/:id", element: <QueryClientProvider client={client}><Page params={{ id: "chart" }} loaderData={{ dehydratedState: dehydrate(client) }} /></QueryClientProvider> }], { initialEntries: ["/me/charts/chart"] });
+  render(<RouterProvider router={router} />);
   return requests;
 }
 test("metadata conflict uses the edit revision, reads latest state and keeps the user's title", async () => {
   const latest = { ...initial, title: "External change", revision: 3 };
   const requests = setup((_path, method) => method === "PATCH" ? Response.json({ error: { code: "CHART_CHANGED", message: "Changed" } }, { status: 409 }) : Response.json(latest));
   fireEvent.change(screen.getByRole("textbox", { name: "标题" }), { target: { value: "My unsaved title" } });
-  fireEvent.click(screen.getByRole("button", { name: "保存标题和曲师" }));
-  await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("草稿已发生变化"));
+  fireEvent.click(screen.getByRole("button", { name: "保存作品资料" }));
+  await waitFor(() => expect(screen.getAllByRole("alert").some(alert => alert.textContent?.includes("草稿已发生变化"))).toBe(true));
   expect((screen.getByRole("textbox", { name: "标题" }) as HTMLInputElement).value).toBe("My unsaved title");
   expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("External change");
-  expect(requests.filter((row) => row.method === "PATCH")).toEqual([{ path: "/api/v1/me/charts/chart", method: "PATCH", body: { expectedRevision: 2, title: "My unsaved title", artist: "Artist" } }]);
+  expect(requests.filter((row) => row.method === "PATCH")).toEqual([{ path: "/api/v1/me/charts/chart", method: "PATCH", body: { expectedRevision: 2, title: "My unsaved title", artist: "Artist", description: "", credits: "", tags: [], releaseNote: { versionId: "v2", text: "" } } }]);
   expect(requests.some((row) => row.method === "GET")).toBe(true);
 });
 test("a lost successful metadata response reads current state instead of replaying PATCH", async () => {
@@ -49,8 +51,9 @@ test("a lost successful metadata response reads current state instead of replayi
     return Response.json(actual);
   });
   fireEvent.change(screen.getByRole("textbox", { name: "标题" }), { target: { value: "Saved remotely" } });
-  fireEvent.click(screen.getByRole("button", { name: "保存标题和曲师" }));
-  await waitFor(() => expect((screen.getByRole("button", { name: "保存标题和曲师" }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: "保存作品资料" }));
+  await waitFor(() => expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Saved remotely"));
+  expect((screen.getByRole("button", { name: "保存作品资料" }) as HTMLButtonElement).disabled).toBe(true);
   expect(requests.filter((row) => row.method === "PATCH")).toHaveLength(1);
   expect(requests.findIndex((row) => row.method === "GET")).toBeGreaterThan(requests.findIndex((row) => row.method === "PATCH"));
   expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Saved remotely");
@@ -86,7 +89,7 @@ test("an expired editor session redirects to login after the failed save", async
   const assign = vi.spyOn(window.location, "assign").mockImplementation(() => {});
   setup(() => Response.json({ error: { code: "UNAUTHORIZED", message: "Sign in" } }, { status: 401 }));
   fireEvent.change(screen.getByRole("textbox", { name: "标题" }), { target: { value: "Unsaved" } });
-  fireEvent.click(screen.getByRole("button", { name: "保存标题和曲师" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存作品资料" }));
   await waitFor(() => expect(assign).toHaveBeenCalledWith("/login?next=%2Fme%2Fcharts%2Fchart"));
 });
 
@@ -94,8 +97,8 @@ test("editor permission failure keeps the input and displays denial without forc
   const assign = vi.spyOn(window.location, "assign").mockImplementation(() => {});
   setup((_path, method) => method === "PATCH" ? Response.json({ error: { code: "FORBIDDEN", message: "Denied" } }, { status: 403 }) : Response.json(initial));
   fireEvent.change(screen.getByRole("textbox", { name: "标题" }), { target: { value: "Unsaved" } });
-  fireEvent.click(screen.getByRole("button", { name: "保存标题和曲师" }));
-  await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("你没有访问这份私有谱面的权限。"));
+  fireEvent.click(screen.getByRole("button", { name: "保存作品资料" }));
+  await waitFor(() => expect(screen.getAllByRole("alert").some(alert => alert.textContent === "你没有访问这份私有谱面的权限。")).toBe(true));
   expect((screen.getByRole("textbox", { name: "标题" }) as HTMLInputElement).value).toBe("Unsaved");
   expect(assign).not.toHaveBeenCalled();
 });
@@ -118,7 +121,7 @@ function choosePublication() {
   fireEvent.click(within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }));
   return section;
 }
-const publication = { versionId: "v1", title: "Original", artist: "Artist", publishedAt: initial.createdAt, updatedAt: initial.updatedAt };
+const publication = { description: "", credits: "", tags: [], releaseNote: "", versionId: "v1", title: "Original", artist: "Artist", publishedAt: initial.createdAt, updatedAt: initial.updatedAt };
 test("lost publication response reconciles durable snapshot without replaying PUT", async () => {
   let actual = { ...initial, publication: null, publicationPending: false } as ChartDto;
   const requests = setup((_path, method) => {
@@ -143,22 +146,25 @@ test.each([true, undefined])("pending or missing durable flag (%s) cannot report
   expect((within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }) as HTMLButtonElement).disabled).toBe(true);
   actual = { ...initial, revision: 3, publication: null, publicationPending: false };
   fireEvent.click(within(section).getByRole("button", { name: "检查发布状态" }));
-  await waitFor(() => expect((within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }) as HTMLButtonElement).disabled).toBe(false));
+  await waitFor(() => expect((within(section).getByLabelText("公开版本") as HTMLSelectElement).disabled).toBe(false));
+  expect((within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(within(section).getByRole("checkbox"));
   expect((within(section).getByLabelText("公开版本") as HTMLSelectElement).value).toBe("v1");
   expect(requests.filter(row => row.method === "PUT")).toHaveLength(1);
   fireEvent.click(within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }));
   await waitFor(() => expect(requests.filter(row => row.method === "PUT")).toHaveLength(2));
   expect(requests.filter(row => row.method === "PUT")[1]?.body.expectedRevision).toBe(3);
 });
-test("publication conflict retains selected version and unsaved editor text without success", async () => {
-  const actual = { ...initial, title: "Other title", revision: 3, publication: null, publicationPending: false };
-  setup((_path, method) => method === "PUT" ? Response.json({ error: { code: "CHART_CHANGED", message: "Changed" } }, { status: 409 }) : Response.json(actual));
+test("unsaved private metadata prevents publishing and retains the chosen version", () => {
+  const requests = setup(() => Response.json(initial));
+  const section = screen.getByRole("region", { name: "公开发布" });
+  fireEvent.change(within(section).getByLabelText("公开版本"), { target: { value: "v1" } });
+  fireEvent.click(within(section).getByRole("checkbox"));
   fireEvent.change(screen.getByRole("textbox", { name: "标题" }), { target: { value: "Unsaved title" } });
-  const section = choosePublication();
-  await waitFor(() => expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Other title"));
+  expect((within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }) as HTMLButtonElement).disabled).toBe(true);
   expect((screen.getByRole("textbox", { name: "标题" }) as HTMLInputElement).value).toBe("Unsaved title");
   expect((within(section).getByLabelText("公开版本") as HTMLSelectElement).value).toBe("v1");
-  expect(screen.queryByText("公开快照已保存。")).toBeNull();
+  expect(requests.filter(row => row.method === "PUT")).toHaveLength(0);
 });
 test("later concurrent publication returned from mutation is never mistaken for requested snapshot", async () => {
   setup(() => Response.json({ ...initial, revision: 4, publication: { ...publication, title: "Concurrent title" }, publicationPending: false }));
@@ -276,4 +282,66 @@ test.each(["publish", "withdraw"])("%s response and follow-up read both lost: pu
   expect((within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }) as HTMLButtonElement).disabled).toBe(true);
   expect(requests.filter(row => row.method === (action === "publish" ? "PUT" : "DELETE"))).toHaveLength(1);
   expect(requests.filter(row => row.method === "GET")).toHaveLength(1);
+});
+
+test("metadata conflict requires an explicit difference review before retrying at the new revision", async () => {
+  let actual = { ...initial, revision: 3, description: "Other tab description" }, attempts = 0;
+  const requests = setup((_path, method, body) => {
+    if (method === "PATCH") {
+      attempts++;
+      if (attempts === 1) return Response.json({ error: { code: "CHART_CHANGED", message: "Changed" } }, { status: 409 });
+      actual = { ...actual, description: String(body.description), revision: 4 };
+    }
+    return Response.json(actual);
+  });
+  fireEvent.change(screen.getByRole("textbox", { name: /作品介绍/ }), { target: { value: "My description" } });
+  fireEvent.click(screen.getByRole("button", { name: "保存作品资料" }));
+  await screen.findByText("Other tab description");
+  expect((screen.getByRole("textbox", { name: /作品介绍/ }) as HTMLTextAreaElement).value).toBe("My description");
+  expect((screen.getByRole("button", { name: "保存作品资料" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: m.chart_metadata_reviewed() }));
+  fireEvent.click(screen.getByRole("button", { name: "保存作品资料" }));
+  await waitFor(() => expect(requests.filter(request => request.method === "PATCH")).toHaveLength(2));
+  expect(requests.filter(request => request.method === "PATCH").map(request => request.body.expectedRevision)).toEqual([2,3]);
+});
+test("saving description, credits, normalized tags and one version note never publishes automatically", async () => {
+  let actual = initial;
+  const requests = setup((_path, method, body) => {
+    if (method === "PATCH") actual = { ...initial, revision: 3, description: String(body.description), credits: String(body.credits),
+      tags: [{ key: "abc", label: "ＡＢＣ" }], versions: initial.versions.map(version => version.id === "v2" ? { ...version, releaseNote: "Version two note" } : version) };
+    return Response.json(actual);
+  });
+  fireEvent.change(screen.getByRole("textbox", { name: /作品介绍/ }), { target: { value: "Description\nSecond line" } });
+  fireEvent.change(screen.getByRole("textbox", { name: /署名与来源/ }), { target: { value: "Original author" } });
+  fireEvent.change(screen.getByRole("textbox", { name: m.chart_metadata_tags() }), { target: { value: "ＡＢＣ\nabc" } });
+  fireEvent.change(screen.getByRole("textbox", { name: /所选版本更新说明/ }), { target: { value: "Version two note" } });
+  fireEvent.click(screen.getByRole("button", { name: "保存作品资料" }));
+  await waitFor(() => expect((screen.getByRole("button", { name: "保存作品资料" }) as HTMLButtonElement).disabled).toBe(true));
+  expect(requests.filter(request => request.method === "PATCH")[0]?.body).toMatchObject({ description: "Description\nSecond line", credits: "Original author", tags: ["ＡＢＣ"], releaseNote: { versionId: "v2", text: "Version two note" } });
+  expect(requests.some(request => request.method === "PUT")).toBe(false);
+});
+test("unsaved editor text blocks navigation and cancel preserves it without localStorage", async () => {
+  const storage = vi.spyOn(window.localStorage, "setItem");
+  setup(() => Response.json(initial));
+  fireEvent.change(screen.getByRole("textbox", { name: /作品介绍/ }), { target: { value: "Unsaved private text" } });
+  fireEvent.click(document.querySelector('a[href="/me/charts"]')!);
+  const dialog = await screen.findByRole("alertdialog", { name: m.chart_metadata_unsaved() });
+  fireEvent.click(within(dialog).getByRole("button", { name: m.avatar_cancel() }));
+  expect((screen.getByRole("textbox", { name: /作品介绍/ }) as HTMLTextAreaElement).value).toBe("Unsaved private text");
+  expect(storage).not.toHaveBeenCalled();
+});
+test("publication comparison reads public metadata from its snapshot and checks the full intended metadata after response loss", async () => {
+  const start = { ...initial, description: "Private description", credits: "Private credits", tags: [{ key: "new", label: "New" }],
+    versions: initial.versions.map(version => ({ ...version, releaseNote: "Private note" })), publication: { ...publication, description: "Public description", releaseNote: "Public note" } };
+  setup((_path, method) => {
+    if (method === "PUT") throw new TypeError("Lost");
+    return Response.json({ ...start, revision: 4, publication: { ...publication, description: "Concurrent description", credits: "Private credits", tags: start.tags, releaseNote: "Private note" }, publicationPending: false });
+  }, start);
+  const section = screen.getByRole("region", { name: "公开发布" });
+  fireEvent.change(within(section).getByLabelText("公开版本"), { target: { value: "v1" } });
+  expect(within(section).getByText("Public description")).toBeTruthy(); expect(within(section).getByText("Private description")).toBeTruthy();
+  fireEvent.click(within(section).getByRole("checkbox"));
+  fireEvent.click(within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }));
+  await within(section).findByText("Concurrent description");
+  expect(within(section).queryByText("公开快照已保存。")).toBeNull();
 });

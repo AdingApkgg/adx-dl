@@ -6,7 +6,7 @@ import { m } from "@/paraglide/messages.js";
 import { ChartCommunityActions } from "@/client/components/chart-community-actions";
 import type { PublicChartDto } from "@/shared/charts";
 import { makeQueryClient } from "@/shared/query-client";
-const chart: PublicChartDto = { id: "12345678-1234-4234-8234-123456789012", publicId: "1", versionId: "12345678-1234-4234-8234-123456789013", ordinal: 1,
+const chart: PublicChartDto = { description: "", credits: "", tags: [], releaseNote: "", id: "12345678-1234-4234-8234-123456789012", publicId: "1", versionId: "12345678-1234-4234-8234-123456789013", ordinal: 1,
   title: "Public", artist: "Artist", publishedAt: "2026-10-18T00:00:00Z", updatedAt: "2026-10-18T00:00:00Z", sourceSize: 100, author: null,
   summary: { title: "Public", artist: "Artist", maidataMd5Base64: "", difficulties: [], warnings: [], audio: null, hasCover: false } };
 function view(active: boolean) {

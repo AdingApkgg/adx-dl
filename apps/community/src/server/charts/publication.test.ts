@@ -97,6 +97,7 @@ async function chartFile(
   ownerId: string,
   input: {
     title?: string;
+    designer?: string;
     build?: string;
     state?: "ready" | "processing";
     purpose?: "avatar" | "chart-source";
@@ -113,7 +114,7 @@ async function chartFile(
     artist: "",
     maidataMd5Base64: createHash("md5").update(maidata).digest("base64"),
     difficulties: [
-      { difficulty: 4, level: null, noteCount: 2, durationMs: 1000, previewSupported: true },
+      { difficulty: 4, ...(input.designer ? { designer: input.designer } : {}), level: null, noteCount: 2, durationMs: 1000, previewSupported: true },
     ],
     warnings: [],
     audio: null,
@@ -1117,6 +1118,7 @@ test("invalid permission payload is rejected before it can enter the journal out
           1,
           {
             versionId: crypto.randomUUID(),
+            description: "", credits: "", tags: [], releaseNote: "",
             title: "😀".repeat(121),
             artist: "",
             publishedAt: new Date().toISOString(),
@@ -1335,7 +1337,7 @@ test("restoring a legacy publication issues a durable number before a later rest
   const { Client } = await import("pg");
   const ctx = fixture.ctx, owner = await readyOwner(ctx), a = await createChart(ctx, owner, (await chartFile(owner)).file.id);
   const now = new Date();
-  const publication = { chartId: a.id, versionId: a.currentVersionId, title: a.title, artist: a.artist, publishedAt: now, updatedAt: now };
+  const publication = { description: "", credits: "", tags: [], releaseNote: "", chartId: a.id, versionId: a.currentVersionId, title: a.title, artist: a.artist, publishedAt: now, updatedAt: now };
   await ctx.db.insert(chartPublications).values(publication);
   const [legacy] = await ctx.db.insert(storageTombstones).values({ kind: "chart_permission", payload: { version: 1, chartId: a.id, revision: 2, publication: publicationDto(publication) } }).returning();
   await ctx.db.update(charts).set({ revision: 2, publicationSequence: legacy.sequence }).where(eq(charts.id, a.id));
@@ -1614,4 +1616,69 @@ test("report daily and open caps are enforced after duplicate detection", async 
   await ctx.db.update(chartReports).set({ createdAt: new Date(Date.now() - 2 * 86400000) }).where(eq(chartReports.reporterId, reporter));
   await ctx.db.insert(chartReports).values(rows.map(row => ({ ...row, chartId: crypto.randomUUID(), versionId: crypto.randomUUID(), createdAt: new Date(Date.now() - 2 * 86400000) })));
   await expect(createChartReport(ctx, reporter, chart.publicId!, input)).rejects.toMatchObject({ code: "REPORT_LIMIT", status: 429 });
+});
+
+test("metadata and selected release note publish atomically and later draft edits stay private until explicit republish", async () => {
+  const { publishChart, getPublicChart } = await import("./publication"), { updateChart } = await import("./service");
+  const { storageTombstones } = await import("../db/schema");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx), source = await chartFile(owner);
+  let chart = await createChart(ctx, owner, source.file.id);
+  chart = await updateChart(ctx, owner, chart.id, { expectedRevision: chart.revision, description: "Public description\nSecond line", credits: "Public source", tags: [" ＡＢＣ "], releaseNote: { versionId: chart.currentVersionId, text: "Public note" } });
+  chart = await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const snapshot = { description: "Public description\nSecond line", credits: "Public source", tags: [{ key: "abc", label: "ＡＢＣ" }], releaseNote: "Public note" };
+  expect(await getPublicChart(ctx, chart.publicId!)).toMatchObject(snapshot);
+  chart = await updateChart(ctx, owner, chart.id, { expectedRevision: chart.revision, description: "Unpublished draft", credits: "Private source", tags: ["private"], releaseNote: { versionId: chart.currentVersionId, text: "Unpublished note" } });
+  expect(await getPublicChart(ctx, chart.publicId!)).toMatchObject(snapshot);
+  await expect(publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision - 1, versionId: chart.currentVersionId, confirmOriginalArchive: true })).rejects.toMatchObject({ code: "CHART_CHANGED" });
+  chart = await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const next = { description: "Unpublished draft", credits: "Private source", tags: [{ key: "private", label: "private" }], releaseNote: "Unpublished note" };
+  expect(await getPublicChart(ctx, chart.publicId!)).toMatchObject(next);
+  const facts = await ctx.db.select().from(storageTombstones).where(sql`${storageTombstones.payload}->>'chartId'=${chart.id}`).orderBy(storageTombstones.sequence);
+  expect(facts.at(-1)?.payload).toMatchObject({ publication: next });
+  const replay = await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision - 1, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  expect(replay.revision).toBe(chart.revision);
+});
+test("public tags, designer search and related ranking never read private metadata or invisible targets", async () => {
+  const { publishChart, getPublicChart, listPublicCharts, suggestPublicChartTags, relatedPublicCharts, withdrawChart } = await import("./publication");
+  const { updateChart } = await import("./service");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx), key = `tag${crypto.randomUUID().slice(0,8)}`, extra = `extra${crypto.randomUUID().slice(0,8)}`, privateKey = `secret${crypto.randomUUID().slice(0,8)}`, designer = `Designer${crypto.randomUUID().slice(0,8)}`;
+  const published = [];
+  for (const tags of [[key, extra], [key, extra], [key]]) {
+    let chart = await createChart(ctx, owner, (await chartFile(owner, { designer })).file.id);
+    chart = await updateChart(ctx, owner, chart.id, { expectedRevision: chart.revision, tags });
+    published.push(await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true }));
+  }
+  let draft = await createChart(ctx, owner, (await chartFile(owner)).file.id);
+  draft = await updateChart(ctx, owner, draft.id, { expectedRevision: draft.revision, tags: [key] });
+  const [source, both, one] = published;
+  expect((await listPublicCharts(ctx, { tag: key })).items.map(chart => chart.id).sort()).toEqual(published.map(chart => chart.id).sort());
+  expect((await listPublicCharts(ctx, { q: designer })).items.map(chart => chart.id).sort()).toEqual(published.map(chart => chart.id).sort());
+  expect(await suggestPublicChartTags(ctx, key)).toEqual([{ key, label: key, count: 3 }]);
+  expect((await relatedPublicCharts(ctx, source.id)).map(chart => chart.id)).toEqual([both.id, one.id]);
+  await updateChart(ctx, owner, source.id, { expectedRevision: source.revision, tags: [privateKey] });
+  expect((await listPublicCharts(ctx, { tag: privateKey })).items).toEqual([]);
+  expect(await suggestPublicChartTags(ctx, privateKey)).toEqual([]);
+  expect((await getPublicChart(ctx, source.id)).tags.map(tag => tag.key)).toEqual([key,extra]);
+  await withdrawChart(ctx, owner, both.id, both.revision);
+  expect(await suggestPublicChartTags(ctx, key)).toEqual([{ key, label: key, count: 2 }]);
+  expect((await relatedPublicCharts(ctx, source.id)).map(chart => chart.id)).toEqual([one.id]);
+  await expect(suggestPublicChartTags(ctx, "😀".repeat(21))).rejects.toMatchObject({ status: 400 });
+});
+test("retaining a deleted author's work removes unpublished metadata and version notes", async () => {
+  const { publishChart, getPublicChart } = await import("./publication"), { updateChart } = await import("./service");
+  const { requestDeletion, purgeUser } = await import("../services/user-deletion"), { createDeletionHandlers } = await import("../storage/deletion");
+  const { user } = await import("../db/schema");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx);
+  let chart = await createChart(ctx, owner, (await chartFile(owner)).file.id);
+  chart = await updateChart(ctx, owner, chart.id, { expectedRevision: chart.revision, description: "Public information", credits: "Public credits", tags: ["public"], releaseNote: { versionId: chart.currentVersionId, text: "Public note" } });
+  chart = await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  chart = await updateChart(ctx, owner, chart.id, { expectedRevision: chart.revision, description: "Private secret", credits: "Private credits", tags: ["private"], releaseNote: { versionId: chart.currentVersionId, text: "Private note" } });
+  const deps = { db: ctx.db, boss: ctx.boss, handlers: createDeletionHandlers(ctx) };
+  await requestDeletion(deps, owner, { deleteContent: false });
+  await ctx.db.update(user).set({ deletionPurgeAt: new Date(0) }).where(eq(user.id, owner)); await purgeUser(deps, owner);
+  expect(await getPublicChart(ctx, chart.publicId!)).toMatchObject({ author: null, description: "Public information", credits: "Public credits", releaseNote: "Public note" });
+  const [retained] = await ctx.db.select().from(charts).where(eq(charts.id, chart.id));
+  const [version] = await ctx.db.select().from(chartVersions).where(eq(chartVersions.id, chart.currentVersionId));
+  expect(retained).toMatchObject({ ownerId: null, description: "Public information", credits: "Public credits", tags: [{ key: "public", label: "public" }] });
+  expect(version.releaseNote).toBe("Public note");
 });

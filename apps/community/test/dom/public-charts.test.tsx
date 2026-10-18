@@ -10,7 +10,7 @@ import PublicChartDetail, { loader as detailLoader, meta as detailMeta } from "@
 import { createApiClient } from "@/shared/api-client";
 import type { PublicChartDto, PublicChartsPageDto } from "@/shared/charts";
 import { apiContext } from "@/shared/router-context";
-const chart: PublicChartDto = {
+const chart: PublicChartDto = { description: "", credits: "", tags: [], releaseNote: "",
   id: "public", publicId: "42", versionId: "selected", ordinal: 2, title: "Published title", artist: "Snapshot artist", sourceSize: 1024,
   publishedAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-11T00:00:00.000Z", author: { publicId: "1", id: "alice", name: "Alice", image: null },
   summary: { title: "Private title must not become metadata", artist: "Private artist", maidataMd5Base64: "hash", difficulties: [{ difficulty: 4, level: "12+", noteCount: 3, durationMs: 5000, previewSupported: true }, { difficulty: 5, level: null, noteCount: null, durationMs: null, previewSupported: false }], warnings: [], audio: null, hasCover: false },
@@ -60,7 +60,7 @@ test("SSR loaders use only public API, no-store, and fetch fresh state for every
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(String(input)).pathname; paths.push(path);
     expect(init?.cache).toBe("no-store");
-    return Response.json(path.endsWith("/42") ? current : { items: [current], nextCursor: null });
+    return Response.json(path.endsWith("/related") ? [] : path.endsWith("/42") ? current : { items: [current], nextCursor: null });
   }));
   const ctx = context();
   const args = { context: ctx, params: { id: "42" } } as unknown as Parameters<typeof detailLoader>[0];
@@ -70,7 +70,7 @@ test("SSR loaders use only public API, no-store, and fetch fresh state for every
   const result = await catalogLoader({ context: ctx, url: new URL("https://community.test/charts") } as unknown as Parameters<typeof catalogLoader>[0]);
   expect(result.init?.headers).toMatchObject({ "Cache-Control": "private, no-store" });
   expect(catalogHeaders()).toMatchObject({ "Cache-Control": "private, no-store" });
-  expect(paths).toEqual(["/api/v1/charts/42", "/api/v1/charts/42", "/api/v1/charts"]);
+  expect(paths).toEqual(["/api/v1/charts/42", "/api/v1/charts/42/related", "/api/v1/charts/42", "/api/v1/charts/42/related", "/api/v1/charts"]);
 });
 test.each([404, 503])("public detail error %s stays no-store and noindex without private fallback", async status => {
   const fetcher = vi.fn(async () => Response.json({ error: { code: "NOT_FOUND", message: "Unavailable" } }, { status }));
@@ -176,4 +176,21 @@ test("favorites page three detail roundtrip restores raw private page cursors", 
   fireEvent.click(screen.getByRole("link", { name: /Published title/ }));
   fireEvent.click(await screen.findByRole("link", { name: m.my_favorites() }));
   expect(screen.getByRole("link", { name: m.chart_previous() }).getAttribute("href")).toBe("/me/favorites?cursor=page2");
+});
+
+test("public tags link to URL filters as siblings of the card link, without nested anchors", () => {
+  render(<MemoryRouter><Catalog loaderData={{ items: [{ ...chart, tags: [{ key: "abc", label: "ＡＢＣ" }] }], nextCursor: null }} /></MemoryRouter>);
+  const tag = screen.getByRole("link", { name: "ＡＢＣ" });
+  expect(tag.getAttribute("href")).toBe("/charts?tag=abc");
+  expect(tag.parentElement?.closest("a")).toBeNull();
+});
+test("published description and credits render as text and share metadata reads only the snapshot", () => {
+  const snapshot = { ...chart, description: "<script>escaped</script>\nPublic description", credits: "Public source", releaseNote: "This version only" };
+  render(<MemoryRouter><Detail loaderData={snapshot} /></MemoryRouter>);
+  expect(screen.getByText(/<script>escaped<\/script>/)).toBeTruthy(); expect(document.querySelector("script")).toBeNull();
+  expect(screen.getByText("Public source")).toBeTruthy(); expect(screen.getByText("This version only")).toBeTruthy();
+  const matches = [{ id: "root", loaderData: { origin: "https://community.test" } }];
+  const head = detailMeta({ loaderData: snapshot, matches, location: { pathname: "/charts/42" } } as unknown as Parameters<typeof detailMeta>[0]);
+  expect(head).toContainEqual({ name: "description", content: "<script>escaped</script> Public description" });
+  expect(JSON.stringify(head)).not.toContain("Private artist");
 });

@@ -4,6 +4,8 @@ export type ChartDiagnostic = { code: string; difficulty?: ChartDifficulty; line
 export type ChartDifficultySummary = {
   difficulty: ChartDifficulty;
   level: string | null;
+  /** Missing on legacy import summaries; never inferred as a user account. */
+  designer?: string;
   noteCount: number | null;
   durationMs: number | null;
   previewSupported: boolean;
@@ -28,7 +30,10 @@ export type ChartPackageInspection = {
   manifest: ChartPreviewManifest;
   artifact: { path: string; size: number; sha256: string };
 };
+export type ChartTag = { key: string; label: string };
+export type ChartMetadata = { description: string; credits: string; tags: ChartTag[] };
 export type ChartVersionDto = {
+  releaseNote: string;
   id: string;
   ordinal: number;
   sourceFileId: string;
@@ -36,10 +41,10 @@ export type ChartVersionDto = {
   summary: ChartImportSummary;
   createdAt: string;
 };
-export type ChartPublicationDto = { versionId: string; title: string; artist: string; publishedAt: string; updatedAt: string };
+export type ChartPublicationDto = ChartMetadata & { releaseNote: string; versionId: string; title: string; artist: string; publishedAt: string; updatedAt: string };
 export type PublicChartDto = ChartPublicationDto & { id: string; publicId: string; ordinal: number; summary: ChartImportSummary; sourceSize: number; author: { id: string; publicId: string | null; name: string; image: string | null } | null };
 export type PublicChartsPageDto = { items: PublicChartDto[]; nextCursor: string | null };
-export type ChartDto = {
+export type ChartDto = ChartMetadata & {
   publicId?: string | null; // Server always supplies this; private drafts have no public number.
   publicationPending?: boolean; // Always supplied by the server; false is required for a durable success.
   publication?: ChartPublicationDto | null; // Transitional fixture typing; every server DTO supplies this field.

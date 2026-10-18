@@ -54,6 +54,32 @@ function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectio
   const player = useRef<PreviewPlayer | null>(null);
   const duration = (summary.difficulties.find(row => row.difficulty === difficulty)?.durationMs ?? 0) / 1000;
 
+  const discussionSeek = useRef<{ difficulty: ChartDifficulty; ms: number } | null>(null);
+  useEffect(() => {
+    if (assetUrl === chartAssetUrl) return;
+    const seek = (event: Event) => {
+      const detail = (event as CustomEvent<{ id: string; versionId: string; difficulty: ChartDifficulty; ms: number }>).detail;
+      if (!detail || detail.id !== id || detail.versionId !== versionId || exporting) return;
+      const row = summary.difficulties.find(row => row.difficulty === detail.difficulty);
+      if (!row?.previewSupported || row.durationMs === null || !Number.isSafeInteger(detail.ms) || detail.ms < 0 || detail.ms > row.durationMs) return;
+      player.current?.pause(); setRange(null); setLoopEnabled(false); player.current?.setRange(null, false);
+      if (opened && ready && difficulty === detail.difficulty && player.current) {
+        player.current.seek(detail.ms / 1000); discussionSeek.current = null;
+      } else { discussionSeek.current = { difficulty: detail.difficulty, ms: detail.ms }; setReady(false); setDifficulty(detail.difficulty); setOpened(true); }
+      section.current?.scrollIntoView({ block: "start", behavior: "smooth" }); section.current?.focus({ preventScroll: true });
+    };
+    const positionRequest = (event: Event) => {
+      const detail = (event as CustomEvent<{ id: string; versionId: string; difficulty: ChartDifficulty; requestId: string }>).detail;
+      if (!detail || typeof detail.requestId !== "string" || detail.requestId.length > 128 || detail.id !== id || detail.versionId !== versionId || detail.difficulty !== difficulty || !opened || !ready || !player.current) return;
+      const row = summary.difficulties.find(row => row.difficulty === difficulty);
+      if (!row?.previewSupported || row.durationMs === null) return;
+      const ms = Math.round(player.current.position() * 1000);
+      if (Number.isSafeInteger(ms) && ms >= 0 && ms <= row.durationMs) window.dispatchEvent(new CustomEvent("community-preview-position", { detail: { id, versionId, difficulty, ms, requestId: detail.requestId } }));
+    };
+    window.addEventListener("community-preview-seek", seek); window.addEventListener("community-preview-position-request", positionRequest);
+    return () => { window.removeEventListener("community-preview-seek", seek); window.removeEventListener("community-preview-position-request", positionRequest); };
+  }, [id, versionId, summary, assetUrl, difficulty, exporting, opened, ready]);
+
   useEffect(() => {
     const element = section.current;
     setFullscreenSupported(Boolean(element?.requestFullscreen) && document.fullscreenEnabled !== false);
@@ -74,6 +100,7 @@ function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectio
     finally { setFullscreenPending(false); }
   }
   function closePreview() {
+    discussionSeek.current = null;
     player.current?.pause(); player.current?.dispose(); cancelExport(); clearDownload();
     setRange(null); setLoopEnabled(false); setReady(false); setOpened(false);
     settings.current.mirror = "none"; setMirror("none");
@@ -157,9 +184,13 @@ function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectio
     const controller = createPreviewPlayer({
       id, versionId, difficulty, duration, summary, canvas: canvas.current, assetUrl,
       rate: settings.current.rate, volume: settings.current.muted ? 0 : settings.current.volume, mirror: settings.current.mirror,
-      onReady: setReady, onPlaying: setPlaying, onPosition: setPosition, onNotes: setNotes,
+      onReady: value => {
+        setReady(value); const target = discussionSeek.current;
+        if (value && target?.difficulty === difficulty && player.current) { player.current.pause(); player.current.setRange(null, false); player.current.seek(target.ms / 1000); discussionSeek.current = null; }
+      }, onPlaying: setPlaying, onPosition: setPosition, onNotes: setNotes,
       onSilent: () => setSilent(true), onCoverFailed: () => setCoverFailed(true), onLoopDisabled: () => setLoopEnabled(false),
       onError: failure => {
+        discussionSeek.current = null;
         setPlaying(false); setError(failure);
         const target = assetUrl === chartAssetUrl ? accountErrorRedirect(failure, `${window.location.pathname}${window.location.search}`) : null;
         if (target) window.location.assign(target);

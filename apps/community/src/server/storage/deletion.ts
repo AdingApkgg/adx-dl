@@ -1,3 +1,4 @@
+import {discussionDeletionHandler} from "../discussions/deletion";
 import { retentionFact } from "@/shared/chart-journal";
 import { awaitChartJournal } from "../charts/publication-journal";
 import { publicationDto } from "../charts/service";
@@ -344,7 +345,8 @@ export function createDeletionHandlers(
   business: readonly DeletionHandler[] = [],
   registry = FILE_REFERENCES,
 ): readonly DeletionHandler[] {
-  const modules = business.some(h => h.name === "charts") ? business : [...business, chartDeletionHandler];
+  const chartModules = business.some(h => h.name === "charts") ? business : [...business, chartDeletionHandler];
+  const modules = chartModules.some(h=>h.name===discussionDeletionHandler.name)?chartModules:[...chartModules,discussionDeletionHandler];
   const names = new Set(modules.map((h) => h.name));
   if (names.size !== modules.length || names.has("storage"))
     throw new Error("Duplicate deletion registration");

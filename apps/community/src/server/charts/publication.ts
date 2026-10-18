@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { parsePublicChartFilters, type PublicChartSearchInput } from "@/shared/public-chart-search";
+import type { SelectedFields } from "drizzle-orm/pg-core";
 import { HTTPException } from "hono/http-exception";
 import type { PublicChartDto, PublicChartsPageDto } from "@/shared/charts";
 import {
@@ -49,10 +50,12 @@ export async function publishChart(
     if ((await tx.select().from(chartModerations).where(eq(chartModerations.chartId, id))).length)
       throw new StorageError(409, "CHART_MODERATED");
     const [p] = await tx.select().from(chartPublications).where(eq(chartPublications.chartId, id));
+    const [selectedVersion] = await tx.select().from(chartVersions).where(and(eq(chartVersions.id, input.versionId), eq(chartVersions.chartId, id), isNull(chartVersions.deletedAt)));
+    if (!selectedVersion) throw missing();
     if (
       p?.versionId === input.versionId.toLowerCase() &&
       p.title === chart.title &&
-      p.artist === chart.artist
+      p.artist === chart.artist && p.description === chart.description && p.credits === chart.credits && JSON.stringify(p.tags) === JSON.stringify(chart.tags) && p.releaseNote === selectedVersion.releaseNote
     )
       return { chart, sequence: chart.publicationSequence };
     if (chart.revision !== input.expectedRevision || chart.revision >= 2147483647)
@@ -101,6 +104,7 @@ export async function publishChart(
       versionId: version.id,
       title: chart.title,
       artist: chart.artist,
+      description: chart.description, credits: chart.credits, tags: chart.tags, releaseNote: version.releaseNote,
       publishedAt: p?.publishedAt ?? now,
       updatedAt: now,
     };
@@ -149,8 +153,7 @@ export async function withdrawChart(
 }
 // One authorization query for each request, including validators and HEAD. No File permission is changed.
 function query(ctx: StorageContext) {
-  return ctx.db
-    .select({
+  return visibilityQuery(ctx, {
       chart: charts,
       publicId: chartPublicIds.publicId,
       p: chartPublications,
@@ -165,7 +168,10 @@ function query(ctx: StorageContext) {
         then ${userPublicIds.publicId} else null end`,
       authorName: user.name,
       authorImage: user.image,
-    })
+    });
+}
+function visibilityQuery<T extends SelectedFields>(ctx: StorageContext, fields: T) {
+  return ctx.db.select(fields)
     .from(chartPublications)
     .innerJoin(charts, eq(charts.id, chartPublications.chartId))
     .innerJoin(chartPublicIds, eq(chartPublicIds.chartId, charts.id))
@@ -250,7 +256,7 @@ export async function listPublicCharts(
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) throw invalid();
   const filters = (() => { try { return parsePublicChartFilters(input); } catch { throw invalid(); } })();
   const scope = createHash("sha256").update(JSON.stringify(filters)).digest("hex");
-  const isDefault = !filters.q && !filters.difficulty && !filters.author && filters.sort === "updated";
+  const isDefault = !filters.q && !filters.difficulty && !filters.author && !filters.tag && filters.sort === "updated";
   let cursor: { at: string; id: string; scope?: string } | undefined;
   if (input.cursor !== undefined) {
     try {
@@ -268,10 +274,13 @@ export async function listPublicCharts(
     sql`strpos(lower(${chartPublications.title}),lower(${filters.q}))>0`,
     sql`strpos(lower(${chartPublications.artist}),lower(${filters.q}))>0`,
     and(durableAuthor, sql`strpos(lower(${user.name}),lower(${filters.q}))>0`),
+    sql`exists(select 1 from jsonb_array_elements(${chartPublications.tags}) tag where strpos(tag->>'key',lower(${filters.q}))>0)`,
+    sql`exists(select 1 from jsonb_array_elements(${chartVersions.summary}->'difficulties') difficulty where strpos(lower(difficulty->>'designer'),lower(${filters.q}))>0)`,
     isPublicChartId(filters.q) ? eq(chartPublicIds.publicId, BigInt(filters.q)) : undefined,
   ) : undefined;
   const rows = await query(ctx).where(and(
     allowed(), search,
+    filters.tag ? sql`${chartPublications.tags} @> ${JSON.stringify([{ key: filters.tag }])}::jsonb` : undefined,
     filters.author ? and(eq(userPublicIds.publicId, BigInt(filters.author)), durableAuthor) : undefined,
     filters.difficulty ? sql`exists(select 1 from jsonb_array_elements(${chartVersions.summary}->'difficulties') d where d->>'difficulty'=${String(filters.difficulty)})` : undefined,
     cursor ? or(lt(timestamp, new Date(cursor.at)), and(eq(timestamp, new Date(cursor.at)), lt(charts.id, cursor.id))) : undefined,
@@ -315,4 +324,28 @@ export async function resolvePublicChartDownload(ctx: StorageContext, id: string
     sha256: r.blob.sha256,
     name: `${r.p.title}-${r.chart.id}.zip`,
   };
+}
+
+/** Suggestions aggregate only authorized current snapshots, with a bounded response. */
+export async function suggestPublicChartTags(ctx: StorageContext, input = "") {
+  if (input.length > 40 || [...input].length > 20 || /[\p{Cc}\p{Cf}]/u.test(input)) throw invalid();
+  const prefix = input.normalize("NFKC").trim().replace(/[A-Z]/g, letter => letter.toLowerCase());
+  if ([...prefix].length > 20) throw invalid();
+  const visible = visibilityQuery(ctx, { tags: chartPublications.tags }).where(allowed()).as("visible_tag_charts");
+  const key = sql<string>`tag.value->>'key'`, label = sql<string>`min(tag.value->>'label')`;
+  return ctx.db.select({ key, label, count: sql<number>`count(*)::integer` }).from(visible)
+    .innerJoin(sql`lateral jsonb_array_elements(${visible.tags}) as tag(value)`, sql`true`)
+    .where(sql`strpos(${key},${prefix})>0`).groupBy(key)
+    .orderBy(sql`count(*) desc`, key).limit(20);
+}
+export async function relatedPublicCharts(ctx: StorageContext, id: string): Promise<PublicChartDto[]> {
+  const target = await getPublicChart(ctx, id);
+  if (!target.tags.length) return [];
+  // Resolve the source again in the same authorization query, so withdrawal cannot turn
+  // an inaccessible source into a tag-discovery oracle between requests.
+  const source = visibilityQuery(ctx, { tags: chartPublications.tags }).where(and(allowed(), eq(charts.id, target.id))).as("related_source");
+  const score = sql<number>`(select count(*)::integer from jsonb_array_elements(${chartPublications.tags}) tag
+    where tag->>'key' in (select source_tag->>'key' from ${source}, jsonb_array_elements(${source.tags}) source_tag))`;
+  return (await query(ctx).where(and(allowed(), sql`${charts.id}<>${target.id}`, sql`${score}>0`))
+    .orderBy(desc(score), desc(chartPublications.updatedAt), desc(charts.id)).limit(6)).map(publicDto);
 }
