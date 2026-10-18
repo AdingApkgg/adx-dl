@@ -16,10 +16,15 @@ assert.ok(proxy, 'CONFIGURED_PROXY_REQUIRED');
 // A new private directory prevents overwriting another run or following output symlinks.
 await mkdir(output, { mode: 0o700 });
 const steps = [], pageErrors = [], blockedWrites = [];
+const staticCache = new Map();
+let staticBytes = 0, cacheHits = 0, routeFailures = 0, targetPath = null;
 let phase = 'setup', browser, page;
 let authenticated = 'not-configured';
 const started = Date.now();
 const statePath = env.PRODUCTION_STORAGE_STATE;
+const bridgeUrl = env.PRODUCTION_AUTH_BRIDGE;
+const hasAuth = Boolean(statePath || bridgeUrl);
+let bridgeKey, sessionRevoked = false;
 const role = env.PRODUCTION_AUTH_ROLE || 'admin';
 let storageState;
 const secrets = [];
@@ -36,13 +41,25 @@ async function result(status) {
     startedAt: new Date(started).toISOString(), elapsedMs: Date.now() - started,
     toolBaseTree: env.PRODUCTION_TOOL_BASE_TREE || null,
     smokeSha256: env.PRODUCTION_SMOKE_SHA256 || null,
-    authenticated, role: statePath ? role : null, steps,
-    failedStage: status === 'failed' ? phase : null,
+    authenticated, role: hasAuth ? role : null, authTransport: bridgeUrl ? 'ssh-readonly-bridge-to-public-production' : statePath ? 'explicit-state' : null,
+    productionRevision: env.PRODUCTION_EXPECT_REVISION || null, sessionRevoked, steps,
+    failedStage: status === 'failed' ? phase : null, failedPath: status === 'failed' ? targetPath : null,
+    staticCacheHits: cacheHits, routeFailures,
     pageErrors: pageErrors.length, blockedBusinessWrites: blockedWrites.length,
     businessWrites: false,
   }, null, 2) + '\n', { mode: 0o600 });
 }
 try {
+  assert.ok(!(statePath && bridgeUrl), 'ONE_AUTH_TRANSPORT_REQUIRED');
+  if (bridgeUrl) {
+    const at = new URL(bridgeUrl);
+    assert.ok(at.protocol === 'http:' && at.hostname === '127.0.0.1' && at.port && at.pathname === '/' && !at.search && !at.username && !at.password, 'LOOPBACK_BRIDGE_REQUIRED');
+    const keyFile = await lstat(env.PRODUCTION_BRIDGE_KEY_FILE);
+    assert.ok(keyFile.isFile() && keyFile.uid === process.getuid() && (keyFile.mode & 0o077) === 0, 'PRIVATE_BRIDGE_KEY_REQUIRED');
+    bridgeKey = (await readFile(env.PRODUCTION_BRIDGE_KEY_FILE, 'utf8')).trim();
+    assert.match(bridgeKey, /^[a-f0-9]{64}$/); secrets.push(bridgeKey);
+    authenticated = 'pending';
+  }
   if (statePath) {
     assert.ok(isAbsolute(statePath), 'ABSOLUTE_STATE_PATH_REQUIRED');
     assert.ok(['admin', 'user'].includes(role), 'INVALID_AUTH_ROLE');
@@ -59,18 +76,53 @@ try {
     authenticated = 'pending';
   }
   const { chromium } = await import(pathToFileURL(modulePath).href);
-  browser = await chromium.launch({ headless: true, proxy: { server: proxy } });
-  async function context(state) {
+  browser = await chromium.launch({ headless: true, proxy: { server: proxy, bypass: '127.0.0.1,localhost' } });
+  async function context(state, viaBridge = false) {
     const ctx = await browser.newContext({ locale: 'zh-CN', viewport: { width: 1280, height: 900 }, serviceWorkers: 'block', ...(state ? { storageState: state } : {}) });
     ctx.setDefaultTimeout(15000); ctx.setDefaultNavigationTimeout(25000);
     await ctx.route('**/*', async route => {
-      const r = route.request(), url = new URL(r.url());
-      if (!['http:', 'https:'].includes(url.protocol)) return route.continue();
-      if (url.origin !== origin || url.pathname.startsWith('/_s/') || url.pathname.startsWith('/cdn-cgi/')) return route.abort('blockedbyclient');
-      if (!['GET', 'HEAD', 'OPTIONS'].includes(r.method())) {
-        blockedWrites.push(r.method()); return route.abort('blockedbyclient');
+      try {
+        const r = route.request(), url = new URL(r.url());
+        if (!['http:', 'https:'].includes(url.protocol)) return route.continue();
+        if (url.origin !== origin || url.pathname.startsWith('/_s/') || url.pathname.startsWith('/cdn-cgi/')) return route.abort('blockedbyclient');
+        if (!['GET', 'HEAD', 'OPTIONS'].includes(r.method())) {
+          blockedWrites.push(r.method()); return route.abort('blockedbyclient');
+        }
+        const fetchOptions = { maxRedirects: 0, timeout: 30000 };
+        if (viaBridge) {
+          const headers = { ...r.headers(), authorization: `Bearer ${bridgeKey}` };
+          delete headers.cookie;
+          Object.assign(fetchOptions, { url: bridgeUrl + url.pathname + url.search, headers });
+        }
+        // Routing disables Chromium's HTTP cache. Reuse only immutable public
+        // hashed build assets within this single run; never cache HTML/API data.
+        if (r.method() === 'GET' && /^\/assets\/[^/]+-[A-Za-z0-9_-]+\.[A-Za-z0-9]+$/.test(url.pathname)) {
+          const cacheKey = url.href;
+          if (staticCache.has(cacheKey)) { cacheHits++; return route.fulfill(await staticCache.get(cacheKey)); }
+          const pending = (async () => {
+            const response = await route.fetch(fetchOptions);
+            const headers = response.headers(), body = await response.body();
+            assert.equal(headers['set-cookie'], undefined, 'STATIC_ASSET_SET_COOKIE');
+            delete headers['content-encoding']; delete headers['content-length'];
+            const content = { status: response.status(), headers, body };
+            staticBytes += body.length;
+            if (content.status !== 200 || staticBytes > 64 * 1024 * 1024) staticCache.delete(cacheKey);
+            return content;
+          })();
+          staticCache.set(cacheKey, pending);
+          try { return await route.fulfill(await pending); }
+          catch { staticCache.delete(cacheKey); throw new Error('STATIC_ASSET_FETCH_FAILED'); }
+        }
+        if (viaBridge) {
+          const response = await route.fetch(fetchOptions);
+          assert.equal(response.headers()['set-cookie'], undefined, 'SESSION_COOKIE_MUST_STAY_ON_PRODUCTION');
+          return route.fulfill({ response });
+        }
+        return route.continue();
+      } catch {
+        routeFailures++;
+        return route.abort('failed').catch(() => {});
       }
-      return route.continue();
     });
     // No server connection is opened for WebSockets.
     await ctx.routeWebSocket('**/*', socket => socket.close());
@@ -80,8 +132,8 @@ try {
   // Validate an explicitly supplied session first: invalid credentials fail fast,
   // instead of spending a minute on unrelated anonymous routes before failing.
   let signedIn;
-  if (storageState) {
-    signedIn = await context(storageState);
+  if (hasAuth) {
+    signedIn = await context(storageState, Boolean(bridgeUrl));
     page = await signedIn.newPage();
     await step('explicit_session_and_role', async () => {
       const response = await page.goto(origin + '/api/v1/me', { waitUntil: 'domcontentloaded' });
@@ -96,7 +148,9 @@ try {
   const anonymous = await context();
   page = await anonymous.newPage();
   async function visit(path) {
-    const r = await page.goto(origin + path, { waitUntil: 'networkidle' });
+    targetPath = path;
+    const r = await page.goto(origin + path, { waitUntil: 'domcontentloaded' });
+    await page.locator('main').waitFor();
     assert.equal(r.status(), 200, 'PAGE_HTTP_STATUS');
     assert.equal(new URL(page.url()).pathname, new URL(path, origin).pathname, 'UNEXPECTED_PAGE_REDIRECT');
     assert.ok((await page.locator('main').innerText()).trim().length > 0, 'EMPTY_PAGE');
@@ -145,18 +199,28 @@ try {
       }
     }
   });
-  if (storageState) {
+  if (hasAuth) {
     page = await signedIn.newPage();
     await step('signed_in_notifications_forum_and_comment_composers', async () => {
-      await visit('/me/notifications'); await json('/api/v1/discussions/notifications');
+      await visit('/me/notifications');
+      await page.getByRole('heading', { level: 1, name: /^站内通知\s*·\s*\d+$/ }).waitFor();
+      await page.getByRole('button', { name: '本页未读标为已读', exact: true }).waitFor();
+      await json('/api/v1/discussions/notifications');
+      await visit('/forum');
+      await page.getByRole('heading', { level: 1, name: '论坛', exact: true }).waitFor();
+      for (const board of ['综合交流', '谱面创作', '问题反馈']) await page.getByRole('link', { name: new RegExp('^' + board) }).waitFor();
       await visit('/forum/new'); await page.getByRole('textbox', { name: '标题', exact: true }).waitFor();
+      await page.getByRole('textbox', { name: '正文', exact: true }).waitFor();
       await visit('/charts/1'); await page.locator('#chart-discussion-composer form').waitFor();
     });
     await step('production_dashboard_permissions_and_pages', async () => {
       if (role === 'user') { await json('/api/v1/dash/access', 403); return; }
       await json('/api/v1/dash/access');
       for (const path of ['/dash', '/dash/users', '/dash/charts', '/dash/discussions', '/dash/discussions?view=boards', '/dash/discussions?view=reports', '/dash/featured', '/dash/notices', '/dash/reports', '/dash/status']) {
-        await visit(path); await page.getByText(`管理员 #${env.PRODUCTION_EXPECT_USER_ID || (await json('/api/v1/dash/access')).publicId}`, { exact: true }).waitFor();
+        await visit(path);
+        const childHeading = path.startsWith('/dash/discussions') ? '讨论管理' : ({ '/dash': '概览', '/dash/users': '用户列表', '/dash/charts': '公开谱面管理', '/dash/featured': '精选谱面', '/dash/notices': '站点公告', '/dash/reports': '举报处理', '/dash/status': '备份记录' })[path];
+        await page.getByRole('heading', { level: 2, name: childHeading, exact: true }).waitFor();
+        await page.getByText(`管理员 #${env.PRODUCTION_EXPECT_USER_ID || (await json('/api/v1/dash/access')).publicId}`, { exact: true }).waitFor();
       }
       const status = await json('/api/v1/dash/status');
       assert.ok(status.checks.length >= 6 && status.checks.every(c => c.status === 'ok'));
@@ -165,6 +229,20 @@ try {
       assert.notEqual(status.backup.status, 'failed');
     });
   }
+  if (bridgeUrl) {
+    await step('production_bridge_write_denial_and_session_revocation', async () => {
+      const headers = { authorization: `Bearer ${bridgeKey}` };
+      assert.equal((await fetch(bridgeUrl + '/api/v1/me')).status, 401);
+      assert.equal((await fetch(bridgeUrl + '/api/auth/get-session', { headers })).status, 403);
+      assert.equal((await fetch(bridgeUrl + '/api/v1/discussions/topics', { method: 'POST', headers, body: '{}' })).status, 405);
+      assert.equal((await fetch(bridgeUrl + '/_smoke/revoke', { method: 'POST', headers })).status, 200);
+      const response = await page.goto(origin + '/api/v1/me', { waitUntil: 'domcontentloaded' });
+      assert.equal(response.status(), 401, 'REVOKED_SESSION_REMAINED_USABLE');
+      assert.deepEqual(await signedIn.cookies(), [], 'PRODUCTION_SESSION_EXPORTED_TO_BROWSER');
+      sessionRevoked = true;
+    });
+  }
+  assert.equal(routeFailures, 0, 'BROWSER_REQUEST_FAILURES');
   assert.equal(pageErrors.length, 0, 'BROWSER_PAGE_ERRORS');
   assert.equal(blockedWrites.length, 0, 'UNEXPECTED_BUSINESS_WRITE_ATTEMPT');
   await result('passed'); console.log(`PRODUCTION_SMOKE_PASSED authenticated=${authenticated}`);

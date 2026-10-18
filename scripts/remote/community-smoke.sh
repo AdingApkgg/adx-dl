@@ -8,13 +8,15 @@ STATE=${PRODUCTION_STORAGE_STATE:-}
 ROLE=${PRODUCTION_AUTH_ROLE:-admin}
 USER_ID=${PRODUCTION_EXPECT_USER_ID:-}
 if [[ ${1:-} == --help || ${1:-} == -h ]]; then
-  echo 'usage: scripts/remote/community-smoke.sh (optional remote PRODUCTION_STORAGE_STATE, PRODUCTION_AUTH_ROLE=admin|user, PRODUCTION_EXPECT_USER_ID)'
+  echo 'usage: scripts/remote/community-smoke.sh [--authenticated|--anonymous] (default: authenticated through trusted SSH)'
   exit 0
 fi
-if [[ $# != 0 ]]; then
-  echo 'usage: scripts/remote/community-smoke.sh (optional remote PRODUCTION_STORAGE_STATE, PRODUCTION_AUTH_ROLE=admin|user, PRODUCTION_EXPECT_USER_ID)' >&2
-  exit 2
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+if [[ ${1:-} == --authenticated || ( $# == 0 && -z $STATE ) ]]; then
+  exec python3 "$ROOT/scripts/remote/community-auth-smoke.py"
 fi
+if [[ ${1:-} == --anonymous ]]; then shift; STATE=; fi
+[[ $# == 0 ]] || { echo 'see --help' >&2; exit 2; }
 # These values become Python literals on the remote end. Restrict them before transport.
 [[ $EXPECTED =~ ^[A-Za-z0-9.-]+$ && $MODULE =~ ^/[A-Za-z0-9_./-]+$ ]] || exit 2
 [[ -z $STATE || $STATE =~ ^/[A-Za-z0-9_./-]+$ ]] || exit 2
