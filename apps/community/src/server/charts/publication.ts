@@ -120,9 +120,13 @@ export async function publishChart(
       .where(eq(charts.id, id))
       .returning();
     const eventSequence = await recordPublicationEvent(tx, id, version.id, userId, now, sequence);
-    return { chart: saved, sequence: Math.max(sequence,eventSequence) };
+    return { chart: saved, sequence: Math.max(sequence,eventSequence),newEvent:eventSequence>sequence };
   });
   await awaitChartJournal(ctx, result.sequence);
+  if("newEvent" in result && result.newEvent) {
+    try { await (await ctx.boss()).send("following.dispatch",{}, {singletonKey:"release-update"}); }
+    catch { ctx.log.warn("following_dispatch_deferred"); }
+  }
   return getChart(ctx, userId, id);
 }
 export async function withdrawChart(

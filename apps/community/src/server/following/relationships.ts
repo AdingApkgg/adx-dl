@@ -32,7 +32,7 @@ export async function setFollow(ctx:StorageContext,userId:string,publicId:string
   const [prior]=await rows<FollowRow&{effective:boolean}>(tx,sql`select f.*,(${effectiveFollow()}) effective from community_follows f where f.user_id=${userId} and f.author_id=${target.id} for update`);
   const active=!!prior?.effective,notify=!!(active&&prior.notify_since);
   // A lost success response can retry its intended final state without toggling it.
-  if(active===input.following&&notify===input.notify)return prior?.journal_sequence??0;
+  if(active===input.following&&notify===input.notify)return Number(prior?.journal_sequence??0);
   if((prior?.revision??0)!==input.expectedRevision||(prior?.revision??0)>=2147483646)throw changed();
   if(input.following&&!active){const [count]=await rows<{n:number}>(tx,sql`select count(*)::int n from community_follows f join "user" a on a.id=f.author_id and a.status='active' where f.user_id=${userId} and ${effectiveFollow()}`);if(count.n>=FOLLOWING_LIMIT)throw new StorageError(429,"FOLLOWING_LIMIT","FOLLOWING_LIMIT",60);}
   const now=await storageTime(tx),followedAt=input.following?(active?prior!.followed_at!:now):null;

@@ -213,6 +213,26 @@ try {
       await page.getByRole('textbox', { name: '正文', exact: true }).waitFor();
       await visit('/charts/1'); await page.locator('#chart-discussion-composer form').waitFor();
     });
+    await step('production_following_feed_and_alert_settings', async () => {
+      await visit('/me/following');
+      await page.getByRole('heading', {level:1,name:'我的关注',exact:true}).waitFor();
+      await page.getByRole('link', {name:'关注动态',exact:true}).first().waitFor();
+      const follows=await json('/api/v1/me/following');assert.ok(Array.isArray(follows.items));
+      await visit('/me/feed');await page.getByRole('heading', {level:1,name:'关注动态',exact:true}).waitFor();
+      const feed=await json('/api/v1/me/following/feed');assert.ok(Array.isArray(feed.items));
+      await visit('/me/notifications?kind=author_update');await page.getByRole('link',{name:'管理关注与提醒',exact:true}).first().waitFor();
+      const notifications=await json('/api/v1/discussions/notifications?kind=author_update');assert.equal(notifications.followingUnavailable,false);
+      assert.ok(notifications.items.every(n=>n.kind==='author_update'));
+      if(role==='admin') {
+        const users=await json('/api/v1/dash/users');const target=users.items.find(u=>u.status==='active'&&u.publicId!==env.PRODUCTION_EXPECT_USER_ID);
+        assert.ok(target,'EXISTING_OTHER_USER_REQUIRED_FOR_FOLLOW_CONTROL');
+        const state=await json(`/api/v1/me/following/authors/${target.publicId}`);assert.equal(typeof state.following,'boolean');assert.equal(typeof state.notify,'boolean');
+        await visit(`/u/${target.publicId}`);await page.getByRole('button',{name:state.following?'取消关注':'关注作者',exact:true}).waitFor();
+        if(state.following)await page.getByRole('checkbox',{name:'接收站内更新提醒',exact:true}).waitFor();
+      }
+      for(const width of [320,390]){await page.setViewportSize({width,height:844});await visit('/me/following');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);}
+      await page.setViewportSize({width:1280,height:900});
+    });
     await step('production_dashboard_permissions_and_pages', async () => {
       if (role === 'user') { await json('/api/v1/dash/access', 403); return; }
       await json('/api/v1/dash/access');
@@ -227,6 +247,8 @@ try {
       assert.equal(status.roles.length, 3); assert.ok(status.roles.every(r => r.ready));
       assert.ok(status.backup.lastSuccessAt, 'NO_SUCCESSFUL_BACKUP_RECORDED');
       assert.notEqual(status.backup.status, 'failed');
+      assert.equal(status.following?.ready,true);assert.equal(status.following.pendingControls,0);
+      await page.getByRole('heading',{name:'作者更新与私有控制',exact:true}).waitFor();
     });
   }
   if (bridgeUrl) {

@@ -102,3 +102,22 @@ test("unverified private restore closes only new features and exposes aggregate 
  const a=await owner();await f.ctx.db.update(communityFollowingStatus).set({ready:false}).where(eq(communityFollowingStatus.id,"global"));
  try{await expect(listFollowing(f.ctx,a.id)).rejects.toMatchObject({status:503});expect((await followingStatus(f.ctx)).ready).toBe(false);expect((await listNotifications(f.ctx,a.id,{})).followingUnavailable).toBe(true);}finally{await f.ctx.db.update(communityFollowingStatus).set({ready:true}).where(eq(communityFollowingStatus.id,"global"));}
 });
+test("500-follow cap, reciprocal idempotency and account-bound stale cursors",async()=>{
+ const a=await owner(),b=await owner();
+ const both=await Promise.all([setFollow(f.ctx,b.id,a.number,{expectedRevision:0,following:true,notify:false}),setFollow(f.ctx,b.id,a.number,{expectedRevision:0,following:true,notify:false})]);expect(both[0]).toEqual(both[1]);
+ const many=Array.from({length:500},()=>crypto.randomUUID());owners.push(...many);
+ await f.ctx.db.insert(user).values(many.map(id=>({id,name:"Cap author",email:`${id}@placeholder.invalid`})));
+ await f.ctx.exportChartJournal!();
+ for(const id of many)await f.ctx.db.execute(sql`insert into community_follows(user_id,author_id,revision,followed_at,journal_sequence) values(${a.id},${id},1,clock_timestamp(),1)`);
+ await expect(setFollow(f.ctx,a.id,b.number,{expectedRevision:0,following:true,notify:false})).rejects.toMatchObject({status:429});
+ const page=await listFollowing(f.ctx,a.id);expect(page.items).toHaveLength(20);expect(page.nextCursor).toBeTruthy();
+ await expect(listFollowing(f.ctx,b.id,page.nextCursor!)).rejects.toMatchObject({status:409});
+ await setFollow(f.ctx,a.id,page.items[0]!.author.publicId,{expectedRevision:1,following:false,notify:false});
+ await expect(listFollowing(f.ctx,a.id,page.nextCursor!)).rejects.toMatchObject({status:409});
+},30000);
+test("concurrent dispatch of one event has one durable delivery and one unread author group",async()=>{
+ const a=await owner(),b=await owner();await setFollow(f.ctx,b.id,a.number,{expectedRevision:0,following:true,notify:true});const chart=await release(a.id);
+ await Promise.all([dispatchFollowingUpdates(f.ctx),dispatchFollowingUpdates(f.ctx)]);
+ const notices=await listNotifications(f.ctx,b.id,{kind:"author_update"});expect(notices.items).toHaveLength(1);
+ const delivered=await f.ctx.db.execute(sql`select count(*)::int n from community_update_deliveries where event_id=${publicationEventId(chart.id,chart.currentVersionId!)}::uuid and user_id=${b.id}`);expect(delivered.rows[0]?.n).toBe(1);
+});

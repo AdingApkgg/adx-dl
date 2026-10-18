@@ -31,6 +31,8 @@ export async function replayFollowingFact(c:Pick<Client,"query">,record:JournalR
   await c.query(`update community_update_notifications set read_at=coalesce(read_at,$4::timestamptz) where user_id=$1 and author_id=$2 and id<>$3 and read_at is null and event_at<=$4::timestamptz`,[fact.userId,fact.authorId,fact.id,fact.eventAt]);
   await c.query(`insert into community_update_notifications(id,user_id,author_id,event_id,event_at,created_at,read_at,revision,journal_sequence)
    select $1,$2,(select id from "user" where id=$3),$4,$5,$6,$7,$8,$9 where exists(select 1 from "user" where id=$2)
+    and not exists(select 1 from community_update_notifications newer where newer.user_id=$2 and newer.author_id is not distinct from $3::text and newer.id<>$1
+      and (newer.event_at,newer.event_id)>($5::timestamptz,$4::uuid))
    on conflict(id) do update set event_id=excluded.event_id,event_at=excluded.event_at,read_at=excluded.read_at,revision=excluded.revision,journal_sequence=excluded.journal_sequence where community_update_notifications.revision<=excluded.revision`,
    [fact.id,fact.userId,fact.authorId,fact.eventId,fact.eventAt,fact.createdAt,fact.readAt,fact.revision,record.sequence]);
  }
@@ -45,7 +47,8 @@ export async function finishFollowingReplay(c:Pick<Client,"query">,durable:numbe
   and not exists(select 1 from community_follows where journal_sequence>$1)
   and not exists(select 1 from community_following_accounts where journal_sequence>$1)
   and not exists(select 1 from community_update_notifications where journal_sequence>$1)
-  and not exists(select 1 from community_update_deliveries where journal_sequence>$1) where id='global'`,[durable]);
+  and not exists(select 1 from community_update_deliveries where journal_sequence>$1)
+  and not exists(select 1 from community_publication_events where journal_sequence>$1) where id='global'`,[durable]);
 }
 /** At most 500 rows per projection; remaining orphans are invisible and drained by the control worker. */
 export async function purgeFollowingUser(c:Pick<Client,"query">,userId:string) {
