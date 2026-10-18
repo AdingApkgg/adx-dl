@@ -3,22 +3,25 @@ import { Button } from "@astrodx/ui/components/button";
 import { MaximizeIcon, MinimizeIcon, Volume2Icon, VolumeXIcon } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { m } from "@/paraglide/messages.js";
-import { ApiError, expectOk } from "@/shared/api-client";
+import type { MirrorMode, Note } from "@lxns-network/maimai-chart-engine";
 import type { ChartDifficulty, ChartImportSummary } from "@/shared/charts";
-import { normalizeChartMaidata } from "@/shared/charts-maidata";
+
 import { chartErrorMessage } from "../lib/chart-errors";
 import { accountErrorRedirect } from "../lib/account-errors";
-import { PREVIEW_RATES, previewAudioStart, previewPosition, previewTime } from "../lib/chart-preview-controls";
+import { PREVIEW_RATES, previewTime } from "../lib/chart-preview-controls";
+import { createPreviewPlayer, type PreviewPlayer } from "../lib/chart-preview-player";
+import { gifFrameCount, initialPreviewRange, normalizePreviewRange, type PreviewRange } from "../lib/chart-preview-practice";
+import { PreviewTimeline } from "./preview-timeline";
 import { chartAssetUrl } from "../queries/charts";
 import { publicDifficultyName } from "./public-chart-card";
 
-type Player = {
-  play(): Promise<void>; pause(): void; seek(seconds: number): void; seekBy(seconds: number): void;
-  setRate(rate: number): void; setVolume(volume: number): void; dispose(): void;
-};
-export function PrivateChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectionId }: {
+type Props = {
   id: string; versionId: string; summary: ChartImportSummary; assetUrl?: typeof chartAssetUrl; sectionId?: string;
-}) {
+};
+export function PrivateChartPreview(props: Props) {
+  return <ChartPreview key={`${props.id}/${props.versionId}`} {...props} />;
+}
+function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectionId }: Props) {
   const previewTitle = assetUrl === chartAssetUrl ? m.chart_preview() : m.public_chart_preview();
   const [difficulty, setDifficulty] = useState<ChartDifficulty | undefined>(() => summary.difficulties.find(row => row.previewSupported)?.difficulty);
   const [opened, setOpened] = useState(false);
@@ -31,14 +34,24 @@ export function PrivateChartPreview({ id, versionId, summary, assetUrl = chartAs
   const [rate, setRate] = useState(1);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
-  const settings = useRef({ rate: 1, volume: 0.8, muted: false });
+  const settings = useRef({ rate: 1, volume: 0.8, muted: false, mirror: "none" as MirrorMode });
+  const [mirror, setMirror] = useState<MirrorMode>("none");
+  const [notes, setNotes] = useState<readonly Note[]>([]);
+  const [range, setRange] = useState<PreviewRange | null>(null);
+  const [loopEnabled, setLoopEnabled] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportState, setExportState] = useState<"idle" | "cancelled" | "failed" | "done">("idle");
+  const [download, setDownload] = useState<{ url: string; name: string } | null>(null);
+  const exportJob = useRef<AbortController | null>(null);
+  const downloadUrl = useRef<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenSupported, setFullscreenSupported] = useState(false);
   const [fullscreenPending, setFullscreenPending] = useState(false);
   const [fullscreenFailed, setFullscreenFailed] = useState(false);
   const section = useRef<HTMLElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const player = useRef<Player | null>(null);
+  const player = useRef<PreviewPlayer | null>(null);
   const duration = (summary.difficulties.find(row => row.difficulty === difficulty)?.durationMs ?? 0) / 1000;
 
   useEffect(() => {
@@ -61,7 +74,9 @@ export function PrivateChartPreview({ id, versionId, summary, assetUrl = chartAs
     finally { setFullscreenPending(false); }
   }
   function closePreview() {
-    player.current?.pause(); setOpened(false);
+    player.current?.pause(); player.current?.dispose(); cancelExport(); clearDownload();
+    setRange(null); setLoopEnabled(false); setReady(false); setOpened(false);
+    settings.current.mirror = "none"; setMirror("none");
     if (document.fullscreenElement === section.current) void document.exitFullscreen().catch(() => {});
   }
   function changeRate(value: number) {
@@ -80,7 +95,7 @@ export function PrivateChartPreview({ id, versionId, summary, assetUrl = chartAs
     player.current?.setVolume(next ? 0 : settings.current.volume);
   }
   function shortcuts(event: KeyboardEvent<HTMLElement>) {
-    if (!opened || !ready || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (!opened || !ready || exporting || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
     const target = event.target;
     if (target instanceof HTMLElement && target.closest("input,select,textarea,button,a,summary,[contenteditable]:not([contenteditable='false']),[role='button'],[role='slider'],[role='textbox']")) return;
     if (event.key === " ") {
@@ -90,153 +105,82 @@ export function PrivateChartPreview({ id, versionId, summary, assetUrl = chartAs
     } else if (event.key === "Home") { event.preventDefault(); player.current?.seek(0); }
   }
 
+  function clearDownload() {
+    if (downloadUrl.current) URL.revokeObjectURL(downloadUrl.current);
+    downloadUrl.current = null; setDownload(null);
+  }
+  function cancelExport() { exportJob.current?.abort(); }
+  function updateRange(value: PreviewRange | null, enabled = loopEnabled) {
+    const next = value ? normalizePreviewRange(value, duration) : null;
+    setRange(next); setLoopEnabled(Boolean(next && enabled));
+    player.current?.setRange(next, Boolean(next && enabled));
+  }
+  function setPoint(point: "a" | "b") {
+    const at = player.current?.position() ?? position;
+    const current = range ?? initialPreviewRange(point === "b" ? Math.max(0, at - 8) : at, duration);
+    if (current) updateRange(point === "a" ? { ...current, start: at } : { ...current, end: at });
+  }
+  function changeMirror(value: MirrorMode) {
+    settings.current.mirror = value; setMirror(value); player.current?.setMirror(value);
+  }
+  async function startExport() {
+    if (!range || !ready || exportJob.current || !player.current) return;
+    try { gifFrameCount(range, duration); } catch { return; }
+    const job = new AbortController(); exportJob.current = job;
+    setExporting(true); setExportProgress(0); setExportState("idle"); clearDownload();
+    try {
+      const blob = await player.current.exportGif({ ...range }, job.signal, value => {
+        if (exportJob.current === job && !job.signal.aborted) setExportProgress(value);
+      });
+      if (exportJob.current !== job || job.signal.aborted) return;
+      const numericId = assetUrl !== chartAssetUrl && /^[1-9]\d{0,19}$/.test(id) ? `-${id}` : "";
+      const name = `chart${numericId}-d${difficulty}-${Math.round(range.start * 1000)}-${Math.round(range.end * 1000)}.gif`;
+      const url = URL.createObjectURL(blob); downloadUrl.current = url; setDownload({ url, name });
+      setExportState("done");
+      const link = document.createElement("a"); link.href = url; link.download = name;
+      document.body.append(link); link.click(); link.remove();
+    } catch {
+      if (exportJob.current === job) setExportState(job.signal.aborted ? "cancelled" : "failed");
+    } finally {
+      if (exportJob.current === job) { exportJob.current = null; setExporting(false); }
+    }
+  }
+  let gifAllowed = false;
+  if (range) { try { gifFrameCount(range, duration); gifAllowed = true; } catch {} }
+  const mirrors: [MirrorMode, string][] = [["none", m.chart_preview_mirror_none()], ["horizontal", m.chart_preview_mirror_h()],
+    ["vertical", m.chart_preview_mirror_v()], ["rotate180", m.chart_preview_mirror_180()]];
+
   useEffect(() => {
     if (!opened || !difficulty || !canvas.current) return;
-    const aborter = new AbortController();
-    let disposed = false;
-    let context: AudioContext | undefined;
-    let gain: GainNode | undefined;
-    let source: AudioBufferSourceNode | undefined;
-    let decoded: AudioBuffer | undefined;
-    let audio: ArrayBuffer | undefined;
-    let preparingAudio: Promise<void> | undefined;
-    let frame = 0, time = 0, started = 0, anchor = 0, lastPositionUpdate = 0;
-    let running = false, wantsToPlay = false, playbackGeneration = 0;
-    let speed = settings.current.rate;
-    let level = settings.current.muted ? 0 : settings.current.volume;
-    let coverUrl: string | undefined;
-    let resize: ResizeObserver | undefined;
-    let renderer: import("@lxns-network/maimai-chart-engine").MainRenderer | undefined;
     setReady(false); setPlaying(false); setSilent(!summary.audio); setError(undefined); setCoverFailed(false); setPosition(0);
-    const clock = () => context ? context.currentTime : performance.now() / 1000;
-    const currentTime = () => running ? previewPosition(anchor, clock() - started, speed, duration) : time;
-    const stopSource = () => { try { source?.stop(); } catch {} source?.disconnect(); source = undefined; };
-    const closeAudio = () => { stopSource(); gain?.disconnect(); gain = undefined; void context?.close().catch(() => {}); context = undefined; decoded = undefined; };
-    const cleanup = () => {
-      if (disposed) return;
-      disposed = true; wantsToPlay = false; ++playbackGeneration; aborter.abort(); cancelAnimationFrame(frame); closeAudio(); resize?.disconnect();
-      renderer?.setIsPlaying(false); renderer?.setBackgroundImage(null);
-      if (coverUrl) URL.revokeObjectURL(coverUrl);
-      audio = undefined;
-    };
-    void (async () => {
-      const engine = await import("@lxns-network/maimai-chart-engine");
-      const maidata = await (await expectOk(await fetch(assetUrl(id, versionId, "maidata"), { signal: aborter.signal, cache: "no-store" }))).arrayBuffer();
-      if (disposed) return;
-      const chart = engine.parseSimaiChart(normalizeChartMaidata(new TextDecoder("utf-8", { fatal: true }).decode(maidata)).text, difficulty, { maxNotes: 100000, maxDurationMs: 3600000 });
-      const timeline = engine.TimingTimeline.fromChart(chart);
-      renderer = new engine.MainRenderer(canvas.current!, { sensorImagePath: "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=", showStatistics: false });
-      renderer.setJudgmentLineDesign("simple");
-      const render = () => renderer?.renderFrame(chart, timeline.beatFromMs(time * 1000), 4);
-      render();
-      resize = new ResizeObserver(() => { renderer?.resize(); render(); }); resize.observe(canvas.current!.parentElement!);
-      const tick = () => {
-        if (disposed || !running) return;
-        time = currentTime(); render();
-        const now = performance.now();
-        if (now - lastPositionUpdate >= 200 || time >= duration) { lastPositionUpdate = now; setPosition(time); }
-        if (time >= duration) { running = false; wantsToPlay = false; stopSource(); renderer?.setIsPlaying(false); setPlaying(false); }
-        else frame = requestAnimationFrame(tick);
-      };
-      const startSource = () => {
-        if (!decoded || !context || !gain) return;
-        const { delay, offset } = previewAudioStart(time, chart.bpm, chart.firstMs ?? 0, speed);
-        if (offset >= decoded.duration) return;
-        source = context.createBufferSource(); source.buffer = decoded; source.playbackRate.value = speed; source.connect(gain);
-        source.start(context.currentTime + delay, offset);
-      };
-      const prepareAudio = () => {
-        if (!preparingAudio && audio) preparingAudio = (async () => {
-          context = new AudioContext(); gain = context.createGain(); gain.gain.value = level; gain.connect(context.destination);
-          await context.resume();
-          if (disposed || !audio) return;
-          const bytes = audio; audio = undefined;
-          const buffer = await context.decodeAudioData(bytes);
-          if (!disposed) decoded = buffer;
-        })().catch(() => { closeAudio(); audio = undefined; if (!disposed) setSilent(true); });
-        return preparingAudio ?? Promise.resolve();
-      };
-      const pause = () => {
-        ++playbackGeneration; wantsToPlay = false; time = currentTime(); running = false;
-        cancelAnimationFrame(frame); stopSource(); renderer?.setIsPlaying(false);
-        if (!disposed) { setPlaying(false); setPosition(time); render(); }
-      };
-      const controller: Player = {
-        async play() {
-          if (disposed || running) return;
-          wantsToPlay = true;
-          const generation = ++playbackGeneration;
-          if (time >= duration) time = 0;
-          await prepareAudio();
-          if (disposed || generation !== playbackGeneration || !wantsToPlay) return;
-          if (context) {
-            try { await context.resume(); }
-            catch { closeAudio(); if (!disposed) setSilent(true); }
-          }
-          if (disposed || generation !== playbackGeneration || !wantsToPlay) return;
-          anchor = time; started = clock(); running = true;
-          renderer?.setIsPlaying(true); startSource(); setPlaying(true); frame = requestAnimationFrame(tick);
-        },
-        pause,
-        seek(seconds) {
-          if (disposed || !Number.isFinite(seconds)) return;
-          const resume = wantsToPlay; pause(); time = Math.max(0, Math.min(duration, seconds)); render(); setPosition(time);
-          if (resume && time < duration) void controller.play();
-        },
-        seekBy(seconds) { controller.seek(currentTime() + seconds); },
-        setRate(value) {
-          if (disposed || !PREVIEW_RATES.some(rate => rate === value)) return;
-          const resume = wantsToPlay; pause(); speed = value;
-          if (resume) void controller.play();
-        },
-        setVolume(value) { level = value; if (gain) gain.gain.value = value; },
-        dispose: cleanup,
-      };
-      // Controls are available while import/maidata is pending; initialize from their latest values.
-      speed = settings.current.rate;
-      level = settings.current.muted ? 0 : settings.current.volume;
-      player.current = controller;
-      // The resolver selects one authorization boundary; failures never fall back to another route.
-      if (summary.hasCover) {
-        try {
-          const blob = await (await expectOk(await fetch(assetUrl(id, versionId, "cover"), { signal: aborter.signal, cache: "no-store" }))).blob();
-          if (disposed) return;
-          coverUrl = URL.createObjectURL(blob);
-          const image = new Image(); image.src = coverUrl;
-          await image.decode(); if (disposed) return; renderer.setBackgroundImage(image); render();
-        } catch (failure) {
-          if (disposed) return;
-          if (failure instanceof ApiError && failure.status < 500) throw failure;
-          if (coverUrl) { URL.revokeObjectURL(coverUrl); coverUrl = undefined; }
-          setCoverFailed(true);
-        }
-      }
-      if (summary.audio) {
-        try {
-          audio = await (await expectOk(await fetch(assetUrl(id, versionId, "audio"), { signal: aborter.signal, cache: "no-store" }))).arrayBuffer();
-          if (disposed) return;
-        } catch (failure) {
-          if (disposed) return;
-          if (failure instanceof ApiError && failure.status < 500) throw failure;
-          setSilent(true);
-        }
-      }
-      setReady(true);
-    })().catch(failure => {
-      if (!disposed) {
-        setError(failure); cleanup(); player.current = null;
+    setNotes([]); setRange(null); setLoopEnabled(false); setExporting(false); setExportState("idle");
+    const controller = createPreviewPlayer({
+      id, versionId, difficulty, duration, summary, canvas: canvas.current, assetUrl,
+      rate: settings.current.rate, volume: settings.current.muted ? 0 : settings.current.volume, mirror: settings.current.mirror,
+      onReady: setReady, onPlaying: setPlaying, onPosition: setPosition, onNotes: setNotes,
+      onSilent: () => setSilent(true), onCoverFailed: () => setCoverFailed(true), onLoopDisabled: () => setLoopEnabled(false),
+      onError: failure => {
+        setPlaying(false); setError(failure);
         const target = assetUrl === chartAssetUrl ? accountErrorRedirect(failure, `${window.location.pathname}${window.location.search}`) : null;
         if (target) window.location.assign(target);
-      }
+      },
     });
-    return () => { cleanup(); player.current = null; };
+    player.current = controller;
+    return () => {
+      controller.dispose(); player.current = null;
+      exportJob.current?.abort(); exportJob.current = null;
+      if (downloadUrl.current) URL.revokeObjectURL(downloadUrl.current);
+      downloadUrl.current = null;
+    };
   }, [id, versionId, difficulty, opened, duration, summary.audio, summary.hasCover, assetUrl]);
+  // Revoke rendered download links when a new preview lifetime starts; cleanup above owns the actual URL.
+  useEffect(() => { setDownload(null); }, [difficulty, opened, id, versionId, assetUrl]);
   return <section ref={section} id={sectionId} tabIndex={0} onKeyDown={shortcuts} aria-label={previewTitle}
     className={`scroll-mt-24 space-y-3 rounded-lg border bg-background p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${fullscreen ? "h-dvh overflow-y-auto" : ""}`}>
     <h2 className="font-semibold">{previewTitle}</h2>
     <p className="text-sm text-muted-foreground">{m.chart_preview_hint()}</p>
     <label className="block text-sm">{m.chart_difficulties()}
-      <select value={difficulty ?? ""} onChange={event => setDifficulty(Number(event.target.value) as ChartDifficulty)} className="ml-2 min-h-11 rounded border bg-background px-2 py-1">
+      <select value={difficulty ?? ""} disabled={exporting} onChange={event => setDifficulty(Number(event.target.value) as ChartDifficulty)} className="ml-2 min-h-11 rounded border bg-background px-2 py-1">
         {!difficulty ? <option value="">{m.chart_unsupported()}</option> : null}
         {summary.difficulties.map(row => <option key={row.difficulty} value={row.difficulty} disabled={!row.previewSupported}>
           {publicDifficultyName(row.difficulty)}{row.previewSupported ? "" : ` · ${m.chart_unsupported()}`}
@@ -249,18 +193,32 @@ export function PrivateChartPreview({ id, versionId, summary, assetUrl = chartAs
       {silent ? <p role="status" className="text-sm">{m.chart_preview_silent()}</p> : null}
       {coverFailed ? <p role="status" className="text-sm">{m.chart_preview_cover_failed()}</p> : null}
       <div role="group" aria-label={m.chart_preview_controls()} className="flex flex-wrap items-center gap-2">
-        <Button className="min-h-11" disabled={!ready} onClick={() => playing ? player.current?.pause() : void player.current?.play()}>{playing ? m.chart_pause() : m.chart_play()}</Button>
+        <Button className="min-h-11" disabled={!ready || exporting} onClick={() => playing ? player.current?.pause() : void player.current?.play()}>{playing ? m.chart_pause() : m.chart_play()}</Button>
         <Button variant="outline" className="min-h-11" onClick={closePreview}>{m.chart_close()}</Button>
         <span className="text-sm tabular-nums">{previewTime(position)} / {previewTime(duration)}</span>
         {fullscreenSupported ? <Button type="button" variant="outline" className="min-h-11" disabled={fullscreenPending} onClick={() => void toggleFullscreen()}>
           {fullscreen ? <MinimizeIcon aria-hidden="true" /> : <MaximizeIcon aria-hidden="true" />}{fullscreen ? m.chart_preview_exit_fullscreen() : m.chart_preview_fullscreen()}
         </Button> : null}
       </div>
-      <input type="range" min={0} max={duration} step={0.1} value={position} disabled={!ready} aria-label={m.chart_seek()} className="min-h-11 w-full" onChange={event => player.current?.seek(Number(event.target.value))} />
+      <PreviewTimeline notes={notes} duration={duration} position={position} range={range} disabled={!ready || exporting}
+        onSeek={seconds => player.current?.seek(seconds)} onRange={value => updateRange(value)} />
+      <div role="group" aria-label={m.chart_preview_practice()} className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" className="min-h-11" disabled={!ready || exporting || duration <= 0} onClick={() => setPoint("a")}>{m.chart_preview_set_a()}</Button>
+        <Button type="button" variant="outline" className="min-h-11" disabled={!ready || exporting || duration <= 0} onClick={() => setPoint("b")}>{m.chart_preview_set_b()}</Button>
+        <Button type="button" variant={loopEnabled ? "default" : "outline"} className="min-h-11" aria-pressed={loopEnabled} disabled={!ready || exporting || duration <= 0}
+          onClick={() => updateRange(range ?? initialPreviewRange(player.current?.position() ?? position, duration), !loopEnabled)}>{m.chart_preview_loop()}</Button>
+        <Button type="button" variant="ghost" className="min-h-11" disabled={!range || exporting} onClick={() => updateRange(null, false)}>{m.chart_preview_clear_range()}</Button>
+      </div>
+      {loopEnabled ? <p role="status" className="text-sm">{m.chart_preview_loop_active()}</p> : null}
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm">{m.chart_preview_rate()}
-          <select value={rate} onChange={event => changeRate(Number(event.target.value))} className="min-h-11 rounded border bg-background px-2">
+          <select value={rate} disabled={exporting} onChange={event => changeRate(Number(event.target.value))} className="min-h-11 rounded border bg-background px-2">
             {PREVIEW_RATES.map(rate => <option key={rate} value={rate}>{rate}×</option>)}
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-sm">{m.chart_preview_mirror()}
+          <select value={mirror} disabled={exporting} onChange={event => changeMirror(event.target.value as MirrorMode)} className="min-h-11 rounded border bg-background px-2">
+            {mirrors.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </label>
         <Button type="button" variant="outline" className="min-h-11" aria-pressed={muted} disabled={silent} onClick={toggleMuted} aria-label={muted ? m.chart_preview_unmute() : m.chart_preview_mute()}>
@@ -269,6 +227,19 @@ export function PrivateChartPreview({ id, versionId, summary, assetUrl = chartAs
         <label className="flex min-w-0 flex-1 basis-40 items-center gap-2 text-sm">{m.chart_preview_volume()}
           <input type="range" min={0} max={1} step={0.01} value={muted ? 0 : volume} disabled={silent} className="min-h-11 w-full min-w-0" onChange={event => changeVolume(Number(event.target.value))} />
         </label>
+      </div>
+      <div className="space-y-2 rounded border p-3">
+        <p className="text-sm text-muted-foreground">{m.chart_preview_export_hint()}</p>
+        <Button type="button" variant="outline" className="min-h-11" disabled={!ready || exporting || !gifAllowed} onClick={() => void startExport()}>{m.chart_preview_export()}</Button>
+        {range && !gifAllowed ? <p role="status" className="text-sm">{m.chart_preview_export_range_hint()}</p> : null}
+        {!range ? <p className="text-xs text-muted-foreground">{m.chart_preview_export_select()}</p> : null}
+        {exporting ? <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-sm">{m.chart_preview_export_progress()}<progress max={1} value={exportProgress} />{Math.round(exportProgress * 100)}%</label>
+          <Button type="button" variant="outline" className="min-h-11" onClick={cancelExport}>{m.chart_preview_export_cancel()}</Button>
+        </div> : null}
+        {exportState === "cancelled" ? <p role="status">{m.chart_preview_export_cancelled()}</p> : null}
+        {exportState === "failed" ? <p role="alert">{m.chart_preview_export_failed()}</p> : null}
+        {download ? <a href={download.url} download={download.name} className="inline-flex min-h-11 items-center underline">{m.chart_preview_export_download()}</a> : null}
       </div>
       <p className="text-xs text-muted-foreground">{m.chart_preview_shortcuts()}</p>
       {rate !== 1 ? <p className="text-xs text-muted-foreground">{m.chart_preview_rate_pitch()}</p> : null}

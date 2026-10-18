@@ -4,13 +4,13 @@ import { m } from "@/paraglide/messages.js";
 import { PrivateChartPreview } from "@/client/components/private-chart-preview";
 import type { ChartImportSummary } from "@/shared/charts";
 import { parseSimaiChart as realParseSimaiChart } from "@lxns-network/maimai-chart-engine/parser";
-const fakes = vi.hoisted(() => ({ renderer: vi.fn(), close: vi.fn(async () => {}), cancelled: vi.fn(), parse: vi.fn() }));
+const fakes = vi.hoisted(() => ({ renderer: vi.fn(), close: vi.fn(async () => {}), cancelled: vi.fn(), parse: vi.fn(), mirror: vi.fn() }));
 vi.mock("@lxns-network/maimai-chart-engine", () => ({
-  parseSimaiChart: (text: string) => fakes.parse(text) ?? ({ bpm: 120, firstMs: 0 }),
+  parseSimaiChart: (text: string) => fakes.parse(text) ?? ({ bpm: 120, firstMs: 0, notes: [] }),
   TimingTimeline: { fromChart: () => ({ beatFromMs: (ms: number) => ms / 500 }) },
   MainRenderer: class {
     constructor() { fakes.renderer(); }
-    setJudgmentLineDesign() {} renderFrame() {} resize() {} setBackgroundImage() {} setIsPlaying() {}
+    setJudgmentLineDesign() {} setMirrorMode(mode: string) { fakes.mirror(mode); } renderFrame() {} resize() {} setBackgroundImage() {} setIsPlaying() {}
   },
 }));
 const summary: ChartImportSummary = { title: "Test", artist: "", maidataMd5Base64: "md5",
@@ -199,4 +199,160 @@ test("preview shortcuts are scoped to its focused surface and do not override in
   expect((screen.getByRole("slider", { name: m.chart_seek() }) as HTMLInputElement).value).toBe("5");
   fireEvent.keyDown(region, { key: "Home" });
   expect((screen.getByRole("slider", { name: m.chart_seek() }) as HTMLInputElement).value).toBe("0");
+});
+
+
+test("engine mirror changes repaint a paused preview and a new chart resets the choice", async () => {
+  fixture();
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("&inote_4=(120){4}1,2,3,E")));
+  const { rerender } = render(<PrivateChartPreview id="one" versionId="version" summary={{ ...summary, audio: null }} />);
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_load() }));
+  await waitFor(() => expect((screen.getByRole("button", { name: m.chart_play() }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.change(screen.getByRole("combobox", { name: m.chart_preview_mirror() }), { target: { value: "horizontal" } });
+  expect(fakes.mirror).toHaveBeenLastCalledWith("horizontal");
+  expect(screen.queryByRole("button", { name: m.chart_pause() })).toBeNull();
+  rerender(<PrivateChartPreview id="two" versionId="version" summary={{ ...summary, audio: null }} />);
+  expect(screen.queryByRole("slider", { name: m.chart_seek() })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_load() }));
+  await waitFor(() => expect(fakes.mirror).toHaveBeenLastCalledWith("none"));
+});
+
+test("a paused A/B edit stays paused; seeking outside disables looping and preserves the selection", async () => {
+  fixture();
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("&inote_4=(120){4}1,2,3,E")));
+  render(<PrivateChartPreview id="chart" versionId="version" summary={{ ...summary, audio: null }} />);
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_load() }));
+  await waitFor(() => expect((screen.getByRole("button", { name: m.chart_play() }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.change(screen.getByRole("slider", { name: m.chart_seek() }), { target: { value: "2" } });
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_set_a() }));
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_loop() }));
+  expect(screen.getByRole("button", { name: m.chart_preview_loop() }).getAttribute("aria-pressed")).toBe("true");
+  expect(screen.queryByRole("button", { name: m.chart_pause() })).toBeNull();
+  fireEvent.change(screen.getByRole("slider", { name: m.chart_seek() }), { target: { value: "0" } });
+  expect(screen.getByRole("button", { name: m.chart_preview_loop() }).getAttribute("aria-pressed")).toBe("false");
+  expect(screen.getByRole("slider", { name: /区间起点 A/ })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: m.chart_close() }));
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_load() }));
+  expect(screen.queryByRole("slider", { name: /区间起点 A/ })).toBeNull();
+});
+
+test("native audio looping continues across visual wraps at the selected speed without restarting sources", async () => {
+  fixture();
+  let now = 0, nextFrame: FrameRequestCallback | undefined;
+  const starts: unknown[][] = [], sources: { loop: boolean; loopStart: number; loopEnd: number }[] = [];
+  vi.stubGlobal("requestAnimationFrame", vi.fn(callback => { nextFrame = callback; return 1; }));
+  vi.stubGlobal("AudioContext", class {
+    get currentTime() { return now; } destination = {};
+    resume = async () => {};
+    decodeAudioData = async () => ({ duration: 10 });
+    createGain = () => ({ gain: { value: 1 }, connect() {}, disconnect() {} });
+    createBufferSource = () => {
+      const source = { buffer: null, playbackRate: { value: 1 }, loop: false, loopStart: 0, loopEnd: 0, connect() {},
+        start(...args: unknown[]) { starts.push(args); }, stop() {}, disconnect() {} };
+      sources.push(source); return source;
+    };
+    close = fakes.close;
+  });
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("&inote_4=(120){4}1,2,3,E")));
+  render(<PrivateChartPreview id="chart" versionId="version" summary={summary} />);
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_load() }));
+  await waitFor(() => expect((screen.getByRole("button", { name: m.chart_play() }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.change(screen.getByRole("slider", { name: m.chart_seek() }), { target: { value: "2" } });
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_set_a() }));
+  fireEvent.change(screen.getByRole("slider", { name: /区间终点 B/ }), { target: { value: "4" } });
+  fireEvent.change(screen.getByRole("combobox", { name: m.chart_preview_rate() }), { target: { value: "2" } });
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_loop() }));
+  fireEvent.click(screen.getByRole("button", { name: m.chart_play() }));
+  await waitFor(() => expect(starts).toHaveLength(1));
+  expect(sources[0]).toMatchObject({ loop: true, loopStart: 0, loopEnd: 2 });
+  now = 1.25;
+  const { act } = await import("@testing-library/react");
+  act(() => nextFrame?.(1250));
+  // The audio device repeats buffer 0..2; chart time 4.5 wraps to 2.5 with no new source.
+  expect(starts).toHaveLength(1);
+  expect((screen.getByRole("slider", { name: m.chart_seek() }) as HTMLInputElement).value).toBe("2.5");
+});
+
+test("export rechecks the public version and denied access never fetches private resources", async () => {
+  fixture();
+  let reads = 0;
+  const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => ++reads === 1 ? new Response("&inote_4=(120){4}1,2,3,E")
+    : Response.json({ error: { code: "NOT_FOUND", message: "Withdrawn" } }, { status: 404 }));
+  vi.stubGlobal("fetch", fetcher);
+  const { publicChartAssetUrl } = await import("@/client/queries/public-charts");
+  render(<PrivateChartPreview id="1" versionId="selected" summary={{ ...summary, audio: null }} assetUrl={publicChartAssetUrl} />);
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_load() }));
+  await waitFor(() => expect((screen.getByRole("button", { name: m.chart_play() }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_set_a() }));
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_export() }));
+  await screen.findByText(m.public_chart_unavailable());
+  expect(fetcher.mock.calls).toHaveLength(2);
+  for (const call of fetcher.mock.calls) expect(call[0]).toBe("/api/v1/charts/1/versions/selected/assets/maidata");
+  expect(screen.queryByRole("link", { name: m.chart_preview_export_download() })).toBeNull();
+});
+
+
+test("cancelling export aborts version reauthorization and retains the A/B selection for retry", async () => {
+  fixture();
+  let reads = 0, exportSignal: AbortSignal | undefined;
+  vi.stubGlobal("fetch", vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    if (++reads === 1) return new Response("&inote_4=(120){4}1,2,3,E");
+    exportSignal = init?.signal as AbortSignal;
+    return new Promise<Response>((_resolve, reject) => {
+      exportSignal!.addEventListener("abort", () => reject(new DOMException("Cancelled", "AbortError")), { once: true });
+    });
+  }));
+  render(<PrivateChartPreview id="chart" versionId="version" summary={{ ...summary, audio: null }} />);
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_load() }));
+  await waitFor(() => expect((screen.getByRole("button", { name: m.chart_play() }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_set_a() }));
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_export() }));
+  await waitFor(() => expect(exportSignal).toBeTruthy());
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_export_cancel() }));
+  await screen.findByText(m.chart_preview_export_cancelled());
+  expect(exportSignal!.aborted).toBe(true);
+  expect(screen.getByRole("slider", { name: /区间起点 A/ })).toBeTruthy();
+  expect((screen.getByRole("button", { name: m.chart_preview_export() }) as HTMLButtonElement).disabled).toBe(false);
+});
+
+
+test("Pause cancels a first Play that is still decoding and a late decode never starts audio", async () => {
+  fixture();
+  let finishDecode!: (buffer: { duration: number }) => void;
+  const start = vi.fn();
+  vi.stubGlobal("AudioContext", class {
+    currentTime = 0; destination = {}; resume = async () => {};
+    decodeAudioData = () => new Promise<{ duration: number }>(resolve => { finishDecode = resolve; });
+    createGain = () => ({ gain: { value: 1 }, connect() {}, disconnect() {} });
+    createBufferSource = () => ({ buffer: null, playbackRate: { value: 1 }, connect() {}, start, stop() {}, disconnect() {} });
+    close = fakes.close;
+  });
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("&inote_4=(120){4}1,2,3,E")));
+  render(<PrivateChartPreview id="chart" versionId="version" summary={summary} />);
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_load() }));
+  await waitFor(() => expect((screen.getByRole("button", { name: m.chart_play() }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: m.chart_play() }));
+  await waitFor(() => expect(finishDecode).toBeTypeOf("function"));
+  fireEvent.click(screen.getByRole("button", { name: m.chart_pause() }));
+  const { act } = await import("@testing-library/react");
+  await act(async () => { finishDecode({ duration: 10 }); await Promise.resolve(); });
+  expect(start).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: m.chart_play() })).toBeTruthy();
+});
+
+test("hiding a looping preview pauses it and returning does not silently resume", async () => {
+  fixture();
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("&inote_4=(120){4}1,2,3,E")));
+  render(<PrivateChartPreview id="chart" versionId="version" summary={{ ...summary, audio: null }} />);
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_load() }));
+  await waitFor(() => expect((screen.getByRole("button", { name: m.chart_play() }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_loop() }));
+  fireEvent.click(screen.getByRole("button", { name: m.chart_play() }));
+  await screen.findByRole("button", { name: m.chart_pause() });
+  const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+  fireEvent(document, new Event("visibilitychange"));
+  expect(screen.getByRole("button", { name: m.chart_play() })).toBeTruthy();
+  hidden.mockReturnValue(false); fireEvent(document, new Event("visibilitychange"));
+  expect(screen.getByRole("button", { name: m.chart_play() })).toBeTruthy();
+  hidden.mockRestore();
 });
