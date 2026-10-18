@@ -33,7 +33,7 @@ export function discussionApi(api: ApiClient) {
     editMessage: (id: string, input: D.EditMessageInput) => call<D.DiscussionMessage>("patch", `messages/${segment(id)}`, input),
     deleteMessage: (id: string, expectedRevision: number) => call<{ ok: true }>("delete", `messages/${segment(id)}`, { expectedRevision }),
     mine: (kind: string, cursor?: string) => call<D.DiscussionPage<D.MyDiscussion>>("get", "me", undefined, { kind, cursor }),
-    notifications: (query: Record<string, string> = {}) => call<D.DiscussionPage<D.DiscussionNotification> & { unreadCount: number }>("get", "notifications", undefined, query),
+    notifications: (query: Record<string, string> = {}) => call<D.DiscussionPage<D.DiscussionNotification> & { unreadCount: number; followingUnavailable?: boolean }>("get", "notifications", undefined, query),
     read: async (ids: string[]) => {const result=await call<{ ok: true }>("post", "notifications/read", { ids });if(typeof window!=="undefined")await getBrowserQueryClient().invalidateQueries({queryKey:["me","notifications","count"]});return result;},
     report: (input: Pick<D.DiscussionReport, "targetType" | "targetId" | "category" | "details">) => call<D.DiscussionReport>("post", "reports", input),
     myReports: (cursor?: string) => call<D.DiscussionPage<D.DiscussionReport>>("get", "me/reports", undefined, { cursor }),

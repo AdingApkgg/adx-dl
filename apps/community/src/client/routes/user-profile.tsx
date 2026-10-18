@@ -1,3 +1,4 @@
+import { FollowAuthor } from "../components/follow-author";
 import { Button } from "@astrodx/ui/components/button";
 import { Card, CardContent } from "@astrodx/ui/components/card";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
@@ -131,6 +132,7 @@ function UserContent({ id, works, worksFilters }: { id: string; works: PublicCha
             <Button asChild variant="outline" size="sm"><Link to={localizeHref("/me/charts")}>{m.charts_title()}</Link></Button>
           </div>
         ) : null}
+        <FollowAuthor publicId={profile.publicId}/>
       </div>
       <Card>
         <CardContent>

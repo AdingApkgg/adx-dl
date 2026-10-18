@@ -8,3 +8,5 @@ export * from "./community-social";
 export * from "./community-content";
 export * from "./community-site";
 export * from "./discussions";
+
+export * from "./following";

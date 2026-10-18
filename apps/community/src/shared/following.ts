@@ -1,0 +1,12 @@
+import type { PublicChartDto } from "./charts";
+export const FOLLOWING_LIMIT = 500;
+export const FOLLOWING_PAGE_SIZE = 20;
+export const FOLLOWING_FEED_DAYS = 90;
+export type FollowAuthorDto = { id: string; publicId: string; name: string; image: string | null };
+export type FollowState = { revision: number; following: boolean; notify: boolean; followedAt: string | null };
+export type FollowingItem = FollowState & { id: string; author: FollowAuthorDto };
+export type FollowingPage<T> = { items: T[]; nextCursor: string | null };
+export type FollowInput = { expectedRevision: number; following: boolean; notify: boolean };
+export type FollowingUpdate = { id: string; occurredAt: string; chart: PublicChartDto };
+export type AuthorUpdateNotice = { author: FollowAuthorDto | null; chart: PublicChartDto | null; state: "current" | "updated" | "unavailable"; occurredAt: string };
+export type FollowingStatus = { ready: boolean; pendingEvents: number; oldestPendingSeconds: number | null; pendingControls: number; failures: number; lastSuccessAt: string | null; lastFailureAt: string | null };

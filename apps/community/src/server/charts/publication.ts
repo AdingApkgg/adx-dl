@@ -1,3 +1,4 @@
+import { recordPublicationEvent } from "../following/events";
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { parsePublicChartFilters, type PublicChartSearchInput } from "@/shared/public-chart-search";
@@ -118,7 +119,8 @@ export async function publishChart(
       .set({ revision: chart.revision + 1, updatedAt: now, publicationSequence: sequence })
       .where(eq(charts.id, id))
       .returning();
-    return { chart: saved, sequence };
+    const eventSequence = await recordPublicationEvent(tx, id, version.id, userId, now, sequence);
+    return { chart: saved, sequence: Math.max(sequence,eventSequence) };
   });
   await awaitChartJournal(ctx, result.sequence);
   return getChart(ctx, userId, id);

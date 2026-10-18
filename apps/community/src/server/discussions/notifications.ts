@@ -1,3 +1,5 @@
+import { assertFollowingReady } from "../following/core";
+import { authorUpdateDto, readUpdateNotifications } from "../following/notifications";
 import { sql } from "drizzle-orm";
 import type { PgBoss } from "pg-boss";
 import type { StorageContext } from "../storage/contracts";
@@ -41,6 +43,10 @@ export async function dispatchDiscussionOutbox(ctx:StorageContext) {
 }
 export async function registerDiscussionWorker(ctx:StorageContext,boss:PgBoss) {await boss.work(DISCUSSION_DISPATCH_QUEUE,async()=>{await dispatchDiscussionOutbox(ctx);});await boss.schedule(DISCUSSION_DISPATCH_QUEUE,"* * * * *",{});}
 export async function notificationDto(ctx:StorageContext,n:NotificationRow):Promise<DiscussionNotification> {
+ if(n.kind==="author_update") {
+  const update=await authorUpdateDto(ctx,n.user_id,n.id);
+  return {id:n.id,kind:"author_update",createdAt:stamp(n.created_at),eventAt:stamp(n.event_at),read:!!n.read_at,available:update.state!=="unavailable",href:update.chart?`/charts/${update.chart.publicId}`:null,topic:null,message:null,publicReason:null,update};
+ }
  let topic:DiscussionNotification["topic"]=null,message:DiscussionNotification["message"]=null,href:string|null=null,publicReason:string|null=null;
  if(n.message_id){const [m]=await rows<MessageRow>(ctx.db,sql`select * from discussion_messages where id=${n.message_id}::uuid`);if(m){try{const c=await messageContext(ctx,m,n.user_id);message=await messageDto(ctx,m,c.chart);if(message.state==="visible"){if(c.topic){topic=await topicDto(ctx,c.topic.t,n.user_id);if(topic.state==="visible")href=`/forum/${topic.publicId}#message-${message.id}`;}else if(c.chart)href=`/charts/${c.chart.publicId}#message-${message.id}`;}if(!href)message=null;}catch(error){if(!unavailable(error))throw error;}}}
  if(n.decision_id){const [d]=await rows<{public_reason:string}>(ctx.db,sql`select public_reason from discussion_decisions where id=${n.decision_id}::uuid and recipient_id=${n.user_id}`);if(d)publicReason=d.public_reason;}
@@ -48,10 +54,23 @@ export async function notificationDto(ctx:StorageContext,n:NotificationRow):Prom
  if(n.report_id&&n.kind!=="chart_report_resolution"){const [r]=await rows<{resolution_note:string}>(ctx.db,sql`select resolution_note from discussion_reports where id=${n.report_id}::uuid and reporter_id=${n.user_id}`);if(r){publicReason=r.resolution_note;href="/me/discussions?kind=reports";}}
  return {id:n.id,kind:n.kind==="chart_report_resolution"?"report_resolution":n.kind,createdAt:stamp(n.created_at),eventAt:stamp(n.event_at),read:!!n.read_at,available:!!href||!!publicReason,href,topic,message,publicReason};
 }
-export async function listNotifications(ctx:StorageContext,userId:string,input:{cursor?:string;unread?:boolean}) {
- const p=page(input.cursor,{notifications:userId,unread:!!input.unread});const rr=await rows<NotificationRow>(ctx.db,sql`select * from discussion_notifications n where n.user_id=${userId} and (${!input.unread} or n.read_at is null) and ${p.condition(sql`n.event_at`,sql`n.id`)} order by n.event_at desc,n.id desc limit 21`);const list=rr.slice(0,20),last=list.at(-1);const [n]=await rows<{n:number}>(ctx.db,sql`select count(*)::int n from discussion_notifications where user_id=${userId} and read_at is null`);return {items:await Promise.all(list.map(r=>notificationDto(ctx,r))),unreadCount:n.n,nextCursor:rr.length>20&&last?p.encode(last.event_at,last.id):null};
+export async function listNotifications(ctx:StorageContext,userId:string,input:{cursor?:string;unread?:boolean;kind?:"author_update"}) {
+ let followingAvailable=true;try{await assertFollowingReady(ctx.db,userId);}catch{followingAvailable=false;}
+ const p=page(input.cursor,{notifications:userId,unread:!!input.unread,kind:input.kind??"all"});
+ const union=sql`(select id,user_id,kind,event_id,topic_id,message_id,decision_id,report_id,event_at,read_at,created_at from discussion_notifications where user_id=${userId}
+  union all select id,user_id,'author_update'::text,event_id,null::uuid,null::uuid,null::uuid,null::uuid,event_at,read_at,created_at from community_update_notifications
+  where user_id=${userId} and ${followingAvailable} and journal_sequence<=${exported})`;
+ const rr=await rows<NotificationRow>(ctx.db,sql`select * from ${union} n where (${!input.unread} or n.read_at is null) and (${input.kind===undefined} or n.kind='author_update')
+  and ${p.condition(sql`n.event_at`,sql`n.id`)} order by n.event_at desc,n.id desc limit 21`);
+ const list=rr.slice(0,20),last=list.at(-1);
+ const [n]=await rows<{n:number}>(ctx.db,sql`select count(*)::int n from ${union} n where read_at is null`);
+ return {items:await Promise.all(list.map(r=>notificationDto(ctx,r))),unreadCount:n.n,nextCursor:rr.length>20&&last?p.encode(last.event_at,last.id):null,followingUnavailable:!followingAvailable};
 }
-export async function readNotifications(ctx:StorageContext,userId:string,ids:string[]) {await withSocialUser(ctx.db,userId,tx=>tx.execute(sql`update discussion_notifications set read_at=clock_timestamp() where user_id=${userId} and id in (${sql.join(ids.map(id=>sql`${id}::uuid`),sql`,`)}) and read_at is null`));return {ok:true as const};}
+export async function readNotifications(ctx:StorageContext,userId:string,ids:string[]) {
+ await readUpdateNotifications(ctx,userId,ids);
+ await withSocialUser(ctx.db,userId,tx=>tx.execute(sql`update discussion_notifications set read_at=clock_timestamp() where user_id=${userId} and id in (${sql.join(ids.map(id=>sql`${id}::uuid`),sql`,`)}) and read_at is null`));
+ return {ok:true as const};
+}
 export async function myDiscussions(ctx:StorageContext,userId:string,input:{kind?:string;cursor?:string}) {
  const kind=input.kind??"topics",p=page(input.cursor,{my:userId,kind});let result:{id:string;at:Date;topic:TopicRow|null;message:MessageRow|null}[]=[];
  if(kind==="topics"||kind==="subscriptions"){const rr=await rows<TopicRow & {at:Date}>(ctx.db,sql`select t.*,p.public_id::text,${kind==="subscriptions"?sql`s.created_at`:sql`t.created_at`} at from discussion_topics t join forum_public_ids p on p.topic_id=t.id ${kind==="subscriptions"?sql`join discussion_subscriptions s on s.topic_id=t.id and s.user_id=${userId}`:sql``} where ${kind==="topics"?sql`t.author_id=${userId}`:sql`true`} and ${p.condition(kind==="subscriptions"?sql`s.created_at`:sql`t.created_at`,sql`t.id`)} order by ${kind==="subscriptions"?sql`s.created_at`:sql`t.created_at`} desc,t.id desc limit 21`);result=rr.map(t=>({id:t.id,at:t.at,topic:t,message:null}));}

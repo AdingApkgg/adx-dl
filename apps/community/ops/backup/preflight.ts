@@ -1,3 +1,4 @@
+import { verifyLatestJournal } from "./journal";
 import { parseDumpBounds } from "./dump-bounds";
 import { mkdir } from "node:fs/promises";
 import { createDb } from "../../src/server/db/client";
@@ -15,6 +16,10 @@ export async function preflightStorage() {
   await assertNormalStorageStartup();
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("STORAGE_DATABASE_REQUIRED");
+  const directory=process.env.STORAGE_JOURNAL_DIR,keyFile=process.env.STORAGE_JOURNAL_KEY_FILE;
+  if(!directory||!keyFile)throw new Error("STORAGE_JOURNAL_CONFIG_REQUIRED");
+  // Unknown private record kinds/versions fail before switching any application role.
+  await verifyLatestJournal({directory,keyFile,databaseUrl:url});
   const { db, pool } = createDb(url),
     c = new Client({
       connectionString: url,

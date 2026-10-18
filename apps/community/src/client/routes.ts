@@ -13,6 +13,8 @@ export default [
     route("help/:topic?", "routes/help.tsx"),
     route("me/discussions", "routes/my-discussions.tsx"),
     route("me/notifications", "routes/notifications.tsx"),
+    route("me/following", "routes/following.tsx"),
+    route("me/feed", "routes/following-feed.tsx"),
     route("privacy", "routes/privacy.tsx"),
     route("onboarding", "routes/onboarding.tsx"),
     route("settings/account", "routes/settings-account.tsx"),
