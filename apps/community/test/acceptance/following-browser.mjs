@@ -39,7 +39,9 @@ export async function exerciseFollowing({owner,other,anonymous,origin,step,zip,e
    assert.equal((await get(other,"/api/v1/discussions/notifications?kind=author_update")).items.length,0);
   });
   await step("following_enable_new_version_notify_and_durable_read",async()=>{
-   await reader.goto(url("/me/following"));await mutate(reader,relation,"PUT",()=>reader.getByRole("checkbox",{name:"接收站内更新提醒",exact:true}).check());
+   await reader.goto(url("/me/following"));
+   const enabled=await mutate(reader,relation,"PUT",()=>reader.getByRole("checkbox",{name:"接收站内更新提醒",exact:true}).click());assert.equal(enabled.notify,true);
+   await reader.waitForFunction(()=>document.querySelector('input[type="checkbox"]')?.checked===true);
    assert.equal((await get(other,"/api/v1/discussions/notifications?kind=author_update")).items.length,0);
    await append("Following browser second version");
    const deadline=Date.now()+80000;
