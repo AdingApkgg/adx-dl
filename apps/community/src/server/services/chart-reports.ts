@@ -90,6 +90,7 @@ export async function resolveChartReport(ctx: StorageContext, actor: { id: strin
     }
     const [saved] = await tx.update(chartReports).set({ status: input.status, resolutionNote: note, resolverPublicId: BigInt(actor.publicId), resolvedAt: sql`clock_timestamp()` })
       .where(eq(chartReports.id, report.id)).returning();
+    await tx.execute(sql`insert into discussion_outbox(actor_id,kind,recipient_id,report_id,sequence) values(${actor.id},'chart_report_resolution',${saved.reporterId},${saved.id}::uuid,0)`);
     return saved;
   });
   return { id: row.id, status: row.status, note: row.resolutionNote };

@@ -11,6 +11,7 @@ import { testDatabaseUrl } from "../testing/services";
 import { prepareTestQueues } from "../testing/test-boss";
 import { communityContentStates, communityNotices, storageJournalProgress } from "../db/schema";
 import { createTopic, createForumReply, editTopic, getTopic, listBoards, listTopics, removeTopic, setSubscription } from "./forum";
+import { resolveChartReport } from "../services/chart-reports";
 import { dispatchDiscussionOutbox, listNotifications, readNotifications } from "./notifications";
 import { moderate, createReport, listReports, resolveReport, updateBoard } from "./moderation";
 import { getNotice, listNotices, saveNotice } from "../community/site";
@@ -156,4 +157,19 @@ test("board readonly controls survive independently of title/body and reject new
     const latest = (await listBoards(fixture.ctx)).items.find(x => x.id === board.id)!;
     await updateBoard(fixture.ctx, a, board.id, { expectedRevision: latest.revision, name: board.name, description: board.description, order: board.order, readOnly: false, reason: "Reopen fixture" });
   }
+});
+
+
+test("chart report resolution delivers one private notification without cross-reading discussion reports", async () => {
+  const reporter = await owner(), admin = await owner(), stranger = await owner(), id = key();
+  await fixture.ctx.db.execute(sql`insert into chart_reports(id,reporter_id,chart_id,public_id,version_id,title,artist,category,details) values(${id}::uuid,${reporter},${key()}::uuid,1,${key()}::uuid,'Synthetic','Synthetic','other','Review')`);
+  await resolveChartReport(fixture.ctx, { id: admin, publicId: "1" }, id, { status: "dismissed", note: "Private resolution" });
+  await resolveChartReport(fixture.ctx, { id: admin, publicId: "1" }, id, { status: "dismissed", note: "Must not replace" });
+  await dispatchDiscussionOutbox(fixture.ctx); await dispatchDiscussionOutbox(fixture.ctx);
+  const notifications = await listNotifications(fixture.ctx, reporter, {});
+  expect(notifications.items).toHaveLength(1);
+  expect(notifications.items[0]).toMatchObject({ kind: "report_resolution", publicReason: "Private resolution", href: "/me/reports", available: true });
+  expect((await listNotifications(fixture.ctx, stranger, {})).items).toHaveLength(0);
+  await fixture.ctx.db.execute(sql`delete from chart_reports where id=${id}::uuid`);
+  expect((await listNotifications(fixture.ctx, reporter, {})).items[0]).toMatchObject({ available: false, href: null, publicReason: null });
 });
