@@ -1527,3 +1527,91 @@ test("discovery searches published text literally and scopes cursors, difficulty
   await withdrawChart(ctx, owner, a.id, a.revision);
   expect((await listPublicCharts(ctx, { author })).items.map(row => row.id)).toEqual([b.id]);
 });
+
+
+test("private favorites remain isolated, idempotent and removable after withdrawal", async () => {
+  const { publishChart, withdrawChart } = await import("./publication");
+  const { addFavorite, removeFavorite, listFavorites, favoriteState } = await import("../services/favorites");
+  const ctx = fixture.ctx, author = await readyOwner(ctx), viewer = await readyOwner(ctx), other = await readyOwner(ctx);
+  let chart = await createChart(ctx, author, (await chartFile(author, { title: "Favorite public snapshot" })).file.id);
+  chart = await publishChart(ctx, author, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  await Promise.all([addFavorite(ctx, viewer, chart.publicId!), addFavorite(ctx, viewer, chart.publicId!)]);
+  expect((await listFavorites(ctx, viewer)).items).toHaveLength(1);
+  expect((await listFavorites(ctx, other)).items).toHaveLength(0);
+  expect(await favoriteState(ctx, other, chart.publicId!)).toEqual({ favorited: false });
+  await withdrawChart(ctx, author, chart.id, chart.revision);
+  const unavailable = await listFavorites(ctx, viewer);
+  expect(unavailable.items).toEqual([{ publicId: chart.publicId, addedAt: expect.any(String), chart: null }]);
+  expect(JSON.stringify(unavailable)).not.toContain("Favorite public snapshot");
+  await removeFavorite(ctx, other, chart.publicId!);
+  expect(await favoriteState(ctx, viewer, chart.publicId!)).toEqual({ favorited: true });
+  await removeFavorite(ctx, viewer, chart.publicId!);
+  expect((await listFavorites(ctx, viewer)).items).toHaveLength(0);
+});
+
+test("reports preserve the first submission, require a current public version and durable separate moderation", async () => {
+  const { publishChart, withdrawChart } = await import("./publication");
+  const { createChartReport, listMyReports, listDashReports, resolveChartReport } = await import("../services/chart-reports");
+  const { moderateChart } = await import("../services/dash");
+  const { userPublicIds } = await import("../db/schema");
+  const ctx = fixture.ctx, author = await readyOwner(ctx), reporter = await readyOwner(ctx), other = await readyOwner(ctx), admin = await readyOwner(ctx);
+  let chart = await createChart(ctx, author, (await chartFile(author, { title: "Report public snapshot" })).file.id);
+  chart = await publishChart(ctx, author, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const input = { versionId: chart.publication!.versionId, category: "broken" as const, details: "Preview issue" };
+  const reports = await Promise.all([createChartReport(ctx, reporter, chart.publicId!, input), createChartReport(ctx, reporter, chart.publicId!, input)]);
+  expect(reports[0]!.id).toBe(reports[1]!.id);
+  expect((await listMyReports(ctx, other)).items).toHaveLength(0);
+  await expect(createChartReport(ctx, other, chart.publicId!, { ...input, versionId: crypto.randomUUID() })).rejects.toMatchObject({ code: "REPORT_CHANGED" });
+  const duplicate = await createChartReport(ctx, reporter, chart.publicId!, { ...input, details: "Do not overwrite" });
+  expect(duplicate.details).toBe("Preview issue");
+  const [identity] = await ctx.db.select().from(userPublicIds).where(eq(userPublicIds.userId, admin));
+  const actor = { id: admin, publicId: identity.publicId.toString() };
+  await expect(resolveChartReport(ctx, actor, duplicate.id, { status: "actioned", note: "Removed" })).rejects.toMatchObject({ code: "REPORT_MODERATION_REQUIRED" });
+  await moderateChart(ctx, actor, chart.id, { expectedRevision: chart.revision, reason: "Reviewed file issue" });
+  expect(await resolveChartReport(ctx, actor, duplicate.id, { status: "actioned", note: "Removed" })).toMatchObject({ status: "actioned", note: "Removed" });
+  expect(await resolveChartReport(ctx, actor, duplicate.id, { status: "dismissed", note: "Cannot overwrite" })).toMatchObject({ status: "actioned", note: "Removed" });
+  expect((await listDashReports(ctx, "resolved")).items.some(row => row.id === duplicate.id)).toBe(true);
+  expect((await listMyReports(ctx, reporter)).items[0]).toMatchObject({ chart: null, status: "actioned" });
+  expect((await createChartReport(ctx, reporter, chart.publicId!, input)).id).toBe(duplicate.id);
+  let withdrawn = await createChart(ctx, author, (await chartFile(author, { title: "Withdrawn report" })).file.id);
+  withdrawn = await publishChart(ctx, author, withdrawn.id, { expectedRevision: withdrawn.revision, versionId: withdrawn.currentVersionId, confirmOriginalArchive: true });
+  await withdrawChart(ctx, author, withdrawn.id, withdrawn.revision);
+  await expect(createChartReport(ctx, other, withdrawn.publicId!, { ...input, versionId: withdrawn.currentVersionId })).rejects.toMatchObject({ status: 404 });
+});
+
+test("account-level favorites cap serializes concurrent insertions and private rows cascade on account purge", async () => {
+  const { publishChart } = await import("./publication");
+  const { addFavorite, listFavorites } = await import("../services/favorites");
+  const { createChartReport } = await import("../services/chart-reports");
+  const { chartFavorites, chartReports, user } = await import("../db/schema");
+  const ctx = fixture.ctx, author = await readyOwner(ctx), viewer = await readyOwner(ctx);
+  const publish = async () => { const c = await createChart(ctx, author, (await chartFile(author)).file.id); return publishChart(ctx, author, c.id, { expectedRevision: c.revision, versionId: c.currentVersionId, confirmOriginalArchive: true }); };
+  const a = await publish(), b = await publish();
+  await ctx.db.insert(chartFavorites).values(Array.from({ length: 999 }, (_, i) => ({ userId: viewer, chartId: crypto.randomUUID(), publicId: BigInt(1000000 + i) })));
+  const outcomes = await Promise.allSettled([addFavorite(ctx, viewer, a.publicId!), addFavorite(ctx, viewer, b.publicId!)]);
+  expect(outcomes.filter(result => result.status === "fulfilled")).toHaveLength(1);
+  expect(outcomes.filter(result => result.status === "rejected")).toHaveLength(1);
+  const first = await listFavorites(ctx, viewer, { limit: 1 });
+  expect(first.nextCursor).toBeTruthy();
+  await expect(listFavorites(ctx, author, { cursor: first.nextCursor! })).rejects.toMatchObject({ status: 400 });
+  await createChartReport(ctx, viewer, a.publicId!, { versionId: a.currentVersionId, category: "other", details: "Private reporter details" });
+  await ctx.db.delete(user).where(eq(user.id, viewer));
+  expect(await ctx.db.select().from(chartFavorites).where(eq(chartFavorites.userId, viewer))).toHaveLength(0);
+  expect(await ctx.db.select().from(chartReports).where(eq(chartReports.reporterId, viewer))).toHaveLength(0);
+});
+
+test("report daily and open caps are enforced after duplicate detection", async () => {
+  const { publishChart } = await import("./publication");
+  const { createChartReport } = await import("../services/chart-reports");
+  const { chartReports } = await import("../db/schema");
+  const ctx = fixture.ctx, author = await readyOwner(ctx), reporter = await readyOwner(ctx);
+  let chart = await createChart(ctx, author, (await chartFile(author)).file.id);
+  chart = await publishChart(ctx, author, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const rows = Array.from({ length: 10 }, (_, i) => ({ reporterId: reporter, chartId: crypto.randomUUID(), publicId: BigInt(2000000 + i), versionId: crypto.randomUUID(), title: "Previously public", artist: "", category: "other" as const, details: "Fixture" }));
+  await ctx.db.insert(chartReports).values(rows);
+  const input = { versionId: chart.currentVersionId, category: "other" as const, details: "An issue" };
+  await expect(createChartReport(ctx, reporter, chart.publicId!, input)).rejects.toMatchObject({ code: "REPORT_LIMIT", status: 429 });
+  await ctx.db.update(chartReports).set({ createdAt: new Date(Date.now() - 2 * 86400000) }).where(eq(chartReports.reporterId, reporter));
+  await ctx.db.insert(chartReports).values(rows.map(row => ({ ...row, chartId: crypto.randomUUID(), versionId: crypto.randomUUID(), createdAt: new Date(Date.now() - 2 * 86400000) })));
+  await expect(createChartReport(ctx, reporter, chart.publicId!, input)).rejects.toMatchObject({ code: "REPORT_LIMIT", status: 429 });
+});

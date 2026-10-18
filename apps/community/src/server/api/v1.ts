@@ -4,6 +4,7 @@ import type { AppEnv } from "../app-env";
 import { fileRoutes } from "./files";
 import { avatarRoutes } from "./avatar";
 import { uploadRoutes } from "./uploads";
+import { favoriteRoutes, myReportRoutes } from "./community-social";
 import { dashRoutes } from "./dash";
 import { meRoutes } from "./me";
 import { userRoutes } from "./users";
@@ -20,6 +21,8 @@ export const apiV1 = new Hono<AppEnv>()
   .route("/files", fileRoutes)
   .route("/me/avatar", avatarRoutes)
   .route("/me/charts", chartRoutes)
+  .route("/me/favorites", favoriteRoutes)
+  .route("/me/reports", myReportRoutes)
   .route("/charts", publicChartRoutes)
   .route("/me", meRoutes)
   // 个人主页的公开资料（spec 第 10.5 节），不要求登录。

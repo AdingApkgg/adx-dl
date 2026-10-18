@@ -39,7 +39,7 @@ function expectPrivate(response: Response, path: string) {
 }
 
 test("anonymous dashboard documents and data responses stay private in each locale", async () => {
-  for (const prefix of ["", "/en", "/ja"]) for (const suffix of ["", "/users", "/charts", "/status"]) {
+  for (const prefix of ["", "/en", "/ja"]) for (const suffix of ["", "/users", "/charts", "/status", "/reports"]) {
     const path = `${prefix}/dash${suffix}`;
     const document = await fetch(server.url(path), { redirect: "manual" });
     expect(document.status, path).toBe(302);
@@ -55,7 +55,7 @@ test("anonymous dashboard documents and data responses stay private in each loca
 });
 
 test("ordinary sessions cannot read dashboard documents, single-fetch data or administrative APIs", async () => {
-  for (const prefix of ["", "/en", "/ja"]) for (const suffix of ["", "/users", "/charts", "/status"]) {
+  for (const prefix of ["", "/en", "/ja"]) for (const suffix of ["", "/users", "/charts", "/status", "/reports"]) {
     const path = `${prefix}/dash${suffix}`;
     for (const extension of ["", ".data"]) {
       const response = await fetch(server.url(`${path}${extension}`), { headers: { cookie: ordinary.cookie }, redirect: "manual" });
@@ -67,7 +67,7 @@ test("ordinary sessions cannot read dashboard documents, single-fetch data or ad
       expect(body).not.toContain("HTTP dashboard administrator");
     }
   }
-  for (const endpoint of ["access", "overview", "users", "charts", "status"]) {
+  for (const endpoint of ["access", "overview", "users", "charts", "status", "reports"]) {
     const response = await fetch(server.url(`/api/v1/dash/${endpoint}`), { headers: { cookie: ordinary.cookie } });
     expect(response.status, endpoint).toBe(403);
     expectPrivate(response, endpoint);
@@ -90,5 +90,15 @@ test("authorized users read localized dashboard documents and data with no-store
         expect(body).toContain(`${prefix}/dash/charts`);
       }
     }
+  }
+});
+
+test("private collection documents and APIs are no-store even when anonymous", async () => {
+  for (const prefix of ["", "/en", "/ja"]) for (const name of ["favorites", "reports"]) {
+    const path = `${prefix}/me/${name}`;
+    const response = await fetch(server.url(path), { redirect: "manual" });
+    expect(response.status).toBe(302); expectPrivate(response, path); await response.text();
+    const api = await fetch(server.url(`/api/v1/me/${name}`));
+    expect(api.status).toBe(401); expectPrivate(api, name); await api.text();
   }
 });

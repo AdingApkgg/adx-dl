@@ -11,7 +11,7 @@ export async function loader({ context, url }: Route.LoaderArgs) { return loadDa
 export function meta() { return [{ title: `${m.dash_title()} - ${m.site_name()}` }, { name: "robots", content: "noindex, nofollow" }]; }
 export default function Dash({ loaderData }: Route.ComponentProps) {
   const revalidator = useRevalidator();
-  const tabs = [["/dash", m.dash_overview()], ["/dash/users", m.dash_users()], ["/dash/charts", m.dash_charts()], ["/dash/status", m.dash_status()]];
+  const tabs = [["/dash", m.dash_overview()], ["/dash/users", m.dash_users()], ["/dash/charts", m.dash_charts()], ["/dash/status", m.dash_status()], ["/dash/reports", m.dash_reports()]];
   return <main className="min-w-0 space-y-6">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <PageTitle description={m.dash_admin_identity({ id: loaderData.publicId })}>{m.dash_title()}</PageTitle>

@@ -43,7 +43,12 @@ export function PublicChartCard({ chart, headingLevel = 2 }: { chart: PublicChar
   const Heading = headingLevel === 3 ? "h3" : "h2";
   const location = useLocation();
   const href = `${location.pathname}${location.search}`;
-  return <Link to={localizeHref(`/charts/${chart.publicId}`)} state={{ publicListHref: href, publicListCursors: publicListCursors(location.state?.publicChartCursors, href) }} className="group flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card/80 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+  const favorites = /\/me\/favorites$/.test(location.pathname);
+  const privateCursors: unknown[] = location.state?.socialPageScope === "/me/favorites:" && Array.isArray(location.state?.socialCursors) ? location.state.socialCursors.slice(-100) : [];
+  const privateHistory = privateCursors.filter((cursor): cursor is string => typeof cursor === "string" && (cursor === "" || /^[A-Za-z0-9_-]{1,512}$/.test(cursor)))
+    .map(cursor => location.pathname + (cursor ? `?cursor=${cursor}` : ""));
+  const history = publicListCursors(favorites ? privateHistory : location.state?.publicChartCursors, href);
+  return <Link to={localizeHref(`/charts/${chart.publicId}`)} state={{ publicListHref: href, publicListCursors: history }} className="group flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card/80 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
     <PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} />
     <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3 sm:p-4">
       <Heading className="line-clamp-1 font-semibold leading-snug" title={chart.title}>{chart.title}</Heading>

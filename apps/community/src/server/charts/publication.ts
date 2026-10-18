@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { parsePublicChartFilters, type PublicChartSearchInput } from "@/shared/public-chart-search";
 import { HTTPException } from "hono/http-exception";
 import type { PublicChartDto, PublicChartsPageDto } from "@/shared/charts";
@@ -235,6 +235,12 @@ async function resolved(ctx: StorageContext, id: string) {
 }
 export async function getPublicChart(ctx: StorageContext, id: string) {
   return publicDto((await resolved(ctx, id)).r);
+}
+/** One bounded authorization query for private collections; unavailable IDs never expose old snapshots. */
+export async function getPublicChartsByIds(ctx: StorageContext, ids: readonly string[]): Promise<PublicChartDto[]> {
+  if (ids.length > 50 || ids.some(id => !UUID_PATTERN.test(id))) throw invalid();
+  if (!ids.length) return [];
+  return (await query(ctx).where(and(allowed(), inArray(charts.id, [...ids])))).map(publicDto);
 }
 export async function listPublicCharts(
   ctx: StorageContext,

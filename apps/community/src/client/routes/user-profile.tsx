@@ -13,7 +13,7 @@ import { apiContext, queryClientContext } from "@/shared/router-context";
 import { Avatar } from "../components/avatar";
 import { PublicChartBrowser } from "../components/public-chart-browser";
 import { publicChartsApi } from "../queries/public-charts";
-import { publicListReturnState } from "../lib/public-chart-navigation";
+import { publicListBackState, publicListReturnState } from "../lib/public-chart-navigation";
 import { PageTitle } from "../components/page-title";
 import { getRenderApi } from "../lib/browser";
 import { canonicalLink, localeAlternates, openGraph, originFrom } from "../lib/seo";
@@ -115,7 +115,7 @@ function UserContent({ id, works, worksFilters }: { id: string; works: PublicCha
   // 资料头部（spec 第 7.5 节）：大头像、昵称、用户 ID、注册日期，下面是简介。
   return (
     <main className="space-y-6">
-      {returnHref && returnHref !== location.pathname + location.search ? <Link to={returnHref} state={{ publicChartCursors: returnState?.publicListCursors }} className="text-sm underline">{m.public_chart_back_results()}</Link> : null}
+      {returnHref && returnHref !== location.pathname + location.search ? <Link to={returnHref} state={returnState ? publicListBackState(returnState) : undefined} className="text-sm underline">{m.public_chart_back_results()}</Link> : null}
       <div className="flex flex-wrap items-center gap-5">
         <Avatar image={profile.image} id={profile.id} name={profile.name} size={80} />
         <div className="min-w-0 flex-1 space-y-1">

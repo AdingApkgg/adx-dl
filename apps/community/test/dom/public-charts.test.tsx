@@ -1,3 +1,5 @@
+import { QueryClientProvider } from "@tanstack/react-query";
+import { makeQueryClient } from "@/shared/query-client";
 import { m } from "@/paraglide/messages.js";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentType } from "react";
@@ -14,7 +16,11 @@ const chart: PublicChartDto = {
   summary: { title: "Private title must not become metadata", artist: "Private artist", maidataMd5Base64: "hash", difficulties: [{ difficulty: 4, level: "12+", noteCount: 3, durationMs: 5000, previewSupported: true }, { difficulty: 5, level: null, noteCount: null, durationMs: null, previewSupported: false }], warnings: [], audio: null, hasCover: false },
 };
 const Catalog = PublicCharts as unknown as ComponentType<{ loaderData: PublicChartsPageDto }>;
-const Detail = PublicChartDetail as unknown as ComponentType<{ loaderData: PublicChartDto }>;
+const DetailComponent = PublicChartDetail as unknown as ComponentType<{ loaderData: PublicChartDto }>;
+function Detail(props: { loaderData: PublicChartDto }) {
+  const client = makeQueryClient(); client.setQueryData(["me"], null);
+  return <QueryClientProvider client={client}><DetailComponent {...props} /></QueryClientProvider>;
+}
 afterEach(() => vi.unstubAllGlobals());
 test("catalog links to public details, names authors and anonymous content, shows difficulties, fallback cover and encoded cursor", () => {
   render(<MemoryRouter><Catalog loaderData={{ items: [chart, { ...chart, id: "anon", title: "Anonymous chart", author: null }], nextCursor: "next/+=" }} /></MemoryRouter>);
@@ -157,4 +163,17 @@ test("page three detail roundtrip preserves the actual previous page", async () 
   fireEvent.click(screen.getByRole("link", { name: /Published title/ }));
   fireEvent.click(await screen.findByRole("link", { name: m.public_chart_back_results() }));
   expect(screen.getByRole("link", { name: m.chart_previous() }).getAttribute("href")).toBe("/charts?q=star&cursor=page2");
+});
+
+test("favorites page three detail roundtrip restores raw private page cursors", async () => {
+  const { Route, Routes } = await import("react-router");
+  const { PublicChartCard } = await import("@/client/components/public-chart-card");
+  const { SocialPager } = await import("@/client/components/social-pager");
+  function FavoritesList() { return <><PublicChartCard chart={chart} /><SocialPager base="/me/favorites" nextCursor={null} /></>; }
+  render(<MemoryRouter initialEntries={[{ pathname: "/me/favorites", search: "?cursor=page3", state: { socialPageScope: "/me/favorites:", socialCursors: ["", "page2"] } }]}>
+    <Routes><Route path="/me/favorites" element={<FavoritesList />} /><Route path="/charts/:id" element={<Detail loaderData={chart} />} /></Routes>
+  </MemoryRouter>);
+  fireEvent.click(screen.getByRole("link", { name: /Published title/ }));
+  fireEvent.click(await screen.findByRole("link", { name: m.my_favorites() }));
+  expect(screen.getByRole("link", { name: m.chart_previous() }).getAttribute("href")).toBe("/me/favorites?cursor=page2");
 });

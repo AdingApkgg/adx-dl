@@ -85,6 +85,11 @@ const chartFrom = sql`from chart_public_ids i left join charts c on c.id=i.chart
   left join "user" u on u.id=c.owner_id left join user_public_ids ui on ui.user_id=u.id
   left join storage_journal_progress j on j.id='global'`;
 const visibleChart = sql`(m.chart_id is not null or (p.chart_id is not null and c.deleted_at is null and c.publication_sequence<=coalesce(j.exported_sequence,0) and (c.owner_id is null or u.status='active')))`;
+export async function dashChartsByIds(db: Db, ids: readonly string[]): Promise<DashChart[]> {
+  if (ids.length > 50 || ids.some(id => !UUID_PATTERN.test(id))) throw new HTTPException(400);
+  if (!ids.length) return [];
+  return read<DashChart>(db, sql`select ${chartColumns} ${chartFrom} where i.chart_id in (${sql.join(ids.map(id => sql`${id}::uuid`), sql`,`)}) and ${visibleChart}`);
+}
 export async function dashCharts(db: Db, page: ReturnType<typeof dashPage>): Promise<DashChartsPage> {
   const rows = await read<DashChart>(db, sql`select ${chartColumns} ${chartFrom}
     where i.public_id>${page.cursor}::bigint and ${visibleChart} order by i.public_id limit ${page.limit + 1}`);

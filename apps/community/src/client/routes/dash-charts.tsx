@@ -26,7 +26,8 @@ export default function DashCharts({ loaderData: page }: Route.ComponentProps) {
     <DashPager base="/dash/charts" nextCursor={page.nextCursor} />
   </section>;
 }
-function ChartRow({ chart }: { chart: DashChart }) {
+export function ChartRow({ chart, instanceId }: { chart: DashChart; instanceId?: string }) {
+  const fieldId = instanceId ?? chart.publicId;
   const [open, setOpen] = useState(false), [reason, setReason] = useState(""), [confirmed, setConfirmed] = useState(false), [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null), [reauth, setReauth] = useState(false);
   const location = useLocation(), revalidator = useRevalidator();
@@ -66,10 +67,10 @@ function ChartRow({ chart }: { chart: DashChart }) {
     {chart.status === "public" && !open ? <Button variant="outline" onClick={() => setOpen(true)}>{m.dash_take_down()}</Button> : null}
     {open && chart.status === "public" ? <form onSubmit={submit} className="space-y-3 rounded-lg border border-destructive/30 p-4">
       <p className="text-sm">{m.dash_take_down_hint()}</p>
-      <label className="grid gap-2 text-sm font-medium" htmlFor={`moderation-${chart.publicId}`}>{m.dash_reason()}
-        <Textarea id={`moderation-${chart.publicId}`} name="reason" value={reason} onChange={event => setReason(event.target.value)} maxLength={1000} rows={3} required disabled={pending} aria-describedby={`reason-count-${chart.publicId}`} />
+      <label className="grid gap-2 text-sm font-medium" htmlFor={`moderation-${fieldId}`}>{m.dash_reason()}
+        <Textarea id={`moderation-${fieldId}`} name="reason" value={reason} onChange={event => setReason(event.target.value)} maxLength={1000} rows={3} required disabled={pending} aria-describedby={`reason-count-${fieldId}`} />
       </label>
-      <p id={`reason-count-${chart.publicId}`} className="text-xs text-muted-foreground">{count}/500</p>
+      <p id={`reason-count-${fieldId}`} className="text-xs text-muted-foreground">{count}/500</p>
       <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} disabled={pending} className="mt-1 accent-destructive" />{m.dash_confirm_take_down({ id: chart.publicId })}</label>
       <div className="flex flex-wrap gap-2"><Button type="submit" variant="destructive" disabled={pending || !confirmed || count < 1 || count > 500}>{pending ? m.dash_submitting() : m.dash_confirm()}</Button><Button type="button" variant="outline" disabled={pending} onClick={() => { setOpen(false); setReason(""); setConfirmed(false); setFailure(null); }}>{m.dash_cancel()}</Button></div>
     </form> : null}

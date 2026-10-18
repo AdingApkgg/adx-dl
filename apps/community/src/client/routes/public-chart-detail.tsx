@@ -1,8 +1,9 @@
 import { DownloadIcon, PlayCircleIcon } from "lucide-react";
+import { ChartCommunityActions } from "../components/chart-community-actions";
 import { ShareChartButton } from "../components/share-chart-button";
 import { Button } from "@astrodx/ui/components/button";
 import { data, Link, redirect, useLocation } from "react-router";
-import { publicListReturnState } from "../lib/public-chart-navigation";
+import { publicListBackState, publicListReturnState } from "../lib/public-chart-navigation";
 import { m } from "@/paraglide/messages.js";
 import { getLocale, localizeHref } from "@/paraglide/runtime.js";
 import type { PublicChartDto } from "@/shared/charts";
@@ -47,7 +48,7 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
   const returnHref = returnState?.publicListHref;
   const canPreview = chart.summary.difficulties.some(row => row.previewSupported);
   return <main className="space-y-6">
-    <Link to={returnHref ?? localizeHref("/charts")} state={returnState ? { publicChartCursors: returnState.publicListCursors } : undefined} className={textLinkClass}>{returnHref ? /^\/(?:(?:en|ja)\/)?u\//.test(returnHref) ? m.public_chart_back_author() : m.public_chart_back_results() : m.public_charts_title()}</Link>
+    <Link to={returnHref ?? localizeHref("/charts")} state={returnState ? publicListBackState(returnState) : undefined} className={textLinkClass}>{returnHref ? /\/me\/favorites$/.test(returnHref.split("?")[0]!) ? m.my_favorites() : /^\/(?:(?:en|ja)\/)?u\//.test(returnHref) ? m.public_chart_back_author() : m.public_chart_back_results() : m.public_charts_title()}</Link>
     <div className="grid gap-6 md:grid-cols-[minmax(0,18rem)_1fr]">
       <div className="overflow-hidden rounded-xl border"><PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} /></div>
       <div className="min-w-0 space-y-3 break-words">
@@ -64,6 +65,7 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
           <Button asChild className="min-h-11"><a href={publicChartDownloadUrl(chart.publicId)} download><DownloadIcon aria-hidden="true" />{m.public_chart_download()}</a></Button>
           <ShareChartButton key={chart.id} title={chart.title} />
         </div>
+        <ChartCommunityActions chart={chart} />
         {!canPreview ? <p className="text-sm text-muted-foreground">{m.public_chart_preview_unavailable()}</p> : null}
       </div>
     </div>

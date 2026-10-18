@@ -1,14 +1,14 @@
 import { publicChartFiltersFromParams, publicChartSearchParams } from "@/shared/public-chart-search";
 import { isPublicUserId } from "@/shared/user-public-id";
 
-/** Only public catalog/profile pages may become a chart's return link. Never accept external or private URLs. */
+/** Only catalog/profile pages and the authenticated favorites page may become return links. */
 export function publicListHref(value: unknown): string | null {
   if (typeof value !== "string" || value.length > 2500 || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return null;
   try {
     const url = new URL(value, "https://community.invalid");
     if (url.origin !== "https://community.invalid" || url.hash) return null;
     const path = url.pathname.replace(/^\/(en|ja)(?=\/)/, "");
-    if (path !== "/charts" && !(path.startsWith("/u/") && isPublicUserId(path.slice(3)))) return null;
+    if (path !== "/charts" && path !== "/me/favorites" && !(path.startsWith("/u/") && isPublicUserId(path.slice(3)))) return null;
     if ([...url.searchParams.keys()].some(key => !["q", "difficulty", "sort", "author", "cursor"].includes(key))) return null;
     publicChartFiltersFromParams(url.searchParams);
     const cursor = url.searchParams.get("cursor");
@@ -34,4 +34,10 @@ export function publicListReturnState(value: unknown): PublicListReturnState | n
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>, href = publicListHref(record.publicListHref);
   return href ? { publicListHref: href, publicListCursors: publicListCursors(record.publicListCursors, href) } : null;
+}
+
+export function publicListBackState(state: PublicListReturnState) {
+  return /\/me\/favorites$/.test(state.publicListHref.split("?")[0]!)
+    ? { socialPageScope: "/me/favorites:", socialCursors: state.publicListCursors.map(href => new URL(href, "https://community.invalid").searchParams.get("cursor") ?? "") }
+    : { publicChartCursors: state.publicListCursors };
 }

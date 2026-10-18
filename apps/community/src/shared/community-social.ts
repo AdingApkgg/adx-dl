@@ -1,0 +1,23 @@
+import type { PublicChartDto } from "./charts";
+import type { DashChart } from "./dash";
+export const FAVORITE_LIMIT = 1000;
+export const REPORT_DAILY_LIMIT = 10;
+export const REPORT_OPEN_LIMIT = 20;
+export const REPORT_TEXT_MAX = 500;
+export const REPORT_CATEGORIES = ["copyright", "inappropriate", "broken", "other"] as const;
+export type ReportCategory = typeof REPORT_CATEGORIES[number];
+export type ReportStatus = "open" | "dismissed" | "actioned";
+export type FavoriteState = { favorited: boolean };
+export type FavoriteItem = { publicId: string; addedAt: string; chart: PublicChartDto | null };
+export type FavoritesPage = { items: FavoriteItem[]; nextCursor: string | null };
+export type ReportInput = { versionId: string; category: ReportCategory; details: string };
+export type MyReport = { id: string; publicId: string; versionId: string; category: ReportCategory; details: string;
+  status: ReportStatus; createdAt: string; resolvedAt: string | null; resolutionNote: string | null; chart: PublicChartDto | null };
+export type MyReportsPage = { items: MyReport[]; nextCursor: string | null };
+export type DashReport = Omit<MyReport, "chart"> & { title: string; artist: string; reporterPublicId: string | null;
+  resolverPublicId: string | null; chart: DashChart | null };
+export type DashReportsPage = { items: DashReport[]; nextCursor: string | null };
+export type ReportResolutionInput = { status: "dismissed" | "actioned"; note: string };
+export const SOCIAL_ERROR_CODES = ["FAVORITE_LIMIT", "REPORT_LIMIT", "REPORT_CHANGED", "REPORT_MODERATION_REQUIRED"] as const;
+
+export type ReportResolutionResult = { id: string; status: ReportStatus; note: string | null };
