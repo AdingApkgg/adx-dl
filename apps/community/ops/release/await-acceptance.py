@@ -88,6 +88,11 @@ def main():
     if mode == '--preflight': return
     revision = sys.argv[2]
     if not re.fullmatch('[a-f0-9]{7,64}', revision): raise ValueError('REVISION_REQUIRED')
+    if mode == '--candidate':
+        expected = os.environ.get('COMMUNITY_RELEASE_SOURCE_REVISION', '')
+        if not re.fullmatch('[a-f0-9]{40}', expected) or revision != expected:
+            raise ValueError('UPDATE_OPERATOR_TO_TARGET_SOURCE_REVISION')
+        return
     if mode == '--await':
         ready = { 'releaseId':run, 'revision':revision, 'startedAt':time.time(), 'smokeSha256':digest, 'runtime':runtime_snapshot() }
         atomic(directory/'ready.json', ready)

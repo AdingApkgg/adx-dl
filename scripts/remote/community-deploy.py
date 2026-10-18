@@ -30,6 +30,8 @@ process=None
 prepared=False
 complete=False
 try:
+    if not args.verify_current and subprocess.check_output(['git','-C',str(ROOT),'status','--porcelain','--untracked-files=no'],text=True).strip():
+        raise RuntimeError('COMMIT_OPERATOR_CHANGES_BEFORE_DEPLOYMENT')
     call('prepare',files=files);prepared=True
     print('RELEASE_STARTED '+release_id,flush=True)
     mode='--verify-current' if args.verify_current else '--no-pull' if args.no_pull else ''

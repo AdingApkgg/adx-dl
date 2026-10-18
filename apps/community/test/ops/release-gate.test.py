@@ -14,7 +14,7 @@ class ReleaseGateTests(unittest.TestCase):
   self.snapshot={role:{'id':role,'image':'sha256:old','startedAt':'start'} for role in ['web','worker','media-worker']}
   self.ready=dict(releaseId=self.run,revision=self.revision,startedAt=time.time()-1,smokeSha256=self.digest,runtime=self.snapshot)
   self.receipt=dict(schema=1,releaseId=self.run,smokeRunId='2'*32,result=dict(status='passed',authenticated='passed',role='admin',headless=True,authTransport='ssh-readonly-bridge-to-public-production',productionRevision=self.revision,smokeSha256=self.digest,sessionRevoked=True,businessWrites=False,pageErrors=0,routeFailures=0,blockedBusinessWrites=0,steps=sorted(gate.REQUIRED_STEPS),startedAt=dt.datetime.now(dt.timezone.utc).isoformat()),cleanup=dict(cleanup='passed',sessionRevoked=True,webNotRestarted=True,runId='2'*32))
-  self.env=dict(COMMUNITY_RELEASE_ID=self.run,COMMUNITY_RELEASE_DIR=str(self.context),COMMUNITY_SMOKE_SHA256=self.digest,COMMUNITY_RELEASE_TIMEOUT='1')
+  self.env=dict(COMMUNITY_RELEASE_ID=self.run,COMMUNITY_RELEASE_DIR=str(self.context),COMMUNITY_SMOKE_SHA256=self.digest,COMMUNITY_RELEASE_TIMEOUT='1',COMMUNITY_RELEASE_SOURCE_REVISION=self.revision)
   self.old=os.getcwd();os.chdir(self.root);self.addCleanup(os.chdir,self.old)
   (self.root/'.deploy-revision').write_text('old\n');(self.root/'.serving-revision').write_text(self.revision+'\n')
  def write_receipt(self):gate.atomic(self.context/'acceptance.json',self.receipt)
@@ -72,6 +72,12 @@ class ReleaseGateTests(unittest.TestCase):
   self.write_receipt();self.invoke('--await')
   self.env['COMMUNITY_RELEASE_ID']='f'*32;(self.context/'.owner').write_text('f'*32)
   with self.assertRaisesRegex(ValueError,'CONTEXT_MISMATCH'):self.invoke('--complete')
+ def test_candidate_requires_exact_operator_source_revision(self):
+  self.invoke('--candidate')
+  for revision in ['', 'c'*40]:
+   self.env['COMMUNITY_RELEASE_SOURCE_REVISION']=revision
+   with self.assertRaisesRegex(ValueError,'UPDATE_OPERATOR'):self.invoke('--candidate')
+   self.assertEqual((self.root/'.deploy-revision').read_text(),'old\n')
  def test_preflight_requires_owned_context_and_script_digest(self):
   self.invoke('--preflight')
   for key,value in [('COMMUNITY_RELEASE_ID',''),('COMMUNITY_SMOKE_SHA256',''),('COMMUNITY_RELEASE_TIMEOUT','0')]:

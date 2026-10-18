@@ -91,6 +91,8 @@ rollback_hint() {
 }
 
 if [ "$verify_current" != 1 ]; then
+# Never apply a newer checkout with an older operator/test bundle.
+"$release_gate" --candidate "$current"
 # compose.yaml 里必填的变量写成 ${…:?}：缺了在这里就报出来，不用等到容器起不来。
 docker compose config --quiet
 

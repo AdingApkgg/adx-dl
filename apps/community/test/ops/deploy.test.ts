@@ -12,7 +12,7 @@ const DEPLOY = fileURLToPath(new URL("../../deploy.sh", import.meta.url));
 const FAKES = {
   flock: `exit 0`,
   gate: `case "$1" in
-  --preflight) exit 0 ;;
+  --preflight|--candidate) exit 0 ;;
   --await) exit "\${FAKE_HEADLESS_EXIT:-0}" ;;
   --complete) echo "$2" > .deploy-revision ;;
   *) exit 2 ;;

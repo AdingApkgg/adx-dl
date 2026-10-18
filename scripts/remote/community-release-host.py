@@ -36,7 +36,7 @@ else:
                 assert re.fullmatch('[A-Z][A-Z0-9_]*',key)
                 env.pop(key,None)
         overlay = deployment/'.superpowers/napcat-reuse.compose.yaml'
-        env.update(COMMUNITY_DEPLOY_DIR=str(deployment),COMMUNITY_RELEASE_ID=task['releaseId'],COMMUNITY_RELEASE_DIR=str(root),COMMUNITY_SMOKE_SHA256=task['smokeSha256'],COMMUNITY_RELEASE_TIMEOUT='600')
+        env.update(COMMUNITY_DEPLOY_DIR=str(deployment),COMMUNITY_RELEASE_ID=task['releaseId'],COMMUNITY_RELEASE_DIR=str(root),COMMUNITY_SMOKE_SHA256=task['smokeSha256'],COMMUNITY_RELEASE_TIMEOUT='600',COMMUNITY_RELEASE_SOURCE_REVISION=task['baseCommit'])
         if overlay.is_file():env['COMPOSE_FILE']='compose.yaml:.superpowers/napcat-reuse.compose.yaml'
         args=['bash',str(tools/'apps/community/deploy.sh')]
         if task['mode']:args.append(task['mode'])
