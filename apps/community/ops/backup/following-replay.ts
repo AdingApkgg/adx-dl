@@ -1,3 +1,4 @@
+import { FOLLOWING_BASELINE_SQL } from "../../src/server/following/baseline";
 import type { Client } from "pg";
 import { privateSocialFact } from "../../src/shared/private-social-journal";
 import { communityHash } from "../../src/server/community/content-journal";
@@ -22,10 +23,10 @@ export async function replayFollowingFact(c:Pick<Client,"query">,record:JournalR
  } else if(fact.entity==="publication") {
   const prior=await c.query("select id from community_publication_events where chart_id=$1 and version_id=$2",[fact.chartId,fact.versionId]);
   if(prior.rowCount&&prior.rows[0].id!==fact.id)throw new Error("PUBLICATION_EVENT_ID_CONFLICT");
-  // Replayed events are facts for history/feed, never an instruction to resend snapshot-era updates.
+  // Rebuild pending work; durable delivery/read facts make retries safe.
   await c.query(`insert into community_publication_events(id,chart_id,version_id,author_id,occurred_at,permission_sequence,journal_sequence,notify,completed)
-   values($1,$2,$3,(select id from "user" where id=$4),$5,$6,$7,$8,true)
-   on conflict(chart_id,version_id) do update set journal_sequence=excluded.journal_sequence,completed=true`,[fact.id,fact.chartId,fact.versionId,fact.authorId,fact.occurredAt,fact.permissionSequence,record.sequence,fact.notify]);
+   values($1,$2,$3,(select id from "user" where id=$4),$5,$6,$7,$8,not $8)
+   on conflict(chart_id,version_id) do update set journal_sequence=excluded.journal_sequence,notify=excluded.notify,cursor=null,completed=excluded.completed`,[fact.id,fact.chartId,fact.versionId,fact.authorId,fact.occurredAt,fact.permissionSequence,record.sequence,fact.notify]);
  } else {
   // Resolve uniqueness before restoring the latest unread author group; an older read group stays read.
   await c.query(`update community_update_notifications set read_at=coalesce(read_at,$4::timestamptz) where user_id=$1 and author_id=$2 and id<>$3 and read_at is null and event_at<=$4::timestamptz`,[fact.userId,fact.authorId,fact.id,fact.eventAt]);
@@ -40,7 +41,9 @@ export async function replayFollowingFact(c:Pick<Client,"query">,record:JournalR
   on conflict(key) do update set revision=excluded.revision,fact=excluded.fact,journal_sequence=excluded.journal_sequence where community_private_states.revision<=excluded.revision`,[key,fact.entity,fact.revision,JSON.stringify(fact),record.sequence]);
 }
 export async function finishFollowingReplay(c:Pick<Client,"query">,durable:number) {
- await c.query("update community_publication_events set completed=true where not completed");
+ await c.query(FOLLOWING_BASELINE_SQL);
+ // Snapshot cursors are only hints. Resume from the start and deduplicate with durable facts.
+ await c.query("update community_publication_events set cursor=null,completed=(not notify or author_id is null)");
  // An old dump may include an unacknowledged control ahead of the durable witness.
  // Disable only this private subsystem; public browsing must not guess its state.
  await c.query(`update community_following_status set ready=not exists(select 1 from community_private_states where journal_sequence>$1)

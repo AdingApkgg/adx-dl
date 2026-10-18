@@ -1,3 +1,4 @@
+import { StorageUnavailableError } from "../storage/errors";
 import { sql } from "drizzle-orm";
 import type { PgBoss } from "pg-boss";
 import type { StorageContext } from "../storage/contracts";
@@ -17,6 +18,9 @@ function notificationFact(row:UpdateRow):PrivateNotificationFact {
 }
 async function currentEvent(ctx:StorageContext,event:EventRow) {
  if(!event.author_id)return null;
+ // Caller holds a transaction: serialize visibility classification with permission writes.
+ const [visibility]=await rows<{pending:boolean}>(ctx.db,sql`select publication_sequence>${exported} pending from charts where id=${event.chart_id}::uuid for share`);
+ if(visibility?.pending)throw new StorageUnavailableError();
  const [chart]=await getPublicChartsByIds(ctx,[event.chart_id]);
  return chart&&chart.author?.id===event.author_id&&chart.versionId===event.version_id?chart:null;
 }
@@ -26,7 +30,7 @@ export async function dispatchFollowingUpdates(ctx:StorageContext) {
  try {
   const events=await rows<EventRow>(ctx.db,sql`select * from community_publication_events where not completed and journal_sequence<=${exported} order by occurred_at,id limit 20`);
   for(const event of events) {
-   if(!event.notify||!event.author_id||!await currentEvent(ctx,event)) {await withStorageTransaction(ctx.db,tx=>tx.execute(sql`update community_publication_events set completed=true where id=${event.id}::uuid`));continue;}
+   if(!event.notify||!event.author_id||!await withStorageTransaction(ctx.db,tx=>currentEvent({...ctx,db:tx as unknown as Db},event))) {await withStorageTransaction(ctx.db,tx=>tx.execute(sql`update community_publication_events set completed=true where id=${event.id}::uuid`));continue;}
    const recipients=await rows<{id:string}>(ctx.db,sql`select f.user_id id from community_follows f join "user" u on u.id=f.user_id and u.status='active'
     where f.author_id=${event.author_id} and ${effectiveFollow()} and f.notify_since<=${event.occurred_at} and f.followed_at<=${event.occurred_at}
     and f.journal_sequence<=${exported} and f.journal_sequence<${event.journal_sequence} and (${event.cursor}::text is null or f.user_id>${event.cursor}) order by f.user_id limit 101`);

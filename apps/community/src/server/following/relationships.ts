@@ -35,8 +35,8 @@ export async function setFollow(ctx:StorageContext,userId:string,publicId:string
   if(active===input.following&&notify===input.notify)return Number(prior?.journal_sequence??0);
   if((prior?.revision??0)!==input.expectedRevision||(prior?.revision??0)>=2147483646)throw changed();
   if(input.following&&!active){const [count]=await rows<{n:number}>(tx,sql`select count(*)::int n from community_follows f join "user" a on a.id=f.author_id and a.status='active' where f.user_id=${userId} and ${effectiveFollow()}`);if(count.n>=FOLLOWING_LIMIT)throw new StorageError(429,"FOLLOWING_LIMIT","FOLLOWING_LIMIT",60);}
-  const now=await storageTime(tx),followedAt=input.following?(active?prior!.followed_at!:now):null;
-  const notifySince=input.following&&input.notify?(active&&prior?.notify_since?prior.notify_since:now):null;
+  const now=await storageTime(tx),followedAt=input.following?(active?new Date(prior!.followed_at!):now):null;
+  const notifySince=input.following&&input.notify?(active&&prior?.notify_since?new Date(prior.notify_since):now):null;
   const id=prior?.id??crypto.randomUUID(),revision=(prior?.revision??0)+1;
   const sequence=await recordPrivateFact(tx,{version:1,entity:"follow",id,userId,authorId:target.id,revision,followedAt:followedAt?stamp(followedAt):null,notifySince:notifySince?stamp(notifySince):null,updatedAt:stamp(now)});
   await tx.insert(communityFollows).values({id,userId,authorId:target.id,revision,followedAt,notifySince,updatedAt:now,journalSequence:sequence})
@@ -53,5 +53,5 @@ export async function listFollowing(ctx:StorageContext,userId:string,cursor?:str
   join user_public_ids p on p.user_id=u.id and p.journal_sequence<=${exported} where f.user_id=${userId} and ${effectiveFollow()} and f.journal_sequence<=${exported}
   ${p.cursor?sql`and (f.followed_at,f.id)<(${p.cursor.at}::timestamptz,${p.cursor.id}::uuid)`:sql``} order by f.followed_at desc,f.id desc limit 21`);
  const items:FollowingItem[]=result.slice(0,20).map(r=>({id:r.id,revision:r.revision,following:true,notify:!!r.notify_since,followedAt:stamp(r.followed_at!),author:{id:r.author_id,publicId:r.public_id,name:r.name,image:r.image}}));
- const last=result[19];return {items,nextCursor:result.length>20&&last?p.encode(last.followed_at!,last.id):null};
+ const last=result[19];return {items,nextCursor:result.length>20&&last?p.encode(new Date(last.followed_at!),last.id):null};
 }

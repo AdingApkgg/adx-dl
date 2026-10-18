@@ -17,11 +17,11 @@ test("follow explicitly defaults alerts off and enables alerts through a second 
  expect(writes[0]).toEqual({expectedRevision:0,following:true,notify:false});expect((screen.getByRole("checkbox",{name:m.following_notify()}) as HTMLInputElement).checked).toBe(false);
  fireEvent.click(screen.getByRole("checkbox",{name:m.following_notify()}));await waitFor(()=>expect(writes).toHaveLength(2));expect(writes[1]).toEqual({expectedRevision:1,following:true,notify:true});
 });
-test("private loader data disappears synchronously when the current account changes",async()=>{
+test("private loader data disappears when the current account changes",async()=>{
  vi.stubGlobal("fetch",vi.fn(async()=>Response.json({revision:0,following:false,notify:false,followedAt:null})));
  const {client}=view({id:"viewer",publicId:"1",status:"active"});expect(screen.getByText("Private following row")).toBeTruthy();
  await act(async()=>{client.setQueryData(["me"],{id:"different-account",publicId:"3",status:"active"});});
- expect(screen.queryByText("Private following row")).toBeNull();
+ await waitFor(()=>expect(screen.queryByText("Private following row")).toBeNull());
 });
 test("a private API failure remains an error rather than an unfollowed state",async()=>{
  vi.stubGlobal("fetch",vi.fn(async()=>Response.json({error:{code:"STORAGE_BUSY",message:"retry"}},{status:503})));

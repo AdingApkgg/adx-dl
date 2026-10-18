@@ -1,11 +1,11 @@
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
 import type { FollowState } from "@/shared/following";
-import { getBrowserApi, getBrowserQueryClient, getRenderApi } from "../lib/browser";
+import { getBrowserApi, getRenderApi } from "../lib/browser";
 import { loginHref } from "../lib/require-user";
 import { followingApi } from "../queries/following";
 import { meQuery } from "../queries/me";
@@ -23,10 +23,10 @@ export function FollowAuthor({publicId}:{publicId:string}) {
  return <FollowControls key={`${me.id}/${publicId}`} publicId={publicId} state={relation.data} onChanged={()=>{void relation.refetch();}}/>;
 }
 export function FollowControls({publicId,state,onChanged}:{publicId:string;state:FollowState;onChanged:()=>void}) {
- const task=useDiscussionTask();
+ const task=useDiscussionTask(), queryClient=useQueryClient();
  async function save(following:boolean,notify:boolean) {
   if(await task.run(()=>followingApi(getBrowserApi()).set(publicId,{expectedRevision:state.revision,following,notify}))) {
-   await getBrowserQueryClient().invalidateQueries({queryKey:["following"]});
+   await queryClient.invalidateQueries({queryKey:["following"]});
    onChanged();
   }
  }

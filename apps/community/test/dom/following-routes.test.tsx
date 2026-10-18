@@ -8,14 +8,14 @@ import FollowingFeed from "@/client/routes/following-feed";
 import { m } from "@/paraglide/messages.js";
 function wrap(component:React.ReactNode,meId="viewer"){const client=makeQueryClient();client.setQueryData(["me"],{id:meId,publicId:"1",status:"active"});return render(<QueryClientProvider client={client}><MemoryRouter>{component}</MemoryRouter></QueryClientProvider>);}
 test("private following empty state links to feed without exposing another account",()=>{
- wrap(<Following loaderData={{userId:"viewer",page:{items:[],nextCursor:null}}} params={{}} matches={[]}/>);
+ wrap(<Following loaderData={{userId:"viewer",page:{items:[],nextCursor:null}}} params={{}} matches={[] as never}/>);
  expect(screen.getByText(m.following_empty())).toBeTruthy();expect(screen.getByRole("link",{name:m.following_feed_title()}).getAttribute("href")).toBe("/me/feed");
 });
 test("feed distinguishes filtered pages from a genuinely empty window",()=>{
- wrap(<FollowingFeed loaderData={{userId:"viewer",page:{items:[],nextCursor:"next-page"}}} params={{}} matches={[]}/>);
+ wrap(<FollowingFeed loaderData={{userId:"viewer",page:{items:[],nextCursor:"next-page"}}} params={{}} matches={[] as never}/>);
  expect(screen.getByText(m.following_feed_filtered())).toBeTruthy();
 });
 test("mismatched account cannot render retained private page rows",()=>{
- wrap(<FollowingFeed loaderData={{userId:"original-viewer",page:{items:[],nextCursor:null}}} params={{}} matches={[]}/>);
+ wrap(<FollowingFeed loaderData={{userId:"original-viewer",page:{items:[],nextCursor:null}}} params={{}} matches={[] as never}/>);
  expect(screen.queryByRole("heading",{name:m.following_feed_title()})).toBeNull();
 });

@@ -34,5 +34,5 @@ export async function listFeed(ctx:StorageContext,userId:string,cursor?:string) 
  const charts=await getPublicChartsByIds(ctx,result.slice(0,20).map(e=>e.chart_id));
  const visible=new Map(charts.map(chart=>[chart.id,chart]));
  const items:FollowingUpdate[]=result.slice(0,20).flatMap(event=>{const chart=visible.get(event.chart_id);return chart&&chart.author?.id===event.author_id&&chart.versionId===event.version_id?[{id:event.id,occurredAt:stamp(event.occurred_at),chart}]:[];});
- const last=result[19];return {items,nextCursor:result.length>20&&last?p.encode(last.occurred_at,last.id):null};
+ const last=result[19];return {items,nextCursor:result.length>20&&last?p.encode(new Date(last.occurred_at),last.id):null};
 }

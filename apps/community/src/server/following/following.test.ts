@@ -1,6 +1,6 @@
 import { beforeAll,afterAll,expect,test } from "bun:test";
 import { mkdtemp,writeFile,rm } from "node:fs/promises";
-import { eq,sql } from "drizzle-orm";
+import { eq,inArray,sql } from "drizzle-orm";
 import { Client } from "pg";
 import { initializeJournal,exportJournal,verifyLatestJournal,type JournalConfig } from "../../../ops/backup/journal";
 import { replayFollowingFact,finishFollowingReplay } from "../../../ops/backup/following-replay";
@@ -10,7 +10,7 @@ import { cleanupStorageFixture } from "../../../test/storage/fixture";
 import { resetTestDatabase } from "../testing/test-db";
 import { prepareTestQueues } from "../testing/test-boss";
 import { testDatabaseUrl } from "../testing/services";
-import { storageJournalProgress,userPublicIds,user,communityFollowingStatus } from "../db/schema";
+import { storageJournalProgress,userPublicIds,user,communityFollowingStatus,charts,chartVersions,chartPublications } from "../db/schema";
 import { createChart,appendChartVersion,updateChart } from "../charts/service";
 import { publishChart,withdrawChart } from "../charts/publication";
 import { withStorageTransaction } from "../storage/transactions";
@@ -18,6 +18,7 @@ import { getFollow,setFollow,listFollowing } from "./relationships";
 import { listFeed,publicationEventId } from "./events";
 import { dispatchFollowingUpdates,followingStatus } from "./notifications";
 import { listNotifications,readNotifications } from "../discussions/notifications";
+import { recordPrivateFact } from "./journal";
 import { followingDeletionHandler } from "./deletion";
 let f:Awaited<ReturnType<typeof readyContext>>,file:ReturnType<typeof followingChartFiles>,journal:JournalConfig,directory:string;
 const owners:string[]=[];
@@ -32,7 +33,7 @@ beforeAll(async()=>{
  await resetTestDatabase();await prepareTestQueues();f=await readyContext();file=followingChartFiles(f);directory=await mkdtemp("/tmp/following-journal-");const keyFile=`${directory}/key`;await writeFile(keyFile,crypto.getRandomValues(new Uint8Array(32)),{mode:0o600});journal={directory:`${directory}/log`,keyFile,databaseUrl:testDatabaseUrl()};
  await f.ctx.db.update(storageJournalProgress).set({exportedSequence:0,chainHash:null,exportedAt:null}).where(eq(storageJournalProgress.id,"global"));await initializeJournal(journal);f.ctx.exportChartJournal=async()=>{await exportJournal(journal);};
 },30000);
-afterAll(async()=>{if(f){await f.ctx.db.update(communityFollowingStatus).set({ready:true}).where(eq(communityFollowingStatus.id,"global"));await cleanupStorageFixture(f.ctx.db,owners,[f.policy.id],undefined,true);}if(directory)await rm(directory,{recursive:true,force:true});},30000);
+afterAll(async()=>{if(f){await f.ctx.db.update(communityFollowingStatus).set({ready:true}).where(eq(communityFollowingStatus.id,"global"));const own=await f.ctx.db.select({id:charts.id}).from(charts).where(inArray(charts.ownerId,owners));const ids=own.map(c=>c.id);if(ids.length){await f.ctx.db.delete(chartPublications).where(inArray(chartPublications.chartId,ids));await f.ctx.db.update(charts).set({currentVersionId:null}).where(inArray(charts.id,ids));await f.ctx.db.delete(chartVersions).where(inArray(chartVersions.chartId,ids));await f.ctx.db.delete(charts).where(inArray(charts.id,ids));}await cleanupStorageFixture(f.ctx.db,owners,[f.policy.id],undefined,true);}if(directory)await rm(directory,{recursive:true,force:true});},30000);
 
 test("private follow is idempotent, optimistic and cannot follow self",async()=>{
  const a=await owner(),b=await owner();
@@ -121,3 +122,59 @@ test("concurrent dispatch of one event has one durable delivery and one unread a
  const notices=await listNotifications(f.ctx,b.id,{kind:"author_update"});expect(notices.items).toHaveLength(1);
  const delivered=await f.ctx.db.execute(sql`select count(*)::int n from community_update_deliveries where event_id=${publicationEventId(chart.id,chart.currentVersionId!)}::uuid and user_id=${b.id}`);expect(delivered.rows[0]?.n).toBe(1);
 });
+
+async function replayPrivateTail() {
+ const verified=await verifyLatestJournal(journal),c=new Client({connectionString:testDatabaseUrl()});await c.connect();
+ try{for(const r of verified.records.filter(r=>r.kind==="private_social"))await replayFollowingFact(c,r);await finishFollowingReplay(c,verified.head.sequence);}finally{await c.end();}
+}
+test("recovery resumes an exported publication before its first delivery",async()=>{
+ const a=await owner(),b=await owner();await setFollow(f.ctx,b.id,a.number,{expectedRevision:0,following:true,notify:true});await release(a.id);
+ expect((await listNotifications(f.ctx,b.id,{})).items).toHaveLength(0);
+ await replayPrivateTail();await dispatch();expect((await listNotifications(f.ctx,b.id,{})).items).toHaveLength(1);
+ await dispatch();expect((await listNotifications(f.ctx,b.id,{})).items).toHaveLength(1);
+});
+test("recovery restarts a partial 101-recipient batch without reviving a read notification",async()=>{
+ const a=await owner(),followers=Array.from({length:101},()=>crypto.randomUUID()).sort();owners.push(...followers);
+ await f.ctx.db.insert(user).values(followers.map(id=>({id,name:"Batch follower",email:`${id}@placeholder.invalid`})));
+ const now=new Date().toISOString();
+ await withStorageTransaction(f.ctx.db,async tx=>{for(const userId of followers){const fact={version:1 as const,entity:"follow" as const,id:crypto.randomUUID(),revision:1,userId,authorId:a.id,followedAt:now,notifySince:now,updatedAt:now};const sequence=await recordPrivateFact(tx,fact);await tx.execute(sql`insert into community_follows(id,user_id,author_id,revision,followed_at,notify_since,updated_at,journal_sequence) values(${fact.id}::uuid,${userId},${a.id},1,${now},${now},${now},${sequence})`);}});
+ await f.ctx.exportChartJournal!();const chart=await release(a.id),event=publicationEventId(chart.id,chart.currentVersionId!);
+ await dispatchFollowingUpdates(f.ctx);
+ expect((await f.ctx.db.execute(sql`select count(*)::int n from community_update_deliveries where event_id=${event}::uuid`)).rows[0]?.n).toBe(100);
+ const notice=(await listNotifications(f.ctx,followers[0]!,{})).items[0]!;await readNotifications(f.ctx,followers[0]!,[notice.id]);
+ await replayPrivateTail();await dispatch();
+ expect((await f.ctx.db.execute(sql`select count(*)::int n from community_update_deliveries where event_id=${event}::uuid`)).rows[0]?.n).toBe(101);
+ expect((await listNotifications(f.ctx,followers[0]!,{unread:true})).items).toHaveLength(0);
+ expect((await listNotifications(f.ctx,followers[100]!,{})).items).toHaveLength(1);
+},30000);
+test("legacy permission tail is backfilled quietly before an old version is republished",async()=>{
+ const a=await owner(),b=await owner();await setFollow(f.ctx,b.id,a.number,{expectedRevision:0,following:true,notify:true});let chart=await release(a.id);
+ const event=publicationEventId(chart.id,chart.currentVersionId!);
+ // Model a pre-feature dump + verified permission tail: this version has no private publication fact.
+ await f.ctx.db.execute(sql`delete from community_publication_events where id=${event}::uuid`);
+ const verified=await verifyLatestJournal(journal),c=new Client({connectionString:testDatabaseUrl()});await c.connect();try{await finishFollowingReplay(c,verified.head.sequence);}finally{await c.end();}
+ expect((await f.ctx.db.execute(sql`select notify,completed from community_publication_events where id=${event}::uuid`)).rows[0]).toEqual({notify:false,completed:true});
+ expect((await listFeed(f.ctx,b.id)).items.map(i=>i.chart.id)).toContain(chart.id);
+ chart=await updateChart(f.ctx,a.id,chart.id,{expectedRevision:chart.revision,title:"Legacy metadata",artist:"Artist"});
+ await publishChart(f.ctx,a.id,chart.id,{expectedRevision:chart.revision,versionId:chart.currentVersionId!,confirmOriginalArchive:true});await dispatch();
+ expect((await listNotifications(f.ctx,b.id,{})).items).toHaveLength(0);
+});
+test("a pending permission export defers dispatch and preserves its recipient cursor",async()=>{
+ const a=await owner(),b=await owner();await setFollow(f.ctx,b.id,a.number,{expectedRevision:0,following:true,notify:true});let chart=await release(a.id);
+ chart=await updateChart(f.ctx,a.id,chart.id,{expectedRevision:chart.revision,title:"Pending metadata",artist:"Artist"});
+ const exporter=f.ctx.exportChartJournal;f.ctx.exportChartJournal=async()=>{};
+ try{await expect(publishChart(f.ctx,a.id,chart.id,{expectedRevision:chart.revision,versionId:chart.currentVersionId!,confirmOriginalArchive:true})).rejects.toMatchObject({status:503});
+ await expect(dispatchFollowingUpdates(f.ctx)).rejects.toMatchObject({status:503});
+ const [event]=(await f.ctx.db.execute(sql`select completed,cursor from community_publication_events where chart_id=${chart.id}::uuid`)).rows;expect(event).toEqual({completed:false,cursor:null});
+ expect((await listNotifications(f.ctx,b.id,{})).items).toHaveLength(0);
+ }finally{f.ctx.exportChartJournal=exporter;await exporter!();}
+ await dispatch();expect((await listNotifications(f.ctx,b.id,{})).items).toHaveLength(1);
+});
+
+test("feed keyset pages remain private and decode native SQL timestamps",async()=>{
+ const a=await owner(),b=await owner(),other=await owner();await setFollow(f.ctx,b.id,a.number,{expectedRevision:0,following:true,notify:false});
+ for(let i=0;i<21;i++)await release(a.id);
+ const first=await listFeed(f.ctx,b.id);expect(first.items).toHaveLength(20);expect(first.nextCursor).toBeTruthy();
+ const second=await listFeed(f.ctx,b.id,first.nextCursor!);expect(second.items).toHaveLength(1);expect(second.nextCursor).toBeNull();expect(new Set([...first.items,...second.items].map(i=>i.id)).size).toBe(21);
+ await expect(listFeed(f.ctx,other.id,first.nextCursor!)).rejects.toMatchObject({status:409});
+},30000);
