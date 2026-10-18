@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +10,13 @@ const DEPLOY = fileURLToPath(new URL("../../deploy.sh", import.meta.url));
 // 假的 git：pull 之前 HEAD 是 aaaaaaa，之后是 bbbbbbb；分支由 FAKE_BRANCH 决定。假的 docker：迁移的退出码由
 // FAKE_MIGRATE_EXIT 决定。curl 的耗时和就绪次数可控；date、sleep 共用一个假时钟，不真的等待。
 const FAKES = {
+  flock: `exit 0`,
+  gate: `case "$1" in
+  --preflight|--candidate) exit 0 ;;
+  --await) exit "\${FAKE_HEADLESS_EXIT:-0}" ;;
+  --complete) echo "$2" > .deploy-revision ;;
+  *) exit 2 ;;
+esac`,
   git: `case "$*" in
   "rev-parse HEAD") cat "$FAKE_DIR/head" ;;
   "rev-parse --abbrev-ref HEAD") echo "\${FAKE_BRANCH:-pre}" ;;
@@ -56,6 +63,8 @@ async function setup({ env = true } = {}) {
   if (env) {
     await writeFile(path.join(sandbox.dir, ".env"), "PUBLIC_ORIGIN=https://adxc.saop.cc\n");
   }
+  await mkdir(path.join(sandbox.dir, "ops/release"), { recursive: true });
+  await copyFile(path.join(sandbox.bin, "gate"), path.join(sandbox.dir, "ops/release/await-acceptance.py"));
   return copyScript(sandbox, DEPLOY, "deploy.sh");
 }
 
@@ -132,8 +141,8 @@ describe("deploy.sh", () => {
     // 6 秒、每 2 秒一次：3 次，加上最后打印结果的那一次。
     expect(await commands(["curl"])).toHaveLength(4);
     expect(output).toContain('"jobs":"fail"');
-    expect(output).toContain("回滚：git checkout --detach aaaaaaa && ./deploy.sh --no-pull");
-    expect(output).toContain("修好以后回到 pre：git checkout pre && ./deploy.sh");
+    expect(output).toContain("回滚：git checkout --detach aaaaaaa，再在控制端运行 python3 scripts/remote/community-deploy.py --no-pull");
+    expect(output).toContain("修好以后回到 pre：git checkout pre，再在控制端运行 python3 scripts/remote/community-deploy.py");
   });
 
   test("--no-pull（回滚用）：不看分支、不拉代码，按当前检出的提交部署", async () => {
@@ -172,7 +181,7 @@ describe("deploy.sh：失败重试和就绪期限", () => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const retry = await sandbox.run(script, [], { FAKE_READY_AFTER: "0", READY_TIMEOUT: "2" });
       expect(retry.code).toBe(1);
-      expect(retry.output).toContain("git checkout --detach aaaaaaa && ./deploy.sh --no-pull");
+      expect(retry.output).toContain("git checkout --detach aaaaaaa，再在控制端运行 python3 scripts/remote/community-deploy.py --no-pull");
       expect(await deployedRevision()).toBe("aaaaaaa\n");
     }
   });
@@ -188,7 +197,7 @@ describe("deploy.sh：失败重试和就绪期限", () => {
       READY_TIMEOUT: "2",
     });
     expect(next.code).toBe(1);
-    expect(next.output).toContain("git checkout --detach bbbbbbb && ./deploy.sh --no-pull");
+    expect(next.output).toContain("git checkout --detach bbbbbbb，再在控制端运行 python3 scripts/remote/community-deploy.py --no-pull");
     expect(await deployedRevision()).toBe("bbbbbbb\n");
   });
 
@@ -286,3 +295,35 @@ test("unhealthy media process cannot complete deployment even if web ready; pres
  await sandbox.run(script, [], {FAKE_SERVING_IMAGE:"sha256:failed-new",FAKE_ROLLBACK_INSPECT_EXIT:"0",FAKE_READY_AFTER:"0",READY_TIMEOUT:"1"});
  expect(await sandbox.calls()).not.toContain("docker image tag sha256:failed-new astrodx-community:rollback-aaaaaaa");
  });
+
+
+describe("formal production headless gate", () => {
+  test("ready web with failed headless gate never advances accepted revision", async () => {
+    const script = await setup();
+    const result = await sandbox.run(script, [], { FAKE_HEADLESS_EXIT: "9" });
+    expect(result.code).toBe(1);
+    expect(result.output).not.toContain("部署完成");
+    expect(await deployedRevision()).toBe("aaaaaaa\n");
+    expect(await readFile(path.join(sandbox.dir, ".serving-revision"), "utf8")).toBe("bbbbbbb\n");
+    expect((await sandbox.calls()).some(call => call.startsWith("gate --complete"))).toBe(false);
+  });
+  test("headless acceptance precedes the final completed marker", async () => {
+    const script = await setup();
+    const result = await sandbox.run(script);
+    expect(result.code).toBe(0);
+    const calls = await sandbox.calls();
+    expect(calls.indexOf("gate --await bbbbbbb")).toBeGreaterThan(calls.indexOf("docker compose exec -T media-worker bun src/server/storage/health.ts media"));
+    expect(calls.indexOf("gate --complete bbbbbbb")).toBeGreaterThan(calls.indexOf("gate --await bbbbbbb"));
+    expect(await deployedRevision()).toBe("bbbbbbb\n");
+  });
+  test("verify-current runs readiness and gate without build, migration or restarting roles", async () => {
+    const script = await setup();
+    await writeFile(path.join(sandbox.dir, ".deploy-revision"), "bbbbbbb\n");
+    await writeFile(path.join(sandbox.dir, ".serving-revision"), "ccccccc\n");
+    const result = await sandbox.run(script, ["--verify-current"]);
+    expect(result.code).toBe(0);
+    expect(await deployedRevision()).toBe("ccccccc\n");
+    expect((await sandbox.calls()).some(call => /compose (build|run|up)/.test(call))).toBe(false);
+    expect((await sandbox.calls()).includes("gate --await ccccccc")).toBe(true);
+  });
+});
