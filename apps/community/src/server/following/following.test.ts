@@ -19,6 +19,7 @@ import { listFeed,publicationEventId } from "./events";
 import { dispatchFollowingUpdates,followingStatus } from "./notifications";
 import { listNotifications,readNotifications } from "../discussions/notifications";
 import { recordPrivateFact } from "./journal";
+import { requestDeletion,cancelDeletion } from "../services/user-deletion";
 import { followingDeletionHandler } from "./deletion";
 let f:Awaited<ReturnType<typeof readyContext>>,file:ReturnType<typeof followingChartFiles>,journal:JournalConfig,directory:string;
 const owners:string[]=[];
@@ -178,3 +179,11 @@ test("feed keyset pages remain private and decode native SQL timestamps",async()
  const second=await listFeed(f.ctx,b.id,first.nextCursor!);expect(second.items).toHaveLength(1);expect(second.nextCursor).toBeNull();expect(new Set([...first.items,...second.items].map(i=>i.id)).size).toBe(21);
  await expect(listFeed(f.ctx,other.id,first.nextCursor!)).rejects.toMatchObject({status:409});
 },30000);
+
+test("deletion cannot report success before its account cutoff is exported",async()=>{
+ const a=await owner(),b=await owner();await setFollow(f.ctx,b.id,a.number,{expectedRevision:0,following:true,notify:true});
+ const exporter=f.ctx.exportChartJournal,deps={db:f.ctx.db,boss:f.ctx.boss,handlers:[followingDeletionHandler(f.ctx)]};f.ctx.exportChartJournal=async()=>{};
+ try{await expect(requestDeletion(deps,a.id,{deleteContent:false})).rejects.toMatchObject({status:503});expect((await f.ctx.db.select().from(user).where(eq(user.id,a.id)))[0]?.status).toBe("pending_deletion");}
+ finally{f.ctx.exportChartJournal=exporter;await exporter!();}
+ await cancelDeletion(deps,a.id);expect((await getFollow(f.ctx,b.id,a.number)).following).toBe(false);
+});

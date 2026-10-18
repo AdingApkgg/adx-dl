@@ -784,7 +784,7 @@ test("whole-chart deletion and final delete-content both revoke durably and rema
     confirmOriginalArchive: true,
   });
   const deps = { db: ctx.db, boss: ctx.boss, handlers: createDeletionHandlers(failed) };
-  await requestDeletion(deps, id, { deleteContent: true });
+  await expect(requestDeletion(deps, id, { deleteContent: true })).rejects.toMatchObject({ status: 503 });
   await ctx.db
     .update(user)
     .set({ deletionPurgeAt: new Date(Date.now() - 1000) })

@@ -1,3 +1,4 @@
+import { exportTestUserIds } from "../testing/user-public-ids";
 import { resetTestDatabase } from "../testing/test-db";
 import { beforeAll, afterAll, expect, test } from "bun:test";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -34,6 +35,7 @@ const future: DeletionHandler = {
 beforeAll(async () => {
   await resetTestDatabase();
   fixture = await readyContext();
+  fixture.ctx.exportChartJournal=exportTestUserIds;
   await fixture.ctx.boss();
 }, 30000);
 afterAll(async () => {
@@ -200,7 +202,7 @@ test("final purge always deletes personal photos and recovery/outbox facts outli
 test("registry binds every real business FK deletion partner and keeps storage last", async () => {
   const { createDeletionHandlers } = await handlers();
   const registry = createDeletionHandlers(fixture.ctx, [future]);
-  expect(registry.map((h) => h.name)).toEqual(["future-fixture", "charts", "discussions", "storage"]);
+  expect(registry.map((h) => h.name)).toEqual(["future-fixture", "charts", "discussions", "following", "storage"]);
   expect(() => createDeletionHandlers(fixture.ctx, [{ ...future, name: "storage" }])).toThrow();
 });
 
