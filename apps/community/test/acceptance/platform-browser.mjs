@@ -23,7 +23,7 @@ export async function exercisePlatform({ owner, other, anonymous, page, origin, 
       await composer.getByRole("textbox", { name: "回复内容", exact: true }).fill("Browser current-version root");
       await composer.getByRole("combobox", { name: "难度", exact: true }).selectOption("4");
       await composer.getByLabel("时间点（谱面毫秒，可留空）", { exact: true }).fill("250");
-      root = await mutation(contributor, `/api/v1/discussions/charts/${chart.publicId}/messages`, "POST", () => composer.getByRole("button", { name: "回复内容", exact: true }).click());
+      root = await mutation(contributor, `/api/v1/discussions/charts/${chart.publicId}/messages`, "POST", () => composer.getByRole("button", { name: "明确提交", exact: true }).click());
       await contributor.locator(`#message-${root.id}`).getByText("Browser current-version root", { exact: true }).waitFor();
       await contributor.locator(`#message-${root.id}`).getByRole("button", { name: "00:00.250", exact: true }).click();
       await contributor.locator("#chart-preview canvas").waitFor();
@@ -32,7 +32,7 @@ export async function exercisePlatform({ owner, other, anonymous, page, origin, 
       await page.locator(`#message-${root.id}`).getByRole("button", { name: "回复内容", exact: true }).click();
       const answer = page.locator("#chart-discussion-composer form");
       await answer.getByRole("textbox", { name: "回复内容", exact: true }).fill("Browser publisher reply");
-      const saved = await mutation(page, `/api/v1/discussions/charts/${chart.publicId}/messages`, "POST", () => answer.getByRole("button", { name: "回复内容", exact: true }).click());
+      const saved = await mutation(page, `/api/v1/discussions/charts/${chart.publicId}/messages`, "POST", () => answer.getByRole("button", { name: "明确提交", exact: true }).click());
       assert.equal(saved.rootId, root.id); assert.equal(saved.publisher, true);
       await page.locator(`#message-${saved.id}`).getByText("Browser publisher reply", { exact: true }).waitFor();
       if (evidenceDirectory) await page.screenshot({ path: join(evidenceDirectory, "platform-comments.png"), fullPage: true });
@@ -55,7 +55,7 @@ export async function exercisePlatform({ owner, other, anonymous, page, origin, 
       await page.getByRole("button", { name: "取消订阅", exact: true }).waitFor();
       const reply = page.locator("#topic-reply-editor form");
       await reply.getByRole("textbox", { name: "回复内容", exact: true }).fill("Browser forum reply");
-      forumReply = await mutation(page, `/api/v1/discussions/topics/${topic.publicId}/replies`, "POST", () => reply.getByRole("button", { name: "回复内容", exact: true }).click());
+      forumReply = await mutation(page, `/api/v1/discussions/topics/${topic.publicId}/replies`, "POST", () => reply.getByRole("button", { name: "明确提交", exact: true }).click());
       await page.locator(`#message-${forumReply.id}`).getByText("Browser forum reply", { exact: true }).waitFor();
       const visitor = await anonymous.newPage();
       await visitor.goto(url(`/forum?chart=${chart.publicId}`));
@@ -91,6 +91,7 @@ export async function exercisePlatform({ owner, other, anonymous, page, origin, 
       await row.getByLabel("告知当事人的原因（1–500 字）", { exact: true }).fill("Synthetic isolated hide");
       await row.getByLabel("我已核对目标、版本与原因，确认执行此操作。", { exact: true }).check();
       await mutation(page, `/api/v1/discussions/dash/messages/${forumReply.id}/moderation`, "POST", () => row.getByRole("button", { name: "应用", exact: true }).click());
+      await row.getByLabel("内部管理原因（1–500 字）", { exact: true }).waitFor({ state: "hidden" });
       await contributor.reload();
       assert.equal(await contributor.getByText("Browser forum reply", { exact: true }).count(), 0);
       assert.equal((await read(owner, `/api/v1/discussions/dash/reports?status=open`)).items.some(item => item.id === report.id), true);
