@@ -3,12 +3,13 @@ import { Fragment, type ReactNode } from "react";
 // A bounded, non-recursive allowlist renderer. Everything else stays escaped text.
 function inline(text: string): ReactNode[] {
   const result: ReactNode[] = []; const pattern = /`([^`\n]+)`|(?<!!)\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g;
-  let end = 0; let match: RegExpExecArray | null;
-  while ((match = pattern.exec(text)) && result.length < 2000) {
+  let end = 0;
+  for (const match of text.matchAll(pattern)) {
+    if (result.length >= 2000) break;
     result.push(text.slice(end, match.index));
     if (match[1]) result.push(<code key={match.index} className="rounded bg-muted px-1 font-mono">{match[1]}</code>);
     else { try { const url = new URL(match[3]!); result.push(<a key={match.index} href={url.href} target="_blank" rel="noopener noreferrer nofollow ugc" className="break-all underline">{match[2]}</a>); } catch { result.push(match[0]); } }
-    end = pattern.lastIndex;
+    end = match.index + match[0].length;
   }
   result.push(text.slice(end)); return result;
 }

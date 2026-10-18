@@ -13,6 +13,7 @@ import { requireActiveSocialUser, socialPage, withSocialUser, type SocialPageInp
 type ReportRow = typeof chartReports.$inferSelect;
 export function reportText(value: string): string {
   const text = value.trim();
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: Deliberately reject control characters before storing untrusted text.
   if (text.length > REPORT_TEXT_MAX * 2 || [...text].length < 1 || [...text].length > REPORT_TEXT_MAX || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(text)) throw new HTTPException(400, { message: "Invalid report text" });
   return text;
 }

@@ -108,7 +108,7 @@ describe("首页 loader：当前用户取不到", () => {
 
       expect(dataByKey(data).meta).toEqual(META);
       expect(dataByKey(data)).not.toHaveProperty("me");
-      expect(links(html)).toEqual([{ href: loginHref("/"), text: m.home_sign_in() }, { href: "/charts", text: m.public_charts_browse() }, { href: "/me/charts", text: m.charts_title() }, { href: "/privacy", text: m.privacy_link() }]);
+      expect(links(html)).toEqual([{ href:"/forum",text:m.site_forum() },{ href:"/help",text:m.site_help() },{ href:"/notices",text:m.site_notices() },{ href: loginHref("/"), text: m.home_sign_in() }, { href: "/charts", text: m.public_charts_browse() }, { href: "/me/charts", text: m.charts_title() }, { href: "/privacy", text: m.privacy_link() }]);
       expect(html).toContain(m.home_api_version({ version: 1 }));
     });
   }
@@ -122,7 +122,7 @@ describe("首页渲染：登录入口", () => {
   test("未登录：登录后回到首页，并有公开隐私入口", async () => {
     const html = await renderHome(false);
 
-    expect(links(html)).toEqual([{ href: loginHref("/"), text: m.home_sign_in() }, { href: "/charts", text: m.public_charts_browse() }, { href: "/me/charts", text: m.charts_title() }, { href: "/privacy", text: m.privacy_link() }]);
+    expect(links(html)).toEqual([{ href:"/forum",text:m.site_forum() },{ href:"/help",text:m.site_help() },{ href:"/notices",text:m.site_notices() },{ href: loginHref("/"), text: m.home_sign_in() }, { href: "/charts", text: m.public_charts_browse() }, { href: "/me/charts", text: m.charts_title() }, { href: "/privacy", text: m.privacy_link() }]);
     expect(loginHref("/")).toBe("/login?next=%2F");
     expect(html).not.toContain(m.home_signed_in_as({ name: "阿丁" }));
   });
@@ -133,7 +133,7 @@ describe("首页渲染：登录入口", () => {
     expect(html).toContain('<svg width="32" height="32"');
     expect(html).toContain(">阿</text>");
     expect(html).toContain(m.home_signed_in_as({ name: "阿丁" }));
-    expect(links(html)).toEqual([
+    expect(links(html)).toEqual([{ href:"/forum",text:m.site_forum() },{ href:"/help",text:m.site_help() },{ href:"/notices",text:m.site_notices() },
       { href: "/u/abc2345678", text: m.home_my_page() },
       { href: "/settings/profile", text: m.home_profile_settings() },
       { href: "/settings/account", text: m.home_account_settings() },
@@ -164,10 +164,10 @@ const PUBLIC_CHART: PublicChartDto = { description:'',credits:'',tags:[],release
   publishedAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-11T00:00:00.000Z", author: null,
   summary: { title: "Unpublished import title", artist: "", maidataMd5Base64: "hash", difficulties: [], warnings: [], audio: null, hasCover: false },
 };
-test("homepage SSR fetches at most six current public charts without caching and renders snapshot cards", async () => {
+test("homepage SSR fetches at most eight current public charts without caching and renders snapshot cards", async () => {
   const requests: unknown[] = [];
   const data = await visit(false, { publicCharts: [PUBLIC_CHART], onChartsRequest: (...args) => requests.push(args) });
-  expect(requests).toEqual([[{ query: { limit: "6" } }, { init: { cache: "no-store" } }]]);
+  expect(requests).toEqual([[{ query: { limit: "8" } }, { init: { cache: "no-store" } }]]);
   expect(data.publicCharts?.items).toEqual([PUBLIC_CHART]);
   const html = renderLoaderData(data);
   expect(html).toContain('href="/charts/42"');

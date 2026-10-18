@@ -1543,7 +1543,7 @@ test("private favorites remain isolated, idempotent and removable after withdraw
   expect(await favoriteState(ctx, other, chart.publicId!)).toEqual({ favorited: false });
   await withdrawChart(ctx, author, chart.id, chart.revision);
   const unavailable = await listFavorites(ctx, viewer);
-  expect(unavailable.items).toEqual([{ publicId: chart.publicId, addedAt: expect.any(String), chart: null }]);
+  expect(unavailable.items).toEqual([{ publicId: chart.publicId!, addedAt: expect.any(String), chart: null }]);
   expect(JSON.stringify(unavailable)).not.toContain("Favorite public snapshot");
   await removeFavorite(ctx, other, chart.publicId!);
   expect(await favoriteState(ctx, viewer, chart.publicId!)).toEqual({ favorited: true });
@@ -1681,4 +1681,59 @@ test("retaining a deleted author's work removes unpublished metadata and version
   const [version] = await ctx.db.select().from(chartVersions).where(eq(chartVersions.id, chart.currentVersionId));
   expect(retained).toMatchObject({ ownerId: null, description: "Public information", credits: "Public credits", tags: [{ key: "public", label: "public" }] });
   expect(version.releaseNote).toBe("Public note");
+});
+
+test("current-version comments preserve lawful replies and hide stale targets from notifications", async () => {
+  const { publishChart, withdrawChart } = await import("./publication");
+  const { createChartMessage, listChartDiscussion, editMessage } = await import("../discussions/messages");
+  const { moderate } = await import("../discussions/moderation");
+  const { dispatchDiscussionOutbox, listNotifications } = await import("../discussions/notifications");
+  const a = await readyOwner(fixture.ctx), b = await readyOwner(fixture.ctx), c = await readyOwner(fixture.ctx);
+  let chart = await createChart(fixture.ctx, a, (await chartFile(a, { title: "Discussion chart" })).file.id);
+  chart = await publishChart(fixture.ctx, a, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const input = { idempotencyKey: crypto.randomUUID(), versionId: chart.currentVersionId, body: "A root comment", difficulty: 4, timestampMs: 200 };
+  const root = await createChartMessage(fixture.ctx, b, chart.publicId!, input);
+  expect(root).toMatchObject({ body: input.body, difficulty: 4, timestampMs: 200, locatable: true });
+  expect((await createChartMessage(fixture.ctx, b, chart.publicId!, input)).id).toBe(root.id);
+  const reply = await createChartMessage(fixture.ctx, c, chart.publicId!, { idempotencyKey: crypto.randomUUID(), versionId: chart.currentVersionId, body: "A reply", rootId: root.id, replyToId: root.id, timestampMs: 300 });
+  expect(reply).toMatchObject({ rootId: root.id, difficulty: 4, timestampMs: 300 });
+  await expect(editMessage(fixture.ctx, b, root.id, { expectedRevision: root.revision, body: input.body, difficulty: null, timestampMs: null })).rejects.toMatchObject({ status: 409 });
+  await dispatchDiscussionOutbox(fixture.ctx);
+  expect((await listNotifications(fixture.ctx, a, {})).items.some(x => x.kind === "chart_comment" && x.message?.id === root.id)).toBe(true);
+  expect((await listNotifications(fixture.ctx, b, {})).items.some(x => x.kind === "direct_reply" && x.message?.id === reply.id)).toBe(true);
+  await moderate(fixture.ctx, a, { message: root.id }, { expectedRevision: root.revision, action: "hide", reason: "Review", publicReason: "Hidden root" });
+  const hiddenRoot = (await listChartDiscussion(fixture.ctx, chart.publicId!, { versionId: chart.currentVersionId })).items.find(x => x.id === root.id);
+  expect(hiddenRoot).toMatchObject({ state: "unavailable", body: null, author: null });
+  expect(hiddenRoot?.replies?.map(x => x.id)).toContain(reply.id);
+  expect((await listNotifications(fixture.ctx, a, {})).items.find(x => x.message?.id === root.id)).toBeUndefined();
+  chart = await withdrawChart(fixture.ctx, a, chart.id, chart.revision);
+  await expect(listChartDiscussion(fixture.ctx, chart.publicId!, { versionId: chart.currentVersionId })).rejects.toMatchObject({ status: 404 });
+  expect(await createChartMessage(fixture.ctx, b, chart.publicId!, input)).toMatchObject({ id: root.id, body: null, author: null, timestampMs: null });
+});
+
+test("file-version publication switches close old comments and numeric forum references remain current", async () => {
+  const { publishChart, relatedPublicCharts } = await import("./publication");
+  const { appendChartVersion } = await import("./service");
+  const { createChartMessage, listChartDiscussion } = await import("../discussions/messages");
+  const { createTopic, listTopics } = await import("../discussions/forum");
+  const { getFeatured, setFeatured } = await import("../community/site");
+  const a = await readyOwner(fixture.ctx), b = await readyOwner(fixture.ctx), c = await readyOwner(fixture.ctx);
+  let chart = await createChart(fixture.ctx, a, (await chartFile(a, { title: "Linked chart" })).file.id);
+  chart = await publishChart(fixture.ctx, a, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const input = { idempotencyKey: crypto.randomUUID(), versionId: chart.currentVersionId, body: "Old version" };
+  const comment = await createChartMessage(fixture.ctx, b, chart.publicId!, input);
+  const topic = await createTopic(fixture.ctx, c, { idempotencyKey: crypto.randomUUID(), boardId: "creation", title: "Linked public chart", body: "Discuss", chartIds: [chart.publicId!] });
+  expect((await listTopics(fixture.ctx, { chart: chart.publicId! })).items.some(x => x.id === topic.id)).toBe(true);
+  expect((await listChartDiscussion(fixture.ctx, chart.publicId!, { versionId: chart.currentVersionId })).relatedTopics.some(x => x.id === topic.id)).toBe(true);
+  const featured = await getFeatured(fixture.ctx, true);
+  await setFeatured(fixture.ctx, a, { expectedRevision: featured.revision, ids: [chart.publicId!] });
+  expect((await getFeatured(fixture.ctx)).items.map(x => x.id)).toEqual([chart.id]);
+  const oldVersion = chart.currentVersionId;
+  chart = await appendChartVersion(fixture.ctx, a, chart.id, { fileId: (await chartFile(a, { title: "Replacement file" })).file.id, expectedRevision: chart.revision });
+  chart = await publishChart(fixture.ctx, a, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  expect((await listChartDiscussion(fixture.ctx, chart.publicId!, { versionId: chart.currentVersionId })).items).toHaveLength(0);
+  await expect(listChartDiscussion(fixture.ctx, chart.publicId!, { versionId: oldVersion })).rejects.toMatchObject({ status: 409 });
+  expect((await createChartMessage(fixture.ctx, b, chart.publicId!, input)).id).toBe(comment.id);
+  expect((await createChartMessage(fixture.ctx, b, chart.publicId!, input)).body).toBeNull();
+  expect(await relatedPublicCharts(fixture.ctx, chart.publicId!)).toEqual([]);
 });

@@ -1,3 +1,4 @@
+import {communityRestoreFixture} from "./community-restore-fixture";
 import { expect } from "bun:test";
 import { createHash } from "node:crypto";
 import { eq, inArray, sql } from "drizzle-orm";
@@ -51,7 +52,7 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
     let chart = await createChart(source, owner, original.id);
     if (kind === "legacy") {
       const now = new Date();
-      const publication = { chartId: chart.id, versionId: chart.currentVersionId, title: chart.title, artist: chart.artist, publishedAt: now, updatedAt: now };
+      const publication = { chartId: chart.id, versionId: chart.currentVersionId, title: chart.title, artist: chart.artist, description:"", credits:"", tags:[], releaseNote:"", publishedAt: now, updatedAt: now };
       await source.db.insert(chartPublications).values(publication);
       const [fact] = await source.db.insert(storageTombstones).values({ kind: "chart_permission", payload: { version: 1, chartId: chart.id, revision: 2, publication: publicationDto(publication) } }).returning();
       await source.db.update(charts).set({ revision: 2, publicationSequence: fact.sequence }).where(eq(charts.id, chart.id));
@@ -65,12 +66,15 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
     }
     rows.push({ kind, owner, original, chart });
   }
+  const community = await communityRestoreFixture(source, f.owner, rows.find(row=>row.kind==="legacy")!.chart);
   let missingVersion = "";
   let lateChart: Awaited<ReturnType<typeof createChart>> | undefined;
   let lateModerated: Awaited<ReturnType<typeof createChart>> | undefined;
   return {
     additionalOriginals: 8,
+    communityCases: community.cases,
     async commitLaterFacts() {
+      await community.commitLaterFacts();
       for (const row of rows) {
         const { chart, owner, kind } = row;
         if (kind === "withdraw") await withdrawChart(source, owner, chart.id, chart.revision);
@@ -112,6 +116,7 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
       await exportJournal(journal);
     },
     async verify(target: StorageContext) {
+      await community.verify(target);
       for (const [owner, number] of userNumbers) {
         const [identity] = await target.db.select().from(userPublicIds).where(eq(userPublicIds.userId, owner));
         expect(identity.publicId.toString()).toBe(number);

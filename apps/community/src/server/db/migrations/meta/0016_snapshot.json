@@ -2691,11 +2691,11 @@
         },
         "storage_tombstones_kind_check": {
           "name": "storage_tombstones_kind_check",
-          "value": "\"storage_tombstones\".\"kind\" IN ('user_deleted','file_deleted','hash_blocked','media_revoked','chart_permission','user_public_id','community_content')"
+          "value": "\"storage_tombstones\".\"kind\" in ('user_deleted','file_deleted','hash_blocked','media_revoked','chart_permission','user_public_id','community_content')"
         },
         "storage_tombstones_subject_check": {
           "name": "storage_tombstones_subject_check",
-          "value": "(\"storage_tombstones\".\"kind\"='community_content' AND \"storage_tombstones\".\"payload\" IS NOT NULL) OR (\"storage_tombstones\".\"kind\"='user_public_id' AND \"storage_tombstones\".\"user_id\" IS NOT NULL AND \"storage_tombstones\".\"payload\" IS NOT NULL) OR (\"storage_tombstones\".\"kind\"='chart_permission' AND \"storage_tombstones\".\"payload\" IS NOT NULL) OR (\"storage_tombstones\".\"kind\"='user_deleted' AND \"storage_tombstones\".\"user_id\" IS NOT NULL) OR (\"storage_tombstones\".\"kind\"='file_deleted' AND \"storage_tombstones\".\"file_id\" IS NOT NULL) OR (\"storage_tombstones\".\"kind\" IN ('hash_blocked','media_revoked') AND \"storage_tombstones\".\"sha256\" IS NOT NULL)"
+          "value": "(\"storage_tombstones\".\"kind\" = 'community_content' and \"storage_tombstones\".\"payload\" is not null) or (\"storage_tombstones\".\"kind\" = 'user_public_id' and \"storage_tombstones\".\"user_id\" is not null and \"storage_tombstones\".\"payload\" is not null) or (\"storage_tombstones\".\"kind\" = 'chart_permission' and \"storage_tombstones\".\"payload\" is not null) or (\"storage_tombstones\".\"kind\" = 'user_deleted' and \"storage_tombstones\".\"user_id\" is not null) or (\"storage_tombstones\".\"kind\" = 'file_deleted' and \"storage_tombstones\".\"file_id\" is not null) or (\"storage_tombstones\".\"kind\" in ('hash_blocked','media_revoked') and \"storage_tombstones\".\"sha256\" is not null)"
         }
       },
       "isRLSEnabled": false
@@ -5902,10 +5902,10 @@
             }
           ],
           "isUnique": true,
+          "where": "\"discussion_notifications\".\"kind\"='subscription' and \"discussion_notifications\".\"read_at\" is null",
           "concurrently": false,
           "method": "btree",
-          "with": {},
-          "where": "\"discussion_notifications\".\"kind\"='subscription' AND \"discussion_notifications\".\"read_at\" IS NULL"
+          "with": {}
         }
       },
       "foreignKeys": {

@@ -203,10 +203,12 @@ function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectio
       if (downloadUrl.current) URL.revokeObjectURL(downloadUrl.current);
       downloadUrl.current = null;
     };
-  }, [id, versionId, difficulty, opened, duration, summary.audio, summary.hasCover, assetUrl]);
+  }, [id, versionId, difficulty, opened, duration, summary, assetUrl]);
   // Revoke rendered download links when a new preview lifetime starts; cleanup above owns the actual URL.
   useEffect(() => { setDownload(null); }, [difficulty, opened, id, versionId, assetUrl]);
-  return <section ref={section} id={sectionId} tabIndex={0} onKeyDown={shortcuts} aria-label={previewTitle}
+  return (
+    // biome-ignore lint/a11y/noNoninteractiveTabindex: A focusable preview region scopes its documented keyboard shortcuts.
+    <section ref={section} id={sectionId} tabIndex={0} onKeyDown={shortcuts} aria-label={previewTitle}
     className={`scroll-mt-24 space-y-3 rounded-lg border bg-background p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${fullscreen ? "h-dvh overflow-y-auto" : ""}`}>
     <h2 className="font-semibold">{previewTitle}</h2>
     <p className="text-sm text-muted-foreground">{m.chart_preview_hint()}</p>
@@ -277,5 +279,5 @@ function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectio
     </>}
     {fullscreenFailed ? <p role="status" className="text-sm text-muted-foreground">{m.chart_preview_fullscreen_failed()}</p> : null}
     {error ? <Alert role="alert" variant="destructive">{assetUrl === chartAssetUrl ? chartErrorMessage(error) : m.public_chart_unavailable()}</Alert> : null}
-  </section>;
+  </section>);
 }

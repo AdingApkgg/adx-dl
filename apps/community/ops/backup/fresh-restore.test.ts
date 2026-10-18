@@ -776,6 +776,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
       purgeObservations: purgeRequests.map((p) => ({ at: p.at })),
       sourceStopped,
       freshVolumes: true,
+      communityContentReplay: publicCharts.communityCases,
       publicChartPermissionReplay: ["withdrawal", "replacement-missing-latest-closed", "chart-deletion", "anonymous-exact-version-retention", "permanent-numeric-identity", "missing-chart-number-reserved", "legacy-number-exported-before-open", "post-snapshot-moderation", "anonymous-retention-then-moderation", "missing-chart-moderation-preserved"],
     };
     await writeFile(join(root, "result.json"), JSON.stringify(evidence, null, 2));

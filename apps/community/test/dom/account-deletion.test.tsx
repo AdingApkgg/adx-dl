@@ -19,6 +19,7 @@ function renderPage(onDeleted: (purgeAt: string) => void) {
   window.history.replaceState(null, "", HERE);
   const queryClient = makeQueryClient();
   queryClient.setQueryData(["me"], USER);
+  queryClient.setQueryData(["me","notifications","count",USER.id],0);
   render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[HERE]}>

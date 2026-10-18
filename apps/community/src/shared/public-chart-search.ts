@@ -9,6 +9,7 @@ export function parsePublicChartFilters(input: PublicChartSearchInput = {}): Pub
   // Bound before trim too, so padding cannot turn into an unbounded query.
   if ((input.q?.length ?? 0) > PUBLIC_CHART_SEARCH_MAX * 2) throw new RangeError("Invalid search");
   const q = (input.q ?? "").trim();
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: Deliberately reject control characters before storing untrusted text.
   if (Array.from(q).length > PUBLIC_CHART_SEARCH_MAX || /[\u0000-\u001f\u007f]/u.test(q)) throw new RangeError("Invalid search");
   const difficulty = input.difficulty || undefined, author = input.author || undefined, sort = input.sort || "updated";
   if (difficulty !== undefined && !/^[1-7]$/.test(difficulty)) throw new RangeError("Invalid difficulty");

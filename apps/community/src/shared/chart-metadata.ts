@@ -2,6 +2,7 @@ import type { ChartTag } from "./charts";
 
 /** PostgreSQL char_length and product limits count Unicode code points. */
 export function chartPlainText(value: unknown, max: number): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: Deliberately reject control characters before storing untrusted text.
   if (typeof value !== "string" || [...value].length > max || /[\u0000\uD800-\uDFFF]/u.test(value)) throw new RangeError("Invalid chart metadata");
   return value;
 }

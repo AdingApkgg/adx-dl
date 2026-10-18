@@ -2,7 +2,7 @@ import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { Textarea } from "@astrodx/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
-import { type FormEvent, type ReactNode, createContext, useContext, useEffect, useId, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import { data, isRouteErrorResponse, Link, redirect, type RouterContextProvider, useBlocker, useLocation } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
@@ -60,10 +60,10 @@ export function DiscussionDraftBoundary({ children }: { children: ReactNode }) {
   // Drafts live only on this page and are synchronously isolated on account changes.
   if (memory.current.identity !== identity) { memory.current = { identity, values: new Map() }; drafts.current.clear(); }
   const update = useRef((token: object, active: boolean) => { const previous = drafts.current.has(token); if (active) drafts.current.add(token); else drafts.current.delete(token); if (previous !== active) renderDrafts(value => value + 1); }).current;
-  const dirty = () => drafts.current.size > 0 || [...memory.current.values.keys()].some(key => (key.startsWith("composer:") || key.startsWith("local:")));
+  const dirty = useCallback(() => drafts.current.size > 0 || [...memory.current.values.keys()].some(key => (key.startsWith("composer:") || key.startsWith("local:"))), []);
   const blocker = useBlocker(dirty);
   useEffect(() => { if (blocker.state === "blocked") { if (window.confirm(m.discussion_leave())) blocker.proceed(); else blocker.reset(); } }, [blocker]);
-  useEffect(() => { const stop = (event: BeforeUnloadEvent) => { if (dirty()) { event.preventDefault(); event.returnValue = ""; } }; window.addEventListener("beforeunload", stop); return () => window.removeEventListener("beforeunload", stop); }, []);
+  useEffect(() => { const stop = (event: BeforeUnloadEvent) => { if (dirty()) { event.preventDefault(); event.returnValue = ""; } }; window.addEventListener("beforeunload", stop); return () => window.removeEventListener("beforeunload", stop); }, [dirty]);
   return <DraftContext.Provider value={update}><DraftMemoryContext.Provider value={memory.current.values}>{[...memory.current.values.keys()].some(key => (key.startsWith("composer:") || key.startsWith("local:"))) ? <p role="status" className="text-sm text-muted-foreground">{m.discussion_drafts_retained()}</p> : null}{children}</DraftMemoryContext.Provider></DraftContext.Provider>;
 }
 export function useUnsavedDiscussion(dirty: boolean) {
@@ -103,7 +103,7 @@ export function DiscussionComposer({ label = m.discussion_reply(), onSubmit, ini
     if (!chartScope || !timeAllowed) return;
     const received = (event: Event) => { const detail = (event as CustomEvent<{ id: string; versionId: string; difficulty: number; ms: number; requestId: string }>).detail; if (detail?.requestId === requestId && detail.id === chartScope.id && detail.versionId === chartScope.versionId && detail.difficulty === selected && Number.isSafeInteger(detail.ms) && detail.ms >= 0 && detail.ms <= row!.durationMs!) { setTime(String(detail.ms)); key.current = null; submitted.current = false; } };
     window.addEventListener("community-preview-position", received); return () => window.removeEventListener("community-preview-position", received);
-  }, [chartScope?.id, chartScope?.versionId, selected, timeAllowed, row?.durationMs, requestId]);
+  }, [chartScope, selected, timeAllowed, row, requestId]);
   const validTime = time === "" || timeAllowed && /^\d+$/.test(time) && Number.isSafeInteger(Number(time)) && Number(time) <= row!.durationMs!;
   const dirtyInput = !submitted.current && (body !== initial || time !== (initialAnchor.timestampMs === undefined ? "" : String(initialAnchor.timestampMs)) || fixedDifficulty === undefined && difficulty !== (initialAnchor.difficulty === undefined ? "" : String(initialAnchor.difficulty)) || subscribed);
   useUnsavedDiscussion(dirtyInput);

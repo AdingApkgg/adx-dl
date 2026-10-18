@@ -1,15 +1,19 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { makeQueryClient } from "@/shared/query-client";
 import { m } from "@/paraglide/messages.js";
-import { fireEvent, render, screen } from "@testing-library/react";
-import type { ComponentType } from "react";
-import { MemoryRouter, RouterContextProvider } from "react-router";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import {isValidElement,useState,type ComponentType,type ReactNode} from "react";
+import {createMemoryRouter,createRoutesFromElements,RouterProvider,Routes,type MemoryRouterProps,RouterContextProvider} from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import PublicCharts, { loader as catalogLoader, headers as catalogHeaders, meta as catalogMeta } from "@/client/routes/public-charts";
 import PublicChartDetail, { loader as detailLoader, meta as detailMeta } from "@/client/routes/public-chart-detail";
 import { createApiClient } from "@/shared/api-client";
 import type { PublicChartDto, PublicChartsPageDto } from "@/shared/charts";
 import { apiContext } from "@/shared/router-context";
+function MemoryRouter({children,initialEntries}:MemoryRouterProps){
+  const [router]=useState(()=>createMemoryRouter(isValidElement<{children:ReactNode}>(children)&&children.type===Routes?createRoutesFromElements(children.props.children):[{path:"*",element:children}],{initialEntries}));
+  return <RouterProvider router={router}/>;
+}
 const chart: PublicChartDto = { description: "", credits: "", tags: [], releaseNote: "",
   id: "public", publicId: "42", versionId: "selected", ordinal: 2, title: "Published title", artist: "Snapshot artist", sourceSize: 1024,
   publishedAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-11T00:00:00.000Z", author: { publicId: "1", id: "alice", name: "Alice", image: null },
@@ -47,7 +51,7 @@ test("public detail exposes original download, selected version, author and sile
   expect(screen.getByRole("link", { name: /作者：Alice/ }).getAttribute("href")).toBe("/u/1");
   expect(screen.getByText("公开版本 ID：selected")).toBeTruthy();
   expect(screen.getByText("未附带（可静音预览）")).toBeTruthy();
-  expect((screen.getByRole("option", { name: /MASTER/ }) as HTMLOptionElement).disabled).toBe(true);
+  expect((within(document.getElementById("chart-preview")!).getByRole("option", { name: /MASTER/ }) as HTMLOptionElement).disabled).toBe(true);
 });
 test("empty catalog remains understandable", () => {
   render(<MemoryRouter><Catalog loaderData={{ items: [], nextCursor: null }} /></MemoryRouter>);
@@ -98,12 +102,12 @@ test("public card difficulty pills name the playable difficulty without relying 
 });
 
 test("public detail has a visible preview shortcut and sharing without eager preview assets", () => {
-  const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+  const fetcher = vi.fn(async(_input:RequestInfo|URL)=>Response.json({items:[],nextCursor:null,chartId:"42",versionId:"selected",difficulties:[],relatedTopics:[],count:0})); vi.stubGlobal("fetch", fetcher);
   render(<MemoryRouter><Detail loaderData={chart} /></MemoryRouter>);
   expect(screen.getByRole("link", { name: "预览谱面" }).getAttribute("href")).toBe("#chart-preview");
   expect(document.getElementById("chart-preview")?.getAttribute("tabindex")).toBe("0");
   expect(screen.getByRole("button", { name: "分享谱面" })).toBeTruthy();
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(fetcher.mock.calls.every(call => !String(call[0]).includes("/assets/"))).toBe(true);
 });
 test("detail without supported difficulties explains the limit and keeps download and sharing available", () => {
   render(<MemoryRouter><Detail loaderData={{ ...chart, summary: { ...chart.summary, difficulties: chart.summary.difficulties.map(row => ({ ...row, previewSupported: false })) } }} /></MemoryRouter>);

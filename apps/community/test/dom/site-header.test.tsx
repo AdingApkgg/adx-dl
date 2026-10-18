@@ -20,6 +20,7 @@ function renderHeader(path: string, me: typeof USER | null) {
   window.history.replaceState(null, "", path);
   const queryClient = makeQueryClient();
   queryClient.setQueryData(["me"], me);
+  queryClient.setQueryData(["me","notifications","count",me?.id],0);
   render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[path]}>
@@ -51,6 +52,8 @@ describe("页头的账号菜单", () => {
 
     expect(menuItems()).toEqual([
       { name: m.charts_title(), href: "/me/charts" },
+      { name:m.site_my_discussions(),href:"/me/discussions" },{ name:m.site_notifications(),href:"/me/notifications" },
+      { name:m.my_favorites(),href:"/me/favorites" },{ name:m.my_reports(),href:"/me/reports" },
       { name: m.nav_my_page(), href: `/u/${USER.id}` },
       { name: m.nav_profile(), href: "/settings/profile" },
       { name: m.nav_account(), href: "/settings/account" },
@@ -62,7 +65,7 @@ describe("页头的账号菜单", () => {
     const user = renderHeader("/en/settings/profile", USER);
     await user.click(screen.getByRole("button", { name: m.nav_account_menu({ name: USER.name }, { locale: "en" }) }));
 
-    expect(menuItems().map((item) => item.href)).toEqual(["/en/me/charts", `/en/u/${USER.id}`, "/en/settings/profile", "/en/settings/account", null]);
+    expect(menuItems().map((item) => item.href)).toEqual(["/en/me/charts","/en/me/discussions","/en/me/notifications","/en/me/favorites","/en/me/reports", `/en/u/${USER.id}`, "/en/settings/profile", "/en/settings/account", null]);
   });
 
   test("待注销的用户（在注销提示页上）：菜单里只有退出登录", async () => {

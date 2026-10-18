@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { parsePublicChartFilters, type PublicChartSearchInput } from "@/shared/public-chart-search";
-import type { SelectedFields } from "drizzle-orm/pg-core";
+import type { PgSelect } from "drizzle-orm/pg-core";
 import { HTTPException } from "hono/http-exception";
 import type { PublicChartDto, PublicChartsPageDto } from "@/shared/charts";
 import {
@@ -153,7 +153,7 @@ export async function withdrawChart(
 }
 // One authorization query for each request, including validators and HEAD. No File permission is changed.
 function query(ctx: StorageContext) {
-  return visibilityQuery(ctx, {
+  return visibilityQuery(ctx.db.select({
       chart: charts,
       publicId: chartPublicIds.publicId,
       p: chartPublications,
@@ -168,11 +168,10 @@ function query(ctx: StorageContext) {
         then ${userPublicIds.publicId} else null end`,
       authorName: user.name,
       authorImage: user.image,
-    });
+    }).from(chartPublications).$dynamic());
 }
-function visibilityQuery<T extends SelectedFields>(ctx: StorageContext, fields: T) {
-  return ctx.db.select(fields)
-    .from(chartPublications)
+function visibilityQuery<T extends PgSelect>(selection: T) {
+  return selection
     .innerJoin(charts, eq(charts.id, chartPublications.chartId))
     .innerJoin(chartPublicIds, eq(chartPublicIds.chartId, charts.id))
     .leftJoin(user, eq(user.id, charts.ownerId))
@@ -331,7 +330,7 @@ export async function suggestPublicChartTags(ctx: StorageContext, input = "") {
   if (input.length > 40 || [...input].length > 20 || /[\p{Cc}\p{Cf}]/u.test(input)) throw invalid();
   const prefix = input.normalize("NFKC").trim().replace(/[A-Z]/g, letter => letter.toLowerCase());
   if ([...prefix].length > 20) throw invalid();
-  const visible = visibilityQuery(ctx, { tags: chartPublications.tags }).where(allowed()).as("visible_tag_charts");
+  const visible = visibilityQuery(ctx.db.select({ tags: chartPublications.tags }).from(chartPublications).$dynamic()).where(allowed()).as("visible_tag_charts");
   const key = sql<string>`tag.value->>'key'`, label = sql<string>`min(tag.value->>'label')`;
   return ctx.db.select({ key, label, count: sql<number>`count(*)::integer` }).from(visible)
     .innerJoin(sql`lateral jsonb_array_elements(${visible.tags}) as tag(value)`, sql`true`)
@@ -343,7 +342,7 @@ export async function relatedPublicCharts(ctx: StorageContext, id: string): Prom
   if (!target.tags.length) return [];
   // Resolve the source again in the same authorization query, so withdrawal cannot turn
   // an inaccessible source into a tag-discovery oracle between requests.
-  const source = visibilityQuery(ctx, { tags: chartPublications.tags }).where(and(allowed(), eq(charts.id, target.id))).as("related_source");
+  const source = visibilityQuery(ctx.db.select({ tags: chartPublications.tags }).from(chartPublications).$dynamic()).where(and(allowed(), eq(charts.id, target.id))).as("related_source");
   const score = sql<number>`(select count(*)::integer from jsonb_array_elements(${chartPublications.tags}) tag
     where tag->>'key' in (select source_tag->>'key' from ${source}, jsonb_array_elements(${source.tags}) source_tag))`;
   return (await query(ctx).where(and(allowed(), sql`${charts.id}<>${target.id}`, sql`${score}>0`))

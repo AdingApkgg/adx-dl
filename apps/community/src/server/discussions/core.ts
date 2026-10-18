@@ -18,6 +18,7 @@ export async function rows<T>(db:Handle, query:SQL):Promise<T[]> { return (await
 export const missing = () => new StorageError(404,"NOT_FOUND");
 export const conflict = (code:StorageErrorCode="DISCUSSION_CHANGED") => new StorageError(409,code);
 export const limited = () => new StorageError(429,"DISCUSSION_LIMIT","DISCUSSION_LIMIT",60);
+// biome-ignore lint/suspicious/noControlCharactersInRegex: Deliberately reject control characters before storing untrusted text.
 export function plain(value:string,max:number) { const v=value.trim(); if([...v].length<1||[...v].length>max||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\ud800-\udfff]/u.test(v)) throw new HTTPException(400); return v; }
 export const stamp = (date:Date) => new Date(date).toISOString();
 export const exported = sql`coalesce((select exported_sequence from storage_journal_progress where id='global'),0)`;

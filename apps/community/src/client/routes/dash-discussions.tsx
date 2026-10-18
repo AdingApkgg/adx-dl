@@ -1,6 +1,6 @@
 import { Button } from "@astrodx/ui/components/button";
 import { Textarea } from "@astrodx/ui/components/textarea";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { Form, Link, useLocation, useRevalidator, isRouteErrorResponse } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
@@ -26,10 +26,10 @@ export default function DashDiscussions({ loaderData }: Route.ComponentProps) {
 }
 function ModerationRow({ item, boards, refresh }: { item: ForumTopic | DiscussionMessage; boards: DiscussionBoard[]; refresh: () => void }) {
   const topic = "publicId" in item ? item : null, task = useDiscussionTask();
-  const initial = () => ({ action: "hide" as DiscussionModerationInput["action"], reason: "", publicReason: "", boardId: topic?.boardId ?? "", pin: 1, confirmed: false, contentRevision: item.revision, controlRevision: topic?.controlRevision ?? 0, comparison: false, dirty: false });
+  const initial = useCallback(() => ({ action: "hide" as DiscussionModerationInput["action"], reason: "", publicReason: "", boardId: topic?.boardId ?? "", pin: 1, confirmed: false, contentRevision: item.revision, controlRevision: topic?.controlRevision ?? 0, comparison: false, dirty: false }), [topic?.boardId, topic?.controlRevision, item.revision]);
   const [form, setForm] = useDiscussionLocalDraft(`moderation:${item.id}`, initial, value => value.dirty);
   const { action, reason, publicReason, boardId, pin, confirmed } = form;
-  useEffect(() => { setForm(previous => previous.dirty ? previous : initial()); }, [item.id, item.revision, topic?.controlRevision]);
+  useEffect(() => { setForm(previous => previous.dirty ? previous : initial()); }, [initial, setForm]);
   const choices: [DiscussionModerationInput["action"], string][] = [["hide", m.discussion_hide()]];
   if (topic?.state === "visible") choices.push([topic.locked ? "unlock" : "lock", topic.locked ? m.discussion_unlock() : m.discussion_lock()], [topic.pin === null ? "pin" : "unpin", topic.pin === null ? m.discussion_pin() : m.discussion_unpin()], ["move", m.discussion_move()]);
   const canModerate = (item.moderationState ?? item.state) === "visible" || !!topic && (item.moderationState ?? item.state) === "root_removed";
@@ -46,10 +46,10 @@ function ModerationRow({ item, boards, refresh }: { item: ForumTopic | Discussio
 }
 function ReasonFields({ reason, setReason, publicReason, setPublicReason, disabled }: { reason: string; setReason: (s: string) => void; publicReason: string; setPublicReason: (s: string) => void; disabled: boolean }) { return <><label className="grid gap-1 text-sm">{m.discussion_internal_reason()}<Textarea value={reason} disabled={disabled} maxLength={1000} required onChange={event => setReason(event.target.value)} /></label><p className="text-xs">{codepoints(reason)}/500</p><label className="grid gap-1 text-sm">{m.discussion_public_reason()}<Textarea value={publicReason} disabled={disabled} maxLength={1000} required onChange={event => setPublicReason(event.target.value)} /></label><p className="text-xs">{codepoints(publicReason)}/500</p></>; }
 function BoardEditor({ board, refresh }: { board: DiscussionBoard; refresh: () => void }) {
-  const initial = () => ({ name: board.name, description: board.description, order: board.order, readOnly: board.readOnly, reason: "", confirmed: false, expectedRevision: board.revision, comparison: false, dirty: false });
+  const initial = useCallback(() => ({ name: board.name, description: board.description, order: board.order, readOnly: board.readOnly, reason: "", confirmed: false, expectedRevision: board.revision, comparison: false, dirty: false }), [board]);
   const [form, setForm] = useDiscussionLocalDraft(`board:${board.id}`, initial, value => value.dirty), task = useDiscussionTask();
   const { name, description, order, readOnly, reason, confirmed } = form;
-  useEffect(() => { setForm(previous => previous.dirty ? previous : initial()); }, [board.id, board.revision]);
+  useEffect(() => { setForm(previous => previous.dirty ? previous : initial()); }, [initial, setForm]);
   const valid = codepoints(name) > 0 && codepoints(name) <= 100 && codepoints(description) > 0 && codepoints(description) <= 500 && codepoints(reason) > 0 && codepoints(reason) <= 500 && Number.isInteger(order) && order >= 0 && order <= 100 && confirmed;
   return <form className="space-y-3 rounded-xl border p-4" onSubmit={async event => { event.preventDefault(); if (!valid) return; if (await task.run(() => discussionApi(getBrowserApi()).board(board.id, { expectedRevision: form.expectedRevision, name: name.trim(), description: description.trim(), order, readOnly, reason: reason.trim() }))) { setForm(previous => ({ ...previous, reason: "", confirmed: false, expectedRevision: previous.expectedRevision + 1, dirty: false })); refresh(); } else setForm(previous => ({ ...previous, comparison: true })); }}><h3 className="font-semibold">{board.name}</h3>
     <label className="grid gap-1 text-sm">{m.discussion_board()}<input value={name} disabled={task.pending} maxLength={200} required onChange={event => setForm(previous => ({ ...previous, name: event.target.value, dirty: true, confirmed: false }))} className="min-h-11 rounded border bg-background px-3" /></label><p className="text-xs">{codepoints(name)}/100</p><label className="grid gap-1 text-sm">{m.discussion_description()}<Textarea value={description} disabled={task.pending} maxLength={1000} required onChange={event => setForm(previous => ({ ...previous, description: event.target.value, dirty: true, confirmed: false }))} /></label><p className="text-xs">{codepoints(description)}/500</p><label className="grid gap-1 text-sm">{m.discussion_board_order()}<input type="number" value={order} min={0} max={100} step={1} disabled={task.pending} onChange={event => setForm(previous => ({ ...previous, order: Number(event.target.value), dirty: true, confirmed: false }))} className="min-h-11 rounded border bg-background px-3" /></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={task.pending} checked={readOnly} onChange={event => setForm(previous => ({ ...previous, readOnly: event.target.checked, dirty: true, confirmed: false }))} />{m.discussion_readonly()}</label><label className="grid gap-1 text-sm">{m.discussion_internal_reason()}<Textarea value={reason} disabled={task.pending} required maxLength={1000} onChange={event => setForm(previous => ({ ...previous, reason: event.target.value, dirty: true, confirmed: false }))} /></label><p className="text-xs">{codepoints(reason)}/500</p>
