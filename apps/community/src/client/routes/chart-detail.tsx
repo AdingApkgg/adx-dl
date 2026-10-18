@@ -2,13 +2,14 @@ import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { toast } from "@astrodx/ui/components/sonner";
 import { dehydrate, HydrationBoundary, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { data, Link, useLocation, useNavigate } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
 import { ApiError } from "@/shared/api-client";
 import type { ChartDto } from "@/shared/charts";
 import { apiContext, queryClientContext } from "@/shared/router-context";
+import { ChartMetadataEditor } from "../components/chart-metadata-editor";
 import { ChartPublication } from "../components/chart-publication";
 import { ChartSummary } from "../components/chart-summary";
 import { ChartUpload } from "../components/chart-upload";
@@ -36,18 +37,15 @@ function Detail({ id }: { id: string }) {
   const client = useQueryClient(); const navigate = useNavigate(); const location = useLocation();
   const { data: chart, error: queryError } = useQuery(chartQuery(getRenderApi(), id));
   const { data: me } = useQuery(meQuery(getRenderApi()));
-  const [title, setTitle] = useState(chart?.title ?? ""); const [artist, setArtist] = useState(chart?.artist ?? "");
+  const [metadataUnsaved, setMetadataUnsaved] = useState(false);
   const [pending, setPending] = useState(false); const [error, setError] = useState<unknown>();
   const [deleting, setDeleting] = useState<string | null>(null);
   const appendRevision = useRef<{ fileId: string; revision: number } | null>(null);
-  const metadataDirty = useRef(false);
-  const metadataRevision = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (!queryError) return;
     const target = accountErrorRedirect(queryError, `${location.pathname}${location.search}`);
     if (target) window.location.assign(target);
   }, [queryError, location.pathname, location.search]);
-  useEffect(() => { if (chart && !metadataDirty.current) { setTitle(chart.title); setArtist(chart.artist); } }, [chart]);
   const refresh = async (updated?: ChartDto) => {
     if (updated) client.setQueryData(chartQuery(getBrowserApi(), id).queryKey, updated);
     await client.invalidateQueries({ queryKey: ["me", "charts"] });
@@ -58,16 +56,11 @@ function Detail({ id }: { id: string }) {
   };
   if (!chart || !me) return null;
   const current = chart.versions.find((version) => version.id === chart.currentVersionId);
-  const acceptMetadata = (updated: ChartDto) => {
-    metadataDirty.current = false; metadataRevision.current = undefined;
-    setTitle(updated.title); setArtist(updated.artist);
-  };
-  async function patch(body: ChartPatch, metadataChange = false) {
+  async function patch(body: ChartPatch) {
     setPending(true); setError(undefined);
     const api = chartsApi(getBrowserApi());
     try {
       const updated = await api.patch(id, body);
-      if (metadataChange) acceptMetadata(updated);
       await refresh(updated); toast.success(m.chart_saved());
     }
     catch (failure) {
@@ -77,20 +70,12 @@ function Detail({ id }: { id: string }) {
         const matched = (body.title === undefined || actual.title === body.title) && (body.artist === undefined || actual.artist === body.artist) &&
           (body.currentVersionId === undefined || actual.currentVersionId === body.currentVersionId);
         if (matched && !(failure instanceof ApiError && failure.status < 500)) {
-          if (metadataChange) acceptMetadata(actual);
           await refresh(actual); toast.success(m.chart_saved()); return;
         }
-        if (metadataChange) metadataRevision.current = actual.revision;
         await refresh(actual);
       } catch {}
       fail(failure);
     } finally { setPending(false); }
-  }
-  async function metadata(event: FormEvent) {
-    event.preventDefault();
-    const cleanTitle = title.trim(); const cleanArtist = artist.trim();
-    if (!cleanTitle || Array.from(cleanTitle).length > 120 || Array.from(cleanArtist).length > 120) { setError(new ApiError(422, "CHART_METADATA_INVALID", "Invalid metadata")); return; }
-    await patch({ expectedRevision: metadataRevision.current ?? chart!.revision, title: cleanTitle, artist: cleanArtist }, true);
   }
   async function remove(versionId?: string) {
     setPending(true); setError(undefined);
@@ -104,18 +89,8 @@ function Detail({ id }: { id: string }) {
   return <main className="space-y-6">
     <PageTitle description={m.charts_private_hint()}>{chart.title}</PageTitle>
     <Link to={localizeHref("/me/charts")} className={textLinkClass}>{m.charts_title()}</Link>
-    <form onSubmit={metadata} className="space-y-3 rounded-lg border p-4">
-      <label className="block">{m.chart_title_label()}<input value={title} maxLength={120} disabled={pending} onChange={(event) => {
-        if (!metadataDirty.current) metadataRevision.current = chart.revision;
-        metadataDirty.current = true; setTitle(event.target.value);
-      }} className="mt-1 block w-full rounded border p-2" required /></label>
-      <label className="block">{m.chart_artist_label()}<input value={artist} maxLength={120} disabled={pending} onChange={(event) => {
-        if (!metadataDirty.current) metadataRevision.current = chart.revision;
-        metadataDirty.current = true; setArtist(event.target.value);
-      }} className="mt-1 block w-full rounded border p-2" /></label>
-      <Button disabled={pending} type="submit">{m.chart_save_metadata()}</Button>
-    </form>
-    <ChartPublication chart={chart} busy={pending} setBusy={setPending} refresh={refresh} />
+    <ChartMetadataEditor chart={chart} busy={pending} setBusy={setPending} refresh={refresh} onDirty={setMetadataUnsaved} />
+    <ChartPublication chart={chart} busy={pending || metadataUnsaved} setBusy={setPending} refresh={refresh} />
     {current ? <><ChartSummary summary={current.summary} /><PrivateChartPreview key={current.id} id={id} versionId={current.id} summary={current.summary} /></> : null}
     <section aria-label={m.chart_versions()} className="space-y-3"><h2 className="font-semibold">{m.chart_versions()}</h2>
       <ul className="space-y-2">{chart.versions.map((version) => <li key={version.id} className="flex flex-wrap items-center gap-3 rounded border p-3">

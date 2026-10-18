@@ -12,6 +12,7 @@ import { publicationDto } from "../charts/service";
 import { recordPermission, awaitChartJournal } from "../charts/publication-journal";
 import { UUID_PATTERN } from "../uuid";
 import { withTimeout } from "../with-timeout";
+import { unknownNapcatObservation } from "../napcat/health";
 import type { ApiServices } from "./api-services";
 
 /** Reads durable identity and current account state; session/frontend flags grant no authority. */
@@ -84,6 +85,11 @@ const chartFrom = sql`from chart_public_ids i left join charts c on c.id=i.chart
   left join "user" u on u.id=c.owner_id left join user_public_ids ui on ui.user_id=u.id
   left join storage_journal_progress j on j.id='global'`;
 const visibleChart = sql`(m.chart_id is not null or (p.chart_id is not null and c.deleted_at is null and c.publication_sequence<=coalesce(j.exported_sequence,0) and (c.owner_id is null or u.status='active')))`;
+export async function dashChartsByIds(db: Db, ids: readonly string[]): Promise<DashChart[]> {
+  if (ids.length > 50 || ids.some(id => !UUID_PATTERN.test(id))) throw new HTTPException(400);
+  if (!ids.length) return [];
+  return read<DashChart>(db, sql`select ${chartColumns} ${chartFrom} where i.chart_id in (${sql.join(ids.map(id => sql`${id}::uuid`), sql`,`)}) and ${visibleChart}`);
+}
 export async function dashCharts(db: Db, page: ReturnType<typeof dashPage>): Promise<DashChartsPage> {
   const rows = await read<DashChart>(db, sql`select ${chartColumns} ${chartFrom}
     where i.public_id>${page.cursor}::bigint and ${visibleChart} order by i.public_id limit ${page.limit + 1}`);
@@ -168,7 +174,10 @@ export async function dashStatus(services: ApiServices): Promise<DashStatus> {
     to_char(finished_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as "finishedAt",
     to_char(last_success_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as "lastSuccessAt",
     manifest_sha256 as "manifestSha256",original_count as "originalCount",bytes::float8 as bytes from storage_backup_status where id='global'`);
-  return { capturedAt: new Date().toISOString(), checks, roles,
+  let qq = unknownNapcatObservation();
+  try { if (services.napcatObservation) qq = await withTimeout(services.napcatObservation(), 250); }
+  catch { /* Missing Redis evidence is unknown, never an offline claim. */ }
+  return { capturedAt: new Date().toISOString(), qq, checks, roles,
     queues: { storageDead, mediaPurgeDead, purgeIncomplete: counts.purgeIncomplete, revoking: counts.revoking },
     journal: { exportedSequence: journal?.exportedSequence ?? "0", exportedAt: journal?.exportedAt ?? null, pending: counts.pending },
     maintenance: { active: counts.active },

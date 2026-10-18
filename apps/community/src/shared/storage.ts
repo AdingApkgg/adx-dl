@@ -1,3 +1,4 @@
+import { SOCIAL_ERROR_CODES } from "./community-social";
 import { CHART_IMPORT_ERROR_CODES, CHART_BUSINESS_ERROR_CODES, type ChartImportSummary } from "./charts";
 /** JSON contracts: timestamps are ISO strings; bytes/revisions are safe integers. */
 export type StoragePurpose = "avatar" | "chart-source";
@@ -6,6 +7,9 @@ export type FileState = "processing" | "ready" | "rejected" | "deleted";
 export const STORAGE_ERROR_CODES = [
   ...CHART_IMPORT_ERROR_CODES,
   ...CHART_BUSINESS_ERROR_CODES,
+  ...SOCIAL_ERROR_CODES,
+  "DISCUSSION_CHANGED", "DISCUSSION_READ_ONLY", "DISCUSSION_LOCKED", "DISCUSSION_ROOT_UNAVAILABLE", "DISCUSSION_VERSION_CHANGED", "DISCUSSION_CURSOR_CHANGED", "DISCUSSION_IDEMPOTENCY_CONFLICT", "DISCUSSION_LIMIT", "DISCUSSION_SUBSCRIPTION_LIMIT", "DISCUSSION_REPLY_LIMIT",
+  "SITE_CHANGED", "SITE_INVALID",
   "PURPOSE_NOT_AVAILABLE",
   "INVALID_UPLOAD",
   "FILE_TOO_LARGE",

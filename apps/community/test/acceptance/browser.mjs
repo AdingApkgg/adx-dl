@@ -1,6 +1,7 @@
 // Run only on a remote Linux runner against the isolated acceptance Compose project.
 // Playwright is installed outside the repository; no product dependency is needed.
 import assert from "node:assert/strict";
+import { exercisePlatform } from "./platform-browser.mjs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -285,7 +286,7 @@ async function acceptance() {
   await step("private_draft_not_public_and_explicit_version_confirmation", async () => {
     await denied(anonymous, publicBase(), 404);
     assert.equal(await page.getByRole("button", { name: "确认发布", exact: true }).isEnabled(), false);
-    await page.getByRole("combobox", { name: /公开版本/ }).selectOption(draft.currentVersionId);
+    await page.getByRole("region", { name: "公开发布", exact: true }).getByRole("combobox", { name: /公开版本/ }).selectOption(draft.currentVersionId);
     assert.equal(await page.getByRole("button", { name: "确认发布", exact: true }).isEnabled(), false);
     await page.getByLabel("我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。", { exact: true }).check();
     const [published] = await Promise.all([
@@ -331,7 +332,7 @@ async function acceptance() {
     await page.getByLabel("标题", { exact: true }).fill("Private metadata edited");
     const [edited] = await Promise.all([
       page.waitForResponse(r => new URL(r.url()).pathname === `/api/v1/me/charts/${draft.id}` && r.request().method() === "PATCH"),
-      page.getByRole("button", { name: "保存标题和曲师", exact: true }).click(),
+      page.getByRole("button", { name: "保存作品资料", exact: true }).click(),
     ]);
     assert.equal(edited.status(), 200);
     assert.deepEqual(await json(anonymous, publicBase()), publicChart);
@@ -420,6 +421,7 @@ async function acceptance() {
       }
     }
   });
+  await exercisePlatform({ owner, other, anonymous, page, origin, chart: { ...publicChart, id: draft.id }, evidenceDirectory, step });
   await step("withdrawal_reauthorizes_all_old_asset_and_download_requests", async () => {
     await page.getByRole("button", { name: "撤回公开", exact: true }).click();
     const [withdrawn] = await Promise.all([
@@ -462,7 +464,7 @@ async function acceptance() {
     ]);
     assert.equal(saved.status(), 201); const optional = await saved.json(); optionalDraft = optional;
     await page.waitForURL(url => url.pathname === `/me/charts/${optional.id}`);
-    await page.getByRole("combobox", { name: /公开版本/ }).selectOption(optional.currentVersionId);
+    await page.getByRole("region", { name: "公开发布", exact: true }).getByRole("combobox", { name: /公开版本/ }).selectOption(optional.currentVersionId);
     await page.getByLabel("我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。", { exact: true }).check();
     const [published] = await Promise.all([
       page.waitForResponse(r => new URL(r.url()).pathname.endsWith("/publication") && r.request().method() === "PUT", { timeout: 60000 }),
@@ -514,7 +516,7 @@ async function acceptance() {
     await page.getByText("管理员 #1", { exact: true }).waitFor();
     assert.match(await page.locator('meta[name="robots"]').getAttribute("content"), /noindex/);
     const navigation = page.getByRole("navigation", { name: "社区管理后台", exact: true });
-    assert.equal(await navigation.getByRole("link").count(), 4);
+    assert.equal(await navigation.getByRole("link").count(), 8);
     if (evidenceDirectory) await page.screenshot({ path: join(evidenceDirectory, "dash-desktop.png"), fullPage: true });
     await navigation.getByRole("link", { name: "用户列表", exact: true }).click();
     await page.waitForURL(url => url.pathname === "/dash/users");
@@ -629,7 +631,7 @@ let deadline;
 try {
   if (evidenceDirectory) await mkdir(evidenceDirectory, { recursive: true, mode: 0o700 });
   await Promise.race([acceptance(), new Promise((_, reject) => {
-    deadline = setTimeout(() => reject(new Error("ACCEPTANCE_OVERALL_TIMEOUT")), 240000);
+    deadline = setTimeout(() => reject(new Error("ACCEPTANCE_OVERALL_TIMEOUT")), 540000);
   })]);
   const result = { status: "passed", steps, elapsedMs: Date.now() - startedAt, browser: "chromium", syntheticAccounts: true, pageErrors: diagnostics.filter(row => row.type === "pageerror").length, hydrationErrors: diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length };
   if (evidenceDirectory) await writeFile(join(evidenceDirectory, "browser-result.json"), JSON.stringify(result, null, 2) + "\n", { mode: 0o600 });

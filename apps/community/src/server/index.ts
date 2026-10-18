@@ -31,6 +31,7 @@ import { USER_PURGE_QUEUE, MEDIA_PURGE_QUEUE } from "./jobs/queues";
 import { createRedisRateLimitStore } from "./middleware/rate-limit";
 import { createOneBotClient } from "./napcat/client";
 import { createNapcatSender } from "./napcat/sender";
+import { readNapcatObservation } from "./napcat/health";
 import { connectRedis, getRedis, pingRedis } from "./redis/client";
 import { createLoginOptions } from "./services/login-options";
 import { DELETION_HANDLERS } from "./services/user-deletion";
@@ -134,6 +135,8 @@ const app = createApp({
     storage,
     db,
     boss: getBoss,
+    napcatObservation: () => env.qq.sender === "napcat" ? readNapcatObservation(redis)
+      : Promise.resolve({ state: "disabled", checkedAt: null, changedAt: null, failure: null }),
     loginOptions: createLoginOptions({
       turnstileSiteKey: env.turnstile.siteKey,
       awmc: Boolean(env.awmc),

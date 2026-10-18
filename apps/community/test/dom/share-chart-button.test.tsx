@@ -5,7 +5,7 @@ import { ShareChartButton } from "@/client/components/share-chart-button";
 
 function setup({ share, writeText, path = "/charts/public" }: { share?: (data: ShareData) => Promise<void>; writeText?: (text: string) => Promise<void>; path?: string } = {}) {
   vi.stubGlobal("navigator", { share, clipboard: writeText ? { writeText } : undefined });
-  render(<MemoryRouter initialEntries={[path]}><ShareChartButton title="Published title" /></MemoryRouter>);
+  render(<MemoryRouter initialEntries={[path]}><ShareChartButton title="Published title" publicId="42" /></MemoryRouter>);
 }
 afterEach(() => vi.unstubAllGlobals());
 test("share copies the localized public page only, without query or fragment", async () => {
@@ -13,7 +13,7 @@ test("share copies the localized public page only, without query or fragment", a
   setup({ writeText, path: "/en/charts/public?token=private#chart-preview" });
   fireEvent.click(screen.getByRole("button", { name: "分享谱面" }));
   await screen.findByRole("status");
-  expect(writeText).toHaveBeenCalledWith("https://community.test/en/charts/public");
+  expect(writeText).toHaveBeenCalledWith("https://community.test/en/charts/42");
   expect(screen.getByRole("status").textContent).toBe("公开链接已复制。");
 });
 test("native sharing is preferred and never claims the link was copied", async () => {
@@ -21,7 +21,7 @@ test("native sharing is preferred and never claims the link was copied", async (
   setup({ share, writeText });
   fireEvent.click(screen.getByRole("button", { name: "分享谱面" }));
   await waitFor(() => expect((screen.getByRole("button", { name: "分享谱面" }) as HTMLButtonElement).disabled).toBe(false));
-  expect(share).toHaveBeenCalledWith({ title: "Published title", url: "https://community.test/charts/public" });
+  expect(share).toHaveBeenCalledWith({ title: "Published title", url: "https://community.test/charts/42" });
   expect(writeText).not.toHaveBeenCalled();
   expect(screen.queryByRole("status")).toBeNull();
 });
@@ -46,7 +46,7 @@ test.each(["unavailable", "denied"])("clipboard %s offers focused manual copy wi
   const button = screen.getByRole("button", { name: "分享谱面" });
   fireEvent.click(button);
   const input = await screen.findByRole("textbox", { name: "公开谱面链接" }) as HTMLInputElement;
-  expect(input.value).toBe("https://community.test/charts/public");
+  expect(input.value).toBe("https://community.test/charts/42");
   expect(input.readOnly).toBe(true);
   await waitFor(() => expect(document.activeElement).toBe(input));
   expect(input.selectionEnd).toBe(input.value.length);

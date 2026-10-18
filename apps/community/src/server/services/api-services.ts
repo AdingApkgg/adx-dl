@@ -18,6 +18,7 @@ export type ApiServices = {
   /** pg-boss 的发送端。第一次调用时才启动（失败的启动不缓存），所以是返回 Promise 的函数。 */
   boss: () => Promise<PgBoss>;
   loginOptions: () => Promise<LoginOptions>;
+  napcatObservation?: () => Promise<import("@/shared/napcat").NapcatObservation>;
   /** 注销处理器（线上是 DELETION_HANDLERS；测试里换成假的）。 */
   deletionHandlers: readonly DeletionHandler[];
   /** Better Auth 实例：createApp 从 AppDeps.auth 放进来，调用方不用再传一遍。 */

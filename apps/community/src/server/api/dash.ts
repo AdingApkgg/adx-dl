@@ -7,6 +7,8 @@ import { isRecentLogin } from "../auth/recent-login";
 import { jsonError } from "../errors";
 import { dashAccess, dashOverview, dashUsers, dashCharts, dashPage, dashStatus, moderateChart } from "../services/dash";
 
+import { listDashReports, reportFilter, resolveChartReport } from "../services/chart-reports";
+import { socialStorage } from "./community-social";
 const pageQuery = z.object({ cursor: z.string().optional(), limit: z.string().optional() }).strict();
 const validatePageQuery = validator("query", (value, c) => {
   const parsed = pageQuery.safeParse(value);
@@ -33,6 +35,19 @@ export const dashRoutes = new Hono<AppEnv>()
   .get("/users", validatePageQuery, async c => c.json(await dashUsers(c.get("services").db, dashPage(c.req.valid("query")))))
   .get("/charts", validatePageQuery, async c => c.json(await dashCharts(c.get("services").db, dashPage(c.req.valid("query")))))
   .get("/status", async c => c.json(await dashStatus(c.get("services"))))
+  .get("/reports", async c => c.json(await listDashReports(socialStorage(c), reportFilter(c.req.query("status")), {
+    cursor: c.req.query("cursor"), ...(c.req.query("limit") !== undefined ? { limit: Number(c.req.query("limit")) } : {}),
+  })))
+  .post("/reports/:id/resolution", validator("json", (value, c) => {
+    const parsed = z.object({ status: z.enum(["dismissed", "actioned"]), note: z.string().max(1000) }).strict().safeParse(value);
+    return parsed.success ? parsed.data : jsonError(c, 400, "BAD_REQUEST", "Invalid resolution");
+  }), async c => {
+    const auth = currentAuth(c);
+    if (!isRecentLogin(auth.session.createdAt)) return jsonError(c, 403, "REAUTH_REQUIRED", "Sign in again to continue");
+    const access = await dashAccess(c.get("services"), auth.user.id);
+    if (!access) return jsonError(c, 403, "FORBIDDEN", "Forbidden");
+    return c.json(await resolveChartReport(socialStorage(c), { id: auth.user.id, publicId: access.publicId }, c.req.param("id"), c.req.valid("json")));
+  })
   .post("/charts/:id/moderation", validator("json", (value, c) => {
     const parsed = moderation.safeParse(value);
     return parsed.success ? parsed.data : jsonError(c, 400, "BAD_REQUEST", "Invalid moderation request");

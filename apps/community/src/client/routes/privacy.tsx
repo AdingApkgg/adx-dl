@@ -49,6 +49,6 @@ export default function Privacy({ loaderData }: Route.ComponentProps) {
           ) : m.privacy_contact_unavailable()}
         </p>
       </section>
-    </main>
+    <section className="space-y-2"><h2 className="font-semibold">{m.site_help_community_title()}</h2><p className="whitespace-pre-line">{m.site_help_community_body()}</p></section></main>
   );
 }

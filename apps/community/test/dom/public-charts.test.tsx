@@ -1,19 +1,30 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import type { ComponentType } from "react";
-import { MemoryRouter, RouterContextProvider } from "react-router";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { makeQueryClient } from "@/shared/query-client";
+import { m } from "@/paraglide/messages.js";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import {isValidElement,useState,type ComponentType,type ReactNode} from "react";
+import {createMemoryRouter,createRoutesFromElements,RouterProvider,Routes,type MemoryRouterProps,RouterContextProvider} from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import PublicCharts, { loader as catalogLoader, headers as catalogHeaders, meta as catalogMeta } from "@/client/routes/public-charts";
 import PublicChartDetail, { loader as detailLoader, meta as detailMeta } from "@/client/routes/public-chart-detail";
 import { createApiClient } from "@/shared/api-client";
 import type { PublicChartDto, PublicChartsPageDto } from "@/shared/charts";
 import { apiContext } from "@/shared/router-context";
-const chart: PublicChartDto = {
+function MemoryRouter({children,initialEntries}:MemoryRouterProps){
+  const [router]=useState(()=>createMemoryRouter(isValidElement<{children:ReactNode}>(children)&&children.type===Routes?createRoutesFromElements(children.props.children):[{path:"*",element:children}],{initialEntries}));
+  return <RouterProvider router={router}/>;
+}
+const chart: PublicChartDto = { description: "", credits: "", tags: [], releaseNote: "",
   id: "public", publicId: "42", versionId: "selected", ordinal: 2, title: "Published title", artist: "Snapshot artist", sourceSize: 1024,
   publishedAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-11T00:00:00.000Z", author: { publicId: "1", id: "alice", name: "Alice", image: null },
   summary: { title: "Private title must not become metadata", artist: "Private artist", maidataMd5Base64: "hash", difficulties: [{ difficulty: 4, level: "12+", noteCount: 3, durationMs: 5000, previewSupported: true }, { difficulty: 5, level: null, noteCount: null, durationMs: null, previewSupported: false }], warnings: [], audio: null, hasCover: false },
 };
 const Catalog = PublicCharts as unknown as ComponentType<{ loaderData: PublicChartsPageDto }>;
-const Detail = PublicChartDetail as unknown as ComponentType<{ loaderData: PublicChartDto }>;
+const DetailComponent = PublicChartDetail as unknown as ComponentType<{ loaderData: PublicChartDto }>;
+function Detail(props: { loaderData: PublicChartDto }) {
+  const client = makeQueryClient(); client.setQueryData(["me"], null);
+  return <QueryClientProvider client={client}><DetailComponent {...props} /></QueryClientProvider>;
+}
 afterEach(() => vi.unstubAllGlobals());
 test("catalog links to public details, names authors and anonymous content, shows difficulties, fallback cover and encoded cursor", () => {
   render(<MemoryRouter><Catalog loaderData={{ items: [chart, { ...chart, id: "anon", title: "Anonymous chart", author: null }], nextCursor: "next/+=" }} /></MemoryRouter>);
@@ -40,7 +51,7 @@ test("public detail exposes original download, selected version, author and sile
   expect(screen.getByRole("link", { name: /作者：Alice/ }).getAttribute("href")).toBe("/u/1");
   expect(screen.getByText("公开版本 ID：selected")).toBeTruthy();
   expect(screen.getByText("未附带（可静音预览）")).toBeTruthy();
-  expect((screen.getByRole("option", { name: /难度 5/ }) as HTMLOptionElement).disabled).toBe(true);
+  expect((within(document.getElementById("chart-preview")!).getByRole("option", { name: /MASTER/ }) as HTMLOptionElement).disabled).toBe(true);
 });
 test("empty catalog remains understandable", () => {
   render(<MemoryRouter><Catalog loaderData={{ items: [], nextCursor: null }} /></MemoryRouter>);
@@ -53,7 +64,7 @@ test("SSR loaders use only public API, no-store, and fetch fresh state for every
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(String(input)).pathname; paths.push(path);
     expect(init?.cache).toBe("no-store");
-    return Response.json(path.endsWith("/42") ? current : { items: [current], nextCursor: null });
+    return Response.json(path.endsWith("/related") ? [] : path.endsWith("/42") ? current : { items: [current], nextCursor: null });
   }));
   const ctx = context();
   const args = { context: ctx, params: { id: "42" } } as unknown as Parameters<typeof detailLoader>[0];
@@ -63,7 +74,7 @@ test("SSR loaders use only public API, no-store, and fetch fresh state for every
   const result = await catalogLoader({ context: ctx, url: new URL("https://community.test/charts") } as unknown as Parameters<typeof catalogLoader>[0]);
   expect(result.init?.headers).toMatchObject({ "Cache-Control": "private, no-store" });
   expect(catalogHeaders()).toMatchObject({ "Cache-Control": "private, no-store" });
-  expect(paths).toEqual(["/api/v1/charts/42", "/api/v1/charts/42", "/api/v1/charts"]);
+  expect(paths).toEqual(["/api/v1/charts/42", "/api/v1/charts/42/related", "/api/v1/charts/42", "/api/v1/charts/42/related", "/api/v1/charts"]);
 });
 test.each([404, 503])("public detail error %s stays no-store and noindex without private fallback", async status => {
   const fetcher = vi.fn(async () => Response.json({ error: { code: "NOT_FOUND", message: "Unavailable" } }, { status }));
@@ -91,12 +102,12 @@ test("public card difficulty pills name the playable difficulty without relying 
 });
 
 test("public detail has a visible preview shortcut and sharing without eager preview assets", () => {
-  const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+  const fetcher = vi.fn(async(_input:RequestInfo|URL)=>Response.json({items:[],nextCursor:null,chartId:"42",versionId:"selected",difficulties:[],relatedTopics:[],count:0})); vi.stubGlobal("fetch", fetcher);
   render(<MemoryRouter><Detail loaderData={chart} /></MemoryRouter>);
   expect(screen.getByRole("link", { name: "预览谱面" }).getAttribute("href")).toBe("#chart-preview");
-  expect(document.getElementById("chart-preview")?.getAttribute("tabindex")).toBe("-1");
+  expect(document.getElementById("chart-preview")?.getAttribute("tabindex")).toBe("0");
   expect(screen.getByRole("button", { name: "分享谱面" })).toBeTruthy();
-  expect(fetcher).not.toHaveBeenCalled();
+  expect(fetcher.mock.calls.every(call => !String(call[0]).includes("/assets/"))).toBe(true);
 });
 test("detail without supported difficulties explains the limit and keeps download and sharing available", () => {
   render(<MemoryRouter><Detail loaderData={{ ...chart, summary: { ...chart.summary, difficulties: chart.summary.difficulties.map(row => ({ ...row, previewSupported: false })) } }} /></MemoryRouter>);
@@ -115,4 +126,75 @@ test.each(["/en/charts/12345678-1234-4234-8234-123456789012/", "/en/Charts/12345
   expect((response as Response).status).toBe(302);
   expect((response as Response).headers.get("location")).toBe("/en/charts/42?from=share");
   expect((response as Response).headers.get("cache-control")).toBe("private, no-store");
+});
+
+
+test("filter changes reset the cursor and preserve Unicode search in the URL", async () => {
+  const { useLocation } = await import("react-router");
+  function Location() { const l = useLocation(); return <output data-testid="search-location">{l.pathname + l.search}</output>; }
+  render(<MemoryRouter initialEntries={["/charts?q=old&cursor=oldpage"]}><Catalog loaderData={{ items: [], nextCursor: null }} /><Location /></MemoryRouter>);
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "星テスト %_" } });
+  fireEvent.change(screen.getByRole("combobox", { name: m.chart_difficulties() }), { target: { value: "4" } });
+  fireEvent.change(screen.getByRole("combobox", { name: m.public_charts_sort() }), { target: { value: "published" } });
+  fireEvent.submit(screen.getByRole("search"));
+  const at = new URL(screen.getByTestId("search-location").textContent!, "https://community.test");
+  expect(at.searchParams.get("q")).toBe("星テスト %_");
+  expect(at.searchParams.get("difficulty")).toBe("4");
+  expect(at.searchParams.get("sort")).toBe("published");
+  expect(at.searchParams.has("cursor")).toBe(false);
+});
+test("a direct filtered cursor page returns to its filtered first page", () => {
+  render(<MemoryRouter initialEntries={["/charts?q=star&difficulty=4&sort=published&cursor=page2"]}><Catalog loaderData={{ items: [chart], nextCursor: "page3" }} /></MemoryRouter>);
+  const previous = new URL(screen.getByRole("link", { name: "上一页" }).getAttribute("href")!, "https://community.test");
+  const next = new URL(screen.getByRole("link", { name: "下一页" }).getAttribute("href")!, "https://community.test");
+  expect(previous.searchParams.get("q")).toBe("star");
+  expect(previous.searchParams.get("difficulty")).toBe("4");
+  expect(previous.searchParams.get("sort")).toBe("published");
+  expect(previous.searchParams.has("cursor")).toBe(false);
+  expect(next.searchParams.get("q")).toBe("star");
+  expect(next.searchParams.get("cursor")).toBe("page3");
+});
+test("the filtered first page does not offer a misleading previous page", () => {
+  render(<MemoryRouter initialEntries={["/charts?q=star"]}><Catalog loaderData={{ items: [], nextCursor: null }} /></MemoryRouter>);
+  expect(screen.queryByRole("link", { name: "上一页" })).toBeNull();
+});
+
+test("page three detail roundtrip preserves the actual previous page", async () => {
+  const { Route, Routes } = await import("react-router");
+  render(<MemoryRouter initialEntries={[{ pathname: "/charts", search: "?q=star&cursor=page3", state: { publicChartCursors: ["/charts?q=star", "/charts?q=star&cursor=page2"] } }]}>
+    <Routes><Route path="/charts" element={<Catalog loaderData={{ items: [chart], nextCursor: null }} />} /><Route path="/charts/:id" element={<Detail loaderData={chart} />} /></Routes>
+  </MemoryRouter>);
+  fireEvent.click(screen.getByRole("link", { name: /Published title/ }));
+  fireEvent.click(await screen.findByRole("link", { name: m.public_chart_back_results() }));
+  expect(screen.getByRole("link", { name: m.chart_previous() }).getAttribute("href")).toBe("/charts?q=star&cursor=page2");
+});
+
+test("favorites page three detail roundtrip restores raw private page cursors", async () => {
+  const { Route, Routes } = await import("react-router");
+  const { PublicChartCard } = await import("@/client/components/public-chart-card");
+  const { SocialPager } = await import("@/client/components/social-pager");
+  function FavoritesList() { return <><PublicChartCard chart={chart} /><SocialPager base="/me/favorites" nextCursor={null} /></>; }
+  render(<MemoryRouter initialEntries={[{ pathname: "/me/favorites", search: "?cursor=page3", state: { socialPageScope: "/me/favorites:", socialCursors: ["", "page2"] } }]}>
+    <Routes><Route path="/me/favorites" element={<FavoritesList />} /><Route path="/charts/:id" element={<Detail loaderData={chart} />} /></Routes>
+  </MemoryRouter>);
+  fireEvent.click(screen.getByRole("link", { name: /Published title/ }));
+  fireEvent.click(await screen.findByRole("link", { name: m.my_favorites() }));
+  expect(screen.getByRole("link", { name: m.chart_previous() }).getAttribute("href")).toBe("/me/favorites?cursor=page2");
+});
+
+test("public tags link to URL filters as siblings of the card link, without nested anchors", () => {
+  render(<MemoryRouter><Catalog loaderData={{ items: [{ ...chart, tags: [{ key: "abc", label: "ＡＢＣ" }] }], nextCursor: null }} /></MemoryRouter>);
+  const tag = screen.getByRole("link", { name: "ＡＢＣ" });
+  expect(tag.getAttribute("href")).toBe("/charts?tag=abc");
+  expect(tag.parentElement?.closest("a")).toBeNull();
+});
+test("published description and credits render as text and share metadata reads only the snapshot", () => {
+  const snapshot = { ...chart, description: "<script>escaped</script>\nPublic description", credits: "Public source", releaseNote: "This version only" };
+  render(<MemoryRouter><Detail loaderData={snapshot} /></MemoryRouter>);
+  expect(screen.getByText(/<script>escaped<\/script>/)).toBeTruthy(); expect(document.querySelector("script")).toBeNull();
+  expect(screen.getByText("Public source")).toBeTruthy(); expect(screen.getByText("This version only")).toBeTruthy();
+  const matches = [{ id: "root", loaderData: { origin: "https://community.test" } }];
+  const head = detailMeta({ loaderData: snapshot, matches, location: { pathname: "/charts/42" } } as unknown as Parameters<typeof detailMeta>[0]);
+  expect(head).toContainEqual({ name: "description", content: "<script>escaped</script> Public description" });
+  expect(JSON.stringify(head)).not.toContain("Private artist");
 });

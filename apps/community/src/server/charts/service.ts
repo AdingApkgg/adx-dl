@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { chartPlainText, normalizeChartTags } from "@/shared/chart-metadata";
 import { recordPermission, awaitChartJournal } from "./publication-journal";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
@@ -43,7 +45,7 @@ async function dto(db: DbTransaction, chart: Chart): Promise<ChartDto> {
     .orderBy(desc(chartVersions.ordinal)).limit(20);
   const versions: ChartVersionDto[] = rows.map(({ version, size }) => ({
     id: version.id, ordinal: version.ordinal, sourceFileId: version.sourceFileId!,
-    sourceSize: size, summary: version.summary, createdAt: version.createdAt.toISOString(),
+    releaseNote: version.releaseNote, sourceSize: size, summary: version.summary, createdAt: version.createdAt.toISOString(),
   }));
   if (!versions.some(v => v.id === chart.currentVersionId)) throw notFound();
   const [publication] = await db.select().from(chartPublications).where(eq(chartPublications.chartId, chart.id));
@@ -51,7 +53,7 @@ async function dto(db: DbTransaction, chart: Chart): Promise<ChartDto> {
   const [identity] = await db.select().from(chartPublicIds).where(eq(chartPublicIds.chartId, chart.id));
   return { publicId: identity?.publicId.toString() ?? null, publicationPending: chart.publicationSequence > (progress?.exportedSequence ?? 0),
     publication: publication ? publicationDto(publication) : null,
-    id: chart.id, title: chart.title, artist: chart.artist, revision: chart.revision,
+    id: chart.id, title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits, tags: chart.tags, revision: chart.revision,
     currentVersionId: chart.currentVersionId, versions, createdAt: chart.createdAt.toISOString(),
     updatedAt: chart.updatedAt.toISOString() };
 }
@@ -120,19 +122,23 @@ export async function getChart(ctx: StorageContext, userId: string, id: string):
     isolationLevel: "repeatable read", accessMode: "read only",
   });
 }
-type Cursor = { at: string; id: string };
+type Cursor = { at: string; id: string; scope?: string };
 function decodeCursor(value: string): Cursor {
   try {
-    if (value.length > 256 || !/^[A-Za-z0-9_-]+$/.test(value)) throw invalid();
+    if (value.length > 512 || !/^[A-Za-z0-9_-]+$/.test(value)) throw invalid();
     const c = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
     if (!c || !UUID_PATTERN.test(c.id) || typeof c.at !== "string" || new Date(c.at).toISOString() !== c.at) throw invalid();
     return c;
   } catch { throw invalid(); }
 }
-export async function listCharts(ctx: StorageContext, userId: string, input: { cursor?: string; limit?: number } = {}): Promise<ChartsPageDto> {
+export async function listCharts(ctx: StorageContext, userId: string, input: { cursor?: string; limit?: number; q?: string; status?: string } = {}): Promise<ChartsPageDto> {
   const limit = input.limit ?? 20;
-  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) throw invalid();
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 20) throw invalid();
+  const q = (input.q ?? "").trim(), status = input.status || "all";
+  if ((input.q?.length ?? 0) > 240 || [...q].length > 120 || /[\p{Cc}]/u.test(q) || !["all", "draft", "published"].includes(status)) throw invalid();
+  const scope = createHash("sha256").update(JSON.stringify({ userId, q, status })).digest("hex");
   const cursor = input.cursor ? decodeCursor(input.cursor) : undefined;
+  if (cursor && cursor.scope !== scope) throw invalid();
   // Read-only reporting uses a consistent snapshot; quota admission still owns the mutation locks.
   return ctx.db.transaction(async tx => {
   const [owner] = await tx.select({ id: user.id }).from(user).where(and(eq(user.id, userId), eq(user.status, "active")));
@@ -143,6 +149,8 @@ export async function listCharts(ctx: StorageContext, userId: string, input: { c
     .innerJoin(user, eq(user.id, charts.ownerId))
     .innerJoin(chartVersions, and(eq(chartVersions.id, charts.currentVersionId), eq(chartVersions.chartId, charts.id)))
     .where(and(eq(charts.ownerId, userId), eq(user.status, "active"), isNull(charts.deletedAt), isNull(chartVersions.deletedAt),
+      q ? or(sql`strpos(lower(${charts.title}),lower(${q}))>0`, sql`strpos(lower(${charts.artist}),lower(${q}))>0`) : undefined,
+      status === "draft" ? isNull(chartPublications.chartId) : status === "published" ? sql`${chartPublications.chartId} is not null` : undefined,
       ...(cursor ? [or(lt(charts.updatedAt, new Date(cursor.at)), and(eq(charts.updatedAt, new Date(cursor.at)), lt(charts.id, cursor.id)))] : [])))
     .orderBy(desc(charts.updatedAt), desc(charts.id)).limit(limit + 1);
   const [progress] = await tx.select().from(storageJournalProgress).where(eq(storageJournalProgress.id, "global"));
@@ -151,20 +159,27 @@ export async function listCharts(ctx: StorageContext, userId: string, input: { c
     publicId: identity?.publicId.toString() ?? null,
     publicationPending: chart.publicationSequence > (progress?.exportedSequence ?? 0),
     publication: publication ? publicationDto(publication) : null, id: chart.id,
-    title: chart.title, artist: chart.artist, revision: chart.revision, currentVersionId: chart.currentVersionId!,
+    title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits, tags: chart.tags, revision: chart.revision, currentVersionId: chart.currentVersionId!,
     summary, updatedAt: chart.updatedAt.toISOString() }));
   const last = page.at(-1)?.chart;
   const usage = await usageByPurpose(tx, userId, "chart-source");
   return { items, nextCursor: rows.length > limit && last
-    ? Buffer.from(JSON.stringify({ at: last.updatedAt.toISOString(), id: last.id })).toString("base64url") : null,
+    ? Buffer.from(JSON.stringify({ at: last.updatedAt.toISOString(), id: last.id, scope })).toString("base64url") : null,
     usage: { ...usage, quotaBytes: chartUploadRule.quota } };
   }, { isolationLevel: "repeatable read", accessMode: "read only" });
 }
-export type ChartPatch = { expectedRevision: number; title?: string; artist?: string; currentVersionId?: string };
+export type ChartPatch = { expectedRevision: number; title?: string; artist?: string; description?: string; credits?: string; tags?: string[]; releaseNote?: { versionId: string; text: string }; currentVersionId?: string };
 export async function updateChart(ctx: StorageContext, userId: string, id: string, input: ChartPatch): Promise<ChartDto> {
   id = id.toLowerCase();
   revision(input.expectedRevision);
-  if (input.title === undefined && input.artist === undefined && input.currentVersionId === undefined) throw invalid();
+  if ([input.title, input.artist, input.description, input.credits, input.tags, input.releaseNote, input.currentVersionId].every(value => value === undefined)) throw invalid();
+  let description: string | undefined, credits: string | undefined, tags: ReturnType<typeof normalizeChartTags> | undefined;
+  try {
+    if (input.description !== undefined) description = chartPlainText(input.description, 2000);
+    if (input.credits !== undefined) credits = chartPlainText(input.credits, 1000);
+    if (input.tags !== undefined) tags = normalizeChartTags(input.tags);
+    if (input.releaseNote) chartPlainText(input.releaseNote.text, 1000);
+  } catch { throw invalid(); }
   const title = input.title?.trim(), artist = input.artist?.trim();
   if ((title !== undefined && (!title || [...title].length > 120)) || (artist !== undefined && [...artist].length > 120)) throw invalid();
   return withStorageTransaction(ctx.db, async tx => {
@@ -178,8 +193,14 @@ export async function updateChart(ctx: StorageContext, userId: string, id: strin
       if (!version) throw notFound();
       await verifyHistoricalSource(tx, userId, version);
     }
+    if (input.releaseNote) {
+      requireId(input.releaseNote.versionId);
+      const [version] = await tx.select().from(chartVersions).where(and(eq(chartVersions.id, input.releaseNote.versionId), eq(chartVersions.chartId, id), isNull(chartVersions.deletedAt))).for("update");
+      if (!version) throw notFound();
+      await tx.update(chartVersions).set({ releaseNote: input.releaseNote.text }).where(eq(chartVersions.id, version.id));
+    }
     const now = await storageTime(tx);
-    const [saved] = await tx.update(charts).set({ ...(title !== undefined ? { title } : {}),
+    const [saved] = await tx.update(charts).set({ ...(description !== undefined ? { description } : {}), ...(credits !== undefined ? { credits } : {}), ...(tags !== undefined ? { tags } : {}), ...(title !== undefined ? { title } : {}),
       ...(artist !== undefined ? { artist } : {}), ...(input.currentVersionId !== undefined ? { currentVersionId: input.currentVersionId } : {}),
       revision: chart.revision + 1, updatedAt: now }).where(eq(charts.id, id)).returning();
     return dto(tx, saved);
@@ -275,6 +296,6 @@ export async function deleteChart(ctx: StorageContext, userId: string, id: strin
 }
 
 export function publicationDto(p: typeof chartPublications.$inferSelect) {
-  return { versionId: p.versionId, title: p.title, artist: p.artist,
+  return { versionId: p.versionId, title: p.title, artist: p.artist, description: p.description ?? "", credits: p.credits ?? "", tags: p.tags ?? [], releaseNote: p.releaseNote ?? "",
     publishedAt: p.publishedAt.toISOString(), updatedAt: p.updatedAt.toISOString() };
 }

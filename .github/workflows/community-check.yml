@@ -182,7 +182,7 @@ jobs:
           ACCEPTANCE_FIXTURE_DIR: ${{ runner.temp }}/community-acceptance/fixture
           ACCEPTANCE_EVIDENCE_DIR: ${{ runner.temp }}/community-acceptance/evidence
           ACCEPTANCE_PLAYWRIGHT_PATH: ${{ runner.temp }}/community-browser/node_modules/playwright/index.mjs
-        run: timeout --signal=TERM --kill-after=10s 300s node apps/community/test/acceptance/browser.mjs
+        run: timeout --signal=TERM --kill-after=10s 600s node apps/community/test/acceptance/browser.mjs
 
       # 与浏览器用例顺序执行；停止其角色后，单独跑现有 opt-in full restore case。
       - name: Fresh-volume backup and recovery acceptance

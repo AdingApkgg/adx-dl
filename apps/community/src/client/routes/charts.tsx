@@ -2,7 +2,7 @@ import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useSearchParams } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
 import { apiContext, queryClientContext } from "@/shared/router-context";
@@ -16,7 +16,7 @@ import type { Route } from "./+types/charts";
 export async function loader({ context, url }: Route.LoaderArgs) {
   await requireUser(context, url);
   const client = context.get(queryClientContext);
-  await client.query(chartsQuery(context.get(apiContext)));
+  await client.query(chartsQuery(context.get(apiContext), undefined, { q: url.searchParams.get("q") ?? "", status: url.searchParams.get("status") ?? "all" }));
   return { dehydratedState: dehydrate(client) };
 }
 export function meta() { return [{ title: `${m.charts_title()} - ${m.site_name()}` }, { name: "robots", content: "noindex" }]; }
@@ -25,8 +25,13 @@ export default function Charts({ loaderData }: Route.ComponentProps) {
 }
 function ChartList() {
   const location = useLocation();
-  const [cursors, setCursors] = useState<(string | undefined)[]>([undefined]);
-  const { data, error, isFetching } = useQuery(chartsQuery(getRenderApi(), cursors.at(-1)));
+  const [params, setParams] = useSearchParams();
+  const filters = { q: params.get("q") ?? "", status: params.get("status") ?? "all" };
+  const scope = JSON.stringify(filters);
+  const [history, setHistory] = useState<{ scope: string; cursors: (string | undefined)[] }>({ scope, cursors: [undefined] });
+  const cursors = history.scope === scope ? history.cursors : [undefined];
+  const setCursors = (update: (string | undefined)[] | ((value: (string | undefined)[]) => (string | undefined)[])) => setHistory({ scope, cursors: typeof update === "function" ? update(cursors) : update });
+  const { data, error, isFetching } = useQuery(chartsQuery(getRenderApi(), cursors.at(-1), filters));
   useEffect(() => {
     if (!error) return;
     const target = accountErrorRedirect(error, `${location.pathname}${location.search}`);
@@ -35,6 +40,15 @@ function ChartList() {
   return <main className="space-y-6">
     <PageTitle description={m.charts_private_hint()}>{m.charts_title()}</PageTitle>
     <Button asChild><Link to={localizeHref("/me/charts/new")}>{m.chart_new()}</Link></Button>
+    <form role="search" className="flex flex-wrap gap-2" onSubmit={event => {
+      event.preventDefault(); const values = new FormData(event.currentTarget);
+      setCursors([undefined]); setParams({ q: String(values.get("q") ?? ""), status: String(values.get("status") ?? "all") });
+    }}>
+      <input key={filters.q} name="q" type="search" defaultValue={filters.q} maxLength={240} aria-label={m.public_charts_search()} className="min-h-11 flex-1 rounded border p-2" />
+      <select key={filters.status} name="status" defaultValue={filters.status} aria-label={m.chart_metadata_status()} className="rounded border p-2">
+        <option value="all">{m.chart_metadata_all()}</option><option value="draft">{m.chart_publication_status_private()}</option><option value="published">{m.chart_publication_status_public()}</option>
+      </select><Button type="submit">{m.public_charts_search()}</Button>
+    </form>
     {error ? <Alert variant="destructive">{chartErrorMessage(error)}</Alert> : null}
     {data ? <>
       <div className="space-y-1 text-sm text-muted-foreground">

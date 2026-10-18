@@ -64,7 +64,7 @@ export default function Login({ loaderData }: Route.ComponentProps) {
 }
 
 function LoginContent() {
-  const { data: options } = useQuery(loginOptionsQuery(getRenderApi()));
+  const { data: options, refetch: refreshOptions, isFetching: refreshingOptions, isRefetchError } = useQuery(loginOptionsQuery(getRenderApi()));
   // loader 已经取过当前用户并 dehydrate。已登录只会出现在"重新登录"（reauth=1）或登录出错回来（带 error）时，
   // 这时不显示"只用通行密钥注册"。
   const { data: me } = useQuery(meQuery(getRenderApi()));
@@ -119,7 +119,12 @@ function LoginContent() {
               onVerified={goAfterQq}
             />
           </CardContent>
-        ) : null}
+        ) : <CardContent className="space-y-2">
+          <Button type="button" variant="outline" disabled={refreshingOptions} onClick={() => void refreshOptions()}>
+            {refreshingOptions ? m.dash_refreshing() : m.login_qq_retry()}
+          </Button>
+          {isRefetchError ? <p role="status" className="text-sm text-muted-foreground">{m.login_qq_retry_failed()}</p> : null}
+        </CardContent>}
       </Card>
 
       <PasskeySection

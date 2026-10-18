@@ -1,9 +1,10 @@
 import { cn } from "@astrodx/ui/lib/utils";
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
 import type { ChartDifficulty, ChartDifficultySummary, PublicChartDto } from "@/shared/charts";
+import { publicListCursors } from "../lib/public-chart-navigation";
 import { publicChartAssetUrl } from "../queries/public-charts";
 
 export const PUBLIC_CHART_GRID_CLASS = "grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6";
@@ -19,6 +20,9 @@ const difficultyStyles: Record<ChartDifficulty, { name: string; tone: string }> 
   7: { name: "宴", tone: "border-pink-500/45 bg-pink-500/15 text-pink-700 dark:text-pink-300" },
 };
 
+export function publicDifficultyName(difficulty: ChartDifficulty): string {
+  return difficultyStyles[difficulty].name || m.chart_difficulty({ difficulty: String(difficulty) });
+}
 function PublicDifficultyPill({ row }: { row: ChartDifficultySummary }) {
   const style = difficultyStyles[row.difficulty];
   return <span className={cn("inline-flex max-w-full flex-wrap items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold tabular-nums", style.tone)}>
@@ -37,7 +41,14 @@ export function PublicCover({ chart }: { chart: PublicChartDto }) {
 }
 export function PublicChartCard({ chart, headingLevel = 2 }: { chart: PublicChartDto; headingLevel?: 2 | 3 }) {
   const Heading = headingLevel === 3 ? "h3" : "h2";
-  return <Link to={localizeHref(`/charts/${chart.publicId}`)} className="group flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card/80 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+  const location = useLocation();
+  const href = `${location.pathname}${location.search}`;
+  const favorites = /\/me\/favorites$/.test(location.pathname);
+  const privateCursors: unknown[] = location.state?.socialPageScope === "/me/favorites:" && Array.isArray(location.state?.socialCursors) ? location.state.socialCursors.slice(-100) : [];
+  const privateHistory = privateCursors.filter((cursor): cursor is string => typeof cursor === "string" && (cursor === "" || /^[A-Za-z0-9_-]{1,512}$/.test(cursor)))
+    .map(cursor => location.pathname + (cursor ? `?cursor=${cursor}` : ""));
+  const history = publicListCursors(favorites ? privateHistory : location.state?.publicChartCursors, href);
+  return <article className="flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card/80"><Link to={localizeHref(`/charts/${chart.publicId}`)} state={{ publicListHref: href, publicListCursors: history }} className="group flex flex-1 flex-col transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
     <PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} />
     <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3 sm:p-4">
       <Heading className="line-clamp-1 font-semibold leading-snug" title={chart.title}>{chart.title}</Heading>
@@ -47,5 +58,9 @@ export function PublicChartCard({ chart, headingLevel = 2 }: { chart: PublicChar
         <PublicDifficultyPill row={row} />
       </li>)}</ul>
     </div>
-  </Link>;
+  </Link><PublicChartTags tags={chart.tags} /></article>;
+}
+
+export function PublicChartTags({ tags }: { tags: PublicChartDto["tags"] }) {
+  return tags?.length ? <ul aria-label={m.chart_metadata_tags()} className="flex flex-wrap gap-2 p-3">{tags.map(tag => <li key={tag.key}><Link className="rounded-full border px-2 py-1 text-xs hover:underline" to={localizeHref(`/charts?${new URLSearchParams({ tag: tag.key })}`)}>{tag.label}</Link></li>)}</ul> : null;
 }

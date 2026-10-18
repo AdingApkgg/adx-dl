@@ -1,4 +1,7 @@
-import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { parsePublicChartFilters, type PublicChartSearchInput } from "@/shared/public-chart-search";
+import type { PgSelect } from "drizzle-orm/pg-core";
 import { HTTPException } from "hono/http-exception";
 import type { PublicChartDto, PublicChartsPageDto } from "@/shared/charts";
 import {
@@ -47,10 +50,12 @@ export async function publishChart(
     if ((await tx.select().from(chartModerations).where(eq(chartModerations.chartId, id))).length)
       throw new StorageError(409, "CHART_MODERATED");
     const [p] = await tx.select().from(chartPublications).where(eq(chartPublications.chartId, id));
+    const [selectedVersion] = await tx.select().from(chartVersions).where(and(eq(chartVersions.id, input.versionId), eq(chartVersions.chartId, id), isNull(chartVersions.deletedAt)));
+    if (!selectedVersion) throw missing();
     if (
       p?.versionId === input.versionId.toLowerCase() &&
       p.title === chart.title &&
-      p.artist === chart.artist
+      p.artist === chart.artist && p.description === chart.description && p.credits === chart.credits && JSON.stringify(p.tags) === JSON.stringify(chart.tags) && p.releaseNote === selectedVersion.releaseNote
     )
       return { chart, sequence: chart.publicationSequence };
     if (chart.revision !== input.expectedRevision || chart.revision >= 2147483647)
@@ -99,6 +104,7 @@ export async function publishChart(
       versionId: version.id,
       title: chart.title,
       artist: chart.artist,
+      description: chart.description, credits: chart.credits, tags: chart.tags, releaseNote: version.releaseNote,
       publishedAt: p?.publishedAt ?? now,
       updatedAt: now,
     };
@@ -147,8 +153,7 @@ export async function withdrawChart(
 }
 // One authorization query for each request, including validators and HEAD. No File permission is changed.
 function query(ctx: StorageContext) {
-  return ctx.db
-    .select({
+  return visibilityQuery(ctx.db.select({
       chart: charts,
       publicId: chartPublicIds.publicId,
       p: chartPublications,
@@ -163,8 +168,10 @@ function query(ctx: StorageContext) {
         then ${userPublicIds.publicId} else null end`,
       authorName: user.name,
       authorImage: user.image,
-    })
-    .from(chartPublications)
+    }).from(chartPublications).$dynamic());
+}
+function visibilityQuery<T extends PgSelect>(selection: T) {
+  return selection
     .innerJoin(charts, eq(charts.id, chartPublications.chartId))
     .innerJoin(chartPublicIds, eq(chartPublicIds.chartId, charts.id))
     .leftJoin(user, eq(user.id, charts.ownerId))
@@ -234,51 +241,55 @@ async function resolved(ctx: StorageContext, id: string) {
 export async function getPublicChart(ctx: StorageContext, id: string) {
   return publicDto((await resolved(ctx, id)).r);
 }
+/** One bounded authorization query for private collections; unavailable IDs never expose old snapshots. */
+export async function getPublicChartsByIds(ctx: StorageContext, ids: readonly string[]): Promise<PublicChartDto[]> {
+  if (ids.length > 50 || ids.some(id => !UUID_PATTERN.test(id))) throw invalid();
+  if (!ids.length) return [];
+  return (await query(ctx).where(and(allowed(), inArray(charts.id, [...ids])))).map(publicDto);
+}
 export async function listPublicCharts(
   ctx: StorageContext,
-  input: { limit?: number; cursor?: string } = {},
+  input: { limit?: number; cursor?: string } & PublicChartSearchInput = {},
 ): Promise<PublicChartsPageDto> {
   const limit = input.limit ?? 24;
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) throw invalid();
-  let cursor: { at: string; id: string } | undefined;
-  if (input.cursor !== undefined)
+  const filters = (() => { try { return parsePublicChartFilters(input); } catch { throw invalid(); } })();
+  const scope = createHash("sha256").update(JSON.stringify(filters)).digest("hex");
+  const isDefault = !filters.q && !filters.difficulty && !filters.author && !filters.tag && filters.sort === "updated";
+  let cursor: { at: string; id: string; scope?: string } | undefined;
+  if (input.cursor !== undefined) {
     try {
-      if (input.cursor.length > 256 || !/^[A-Za-z0-9_-]+$/.test(input.cursor)) throw invalid();
+      if (input.cursor.length > 512 || !/^[A-Za-z0-9_-]+$/.test(input.cursor)) throw invalid();
       cursor = JSON.parse(Buffer.from(input.cursor, "base64url").toString());
-      if (
-        !cursor ||
-        Object.keys(cursor).sort().join() !== "at,id" ||
-        !UUID_PATTERN.test(cursor.id) ||
-        new Date(cursor.at).toISOString() !== cursor.at
-      )
-        throw invalid();
-    } catch {
-      throw invalid();
-    }
-  const rows = await query(ctx)
-    .where(
-      and(
-        allowed(),
-        cursor
-          ? or(
-              lt(chartPublications.updatedAt, new Date(cursor.at)),
-              and(eq(chartPublications.updatedAt, new Date(cursor.at)), lt(charts.id, cursor.id)),
-            )
-          : undefined,
-      ),
-    )
-    .orderBy(desc(chartPublications.updatedAt), desc(charts.id))
-    .limit(limit + 1);
-  const page = rows.slice(0, limit),
-    last = page.at(-1);
+      if (!cursor || typeof cursor.id !== "string" || typeof cursor.at !== "string" ||
+        !UUID_PATTERN.test(cursor.id) || new Date(cursor.at).toISOString() !== cursor.at ||
+        (Object.keys(cursor).sort().join() !== "at,id,scope" && Object.keys(cursor).sort().join() !== "at,id") ||
+        (cursor.scope === undefined ? !isDefault : cursor.scope !== scope)) throw invalid();
+    } catch { throw invalid(); }
+  }
+  const timestamp = filters.sort === "published" ? chartPublications.publishedAt : chartPublications.updatedAt;
+  const durableAuthor = sql`${userPublicIds.journalSequence}<=(select exported_sequence from storage_journal_progress where id='global')`;
+  const search = filters.q ? or(
+    sql`strpos(lower(${chartPublications.title}),lower(${filters.q}))>0`,
+    sql`strpos(lower(${chartPublications.artist}),lower(${filters.q}))>0`,
+    and(durableAuthor, sql`strpos(lower(${user.name}),lower(${filters.q}))>0`),
+    sql`exists(select 1 from jsonb_array_elements(${chartPublications.tags}) tag where strpos(tag->>'key',lower(${filters.q}))>0)`,
+    sql`exists(select 1 from jsonb_array_elements(${chartVersions.summary}->'difficulties') difficulty where strpos(lower(difficulty->>'designer'),lower(${filters.q}))>0)`,
+    isPublicChartId(filters.q) ? eq(chartPublicIds.publicId, BigInt(filters.q)) : undefined,
+  ) : undefined;
+  const rows = await query(ctx).where(and(
+    allowed(), search,
+    filters.tag ? sql`${chartPublications.tags} @> ${JSON.stringify([{ key: filters.tag }])}::jsonb` : undefined,
+    filters.author ? and(eq(userPublicIds.publicId, BigInt(filters.author)), durableAuthor) : undefined,
+    filters.difficulty ? sql`exists(select 1 from jsonb_array_elements(${chartVersions.summary}->'difficulties') d where d->>'difficulty'=${String(filters.difficulty)})` : undefined,
+    cursor ? or(lt(timestamp, new Date(cursor.at)), and(eq(timestamp, new Date(cursor.at)), lt(charts.id, cursor.id))) : undefined,
+  )).orderBy(desc(timestamp), desc(charts.id)).limit(limit + 1);
+  const page = rows.slice(0, limit), last = page.at(-1);
   return {
     items: page.map(publicDto),
-    nextCursor:
-      rows.length > limit && last
-        ? Buffer.from(
-            JSON.stringify({ at: last.p.updatedAt.toISOString(), id: last.chart.id }),
-          ).toString("base64url")
-        : null,
+    nextCursor: rows.length > limit && last ? Buffer.from(JSON.stringify({
+      at: (filters.sort === "published" ? last.p.publishedAt : last.p.updatedAt).toISOString(), id: last.chart.id, scope,
+    })).toString("base64url") : null,
   };
 }
 export async function resolvePublicChartAsset(
@@ -312,4 +323,28 @@ export async function resolvePublicChartDownload(ctx: StorageContext, id: string
     sha256: r.blob.sha256,
     name: `${r.p.title}-${r.chart.id}.zip`,
   };
+}
+
+/** Suggestions aggregate only authorized current snapshots, with a bounded response. */
+export async function suggestPublicChartTags(ctx: StorageContext, input = "") {
+  if (input.length > 40 || [...input].length > 20 || /[\p{Cc}\p{Cf}]/u.test(input)) throw invalid();
+  const prefix = input.normalize("NFKC").trim().replace(/[A-Z]/g, letter => letter.toLowerCase());
+  if ([...prefix].length > 20) throw invalid();
+  const visible = visibilityQuery(ctx.db.select({ tags: chartPublications.tags }).from(chartPublications).$dynamic()).where(allowed()).as("visible_tag_charts");
+  const key = sql<string>`tag.value->>'key'`, label = sql<string>`min(tag.value->>'label')`;
+  return ctx.db.select({ key, label, count: sql<number>`count(*)::integer` }).from(visible)
+    .innerJoin(sql`lateral jsonb_array_elements(${visible.tags}) as tag(value)`, sql`true`)
+    .where(sql`strpos(${key},${prefix})>0`).groupBy(key)
+    .orderBy(sql`count(*) desc`, key).limit(20);
+}
+export async function relatedPublicCharts(ctx: StorageContext, id: string): Promise<PublicChartDto[]> {
+  const target = await getPublicChart(ctx, id);
+  if (!target.tags.length) return [];
+  // Resolve the source again in the same authorization query, so withdrawal cannot turn
+  // an inaccessible source into a tag-discovery oracle between requests.
+  const source = visibilityQuery(ctx.db.select({ tags: chartPublications.tags }).from(chartPublications).$dynamic()).where(and(allowed(), eq(charts.id, target.id))).as("related_source");
+  const score = sql<number>`(select count(*)::integer from jsonb_array_elements(${chartPublications.tags}) tag
+    where tag->>'key' in (select source_tag->>'key' from ${source}, jsonb_array_elements(${source.tags}) source_tag))`;
+  return (await query(ctx).where(and(allowed(), sql`${charts.id}<>${target.id}`, sql`${score}>0`))
+    .orderBy(desc(score), desc(chartPublications.updatedAt), desc(charts.id)).limit(6)).map(publicDto);
 }

@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import type { AppEnv } from "../app-env";
 import {
+  suggestPublicChartTags, relatedPublicCharts,
   getPublicChart,
   listPublicCharts,
   resolvePublicChartAsset,
@@ -28,10 +29,13 @@ export const publicChartRoutes = new Hono<AppEnv>()
     c.json(
       await listPublicCharts(storage(c), {
         cursor: c.req.query("cursor"),
+        tag: c.req.query("tag"), q: c.req.query("q"), difficulty: c.req.query("difficulty"), sort: c.req.query("sort"), author: c.req.query("author"),
         ...(c.req.query("limit") !== undefined ? { limit: Number(c.req.query("limit")) } : {}),
       }),
     ),
   )
+  .get("/tags", async c => c.json(await suggestPublicChartTags(storage(c), c.req.query("q") ?? "")))
+  .get("/:id/related", async c => c.json(await relatedPublicCharts(storage(c), c.req.param("id"))))
   .get("/:id", async (c) => c.json(await getPublicChart(storage(c), c.req.param("id"))))
   .on(["GET", "HEAD"], "/:id/download", async (c) => {
     const ctx = storage(c),

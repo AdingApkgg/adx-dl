@@ -1,13 +1,19 @@
 import { Button } from "@astrodx/ui/components/button";
 import { Card, CardContent } from "@astrodx/ui/components/card";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
-import { data, Link, redirect } from "react-router";
+import { data, Link, redirect, useLocation } from "react-router";
+import { ApiError } from "@/shared/api-client";
+import type { PublicChartsPageDto } from "@/shared/charts";
+import { publicChartFiltersFromParams, type PublicChartFilters } from "@/shared/public-chart-search";
 
 import { m } from "@/paraglide/messages.js";
 import { getLocale, localizeHref } from "@/paraglide/runtime.js";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
 import { Avatar } from "../components/avatar";
+import { PublicChartBrowser, PublicChartSearchForm } from "../components/public-chart-browser";
+import { publicChartsApi } from "../queries/public-charts";
+import { publicListBackState, publicListReturnState } from "../lib/public-chart-navigation";
 import { PageTitle } from "../components/page-title";
 import { getRenderApi } from "../lib/browser";
 import { canonicalLink, localeAlternates, openGraph, originFrom } from "../lib/seo";
@@ -49,7 +55,21 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     profile.status === "active"
       ? { title: profile.name, description: summarize(profile.bio) || m.user_page_description({ name: profile.name }), index: true }
       : { title: m.user_page_pending_title(), description: m.user_page_pending_body(), index: false };
-  return data({ dehydratedState: dehydrate(queryClient), head }, { headers: profileHeaders });
+  let works: PublicChartsPageDto | null = null;
+  let worksFilters: PublicChartFilters | null = null;
+  if (profile.status === "active") {
+    const url = new URL(request.url);
+    try { worksFilters = { ...publicChartFiltersFromParams(url.searchParams), author: profile.publicId }; }
+    catch { throw data(null, { status: 400, headers: profileHeaders }); }
+    try {
+      works = await publicChartsApi(api).list(url.searchParams.get("cursor") ?? undefined, undefined,
+        { ...worksFilters, difficulty: worksFilters.difficulty ? String(worksFilters.difficulty) : undefined });
+    } catch (error) {
+      if (error instanceof ApiError && error.status < 500) throw data(null, { status: error.status, headers: profileHeaders });
+      // Profile remains readable, but unavailable works must not look like an empty list.
+    }
+  }
+  return data({ dehydratedState: dehydrate(queryClient), head, works, worksFilters }, { headers: profileHeaders });
 }
 
 export function meta({ loaderData, matches, location }: Route.MetaArgs) {
@@ -59,7 +79,7 @@ export function meta({ loaderData, matches, location }: Route.MetaArgs) {
   return [
     { title: `${title} - ${m.site_name()}` },
     { name: "description", content: description },
-    ...(index ? [] : [{ name: "robots", content: "noindex" }]),
+    ...(index && !location.search ? [] : [{ name: "robots", content: "noindex" }]),
     canonical,
     ...localeAlternates(origin, location.pathname),
     ...openGraph({ title, description, url: canonical.href, locale: getLocale(), siteName: m.site_name() }),
@@ -69,12 +89,15 @@ export function meta({ loaderData, matches, location }: Route.MetaArgs) {
 export default function UserProfile({ loaderData, params }: Route.ComponentProps) {
   return (
     <HydrationBoundary state={loaderData.dehydratedState}>
-      <UserContent id={params.id} />
+      <UserContent id={params.id} works={loaderData.works} worksFilters={loaderData.worksFilters} />
     </HydrationBoundary>
   );
 }
 
-function UserContent({ id }: { id: string }) {
+function UserContent({ id, works, worksFilters }: { id: string; works: PublicChartsPageDto | null; worksFilters: PublicChartFilters | null }) {
+  const location = useLocation();
+  const returnState = publicListReturnState(location.state);
+  const returnHref = returnState?.publicListHref;
   const api = getRenderApi();
   const { data: profile } = useQuery(userQuery(api, id));
   const { data: me } = useQuery(meQuery(api));
@@ -92,6 +115,7 @@ function UserContent({ id }: { id: string }) {
   // 资料头部（spec 第 7.5 节）：大头像、昵称、用户 ID、注册日期，下面是简介。
   return (
     <main className="space-y-6">
+      {returnHref && returnHref !== location.pathname + location.search ? <Link to={returnHref} state={returnState ? publicListBackState(returnState) : undefined} className="text-sm underline">{m.public_chart_back_results()}</Link> : null}
       <div className="flex flex-wrap items-center gap-5">
         <Avatar image={profile.image} id={profile.id} name={profile.name} size={80} />
         <div className="min-w-0 flex-1 space-y-1">
@@ -102,9 +126,10 @@ function UserContent({ id }: { id: string }) {
           <p className="text-sm text-muted-foreground">{m.user_page_joined({ date: profile.createdAt.slice(0, 10) })}</p>
         </div>
         {me?.id === profile.id ? (
-          <Button asChild variant="outline" size="sm">
-            <Link to={localizeHref("/settings/profile")}>{m.user_page_edit()}</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm"><Link to={localizeHref("/settings/profile")}>{m.user_page_edit()}</Link></Button>
+            <Button asChild variant="outline" size="sm"><Link to={localizeHref("/me/charts")}>{m.charts_title()}</Link></Button>
+          </div>
         ) : null}
       </div>
       <Card>
@@ -118,6 +143,12 @@ function UserContent({ id }: { id: string }) {
           )}
         </CardContent>
       </Card>
+      <section aria-labelledby="author-public-charts" className="space-y-4">
+        <h2 id="author-public-charts" className="text-xl font-semibold">{m.user_public_charts()}</h2>
+        {works && worksFilters ? <><PublicChartSearchForm filters={worksFilters} base={localizeHref(`/u/${profile.publicId}`)} />
+          <PublicChartBrowser page={works} filters={worksFilters} base={localizeHref(`/u/${profile.publicId}`)} headingLevel={3} /></>
+          : <p role="status" className="text-sm text-muted-foreground">{m.public_charts_unavailable()}</p>}
+      </section>
     </main>
   );
 }

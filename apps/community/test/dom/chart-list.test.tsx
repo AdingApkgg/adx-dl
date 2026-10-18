@@ -11,12 +11,12 @@ import { makeQueryClient } from "@/shared/query-client";
 const api = createApiClient("https://community.test");
 vi.mock("@/client/lib/browser", () => ({ getBrowserApi: () => api, getRenderApi: () => api }));
 const Page = Charts as unknown as ComponentType<{ loaderData: { dehydratedState: ReturnType<typeof dehydrate> } }>;
-const item = (id: string): ChartListItemDto => ({ id, title: id, artist: "", revision: 1, currentVersionId: `${id}-version`,
+const item = (id: string): ChartListItemDto => ({ id, title: id, artist: "", description:"", credits:"", tags:[], revision: 1, currentVersionId: `${id}-version`,
   updatedAt: "2026-10-11T00:00:00.000Z", summary: { title: id, artist: "", maidataMd5Base64: "md5", difficulties: [], warnings: [], audio: null, hasCover: false } });
 const usage = { usedBytes: 32 * 1024 * 1024, reservedBytes: 4 * 1024 * 1024, quotaBytes: 256 * 1024 * 1024 };
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 function setup(data: ChartsPageDto) {
-  const client = makeQueryClient(); client.setQueryData(chartsQuery(api).queryKey, data);
+  const client = makeQueryClient(); client.setQueryData(chartsQuery(api, undefined, {q:"",status:"all"}).queryKey, data);
   render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/me/charts"]}><Page loaderData={{ dehydratedState: dehydrate(client) }} /></MemoryRouter></QueryClientProvider>);
 }
 test("an empty private chart list offers upload without fake items or pagination", () => {

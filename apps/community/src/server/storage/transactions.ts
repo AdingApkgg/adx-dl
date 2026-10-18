@@ -24,7 +24,7 @@ export async function lockStorageMutation(tx: DbTransaction): Promise<void> {
 function isDeadline(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const e = error as { code?: string; cause?: unknown };
-  return e.code === "55P03" || e.code === "57014" || (!!e.cause && isDeadline(e.cause));
+  return e.code === "55P03" || e.code === "57014" || e.code === "40P01" || (!!e.cause && isDeadline(e.cause));
 }
 export async function withStorageTransaction<T>(
   db: Db,

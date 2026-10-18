@@ -97,6 +97,7 @@ async function chartFile(
   ownerId: string,
   input: {
     title?: string;
+    designer?: string;
     build?: string;
     state?: "ready" | "processing";
     purpose?: "avatar" | "chart-source";
@@ -113,7 +114,7 @@ async function chartFile(
     artist: "",
     maidataMd5Base64: createHash("md5").update(maidata).digest("base64"),
     difficulties: [
-      { difficulty: 4, level: null, noteCount: 2, durationMs: 1000, previewSupported: true },
+      { difficulty: 4, ...(input.designer ? { designer: input.designer } : {}), level: null, noteCount: 2, durationMs: 1000, previewSupported: true },
     ],
     warnings: [],
     audio: null,
@@ -342,7 +343,7 @@ test("failed durable export closes access and a retry exports the same withdrawa
   });
 });
 test("cooling-off hides publication, cancellation restores it and final retention preserves only the public version anonymously", async () => {
-  const { publishChart, getPublicChart } = await import("./publication");
+  const { publishChart, getPublicChart, listPublicCharts } = await import("./publication");
   const { appendChartVersion } = await import("./service");
   const { requestDeletion, cancelDeletion, purgeUser } = await import("../services/user-deletion");
   const { createDeletionHandlers } = await import("../storage/deletion");
@@ -360,6 +361,7 @@ test("cooling-off hides publication, cancellation restores it and final retentio
     versionId: first,
     confirmOriginalArchive: true,
   });
+  const formerAuthorId = (await getPublicChart(ctx, c.id)).author!.publicId!;
   const deps = { db: ctx.db, boss: ctx.boss, handlers: createDeletionHandlers(ctx) };
   await requestDeletion(deps, id, { deleteContent: false });
   await expect(getPublicChart(ctx, c.id)).rejects.toMatchObject({ status: 404 });
@@ -372,6 +374,7 @@ test("cooling-off hides publication, cancellation restores it and final retentio
     .where(eq(user.id, id));
   expect(await purgeUser(deps, id)).toBe("purged");
   expect((await getPublicChart(ctx, c.id)).author).toBeNull();
+  expect((await listPublicCharts(ctx, { author: formerAuthorId })).items).toHaveLength(0);
   expect(await retainsFile(ctx.db, a.file.id)).toBe(true);
   expect(await retainsFile(ctx.db, b.file.id)).toBe(false);
   expect((await ctx.db.select().from(files).where(eq(files.id, a.file.id)))[0]).toMatchObject({
@@ -1115,6 +1118,7 @@ test("invalid permission payload is rejected before it can enter the journal out
           1,
           {
             versionId: crypto.randomUUID(),
+            description: "", credits: "", tags: [], releaseNote: "",
             title: "😀".repeat(121),
             artist: "",
             publishedAt: new Date().toISOString(),
@@ -1333,7 +1337,7 @@ test("restoring a legacy publication issues a durable number before a later rest
   const { Client } = await import("pg");
   const ctx = fixture.ctx, owner = await readyOwner(ctx), a = await createChart(ctx, owner, (await chartFile(owner)).file.id);
   const now = new Date();
-  const publication = { chartId: a.id, versionId: a.currentVersionId, title: a.title, artist: a.artist, publishedAt: now, updatedAt: now };
+  const publication = { description: "", credits: "", tags: [], releaseNote: "", chartId: a.id, versionId: a.currentVersionId, title: a.title, artist: a.artist, publishedAt: now, updatedAt: now };
   await ctx.db.insert(chartPublications).values(publication);
   const [legacy] = await ctx.db.insert(storageTombstones).values({ kind: "chart_permission", payload: { version: 1, chartId: a.id, revision: 2, publication: publicationDto(publication) } }).returning();
   await ctx.db.update(charts).set({ revision: 2, publicationSequence: legacy.sequence }).where(eq(charts.id, a.id));
@@ -1484,4 +1488,252 @@ test("restore preserves a moderation with no chart and older permission or anony
     expect((await c.query("select reason from chart_moderations where chart_id=$1", [chart.id])).rows).toEqual([{ reason: "Permanent takedown" }]);
   } finally { await c.query("rollback"); await c.end(); }
   expect((await ctx.db.select().from(chartModerations).where(eq(chartModerations.chartId, chart.id)))[0].reason).toBe("Permanent takedown");
+});
+
+
+test("discovery searches published text literally and scopes cursors, difficulty and durable author works", async () => {
+  const { publishChart, withdrawChart, getPublicChart, listPublicCharts } = await import("./publication");
+  const { updateChart } = await import("./service");
+  const { user } = await import("../db/schema");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx), other = await readyOwner(ctx), tag = crypto.randomUUID();
+  await ctx.db.update(user).set({ name: `${tag} Publisher` }).where(eq(user.id, owner));
+  const publish = async (id: string, title: string) => {
+    const draft = await createChart(ctx, id, (await chartFile(id, { title })).file.id);
+    return publishChart(ctx, id, draft.id, { expectedRevision: draft.revision, versionId: draft.currentVersionId, confirmOriginalArchive: true });
+  };
+  let a = await publish(owner, `${tag} 星テスト %_ Alpha`);
+  const b = await publish(owner, `${tag} 星テスト Beta`);
+  await publish(other, `${tag} Other`);
+  const author = (await getPublicChart(ctx, a.id)).author!.publicId!;
+  expect(author).toBeTruthy();
+  const own = await listPublicCharts(ctx, { author });
+  expect(new Set(own.items.map(row => row.id))).toEqual(new Set([a.id, b.id]));
+  expect((await listPublicCharts(ctx, { q: `${tag} publisher` })).items.map(row => row.id).sort()).toEqual([a.id, b.id].sort());
+  expect((await listPublicCharts(ctx, { q: "%_" })).items.map(row => row.id)).toContain(a.id);
+  expect((await listPublicCharts(ctx, { q: "%_" })).items.map(row => row.id)).not.toContain(b.id);
+  expect((await listPublicCharts(ctx, { q: "星テスト", author, difficulty: "4" })).items).toHaveLength(2);
+  expect((await listPublicCharts(ctx, { q: tag, difficulty: "5" })).items).toHaveLength(0);
+  expect((await listPublicCharts(ctx, { q: a.publicId! })).items.map(row => row.id)).toContain(a.id);
+  const first = await listPublicCharts(ctx, { q: tag, limit: 1 });
+  const second = await listPublicCharts(ctx, { q: tag, limit: 1, cursor: first.nextCursor! });
+  expect(first.nextCursor).toBeTruthy();
+  expect(second.items[0]!.id).not.toBe(first.items[0]!.id);
+  for (const changed of [{ q: "different" }, { q: tag, sort: "published" }, { q: tag, difficulty: "4" }, { q: tag, author }])
+    await expect(listPublicCharts(ctx, { ...changed, cursor: first.nextCursor! })).rejects.toMatchObject({ status: 400 });
+  a = await updateChart(ctx, owner, a.id, { title: `${tag} PrivateOnly`, expectedRevision: a.revision });
+  expect((await listPublicCharts(ctx, { q: `${tag} PrivateOnly` })).items).toHaveLength(0);
+  expect((await listPublicCharts(ctx, { q: "%_", author })).items.map(row => row.id)).toEqual([a.id]);
+  await ctx.db.update(user).set({ status: "pending_deletion" }).where(eq(user.id, owner));
+  try { expect((await listPublicCharts(ctx, { author })).items).toHaveLength(0); }
+  finally { await ctx.db.update(user).set({ status: "active" }).where(eq(user.id, owner)); }
+  await withdrawChart(ctx, owner, a.id, a.revision);
+  expect((await listPublicCharts(ctx, { author })).items.map(row => row.id)).toEqual([b.id]);
+});
+
+
+test("private favorites remain isolated, idempotent and removable after withdrawal", async () => {
+  const { publishChart, withdrawChart } = await import("./publication");
+  const { addFavorite, removeFavorite, listFavorites, favoriteState } = await import("../services/favorites");
+  const ctx = fixture.ctx, author = await readyOwner(ctx), viewer = await readyOwner(ctx), other = await readyOwner(ctx);
+  let chart = await createChart(ctx, author, (await chartFile(author, { title: "Favorite public snapshot" })).file.id);
+  chart = await publishChart(ctx, author, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  await Promise.all([addFavorite(ctx, viewer, chart.publicId!), addFavorite(ctx, viewer, chart.publicId!)]);
+  expect((await listFavorites(ctx, viewer)).items).toHaveLength(1);
+  expect((await listFavorites(ctx, other)).items).toHaveLength(0);
+  expect(await favoriteState(ctx, other, chart.publicId!)).toEqual({ favorited: false });
+  await withdrawChart(ctx, author, chart.id, chart.revision);
+  const unavailable = await listFavorites(ctx, viewer);
+  expect(unavailable.items).toEqual([{ publicId: chart.publicId!, addedAt: expect.any(String), chart: null }]);
+  expect(JSON.stringify(unavailable)).not.toContain("Favorite public snapshot");
+  await removeFavorite(ctx, other, chart.publicId!);
+  expect(await favoriteState(ctx, viewer, chart.publicId!)).toEqual({ favorited: true });
+  await removeFavorite(ctx, viewer, chart.publicId!);
+  expect((await listFavorites(ctx, viewer)).items).toHaveLength(0);
+});
+
+test("reports preserve the first submission, require a current public version and durable separate moderation", async () => {
+  const { publishChart, withdrawChart } = await import("./publication");
+  const { createChartReport, listMyReports, listDashReports, resolveChartReport } = await import("../services/chart-reports");
+  const { moderateChart } = await import("../services/dash");
+  const { userPublicIds } = await import("../db/schema");
+  const ctx = fixture.ctx, author = await readyOwner(ctx), reporter = await readyOwner(ctx), other = await readyOwner(ctx), admin = await readyOwner(ctx);
+  let chart = await createChart(ctx, author, (await chartFile(author, { title: "Report public snapshot" })).file.id);
+  chart = await publishChart(ctx, author, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const input = { versionId: chart.publication!.versionId, category: "broken" as const, details: "Preview issue" };
+  const reports = await Promise.all([createChartReport(ctx, reporter, chart.publicId!, input), createChartReport(ctx, reporter, chart.publicId!, input)]);
+  expect(reports[0]!.id).toBe(reports[1]!.id);
+  expect((await listMyReports(ctx, other)).items).toHaveLength(0);
+  await expect(createChartReport(ctx, other, chart.publicId!, { ...input, versionId: crypto.randomUUID() })).rejects.toMatchObject({ code: "REPORT_CHANGED" });
+  const duplicate = await createChartReport(ctx, reporter, chart.publicId!, { ...input, details: "Do not overwrite" });
+  expect(duplicate.details).toBe("Preview issue");
+  const [identity] = await ctx.db.select().from(userPublicIds).where(eq(userPublicIds.userId, admin));
+  const actor = { id: admin, publicId: identity.publicId.toString() };
+  await expect(resolveChartReport(ctx, actor, duplicate.id, { status: "actioned", note: "Removed" })).rejects.toMatchObject({ code: "REPORT_MODERATION_REQUIRED" });
+  await moderateChart(ctx, actor, chart.id, { expectedRevision: chart.revision, reason: "Reviewed file issue" });
+  expect(await resolveChartReport(ctx, actor, duplicate.id, { status: "actioned", note: "Removed" })).toMatchObject({ status: "actioned", note: "Removed" });
+  expect(await resolveChartReport(ctx, actor, duplicate.id, { status: "dismissed", note: "Cannot overwrite" })).toMatchObject({ status: "actioned", note: "Removed" });
+  expect((await listDashReports(ctx, "resolved")).items.some(row => row.id === duplicate.id)).toBe(true);
+  expect((await listMyReports(ctx, reporter)).items[0]).toMatchObject({ chart: null, status: "actioned" });
+  expect((await createChartReport(ctx, reporter, chart.publicId!, input)).id).toBe(duplicate.id);
+  let withdrawn = await createChart(ctx, author, (await chartFile(author, { title: "Withdrawn report" })).file.id);
+  withdrawn = await publishChart(ctx, author, withdrawn.id, { expectedRevision: withdrawn.revision, versionId: withdrawn.currentVersionId, confirmOriginalArchive: true });
+  await withdrawChart(ctx, author, withdrawn.id, withdrawn.revision);
+  await expect(createChartReport(ctx, other, withdrawn.publicId!, { ...input, versionId: withdrawn.currentVersionId })).rejects.toMatchObject({ status: 404 });
+});
+
+test("account-level favorites cap serializes concurrent insertions and private rows cascade on account purge", async () => {
+  const { publishChart } = await import("./publication");
+  const { addFavorite, listFavorites } = await import("../services/favorites");
+  const { createChartReport } = await import("../services/chart-reports");
+  const { chartFavorites, chartReports, user } = await import("../db/schema");
+  const ctx = fixture.ctx, author = await readyOwner(ctx), viewer = await readyOwner(ctx);
+  const publish = async () => { const c = await createChart(ctx, author, (await chartFile(author)).file.id); return publishChart(ctx, author, c.id, { expectedRevision: c.revision, versionId: c.currentVersionId, confirmOriginalArchive: true }); };
+  const a = await publish(), b = await publish();
+  await ctx.db.insert(chartFavorites).values(Array.from({ length: 999 }, (_, i) => ({ userId: viewer, chartId: crypto.randomUUID(), publicId: BigInt(1000000 + i) })));
+  const outcomes = await Promise.allSettled([addFavorite(ctx, viewer, a.publicId!), addFavorite(ctx, viewer, b.publicId!)]);
+  expect(outcomes.filter(result => result.status === "fulfilled")).toHaveLength(1);
+  expect(outcomes.filter(result => result.status === "rejected")).toHaveLength(1);
+  const first = await listFavorites(ctx, viewer, { limit: 1 });
+  expect(first.nextCursor).toBeTruthy();
+  await expect(listFavorites(ctx, author, { cursor: first.nextCursor! })).rejects.toMatchObject({ status: 400 });
+  await createChartReport(ctx, viewer, a.publicId!, { versionId: a.currentVersionId, category: "other", details: "Private reporter details" });
+  await ctx.db.delete(user).where(eq(user.id, viewer));
+  expect(await ctx.db.select().from(chartFavorites).where(eq(chartFavorites.userId, viewer))).toHaveLength(0);
+  expect(await ctx.db.select().from(chartReports).where(eq(chartReports.reporterId, viewer))).toHaveLength(0);
+});
+
+test("report daily and open caps are enforced after duplicate detection", async () => {
+  const { publishChart } = await import("./publication");
+  const { createChartReport } = await import("../services/chart-reports");
+  const { chartReports } = await import("../db/schema");
+  const ctx = fixture.ctx, author = await readyOwner(ctx), reporter = await readyOwner(ctx);
+  let chart = await createChart(ctx, author, (await chartFile(author)).file.id);
+  chart = await publishChart(ctx, author, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const rows = Array.from({ length: 10 }, (_, i) => ({ reporterId: reporter, chartId: crypto.randomUUID(), publicId: BigInt(2000000 + i), versionId: crypto.randomUUID(), title: "Previously public", artist: "", category: "other" as const, details: "Fixture" }));
+  await ctx.db.insert(chartReports).values(rows);
+  const input = { versionId: chart.currentVersionId, category: "other" as const, details: "An issue" };
+  await expect(createChartReport(ctx, reporter, chart.publicId!, input)).rejects.toMatchObject({ code: "REPORT_LIMIT", status: 429 });
+  await ctx.db.update(chartReports).set({ createdAt: new Date(Date.now() - 2 * 86400000) }).where(eq(chartReports.reporterId, reporter));
+  await ctx.db.insert(chartReports).values(rows.map(row => ({ ...row, chartId: crypto.randomUUID(), versionId: crypto.randomUUID(), createdAt: new Date(Date.now() - 2 * 86400000) })));
+  await expect(createChartReport(ctx, reporter, chart.publicId!, input)).rejects.toMatchObject({ code: "REPORT_LIMIT", status: 429 });
+});
+
+test("metadata and selected release note publish atomically and later draft edits stay private until explicit republish", async () => {
+  const { publishChart, getPublicChart } = await import("./publication"), { updateChart } = await import("./service");
+  const { storageTombstones } = await import("../db/schema");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx), source = await chartFile(owner);
+  let chart = await createChart(ctx, owner, source.file.id);
+  chart = await updateChart(ctx, owner, chart.id, { expectedRevision: chart.revision, description: "Public description\nSecond line", credits: "Public source", tags: [" ＡＢＣ "], releaseNote: { versionId: chart.currentVersionId, text: "Public note" } });
+  chart = await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const snapshot = { description: "Public description\nSecond line", credits: "Public source", tags: [{ key: "abc", label: "ＡＢＣ" }], releaseNote: "Public note" };
+  expect(await getPublicChart(ctx, chart.publicId!)).toMatchObject(snapshot);
+  chart = await updateChart(ctx, owner, chart.id, { expectedRevision: chart.revision, description: "Unpublished draft", credits: "Private source", tags: ["private"], releaseNote: { versionId: chart.currentVersionId, text: "Unpublished note" } });
+  expect(await getPublicChart(ctx, chart.publicId!)).toMatchObject(snapshot);
+  await expect(publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision - 1, versionId: chart.currentVersionId, confirmOriginalArchive: true })).rejects.toMatchObject({ code: "CHART_CHANGED" });
+  chart = await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const next = { description: "Unpublished draft", credits: "Private source", tags: [{ key: "private", label: "private" }], releaseNote: "Unpublished note" };
+  expect(await getPublicChart(ctx, chart.publicId!)).toMatchObject(next);
+  const facts = await ctx.db.select().from(storageTombstones).where(sql`${storageTombstones.payload}->>'chartId'=${chart.id}`).orderBy(storageTombstones.sequence);
+  expect(facts.at(-1)?.payload).toMatchObject({ publication: next });
+  const replay = await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision - 1, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  expect(replay.revision).toBe(chart.revision);
+});
+test("public tags, designer search and related ranking never read private metadata or invisible targets", async () => {
+  const { publishChart, getPublicChart, listPublicCharts, suggestPublicChartTags, relatedPublicCharts, withdrawChart } = await import("./publication");
+  const { updateChart } = await import("./service");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx), key = `tag${crypto.randomUUID().slice(0,8)}`, extra = `extra${crypto.randomUUID().slice(0,8)}`, privateKey = `secret${crypto.randomUUID().slice(0,8)}`, designer = `Designer${crypto.randomUUID().slice(0,8)}`;
+  const published = [];
+  for (const tags of [[key, extra], [key, extra], [key]]) {
+    let chart = await createChart(ctx, owner, (await chartFile(owner, { designer })).file.id);
+    chart = await updateChart(ctx, owner, chart.id, { expectedRevision: chart.revision, tags });
+    published.push(await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true }));
+  }
+  let draft = await createChart(ctx, owner, (await chartFile(owner)).file.id);
+  draft = await updateChart(ctx, owner, draft.id, { expectedRevision: draft.revision, tags: [key] });
+  const [source, both, one] = published;
+  expect((await listPublicCharts(ctx, { tag: key })).items.map(chart => chart.id).sort()).toEqual(published.map(chart => chart.id).sort());
+  expect((await listPublicCharts(ctx, { q: designer })).items.map(chart => chart.id).sort()).toEqual(published.map(chart => chart.id).sort());
+  expect(await suggestPublicChartTags(ctx, key)).toEqual([{ key, label: key, count: 3 }]);
+  expect((await relatedPublicCharts(ctx, source.id)).map(chart => chart.id)).toEqual([both.id, one.id]);
+  await updateChart(ctx, owner, source.id, { expectedRevision: source.revision, tags: [privateKey] });
+  expect((await listPublicCharts(ctx, { tag: privateKey })).items).toEqual([]);
+  expect(await suggestPublicChartTags(ctx, privateKey)).toEqual([]);
+  expect((await getPublicChart(ctx, source.id)).tags.map(tag => tag.key)).toEqual([key,extra]);
+  await withdrawChart(ctx, owner, both.id, both.revision);
+  expect(await suggestPublicChartTags(ctx, key)).toEqual([{ key, label: key, count: 2 }]);
+  expect((await relatedPublicCharts(ctx, source.id)).map(chart => chart.id)).toEqual([one.id]);
+  await expect(suggestPublicChartTags(ctx, "😀".repeat(21))).rejects.toMatchObject({ status: 400 });
+});
+test("retaining a deleted author's work removes unpublished metadata and version notes", async () => {
+  const { publishChart, getPublicChart } = await import("./publication"), { updateChart } = await import("./service");
+  const { requestDeletion, purgeUser } = await import("../services/user-deletion"), { createDeletionHandlers } = await import("../storage/deletion");
+  const { user } = await import("../db/schema");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx);
+  let chart = await createChart(ctx, owner, (await chartFile(owner)).file.id);
+  chart = await updateChart(ctx, owner, chart.id, { expectedRevision: chart.revision, description: "Public information", credits: "Public credits", tags: ["public"], releaseNote: { versionId: chart.currentVersionId, text: "Public note" } });
+  chart = await publishChart(ctx, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  chart = await updateChart(ctx, owner, chart.id, { expectedRevision: chart.revision, description: "Private secret", credits: "Private credits", tags: ["private"], releaseNote: { versionId: chart.currentVersionId, text: "Private note" } });
+  const deps = { db: ctx.db, boss: ctx.boss, handlers: createDeletionHandlers(ctx) };
+  await requestDeletion(deps, owner, { deleteContent: false });
+  await ctx.db.update(user).set({ deletionPurgeAt: new Date(0) }).where(eq(user.id, owner)); await purgeUser(deps, owner);
+  expect(await getPublicChart(ctx, chart.publicId!)).toMatchObject({ author: null, description: "Public information", credits: "Public credits", releaseNote: "Public note" });
+  const [retained] = await ctx.db.select().from(charts).where(eq(charts.id, chart.id));
+  const [version] = await ctx.db.select().from(chartVersions).where(eq(chartVersions.id, chart.currentVersionId));
+  expect(retained).toMatchObject({ ownerId: null, description: "Public information", credits: "Public credits", tags: [{ key: "public", label: "public" }] });
+  expect(version.releaseNote).toBe("Public note");
+});
+
+test("current-version comments preserve lawful replies and hide stale targets from notifications", async () => {
+  const { publishChart, withdrawChart } = await import("./publication");
+  const { createChartMessage, listChartDiscussion, editMessage } = await import("../discussions/messages");
+  const { moderate } = await import("../discussions/moderation");
+  const { dispatchDiscussionOutbox, listNotifications } = await import("../discussions/notifications");
+  const a = await readyOwner(fixture.ctx), b = await readyOwner(fixture.ctx), c = await readyOwner(fixture.ctx);
+  let chart = await createChart(fixture.ctx, a, (await chartFile(a, { title: "Discussion chart" })).file.id);
+  chart = await publishChart(fixture.ctx, a, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const input = { idempotencyKey: crypto.randomUUID(), versionId: chart.currentVersionId, body: "A root comment", difficulty: 4, timestampMs: 200 };
+  const root = await createChartMessage(fixture.ctx, b, chart.publicId!, input);
+  expect(root).toMatchObject({ body: input.body, difficulty: 4, timestampMs: 200, locatable: true });
+  expect((await createChartMessage(fixture.ctx, b, chart.publicId!, input)).id).toBe(root.id);
+  const reply = await createChartMessage(fixture.ctx, c, chart.publicId!, { idempotencyKey: crypto.randomUUID(), versionId: chart.currentVersionId, body: "A reply", rootId: root.id, replyToId: root.id, timestampMs: 300 });
+  expect(reply).toMatchObject({ rootId: root.id, difficulty: 4, timestampMs: 300 });
+  await expect(editMessage(fixture.ctx, b, root.id, { expectedRevision: root.revision, body: input.body, difficulty: null, timestampMs: null })).rejects.toMatchObject({ status: 409 });
+  await dispatchDiscussionOutbox(fixture.ctx);
+  expect((await listNotifications(fixture.ctx, a, {})).items.some(x => x.kind === "chart_comment" && x.message?.id === root.id)).toBe(true);
+  expect((await listNotifications(fixture.ctx, b, {})).items.some(x => x.kind === "direct_reply" && x.message?.id === reply.id)).toBe(true);
+  await moderate(fixture.ctx, a, { message: root.id }, { expectedRevision: root.revision, action: "hide", reason: "Review", publicReason: "Hidden root" });
+  const hiddenRoot = (await listChartDiscussion(fixture.ctx, chart.publicId!, { versionId: chart.currentVersionId })).items.find(x => x.id === root.id);
+  expect(hiddenRoot).toMatchObject({ state: "unavailable", body: null, author: null });
+  expect(hiddenRoot?.replies?.map(x => x.id)).toContain(reply.id);
+  expect((await listNotifications(fixture.ctx, a, {})).items.find(x => x.message?.id === root.id)).toBeUndefined();
+  chart = await withdrawChart(fixture.ctx, a, chart.id, chart.revision);
+  await expect(listChartDiscussion(fixture.ctx, chart.publicId!, { versionId: chart.currentVersionId })).rejects.toMatchObject({ status: 404 });
+  expect(await createChartMessage(fixture.ctx, b, chart.publicId!, input)).toMatchObject({ id: root.id, body: null, author: null, timestampMs: null });
+});
+
+test("file-version publication switches close old comments and numeric forum references remain current", async () => {
+  const { publishChart, relatedPublicCharts } = await import("./publication");
+  const { appendChartVersion } = await import("./service");
+  const { createChartMessage, listChartDiscussion } = await import("../discussions/messages");
+  const { createTopic, listTopics } = await import("../discussions/forum");
+  const { getFeatured, setFeatured } = await import("../community/site");
+  const a = await readyOwner(fixture.ctx), b = await readyOwner(fixture.ctx), c = await readyOwner(fixture.ctx);
+  let chart = await createChart(fixture.ctx, a, (await chartFile(a, { title: "Linked chart" })).file.id);
+  chart = await publishChart(fixture.ctx, a, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  const input = { idempotencyKey: crypto.randomUUID(), versionId: chart.currentVersionId, body: "Old version" };
+  const comment = await createChartMessage(fixture.ctx, b, chart.publicId!, input);
+  const topic = await createTopic(fixture.ctx, c, { idempotencyKey: crypto.randomUUID(), boardId: "creation", title: "Linked public chart", body: "Discuss", chartIds: [chart.publicId!] });
+  expect((await listTopics(fixture.ctx, { chart: chart.publicId! })).items.some(x => x.id === topic.id)).toBe(true);
+  expect((await listChartDiscussion(fixture.ctx, chart.publicId!, { versionId: chart.currentVersionId })).relatedTopics.some(x => x.id === topic.id)).toBe(true);
+  const featured = await getFeatured(fixture.ctx, true);
+  await setFeatured(fixture.ctx, a, { expectedRevision: featured.revision, ids: [chart.publicId!] });
+  expect((await getFeatured(fixture.ctx)).items.map(x => x.id)).toEqual([chart.id]);
+  const oldVersion = chart.currentVersionId;
+  chart = await appendChartVersion(fixture.ctx, a, chart.id, { fileId: (await chartFile(a, { title: "Replacement file" })).file.id, expectedRevision: chart.revision });
+  chart = await publishChart(fixture.ctx, a, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId, confirmOriginalArchive: true });
+  expect((await listChartDiscussion(fixture.ctx, chart.publicId!, { versionId: chart.currentVersionId })).items).toHaveLength(0);
+  await expect(listChartDiscussion(fixture.ctx, chart.publicId!, { versionId: oldVersion })).rejects.toMatchObject({ status: 409 });
+  expect((await createChartMessage(fixture.ctx, b, chart.publicId!, input)).id).toBe(comment.id);
+  expect((await createChartMessage(fixture.ctx, b, chart.publicId!, input)).body).toBeNull();
+  expect(await relatedPublicCharts(fixture.ctx, chart.publicId!)).toEqual([]);
 });
