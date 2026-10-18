@@ -66,7 +66,10 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
     }
     rows.push({ kind, owner, original, chart });
   }
-  const community = await communityRestoreFixture(source, f.owner, rows.find(row=>row.kind==="legacy")!.chart);
+  // Comments require a currently numbered publication. The legacy case deliberately
+  // has no public ID until recovery; retained content stays publicly readable then.
+  const retainedChart = rows.find(row => row.kind === "retain")!.chart;
+  const community = await communityRestoreFixture(source, f.owner, { id: retainedChart.id, currentVersionId: retainedChart.publication!.versionId });
   let missingVersion = "";
   let lateChart: Awaited<ReturnType<typeof createChart>> | undefined;
   let lateModerated: Awaited<ReturnType<typeof createChart>> | undefined;
