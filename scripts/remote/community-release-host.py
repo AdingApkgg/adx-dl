@@ -41,7 +41,9 @@ else:
         args=['bash',str(tools/'apps/community/deploy.sh')]
         if task['mode']:args.append(task['mode'])
         with open(root/'deploy.log','w') as log:
-            result=subprocess.run(args,env=env,stdout=log,stderr=subprocess.STDOUT)
+            # Git/Docker public source must remain readable by the non-root smoke tool.
+            # Private release files stay under this parent's 077 umask and 0700 context.
+            result=subprocess.run(args,env=env,stdout=log,stderr=subprocess.STDOUT,umask=0o022)
         print(json.dumps({'deployExitCode':result.returncode}))
         raise SystemExit(result.returncode)
     elif action in ['receipt','fail']:
