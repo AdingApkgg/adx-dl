@@ -56,7 +56,8 @@ export function createOneBotClient(options: { httpUrl: string; accessToken: stri
     },
     async getStatus(callOptions) {
       const data = await call<{ online?: unknown; good?: unknown }>("get_status", {}, callOptions);
-      return { online: data?.online === true, good: data?.good === true };
+      if (typeof data?.online !== "boolean") throw new OneBotError("get_status", null, "invalid response");
+      return { online: data.online, good: data.good === true };
     },
     async setFriendAddRequest(flag, approve) {
       await call("set_friend_add_request", { flag, approve });

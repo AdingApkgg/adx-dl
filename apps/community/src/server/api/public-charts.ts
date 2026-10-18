@@ -28,6 +28,7 @@ export const publicChartRoutes = new Hono<AppEnv>()
     c.json(
       await listPublicCharts(storage(c), {
         cursor: c.req.query("cursor"),
+        q: c.req.query("q"), difficulty: c.req.query("difficulty"), sort: c.req.query("sort"), author: c.req.query("author"),
         ...(c.req.query("limit") !== undefined ? { limit: Number(c.req.query("limit")) } : {}),
       }),
     ),

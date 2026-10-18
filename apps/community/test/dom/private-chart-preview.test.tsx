@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
+import { m } from "@/paraglide/messages.js";
 import { PrivateChartPreview } from "@/client/components/private-chart-preview";
 import type { ChartImportSummary } from "@/shared/charts";
 import { parseSimaiChart as realParseSimaiChart } from "@lxns-network/maimai-chart-engine/parser";
@@ -21,6 +22,7 @@ function fixture() {
   vi.stubGlobal("AudioContext", class {
     currentTime = 0;
     resume = async () => {};
+    createGain = () => ({ gain: { value: 1 }, connect() {}, disconnect() {} });
     decodeAudioData = async () => { throw new Error("Unsupported audio"); };
     close = fakes.close;
   });
@@ -97,7 +99,8 @@ test.each([0, 0.5])("AudioContext start accounts for the engine lead-in, seek an
     currentTime = 0; destination = {};
     resume = async () => {};
     decodeAudioData = async () => ({ duration: 10 });
-    createBufferSource = () => ({ buffer: null, connect() {}, start, stop() {}, disconnect() {} });
+    createGain = () => ({ gain: { value: 1 }, connect() {}, disconnect() {} });
+    createBufferSource = () => ({ buffer: null, playbackRate: { value: 1 }, connect() {}, start, stop() {}, disconnect() {} });
     close = fakes.close;
   });
   // Use the real pure parser for this case so its four-beat lead-in is part of the integration.
@@ -112,7 +115,7 @@ test.each([0, 0.5])("AudioContext start accounts for the engine lead-in, seek an
   fireEvent.click(screen.getByRole("button", { name: "播放" }));
   await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
   expect(start).toHaveBeenNthCalledWith(1, 2 - first, 0);
-  fireEvent.change(screen.getByRole("slider"), { target: { value: "3" } });
+  fireEvent.change(screen.getByRole("slider", { name: m.chart_seek() }), { target: { value: "3" } });
   await waitFor(() => expect(start).toHaveBeenCalledTimes(2));
   expect(start).toHaveBeenNthCalledWith(2, 0, 1 + first);
 });
@@ -149,4 +152,51 @@ test("public cover/audio/maidata all stay on the explicit public version and sta
   ]);
   rerender(<PrivateChartPreview id="public" versionId="selected" summary={publicSummary} assetUrl={publicChartAssetUrl} />);
   expect(fetcher).toHaveBeenCalledTimes(3);
+});
+
+test("controls changed during maidata loading become the actual playback settings", async () => {
+  fixture();
+  const start = vi.fn(), playbackRate = { value: 1 }, gain = { value: 1 };
+  vi.stubGlobal("AudioContext", class {
+    currentTime = 0; destination = {};
+    resume = async () => {};
+    decodeAudioData = async () => ({ duration: 10 });
+    createGain = () => ({ gain, connect() {}, disconnect() {} });
+    createBufferSource = () => ({ buffer: null, playbackRate, connect() {}, start, stop() {}, disconnect() {} });
+    close = fakes.close;
+  });
+  let release!: (response: Response) => void;
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => String(input).endsWith("/maidata")
+    ? new Promise<Response>(resolve => { release = resolve; }) : new Response(new Uint8Array([1,2,3]))));
+  render(<PrivateChartPreview id="chart" versionId="version" summary={summary} />);
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_load() }));
+  await waitFor(() => expect(release).toBeTypeOf("function"));
+  fireEvent.change(screen.getByRole("combobox", { name: m.chart_preview_rate() }), { target: { value: "2" } });
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_mute() }));
+  release(new Response("&inote_4=(120){4}1,2,3,E"));
+  await waitFor(() => expect((screen.getByRole("button", { name: m.chart_play() }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: m.chart_play() }));
+  await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+  expect(playbackRate.value).toBe(2);
+  expect(gain.value).toBe(0);
+  expect(start).toHaveBeenCalledWith(1, 0);
+});
+
+test("preview shortcuts are scoped to its focused surface and do not override inputs", async () => {
+  fixture();
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("&inote_4=(120){4}1,2,3,E")));
+  render(<><input aria-label="Outside preview" /><PrivateChartPreview id="chart" versionId="version" summary={{ ...summary, audio: null }} /></>);
+  fireEvent.click(screen.getByRole("button", { name: m.chart_preview_load() }));
+  await waitFor(() => expect((screen.getByRole("button", { name: m.chart_play() }) as HTMLButtonElement).disabled).toBe(false));
+  const region = screen.getByRole("region", { name: m.chart_preview() });
+  fireEvent.keyDown(screen.getByRole("textbox", { name: "Outside preview" }), { key: " " });
+  expect(screen.queryByRole("button", { name: m.chart_pause() })).toBeNull();
+  fireEvent.keyDown(region, { key: " " });
+  await screen.findByRole("button", { name: m.chart_pause() });
+  fireEvent.keyDown(screen.getByRole("slider", { name: m.chart_seek() }), { key: " " });
+  expect(screen.getByRole("button", { name: m.chart_pause() })).toBeTruthy();
+  fireEvent.keyDown(region, { key: "ArrowRight" });
+  expect((screen.getByRole("slider", { name: m.chart_seek() }) as HTMLInputElement).value).toBe("5");
+  fireEvent.keyDown(region, { key: "Home" });
+  expect((screen.getByRole("slider", { name: m.chart_seek() }) as HTMLInputElement).value).toBe("0");
 });

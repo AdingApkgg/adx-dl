@@ -4,6 +4,10 @@ import type { RedisCommandSender } from "../middleware/rate-limit";
 import { createLoginOptions } from "./login-options";
 
 function fakeRedis(value: string | null): RedisCommandSender {
+  if (value) {
+    const record = JSON.parse(value);
+    value = JSON.stringify({ ...record, checkedAt: new Date().toISOString() });
+  }
   return { send: async () => value };
 }
 

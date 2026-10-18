@@ -12,6 +12,7 @@ import { publicationDto } from "../charts/service";
 import { recordPermission, awaitChartJournal } from "../charts/publication-journal";
 import { UUID_PATTERN } from "../uuid";
 import { withTimeout } from "../with-timeout";
+import { unknownNapcatObservation } from "../napcat/health";
 import type { ApiServices } from "./api-services";
 
 /** Reads durable identity and current account state; session/frontend flags grant no authority. */
@@ -168,7 +169,10 @@ export async function dashStatus(services: ApiServices): Promise<DashStatus> {
     to_char(finished_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as "finishedAt",
     to_char(last_success_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as "lastSuccessAt",
     manifest_sha256 as "manifestSha256",original_count as "originalCount",bytes::float8 as bytes from storage_backup_status where id='global'`);
-  return { capturedAt: new Date().toISOString(), checks, roles,
+  let qq = unknownNapcatObservation();
+  try { if (services.napcatObservation) qq = await withTimeout(services.napcatObservation(), 250); }
+  catch { /* Missing Redis evidence is unknown, never an offline claim. */ }
+  return { capturedAt: new Date().toISOString(), qq, checks, roles,
     queues: { storageDead, mediaPurgeDead, purgeIncomplete: counts.purgeIncomplete, revoking: counts.revoking },
     journal: { exportedSequence: journal?.exportedSequence ?? "0", exportedAt: journal?.exportedAt ?? null, pending: counts.pending },
     maintenance: { active: counts.active },

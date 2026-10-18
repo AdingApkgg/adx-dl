@@ -20,6 +20,7 @@ export type DashChart = {
 export type DashChartsPage = { items: DashChart[]; nextCursor: string | null };
 export type DashStatus = {
   capturedAt: string;
+  qq?: import("./napcat").NapcatObservation;
   checks: { name: string; status: "ok" | "unavailable" }[];
   /** A negative heartbeat age means this role has never registered. */
   roles: { role: "web" | "media" | "control"; heartbeatAgeSeconds: number; ready: boolean }[];

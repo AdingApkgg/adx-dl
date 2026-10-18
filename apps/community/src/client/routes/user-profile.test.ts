@@ -28,7 +28,7 @@ type LoaderArgs = Parameters<typeof loader>[0];
 type LoaderData = Exclude<Awaited<ReturnType<typeof loader>>, Response>["data"];
 type MetaArgs = Parameters<typeof meta>[0];
 
-// 只实现个人主页 loader 会调用的两个接口：/api/v1/users/:id 和 /api/v1/me。
+// 实现个人主页 loader 的资料、当前用户和公开作品接口。
 function contextFor(user: object | null, viewer: object | null = null) {
   const api = {
     api: {
@@ -40,6 +40,7 @@ function contextFor(user: object | null, viewer: object | null = null) {
           },
         },
         me: { $get: async () => (viewer ? Response.json(viewer) : new Response(null, { status: 401 })) },
+        charts: { $get: async () => Response.json({ items: [], nextCursor: null }) },
       },
     },
   } as unknown as ApiClient;
@@ -171,4 +172,15 @@ test("legacy aliases redirect to numeric ID after lookup, keeping locale/query a
     expect((response as Response).headers.get("location")).toBe(path.replace(/\/u\/[^/?]+\/?/i, `/u/${PUBLIC_ID}`));
     expect((response as Response).headers.get("cache-control")).toBe("private, no-store");
   }
+});
+
+
+test("active profile requests only its own public works and pending deletion requests none", async () => {
+  const active = await visit(ACTIVE);
+  expect(active.works).toEqual({ items: [], nextCursor: null });
+  expect(active.worksFilters?.author).toBe(PUBLIC_ID);
+  expect(render(active)).toContain(m.user_public_charts());
+  const pending = await visit({ id: ID, publicId: PUBLIC_ID, status: "pending_deletion" });
+  expect(pending.works).toBeNull();
+  expect(render(pending)).not.toContain(m.user_public_charts());
 });

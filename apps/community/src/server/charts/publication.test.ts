@@ -342,7 +342,7 @@ test("failed durable export closes access and a retry exports the same withdrawa
   });
 });
 test("cooling-off hides publication, cancellation restores it and final retention preserves only the public version anonymously", async () => {
-  const { publishChart, getPublicChart } = await import("./publication");
+  const { publishChart, getPublicChart, listPublicCharts } = await import("./publication");
   const { appendChartVersion } = await import("./service");
   const { requestDeletion, cancelDeletion, purgeUser } = await import("../services/user-deletion");
   const { createDeletionHandlers } = await import("../storage/deletion");
@@ -360,6 +360,7 @@ test("cooling-off hides publication, cancellation restores it and final retentio
     versionId: first,
     confirmOriginalArchive: true,
   });
+  const formerAuthorId = (await getPublicChart(ctx, c.id)).author!.publicId!;
   const deps = { db: ctx.db, boss: ctx.boss, handlers: createDeletionHandlers(ctx) };
   await requestDeletion(deps, id, { deleteContent: false });
   await expect(getPublicChart(ctx, c.id)).rejects.toMatchObject({ status: 404 });
@@ -372,6 +373,7 @@ test("cooling-off hides publication, cancellation restores it and final retentio
     .where(eq(user.id, id));
   expect(await purgeUser(deps, id)).toBe("purged");
   expect((await getPublicChart(ctx, c.id)).author).toBeNull();
+  expect((await listPublicCharts(ctx, { author: formerAuthorId })).items).toHaveLength(0);
   expect(await retainsFile(ctx.db, a.file.id)).toBe(true);
   expect(await retainsFile(ctx.db, b.file.id)).toBe(false);
   expect((await ctx.db.select().from(files).where(eq(files.id, a.file.id)))[0]).toMatchObject({
@@ -1484,4 +1486,44 @@ test("restore preserves a moderation with no chart and older permission or anony
     expect((await c.query("select reason from chart_moderations where chart_id=$1", [chart.id])).rows).toEqual([{ reason: "Permanent takedown" }]);
   } finally { await c.query("rollback"); await c.end(); }
   expect((await ctx.db.select().from(chartModerations).where(eq(chartModerations.chartId, chart.id)))[0].reason).toBe("Permanent takedown");
+});
+
+
+test("discovery searches published text literally and scopes cursors, difficulty and durable author works", async () => {
+  const { publishChart, withdrawChart, getPublicChart, listPublicCharts } = await import("./publication");
+  const { updateChart } = await import("./service");
+  const { user } = await import("../db/schema");
+  const ctx = fixture.ctx, owner = await readyOwner(ctx), other = await readyOwner(ctx), tag = crypto.randomUUID();
+  await ctx.db.update(user).set({ name: `${tag} Publisher` }).where(eq(user.id, owner));
+  const publish = async (id: string, title: string) => {
+    const draft = await createChart(ctx, id, (await chartFile(id, { title })).file.id);
+    return publishChart(ctx, id, draft.id, { expectedRevision: draft.revision, versionId: draft.currentVersionId, confirmOriginalArchive: true });
+  };
+  let a = await publish(owner, `${tag} 星テスト %_ Alpha`);
+  const b = await publish(owner, `${tag} 星テスト Beta`);
+  await publish(other, `${tag} Other`);
+  const author = (await getPublicChart(ctx, a.id)).author!.publicId!;
+  expect(author).toBeTruthy();
+  const own = await listPublicCharts(ctx, { author });
+  expect(new Set(own.items.map(row => row.id))).toEqual(new Set([a.id, b.id]));
+  expect((await listPublicCharts(ctx, { q: `${tag} publisher` })).items.map(row => row.id).sort()).toEqual([a.id, b.id].sort());
+  expect((await listPublicCharts(ctx, { q: "%_" })).items.map(row => row.id)).toContain(a.id);
+  expect((await listPublicCharts(ctx, { q: "%_" })).items.map(row => row.id)).not.toContain(b.id);
+  expect((await listPublicCharts(ctx, { q: "星テスト", author, difficulty: "4" })).items).toHaveLength(2);
+  expect((await listPublicCharts(ctx, { q: tag, difficulty: "5" })).items).toHaveLength(0);
+  expect((await listPublicCharts(ctx, { q: a.publicId! })).items.map(row => row.id)).toContain(a.id);
+  const first = await listPublicCharts(ctx, { q: tag, limit: 1 });
+  const second = await listPublicCharts(ctx, { q: tag, limit: 1, cursor: first.nextCursor! });
+  expect(first.nextCursor).toBeTruthy();
+  expect(second.items[0]!.id).not.toBe(first.items[0]!.id);
+  for (const changed of [{ q: "different" }, { q: tag, sort: "published" }, { q: tag, difficulty: "4" }, { q: tag, author }])
+    await expect(listPublicCharts(ctx, { ...changed, cursor: first.nextCursor! })).rejects.toMatchObject({ status: 400 });
+  a = await updateChart(ctx, owner, a.id, { title: `${tag} PrivateOnly`, expectedRevision: a.revision });
+  expect((await listPublicCharts(ctx, { q: `${tag} PrivateOnly` })).items).toHaveLength(0);
+  expect((await listPublicCharts(ctx, { q: "%_", author })).items.map(row => row.id)).toEqual([a.id]);
+  await ctx.db.update(user).set({ status: "pending_deletion" }).where(eq(user.id, owner));
+  try { expect((await listPublicCharts(ctx, { author })).items).toHaveLength(0); }
+  finally { await ctx.db.update(user).set({ status: "active" }).where(eq(user.id, owner)); }
+  await withdrawChart(ctx, owner, a.id, a.revision);
+  expect((await listPublicCharts(ctx, { author })).items.map(row => row.id)).toEqual([b.id]);
 });

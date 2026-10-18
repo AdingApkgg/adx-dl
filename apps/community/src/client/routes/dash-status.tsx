@@ -6,12 +6,21 @@ export { headers, shouldRevalidate } from "../lib/dash";
 export async function loader({ context, url }: Route.LoaderArgs) { return loadDash(context, url, api => api.status()); }
 export default function DashStatus({ loaderData: state }: Route.ComponentProps) {
   const backup = state.backup;
+  const qq = state.qq;
+  const qqStates = { online: m.dash_qq_online, offline: m.dash_qq_offline, unreachable: m.dash_qq_unreachable, unknown: m.dash_unknown, disabled: m.dash_qq_disabled };
+  const qqFailures = { qq_offline: m.dash_qq_offline, timeout: m.dash_qq_timeout, provider_error: m.dash_qq_provider_error, connection_error: m.dash_qq_connection_error };
   const backupLabel = backup.status === "succeeded" ? m.dash_backup_succeeded() : backup.status === "failed" ? m.dash_backup_failed() : backup.status === "running" ? m.dash_backup_running() : m.dash_unknown();
   const checks: Record<string, () => string> = { db: m.dash_check_db, redis: m.dash_check_redis, storage: m.dash_check_storage, media: m.dash_check_media, runtime: m.dash_check_runtime, jobs: m.dash_check_jobs };
   const roles: Record<string, () => string> = { web: m.dash_role_web, media: m.dash_role_media, control: m.dash_role_control };
   return <section className="space-y-4" aria-label={m.dash_status()}>
     <p className="text-sm text-muted-foreground">{m.dash_status_hint({ at: dashDate(state.capturedAt) })}</p>
     <div className="grid gap-4 lg:grid-cols-2">
+      <DashSection title={m.dash_qq()}><DashFacts rows={[
+        { label: m.dash_qq_state(), value: qq ? qqStates[qq.state]() : m.dash_unknown() },
+        { label: m.dash_qq_checked(), value: dashDate(qq?.checkedAt ?? null) },
+        { label: m.dash_qq_changed(), value: dashDate(qq?.changedAt ?? null) },
+        { label: m.dash_qq_failure(), value: qq?.failure ? qqFailures[qq.failure]() : "—" },
+      ]} /></DashSection>
       <DashSection title={m.dash_dependencies()}><DashFacts rows={state.checks.map(check => ({ label: checks[check.name]?.() ?? check.name, value: check.status === "ok" ? m.dash_ok() : m.dash_unavailable() }))} /></DashSection>
       <DashSection title={m.dash_roles()}><DashFacts rows={state.roles.map(role => ({ label: roles[role.role]?.() ?? role.role, value: `${role.ready ? m.dash_ok() : m.dash_unavailable()} · ${(role.heartbeatAgeSeconds < 0 ? m.dash_unknown() : `${role.heartbeatAgeSeconds.toFixed(1)}s`)}` }))} /></DashSection>
       <DashSection title={m.dash_queues()}><DashFacts rows={[

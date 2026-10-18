@@ -1,47 +1,62 @@
+import type { Logger } from "@/shared/log";
+import type { NapcatFailure, NapcatObservation, NapcatState } from "@/shared/napcat";
 import type { RedisCommandSender } from "../middleware/rate-limit";
-import type { OneBotClient } from "./client";
-
-/** online：可以用；offline：NapCat 活着但 QQ 掉线；unreachable：连不上 NapCat。 */
-export type NapcatState = "online" | "offline" | "unreachable";
+import { OneBotError, type OneBotClient } from "./client";
+export type { NapcatState } from "@/shared/napcat";
 
 export const NAPCAT_HEALTH_KEY = "napcat:health";
+const FRESH_MS = 180_000;
+const HISTORY_SECONDS = 7 * 24 * 3600;
+export const unknownNapcatObservation = (): NapcatObservation => ({ state: "unknown", checkedAt: null, changedAt: null, failure: null });
+type HealthRecord = NapcatObservation & { state: NapcatState; checkedAt: string; changedAt: string };
 
-// 只信 get_status 的 online：QQ 掉线时它照常返回 200，只是 online 变成 false（调研报告第 2.4 节）。
-export async function checkNapcat(client: OneBotClient): Promise<NapcatState> {
+function parseRecord(raw: unknown, maxAge: number): HealthRecord | null {
+  if (typeof raw !== "string") return null;
   try {
-    return (await client.getStatus({ timeoutMs: 5000 })).online ? "online" : "offline";
-  } catch {
-    return "unreachable";
+    const r = JSON.parse(raw);
+    if (!r || !["online", "offline", "unreachable"].includes(r.state) || typeof r.checkedAt !== "string") return null;
+    const at = Date.parse(r.checkedAt), changed = Date.parse(r.changedAt ?? r.checkedAt), now = Date.now();
+    if (!Number.isFinite(at) || !Number.isFinite(changed) || at > now + 5000 || now - at >= maxAge || changed > at) return null;
+    const failure = ["qq_offline", "timeout", "provider_error", "connection_error"].includes(r.failure) ? r.failure as NapcatFailure : null;
+    return { state: r.state, checkedAt: new Date(at).toISOString(), changedAt: new Date(changed).toISOString(), failure };
+  } catch { return null; }
+}
+async function probe(client: OneBotClient): Promise<{ state: NapcatState; failure: NapcatFailure | null }> {
+  try {
+    return (await client.getStatus({ timeoutMs: 5000 })).online
+      ? { state: "online", failure: null } : { state: "offline", failure: "qq_offline" };
+  } catch (error) {
+    return { state: "unreachable", failure: error instanceof OneBotError ? "provider_error"
+      : error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name) ? "timeout" : "connection_error" };
   }
 }
+export async function checkNapcat(client: OneBotClient): Promise<NapcatState> { return (await probe(client)).state; }
 
-// worker 每分钟写一次，3 分钟过期：worker 停了以后，登录页不会一直按过时的状态显示。
-export async function writeNapcatHealth(
-  redis: RedisCommandSender,
-  state: NapcatState,
-  key = NAPCAT_HEALTH_KEY
-): Promise<void> {
-  await redis.send("SET", [key, JSON.stringify({ state, checkedAt: new Date().toISOString() }), "EX", "180"]);
+/** Two bounded keys: live state (3 minutes) and last observation (7 days). Logs retain transitions. */
+export async function writeNapcatHealth(redis: RedisCommandSender, state: NapcatState, key = NAPCAT_HEALTH_KEY,
+  failure: NapcatFailure | null = state === "offline" ? "qq_offline" : null, log?: Logger): Promise<void> {
+  const previous = parseRecord(await redis.send("GET", [`${key}:last`]), HISTORY_SECONDS * 1000);
+  const checkedAt = new Date().toISOString();
+  const changed = !previous || previous.state !== state;
+  const record: HealthRecord = { state, checkedAt, changedAt: changed ? checkedAt : (previous?.changedAt ?? checkedAt), failure };
+  const value = JSON.stringify(record);
+  await redis.send("SET", [key, value, "EX", "180"]);
+  await redis.send("SET", [`${key}:last`, value, "EX", String(HISTORY_SECONDS)]);
+  if (changed || previous?.failure !== failure) log?.info("napcat_health_changed", {
+    previousState: previous?.state ?? "unknown", state, checkedAt, changedAt: record.changedAt, failure,
+  });
 }
-
+export async function readNapcatObservation(redis: RedisCommandSender, key = NAPCAT_HEALTH_KEY): Promise<NapcatObservation> {
+  const live = parseRecord(await redis.send("GET", [key]), FRESH_MS);
+  if (live) return live;
+  const last = parseRecord(await redis.send("GET", [`${key}:last`]), HISTORY_SECONDS * 1000);
+  return last ? { ...last, state: "unknown" } : unknownNapcatObservation();
+}
 export async function readNapcatHealth(redis: RedisCommandSender, key = NAPCAT_HEALTH_KEY): Promise<NapcatState | null> {
-  const raw = await redis.send("GET", [key]);
-  if (typeof raw !== "string") {
-    return null;
-  }
-  try {
-    const state = (JSON.parse(raw) as { state?: unknown }).state;
-    return state === "online" || state === "offline" || state === "unreachable" ? state : null;
-  } catch {
-    return null;
-  }
+  const record = parseRecord(await redis.send("GET", [key]), FRESH_MS);
+  return record?.state ?? null;
 }
-
-/** napcat.health 任务的内容：检查一次，写进 Redis。 */
-export async function recordNapcatHealth(
-  client: OneBotClient,
-  redis: RedisCommandSender,
-  key = NAPCAT_HEALTH_KEY
-): Promise<void> {
-  await writeNapcatHealth(redis, await checkNapcat(client), key);
+export async function recordNapcatHealth(client: OneBotClient, redis: RedisCommandSender, key = NAPCAT_HEALTH_KEY, log?: Logger): Promise<void> {
+  const result = await probe(client);
+  await writeNapcatHealth(redis, result.state, key, result.failure, log);
 }

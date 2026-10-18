@@ -1,7 +1,8 @@
 import { DownloadIcon, PlayCircleIcon } from "lucide-react";
 import { ShareChartButton } from "../components/share-chart-button";
 import { Button } from "@astrodx/ui/components/button";
-import { data, Link, redirect } from "react-router";
+import { data, Link, redirect, useLocation } from "react-router";
+import { publicListReturnState } from "../lib/public-chart-navigation";
 import { m } from "@/paraglide/messages.js";
 import { getLocale, localizeHref } from "@/paraglide/runtime.js";
 import type { PublicChartDto } from "@/shared/charts";
@@ -41,14 +42,17 @@ export function meta({ loaderData: chart, matches, location }: Route.MetaArgs) {
     ...openGraph({ title: chart.title, description: chart.artist, url: canonical.href, locale: getLocale(), siteName: m.site_name() })];
 }
 export default function PublicChartDetail({ loaderData: chart }: Route.ComponentProps) {
+  const location = useLocation();
+  const returnState = publicListReturnState(location.state);
+  const returnHref = returnState?.publicListHref;
   const canPreview = chart.summary.difficulties.some(row => row.previewSupported);
   return <main className="space-y-6">
-    <Link to={localizeHref("/charts")} className={textLinkClass}>{m.public_charts_title()}</Link>
+    <Link to={returnHref ?? localizeHref("/charts")} state={returnState ? { publicChartCursors: returnState.publicListCursors } : undefined} className={textLinkClass}>{returnHref ? /^\/(?:(?:en|ja)\/)?u\//.test(returnHref) ? m.public_chart_back_author() : m.public_chart_back_results() : m.public_charts_title()}</Link>
     <div className="grid gap-6 md:grid-cols-[minmax(0,18rem)_1fr]">
       <div className="overflow-hidden rounded-xl border"><PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} /></div>
       <div className="min-w-0 space-y-3 break-words">
         <PageTitle description={chart.artist}>{chart.title}</PageTitle>
-        {chart.author ? <Link to={localizeHref(`/u/${chart.author.publicId ?? chart.author.id}`)} className="flex items-center gap-2 underline">
+        {chart.author ? <Link to={localizeHref(`/u/${chart.author.publicId ?? chart.author.id}`)} state={returnState} className="flex items-center gap-2 underline">
           <Avatar image={chart.author.image} id={chart.author.id} name={chart.author.name} size={32} />{m.public_chart_author({ name: chart.author.name })}
         </Link> : <p>{m.public_chart_author({ name: m.public_chart_anonymous() })}</p>}
         <p>{m.chart_version({ number: String(chart.ordinal) })} · {(chart.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p>

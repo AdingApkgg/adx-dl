@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { parsePublicChartFilters, type PublicChartSearchInput } from "@/shared/public-chart-search";
 import { HTTPException } from "hono/http-exception";
 import type { PublicChartDto, PublicChartsPageDto } from "@/shared/charts";
 import {
@@ -236,49 +238,44 @@ export async function getPublicChart(ctx: StorageContext, id: string) {
 }
 export async function listPublicCharts(
   ctx: StorageContext,
-  input: { limit?: number; cursor?: string } = {},
+  input: { limit?: number; cursor?: string } & PublicChartSearchInput = {},
 ): Promise<PublicChartsPageDto> {
   const limit = input.limit ?? 24;
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) throw invalid();
-  let cursor: { at: string; id: string } | undefined;
-  if (input.cursor !== undefined)
+  const filters = (() => { try { return parsePublicChartFilters(input); } catch { throw invalid(); } })();
+  const scope = createHash("sha256").update(JSON.stringify(filters)).digest("hex");
+  const isDefault = !filters.q && !filters.difficulty && !filters.author && filters.sort === "updated";
+  let cursor: { at: string; id: string; scope?: string } | undefined;
+  if (input.cursor !== undefined) {
     try {
-      if (input.cursor.length > 256 || !/^[A-Za-z0-9_-]+$/.test(input.cursor)) throw invalid();
+      if (input.cursor.length > 512 || !/^[A-Za-z0-9_-]+$/.test(input.cursor)) throw invalid();
       cursor = JSON.parse(Buffer.from(input.cursor, "base64url").toString());
-      if (
-        !cursor ||
-        Object.keys(cursor).sort().join() !== "at,id" ||
-        !UUID_PATTERN.test(cursor.id) ||
-        new Date(cursor.at).toISOString() !== cursor.at
-      )
-        throw invalid();
-    } catch {
-      throw invalid();
-    }
-  const rows = await query(ctx)
-    .where(
-      and(
-        allowed(),
-        cursor
-          ? or(
-              lt(chartPublications.updatedAt, new Date(cursor.at)),
-              and(eq(chartPublications.updatedAt, new Date(cursor.at)), lt(charts.id, cursor.id)),
-            )
-          : undefined,
-      ),
-    )
-    .orderBy(desc(chartPublications.updatedAt), desc(charts.id))
-    .limit(limit + 1);
-  const page = rows.slice(0, limit),
-    last = page.at(-1);
+      if (!cursor || typeof cursor.id !== "string" || typeof cursor.at !== "string" ||
+        !UUID_PATTERN.test(cursor.id) || new Date(cursor.at).toISOString() !== cursor.at ||
+        (Object.keys(cursor).sort().join() !== "at,id,scope" && Object.keys(cursor).sort().join() !== "at,id") ||
+        (cursor.scope === undefined ? !isDefault : cursor.scope !== scope)) throw invalid();
+    } catch { throw invalid(); }
+  }
+  const timestamp = filters.sort === "published" ? chartPublications.publishedAt : chartPublications.updatedAt;
+  const durableAuthor = sql`${userPublicIds.journalSequence}<=(select exported_sequence from storage_journal_progress where id='global')`;
+  const search = filters.q ? or(
+    sql`strpos(lower(${chartPublications.title}),lower(${filters.q}))>0`,
+    sql`strpos(lower(${chartPublications.artist}),lower(${filters.q}))>0`,
+    and(durableAuthor, sql`strpos(lower(${user.name}),lower(${filters.q}))>0`),
+    isPublicChartId(filters.q) ? eq(chartPublicIds.publicId, BigInt(filters.q)) : undefined,
+  ) : undefined;
+  const rows = await query(ctx).where(and(
+    allowed(), search,
+    filters.author ? and(eq(userPublicIds.publicId, BigInt(filters.author)), durableAuthor) : undefined,
+    filters.difficulty ? sql`exists(select 1 from jsonb_array_elements(${chartVersions.summary}->'difficulties') d where d->>'difficulty'=${String(filters.difficulty)})` : undefined,
+    cursor ? or(lt(timestamp, new Date(cursor.at)), and(eq(timestamp, new Date(cursor.at)), lt(charts.id, cursor.id))) : undefined,
+  )).orderBy(desc(timestamp), desc(charts.id)).limit(limit + 1);
+  const page = rows.slice(0, limit), last = page.at(-1);
   return {
     items: page.map(publicDto),
-    nextCursor:
-      rows.length > limit && last
-        ? Buffer.from(
-            JSON.stringify({ at: last.p.updatedAt.toISOString(), id: last.chart.id }),
-          ).toString("base64url")
-        : null,
+    nextCursor: rows.length > limit && last ? Buffer.from(JSON.stringify({
+      at: (filters.sort === "published" ? last.p.publishedAt : last.p.updatedAt).toISOString(), id: last.chart.id, scope,
+    })).toString("base64url") : null,
   };
 }
 export async function resolvePublicChartAsset(

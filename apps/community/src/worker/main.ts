@@ -99,7 +99,7 @@ await boss.schedule(SESSION_CLEANUP_QUEUE, SESSION_CLEANUP_CRON, {}, { tz: SESSI
 if (env.qq.sender === "napcat") {
   const napcat = createOneBotClient({ httpUrl: env.qq.httpUrl, accessToken: env.qq.accessToken });
   await boss.work(NAPCAT_HEALTH_QUEUE, async () => {
-    await recordNapcatHealth(napcat, redis);
+    await recordNapcatHealth(napcat, redis, undefined, log);
   });
   await boss.schedule(NAPCAT_HEALTH_QUEUE, "* * * * *");
   // spec 第 10.3 节：收到加好友申请就自动通过，之后才能私聊发验证码。
