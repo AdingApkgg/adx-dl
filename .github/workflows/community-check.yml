@@ -2,7 +2,7 @@ name: Community check
 
 # 社区站的检查：lint、类型检查、单元与集成测试、构建、对构建产物的 HTTP 测试、
 # Docker 构建，以及相关改动的真实浏览器/隔离备份恢复验收（只检查不推送）。
-# 部署是在 g510 上手动做的，不经 GitHub。
+# CI 不执行生产部署；正式部署经 scripts/remote/community-deploy.py 自动做生产登录态门禁。
 on:
   push:
     branches:
@@ -11,6 +11,7 @@ on:
       - pre
     paths:
       - "apps/community/**"
+      - "scripts/remote/community-*"
       - "packages/**"
       - "patches/**"
       - "package.json"
@@ -20,6 +21,7 @@ on:
   pull_request:
     paths:
       - "apps/community/**"
+      - "scripts/remote/community-*"
       - "packages/**"
       - "patches/**"
       - "package.json"
@@ -160,6 +162,9 @@ jobs:
         run: |
           bash apps/community/test/ops/seaweed-runtime.sh apps/community/ops/seaweed
           bash apps/community/test/ops/seaweed-eof.sh apps/community/ops/seaweed
+
+      - name: Release receipt validation (synthetic, no production access)
+        run: python3 apps/community/test/ops/release-gate.test.py
 
       # 复用以上镜像；没有生产密钥，DB/S3/账号和有界磁盘均为本轮临时 fixture。
       - name: Prepare isolated native acceptance

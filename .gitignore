@@ -53,3 +53,8 @@ Official/**
 !Official/.gitkeep
 !Official/**/
 !Official/**/.gitkeep
+
+# Production deployment state and release lock
+apps/community/.serving-revision
+apps/community/.release-status.json
+apps/community/.deploy.lock

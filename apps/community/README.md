@@ -267,13 +267,14 @@ pg-boss 的表和队列还没建好时，web 的 `jobs` 就绪检查不过，`/r
 - 端口一律只绑 127.0.0.1：g510 上的 cloudflared 跑在宿主机上，经回环地址连进来。绑到 0.0.0.0 等于让局域网绕过
   Cloudflare，还能自己带 `CF-Connecting-IP` 冒充访客的 IP（限流和登录设备都认这个头）。g510 上给 astrbot 用的 napcat
   容器（WebUI 在宿主机的 6099）和这里的 `napcat` 互不相干。
-- **部署**：在 g510 的 `apps/community` 下 `./deploy.sh`。它只在 `pre` 分支上拉代码（`git pull --ff-only`），检查 compose
-  的变量，构建，先跑迁移（失败就停，旧版本照常服务），再重启 web 和 worker，最后等 `/readyz`（默认最多 60 秒，
-  `READY_TIMEOUT` 可设为 1–2147483647 之间的整数秒）。探针和休眠都只用剩余时间；失败后的诊断请求可额外花最多 5 秒。
-  本机的 `.deploy-revision` 原子记录最近就绪成功的提交，失败和重试都保留它；第一次运行时先以拉取前的 checkout 为基线，
-  所以已有部署第一次改用脚本时，应从当前实际运行的提交开始。不要删除该文件或同时运行多个部署。没就绪时打印
-  回滚办法：`git checkout --detach <记录的提交> && ./deploy.sh --no-pull`，回滚成功也会更新记录。NapCat 和 Umami 不由它重启，要动它们时单独
-  `docker compose up -d napcat`（或 `umami`）。
+- **正式部署**：从仓库根目录执行 `python3 scripts/remote/community-deploy.py`。协调器通过既有 SSH 权限在 g510
+  拉取 `pre`、构建、迁移、容量预检和切换应用，再自动在构建机运行生产登录态无头验收。只有验收与临时会话清理均成功，
+  才记录“发布完成”。底层 `apps/community/deploy.sh` 缺少协调器的受控上下文时拒绝执行，不能只凭就绪探针完成发布。
+  `.serving-revision` 表示已切换运行版本；`.deploy-revision` 表示最近一次验收通过版本。失败保留前一通过版本、回滚镜像和
+  本轮证据，`.release-status.json` 会显示失败或等待验收；整轮持有部署锁，防止并发切换。既有 `COMPOSE_FILE` 的 NapCat
+  复用 overlay 保留，NapCat/Umami 不由该流程重启。回退前先确认迁移与日志读者兼容，再通过协调器的 `--no-pull` 部署明确检出的
+  兼容版本；不会自动启动旧读者。`--verify-current` 仅对当前运行版本重做完整门禁，不构建、不迁移、不重启。
+  详见仓库 `docs/verification/community-headless-e2e.md`。
 - `/readyz` 只回答本机的探针：带 `CF-Connecting-IP` 的请求（经 Cloudflare 来的）一律 404。
 - **访问 Google 的代理**：`.env` 里 `OUTBOUND_HTTPS_PROXY=http://host.docker.internal:20171`，compose 把它作为
   `HTTPS_PROXY` 交给 web，`extra_hosts` 让容器里认得 `host.docker.internal`。不在 `.env` 里直接写 `HTTPS_PROXY`：

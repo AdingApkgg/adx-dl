@@ -23,7 +23,9 @@ if task['action'] == 'prepare':
     (root / '.owner').write_text(task['runId'])
     (root / 'tools/auth-bridge.ts').write_bytes(base64.b64decode(task['source']))
     state = {'webId': web['Id'], 'webStartedAt': web['State']['StartedAt'], 'image': web['Image'], 'runId': task['runId'], 'container': name}
-    state['revision'] = pathlib.Path('/home/i/astrodx-dash-src/apps/community/.deploy-revision').read_text().strip()
+    deployment = pathlib.Path('/home/i/astrodx-dash-src/apps/community')
+    marker = deployment/'.serving-revision'
+    state['revision'] = (marker if marker.exists() else deployment/'.deploy-revision').read_text().strip()
     (root / 'state.json').write_text(json.dumps(state))
     env = dict(x.split('=', 1) for x in web['Config']['Env'])
     allowed = ['DATABASE_URL', 'BETTER_AUTH_SECRET', 'PUBLIC_ORIGIN', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'COMMUNITY_ADMIN_PUBLIC_IDS', 'HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'NO_PROXY', 'no_proxy']

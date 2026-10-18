@@ -10,6 +10,8 @@ remote = (ROOT / 'scripts/remote/community-auth-host.py').read_text()
 tools = ROOT / 'apps/community/test/acceptance/production-smoke.mjs'
 base_tree = subprocess.check_output(['git','-C',str(ROOT),'rev-parse','HEAD^{tree}'],text=True).strip()
 processes = []
+ready = None
+proof = None
 ssh_options = ['-o','BatchMode=yes','-o','ConnectTimeout=15','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=2']
 def production(action):
     task = dict(action=action, runId=run_id, key=capability)
@@ -31,6 +33,8 @@ status, cleanup = 1, None
 with tempfile.TemporaryDirectory(prefix='adxc-smoke-ssh-') as scratch:
     try:
         ready = production('prepare')
+        if os.environ.get('PRODUCTION_EXPECT_REVISION') and ready['productionRevision'] != os.environ['PRODUCTION_EXPECT_REVISION']:
+            raise RuntimeError('EXPECTED_PRODUCTION_REVISION_MISMATCH')
         print('PRODUCTION_AUTH_BRIDGE_READY revision=' + ready['productionRevision'], flush=True)
         local_port = free_port()
         with open(pathlib.Path(scratch)/'tunnels.log','w') as errors:
@@ -77,6 +81,8 @@ try:
 finally: key_file.unlink(missing_ok=True)
 '''
             builder(script)
+            read_proof = "import json,pathlib\np=pathlib.Path('/home/i/astrodx-verify/production-smoke/auth-" + run_id + "/evidence/result.json')\nprint(p.read_text())\n"
+            proof = json.loads(builder(read_proof, capture=True).stdout)
             if reverse.poll() is not None: raise RuntimeError('REVERSE_TUNNEL_EXITED')
             status = 0
     except Exception as error:
@@ -92,4 +98,9 @@ finally: key_file.unlink(missing_ok=True)
             process.terminate()
             try: process.wait(timeout=10)
             except subprocess.TimeoutExpired: process.kill();process.wait()
+if status == 0 and os.environ.get('PRODUCTION_RELEASE_RECEIPT'):
+    receipt = dict(schema=1, releaseId=os.environ['COMMUNITY_RELEASE_ID'], smokeRunId=run_id, result=proof, cleanup=cleanup)
+    target=pathlib.Path(os.environ['PRODUCTION_RELEASE_RECEIPT'])
+    with open(target, 'x') as file:
+        os.chmod(target,0o600);json.dump(receipt,file)
 raise SystemExit(status)

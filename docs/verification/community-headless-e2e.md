@@ -10,15 +10,37 @@
 
 代码、锁文件、运行配置及镜像层未变化时复用候选的通过记录；合并后核对实际树与部署制品。修改失败项后先定向重跑，最终发布门禁以最终候选为准，不能拼接不同候选的结果。
 
+## 正式发布入口（强制门禁）
+
+```sh
+python3 scripts/remote/community-deploy.py
+```
+
+正式入口会自动完成：`pre` 切换 → web/media 就绪 → 生产登录态无头验收 → 会话和容器清理 → 核对版本与三角色身份 → 标记发布完成。
+无需手动追加一次冒烟命令。部署脚本从切换到最终验收全程持有同一把主机锁；缺少协调器上下文的直接调用在拉取、构建前拒绝执行。
+
+`.serving-revision` 在应用就绪后记录实际运行版本，供冒烟识别候选；`.deploy-revision` 只在本轮验收通过后推进，失败保留上一次通过版本。
+每轮在 `/home/i/astrodx-community-releases/<releaseId>/` 保存私有 `ready.json`、`acceptance.json`、`accepted.json` 和 `complete.json`。
+只有 `complete.json` 与 `.release-status.json` 都为 complete 才能报告发布完成。旧结果、匿名结果、错版本、错脚本哈希、漏场景、未撤销会话、
+清理失败、过期收据，以及验收期间任何角色被替换都会被拒绝。receipt 与本轮随机 releaseId、当前版本及三个运行角色绑定，不重用早先的冒烟通过记录。
+
+```sh
+# 仅复核当前运行版本，实际经过相同门禁，不构建/迁移/重启
+python3 scripts/remote/community-deploy.py --verify-current
+```
+
+异常或超时自动令本轮失败，保留正在运行的服务及上一次通过标记，供修复后重试；不会自动回滚不兼容的认证日志读者。
+运维部署输出留在生产私有 deploy.log；控制端只返回阶段与非敏感收据。现有 SSH 和代理配置继续使用，不新增 SSH 密钥或公开端点。
+
 ## 部署后：默认带生产登录态
 
-在完成切换和就绪检查后执行：
+单独诊断时可执行：
 
 ```sh
 scripts/remote/community-smoke.sh
 ```
 
-默认等同 `--authenticated`。这是部署后必需的独立门禁，失败不能把发布标为完成；不会触发新部署，也不启动定时任务。只需 SSH 到构建机和生产机的现有运维权限。Mac 只运行轻量控制脚本和 SSH TCP 转发，Chromium 和所有浏览器操作均在 `localhost-1` 运行。
+默认等同 `--authenticated`。正式协调器会自动调用它，单独运行只做诊断，不写发布完成标记；不会触发新部署，也不启动定时任务。只需 SSH 到构建机和生产机的现有运维权限。Mac 只运行轻量控制脚本和 SSH TCP 转发，Chromium 和所有浏览器操作均在 `localhost-1` 运行。
 
 `community-auth-smoke.py` 自动完成：
 
