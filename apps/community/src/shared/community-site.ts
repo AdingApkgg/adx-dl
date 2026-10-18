@@ -19,3 +19,11 @@ export type PublicNotice={id:string;publication:NoticePublication};
 export type NoticePage<T>={items:T[];nextCursor:string|null};
 export type FeaturedState={revision:number;ids:string[];items:PublicChartDto[]};
 export function noticeText(value:{zh:string;en?:string;ja?:string},locale:string){const translated=locale==="en"?value.en:locale==="ja"?value.ja:value.zh;return {text:translated?.trim()?translated:value.zh,fallback:locale!=="zh"&&!translated?.trim()};}
+
+/** PostgreSQL JSONB key order must not make a saved notice appear dirty. */
+export function sameNoticeDraft(left: NoticeDraft, right: NoticeDraft): boolean {
+  const translated = (value: NoticeDraft["title"]) => [value.zh, value.en ?? null, value.ja ?? null];
+  const fields = (value: NoticeDraft) => [translated(value.title), translated(value.body), value.level,
+    value.startsAt, value.expiresAt, value.href, value.linkLabel ? translated(value.linkLabel) : null, value.order];
+  return JSON.stringify(fields(left)) === JSON.stringify(fields(right));
+}

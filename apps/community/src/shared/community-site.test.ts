@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { noticeDraftSchema, noticeText, type NoticeDraft } from "./community-site";
+import { sameNoticeDraft, noticeDraftSchema, noticeText, type NoticeDraft } from "./community-site";
 import { communityContentFact } from "./community-content-journal";
 const draft = (): NoticeDraft => ({title:{zh:"公告"},body:{zh:"正文"},level:"normal",startsAt:null,expiresAt:null,href:null,linkLabel:null,order:0});
 test("notice times normalize before snapshots and reject inverted schedules", () => {
@@ -29,4 +29,13 @@ test("durable numeric identities fit signed bigint and content facts contain no 
   expect(communityContentFact.safeParse({...fact,publicId:"9223372036854775807"}).success).toBe(true);
   expect(communityContentFact.safeParse({...fact,body:"private content"}).success).toBe(false);
   expect(communityContentFact.safeParse({version:1,entity:"notice",id:"notice1",revision:1,state:"visible"}).success).toBe(false);
+});
+
+
+test("saved notice equality ignores JSONB key order but keeps all publication fields", () => {
+  const value: NoticeDraft = { ...draft(), title: { zh: "公告", en: "Notice" }, href: "/help", linkLabel: { zh: "帮助", ja: "ヘルプ" } };
+  const reordered: NoticeDraft = { order: value.order, linkLabel: { ja: "ヘルプ", zh: "帮助" }, href: value.href, expiresAt: null, startsAt: null, level: value.level, body: value.body, title: { en: "Notice", zh: "公告" } };
+  expect(JSON.stringify(value)).not.toBe(JSON.stringify(reordered));
+  expect(sameNoticeDraft(value, reordered)).toBe(true);
+  for (const change of [{title:{zh:"新标题"}}, {body:{zh:"新正文"}}, {level:"important" as const}, {startsAt:"2026-10-18T00:00:00Z"}, {expiresAt:"2026-10-19T00:00:00Z"}, {href:"/charts"}, {linkLabel:{zh:"新标签"}}, {order:1}]) expect(sameNoticeDraft(value, {...reordered,...change})).toBe(false);
 });

@@ -5,7 +5,7 @@ import {m} from "@/paraglide/messages.js";
 import {localizeHref} from "@/paraglide/runtime.js";
 import {ApiError} from "@/shared/api-client";
 import {apiContext} from "@/shared/router-context";
-import type {NoticeDraft,SiteNotice} from "@/shared/community-site";
+import {sameNoticeDraft,type NoticeDraft,type SiteNotice} from "@/shared/community-site";
 import {siteApi} from "../queries/community-site";
 import {getBrowserApi} from "../lib/browser";
 import {requireUser,loginHref} from "../lib/require-user";
@@ -29,7 +29,7 @@ function NoticeEditor({row}:{row:SiteNotice}){
   catch(failure){setError(failure);try{setLatest(await siteApi(getBrowserApi()).getNotice(row.id));}catch{}await revalidator.revalidate();}finally{setPending(false);}
  }
  function translated(field:"title"|"body",lang:"zh"|"en"|"ja",value:string){setDraft(current=>({...current,[field]:{...current[field],[lang]:value}}));setConfirmed(false);}
- const dirty=JSON.stringify(draft)!==JSON.stringify(saved.draft);
+ const dirty=!sameNoticeDraft(draft,saved.draft);
  const server=latest&&latest.revision>=row.revision?latest:row;
  const conflict=server.revision>revision;
  const disabled=pending||saved.withdrawn||server.withdrawn;

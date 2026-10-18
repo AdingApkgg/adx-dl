@@ -97,7 +97,7 @@ export async function exercisePlatform({ owner, other, anonymous, page, origin, 
       assert.equal((await read(owner, `/api/v1/discussions/dash/reports?status=open`)).items.some(item => item.id === report.id), true);
       await page.goto(url("/dash/discussions?view=reports"));
       const review = page.getByRole("article").filter({ hasText: "Synthetic browser report" });
-      await review.getByLabel("处理结果", { exact: true }).selectOption("actioned");
+      await review.getByRole("combobox", { name: "处理结果", exact: true }).selectOption("actioned");
       await review.getByLabel("处理说明（举报者可见）", { exact: true }).fill("Synthetic report resolved after exact-target hide");
       await review.getByLabel("我确认保存此处理结果；保存后不能改写。", { exact: true }).check();
       await mutation(page, `/api/v1/discussions/dash/reports/${report.id}/resolution`, "POST", () => review.getByRole("button", { name: "确认处理", exact: true }).click());
