@@ -1,3 +1,4 @@
+import { followingRestoreFixture } from "./following-restore-fixture";
 import {communityRestoreFixture} from "./community-restore-fixture";
 import { expect } from "bun:test";
 import { createHash } from "node:crypto";
@@ -43,6 +44,7 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
   const [adminIdentity] = await source.db.select().from(userPublicIds).where(eq(userPublicIds.userId, admin));
   const actor = { id: admin, publicId: adminIdentity.publicId.toString() };
   userNumbers.set(admin, actor.publicId);
+  let following:Awaited<ReturnType<typeof followingRestoreFixture>>|undefined;
   const rows: { kind: "withdraw" | "replace" | "delete" | "retain" | "legacy" | "moderate" | "moderate-retain"; owner: string; original: Awaited<ReturnType<typeof upload>>; chart: Awaited<ReturnType<typeof createChart>> }[] = [];
   for (const kind of ["withdraw", "replace", "delete", "retain", "legacy", "moderate", "moderate-retain"] as const) {
     const owner = await f.owner(), original = await upload(owner, `Restore ${kind}`);
@@ -50,6 +52,7 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
     userNumbers.set(owner, identity.publicId.toString());
     await source.db.insert(profiles).values({ userId: owner, bio: "private-identity-must-disappear" });
     let chart = await createChart(source, owner, original.id);
+    if(kind==="replace")following=await followingRestoreFixture(source,f.owner,owner);
     if (kind === "legacy") {
       const now = new Date();
       const publication = { chartId: chart.id, versionId: chart.currentVersionId, title: chart.title, artist: chart.artist, description:"", credits:"", tags:[], releaseNote:"", publishedAt: now, updatedAt: now };
@@ -60,6 +63,7 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
       chart = await getChart(source, owner, chart.id);
       expect(chart.publicId).toBeNull();
     } else chart = await publishChart(source, owner, chart.id, { expectedRevision: chart.revision, versionId: chart.currentVersionId!, confirmOriginalArchive: true });
+    if(kind==="replace")await following!.afterInitialPublication();
     if (kind === "retain") {
       const draft = await upload(owner, "Never public retention draft");
       chart = await appendChartVersion(source, owner, chart.id, { expectedRevision: chart.revision, fileId: draft.id });
@@ -75,9 +79,10 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
   let lateModerated: Awaited<ReturnType<typeof createChart>> | undefined;
   return {
     additionalOriginals: 8,
-    communityCases: community.cases,
+    communityCases: [...community.cases,...following!.cases],
     async commitLaterFacts() {
       await community.commitLaterFacts();
+      await following!.commitLaterFacts();
       for (const row of rows) {
         const { chart, owner, kind } = row;
         if (kind === "withdraw") await withdrawChart(source, owner, chart.id, chart.revision);
@@ -120,6 +125,7 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
     },
     async verify(target: StorageContext) {
       await community.verify(target);
+      await following!.verify(target);
       for (const [owner, number] of userNumbers) {
         const [identity] = await target.db.select().from(userPublicIds).where(eq(userPublicIds.userId, owner));
         expect(identity.publicId.toString()).toBe(number);

@@ -108,6 +108,7 @@ export const STORAGE_QUEUES: readonly QueueDefinition[] = [
 // 顺序有要求：死信队列必须排在指向它的队列前面，createQueue 会先检查死信队列存在。
 export const QUEUES: readonly QueueDefinition[] = [
   ...STORAGE_QUEUES,
+  { name:"following.dispatch", options:{policy:"stately",retryLimit:0,expireInSeconds:600,retentionSeconds:7*DAY,deleteAfterSeconds:7*DAY} },
   { name:"discussion.dispatch", options:{policy:"stately",retryLimit:0,expireInSeconds:600,retentionSeconds:7*DAY,deleteAfterSeconds:7*DAY} },
   // 每分钟检查一次机器人在不在线，结果写进 Redis，登录页据此显示"QQ 登录暂不可用"。
   // 检查本身就是周期性的，失败不重试；stately：同一时刻最多一个排队、一个在跑，

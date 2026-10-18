@@ -20,3 +20,7 @@ The offline `verify-native-evidence.py` checker audits private native diagnostic
 Its fixture-based regression test runs only on the builder: set `TASK3_RAW_ROOT` to the preserved private diagnostic log directory and run `python3 apps/community/test/acceptance/verify-native-evidence.test.py`. It mutates in-memory copies of real observations, never the original evidence or running services. These tests validate the verifier and do not count as a new application acceptance run.
 
 Production read-only smoke uses a separate remote entrypoint: `scripts/remote/community-smoke.sh`. See [the release workflow](../../../../docs/verification/community-headless-e2e.md). It never runs this isolated write scenario against production.
+
+作者关注验收复用同一隔离账号与真实 worker：默认不提醒、发布进入动态、开启后新版本投递、标读、元数据不重复、取消停止后续投递，并检查 320/390 像素。恢复 fixture 通过真实旧 dump 和加密 tail 验证取消、关闭提醒、已读及注销。定向服务测试另覆盖 101 人中断续投和导出屏障等待。
+
+正式生产门禁现要求十组场景，新增 `production_following_feed_and_alert_settings`：只读访问本人关注、动态、提醒筛选与作者控件，核对后台私有控制屏障。未包含这一组的旧九组收据无法完成新发布。生产验收不会创建关注或谱面；写入行为在隔离环境验收。

@@ -1,3 +1,4 @@
+import { followingRoutes } from "./following";
 import {communitySiteRoutes} from "./community-site";
 import {discussionRoutes} from "./discussions";
 import { Hono } from "hono";
@@ -20,6 +21,7 @@ export const apiV1 = new Hono<AppEnv>()
   .get("/login-options", async (c) => c.json(await c.get("services").loginOptions()))
   .route("/site", communitySiteRoutes)
   .route("/discussions", discussionRoutes)
+  .route("/me/following", followingRoutes)
   .route("/dash", dashRoutes)
   .route("/uploads", uploadRoutes)
   .route("/files", fileRoutes)

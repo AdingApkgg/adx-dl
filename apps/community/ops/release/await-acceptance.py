@@ -16,7 +16,7 @@ REQUIRED_STEPS = {
     'legacy_chart_and_user_redirects', 'three_language_forum_notices_help',
     'anonymous_private_routes_denied', 'mobile_catalog_and_forum_320_390',
     'signed_in_notifications_forum_and_comment_composers',
-    'production_dashboard_permissions_and_pages',
+    'production_dashboard_permissions_and_pages', 'production_following_feed_and_alert_settings',
     'production_bridge_write_denial_and_session_revocation',
 }
 

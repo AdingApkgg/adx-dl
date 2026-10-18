@@ -1,3 +1,4 @@
+import { exportTestUserIds } from "../testing/user-public-ids";
 import { beforeAll, describe, expect, test } from "bun:test";
 import { eq, sql } from "drizzle-orm";
 
@@ -274,6 +275,7 @@ test.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH)(
     const { ctx, policy } = await readyContext(),
       secret = "internalMediaSecret" in ctx.config ? ctx.config.internalMediaSecret : "",
       drain = createMediaDrain({ db: ctx.db, secret });
+    ctx.exportChartJournal=exportTestUserIds;
     let failResume = false,
       resumes = 0;
     const { deps } = testAppDeps({ auth: createTestAuth().auth });

@@ -1,3 +1,4 @@
+import { privateSocialFact, type PrivateSocialFact } from "../../src/shared/private-social-journal";
 import {preservePayloadShape,journalBatchPrefix} from "./journal-codec";
 import { communityContentFact, type CommunityContentFact } from "../../src/shared/community-content-journal";
 import { userPublicIdFact, type UserPublicIdFact } from "../../src/shared/user-journal";
@@ -11,8 +12,8 @@ export type JournalConfig = { directory: string; keyFile: string; databaseUrl: s
 export type JournalHead = { sequence: number; hash: string; capturedAt: string };
 export type JournalRecord = {
   sequence: number;
-  kind: "user_deleted" | "file_deleted" | "hash_blocked" | "media_revoked" | "chart_permission" | "user_public_id" | "community_content";
-  payload?: ChartJournalPayload | UserPublicIdFact | CommunityContentFact;
+  kind: "user_deleted" | "file_deleted" | "hash_blocked" | "media_revoked" | "chart_permission" | "user_public_id" | "community_content" | "private_social";
+  payload?: ChartJournalPayload | UserPublicIdFact | CommunityContentFact | PrivateSocialFact;
   userId: string | null;
   fileId: string | null;
   sha256: string | null;
@@ -32,6 +33,8 @@ export function validJournalRecord(r: JournalRecord): boolean {
     typeof r.fileId === "string" &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r.fileId);
   const hash = typeof r.sha256 === "string" && /^[a-f0-9]{64}$/.test(r.sha256);
+  if (r.kind === "private_social")
+    return r.userId === null && r.fileId === null && r.sha256 === null && r.generation === null && privateSocialFact.safeParse(r.payload).success;
   if (r.kind === "community_content")
     return (r.userId === null || userId) && r.fileId === null && r.sha256 === null && r.generation === null && communityContentFact.safeParse(r.payload).success;
   if (r.kind === "user_public_id")
@@ -320,7 +323,7 @@ function record(r: Record<string, unknown>): JournalRecord {
   // Never add payload:null to legacy records: their exact JSON bytes are already hash chained.
   if (r.payload != null) {
     const parsed = result.kind === "chart_permission"
-      ? permissionFact.parse(r.payload) : result.kind === "community_content" ? communityContentFact.parse(r.payload) : result.kind === "user_public_id" ? userPublicIdFact.parse(r.payload) : retentionFact.parse(r.payload);
+      ? permissionFact.parse(r.payload) : result.kind === "private_social" ? privateSocialFact.parse(r.payload) : result.kind === "community_content" ? communityContentFact.parse(r.payload) : result.kind === "user_public_id" ? userPublicIdFact.parse(r.payload) : retentionFact.parse(r.payload);
     result.payload=preservePayloadShape(parsed,r.payload);
   }
   if (!validJournalRecord(result)) throw fail();

@@ -34,6 +34,11 @@ class ReleaseGateTests(unittest.TestCase):
     with self.assertRaises(ValueError):gate.validate(receipt,self.ready)
   wrong=copy.deepcopy(self.receipt);wrong['releaseId']='f'*32
   with self.assertRaises(ValueError):gate.validate(wrong,self.ready)
+ def test_previous_nine_steps_cannot_complete_following_release(self):
+  self.receipt['result']['steps'].remove('production_following_feed_and_alert_settings')
+  self.write_receipt()
+  with self.assertRaises(ValueError):self.invoke('--await')
+  self.assertEqual((self.root/'.deploy-revision').read_text(),'old\n')
  def test_old_pass_cannot_complete_a_new_deployment(self):
   self.receipt['result']['startedAt']=(dt.datetime.now(dt.timezone.utc)-dt.timedelta(hours=1)).isoformat()
   self.write_receipt()

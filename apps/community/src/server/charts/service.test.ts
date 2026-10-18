@@ -1,3 +1,4 @@
+import { exportTestUserIds } from "../testing/user-public-ids";
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { Client } from "pg";
@@ -23,7 +24,7 @@ import { appendChartVersion, createChart, deleteChart, deleteChartVersion, getCh
 
 let fixture: Awaited<ReturnType<typeof readyContext>>;
 const owners: string[] = [];
-beforeAll(async () => { await resetTestDatabase(); await prepareTestQueues(); fixture = await readyContext(); }, 30000);
+beforeAll(async () => { await resetTestDatabase(); await prepareTestQueues(); fixture = await readyContext(); fixture.ctx.exportChartJournal=exportTestUserIds; }, 30000);
 afterAll(async () => {
   if (!fixture) return;
   // Fixture cleanup deliberately releases its own business references before its logical files.

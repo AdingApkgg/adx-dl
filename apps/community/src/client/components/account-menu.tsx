@@ -71,6 +71,8 @@ export function AccountMenu() {
             <DropdownMenuItem asChild>
               <Link to={localizeHref("/me/charts")}>{m.charts_title()}</Link>
             </DropdownMenuItem>
+            <DropdownMenuItem asChild><Link to={localizeHref("/me/feed")}>{m.following_feed_title()}</Link></DropdownMenuItem>
+            <DropdownMenuItem asChild><Link to={localizeHref("/me/following")}>{m.following_title()}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to={localizeHref("/me/discussions")}>{m.site_my_discussions()}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to={localizeHref("/me/notifications")}>{m.site_notifications()}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to={localizeHref("/me/favorites")}>{m.my_favorites()}</Link></DropdownMenuItem>

@@ -1,3 +1,4 @@
+import { followingDeletionHandler } from "../following/deletion";
 import {discussionDeletionHandler} from "../discussions/deletion";
 import { retentionFact } from "@/shared/chart-journal";
 import { awaitChartJournal } from "../charts/publication-journal";
@@ -347,14 +348,16 @@ export function createDeletionHandlers(
 ): readonly DeletionHandler[] {
   const chartModules = business.some(h => h.name === "charts") ? business : [...business, chartDeletionHandler];
   const modules = chartModules.some(h=>h.name===discussionDeletionHandler.name)?chartModules:[...chartModules,discussionDeletionHandler];
-  const names = new Set(modules.map((h) => h.name));
-  if (names.size !== modules.length || names.has("storage"))
+  const following = followingDeletionHandler(ctx);
+  const allModules = modules.some(h=>h.name===following.name)?modules:[...modules,following];
+  const names = new Set(allModules.map((h) => h.name));
+  if (names.size !== allModules.length || names.has("storage"))
     throw new Error("Duplicate deletion registration");
   names.add("storage");
   for (const reference of registry)
     if (!names.has(reference.deletionPartner))
       throw new Error("Missing file reference deletion partner");
-  return Object.freeze([...modules, createStorageDeletionHandler(ctx, registry)]);
+  return Object.freeze([...allModules, createStorageDeletionHandler(ctx, registry)]);
 }
 
 /** Retry only the user's CURRENT public association, never a captured old image/selection. */

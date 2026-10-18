@@ -89,6 +89,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
     };
     const sourceControl = {
       ...f.ctx,
+      exportChartJournal: async () => { await exportJournal(journal); },
       config: sourceControlConfig,
       driver: createS3Driver(sourceControlConfig),
     };

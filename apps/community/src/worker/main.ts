@@ -1,3 +1,4 @@
+import { registerFollowingWorker } from "@/server/following/notifications";
 import {registerDiscussionWorker} from "@/server/discussions/notifications";
 import { createStorageIOTracker } from "@/server/storage/maintenance";
 import { startStorageRole } from "@/server/storage/runtime-role";
@@ -80,6 +81,7 @@ function shutdown(signal: string): Promise<void> {
 superviseStorageRole(role.failure, () => shutdown("STORAGE_ROLE_LOST"), 70000);
 
 await registerDiscussionWorker(storage,boss);
+await registerFollowingWorker(storage,boss);
 const deletionHandlers = createDeletionHandlers(storage);
 await registerMediaPurgeWorker(storage, boss);
 await registerStorageWorkers(storage, boss);

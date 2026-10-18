@@ -28,6 +28,15 @@ export default function DashStatus({ loaderData: state }: Route.ComponentProps) 
         { label: m.dash_purge_incomplete(), value: state.queues.purgeIncomplete }, { label: m.dash_revoking(), value: state.queues.revoking },
         { label: m.dash_maintenance(), value: state.maintenance.active ? m.dash_maintenance_active() : m.dash_maintenance_idle() },
       ]} /></DashSection>
+      <DashSection title={m.following_status_title()}><DashFacts rows={[
+        {label:m.following_status_ready(),value:state.following?.ready?m.dash_ok():m.dash_unavailable()},
+        {label:m.following_status_pending(),value:state.following?.pendingEvents??m.dash_unknown()},
+        {label:m.following_status_delay(),value:state.following?.oldestPendingSeconds===null||!state.following?"—":`${state.following.oldestPendingSeconds.toFixed(1)}s`},
+        {label:m.following_status_controls(),value:state.following?.pendingControls??m.dash_unknown()},
+        {label:m.following_status_failures(),value:state.following?.failures??m.dash_unknown()},
+        {label:m.following_status_success(),value:dashDate(state.following?.lastSuccessAt??null)},
+        {label:m.following_status_failure(),value:dashDate(state.following?.lastFailureAt??null)},
+      ]}/></DashSection>
       <DashSection title={m.dash_journal()}><DashFacts rows={[
         { label: m.dash_exported_sequence(), value: state.journal.exportedSequence }, { label: m.dash_journal_pending(), value: state.journal.pending },
         { label: m.dash_exported_at(), value: dashDate(state.journal.exportedAt) },

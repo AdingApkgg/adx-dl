@@ -18,6 +18,7 @@ export type DeletionHandler = {
   name: string;
   beforeTransaction?(): Promise<void>;
   afterPurge?(userId: string): Promise<void>;
+  afterPrepare?(userId: string): Promise<void>;
   prepare?(userId: string, tx: DbTransaction): Promise<void>;
   restore?(userId: string, tx: DbTransaction): Promise<void>;
   hasContent(userId: string, db: Db): Promise<boolean>;
@@ -60,7 +61,7 @@ export async function requestDeletion(
   // 同一个值既写进 deletion_purge_at，也当任务的 startAfter。清除时以库里的值和数据库的时钟为准。
   const purgeAt = new Date(contents.some(Boolean) ? now + DELETION_COOLING_OFF_MS : now);
   try {
-    return await deps.db.transaction(async (tx) => {
+    const result = await deps.db.transaction(async (tx) => {
       await lockStorageMutation(tx);
       const marked = await tx
         .update(user)
@@ -89,6 +90,8 @@ export async function requestDeletion(
       }
       return { status: "requested", purgeAt } as const;
     });
+    if(result.status === "requested") for(const handler of deps.handlers) await handler.afterPrepare?.(userId);
+    return result;
   } catch (error) {
     if (error instanceof PurgeAlreadyQueued) {
       return { status: "conflict" };

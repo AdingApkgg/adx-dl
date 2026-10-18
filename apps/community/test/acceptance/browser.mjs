@@ -1,3 +1,4 @@
+import { exerciseFollowing } from "./following-browser.mjs";
 // Run only on a remote Linux runner against the isolated acceptance Compose project.
 // Playwright is installed outside the repository; no product dependency is needed.
 import assert from "node:assert/strict";
@@ -624,6 +625,7 @@ async function acceptance() {
     assert.equal(republished.status(), 409); assert.equal((await republished.json()).error.code, "CHART_MODERATED");
     await denied(anonymous, "/api/v1/charts/2", 404);
   });
+  await exerciseFollowing({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Following browser\n&inote_4=(120){4}1,2,E\n`)]])});
   assert.equal(diagnostics.filter(row => row.type === "pageerror").length, 0, "uncaught browser errors");
   assert.equal(diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length, 0, "hydration errors");
 }

@@ -1,3 +1,4 @@
+import { FollowAuthor } from "../components/follow-author";
 import {ChartDiscussion} from "../components/chart-discussion";
 import { DownloadIcon, PlayCircleIcon } from "lucide-react";
 import { ChartCommunityActions } from "../components/chart-community-actions";
@@ -60,6 +61,7 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
         {chart.author ? <Link to={localizeHref(`/u/${chart.author.publicId ?? chart.author.id}`)} state={returnState} className="flex items-center gap-2 underline">
           <Avatar image={chart.author.image} id={chart.author.id} name={chart.author.name} size={32} />{m.public_chart_author({ name: chart.author.name })}
         </Link> : <p>{m.public_chart_author({ name: m.public_chart_anonymous() })}</p>}
+        {chart.author?.publicId ? <FollowAuthor publicId={chart.author.publicId}/> : null}
         <p>{m.chart_version({ number: String(chart.ordinal) })} · {(chart.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p>
         <p className="break-all text-xs text-muted-foreground">{m.chart_publication_version_id({ id: chart.versionId })}</p>
         <time dateTime={chart.updatedAt}>{m.public_chart_updated({ date: chart.updatedAt.slice(0, 10) })}</time>
