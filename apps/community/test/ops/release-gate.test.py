@@ -1,4 +1,4 @@
-import copy, datetime as dt, importlib.util, json, os, pathlib, tempfile, time, unittest
+import copy, datetime as dt, importlib.util, json, os, pathlib, shlex, stat, tempfile, time, unittest
 from unittest.mock import patch
 
 SOURCE = pathlib.Path(__file__).resolve().parents[2]/'ops/release/await-acceptance.py'
@@ -90,5 +90,27 @@ class ReleaseGateTests(unittest.TestCase):
     old=self.env[key];self.env[key]=value
     with self.assertRaises(ValueError):self.invoke('--preflight')
     self.env[key]=old
+
+class ReleaseSourcePermissionsTests(unittest.TestCase):
+ def test_public_checkout_is_readable_while_release_context_and_env_stay_private(self):
+  with tempfile.TemporaryDirectory() as directory:
+   parent=pathlib.Path(directory);releases=parent/'releases';deployment=parent/'deployment';tools=parent/'tools'
+   run='a'*32;context=releases/run;context.mkdir(parents=True,mode=0o700);deployment.mkdir();(tools/'apps/community').mkdir(parents=True)
+   (context/'.owner').write_text(run);(context/'tools.json').write_text(json.dumps({'path':str(tools)}))
+   (deployment/'.env').write_text('FIXTURE_ONLY=value\n');(deployment/'.env').chmod(0o600)
+   (tools/'apps/community/deploy.sh').write_text('cd '+shlex.quote(str(deployment))+'\nprintf source > public.ts\nmkdir public-module\n')
+   source=(pathlib.Path(__file__).resolve().parents[4]/'scripts/remote/community-release-host.py').read_text().replace('/home/i/astrodx-community-releases',str(releases)).replace('/home/i/astrodx-dash-src/apps/community',str(deployment))
+   previous=os.umask(0o077)
+   try:
+    with patch('os.uname',return_value=os.uname_result(('Linux','arch','','',''))),patch('subprocess.check_output',return_value=''):
+     with self.assertRaises(SystemExit) as outcome:exec(compile(source,'community-release-host.py','exec'),{'task':dict(action='start',releaseId=run,mode='--no-pull',smokeSha256='b'*64,baseCommit='c'*40)})
+    self.assertEqual(outcome.exception.code,0)
+   finally:os.umask(previous)
+   self.assertEqual(stat.S_IMODE((deployment/'public.ts').stat().st_mode),0o644)
+   self.assertEqual(stat.S_IMODE((deployment/'public-module').stat().st_mode),0o755)
+   self.assertEqual(stat.S_IMODE((context/'deploy.log').stat().st_mode),0o600)
+   self.assertEqual(stat.S_IMODE(context.stat().st_mode),0o700)
+   self.assertEqual(stat.S_IMODE((deployment/'.env').stat().st_mode),0o600)
+   self.assertEqual((deployment/'.env').read_text(),'FIXTURE_ONLY=value\n')
 
 if __name__=='__main__':unittest.main()
