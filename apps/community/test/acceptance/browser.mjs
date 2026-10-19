@@ -99,7 +99,7 @@ function wav() {
   return bytes;
 }
 
-const steps = [], diagnostics = [];
+const steps = [], diagnostics = [], suiteFailures = [];
 let phase = "launch", browser, page, owner, other, anonymous, publicVisitor;
 const startedAt = Date.now();
 async function step(name, work) {
@@ -107,6 +107,15 @@ async function step(name, work) {
   await work();
   steps.push(name);
   console.log(`ACCEPTANCE_STEP_OK ${name}`);
+}
+// Independent synthetic journeys may collect failures together; none can turn a failed run green.
+async function independentSuite(name, work) {
+  try { await work(); return true; }
+  catch (error) {
+    suiteFailures.push({ suite: name, phase, error: sanitized(error.message) });
+    console.error(`ACCEPTANCE_SUITE_FAILED ${name}: ${sanitized(error.message)}`);
+    return false;
+  }
 }
 async function json(context, path, status = 200) {
   const response = await context.request.get(new URL(path, origin).href, { timeout: 10000 });
@@ -431,7 +440,7 @@ async function acceptance() {
       }
     }
   });
-  await exercisePlatform({ owner, other, anonymous, page, origin, chart: { ...publicChart, id: draft.id }, evidenceDirectory, step });
+  await independentSuite("platform", () => exercisePlatform({ owner, other, anonymous, page, origin, chart: { ...publicChart, id: draft.id }, evidenceDirectory, step }));
   await step("withdrawal_reauthorizes_all_old_asset_and_download_requests", async () => {
     await page.getByRole("button", { name: "撤回公开", exact: true }).click();
     const [withdrawn] = await Promise.all([
@@ -636,10 +645,11 @@ async function acceptance() {
     assert.equal(republished.status(), 409); assert.equal((await republished.json()).error.code, "CHART_MODERATED");
     await denied(anonymous, "/api/v1/charts/2", 404);
   });
-  await exerciseLibrary({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Library browser\n&inote_4=(120){4}1,2,E\n`)]])});
-  await exerciseFollowing({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Following browser\n&inote_4=(120){4}1,2,E\n`)]])});
-  await exerciseAuthor({owner,other,anonymous,origin,step,evidenceDirectory,zip:(label,next=false)=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Creator browser\n&inote_4=(120){4}${next?"1,(240)3,4":"1,2"},E\n`)]])});
-  await exerciseDiscovery({owner,other,anonymous,origin,step,evidenceDirectory});
+  await independentSuite("library", () => exerciseLibrary({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Library browser\n&inote_4=(120){4}1,2,E\n`)]])}));
+  await independentSuite("following", () => exerciseFollowing({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Following browser\n&inote_4=(120){4}1,2,E\n`)]])}));
+  const authorPassed = await independentSuite("author", () => exerciseAuthor({owner,other,anonymous,origin,step,evidenceDirectory,zip:(label,next=false)=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Creator browser\n&inote_4=(120){4}${next?"1,(240)3,4":"1,2"},E\n`)]])}));
+  if (authorPassed) await independentSuite("discovery", () => exerciseDiscovery({owner,other,anonymous,origin,step,evidenceDirectory}));
+  assert.deepEqual(suiteFailures, [], "all independent synthetic journeys must pass");
   assert.equal(diagnostics.filter(row => row.type === "pageerror").length, 0, "uncaught browser errors");
   assert.equal(diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length, 0, "hydration errors");
 }
@@ -653,7 +663,7 @@ try {
   if (evidenceDirectory) await writeFile(join(evidenceDirectory, "browser-result.json"), JSON.stringify(result, null, 2) + "\n", { mode: 0o600 });
   console.log("ACCEPTANCE_BROWSER_PASSED");
 } catch (error) {
-  const result = { status: "failed", phase, steps, elapsedMs: Date.now() - startedAt, error: sanitized(error.message), diagnostics: diagnostics.slice(-40) };
+  const result = { status: "failed", phase, steps, elapsedMs: Date.now() - startedAt, error: sanitized(error.message), suiteFailures, diagnostics: diagnostics.slice(-40) };
   if (evidenceDirectory) {
     await writeFile(join(evidenceDirectory, "browser-result.json"), JSON.stringify(result, null, 2) + "\n", { mode: 0o600 });
     const failedPage = phase === "anonymous_home_catalog_detail_lazy_native_preview_exact_zip" ? publicVisitor : page;
