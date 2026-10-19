@@ -141,6 +141,7 @@ export function formatTimestamp(ms: number) { return `${Math.floor(ms / 60000).t
 export function DiscussionSignIn() { const location = useLocation(); return <Link className={textLinkClass} to={loginHref(location.pathname + location.search)}>{m.social_login()}</Link>; }
 
 export function safeDiscussionHref(href: string | null): string | null {
+  if (href === "/me/library?view=reports") return `${localizeHref("/me/library")}?view=reports`;
   if (href === "/me/reports") return localizeHref("/me/reports");
   if (href === "/me/discussions?kind=reports") return `${localizeHref("/me/discussions")}?kind=reports`;
   if (!href || !/^\/(?:forum\/[1-9]\d{0,18}|charts\/[1-9]\d{0,18})(?:#message-[A-Za-z0-9_-]{1,100})?$/.test(href)) return null;
