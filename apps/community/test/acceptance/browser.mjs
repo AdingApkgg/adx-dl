@@ -368,6 +368,7 @@ async function acceptance() {
     await visitor.setViewportSize({ width: 1440, height: 900 });
     await latest.locator('a[href="/charts"]').click();
     await visitor.waitForURL(u => u.pathname === "/charts");
+    await visitor.getByRole("heading", { level: 1, name: "公开谱面", exact: true }).waitFor();
     await visitor.getByRole("link", { name: /CI private draft/ }).click();
     await visitor.getByRole("heading", { level: 1, name: "CI private draft", exact: true }).waitFor();
     assert.equal(new URL(visitor.url()).pathname, `/charts/${publicChart.publicId}`);
@@ -653,7 +654,8 @@ try {
   const result = { status: "failed", phase, steps, elapsedMs: Date.now() - startedAt, error: sanitized(error.message), diagnostics: diagnostics.slice(-40) };
   if (evidenceDirectory) {
     await writeFile(join(evidenceDirectory, "browser-result.json"), JSON.stringify(result, null, 2) + "\n", { mode: 0o600 });
-    if (page && !page.isClosed()) await page.screenshot({ path: join(evidenceDirectory, "browser-failure.png"), fullPage: true, timeout: 5000 }).catch(() => {});
+    const failedPage = phase === "anonymous_home_catalog_detail_lazy_native_preview_exact_zip" ? publicVisitor : page;
+    if (failedPage && !failedPage.isClosed()) await failedPage.screenshot({ path: join(evidenceDirectory, "browser-failure.png"), fullPage: true, timeout: 5000 }).catch(() => {});
   }
   console.error(`ACCEPTANCE_BROWSER_FAILED ${phase}: ${sanitized(error.message)}`);
   process.exitCode = 1;
