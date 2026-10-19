@@ -28,6 +28,7 @@ export default [
     route("lists/:id", "routes/public-list-detail.tsx"),
     route("me/favorites", "routes/favorites.tsx"),
     route("me/reports", "routes/my-reports.tsx"),
+    route("me/imports", "routes/imports.tsx"),
     route("me/charts", "routes/charts.tsx"),
     route("me/charts/new", "routes/chart-new.tsx"),
     route("me/charts/:id", "routes/chart-detail.tsx"),

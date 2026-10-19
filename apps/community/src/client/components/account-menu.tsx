@@ -1,3 +1,4 @@
+import {clearDeviceImports} from "../imports/provider";
 import {clearDeviceDownloads} from "../downloads/provider";
 import { Button } from "@astrodx/ui/components/button";
 import {
@@ -53,6 +54,7 @@ export function AccountMenu() {
       toast.error(errorMessage(error) ?? m.error_unknown());
       return;
     }
+    await clearDeviceImports();
     await clearDeviceDownloads();
     if (me) clearUploadRecords(me.id);
     window.location.assign(localizeHref("/"));

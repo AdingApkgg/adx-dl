@@ -1,3 +1,4 @@
+import {ImportProvider} from "../imports/provider";
 import {DownloadProvider} from "../downloads/provider";
 import {LibrarySelectionProvider} from "../components/library-selection";
 import { dehydrate, HydrationBoundary, type Query } from "@tanstack/react-query";
@@ -89,9 +90,9 @@ export function loader({ params, context }: Route.LoaderArgs) {
 export default function LocaleLayout({ loaderData }: Route.ComponentProps) {
   return (
     <HydrationBoundary state={loaderData.dehydratedState}>
-      <DownloadProvider><LibrarySelectionProvider><SiteShell>
+      <ImportProvider><DownloadProvider><LibrarySelectionProvider><SiteShell>
         <Outlet />
-      </SiteShell></LibrarySelectionProvider></DownloadProvider>
+      </SiteShell></LibrarySelectionProvider></DownloadProvider></ImportProvider>
     </HydrationBoundary>
   );
 }

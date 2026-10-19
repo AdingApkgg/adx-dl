@@ -1,96 +1,61 @@
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { useLocation } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import type { FileDto } from "@/shared/storage";
-import { getBrowserApi } from "../lib/browser";
+import { useImports } from "../imports/provider";
+import { ImportStore } from "../imports/store";
+import type { ImportSelection } from "../imports/model";
 import { accountErrorRedirect } from "../lib/account-errors";
 import { chartErrorMessage } from "../lib/chart-errors";
-import { packChartFolder, packChartParts, type ChartParts } from "../lib/chart-input";
-import { createUploadController, readUploadRecords, type UploadController, type UploadRecord, type UploadSnapshot } from "../lib/file-upload";
-import { storageApi } from "../queries/storage";
+import { type ChartParts } from "../lib/chart-input";
+import { readUploadRecords, type UploadRecord, type UploadSnapshot } from "../lib/file-upload";
 import { ChartSummary } from "./chart-summary";
 
 export function ChartUpload({ userId, onSave }: { userId: string; onSave: (file: FileDto) => Promise<void> }) {
   const id = useId();
   const location = useLocation();
-  const controller = useRef<UploadController | null>(null);
-  const packaging = useRef<AbortController | null>(null);
   const lifecycle = useRef(0);
-  const [state, setState] = useState<UploadSnapshot>({ phase: "idle", progress: 0 });
-  const [packing, setPacking] = useState(false);
+  const imports = useImports();
+  const [fallback] = useState(() => new ImportStore());
+  const fallbackSnapshot = useSyncExternalStore(fallback.subscribe, fallback.getSnapshot, fallback.getServerSnapshot);
+  const store = imports?.store ?? fallback, snapshot = imports?.snapshot ?? fallbackSnapshot;
+  const origin = `${location.pathname}${location.search}`;
+  const state: UploadSnapshot = snapshot.single?.origin === origin ? snapshot.single.state : {phase:"idle",progress:0};
   const [parts, setParts] = useState<ChartParts>({});
   const [pending, setPending] = useState(false);
   const [records, setRecords] = useState<UploadRecord[]>([]);
   const [resume, setResume] = useState<UploadRecord | null>(null);
   const [error, setError] = useState<unknown>();
   const handleError = (failure: unknown) => {
-    const target = accountErrorRedirect(failure, `${location.pathname}${location.search}`);
+    const target = accountErrorRedirect(failure, origin);
     if (target) window.location.assign(target); else setError(failure);
   };
   useEffect(() => {
-    lifecycle.current++;
-    let storage: Pick<Storage, "getItem" | "setItem" | "removeItem">;
-    try { storage = localStorage; } catch { storage = { getItem: () => null, setItem: () => {}, removeItem: () => {} }; }
-    setRecords(readUploadRecords(storage, userId, "chart-source"));
-    const upload = createUploadController({ purpose: "chart-source", api: storageApi(getBrowserApi()), userId, storage,
-      onState: (next) => {
-        setState(next); setRecords(readUploadRecords(storage, userId, "chart-source"));
-        if (next.error) {
-          const target = accountErrorRedirect(next.error, `${location.pathname}${location.search}`);
-          if (target) window.location.assign(target);
-        }
-      },
-    });
-    controller.current = upload;
-    return () => { lifecycle.current++; packaging.current?.abort(); upload.dispose(); controller.current = null; };
-  }, [userId, location.pathname, location.search]);
-  const busy = packing || pending || ["hashing", "uploading", "processing"].includes(state.phase);
-  async function choose(selection: { file: File } | { folder: File[] } | { parts: ChartParts }) {
-    setError(undefined);
-    const owner = lifecycle.current;
-    const aborter = new AbortController();
-    packaging.current?.abort(); packaging.current = aborter;
-    try {
-      setPacking(!("file" in selection));
-      const file = "parts" in selection ? await packChartParts(selection.parts, aborter.signal) :
-        "folder" in selection ? await packChartFolder(selection.folder, aborter.signal) : selection.file;
-      if (aborter.signal.aborted || owner !== lifecycle.current) return;
-      setPacking(false);
-      const record = resume; setResume(null);
-      if (record) await controller.current?.resume(file, record);
-      else await controller.current?.start(file);
-    } catch (failure) {
-      if (!aborter.signal.aborted && owner === lifecycle.current) handleError(failure);
-    } finally { if (owner === lifecycle.current) setPacking(false); }
+    if(!imports) void fallback.activate(userId);
+    return () => { if(!imports) fallback.halt(); };
+  }, [fallback, imports?.store, userId]);
+  useEffect(() => { lifecycle.current++; return () => { lifecycle.current++; }; }, [userId, origin]);
+  useEffect(() => { try { setRecords(readUploadRecords(localStorage,userId,"chart-source")); } catch {} }, [userId,state.phase,snapshot.busy]);
+  const packing = false;
+  const busy = snapshot.busy || pending || Boolean(snapshot.single && snapshot.single.origin !== origin);
+  async function choose(selection: ImportSelection) {
+    setError(undefined); const owner=lifecycle.current; const record=resume;setResume(null);
+    try { await store.runSingle(origin,selection,record??undefined); }
+    catch(failure) { if(owner===lifecycle.current)handleError(failure); }
   }
   async function discard() {
-    const owner = lifecycle.current;
-    packaging.current?.abort(); setPacking(false); setParts({}); setResume(null); setError(undefined);
-    setPending(true);
-    try {
-      if (state.file) {
-        await storageApi(getBrowserApi()).deleteFile(state.file.id);
-        if (state.uploadId) controller.current?.forget(state.uploadId);
-        setRecords((rows) => rows.filter((row) => row.uploadId !== state.uploadId));
-        if (owner === lifecycle.current) setState({ phase: "idle", progress: 0 });
-      } else await controller.current?.cancel();
-    } catch (failure) { if (owner === lifecycle.current) handleError(failure); }
-    finally { if (owner === lifecycle.current) setPending(false); }
+    const owner=lifecycle.current;setPending(true);setError(undefined);
+    try { await store.cancelSingle(origin);if(owner===lifecycle.current){setParts({});setResume(null);} }
+    catch(failure) { if(owner===lifecycle.current)handleError(failure); }
+    finally { if(owner===lifecycle.current)setPending(false); }
   }
   async function save() {
-    if (!state.file || state.phase !== "ready") return;
-    const owner = lifecycle.current; setPending(true); setError(undefined);
-    try {
-      await onSave(state.file);
-      if (owner !== lifecycle.current) return;
-      if (state.uploadId) controller.current?.forget(state.uploadId);
-      setRecords((rows) => rows.filter((row) => row.uploadId !== state.uploadId));
-      setState({ phase: "idle", progress: 0 });
-      setParts({});
-    } catch (failure) { if (owner === lifecycle.current) handleError(failure); }
-    finally { if (owner === lifecycle.current) setPending(false); }
+    const owner=lifecycle.current;setPending(true);setError(undefined);
+    try { await store.saveSingle(origin,onSave);if(owner===lifecycle.current)setParts({}); }
+    catch(failure) { if(owner===lifecycle.current)handleError(failure); }
+    finally { if(owner===lifecycle.current)setPending(false); }
   }
   const status = packing ? m.chart_packing() : state.phase === "processing" ? m.chart_processing() :
     state.phase === "hashing" ? m.avatar_hashing() : state.phase === "uploading" ? m.avatar_uploading() :

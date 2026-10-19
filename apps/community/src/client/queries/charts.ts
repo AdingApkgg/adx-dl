@@ -18,6 +18,8 @@ export function chartsApi(api: ApiClient) {
       okJson(await routes.$get({ query: { ...filters, ...(cursor ? { cursor } : {}) } }, { init: { signal } })),
     get: async (id: string, signal?: AbortSignal): Promise<ChartDto> =>
       okJson(await routes[":id"].$get({ param: { id } }, { init: { signal } })),
+    createOnce: async (fileId:string,signal:AbortSignal):Promise<ChartDto> => okJson(await routes.$post(undefined,json({fileId},signal))),
+    appendOnce: async (id:string,fileId:string,expectedRevision:number,signal:AbortSignal):Promise<ChartDto> => okJson(await routes[":id"].versions.$post({param:{id}},json({fileId,expectedRevision},signal))),
     create: (fileId: string): Promise<ChartDto> =>
       replayRequest(async () => okJson(await routes.$post(undefined, json({ fileId })))),
     append: (id: string, fileId: string, expectedRevision: number): Promise<ChartDto> =>
