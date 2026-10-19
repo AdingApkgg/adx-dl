@@ -14,7 +14,7 @@ const create = z.object({ fileId: z.string() }).strict();
 const append = create.extend({ expectedRevision: expected }).strict();
 const remove = z.object({ expectedRevision: expected }).strict();
 const patch = z.object({ expectedRevision: expected, title: z.string().optional(), artist: z.string().optional(),
-  description: z.string().optional(), credits: z.string().optional(), tags: z.array(z.string()).max(64).optional(),
+  description: z.string().optional(), credits: z.string().optional(), tags: z.array(z.string()).max(64).optional(), aliases: z.array(z.string()).max(64).optional(),
   releaseNote: z.object({ versionId: z.string(), text: z.string() }).strict().optional(), currentVersionId: z.string().optional() }).strict();
 function storage(c: Context<AppEnv>) {
   const ctx = c.get("services").storage;

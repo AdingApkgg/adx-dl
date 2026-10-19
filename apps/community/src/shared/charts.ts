@@ -31,7 +31,7 @@ export type ChartPackageInspection = {
   artifact: { path: string; size: number; sha256: string };
 };
 export type ChartTag = { key: string; label: string };
-export type ChartMetadata = { description: string; credits: string; tags: ChartTag[] };
+export type ChartMetadata = { aliases?: string[]; description: string; credits: string; tags: ChartTag[] };
 export type ChartVersionDto = {
   releaseNote: string;
   id: string;

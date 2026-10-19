@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { chartPlainText, normalizeChartTags } from "@/shared/chart-metadata";
+import { chartPlainText, normalizeChartAliases, normalizeChartTags } from "@/shared/chart-metadata";
 import { recordPermission, awaitChartJournal } from "./publication-journal";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
@@ -53,7 +53,7 @@ async function dto(db: DbTransaction, chart: Chart): Promise<ChartDto> {
   const [identity] = await db.select().from(chartPublicIds).where(eq(chartPublicIds.chartId, chart.id));
   return { publicId: identity?.publicId.toString() ?? null, publicationPending: chart.publicationSequence > (progress?.exportedSequence ?? 0),
     publication: publication ? publicationDto(publication) : null,
-    id: chart.id, title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits, tags: chart.tags, revision: chart.revision,
+    id: chart.id, title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits, tags: chart.tags, aliases: chart.aliases, revision: chart.revision,
     currentVersionId: chart.currentVersionId, versions, createdAt: chart.createdAt.toISOString(),
     updatedAt: chart.updatedAt.toISOString() };
 }
@@ -159,7 +159,7 @@ export async function listCharts(ctx: StorageContext, userId: string, input: { c
     publicId: identity?.publicId.toString() ?? null,
     publicationPending: chart.publicationSequence > (progress?.exportedSequence ?? 0),
     publication: publication ? publicationDto(publication) : null, id: chart.id,
-    title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits, tags: chart.tags, revision: chart.revision, currentVersionId: chart.currentVersionId!,
+    title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits, tags: chart.tags, aliases: chart.aliases, revision: chart.revision, currentVersionId: chart.currentVersionId!,
     summary, updatedAt: chart.updatedAt.toISOString() }));
   const last = page.at(-1)?.chart;
   const usage = await usageByPurpose(tx, userId, "chart-source");
@@ -168,16 +168,18 @@ export async function listCharts(ctx: StorageContext, userId: string, input: { c
     usage: { ...usage, quotaBytes: chartUploadRule.quota } };
   }, { isolationLevel: "repeatable read", accessMode: "read only" });
 }
-export type ChartPatch = { expectedRevision: number; title?: string; artist?: string; description?: string; credits?: string; tags?: string[]; releaseNote?: { versionId: string; text: string }; currentVersionId?: string };
+export type ChartPatch = { expectedRevision: number; title?: string; artist?: string; description?: string; credits?: string; tags?: string[]; aliases?: string[]; releaseNote?: { versionId: string; text: string }; currentVersionId?: string };
 export async function updateChart(ctx: StorageContext, userId: string, id: string, input: ChartPatch): Promise<ChartDto> {
   id = id.toLowerCase();
   revision(input.expectedRevision);
-  if ([input.title, input.artist, input.description, input.credits, input.tags, input.releaseNote, input.currentVersionId].every(value => value === undefined)) throw invalid();
+  if ([input.title, input.artist, input.description, input.credits, input.tags, input.aliases, input.releaseNote, input.currentVersionId].every(value => value === undefined)) throw invalid();
+  let aliases: string[] | undefined;
   let description: string | undefined, credits: string | undefined, tags: ReturnType<typeof normalizeChartTags> | undefined;
   try {
     if (input.description !== undefined) description = chartPlainText(input.description, 2000);
     if (input.credits !== undefined) credits = chartPlainText(input.credits, 1000);
     if (input.tags !== undefined) tags = normalizeChartTags(input.tags);
+    if (input.aliases !== undefined) aliases = normalizeChartAliases(input.aliases);
     if (input.releaseNote) chartPlainText(input.releaseNote.text, 1000);
   } catch { throw invalid(); }
   const title = input.title?.trim(), artist = input.artist?.trim();
@@ -200,7 +202,7 @@ export async function updateChart(ctx: StorageContext, userId: string, id: strin
       await tx.update(chartVersions).set({ releaseNote: input.releaseNote.text }).where(eq(chartVersions.id, version.id));
     }
     const now = await storageTime(tx);
-    const [saved] = await tx.update(charts).set({ ...(description !== undefined ? { description } : {}), ...(credits !== undefined ? { credits } : {}), ...(tags !== undefined ? { tags } : {}), ...(title !== undefined ? { title } : {}),
+    const [saved] = await tx.update(charts).set({ ...(description !== undefined ? { description } : {}), ...(credits !== undefined ? { credits } : {}), ...(tags !== undefined ? { tags } : {}), ...(aliases !== undefined ? { aliases } : {}), ...(title !== undefined ? { title } : {}),
       ...(artist !== undefined ? { artist } : {}), ...(input.currentVersionId !== undefined ? { currentVersionId: input.currentVersionId } : {}),
       revision: chart.revision + 1, updatedAt: now }).where(eq(charts.id, id)).returning();
     return dto(tx, saved);
@@ -296,6 +298,6 @@ export async function deleteChart(ctx: StorageContext, userId: string, id: strin
 }
 
 export function publicationDto(p: typeof chartPublications.$inferSelect) {
-  return { versionId: p.versionId, title: p.title, artist: p.artist, description: p.description ?? "", credits: p.credits ?? "", tags: p.tags ?? [], releaseNote: p.releaseNote ?? "",
+  return { versionId: p.versionId, title: p.title, artist: p.artist, description: p.description ?? "", credits: p.credits ?? "", tags: p.tags ?? [], aliases: p.aliases ?? [], releaseNote: p.releaseNote ?? "",
     publishedAt: p.publishedAt.toISOString(), updatedAt: p.updatedAt.toISOString() };
 }

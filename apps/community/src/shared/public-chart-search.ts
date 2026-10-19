@@ -1,32 +1,36 @@
 import { normalizeChartTags } from "./chart-metadata";
 import type { ChartDifficulty } from "./charts";
 import { isPublicUserId } from "./user-public-id";
-
-export type PublicChartSearchInput = { q?: string; difficulty?: string; sort?: string; author?: string; tag?: string };
-export type PublicChartFilters = { q: string; difficulty?: ChartDifficulty; sort: "updated" | "published"; author?: string; tag?: string };
-export const PUBLIC_CHART_SEARCH_MAX = 120;
-export function parsePublicChartFilters(input: PublicChartSearchInput = {}): PublicChartFilters {
-  // Bound before trim too, so padding cannot turn into an unbounded query.
-  if ((input.q?.length ?? 0) > PUBLIC_CHART_SEARCH_MAX * 2) throw new RangeError("Invalid search");
-  const q = (input.q ?? "").trim();
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: Deliberately reject control characters before storing untrusted text.
-  if (Array.from(q).length > PUBLIC_CHART_SEARCH_MAX || /[\u0000-\u001f\u007f]/u.test(q)) throw new RangeError("Invalid search");
-  const difficulty = input.difficulty || undefined, author = input.author || undefined, sort = input.sort || "updated";
-  if (difficulty !== undefined && !/^[1-7]$/.test(difficulty)) throw new RangeError("Invalid difficulty");
-  if (sort !== "updated" && sort !== "published") throw new RangeError("Invalid sort");
-  if (author !== undefined && !isPublicUserId(author)) throw new RangeError("Invalid author");
-  const tag = input.tag ? normalizeChartTags([input.tag])[0]?.key : undefined;
-  return { q, ...(tag ? { tag } : {}), ...(difficulty ? { difficulty: Number(difficulty) as ChartDifficulty } : {}), sort, ...(author ? { author } : {}) };
+export type PublicChartSearchInput = { q?:string; difficulty?:string;sort?:string;author?:string;tag?:string;tags?:string;levels?:string;designer?:string;minSeconds?:string;maxSeconds?:string;preview?:string };
+export type PublicChartFilters = {q:string;difficulty?:ChartDifficulty;sort:"updated"|"published"|"collected"|"title"|"relevance";author?:string;tag?:string;tags?:string[];levels?:string[];designer?:string;minSeconds?:number;maxSeconds?:number;preview?:boolean};
+export const PUBLIC_CHART_SEARCH_MAX=120;
+const fields=["q","difficulty","sort","author","tag","tags","levels","designer","minSeconds","maxSeconds","preview"] as const;
+function list(value:string|undefined,max:number,normalize:(s:string)=>string):string[]|undefined {
+ if(!value)return undefined;if(value.length>2048)throw new RangeError("Invalid filters");
+ const a:unknown=JSON.parse(value);if(!Array.isArray(a)||a.length>max||a.some(v=>typeof v!=="string"))throw new RangeError("Invalid filters");
+ return [...new Set((a as string[]).map(normalize))];
 }
-export function publicChartFiltersFromParams(params: URLSearchParams): PublicChartFilters {
-  return parsePublicChartFilters(Object.fromEntries(["q", "difficulty", "sort", "author", "tag"].map(key => [key, params.get(key) ?? undefined])));
+export function parsePublicChartFilters(input:PublicChartSearchInput={}):PublicChartFilters {
+ if((input.q?.length??0)>240)throw new RangeError("Invalid search");
+ const q=(input.q??"").trim();
+ if([...q].length>120||/[\u0000-\u001f\u007f\uD800-\uDFFF]/u.test(q))throw new RangeError("Invalid search");
+ const difficulty=input.difficulty||undefined,author=input.author||undefined,sort=input.sort||"updated";
+ if(difficulty!==undefined&&!/^[1-7]$/.test(difficulty)||author!==undefined&&!isPublicUserId(author)||!["updated","published","collected","title","relevance"].includes(sort))throw new RangeError("Invalid filters");
+ if(input.tag&&input.tags)throw new RangeError("Conflicting tag filters");
+ const tag=input.tag?normalizeChartTags([input.tag])[0]?.key:undefined;
+ const tags=list(input.tags,5,v=>normalizeChartTags([v])[0].key);
+ const normalize=(v:string)=>{const t=v.normalize("NFKC").trim().replace(/[A-Z]/g,c=>c.toLowerCase());if(!t||[...t].length>120||/[\p{Cc}\uD800-\uDFFF]/u.test(t))throw new RangeError("Invalid filter value");return t;};
+ const levels=list(input.levels,8,normalize),designer=input.designer?normalize(input.designer):undefined;
+ const seconds=(v:string|undefined)=>{if(v===undefined||v==="")return undefined;if(!/^(0|[1-9]\d{0,3})$/.test(v)||Number(v)>3600)throw new RangeError("Invalid duration");return Number(v);};
+ const minSeconds=seconds(input.minSeconds),maxSeconds=seconds(input.maxSeconds);
+ if(minSeconds!==undefined&&maxSeconds!==undefined&&minSeconds>maxSeconds||input.preview!==undefined&&input.preview!==""&&input.preview!=="1")throw new RangeError("Invalid filters");
+ return {q,sort:sort as PublicChartFilters["sort"],...(difficulty?{difficulty:Number(difficulty) as ChartDifficulty}:{}),...(author?{author}:{}),...(tag?{tag}:{}),...(tags?.length?{tags}:{}),...(levels?.length?{levels}:{}),...(designer?{designer}:{}),...(minSeconds!==undefined?{minSeconds}:{}),...(maxSeconds!==undefined?{maxSeconds}:{}),...(input.preview==="1"?{preview:true}:{})};
 }
-export function publicChartSearchParams(filters: PublicChartFilters): URLSearchParams {
-  const params = new URLSearchParams();
-  if (filters.q) params.set("q", filters.q);
-  if (filters.difficulty) params.set("difficulty", String(filters.difficulty));
-  if (filters.sort !== "updated") params.set("sort", filters.sort);
-  if (filters.tag) params.set("tag", filters.tag);
-  if (filters.author) params.set("author", filters.author);
-  return params;
+export function publicChartFiltersFromParams(params:URLSearchParams):PublicChartFilters {
+ for(const key of fields)if(params.getAll(key).length>1)throw new RangeError("Duplicate filter");
+ return parsePublicChartFilters(Object.fromEntries(fields.map(key=>[key,params.get(key)??undefined])));
+}
+export function publicChartSearchParams(filters:PublicChartFilters):URLSearchParams {
+ const p=new URLSearchParams();
+ for(const key of fields){const v=filters[key as keyof PublicChartFilters];if(v===undefined||v===""||key==="sort"&&v==="updated")continue;p.set(key,Array.isArray(v)?JSON.stringify(v):typeof v==="boolean"?"1":String(v));}return p;
 }

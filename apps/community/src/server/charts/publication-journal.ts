@@ -15,7 +15,7 @@ export async function recordPermission(
 ) {
   const [identity] = await tx.select().from(chartPublicIds).where(eq(chartPublicIds.chartId, chartId));
   const [moderation] = await tx.select().from(chartModerations).where(eq(chartModerations.chartId, chartId));
-  const payload = permissionFact.parse({ version: 1, chartId, revision, publication,
+  const payload = permissionFact.parse({ version: 2, chartId, revision, publication,
     ...(moderation ? { moderation: { revision: moderation.revision, actorId: moderation.actorId, actorPublicId: moderation.actorPublicId.toString(),
       reason: moderation.reason, createdAt: moderation.createdAt.toISOString(), publication: moderation.publication, author: moderation.author } } : {}),
     ...(identity ? { publicId: identity.publicId.toString() } : {}) });

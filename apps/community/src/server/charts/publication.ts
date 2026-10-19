@@ -57,7 +57,7 @@ export async function publishChart(
     if (
       p?.versionId === input.versionId.toLowerCase() &&
       p.title === chart.title &&
-      p.artist === chart.artist && p.description === chart.description && p.credits === chart.credits && JSON.stringify(p.tags) === JSON.stringify(chart.tags) && p.releaseNote === selectedVersion.releaseNote
+      p.artist === chart.artist && p.description === chart.description && p.credits === chart.credits && JSON.stringify(p.tags) === JSON.stringify(chart.tags) && JSON.stringify(p.aliases) === JSON.stringify(chart.aliases) && p.releaseNote === selectedVersion.releaseNote
     )
       return { chart, sequence: chart.publicationSequence };
     if (chart.revision !== input.expectedRevision || chart.revision >= 2147483647)
@@ -106,7 +106,7 @@ export async function publishChart(
       versionId: version.id,
       title: chart.title,
       artist: chart.artist,
-      description: chart.description, credits: chart.credits, tags: chart.tags, releaseNote: version.releaseNote,
+      description: chart.description, credits: chart.credits, tags: chart.tags, aliases: chart.aliases, releaseNote: version.releaseNote,
       publishedAt: p?.publishedAt ?? now,
       updatedAt: now,
     };

@@ -1737,3 +1737,17 @@ test("file-version publication switches close old comments and numeric forum ref
   expect((await createChartMessage(fixture.ctx, b, chart.publicId!, input)).body).toBeNull();
   expect(await relatedPublicCharts(fixture.ctx, chart.publicId!)).toEqual([]);
 });
+
+test("aliases remain private until explicit v2 publication and same-version updates preserve identity", async()=>{
+ const {updateChart}=await import('./service');const {publishChart,getPublicChart,withdrawChart}=await import('./publication');
+ const owner=await readyOwner(fixture.ctx);let c=await createChart(fixture.ctx,owner,(await chartFile(owner,{title:'Alias lifecycle'})).file.id);
+ c=await publishChart(fixture.ctx,owner,c.id,{expectedRevision:c.revision,versionId:c.currentVersionId,confirmOriginalArchive:true});
+ const version=c.currentVersionId,number=c.publicId,old=c.publication!;
+ c=await updateChart(fixture.ctx,owner,c.id,{expectedRevision:c.revision,aliases:[' ＡＢＣ ','日本語']});
+ expect((await getPublicChart(fixture.ctx,number!)).aliases).toEqual([]);
+ c=await publishChart(fixture.ctx,owner,c.id,{expectedRevision:c.revision,versionId:version,confirmOriginalArchive:true});
+ expect((await getPublicChart(fixture.ctx,number!)).aliases).toEqual(['ＡＢＣ','日本語']);
+ expect(c.currentVersionId).toBe(version);expect(c.publicId).toBe(number);expect(c.publication?.publishedAt).toBe(old.publishedAt);
+ await withdrawChart(fixture.ctx,owner,c.id,{expectedRevision:c.revision});
+ await expect(getPublicChart(fixture.ctx,number!)).rejects.toMatchObject({status:404});
+});
