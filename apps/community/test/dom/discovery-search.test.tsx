@@ -14,7 +14,7 @@ test('composition does not request suggestions and stale aborted requests cannot
  const input=screen.getByRole('combobox',{name:m.discovery_search_label()});
  fireEvent.focus(input);fireEvent.compositionStart(input);fireEvent.change(input,{target:{value:'日本語'}});await new Promise(r=>setTimeout(r,180));expect(requests).toEqual([]);
  fireEvent.compositionEnd(input,{data:'語'});await waitFor(()=>expect(requests).toEqual(['日本語']));
- fireEvent.keyDown(input,{key:'Escape'});expect(input.getAttribute('aria-expanded')).toBe('false');
+ const escapeEvent=new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true});fireEvent(input,escapeEvent);expect(escapeEvent.defaultPrevented).toBe(true);expect((input as HTMLInputElement).value).toBe('日本語');expect(input.getAttribute('aria-expanded')).toBe('false');
 });
 
  test('Escape and page suspension invalidate late suggestion responses',async()=>{

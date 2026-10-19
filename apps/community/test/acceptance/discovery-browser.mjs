@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {join} from 'node:path';
 import {enabled} from './browser-input.mjs';
 /** Continues the author upload flow; all mutations stay in the disposable native fixture. */
-export async function exerciseDiscovery({owner,other,anonymous,origin,step,evidenceDirectory}){
+export async function exerciseDiscovery({owner,other,anonymous,origin,step,evidenceDirectory,independentSuite}){
  const writer=await other.newPage(),reader=await owner.newPage(),errors=[];for(const p of [writer,reader])p.on('pageerror',e=>errors.push(e.name));const url=p=>new URL(p,origin).href;
  const get=async(context,path)=>{const r=await context.request.get(url(path));assert.equal(r.status(),200,path);return r.json();};
  let chart,alias='Discovery alias '+crypto.randomUUID(),listName='Discovery list '+crypto.randomUUID();
@@ -18,22 +18,22 @@ export async function exerciseDiscovery({owner,other,anonymous,origin,step,evide
   chart=await get(other,`/api/v1/me/charts/${chart.id}`);assert.equal(chart.publicId,before.number);assert.equal(chart.publication.versionId,before.version);assert.equal(chart.versions.find(v=>v.id===before.version).sourceFileId,before.source);
   const result=await get(anonymous,`/api/v1/search?type=charts&q=${encodeURIComponent(alias)}`);assert.equal(result.groups.charts.total,1);assert.equal(result.groups.charts.items[0].reason.kind,'alias');
  });
- await step('discovery_suggestions_same_slot_filters_share_and_library_actions',async()=>{
-  await reader.goto(url('/search'));const main=reader.locator('main'),input=main.getByRole('combobox',{name:'搜索公开内容',exact:true});await input.fill(alias);await main.getByRole('listbox').getByRole('link').first().waitFor();await input.press('Escape');await input.press('Enter');await reader.waitForURL(u=>u.pathname==='/search'&&u.searchParams.get('q')===alias);
+ await independentSuite('discovery_suggestions_same_slot_filters_share_and_library_actions',()=>step('discovery_suggestions_same_slot_filters_share_and_library_actions',async()=>{
+  await reader.goto(url('/search'));const main=reader.locator('main'),input=main.getByRole('combobox',{name:'搜索公开内容',exact:true});await input.fill(alias);await main.getByRole('listbox').getByRole('link').first().waitFor();await input.press('Escape');assert.equal(await input.inputValue(),alias,'Escape must close suggestions without clearing the query');await input.press('Enter');await reader.waitForURL(u=>u.pathname==='/search'&&u.searchParams.get('q')===alias);
   await reader.goto(url(`/search?${new URLSearchParams({q:alias,type:'charts',difficulty:'4',preview:'1',minSeconds:'0',maxSeconds:'3600'})}`));await main.getByRole('heading',{name:chart.publication.title,exact:true}).first().waitFor();
   const api=await get(anonymous,`/api/v1/search?${new URLSearchParams({q:alias,type:'charts',difficulty:'6',preview:'1'})}`);assert.equal(api.groups.charts.total,0);
   await reader.goto(url(`/charts/${chart.publicId}?difficulty=4&t=0.5`));const preview=reader.getByRole('region',{name:'公开谱面预览',exact:true});assert.equal(await preview.locator('canvas').count(),0);await preview.getByRole('button',{name:'加载预览',exact:true}).click();await enabled(preview.getByRole('button',{name:'播放',exact:true}));assert.equal(await preview.getByRole('button',{name:'暂停',exact:true}).count(),0);const seek=preview.getByRole('slider',{name:'拖动预览时间轴',exact:true});assert.ok(Number(await seek.inputValue())>=0.49);await preview.getByRole('button',{name:'分享当前难度与位置',exact:true}).waitFor();
   await reader.goto(url(`/search?${new URLSearchParams({q:alias,type:'charts'})}`));const clear=reader.getByRole('button',{name:'清除选择',exact:true});if(await clear.count())await clear.click();
   const checkbox=reader.locator('main').getByRole('checkbox').filter({visible:true});await checkbox.last().check();const bar=reader.locator('aside').filter({has:reader.getByRole('button',{name:'加入谱单',exact:true})});await bar.getByRole('button',{name:'加入谱单',exact:true}).click();await bar.getByLabel('谱单名称',{exact:true}).fill(listName);await bar.getByRole('button',{name:'加入 1 首',exact:true}).click();await bar.locator('a[href^="/me/lists/"]').waitFor();assert.equal((await get(owner,'/api/v1/me/lists')).items.some(l=>l.name===listName),true);await bar.getByRole('button',{name:'加入下载队列',exact:true}).waitFor();
   if(evidenceDirectory)await reader.screenshot({path:join(evidenceDirectory,'discovery-search-library.png'),fullPage:true});
- });
- await step('discovery_directories_languages_mobile_and_public_xml',async()=>{
+ }));
+ await independentSuite('discovery_directories_languages_mobile_and_public_xml',()=>step('discovery_directories_languages_mobile_and_public_xml',async()=>{
   for(const prefix of ['','/en','/ja'])for(const path of ['/discover','/authors','/tags','/search?type=lists','/search?type=topics']){await reader.goto(url(prefix+path));await reader.locator('main h1').waitFor();for(const width of [320,390,1280]){await reader.setViewportSize({width,height:900});assert.equal(await reader.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}}
   const bucket=((BigInt(chart.publicId)-1n)/1000n).toString();
   for(const path of ['/sitemap.xml',`/sitemaps/charts-${bucket}.xml`,'/feed.xml']){const r=await anonymous.request.get(url(path));assert.equal(r.status(),200);assert.match(r.headers()['cache-control'],/no-store/);const text=await r.text();if(path.startsWith('/sitemaps/'))assert.ok(text.includes(`<loc>${url(`/charts/${chart.publicId}`)}</loc>`));if(path==='/feed.xml'){let next='/api/v1/charts?sort=collected',expected=[];while(next&&expected.length<30){const p=await get(anonymous,next);expected.push(...p.items.map(c=>url(`/charts/${c.publicId}`)));next=p.nextCursor?'/api/v1/charts?sort=collected&cursor='+encodeURIComponent(p.nextCursor):null;}assert.deepEqual([...text.matchAll(/<guid isPermaLink="true">([^<]+)<\/guid>/g)].map(m=>m[1]),expected.slice(0,30));}}
 
- });
- await step('discovery_withdrawal_removes_suggestions_results_counts_and_xml',async()=>{
+ }));
+ await independentSuite('discovery_withdrawal_removes_suggestions_results_counts_and_xml',()=>step('discovery_withdrawal_removes_suggestions_results_counts_and_xml',async()=>{
   await reader.goto(url(`/search?${new URLSearchParams({q:alias,type:'charts'})}`));await reader.locator('main').getByRole('heading',{name:chart.publication.title,exact:true}).first().waitFor();await reader.goto(url('/help/search'));
   const r=await other.request.delete(url(`/api/v1/me/charts/${chart.id}/publication`),{headers:{origin:origin.origin},data:{expectedRevision:chart.revision}});assert.equal(r.status(),200);
   assert.equal((await get(anonymous,`/api/v1/search?type=charts&q=${encodeURIComponent(alias)}`)).groups.charts.total,0);
@@ -41,6 +41,6 @@ export async function exerciseDiscovery({owner,other,anonymous,origin,step,evide
   await reader.goBack();await reader.locator('main h1').waitFor();await reader.locator('main').getByRole('heading',{name:chart.publication.title,exact:true}).waitFor({state:'detached'});
   for(const path of ['/sitemaps/charts-0.xml','/feed.xml'])assert.equal((await (await anonymous.request.get(url(path))).text()).includes(`/charts/${chart.publicId}<`),false);
   assert.equal(errors.length,0);
- });
+ }));
  }finally{await writer.close();await reader.close();}
 }
