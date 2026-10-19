@@ -12,3 +12,22 @@ test("failed fresh identity validation leaves old-account imports suspended",asy
  render(<MemoryRouter><QueryClientProvider client={client}><ImportProvider><State/></ImportProvider></QueryClientProvider></MemoryRouter>);
  await waitFor(()=>expect(mock.activate).toHaveBeenCalledWith("a"));await act(async()=>mock.onChange!());await waitFor(()=>expect(client.getQueryState(["me"])?.fetchStatus).toBe("idle"));expect(screen.getByTestId("scope").textContent).toBe("suspended");
 });
+
+test("identity invalidation starts a new server read instead of accepting an older in-flight identity",async()=>{
+ let release!:(response:Response)=>void;let calls=0;
+ vi.stubGlobal("fetch",vi.fn(async()=>{calls++;if(calls===1)return new Promise<Response>(resolve=>{release=resolve;});return Response.json({id:"b",status:"active"});}));
+ const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:30000}}});client.setQueryData(["me"],{id:"a",status:"active"});
+ render(<MemoryRouter><QueryClientProvider client={client}><ImportProvider><State/></ImportProvider></QueryClientProvider></MemoryRouter>);
+ const older=client.refetchQueries({queryKey:["me"],exact:true});void older.catch(()=>{});
+ try{await waitFor(()=>expect(calls).toBe(1));await act(async()=>mock.onChange!());await waitFor(()=>expect(calls).toBe(2));await waitFor(()=>expect(mock.activate).toHaveBeenCalledWith("b"));}
+ finally{release(Response.json({id:"a",status:"active"}));await older;}
+ expect(client.getQueryData(["me"])).toMatchObject({id:"b"});
+});
+
+test("both device queues share the latest identity round without canceling each other's validation",async()=>{
+ const {refreshMe}=await import("@/client/queries/me"),{createApiClient}=await import("@/shared/api-client");let release!:(response:Response)=>void,calls=0;
+ vi.stubGlobal("fetch",vi.fn(async()=>{calls++;return calls===1?new Promise<Response>(resolve=>{release=resolve;}):Response.json({id:"b",status:"active"});}));
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}}),api=createApiClient("https://community.test");
+ const first=refreshMe(client,api);await waitFor(()=>expect(calls).toBe(1));const second=refreshMe(client,api);release(Response.json({id:"a",status:"active"}));
+ expect(await first).toMatchObject({id:"b"});expect(await second).toMatchObject({id:"b"});expect(calls).toBe(2);expect(client.getQueryData(["me"])).toMatchObject({id:"b"});
+});

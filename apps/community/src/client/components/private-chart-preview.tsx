@@ -57,13 +57,15 @@ function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectio
 
   const positionCallback = useRef(onPosition); positionCallback.current = onPosition;
   const initialSeek = useRef(initialPosition);
+  const appliedExternalSeek = useRef<number|null>(null);
   const discussionSeek = useRef<{ difficulty: ChartDifficulty; ms: number } | null>(null);
   useEffect(() => {
-    if (!externalSeek || !difficulty || exporting || !Number.isFinite(externalSeek.seconds) || externalSeek.seconds < 0 || externalSeek.seconds > duration) return;
+    if (!externalSeek || appliedExternalSeek.current===externalSeek.token || !difficulty || exporting || !Number.isFinite(externalSeek.seconds) || externalSeek.seconds < 0 || externalSeek.seconds > duration) return;
+    appliedExternalSeek.current=externalSeek.token;
     player.current?.pause(); setRange(null);setLoopEnabled(false);player.current?.setRange(null,false);
     if(opened && ready && player.current){player.current.seek(externalSeek.seconds);discussionSeek.current=null;}
     else{discussionSeek.current={difficulty,ms:externalSeek.seconds*1000};setOpened(true);}
-  }, [externalSeek?.token, difficulty, exporting]);
+  }, [externalSeek, difficulty, exporting, duration, opened, ready]);
   useEffect(() => {
     if (assetUrl === chartAssetUrl) return;
     const seek = (event: Event) => {

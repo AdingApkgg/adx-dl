@@ -1,3 +1,4 @@
+import {chooseFiles} from "./browser-input.mjs";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 /** Real disposable accounts; relationship and publication writes use visible controls. */
@@ -18,7 +19,7 @@ export async function exerciseFollowing({owner,other,anonymous,origin,step,zip,e
  }
  async function append(label){
   await writer.goto(url(`/me/charts/${chart.id}`));
-  await writer.getByLabel("选择 ADX / ZIP",{exact:true}).setInputFiles({name:"following-next.zip",mimeType:"application/zip",buffer:zip(label)});
+  await chooseFiles(writer.getByLabel("选择 ADX / ZIP",{exact:true}),{name:"following-next.zip",mimeType:"application/zip",buffer:zip(label)});
   await writer.getByRole("button",{name:"保存私有草稿",exact:true}).waitFor({timeout:90000});
   const next=await mutate(writer,`/api/v1/me/charts/${chart.id}/versions`,"POST",()=>writer.getByRole("button",{name:"保存私有草稿",exact:true}).click());
   chart=await publish(next);
@@ -31,7 +32,7 @@ export async function exerciseFollowing({owner,other,anonymous,origin,step,zip,e
    await reader.goto(url(`/u/${identity.publicId}`));
    const followed=await mutate(reader,relation,"PUT",()=>reader.getByRole("button",{name:"关注作者",exact:true}).click());assert.equal(followed.following,true);assert.equal(followed.notify,false);
    assert.equal((await get(owner,"/api/v1/me/following")).items.length,0);
-   await writer.goto(url("/me/charts/new"));await writer.getByLabel("选择 ADX / ZIP",{exact:true}).setInputFiles({name:"following.zip",mimeType:"application/zip",buffer:zip("Following browser release")});
+   await writer.goto(url("/me/charts/new"));await chooseFiles(writer.getByLabel("选择 ADX / ZIP",{exact:true}),{name:"following.zip",mimeType:"application/zip",buffer:zip("Following browser release")});
    await writer.getByRole("button",{name:"保存私有草稿",exact:true}).waitFor({timeout:90000});
    const draft=await mutate(writer,"/api/v1/me/charts","POST",()=>writer.getByRole("button",{name:"保存私有草稿",exact:true}).click());chart=await publish(draft);
    await reader.goto(url("/me/feed"));await reader.getByRole("heading",{level:2,name:"Following browser release",exact:true}).waitFor();

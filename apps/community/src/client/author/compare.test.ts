@@ -1,4 +1,5 @@
 import {expect,test} from "bun:test";
+import {analyzeMaidata} from "./analysis";
 import {compareStatements,compareFingerprints} from "./compare";
 const tokens=(values:string[])=>values.map((text,index)=>({text,start:index,end:index+1}));
 test("bounded diff retains stable anchors and reports complete insert/delete ranges",()=>{
@@ -15,4 +16,12 @@ test("different archive bytes with identical role hashes is not whole-package eq
  const left={versionId:"l",source:{sha256:"a".repeat(64),size:10},assets:{maidata:asset}};
  const result=compareFingerprints(left,{...left,versionId:"r",source:{sha256:"b".repeat(64),size:10}});
  expect(result).toMatchObject({archiveSame:false,previewSame:true});
+});
+
+test("analysis preserves empty comma timing units in the complete textual diff",()=>{
+ const left="&inote_4=(120){4}1,2,E",right="&inote_4=(120){4}1,,2,E";
+ const a=analyzeMaidata(left,4),b=analyzeMaidata(right,4);
+ const units=(source:string,result:typeof a)=>result.statements.map(s=>({text:source.slice(s.start,s.end),start:s.start,end:s.end}));
+ expect(b.statements.some(s=>right.slice(s.start,s.end)===",")).toBe(true);
+ const diff=compareStatements(units(left,a),units(right,b));expect(diff.complete).toBe(true);expect(diff.hunks.length).toBeGreaterThan(0);
 });

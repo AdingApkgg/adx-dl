@@ -18,3 +18,9 @@ test("empty header line and body-relative diagnostics receive full source offset
   parseSimaiChart(source, 4, { onDiagnostic: d => warnings.push(d) });
   expect(warnings.some(d => d.sourceStart === source.indexOf("wrong"))).toBe(true);
 });
+
+test("same-line diagnostics carry their actual statement offset rather than the first note on that line",()=>{
+ const source="&inote_4=(120)1,wrong,2,E",warnings:{code:string;sourceStart?:number}[]=[];
+ parseSimaiChart(source,4,{onDiagnostic:d=>warnings.push(d)});
+ expect(warnings.find(d=>d.code==="UNKNOWN_TOKEN")?.sourceStart).toBe(source.indexOf("wrong"));
+});

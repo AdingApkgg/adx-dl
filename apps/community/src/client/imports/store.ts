@@ -1,4 +1,4 @@
-import type {FileDto} from "@/shared/storage";
+import type {ChartDto} from "@/shared/charts";
 import type {WorkbenchPage} from "@/shared/author-workbench";
 import {ApiError} from "@/shared/api-client";
 import {getBrowserApi} from "../lib/browser";
@@ -9,59 +9,61 @@ import {storageApi,type StorageApi} from "../queries/storage";
 import {IMPORT_TTL,importFailure,selectionInfo,validatePlan,type ImportRow,type ImportSelection} from "./model";
 import * as persistence from "./persistence";
 import type {ImportScope,Executor} from "./persistence";
-export type ImportSnapshot={scope:string|null;rows:ImportRow[];persistent:boolean;capable:boolean;busy:boolean;failure:string|null;single:{origin:string;state:UploadSnapshot}|null};
+export type SingleSaveTarget={kind:"new"}|{kind:"append";id:string;expectedRevision:number};
+export type SingleCommit={signal:AbortSignal;assertActive:()=>Promise<void>};
+export type ImportSnapshot={scope:string|null;rows:ImportRow[];persistent:boolean;capable:boolean;busy:boolean;failure:string|null;single:{origin:string;state:UploadSnapshot;target?:SingleSaveTarget}|null};
 const empty:ImportSnapshot={scope:null,rows:[],persistent:false,capable:false,busy:false,failure:null,single:null};
 export class ImportStore {
  private snapshot:ImportSnapshot=empty;private listeners=new Set<()=>void>();private scope:ImportScope|null=null;private generation=0;private owner=crypto.randomUUID();
  private selections=new Map<string,ImportSelection>();private prepared=new Map<string,File>();private controller:UploadController|null=null;private active:AbortController|null=null;
- private executor:Executor|null=null;private database=false;private operation:Promise<unknown>|null=null;private channel:BroadcastChannel|null=null;private singleController:UploadController|null=null;
+ private executor:Executor|null=null;private database=false;private dirty=false;private onIdentity:(()=>void)|null=null;private operation:Promise<unknown>|null=null;private channel:BroadcastChannel|null=null;private singleController:UploadController|null=null;
  getSnapshot=()=>this.snapshot;getServerSnapshot=()=>empty;subscribe=(f:()=>void)=>{this.listeners.add(f);return()=>this.listeners.delete(f);};
  private emit(patch:Partial<ImportSnapshot>={}){this.snapshot={...this.snapshot,...patch,rows:[...(patch.rows??this.snapshot.rows)]};for(const f of this.listeners)f();}
- private check(g:number){if(g!==this.generation||!this.scope||this.active?.signal.aborted)throw Error("SCOPE_CHANGED");}
- private async fence(g:number){this.check(g);if(this.database&&this.executor)await persistence.fenceImportExecutor(this.scope!,this.executor);this.check(g);}
+ private check(g:number){if(g!==this.generation||!this.scope)throw Error("SCOPE_CHANGED");this.active?.signal.throwIfAborted();}
+ private async fence(g:number){this.check(g);if(this.database&&this.executor)try{await persistence.fenceImportExecutor(this.scope!,this.executor);}catch(error){if(error instanceof Error&&error.message==="SCOPE_CHANGED"){this.halt();this.onIdentity?.();}throw error;}this.check(g);}
  private async call<T>(g:number,fn:()=>Promise<T>):Promise<T>{await this.fence(g);const value=await fn();await this.fence(g);return value;}
- private async persist(g:number){await this.fence(g);if(this.database&&this.executor)try{await persistence.saveImportPlan(this.scope!,this.executor,this.snapshot.rows);}catch(e){this.check(g);if(e instanceof Error&&["SCOPE_CHANGED","EXECUTOR_BUSY"].includes(e.message))throw e;this.emit({persistent:false,failure:"PERSISTENCE"});}this.check(g);}
- connect(onIdentity:()=>void){
+ private async persist(g:number){await this.fence(g);if(this.database&&this.executor)try{await persistence.saveImportPlan(this.scope!,this.executor,this.snapshot.rows);this.dirty=false;this.emit({persistent:true});}catch(e){this.check(g);if(e instanceof Error&&["SCOPE_CHANGED","EXECUTOR_BUSY"].includes(e.message))throw e;this.dirty=true;this.emit({persistent:false,failure:"PERSISTENCE"});}this.check(g);}
+ connect(onIdentity:()=>void){this.onIdentity=onIdentity;
   const invalid=()=>{this.halt();onIdentity();};
   if(typeof BroadcastChannel==="function"){this.channel=new BroadcastChannel("adxc-import-identity");this.channel.onmessage=e=>{if(e.data?.kind==="identity")invalid();else if(e.data?.kind==="plan"&&!this.snapshot.busy)void this.refreshLocal();};}
   const storage=(e:StorageEvent)=>{if(e.key==="adxc-import-identity")invalid();};window.addEventListener("storage",storage);
   const offline=()=>this.pause();window.addEventListener("offline",offline);
-  return()=>{window.removeEventListener("storage",storage);window.removeEventListener("offline",offline);this.channel?.close();this.channel=null;this.halt();};
+  return()=>{window.removeEventListener("storage",storage);window.removeEventListener("offline",offline);this.channel?.close();this.channel=null;this.onIdentity=null;this.halt();};
  }
  private announceIdentity(){this.channel?.postMessage({kind:"identity"});try{localStorage.setItem("adxc-import-identity",crypto.randomUUID());}catch{}}
  async activate(owner:string|null){
   if(owner===this.scope?.scope)return;
-  this.halt();if(!owner)return;const g=this.generation;
-  this.emit({scope:owner});
-  try{const identity=await persistence.activateImportScope(owner);if(g!==this.generation)return;this.database=true;this.scope=identity;if(identity.changed)this.announceIdentity();const rows=await persistence.loadImportPlan(identity);this.check(g);this.emit({rows,persistent:true,capable:true});}
-  catch{if(g!==this.generation)return;this.database=false;this.scope={scope:owner,epoch:crypto.randomUUID()};this.emit({persistent:false,capable:!!navigator.locks?.request,failure:"PERSISTENCE"});}
+  const previous=this.scope;this.halt();
+  if(!owner){if(previous){await persistence.invalidateImportScope(previous).catch(()=>{});this.announceIdentity();}return;}const g=this.generation;
+  try{const identity=await persistence.activateImportScope(owner);if(g!==this.generation)return;this.database=true;this.scope=identity;if(identity.changed)this.announceIdentity();const rows=await persistence.loadImportPlan(identity);this.check(g);this.emit({scope:owner,rows,persistent:true,capable:true});}
+  catch(error){if(g!==this.generation)return;if(error instanceof Error&&["SCOPE_CHANGED","EXECUTOR_BUSY"].includes(error.message)){this.halt();this.onIdentity?.();return;}this.database=false;this.dirty=true;this.scope={scope:owner,epoch:crypto.randomUUID()};this.emit({scope:owner,persistent:false,capable:!!navigator.locks?.request,failure:"PERSISTENCE"});}
  }
- halt(){++this.generation;this.active?.abort();this.controller?.dispose();this.singleController?.dispose();this.scope=null;this.selections.clear();this.prepared.clear();this.controller=null;this.singleController=null;this.emit({...empty});}
- async clear(){this.halt();await persistence.activateImportScope(`cleared:${crypto.randomUUID()}`).catch(()=>{});this.announceIdentity();}
- private async refreshLocal(){const g=this.generation,scope=this.scope;if(!scope||!this.database)return;try{const rows=await persistence.loadImportPlan(scope);this.check(g);this.emit({rows});}catch{}}
+ halt(){++this.generation;this.active?.abort();this.controller?.dispose();this.singleController?.dispose();this.scope=null;this.dirty=false;this.selections.clear();this.prepared.clear();this.controller=null;this.singleController=null;this.emit({...empty});}
+ async clear(){const previous=this.scope;this.halt();if(previous)await persistence.invalidateImportScope(previous).catch(()=>{});this.announceIdentity();}
+ private async refreshLocal(){const g=this.generation,scope=this.scope;if(!scope||!this.database||this.dirty)return;try{const rows=await persistence.loadImportPlan(scope);this.check(g);this.emit({rows});}catch{}}
  private async execute<T>(fn:(g:number,signal:AbortSignal)=>Promise<T>,single=false):Promise<T>{
   if(this.snapshot.busy||this.operation)throw Error("EXECUTOR_BUSY");if(!this.scope)throw Error("SCOPE_CHANGED");if(!single&&!this.snapshot.capable)throw Error("PERSISTENCE");
   const g=this.generation,aborter=new AbortController();this.active=aborter;this.emit({busy:true,failure:null});
-  const run=async()=>{
-   const executor={owner:this.owner,token:crypto.randomUUID()};this.executor=executor;
+  const run=async(webLock=false)=>{
+   const executor:Executor={owner:this.owner,token:crypto.randomUUID(),...(webLock?{webLock:true as const}:{})};this.executor=executor;
    let timer:ReturnType<typeof setInterval>|undefined;
    try{
     if(this.database){if(!await persistence.claimImportExecutor(this.scope!,executor))throw Error("EXECUTOR_BUSY");timer=setInterval(()=>{void this.fence(g).catch(()=>aborter.abort());},5000);}
     await this.fence(g);return await fn(g,aborter.signal);
    }finally{clearInterval(timer);if(this.database)await persistence.releaseImportExecutor(executor).catch(()=>{});if(this.executor===executor)this.executor=null;}
   };
-  const operation=(navigator.locks?.request?navigator.locks.request("adxc-import-executor",{mode:"exclusive",ifAvailable:true},lock=>{if(!lock)throw Error("EXECUTOR_BUSY");return run();}):run());
+  const operation=(navigator.locks?.request?navigator.locks.request("adxc-import-executor",{mode:"exclusive",ifAvailable:true},lock=>{if(!lock)throw Error("EXECUTOR_BUSY");return run(true);}):run());
   this.operation=operation;
-  try{return await operation;}catch(error){if(g===this.generation){for(const row of this.snapshot.rows){if(["packing","hashing","queued","uploading","processing"].includes(row.phase))this.update(row,{phase:"paused",failure:importFailure(error)});else if(row.phase==="saving")this.update(row,{phase:"uncertain",failure:"RECONCILE_FIRST"});}this.emit({failure:importFailure(error)});}throw error;}
+  try{return await operation;}catch(error){if(g===this.generation&&error instanceof Error&&error.message==="SCOPE_CHANGED"){this.halt();this.onIdentity?.();}if(g===this.generation){for(const row of this.snapshot.rows){if(["packing","hashing","queued","uploading","processing"].includes(row.phase))this.update(row,{phase:"paused",failure:importFailure(error)});else if(row.phase==="saving")this.update(row,{phase:"uncertain",failure:"RECONCILE_FIRST"});}this.emit({failure:importFailure(error)});}throw error;}
   finally{if(this.operation===operation)this.operation=null;if(this.active===aborter)this.active=null;if(g===this.generation)this.emit({busy:false});this.channel?.postMessage({kind:"plan"});}
  }
- private async sync(g:number){if(!this.database)return;const stored=await persistence.loadImportPlan(this.scope!);this.check(g);const own=new Map(this.snapshot.rows.map(r=>[r.id,r]));this.emit({rows:stored.map(r=>own.has(r.id)?{...r,phase:own.get(r.id)!.phase,progress:own.get(r.id)!.progress}:r)});}
- async add(selections:ImportSelection[]){await this.execute(async(g)=>{await this.sync(g);if(this.snapshot.single&&this.snapshot.single.state.phase!=="idle")throw Error("BATCH_ACTIVE");let rows=this.snapshot.rows;if(rows.every(r=>["saved","cancelled"].includes(r.phase)))rows=[];const now=Date.now();const added=selections.map(selection=>{const info=selectionInfo(selection);if("file" in selection&&!/\.(adx|zip)$/i.test(selection.file.name))throw Error("TYPE_NOT_ALLOWED");return {id:crypto.randomUUID(),name:info.name.slice(0,240),size:info.size,rawSize:info.rawSize,createdAt:now,expiresAt:now+IMPORT_TTL,phase:"confirmation" as const,progress:0,target:null};});validatePlan([...rows,...added]);added.forEach((r,i)=>this.selections.set(r.id,selections[i]));this.emit({rows:[...rows,...added]});await this.persist(g);});}
+ private async sync(g:number){if(!this.database||this.dirty)return;const stored=await persistence.loadImportPlan(this.scope!);this.check(g);const own=new Map(this.snapshot.rows.map(r=>[r.id,r]));this.emit({rows:stored.map(r=>own.has(r.id)?{...r,phase:own.get(r.id)!.phase,progress:own.get(r.id)!.progress}:r)});}
+ async add(selections:ImportSelection[]){await this.execute(async(g)=>{await this.sync(g);if(this.snapshot.single&&this.snapshot.single.state.phase!=="idle")throw Error("BATCH_ACTIVE");let rows=this.snapshot.rows;if(rows.every(r=>["saved","cancelled"].includes(r.phase)))rows=[];const now=Date.now();const added=selections.map(selection=>{const info=selectionInfo(selection);if("file" in selection&&!/\.(adx|zip)$/i.test(selection.file.name))throw Error("TYPE_NOT_ALLOWED");return {id:crypto.randomUUID(),name:info.name.slice(0,240),size:info.size,rawSize:info.rawSize,inputKind:info.inputKind,createdAt:now,expiresAt:now+IMPORT_TTL,phase:"confirmation" as const,progress:0,target:null};});validatePlan([...rows,...added]);added.forEach((r,i)=>{this.selections.set(r.id,selections[i]);});this.emit({rows:[...rows,...added]});await this.persist(g);});}
  async map(id:string,target:{id:string;revision:number}|null){await this.execute(async g=>{await this.sync(g);const row=this.row(id);if(["saved","saving","uncertain","cancelled"].includes(row.phase))throw Error("RECONCILE_FIRST");const rows=this.snapshot.rows.map(r=>r.id===id?{...r,target,failure:undefined}:r);validatePlan(rows);this.emit({rows});await this.persist(g);});}
  private row(id:string){const row=this.snapshot.rows.find(r=>r.id===id);if(!row)throw Error("IMPORT_MISSING");if(row.expiresAt<=Date.now())throw Error("UPLOAD_EXPIRED");return row;}
  private update(row:ImportRow,patch:Partial<ImportRow>){Object.assign(row,patch);this.emit({rows:this.snapshot.rows.map(r=>r.id===row.id?{...row}:r)});}
  private async workbench(g:number,signal:AbortSignal){return this.call(g,()=>chartsApi(getBrowserApi()).workbench({},signal));}
- private checkCapacity(row:ImportRow,page:WorkbenchPage,all=false){
+ private checkCapacity(row:Pick<ImportRow,"target"|"fileId"|"uploadId"|"size">,page:WorkbenchPage,all=false){
   const targets=this.snapshot.rows.filter(r=>!["saved","cancelled"].includes(r.phase));
   if(row.target){const target=page.targets.find(t=>t.id===row.target!.id);if(!target)throw Error("NOT_FOUND");if(target.revision!==row.target.revision)throw Error("CHART_CHANGED");if(target.versionCount>=20)throw Error("CHART_VERSION_LIMIT");}
   else if(page.counts.total+(all?targets.filter(r=>!r.target).length:1)>50)throw Error("CHART_DRAFT_LIMIT");
@@ -126,7 +128,7 @@ export class ImportStore {
   if(row.fileId){const binding=await this.call(g,()=>chartsApi(getBrowserApi()).binding(row.fileId!,signal));if(binding.state!=="unbound"){this.update(row,{phase:binding.state==="bound"?"uncertain":"cancelled",failure:binding.state==="bound"?"RECONCILE_FIRST":"NOT_FOUND"});continue;}await this.call(g,()=>this.api(g).deleteFile(row.fileId!));}
   else if(row.uploadId){const upload=await this.call(g,()=>this.api(g).upload(row.uploadId!,signal));if(upload.fileId){row.fileId=upload.fileId;this.update(row,{phase:"uncertain",failure:"RECONCILE_FIRST"});await this.persist(g);continue;}await this.call(g,()=>this.api(g).cancel(row.uploadId!));}
   this.update(row,{phase:"cancelled",failure:undefined});this.selections.delete(id);this.prepared.delete(id);
- }catch(error){this.check(g);this.update(row,{failure:importFailure(error)});}await this.persist(g);}});}
+ }catch(error){this.check(g);this.update(row,{...(error instanceof ApiError&&error.status===404?{phase:"cancelled" as const}:{}),failure:importFailure(error)});}await this.persist(g);}});}
  async remove(id:string){await this.execute(async g=>{await this.sync(g);const row=this.row(id);if((row.uploadId||row.fileId)&&!["saved","cancelled"].includes(row.phase)||!["confirmation","queued","failed","paused","cancelled","saved"].includes(row.phase))throw Error("CANCEL_FIRST");this.selections.delete(id);this.prepared.delete(id);this.emit({rows:this.snapshot.rows.filter(r=>r.id!==id)});await this.persist(g);});}
  async runSingle(origin:string,selection:ImportSelection,record?:UploadRecord){await this.execute(async(g,signal)=>{
   if(this.snapshot.rows.some(r=>!["saved","cancelled"].includes(r.phase)))throw Error("BATCH_ACTIVE");
@@ -135,6 +137,31 @@ export class ImportStore {
   this.emit({single:{origin,state:{phase:"hashing",progress:0}}});const file=await this.pack(selection,signal);await this.fence(g);
   await this.upload(g,file,record,state=>this.emit({single:{origin,state}}));this.singleController=this.controller;
  },true);}
- async saveSingle(origin:string,fn:(file:FileDto)=>Promise<void>){await this.execute(async g=>{const single=this.snapshot.single;if(single?.origin!==origin||single.state.phase!=="ready"||!single.state.file)return;await this.call(g,()=>fn(single.state.file!));if(single.state.uploadId)this.singleController?.forget(single.state.uploadId);this.emit({single:null});},true);}
+ async saveSingle(origin:string,target:SingleSaveTarget,commit:(chart:ChartDto,operation:SingleCommit)=>Promise<void>){await this.execute(async(g,signal)=>{
+  const single=this.snapshot.single;if(single?.origin!==origin||single.state.phase!=="ready"||!single.state.file)return;
+  const intent=single.target??target,fileId=single.state.file.id,api=chartsApi(getBrowserApi());
+  this.emit({single:{...single,target:intent,state:{...single.state,error:undefined}}});
+  const bound=async()=>{
+   const binding=await this.call(g,()=>api.binding(fileId,signal));
+   if(binding.state==="unavailable")throw new ApiError(404,"NOT_FOUND","Source unavailable");
+   if(binding.state==="bound"){
+    if(intent.kind==="append"&&binding.chartId!==intent.id)throw new ApiError(409,"CHART_FILE_ASSIGNED","Source already assigned");
+    const chart=await this.call(g,()=>api.get(binding.chartId,signal));if(!chart.versions.some(v=>v.id===binding.versionId&&v.sourceFileId===fileId))throw new ApiError(404,"NOT_FOUND","Bound source unavailable");return chart;
+   }
+   return null;
+  };
+  try{
+   let chart=await bound();
+   if(!chart){
+    const page=await this.workbench(g,signal);
+    this.checkCapacity({fileId,size:single.state.file.size,target:intent.kind==="append"?{id:intent.id,revision:intent.expectedRevision}:null},page);
+    try{chart=await this.call(g,()=>intent.kind==="append"?api.appendOnce(intent.id,fileId,intent.expectedRevision,signal):api.createOnce(fileId,signal));}
+    catch(error){this.check(g);if(error instanceof ApiError&&error.status<500)throw error;chart=await bound();if(!chart)throw error;}
+   }
+   await this.fence(g);await commit(chart,{signal,assertActive:()=>this.fence(g)});await this.fence(g);
+   if(single.state.uploadId)this.singleController?.forget(single.state.uploadId);this.emit({single:null});
+  }catch(error){this.check(g);this.emit({single:{...single,target:intent,state:{...single.state,error}}});throw error;}
+ },true);}
+ async reconfirmSingle(origin:string){await this.execute(async(g,signal)=>{const single=this.snapshot.single;if(single?.origin!==origin||single.target?.kind!=="append")return;const page=await this.workbench(g,signal),target=page.targets.find(t=>t.id===(single.target as {id:string}).id);if(!target)throw Error("NOT_FOUND");this.emit({single:{...single,target:{kind:"append",id:target.id,expectedRevision:target.revision},state:{...single.state,error:undefined}}});},true);}
  async cancelSingle(origin:string){this.pause();await this.operation?.catch(()=>{});await this.execute(async(g,signal)=>{const single=this.snapshot.single;if(single?.origin!==origin)return;const state=single.state;if(state.file){const binding=await this.call(g,()=>chartsApi(getBrowserApi()).binding(state.file!.id,signal));if(binding.state!=="unbound")throw Error("RECONCILE_FIRST");await this.call(g,()=>this.api(g).deleteFile(state.file!.id));}else await this.singleController?.cancel();if(state.uploadId)this.singleController?.forget(state.uploadId);this.singleController?.dispose();this.singleController=null;this.emit({single:null});},true);}
 }

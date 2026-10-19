@@ -27,8 +27,8 @@ export function analyzeMaidata(source: string, difficulty: ChartDifficulty): Mai
   const chart=parseSimaiChart(normalized.text,difficulty,{maxNotes:100000,maxDurationMs:3600000,onDiagnostic:d=>warnings.push(d),onStatement:s=>{if(points.length<50000)points.push(s);else following=false;}});
   const timeline=TimingTimeline.fromChart(chart);
   for(const point of points){
-   if(point.sourceStart===undefined||point.sourceEnd===undefined||point.sourceEnd<=point.sourceStart)continue;
-   const start=normalized.offsets[point.sourceStart],last=normalized.offsets[point.sourceEnd-1],position=location(start);
+   if(point.sourceStart===undefined||point.sourceEnd===undefined||point.sourceEnd<point.sourceStart)continue;
+   const start=normalized.offsets[point.sourceStart],delimiter=normalized.text[point.sourceEnd]===",",last=normalized.offsets[delimiter?point.sourceEnd:point.sourceEnd-1],position=location(start);
    if(!position||last<start)continue;
    base.statements.push({start,end:last+1,line:position.line,column:position.column,seconds:timeline.msFromBeat(point.beat)/1000,beat:point.beat});
   }

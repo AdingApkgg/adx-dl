@@ -22,18 +22,19 @@ export async function listWorkbench(ctx:StorageContext,ownerId:string,input:Work
   if(!active)throw new StorageError(403,"ACCOUNT_INACTIVE");
   // Existing admission caps each owner at50 charts/20 versions. No media read or per-chart parsing.
   const rows=await tx.select({chart:charts,version:chartVersions,publication:chartPublications,identity:chartPublicIds,moderation:chartModerations,
+    publishedOrdinal:sql<number|null>`(select v.ordinal from chart_versions v where v.id=${chartPublications.versionId} and v.chart_id=${charts.id} and v.deleted_at is null)`,
     versionCount:sql<number>`(select count(*)::integer from chart_versions v where v.chart_id=${charts.id} and v.deleted_at is null)`})
    .from(charts).innerJoin(chartVersions,and(eq(chartVersions.id,charts.currentVersionId),eq(chartVersions.chartId,charts.id),isNull(chartVersions.deletedAt)))
    .leftJoin(chartPublications,eq(chartPublications.chartId,charts.id)).leftJoin(chartPublicIds,eq(chartPublicIds.chartId,charts.id))
    .leftJoin(chartModerations,eq(chartModerations.chartId,charts.id))
    .where(and(eq(charts.ownerId,ownerId),isNull(charts.deletedAt))).orderBy(desc(charts.updatedAt),desc(charts.id)).limit(50);
   const [progress]=await tx.select().from(storageJournalProgress).where(eq(storageJournalProgress.id,"global"));
-  const items:WorkbenchItem[]=rows.map(({chart,version,publication,identity,moderation,versionCount})=>{
+  const items:WorkbenchItem[]=rows.map(({chart,version,publication,identity,moderation,versionCount,publishedOrdinal})=>{
    const pub=publication?publicationDto(publication):null;
    const changed=!!pub&&(pub.versionId!==chart.currentVersionId||pub.title!==chart.title||pub.artist!==chart.artist||pub.description!==chart.description||pub.credits!==chart.credits||JSON.stringify(pub.tags)!==JSON.stringify(chart.tags)||pub.releaseNote!==version.releaseNote);
    return {id:chart.id,title:chart.title,artist:chart.artist,description:chart.description,credits:chart.credits,tags:chart.tags,revision:chart.revision,currentVersionId:chart.currentVersionId!,updatedAt:chart.updatedAt.toISOString(),publicId:identity?.publicId.toString()??null,
-    publication:pub,publicationPending:chart.publicationSequence>(progress?.exportedSequence??0),summary:version.summary,currentOrdinal:version.ordinal,versionCount:Number(versionCount),warningCount:version.summary.warnings.length,changed,moderated:!!moderation};
-  });
+    publication:pub,publicationPending:chart.publicationSequence>(progress?.exportedSequence??0),summary:version.summary,currentOrdinal:version.ordinal,publishedOrdinal:publishedOrdinal===null?null:Number(publishedOrdinal),versionCount:Number(versionCount),warningCount:version.summary.warnings.length,changed,moderated:!!moderation};
+  }).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)||b.id.localeCompare(a.id));
   const counts={total:items.length,private:items.filter(i=>!i.publication).length,published:items.filter(i=>i.publication).length,changed:items.filter(i=>i.changed).length,warnings:items.filter(i=>i.warningCount).length,pending:items.filter(i=>i.publicationPending).length,hidden:items.filter(i=>i.moderated).length};
   const filtered=items.filter(i=>(!q||`${i.title}\n${i.artist}`.toLocaleLowerCase().includes(q.toLocaleLowerCase()))&&(status==="all"||(status==="draft"&&!i.publication)||(status==="published"&&!!i.publication)||(status==="hidden"&&i.moderated))&&(!input.changed||i.changed)&&(!input.warnings||i.warningCount>0)&&(!input.pending||i.publicationPending));
   const after=cursor?filtered.filter(i=>i.updatedAt<cursor!.at||(i.updatedAt===cursor!.at&&i.id<cursor!.id)):filtered;

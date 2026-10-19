@@ -1,3 +1,4 @@
+import {clearDeviceImports} from "../imports/provider";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@astrodx/ui/components/card";
@@ -88,6 +89,7 @@ function DeletionContent() {
       setPending(false);
       return;
     }
+    await clearDeviceImports();
     if (me) clearUploadRecords(me.id);
     window.location.assign(localizeHref("/"));
   }

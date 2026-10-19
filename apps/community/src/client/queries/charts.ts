@@ -25,8 +25,8 @@ export function chartsApi(api: ApiClient) {
     append: (id: string, fileId: string, expectedRevision: number): Promise<ChartDto> =>
       replayRequest(async () => okJson(await routes[":id"].versions.$post({ param: { id } }, json({ fileId, expectedRevision })))),
     // PATCH is never automatically replayed after an ambiguous response; the editor fetches current state.
-    patch: async (id: string, body: ChartPatch): Promise<ChartDto> =>
-      okJson(await routes[":id"].$patch({ param: { id } }, json(body))),
+    patch: async (id: string, body: ChartPatch, signal?: AbortSignal): Promise<ChartDto> =>
+      okJson(await routes[":id"].$patch({ param: { id } }, json(body, signal))),
     // Publication mutations must be reconciled with GET, never automatically replayed.
     publish: async (id: string, expectedRevision: number, versionId: string): Promise<ChartDto> =>
       okJson(await routes[":id"].publication.$put({ param: { id } }, json({ expectedRevision, versionId, confirmOriginalArchive: true }))),

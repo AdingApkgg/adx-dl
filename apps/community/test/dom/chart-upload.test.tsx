@@ -22,12 +22,15 @@ test("validated chart stays unsaved until explicit Save, then recovery is cleare
     if (path.endsWith("/parts/0")) return new Response(null, { status: 204 });
     if (path.endsWith("/complete")) return Response.json({ id: "u", state: "ready", fileId: "f", receivedParts: [] });
     if (path === "/api/v1/uploads/u") return Response.json({ id: "u", state: "receiving", partSize: 4194304, partCount: 1, receivedParts: [{ index: 0, size: 3, sha256: "a".repeat(64) }] });
+    if(path === "/api/v1/me/charts/bindings/f")return Response.json({state:"unbound"});
+    if(path === "/api/v1/me/charts/workbench")return Response.json({counts:{total:0},targets:[],usage:{usedBytes:3,reservedBytes:0,quotaBytes:268435456}});
+    if(path === "/api/v1/me/charts")return Response.json({id:"chart",versions:[{id:"version",sourceFileId:"f"}]},{status:201});
     if (path === "/api/v1/files/f") return Response.json({ id: "f", purpose: "chart-source", name: "chart.zip", size: 3, state: "ready", chart: summary, createdAt: "" });
     throw new Error(`Unexpected ${init?.method} ${path}`);
   });
   vi.stubGlobal("fetch", fetcher);
   const save = vi.fn(async () => {});
-  render(<MemoryRouter><ChartUpload userId="alice" onSave={save} /></MemoryRouter>);
+  render(<MemoryRouter><ChartUpload userId="alice" onSaved={save} /></MemoryRouter>);
   fireEvent.change(screen.getByLabelText("选择 ADX / ZIP"), { target: { files: [new File(["zip"], "chart.zip", { type: "application/zip" })] } });
   await waitFor(() => expect(screen.getByRole("button", { name: "保存私有草稿" })).toBeTruthy());
   expect(save).not.toHaveBeenCalled();
@@ -46,7 +49,7 @@ test("ADX archives can be selected without renaming or changing their upload ide
     throw new Error("unexpected request");
   });
   vi.stubGlobal("fetch", fetcher);
-  render(<MemoryRouter><ChartUpload userId="alice" onSave={async () => {}} /></MemoryRouter>);
+  render(<MemoryRouter><ChartUpload userId="alice" onSaved={async () => {}} /></MemoryRouter>);
   const picker = screen.getByLabelText(/选择.*ZIP/);
   expect(picker.getAttribute("accept")).toContain(".adx");
   fireEvent.change(picker, { target: { files: [new File(["zip"], "single-chart.adx", { type: "application/octet-stream" })] } });
@@ -74,7 +77,7 @@ test("separate score/audio/cover/video wait for explicit assembly then upload on
     throw new Error(`Unexpected ${init?.method} ${path}`);
   });
   vi.stubGlobal("fetch", fetcher);
-  render(<MemoryRouter><ChartUpload userId="alice" onSave={async () => {}} /></MemoryRouter>);
+  render(<MemoryRouter><ChartUpload userId="alice" onSaved={async () => {}} /></MemoryRouter>);
   const submit = screen.getByRole("button", { name: "组装并上传" });
   expect(submit.hasAttribute("disabled")).toBe(true);
   fireEvent.change(screen.getByLabelText("谱面文件（必选）"), { target: { files: [new File(["&inote_4=(120)1,E"], "my-score.txt")] } });
@@ -86,6 +89,7 @@ test("separate score/audio/cover/video wait for explicit assembly then upload on
   for (const name of ["my-score.txt", "music.ogg", "picture.png"]) expect(screen.getByText(name)).toBeTruthy();
   expect(fetcher).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText(/背景视频/), { target: { files: [new File(["video-bytes"], "movie.mp4")] } });
+  await waitFor(() => expect((submit as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(submit);
   await waitFor(() => expect(screen.getByRole("button", { name: "保存私有草稿" })).toBeTruthy());
   const contents = unzipSync(uploaded!);

@@ -39,8 +39,8 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
   const setConfirmed = (value:boolean) => setConfirmedKey(value?confirmationKey:null);
   const [fingerprints,setFingerprints]=useState<{key:string;items:VersionFingerprint[];error:unknown}>({key:"",items:[],error:null});
   const fingerprintKey=JSON.stringify([chart.id,versionId,chart.publication?.versionId]);
-  useEffect(()=>{const aborter=new AbortController();setFingerprints({key:fingerprintKey,items:[],error:null});if(!versionId)return()=>aborter.abort();
-    void(async()=>{const api=chartsApi(getRenderApi()),items=[await api.fingerprint(chart.id,versionId,aborter.signal)];if(chart.publication?.versionId&&chart.publication.versionId!==versionId)items.unshift(await api.fingerprint(chart.id,chart.publication.versionId,aborter.signal));if(!aborter.signal.aborted)setFingerprints({key:fingerprintKey,items,error:null});})().catch(error=>{if(!aborter.signal.aborted)setFingerprints({key:fingerprintKey,items:[],error});});return()=>aborter.abort();
+  useEffect(()=>{const [chartId,versionId,publishedId]=JSON.parse(fingerprintKey) as [string,string,string|null];const aborter=new AbortController();setFingerprints({key:fingerprintKey,items:[],error:null});if(!versionId)return()=>aborter.abort();
+    void(async()=>{const api=chartsApi(getRenderApi()),items=[await api.fingerprint(chartId,versionId,aborter.signal)];if(publishedId&&publishedId!==versionId)items.unshift(await api.fingerprint(chartId,publishedId,aborter.signal));if(!aborter.signal.aborted)setFingerprints({key:fingerprintKey,items,error:null});})().catch(error=>{if(!aborter.signal.aborted)setFingerprints({key:fingerprintKey,items:[],error});});return()=>aborter.abort();
   },[fingerprintKey]);
   const [withdrawing, setWithdrawing] = useState(false);
   const [reconcile, setReconcile] = useState(false);

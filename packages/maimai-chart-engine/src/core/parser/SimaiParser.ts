@@ -45,7 +45,7 @@ export class ParseLimitError extends Error {
 interface ParseBudget {
   maxNotes: number;
   checkDuration: (milliseconds: number) => void;
-  diagnostic: (code: string, line?: number) => void;
+  diagnostic: (code: string, line?: number, bodyOffset?: number) => void;
   statement?: (start: number, end: number, line: number, beat: number) => void;
 }
 
@@ -250,9 +250,9 @@ export function parseSimaiChart(simaiText: string, difficulty?: ChartDifficulty,
       return span.start + offset - spanStarts[index];
     };
     let diagnosticCount = 0;
-    const diagnostic = (code: string, line?: number) => {
+    const diagnostic = (code: string, line?: number, bodyOffset?: number) => {
       if (!options?.onDiagnostic) return;
-      if (diagnosticCount < 63) options.onDiagnostic({ code, ...(line === undefined ? {} : { line, sourceStart: sourceOffset(bodyLineOffsets[line - 1] ?? -1) }) });
+      if (diagnosticCount < 63) options.onDiagnostic({ code, ...(line === undefined ? {} : { line, sourceStart: sourceOffset(bodyOffset ?? bodyLineOffsets[line - 1] ?? -1) }) });
       else if (diagnosticCount === 63) options.onDiagnostic({ code: "WARNINGS_TRUNCATED" });
       diagnosticCount++;
     };
@@ -546,7 +546,7 @@ function parseNotes(chartBody: string, initialBpm: number, budget?: ParseBudget)
 
         if (budget && !parsedNotes.length && noteStr !== "E") {
           const outOfRange = /^\d+[hbx$]*($|\[)/i.test(noteStr) || /^([ABDE]\d+|C\d+)[hbfx]*(\[.*\])?$/i.test(noteStr);
-          budget.diagnostic(outOfRange ? "NOTE_OUT_OF_RANGE" : "UNKNOWN_TOKEN", startLine);
+          budget.diagnostic(outOfRange ? "NOTE_OUT_OF_RANGE" : "UNKNOWN_TOKEN", startLine, startPos);
         }
         if (budget) {
           if (notes.length + parsedNotes.length > budget.maxNotes) throw new ParseLimitError();
@@ -554,8 +554,8 @@ function parseNotes(chartBody: string, initialBpm: number, budget?: ParseBudget)
             let endMs = note.timingMs;
             if (note.type === "slide") {
               for (let i = 0; i < (note.allDurationMs?.length ?? 1); i++) endMs = Math.max(endMs, note.timingMs + (note.allDelayMs?.[i] ?? note.delayMs ?? 0) + (note.allDurationMs?.[i] ?? note.durationMs ?? 0));
-              if (note.allSlideSegments?.some((segments) => segments.some((segment) => segment.endPos < 1 || segment.endPos > 8 || (segment.midPos !== undefined && (segment.midPos < 1 || segment.midPos > 8))))) budget.diagnostic("NOTE_OUT_OF_RANGE", startLine);
-              if (!note.slideSegments?.length) budget.diagnostic("UNKNOWN_TOKEN", startLine);
+              if (note.allSlideSegments?.some((segments) => segments.some((segment) => segment.endPos < 1 || segment.endPos > 8 || (segment.midPos !== undefined && (segment.midPos < 1 || segment.midPos > 8))))) budget.diagnostic("NOTE_OUT_OF_RANGE", startLine, startPos);
+              if (!note.slideSegments?.length) budget.diagnostic("UNKNOWN_TOKEN", startLine, startPos);
             } else if ("isHoldStart" in note && note.isHoldStart && "duration" in note) endMs += note.duration * 60000 / note.bpm;
             budget.checkDuration(endMs + 240000 / (firstBpm ?? initialBpm));
           }

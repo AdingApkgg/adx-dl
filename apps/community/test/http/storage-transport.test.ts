@@ -21,7 +21,7 @@ import { startBuiltServer, HTTP_TEST_AUTH_SECRET } from "./server";
 const hash = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
 /** Deliberately paced object HTTP fixture: actual built web, Node adapter, auth and PostgreSQL permissions. */
 test("built Node server streams known lengths, backpressures, cancels private disconnect/public drain, and closes its only public listener", async () => {
-  const original = randomBytes(8388608),
+  const original = randomBytes(33554432),
     output = randomBytes(524288),
     sha = hash(original),
     outSha = hash(output);
@@ -177,17 +177,25 @@ test("built Node server streams known lengths, backpressures, cancels private di
         resolve(res);
       }).on("error", reject);
     });
-    const before = sent;
-    await Bun.sleep(1400);
-    const after = sent;
-    await Bun.sleep(300);
-    expect(after - before).toBeLessThan(original.length);
-    expect(sent - after).toBeLessThan(1048576);
+    // Exceed loopback socket buffering; a small response may reach EOF while the client is paused.
+    const canceledBefore = canceled;
+    let lastSent = sent, stableSince = Date.now();
+    const deadline = Date.now() + 8000;
+    while (Date.now() < deadline && Date.now() - stableSince < 400) {
+      await Bun.sleep(50);
+      if (sent !== lastSent) { lastSent = sent; stableSince = Date.now(); }
+    }
+    expect(active).toBe(1); // EOF cannot masquerade as backpressure.
+    expect(Date.now() - stableSince).toBeGreaterThanOrEqual(400);
     paused.destroy();
+    for (let i = 0; i < 50 && canceled === canceledBefore; i++) await Bun.sleep(20);
+    expect(canceled).toBe(canceledBefore + 1);
     const cut = await fetch(privateUrl, { headers: { cookie } });
     const reader = cut.body!.getReader();
     await reader.read();
     await reader.cancel();
+    for (let i = 0; i < 50 && canceled === canceledBefore + 1; i++) await Bun.sleep(20);
+    expect(canceled).toBe(canceledBefore + 2);
     // Keep this response in flight even if the revocation transaction takes longer than EOF.
     const publicCanceledBefore = publicCanceled;
     const internal = Number(new URL(server.origin).port) + 10000;

@@ -5,9 +5,8 @@ import { localizeHref } from "@/paraglide/runtime.js";
 import { queryClientContext } from "@/shared/router-context";
 import { ChartUpload } from "../components/chart-upload";
 import { PageTitle, textLinkClass } from "../components/page-title";
-import { getBrowserApi, getRenderApi } from "../lib/browser";
+import { getRenderApi } from "../lib/browser";
 import { requireUser } from "../lib/require-user";
-import { chartsApi } from "../queries/charts";
 import { meQuery } from "../queries/me";
 import type { Route } from "./+types/chart-new";
 export async function loader({ context, url }: Route.LoaderArgs) {
@@ -24,8 +23,8 @@ function NewChart() {
   if (!me) return null;
   return <main className="space-y-6">
     <PageTitle description={m.charts_private_hint()}>{m.chart_new()}</PageTitle>
-    <ChartUpload userId={me.id} onSave={async (file) => {
-      const chart = await chartsApi(getBrowserApi()).create(file.id);
+    <ChartUpload userId={me.id} onSaved={async (chart, operation) => {
+      await operation.assertActive();
       await navigate(localizeHref(`/me/charts/${chart.id}`));
     }} />
     <Link to={localizeHref("/me/charts")} className={textLinkClass}>{m.charts_title()}</Link>

@@ -269,7 +269,7 @@ try {
         await json(`/api/v1/me/charts/${chart.id}/versions/${missing}/fingerprint`,404);
         if(chart.versions.length>=2){await visit(`/me/charts/${chart.id}/compare?left=${chart.versions[1].id}&right=${version.id}`);await page.getByRole('heading',{level:2,name:'只读 Simai 源码',exact:true}).first().waitFor({timeout:30000});authorCoverage.compare='existing-owned-pair';}
         else{const denied=await page.goto(origin+`/me/charts/${chart.id}/compare?left=${missing}&right=${version.id}`,{waitUntil:'domcontentloaded'});assert.equal(denied.status(),404);authorCoverage.compare='no-second-version-valid-missing-id-denied';}
-      }else{authorCoverage.review='no-owned-version-missing-id-denied';authorCoverage.compare='no-owned-pair-missing-id-denied';}
+      }else{for(const suffix of ['review','compare']){const denied=await page.goto(origin+`/me/charts/${missing}/${suffix}`,{waitUntil:'domcontentloaded'});assert.equal(denied.status(),404);}authorCoverage.review='no-owned-version-missing-id-denied';authorCoverage.compare='no-owned-pair-missing-id-denied';}
     });
     await step('production_dashboard_permissions_and_pages', async () => {
       if (role === 'user') { await json('/api/v1/dash/access', 403); return; }

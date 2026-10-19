@@ -16,7 +16,7 @@ export async function readBoundedSource(url:string,signal:AbortSignal){
 }
 export function useAuthorAnalysis(account:string|null,chart:string,versions:string[],difficulty:ChartDifficulty){
  const key=JSON.stringify({account,chart,versions,difficulty}),[state,setState]=useState<{key:string;data:AuthorAnalysis|null;error:unknown}>({key,data:null,error:null}),[retry,setRetry]=useState(0);
- useEffect(()=>{const aborter=new AbortController();setState({key,data:null,error:null});if(!account||!versions.length||versions.length>2)return()=>aborter.abort();
+ useEffect(()=>{const {account,chart,versions,difficulty}=JSON.parse(key) as {account:string|null;chart:string;versions:string[];difficulty:ChartDifficulty};const aborter=new AbortController();setState({key,data:null,error:null});if(!account||!versions.length||versions.length>2)return()=>aborter.abort();
   void(async()=>{const api=chartsApi(getBrowserApi()),fingerprints:VersionFingerprint[]=[],sources:string[]=[];
    for(const version of versions){fingerprints.push(await api.fingerprint(chart,version,aborter.signal));sources.push(await readBoundedSource(chartAssetUrl(chart,version,"maidata"),aborter.signal));}
    aborter.signal.throwIfAborted();const identity={account,chart,versions,hashes:fingerprints.map(f=>f.assets.maidata?.sha256??""),difficulty,algorithm:1 as const};
