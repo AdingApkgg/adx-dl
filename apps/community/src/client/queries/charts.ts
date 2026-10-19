@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { type ApiClient, expectOk, okJson } from "@/shared/api-client";
+import type { WorkbenchFilters, WorkbenchPage, VersionFingerprint, SourceBinding } from "@/shared/author-workbench";
 import type { ChartAssetRole, ChartDto, ChartsPageDto } from "@/shared/charts";
 import { replayRequest } from "./storage";
 
@@ -10,6 +11,9 @@ export function chartsApi(api: ApiClient) {
     headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal,
   } });
   return {
+    workbench: async (filters: WorkbenchFilters = {}, signal?: AbortSignal): Promise<WorkbenchPage> => okJson(await routes.workbench.$get({ query: {q:filters.q,status:filters.status,cursor:filters.cursor,changed:filters.changed?"1":undefined,warnings:filters.warnings?"1":undefined,pending:filters.pending?"1":undefined} }, {init:{signal}})),
+    binding: async (fileId: string, signal?: AbortSignal): Promise<SourceBinding> => okJson(await routes.bindings[":fileId"].$get({param:{fileId}},{init:{signal}})),
+    fingerprint: async (id:string,versionId:string,signal?:AbortSignal):Promise<VersionFingerprint> => okJson(await routes[":id"].versions[":versionId"].fingerprint.$get({param:{id,versionId}},{init:{signal}})),
     list: async (cursor?: string, signal?: AbortSignal, filters: { q?: string; status?: string } = {}): Promise<ChartsPageDto> =>
       okJson(await routes.$get({ query: { ...filters, ...(cursor ? { cursor } : {}) } }, { init: { signal } })),
     get: async (id: string, signal?: AbortSignal): Promise<ChartDto> =>
@@ -45,3 +49,5 @@ export const chartQuery = (api: ApiClient, id: string) => queryOptions({
 export function chartAssetUrl(id: string, versionId: string, role: ChartAssetRole): string {
   return `/api/v1/me/charts/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/assets/${role}`;
 }
+
+export const workbenchQuery=(api:ApiClient,ownerId:string,filters:WorkbenchFilters={})=>queryOptions({queryKey:["me","author-workbench",ownerId,filters] as const,queryFn:({signal})=>chartsApi(api).workbench(filters,signal)});

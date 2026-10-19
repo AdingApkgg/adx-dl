@@ -260,3 +260,24 @@ test("private list cursor binds owner and filters and cannot be reused for anoth
   await expect(listCharts(ctx, otherId, { q: "Search", status: "draft", cursor: first.nextCursor! })).rejects.toMatchObject({ status: 400 });
   await expect(listCharts(ctx, ownerId, { limit: 21 })).rejects.toMatchObject({ status: 400 });
 });
+
+// Author projections use the same isolated storage fixture, not production data.
+test("author workbench and fingerprints are bounded, owner-only and reconcile bindings", async () => {
+ const { listWorkbench, versionFingerprint, sourceBinding } = await import("./workbench");
+ const {ctx}=fixture,id=await owner(),other=await owner(),source=await chartFile(id,{title:"Workbench"});
+ const chart=await createChart(ctx,id,source.file.id);
+ const page=await listWorkbench(ctx,id,{});
+ expect(page.counts).toMatchObject({total:1,private:1,published:0});
+ expect(page.items[0]).toMatchObject({id:chart.id,versionCount:1,warningCount:0});
+ expect((await listWorkbench(ctx,id,{warnings:true})).items).toHaveLength(0);
+ const fingerprint=await versionFingerprint(ctx,id,chart.id,chart.currentVersionId);
+ expect(fingerprint.source.sha256).toBe(source.blob.sha256);
+ expect(fingerprint.assets.maidata?.size).toBeGreaterThan(0);
+ expect(JSON.stringify(fingerprint)).not.toContain("sha256/");
+ expect(await sourceBinding(ctx,id,source.file.id)).toEqual({state:"bound",chartId:chart.id,versionId:chart.currentVersionId});
+ await expect(versionFingerprint(ctx,other,chart.id,chart.currentVersionId)).rejects.toMatchObject({status:404});
+ await expect(sourceBinding(ctx,other,source.file.id)).rejects.toMatchObject({status:404});
+ await deleteChart(ctx,id,chart.id,chart.revision);
+ expect((await listWorkbench(ctx,id,{})).counts.total).toBe(0);
+ expect(await sourceBinding(ctx,id,source.file.id)).toEqual({state:"unavailable"});
+});
