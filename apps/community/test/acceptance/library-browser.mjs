@@ -8,7 +8,7 @@ export async function exerciseLibrary({owner,other,anonymous,origin,step,zip,evi
  const mutate=async(page,path,method,action)=>{const [r]=await Promise.all([page.waitForResponse(r=>new URL(r.url()).pathname===path&&r.request().method()===method,{timeout:60000}),action()]);assert.ok(r.ok(),`${method} ${path}: ${r.status()}`);return r.json();};
  const original=zip('Library browser original');let chart,list,copied;
  async function readyQueue(page){await page.getByRole('link',{name:'查看下载队列',exact:true}).click();await page.getByText('已校验，等待保存',{exact:false}).waitFor({timeout:60000});}
- async function enqueue(page){await page.getByRole('button',{name:'加入下载队列',exact:true}).click();await readyQueue(page);}
+ async function enqueue(page){await page.getByRole('button',{name:'加入下载队列',exact:true}).click();await page.getByRole('button',{name:'确认加入并开始',exact:true}).click();await readyQueue(page);}
  try{
  await step('library_private_editor_explicit_publication_and_copy',async()=>{
   await writer.goto(url('/me/charts/new'));await writer.getByLabel('选择 ADX / ZIP',{exact:true}).setInputFiles({name:'library.zip',mimeType:'application/zip',buffer:original});await writer.getByRole('button',{name:'保存私有草稿',exact:true}).waitFor({timeout:90000});const draft=await mutate(writer,'/api/v1/me/charts','POST',()=>writer.getByRole('button',{name:'保存私有草稿',exact:true}).click());await writer.getByRole('region',{name:'公开发布',exact:true}).getByRole('combobox',{name:/公开版本/}).selectOption(draft.currentVersionId);await writer.getByLabel('我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。',{exact:true}).check();chart=await mutate(writer,`/api/v1/me/charts/${draft.id}/publication`,'PUT',()=>writer.getByRole('button',{name:'确认发布',exact:true}).click());

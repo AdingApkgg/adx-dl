@@ -878,5 +878,8 @@
   "download_cancelled": "Cancelled",
   "download_budget": "Device cache or collection budget exceeded. Clear old tasks, use a smaller batch, save originals individually or write to a folder.",
   "download_other_tab": "Another tab is processing downloads. Pause it first.",
-  "download_help": "Queue charts from details, favorites or lists, up to 50 at once. Tasks lock the public version at creation; updates and withdrawals require confirmation. Only complete files are checkpointed; reloading never resumes automatically. Collections preserve original ZIPs and are not importable ADX files. Browser downloads only confirm a save request; directory writes confirm actual completion. All records stay on this device and are cleared on sign-out or account change."
+  "download_help": "Queue charts from details, favorites or lists, up to 50 at once. Tasks lock the public version at creation; updates and withdrawals require confirmation. Only complete files are checkpointed; reloading never resumes automatically. Collections preserve original ZIPs and are not importable ADX files. Browser downloads only confirm a save request; directory writes confirm actual completion. All records stay on this device and are cleared on sign-out or account change.",
+  "download_confirm": "Confirm and start",
+  "download_plan_summary": "{count} originals · {bytes} MiB",
+  "download_plan_hint": "Confirmation starts fixed-version transfers. Large files stay in the queue for directory or original-link saving."
 }
