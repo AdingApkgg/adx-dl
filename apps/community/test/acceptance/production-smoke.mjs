@@ -394,7 +394,7 @@ try {
       await page.getByRole('checkbox',{name:'选择谱面 #1',exact:true}).check();
       const bar=page.locator('aside').filter({has:page.getByRole('button',{name:'加入谱单',exact:true})});
       await bar.getByRole('button',{name:'加入谱单',exact:true}).click();await bar.getByLabel('谱单名称',{exact:true}).waitFor();await bar.getByRole('button',{name:'加入下载队列',exact:true}).waitFor();
-      await bar.getByRole('button',{name:'清除选择',exact:true}).click();
+      await bar.getByRole('button',{name:'清空选择',exact:true}).click();
       await visit('/me/library');await json('/api/v1/me/lists');await visit('/downloads');
       if(role==='admin'){const status=await json('/api/v1/dash/status');assert.equal(status.discovery.ready,true);assert.deepEqual(status.discovery.permissionVersions,[1,2]);}
     });
