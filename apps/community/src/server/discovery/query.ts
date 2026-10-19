@@ -17,15 +17,17 @@ export function decodeCursor(value:string|undefined,scope:string):Cursor|null {
 }
 export function encodeCursor(c:Cursor):string{return Buffer.from(JSON.stringify(c)).toString('base64url');}
 /** Known static column expressions only. No untrusted identifier enters sql.raw. */
-export function chartFilter(f:PublicChartFilters):SQL {
- const tags=f.tags??(f.tag?[f.tag]:[]);
- const slot=(f.difficulty||f.levels?.length||f.designer||f.minSeconds!==undefined||f.maxSeconds!==undefined||f.preview)?sql`exists(select 1 from jsonb_array_elements(c.data->'summary'->'difficulties') d where
- (${f.difficulty??null}::integer is null or (d->>'difficulty')::integer=${f.difficulty??null}) and
+export function chartSlotFilter(f:PublicChartFilters):SQL {
+ return sql`(${f.difficulty??null}::integer is null or (d->>'difficulty')::integer=${f.difficulty??null}) and
  (${!f.levels?.length} or adxc_text_key(d->>'level')=any(${f.levels??[]}::text[])) and
  (${!f.designer} or adxc_text_key(d->>'designer')=adxc_text_key(${f.designer??''})) and
  (${f.minSeconds===undefined} or (d->>'durationMs')::integer>=${(f.minSeconds??0)*1000}) and
  (${f.maxSeconds===undefined} or (d->>'durationMs')::integer<=${(f.maxSeconds??3600)*1000}) and
- (${!f.preview} or (d->>'previewSupported')::boolean and (d->>'noteCount')::integer>0))`:sql`true`;
+ (${!f.preview} or (d->>'previewSupported')::boolean and (d->>'noteCount')::integer>0)`;
+}
+export function chartFilter(f:PublicChartFilters):SQL {
+ const tags=f.tags??(f.tag?[f.tag]:[]);
+ const slot=(f.difficulty||f.levels?.length||f.designer||f.minSeconds!==undefined||f.maxSeconds!==undefined||f.preview)?sql`exists(select 1 from jsonb_array_elements(c.data->'summary'->'difficulties') d where ${chartSlotFilter(f)})`:sql`true`;
  return sql`${slot} and (${!f.author} or c.data->'author'->>'publicId'=${f.author??''}) and ${tags.length?sql.join(tags.map(t=>sql`c.data->'tags' @> ${JSON.stringify([{key:t}])}::jsonb`),sql` and `):sql`true`}`;
 }
 export function termMatch(q:string):SQL {
@@ -55,7 +57,8 @@ export function afterCursor(f:PublicChartFilters,c:Cursor|null):SQL {
  return f.sort==='relevance'?sql`(score<${c.score} or (score=${c.score} and ${tail}))`:tail;
 }
 export async function snapshot<T>(ctx:StorageContext,run:(ctx:StorageContext,deadline:number)=>Promise<T>):Promise<T>{
- try{return await ctx.db.transaction(async tx=>{await tx.execute(sql`set local statement_timeout='1500ms'`);return run({...ctx,db:tx as unknown as StorageContext['db']},performance.now()+2500);},{isolationLevel:'repeatable read',accessMode:'read only'});}catch(e){if(e instanceof HTTPException)throw e;if(e instanceof RangeError)throw invalid();throw new StorageUnavailableError();}
+ const deadline=performance.now()+2500;
+ try{return await ctx.db.transaction(async tx=>{if(performance.now()>=deadline)throw new StorageUnavailableError();await tx.execute(sql`set local statement_timeout='1500ms'`);const r=await run({...ctx,db:tx as unknown as StorageContext['db']},deadline);if(performance.now()>deadline)throw new StorageUnavailableError();return r;},{isolationLevel:'repeatable read',accessMode:'read only'});}catch(e){if(e instanceof HTTPException)throw e;if(e instanceof RangeError)throw invalid();throw new StorageUnavailableError();}
 }
 export async function groupSavepoint<T>(ctx:StorageContext,type:SearchType,deadline:number,run:()=>Promise<T>):Promise<T|null>{
  if(performance.now()>=deadline)return null;

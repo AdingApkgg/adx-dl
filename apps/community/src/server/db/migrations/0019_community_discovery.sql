@@ -14,7 +14,7 @@ BEGIN
  RETURN result;
 END $$;
 --> statement-breakpoint
-CREATE FUNCTION adxc_text_key(v text) RETURNS text LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$ SELECT translate(regexp_replace(btrim(normalize(v,NFKC)), '[[:space:]]+', ' ', 'g'),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz') $$;
+CREATE FUNCTION adxc_text_key(v text) RETURNS text LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$ SELECT translate(btrim(regexp_replace(normalize(v,NFKC), U&'[\0009-\000d\0020\00a0\1680\2000-\200a\2028\2029\202f\205f\3000\feff]+', ' ', 'g')),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz') $$;
 --> statement-breakpoint
 CREATE FUNCTION adxc_u16len(v text) RETURNS integer LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$ SELECT char_length(v)+char_length(regexp_replace(v,U&'[^\+010000-\+10FFFF]','','g')) $$;
 --> statement-breakpoint

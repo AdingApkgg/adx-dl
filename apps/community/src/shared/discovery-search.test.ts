@@ -29,3 +29,10 @@ test("aliases stay canonical bounded text; strict v1 facts reject new fields; v2
  expect(retentionFact.parse({version:2,retained:[f]}).retained[0]?.publication.aliases).toEqual(['日本語']);
  expect(retentionFact.safeParse({version:1,retained:[f]}).success).toBe(false);
 });
+
+test('highlight offsets preserve original graphemes, NFKC expansion and inert malicious text',async()=>{
+ const {searchHighlights}=await import('./search-highlights');
+ expect(searchHighlights('ＡＢＣ 日本語','abc')).toEqual([{start:0,end:3}]);
+ expect(searchHighlights('e\u0301clair','é')).toEqual([{start:0,end:2}]);
+ expect(searchHighlights('😀 <script>','script')).toEqual([{start:4,end:10}]);
+});

@@ -18,3 +18,5 @@ test('SQL rejects the same adversarial manifests as final TS resolver before que
  for(const m of variants){let expected=true;try{validateChartPreviewManifest(m,size);}catch{expected=false;}
  const r=await db().execute(sql`select adxc_manifest_valid(${JSON.stringify(m)}::jsonb,${size}::bigint,${valid.summary.maidataMd5Base64}) ok`);expect(r.rows[0]?.ok).toBe(expected);}
 });
+
+test('SQL query normalization equals browser normalization for Unicode whitespace and ASCII folding',async()=>{const {normalizeSearchText}=await import('@/shared/discovery-search');for(const value of [' ＡＢＣ　日本語\t%_  ','\uFEFFABC\u2028DEF\u2029','\u0085Case','e\u0301clair']){const r=await db().execute(sql`select adxc_text_key(${value}) k`);expect(r.rows[0]?.k).toBe(normalizeSearchText(value));}});

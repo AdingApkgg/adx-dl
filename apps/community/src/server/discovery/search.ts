@@ -5,7 +5,7 @@ import {SEARCH_TYPES,normalizeSearchText,type DiscoveryInput,type SearchType,typ
 import {parsePublicChartFilters,type PublicChartSearchInput,type PublicChartFilters} from '@/shared/public-chart-search';
 import type {PublicChartDto,PublicChartsPageDto} from '@/shared/charts';
 import {entityRelation,chartRelation} from './visibility';
-import {snapshot,groupSavepoint,rows,key,decodeCursor,encodeCursor,chartFilter,termMatch,rankSelect,orderBy,afterCursor,invalid,type Cursor} from './query';
+import {snapshot,groupSavepoint,rows,key,decodeCursor,encodeCursor,chartFilter,chartSlotFilter,termMatch,rankSelect,orderBy,afterCursor,invalid,type Cursor} from './query';
 export const unavailable=():SearchGroup=>({status:'unavailable',items:[],total:null,nextCursor:null});
 export const empty=():SearchGroup=>({status:'ready',items:[],total:0,nextCursor:null});
 export type HitRow={id:string;public_id:string;title:string;description:string;at:string;kind:string;label:string;score:number;data:Record<string,unknown>};
@@ -28,8 +28,8 @@ export async function queryGroup(ctx:StorageContext,type:SearchType,f:PublicChar
 export async function queryFacets(ctx:StorageContext,f:PublicChartFilters):Promise<SearchFacets> {
  const [r]=await rows<SearchFacets>(ctx.db,sql`with c as materialized(select c.* from (${chartRelation(ctx)}) c where ${chartFilter(f)} and ${termMatch(f.q)})
  select coalesce((select jsonb_agg(x) from (select t->>'key' key,min(t->>'label' collate "C") label,count(distinct c.public_id)::integer count from c cross join lateral jsonb_array_elements(c.data->'tags') t group by t->>'key' order by count desc,(t->>'key') collate "C" limit 20)x),'[]') tags,
- coalesce((select jsonb_agg(x) from (select adxc_text_key(d->>'level') value,count(distinct c.public_id)::integer count from c cross join lateral jsonb_array_elements(c.data->'summary'->'difficulties') d where coalesce(d->>'level','')<>'' group by adxc_text_key(d->>'level') order by count desc,adxc_text_key(d->>'level') collate "C" limit 20)x),'[]') levels,
- coalesce((select jsonb_agg(x) from (select adxc_text_key(d->>'designer') value,count(distinct c.public_id)::integer count from c cross join lateral jsonb_array_elements(c.data->'summary'->'difficulties') d where coalesce(d->>'designer','')<>'' group by adxc_text_key(d->>'designer') order by count desc,adxc_text_key(d->>'designer') collate "C" limit 20)x),'[]') designers`);
+ coalesce((select jsonb_agg(x) from (select adxc_text_key(d->>'level') value,count(distinct c.public_id)::integer count from c cross join lateral jsonb_array_elements(c.data->'summary'->'difficulties') d where coalesce(d->>'level','')<>'' and ${chartSlotFilter(f)} group by adxc_text_key(d->>'level') order by count desc,adxc_text_key(d->>'level') collate "C" limit 20)x),'[]') levels,
+ coalesce((select jsonb_agg(x) from (select adxc_text_key(d->>'designer') value,count(distinct c.public_id)::integer count from c cross join lateral jsonb_array_elements(c.data->'summary'->'difficulties') d where coalesce(d->>'designer','')<>'' and ${chartSlotFilter(f)} group by adxc_text_key(d->>'designer') order by count desc,adxc_text_key(d->>'designer') collate "C" limit 20)x),'[]') designers`);
  return r??{tags:[],levels:[],designers:[]};
 }
 export async function searchPublic(ctx:StorageContext,input:DiscoveryInput):Promise<SearchResult> {

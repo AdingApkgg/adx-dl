@@ -23,7 +23,7 @@ export async function tagPageIn(ctx:StorageContext,input:{q?:string;cursor?:stri
 export const tagDirectory=(ctx:StorageContext,input:{q?:string;cursor?:string}={})=>snapshot(ctx,tx=>tagPageIn(tx,input));
 export async function authorDirectory(ctx:StorageContext,input:{q?:string;cursor?:string;sort?:string}={}):Promise<DirectoryPage<AuthorSummary>> {
  if(input.sort&&input.sort!=='name'&&input.sort!=='recent')throw invalid();
- const f=parsePublicChartFilters({q:input.q,sort:input.sort==='recent'?'updated':'title'});
+ let f;try{f=parsePublicChartFilters({q:input.q,sort:input.sort==='recent'?'updated':'title'});}catch{throw invalid();}
  return snapshot(ctx,async tx=>{const g=await queryGroup(tx,'authors',f,input.cursor);return {items:g.items.map(h=>({publicId:h.publicId,name:h.title,bio:h.description,image:h.image??null,count:h.count??0,updatedAt:h.updatedAt})),nextCursor:g.nextCursor};});
 }
 async function randomIn(ctx:StorageContext,input:PublicChartSearchInput={},date?:string):Promise<PublicChartDto|null> {

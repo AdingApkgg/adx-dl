@@ -1,15 +1,16 @@
+import {StorageUnavailableError} from "../storage/errors";
 import {sql} from 'drizzle-orm';
 import {isPublicChartId} from '@/shared/chart-public-id';
 import type {StorageContext} from '../storage/contracts';
 import {entityRelation} from './visibility';
-import {snapshot,rows,invalid} from './query';
+import {snapshot,groupSavepoint,rows,invalid} from './query';
 import type {SearchType} from '@/shared/discovery-search';
 export function xmlEscape(v:string):string{return v.replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]!)).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'');}
 const types=['charts','lists','authors'] as const;
 const route=(type:typeof types[number])=>type==='authors'?'u':type;
 const wrap=(tag:string,rows:string)=>`<?xml version="1.0" encoding="UTF-8"?><${tag} xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${rows}</${tag}>`;
 export async function sitemapIndex(ctx:StorageContext,origin:string):Promise<string> {
- return snapshot(ctx,async tx=>{const links=[`${origin}/sitemaps/static.xml`];for(const type of types){const rr=await rows<{bucket:string}>(tx.db,sql`select distinct ((public_id::bigint-1)/1000)::text bucket from (${entityRelation(tx,type)}) c order by bucket`);for(const r of rr)links.push(`${origin}/sitemaps/${type}-${r.bucket}.xml`);}return wrap('sitemapindex',links.map(h=>`<sitemap><loc>${xmlEscape(h)}</loc></sitemap>`).join(''));});
+ return snapshot(ctx,async(tx,deadline)=>{const links=[`${origin}/sitemaps/static.xml`];for(const type of types){const rr=await groupSavepoint(tx,type,deadline,()=>rows<{bucket:string}>(tx.db,sql`select distinct ((public_id::bigint-1)/1000)::text bucket from (${entityRelation(tx,type)}) c order by bucket`));if(!rr)throw new StorageUnavailableError();for(const r of rr)links.push(`${origin}/sitemaps/${type}-${r.bucket}.xml`);}return wrap('sitemapindex',links.map(h=>`<sitemap><loc>${xmlEscape(h)}</loc></sitemap>`).join(''));});
 }
 export async function sitemapPart(ctx:StorageContext,origin:string,name:string):Promise<string> {
  if(name==='static.xml')return wrap('urlset',['/','/charts','/discover','/authors','/tags','/lists','/forum','/notices','/help'].flatMap(p=>['','/en','/ja'].map(l=>`<url><loc>${xmlEscape(origin+l+(p==='/'?(l?'':'/'):p))}</loc></url>`)).join(''));
