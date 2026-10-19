@@ -1,3 +1,4 @@
+import {exerciseDiscovery} from "./discovery-browser.mjs";
 import {exerciseAuthor} from "./author-browser.mjs";
 import {exerciseLibrary} from "./library-browser.mjs";
 import { exerciseFollowing } from "./following-browser.mjs";
@@ -634,6 +635,7 @@ async function acceptance() {
   await exerciseLibrary({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Library browser\n&inote_4=(120){4}1,2,E\n`)]])});
   await exerciseFollowing({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Following browser\n&inote_4=(120){4}1,2,E\n`)]])});
   await exerciseAuthor({owner,other,anonymous,origin,step,evidenceDirectory,zip:(label,next=false)=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Creator browser\n&inote_4=(120){4}${next?"1,(240)3,4":"1,2"},E\n`)]])});
+  await exerciseDiscovery({owner,other,anonymous,origin,step,evidenceDirectory});
   assert.equal(diagnostics.filter(row => row.type === "pageerror").length, 0, "uncaught browser errors");
   assert.equal(diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length, 0, "hydration errors");
 }

@@ -361,7 +361,7 @@ test('shared difficulty and initial position remain lazy, paused and clamped to 
  fixture();const fetcher=vi.fn(async()=>new Response('&inote_4=(120){4}1,2,3,E'));vi.stubGlobal('fetch',fetcher);
  render(<PrivateChartPreview id="chart" versionId="version" summary={summary} initialDifficulty={4} initialPosition={100}/>);
  expect(fetcher).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:m.chart_preview_load()}));
- await waitFor(()=>expect((screen.getByRole('button',{name:m.chart_preview_play()}) as HTMLButtonElement).disabled).toBe(false));
- expect(Number((screen.getByRole('slider',{name:m.chart_preview_seek()}) as HTMLInputElement).value)).toBe(5);
- expect(screen.queryByRole('button',{name:m.chart_preview_pause()})).toBeNull();
+ await waitFor(()=>expect((screen.getByRole('button',{name:m.chart_play()}) as HTMLButtonElement).disabled).toBe(false));
+ expect(Number((screen.getByRole('slider',{name:m.chart_seek()}) as HTMLInputElement).value)).toBe(5);
+ expect(screen.queryByRole('button',{name:m.chart_pause()})).toBeNull();
 });

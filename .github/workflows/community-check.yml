@@ -127,6 +127,13 @@ jobs:
         working-directory: apps/community
         run: bun run check
 
+      - name: Controlled discovery workload (rollback scoped, synthetic)
+        working-directory: apps/community
+        env:
+          DISCOVERY_PERF: '1'
+          DISCOVERY_PERF_REPORT: ${{ runner.temp }}/community-discovery-performance.json
+        run: bun test --timeout 180000 src/server/discovery/performance.test.ts
+
       - name: Central chart parser regressions
         run: bun test packages/maimai-chart-engine
 

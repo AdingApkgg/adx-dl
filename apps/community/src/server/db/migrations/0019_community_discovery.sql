@@ -82,3 +82,12 @@ BEGIN
  RETURN true;
  EXCEPTION WHEN OTHERS THEN RETURN false;
 END $$;
+--> statement-breakpoint
+-- Validate immutable artifacts once in the index, then compare the live version's MD5/summary separately.
+CREATE INDEX derived_objects_public_chart_integrity_idx ON derived_objects(id) WHERE mime='application/vnd.astrodx.chart-preview' AND adxc_manifest_valid(properties->'chartPreview',size,properties->'chartPreview'->'summary'->>'maidataMd5Base64');
+--> statement-breakpoint
+CREATE FUNCTION adxc_topic_hash(title text, body text, chart_ids jsonb) RETURNS text LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT encode(sha256(convert_to(adxc_canonical_jsonb(jsonb_build_object('title',title,'body',body,'chartIds',chart_ids)),'UTF8')),'hex') $$;
+--> statement-breakpoint
+CREATE INDEX discussion_topics_public_integrity_idx ON discussion_topics(id) WHERE content_hash=adxc_topic_hash(title,body,linked_chart_ids);
+--> statement-breakpoint
+CREATE INDEX chart_lists_public_integrity_idx ON chart_lists(id) WHERE adxc_library_public_valid(fact,public_id::text);

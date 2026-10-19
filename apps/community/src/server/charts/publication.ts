@@ -200,7 +200,8 @@ export function publicChartVisibilityQuery<T extends PgSelect>(selection: T) {
 }
 export function publicChartAllowed() {
   return and(
-    sql`adxc_manifest_valid(${derivedObjects.properties}->'chartPreview', ${derivedObjects.size}, ${chartVersions.maidataMd5Base64})`,
+    sql`adxc_manifest_valid(${derivedObjects.properties}->'chartPreview', ${derivedObjects.size}, ${derivedObjects.properties}->'chartPreview'->'summary'->>'maidataMd5Base64')`,
+    sql`${derivedObjects.properties}->'chartPreview'->'summary'->>'maidataMd5Base64'=${chartVersions.maidataMd5Base64}`,
     sql`${chartVersions.summary}=${derivedObjects.properties}->'chartPreview'->'summary'`,
     isNull(charts.deletedAt),
     sql`not exists(select 1 from ${chartModerations} where chart_id=${charts.id})`,

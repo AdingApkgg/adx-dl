@@ -1,11 +1,11 @@
-import {sql,type SQL} from 'drizzle-orm';
+import {sql,type SQL,type SQLWrapper} from 'drizzle-orm';
 import {charts,chartVersions,chartPublications,chartPublicIds,files,user,userPublicIds} from '../db/schema';
 import {publicChartVisibilityQuery,publicChartAllowed} from '../charts/publication';
 import type {StorageContext} from '../storage/contracts';
 import {publicListAllowed} from '../library/core';
 import {visible,topicAllowed,effectiveBoard,exported} from '../discussions/core';
 import type {SearchType} from '@/shared/discovery-search';
-const field=(kind:string,value:SQL)=>sql`jsonb_build_object('kind',${kind},'value',coalesce(${value},''))`;
+const field=(kind:string,value:SQLWrapper)=>sql`jsonb_build_object('kind',${kind},'value',coalesce(${value},''))`;
 /** Single live chart authority used by search, facets, directories, random and XML. */
 export function chartRelation(ctx:StorageContext):SQL {
  const author=sql`case when ${userPublicIds.journalSequence}<=${exported} and ${user.status}='active' then jsonb_build_object('id',${user.id},'publicId',${userPublicIds.publicId}::text,'name',${user.name},'image',${user.image}) else null end`;

@@ -1,3 +1,5 @@
+import {searchPublic,suggestPublic} from "../../src/server/discovery/search";
+import {parseDiscoveryInput} from "../../src/shared/discovery-search";
 import {listWorkbench,versionFingerprint,sourceBinding} from "../../src/server/charts/workbench";
 import {chartAssetResponse,resolveChartAsset} from "../../src/server/charts/assets";
 import {analyzeMaidata} from "../../src/client/author/analysis";
@@ -17,7 +19,7 @@ import { putUploadPart } from "../../src/server/storage/parts";
 import { ingestUpload } from "../../src/media-worker/ingest";
 import { handleChartImport } from "../../src/media-worker/chart-import";
 import { finalizeUpload } from "../../src/media-worker/finalize";
-import { createChart, appendChartVersion, deleteChart, getChart, publicationDto } from "../../src/server/charts/service";
+import { createChart, updateChart, appendChartVersion, deleteChart, getChart, publicationDto } from "../../src/server/charts/service";
 import { publishChart, withdrawChart, getPublicChart, resolvePublicChartDownload, resolvePublicChartAsset } from "../../src/server/charts/publication";
 import { createDeletionHandlers } from "../../src/server/storage/deletion";
 import { requestDeletion, purgeUser } from "../../src/server/services/user-deletion";
@@ -57,12 +59,14 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
     userNumbers.set(owner, identity.publicId.toString());
     await source.db.insert(profiles).values({ userId: owner, bio: "private-identity-must-disappear" });
     let chart = await createChart(source, owner, original.id);
+    if(kind!=="legacy")chart=await updateChart(source,owner,chart.id,{expectedRevision:chart.revision,aliases:[`Restore ${kind} alias`]});
     if(kind==="replace")following=await followingRestoreFixture(source,f.owner,owner);
     if (kind === "legacy") {
       const now = new Date();
-      const publication = { chartId: chart.id, versionId: chart.currentVersionId, title: chart.title, artist: chart.artist, description:"", credits:"", tags:[], releaseNote:"", publishedAt: now, updatedAt: now };
+      const publication = { chartId: chart.id, versionId: chart.currentVersionId, title: chart.title, artist: chart.artist, description:"", credits:"", tags:[], aliases:[], releaseNote:"", publishedAt: now, updatedAt: now };
       await source.db.insert(chartPublications).values(publication);
-      const [fact] = await source.db.insert(storageTombstones).values({ kind: "chart_permission", payload: { version: 1, chartId: chart.id, revision: 2, publication: publicationDto(publication) } }).returning();
+      const {aliases: legacyAliases,...legacyPublication}=publicationDto(publication);
+      const [fact] = await source.db.insert(storageTombstones).values({ kind: "chart_permission", payload: { version: 1, chartId: chart.id, revision: 2, publication: legacyPublication } }).returning();
       await source.db.update(charts).set({ revision: 2, publicationSequence: fact.sequence }).where(eq(charts.id, chart.id));
       await source.exportChartJournal();
       chart = await getChart(source, owner, chart.id);
@@ -85,12 +89,16 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
   let lateModerated: Awaited<ReturnType<typeof createChart>> | undefined;
   return {
     additionalOriginals: 8,
-    communityCases: [...community.cases,...following!.cases,...library.cases,"author-workbench-restored-projection","author-derived-source-map-rebuilt","author-owner-denial-after-restore"],
+    communityCases: [...community.cases,...following!.cases,...library.cases,"author-workbench-restored-projection","author-derived-source-map-rebuilt","author-owner-denial-after-restore","discovery-v1-v2-public-alias-replay","discovery-anonymous-retained-alias","discovery-withdrawn-alias-not-revived"],
     async commitLaterFacts() {
       await library.commitLaterFacts();
       await community.commitLaterFacts();
       await following!.commitLaterFacts();
       for (const row of rows) {
+        if(row.kind==="retain"){
+          let changed=await updateChart(source,row.owner,row.chart.id,{expectedRevision:row.chart.revision,aliases:["Latest retained discovery alias"]});
+          changed=await publishChart(source,row.owner,changed.id,{expectedRevision:changed.revision,versionId:row.chart.publication!.versionId,confirmOriginalArchive:true});row.chart=changed;
+        }
         const { chart, owner, kind } = row;
         if (kind === "withdraw") await withdrawChart(source, owner, chart.id, chart.revision);
         if (kind === "delete") await deleteChart(source, owner, chart.id, chart.revision);
@@ -131,6 +139,8 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
       await exportJournal(journal);
     },
     async verify(target: StorageContext) {
+      const withdrawnAlias=await searchPublic(target,parseDiscoveryInput(new URLSearchParams({type:"charts",q:"Restore withdraw alias"})));
+      expect(withdrawnAlias.groups.charts.total).toBe(0);
       await library.verify(target);
       await community.verify(target);
       await following!.verify(target);
@@ -206,6 +216,8 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
           continue;
         }
         const visible = await getPublicChart(target, row.chart.id);
+        expect(visible.aliases).toEqual(["Latest retained discovery alias"]);
+        expect((await suggestPublic(target,"Latest retained discovery alias")).some(h=>h.publicId===visible.publicId)).toBe(true);
         expect(visible.author).toBeNull();
         expect(visible.versionId).toBe(row.chart.publication!.versionId);
         expect(await target.db.select().from(user).where(eq(user.id, row.owner))).toHaveLength(0);
