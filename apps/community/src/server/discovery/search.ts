@@ -1,4 +1,6 @@
-import {sql,type SQL} from 'drizzle-orm';
+import {charts} from '../db/schema';
+import {publicChartQuery,publicChartDto,publicChartAllowed} from '../charts/publication';
+import {and,inArray,sql,type SQL} from 'drizzle-orm';
 import type {StorageContext} from '../storage/contracts';
 import {StorageUnavailableError} from '../storage/errors';
 import {SEARCH_TYPES,normalizeSearchText,type DiscoveryInput,type SearchType,type SearchGroup,type SearchHit,type SearchResult,type SearchFacets} from '@/shared/discovery-search';
@@ -14,7 +16,7 @@ function hit(type:SearchType,r:HitRow):SearchHit {
  return {type,publicId:r.public_id,title:r.title,description:[...(r.description??'')].slice(0,120).join(''),url:`/${paths[type]}/${r.public_id}`,updatedAt:new Date(r.at).toISOString(),reason:r.score>0?{kind:r.kind as NonNullable<SearchHit['reason']>['kind'],label:r.label}:null,...(type==='charts'?{chart:r.data as unknown as PublicChartDto}:{}),...(type==='authors'?{image:r.data.image as string|null,count:Number(r.data.count)}:{}),...(type==='lists'?{count:Number(r.data.total)}:{}),...(type==='topics'?{board:{id:String(r.data.boardId),name:String(r.data.boardName)}}:{})};
 }
 export function rankedRelation(ctx:StorageContext,type:SearchType,f:PublicChartFilters):SQL {
- return sql`select c.*,date_trunc('milliseconds',${f.sort==='published'?sql`c.published`:sql`c.at`}) sort_at,b.kind,b.label,b.score from (${entityRelation(ctx,type)}) c cross join lateral(${rankSelect(f.q)}) b where ${termMatch(f.q)} and ${type==='charts'?chartFilter(f):sql`true`}`;
+ return sql`select c.id,c.public_id,c.title,c.description,${type==='charts'?sql`null::jsonb`:sql`c.data`} data,date_trunc('milliseconds',${f.sort==='published'?sql`c.published`:sql`c.at`}) sort_at,b.kind,b.label,b.score from (${entityRelation(ctx,type)}) c cross join lateral(${rankSelect(f.q)}) b where ${termMatch(f.q)} and ${type==='charts'?chartFilter(f):sql`true`}`;
 }
 export function groupStatement(ctx:StorageContext,type:SearchType,f:PublicChartFilters,cursor:Cursor|null,limit:number):SQL {
  const ranked=rankedRelation(ctx,type,f);
@@ -26,13 +28,17 @@ export async function queryGroup(ctx:StorageContext,type:SearchType,f:PublicChar
  const scope=key({algorithm:1,type,f:{...f,q:normalizeSearchText(f.q)}}),cursor=decodeCursor(after,scope);
  const [r]=await rows<{total:number;items:HitRow[]}>(ctx.db,groupStatement(ctx,type,f,cursor,limit));
  const selected=(r?.items??[]).slice(0,limit),last=selected.at(-1);
+ // Permissions, matching, counts and order are settled before this bounded DTO read,
+ // on the same repeatable-read transaction. Never construct thousands of full cards.
+ if(type==='charts'&&selected.length){const detail=await publicChartQuery(ctx).where(and(publicChartAllowed(),inArray(charts.id,selected.map(row=>row.id))));const byId=new Map(detail.map(row=>[row.chart.id,publicChartDto(row)]));for(const row of selected){const value=byId.get(row.id);if(!value)throw new StorageUnavailableError();row.data=value as unknown as Record<string,unknown>;}}
+
  return {status:'ready',items:selected.map(row=>hit(type,row)),total:r?.total??0,nextCursor:(r?.items.length??0)>limit&&last?encodeCursor({scope,score:last.score,at:new Date(last.at).toISOString(),id:last.public_id,title:normalizeSearchText(last.title)}):null};
 }
 export async function queryFacets(ctx:StorageContext,f:PublicChartFilters):Promise<SearchFacets> {
- const [r]=await rows<SearchFacets>(ctx.db,sql`with c as materialized(select c.* from (${chartRelation(ctx)}) c where ${chartFilter(f)} and ${termMatch(f.q)})
- select coalesce((select jsonb_agg(x) from (select t->>'key' key,min(t->>'label' collate "C") label,count(distinct c.public_id)::integer count from c cross join lateral jsonb_array_elements(c.data->'tags') t group by t->>'key' order by count desc,(t->>'key') collate "C" limit 20)x),'[]') tags,
- coalesce((select jsonb_agg(x) from (select adxc_text_key(d->>'level') value,count(distinct c.public_id)::integer count from c cross join lateral jsonb_array_elements(c.data->'summary'->'difficulties') d where coalesce(d->>'level','')<>'' and ${chartSlotFilter(f)} group by adxc_text_key(d->>'level') order by count desc,adxc_text_key(d->>'level') collate "C" limit 20)x),'[]') levels,
- coalesce((select jsonb_agg(x) from (select adxc_text_key(d->>'designer') value,count(distinct c.public_id)::integer count from c cross join lateral jsonb_array_elements(c.data->'summary'->'difficulties') d where coalesce(d->>'designer','')<>'' and ${chartSlotFilter(f)} group by adxc_text_key(d->>'designer') order by count desc,adxc_text_key(d->>'designer') collate "C" limit 20)x),'[]') designers`);
+ const [r]=await rows<SearchFacets>(ctx.db,sql`with c as materialized(select c.public_id,c.filter_tags,c.filter_difficulties from (${chartRelation(ctx)}) c where ${chartFilter(f)} and ${termMatch(f.q)})
+ select coalesce((select jsonb_agg(x) from (select t->>'key' key,min(t->>'label' collate "C") label,count(distinct c.public_id)::integer count from c cross join lateral jsonb_array_elements(c.filter_tags) t group by t->>'key' order by count desc,(t->>'key') collate "C" limit 20)x),'[]') tags,
+ coalesce((select jsonb_agg(x) from (select adxc_text_key(d->>'level') value,count(distinct c.public_id)::integer count from c cross join lateral jsonb_array_elements(c.filter_difficulties) d where coalesce(d->>'level','')<>'' and ${chartSlotFilter(f)} group by adxc_text_key(d->>'level') order by count desc,adxc_text_key(d->>'level') collate "C" limit 20)x),'[]') levels,
+ coalesce((select jsonb_agg(x) from (select adxc_text_key(d->>'designer') value,count(distinct c.public_id)::integer count from c cross join lateral jsonb_array_elements(c.filter_difficulties) d where coalesce(d->>'designer','')<>'' and ${chartSlotFilter(f)} group by adxc_text_key(d->>'designer') order by count desc,adxc_text_key(d->>'designer') collate "C" limit 20)x),'[]') designers`);
  return r??{tags:[],levels:[],designers:[]};
 }
 export async function searchPublic(ctx:StorageContext,input:DiscoveryInput):Promise<SearchResult> {

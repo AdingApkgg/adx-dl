@@ -130,4 +130,7 @@ CREATE FUNCTION public.adxc_topic_hash(title text, body text, chart_ids jsonb) R
 --> statement-breakpoint
 CREATE INDEX discussion_topics_public_integrity_idx ON discussion_topics(id) WHERE content_hash=public.adxc_topic_hash(title,body,linked_chart_ids);
 --> statement-breakpoint
-CREATE INDEX chart_lists_public_integrity_idx ON chart_lists(id) WHERE public.adxc_library_public_valid(fact,public_id::text);
+CREATE INDEX chart_lists_public_integrity_idx ON chart_lists(owner_id,id) WHERE public.adxc_library_public_valid(fact,public_id::text);
+
+--> statement-breakpoint
+CREATE INDEX community_content_states_public_integrity_idx ON community_content_states(key) WHERE public.adxc_community_fact_valid(fact);

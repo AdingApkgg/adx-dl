@@ -28,8 +28,8 @@ export function chartSlotFilter(f:PublicChartFilters):SQL {
 }
 export function chartFilter(f:PublicChartFilters):SQL {
  const tags=f.tags??(f.tag?[f.tag]:[]);
- const slot=(f.difficulty||f.levels?.length||f.designer||f.minSeconds!==undefined||f.maxSeconds!==undefined||f.preview)?sql`exists(select 1 from jsonb_array_elements(c.data->'summary'->'difficulties') d where ${chartSlotFilter(f)})`:sql`true`;
- return sql`${slot} and (${!f.author} or c.data->'author'->>'publicId'=${f.author??''}) and ${tags.length?sql.join(tags.map(t=>sql`c.data->'tags' @> ${JSON.stringify([{key:t}])}::jsonb`),sql` and `):sql`true`}`;
+ const slot=(f.difficulty||f.levels?.length||f.designer||f.minSeconds!==undefined||f.maxSeconds!==undefined||f.preview)?sql`exists(select 1 from jsonb_array_elements(c.filter_difficulties) d where ${chartSlotFilter(f)})`:sql`true`;
+ return sql`${slot} and (${!f.author} or c.author_public_id=${f.author??''}) and ${tags.length?sql.join(tags.map(t=>sql`c.filter_tags @> ${JSON.stringify([{key:t}])}::jsonb`),sql` and `):sql`true`}`;
 }
 export function termMatch(q:string):SQL {
  const terms=searchTerms(q);return terms.length?sql.join(terms.map(term=>sql`exists(select 1 from jsonb_array_elements(c.fields) f where (f->>'kind'='id' and f->>'value'=${term}) or (f->>'kind'<>'id' and strpos(adxc_text_key(f->>'value'),${term})>0))`),sql` and `):sql`true`;

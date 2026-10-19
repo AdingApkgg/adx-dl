@@ -17,7 +17,7 @@ export async function tagPageIn(ctx:StorageContext,input:{q?:string;cursor?:stri
  const scope=key({kind:'tags',q});let c:{scope:string;count:number;key:string}|undefined;
  if(input.cursor){try{if(input.cursor.length>1024)throw 0;c=JSON.parse(Buffer.from(input.cursor,'base64url').toString());if(!c||Object.keys(c).sort().join()!=='count,key,scope'||c.scope!==scope||!Number.isSafeInteger(c.count)||c.count<0||typeof c.key!=='string'||[...c.key].length>20)throw 0;}catch{throw invalid();}}
  const limit=Math.min(input.limit??20,20);
- const rr=await rows<{key:string;label:string;count:number}>(ctx.db,sql`with tags as(select t->>'key' key,min(t->>'label' collate "C") label,count(distinct c.public_id)::integer count from (${chartRelation(ctx)}) c cross join lateral jsonb_array_elements(c.data->'tags') t where strpos(t->>'key',${q})>0 group by t->>'key')
+ const rr=await rows<{key:string;label:string;count:number}>(ctx.db,sql`with tags as(select t->>'key' key,min(t->>'label' collate "C") label,count(distinct c.public_id)::integer count from (${chartRelation(ctx)}) c cross join lateral jsonb_array_elements(c.filter_tags) t where strpos(t->>'key',${q})>0 group by t->>'key')
  select * from tags where ${c?sql`(count<${c.count} or (count=${c.count} and key collate "C">${c.key} collate "C"))`:sql`true`} order by count desc,key collate "C" limit ${limit+1}`);
  const items=rr.slice(0,limit),last=items.at(-1);return {items,nextCursor:rr.length>limit&&last?Buffer.from(JSON.stringify({...last,label:undefined,scope})).toString('base64url'):null};
 }
