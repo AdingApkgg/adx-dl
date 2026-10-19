@@ -1,3 +1,6 @@
+import {discoveryApi} from "../queries/discovery";
+import {parsePreviewShare,type PreviewShare} from "@/shared/discovery-search";
+import {PublicListCard} from "../components/library-ui";
 import {DownloadAddButton} from "../components/download-actions";
 import { FollowAuthor } from "../components/follow-author";
 import {ChartDiscussion} from "../components/chart-discussion";
@@ -38,7 +41,10 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   }
   let related: PublicChartDto[] | null = null;
   try { related = await publicChartsApi(context.get(apiContext)).related(chart.publicId); } catch {}
-  return data({ ...chart, related }, { headers: publicHeaders });
+  let share:PreviewShare|null=null,shareInvalid=false;
+  try{share=parsePreviewShare(new URL(request.url).searchParams);if(share&&!chart.summary.difficulties.some(d=>d.difficulty===share!.difficulty&&d.previewSupported)){share=null;shareInvalid=true;}}catch{shareInvalid=true;}
+  const [other,lists]=await Promise.all([chart.author?.publicId?publicChartsApi(context.get(apiContext)).list(undefined,7,{author:chart.author.publicId}).then(p=>p.items.filter(c=>c.publicId!==chart.publicId).slice(0,6)).catch(()=>null):Promise.resolve([]),discoveryApi(context.get(apiContext)).lists(chart.publicId).catch(()=>null)]);
+  return data({ ...chart, related,other,lists,share,shareInvalid }, { headers: publicHeaders });
 }
 export function meta({ loaderData: chart, matches, location }: Route.MetaArgs) {
   if (!chart) return [{ title: `${m.public_charts_title()} - ${m.site_name()}` }, { name: "robots", content: "noindex" }];
@@ -79,6 +85,7 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
     </div>
     <section aria-label={m.chart_metadata_heading()} className="space-y-3 rounded-xl border p-4">
       <PublicChartTags tags={chart.tags} />
+      {chart.aliases?.length?<p className="break-words text-sm">{m.discovery_aliases()}: {chart.aliases.join(" · ")}</p>:null}
       {chart.description ? <div><h2 className="font-semibold">{m.chart_metadata_description()}</h2><p className="whitespace-pre-wrap break-words">{chart.description}</p></div> : null}
       {chart.credits ? <div><h2 className="font-semibold">{m.chart_metadata_credits()}</h2><p className="whitespace-pre-wrap break-words">{chart.credits}</p></div> : null}
       {chart.releaseNote ? <div><h2 className="font-semibold">{m.chart_metadata_release_note()}</h2><p className="whitespace-pre-wrap break-words">{chart.releaseNote}</p></div> : null}
@@ -88,7 +95,10 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
     <section className="space-y-3" aria-label={m.chart_metadata_related()}><h2 className="font-semibold">{m.chart_metadata_related()}</h2>
       {chart.related?.length ? <ul className={PUBLIC_CHART_GRID_CLASS}>{chart.related.map(item => <li key={item.id}><PublicChartCard chart={item} headingLevel={3} /></li>)}</ul> : chart.related === null ? <p role="status">{m.chart_metadata_related_unavailable()}</p> : chart.author ? <Link className={textLinkClass} to={localizeHref(`/u/${chart.author.publicId ?? chart.author.id}`)}>{m.public_chart_back_author()}</Link> : null}
     </section>
-    <PrivateChartPreview sectionId="chart-preview" key={`${chart.id}/${chart.versionId}`} id={chart.publicId} versionId={chart.versionId} summary={chart.summary} assetUrl={publicChartAssetUrl} />
+    {chart.other===null?<p role="status">{m.discovery_unavailable()}</p>:chart.other?.length?<section className="space-y-3"><h2 className="font-semibold">{m.discovery_other_works()}</h2><ul className={PUBLIC_CHART_GRID_CLASS}>{chart.other.map(c=><li key={c.publicId}><PublicChartCard chart={c} headingLevel={3}/></li>)}</ul></section>:null}
+    {chart.lists===null?<p role="status">{m.discovery_unavailable()}</p>:chart.lists?.length?<section className="space-y-3"><h2 className="font-semibold">{m.discovery_containing_lists()}</h2><ul className="grid gap-3 sm:grid-cols-2">{chart.lists.map(l=><li key={l.publicId}><PublicListCard list={l}/></li>)}</ul></section>:null}
+    {chart.shareInvalid?<p role="status">{m.discovery_share_invalid()}</p>:null}
+    <PrivateChartPreview enableShare initialDifficulty={chart.share?.difficulty} initialPosition={chart.share?.seconds??0} sectionId="chart-preview" key={`${chart.id}/${chart.versionId}/${chart.share?.difficulty??""}/${chart.share?.seconds??""}`} id={chart.publicId} versionId={chart.versionId} summary={chart.summary} assetUrl={publicChartAssetUrl} />
   </main>;
 }
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) { return <ErrorCard error={error} />; }

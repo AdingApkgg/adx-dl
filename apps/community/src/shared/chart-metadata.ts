@@ -18,3 +18,17 @@ export function normalizeChartTags(values: unknown): ChartTag[] {
   if (tags.size > 8) throw new RangeError("Invalid tags");
   return [...tags.values()];
 }
+
+/** Aliases are author-authored plain text, never executable markup or fetched URLs. */
+export function normalizeChartAliases(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > 64) throw new RangeError("Invalid aliases");
+  const result = new Map<string, string>();
+  for (const item of value) {
+    if (typeof item !== "string" || item.length > 240) throw new RangeError("Invalid alias");
+    const label = item.trim(), key = label.normalize("NFKC").replace(/[A-Z]/g, c => c.toLowerCase());
+    if (!label || [...label].length > 60 || /[\p{Cc}\p{Cf}\uD800-\uDFFF]/u.test(label + key)) throw new RangeError("Invalid alias");
+    if (!result.has(key)) result.set(key, label);
+  }
+  if (result.size > 8) throw new RangeError("Invalid aliases");
+  return [...result.values()];
+}

@@ -11,7 +11,7 @@ import { SiteHeader } from "./site-header";
 // 出错页面也套在里面，页头照样在。
 export function SiteShell({ children }: { children: ReactNode }) {
   const path = deLocalizeHref(useLocation().pathname);
-  const publicCharts = path === "/" || path === "/charts" || path.startsWith("/charts/");
+  const publicCharts = ["/search","/discover","/authors","/tags"].includes(path) || path.startsWith("/tags/") || path === "/" || path === "/charts" || path.startsWith("/charts/");
   return (
     <div className="flex min-h-dvh flex-col">
       <SiteHeader />

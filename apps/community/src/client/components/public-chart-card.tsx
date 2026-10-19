@@ -1,3 +1,4 @@
+import {SearchText} from "./search-text";
 import {ChartSelection} from "./library-selection";
 import { cn } from "@astrodx/ui/lib/utils";
 import { useState } from "react";
@@ -24,7 +25,7 @@ const difficultyStyles: Record<ChartDifficulty, { name: string; tone: string }> 
 export function publicDifficultyName(difficulty: ChartDifficulty): string {
   return difficultyStyles[difficulty].name || m.chart_difficulty({ difficulty: String(difficulty) });
 }
-function PublicDifficultyPill({ row }: { row: ChartDifficultySummary }) {
+export function PublicDifficultyPill({ row }: { row: ChartDifficultySummary }) {
   const style = difficultyStyles[row.difficulty];
   return <span className={cn("inline-flex max-w-full flex-wrap items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold tabular-nums", style.tone)}>
     <span>{style.name || m.chart_difficulty({ difficulty: String(row.difficulty) })}</span>
@@ -40,7 +41,7 @@ export function PublicCover({ chart }: { chart: PublicChartDto }) {
       <div className="flex h-full items-center justify-center p-3 text-center text-sm text-muted-foreground">{m.chart_cover()} · {m.chart_missing()}</div>}
   </div>;
 }
-export function PublicChartCard({ chart, headingLevel = 2 }: { chart: PublicChartDto; headingLevel?: 2 | 3 }) {
+export function PublicChartCard({ chart, headingLevel = 2, query="" }: { chart: PublicChartDto; headingLevel?: 2 | 3; query?:string }) {
   const Heading = headingLevel === 3 ? "h3" : "h2";
   const location = useLocation();
   const href = `${location.pathname}${location.search}`;
@@ -52,7 +53,7 @@ export function PublicChartCard({ chart, headingLevel = 2 }: { chart: PublicChar
   return <article className="flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card/80"><Link to={localizeHref(`/charts/${chart.publicId}`)} state={{ publicListHref: href, publicListCursors: history }} className="group flex flex-1 flex-col transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
     <PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} />
     <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3 sm:p-4">
-      <Heading className="line-clamp-1 font-semibold leading-snug" title={chart.title}>{chart.title}</Heading>
+      <Heading className="line-clamp-1 font-semibold leading-snug" title={chart.title}><SearchText text={chart.title} query={query}/></Heading>
       <p className="line-clamp-1 text-sm text-muted-foreground">{chart.artist || "—"}</p>
       <p className="line-clamp-1 text-xs text-muted-foreground">{m.public_chart_author({ name: chart.author?.name ?? m.public_chart_anonymous() })}</p>
       <ul className="mt-auto flex flex-wrap gap-1.5">{chart.summary.difficulties.map(row => <li key={row.difficulty} className="max-w-full">

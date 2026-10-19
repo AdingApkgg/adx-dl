@@ -58,6 +58,9 @@ async function revoke() {
   event("session_revoked", { verified: true, originalSessionsPreserved: true, rejectedWrites, reads });
 }
 const matches = (path: string) => {
+  if (/^\/(?:en\/|ja\/)?(?:search|discover|authors|tags(?:\/[^/]{1,240})?)(?:\.data)?$/.test(path)) return true;
+  if (/^\/api\/v1\/(?:search(?:\/suggestions)?|discovery|authors|tags)$/.test(path)) return true;
+  if (/^\/(?:sitemap\.xml|feed\.xml|sitemaps\/(?:static|(?:charts|lists|authors)-[0-9]+)\.xml)$/.test(path)) return true;
   if (/^\/(?:en\/|ja\/)?(?:u\/[1-9]\d*|forum(?:\/new|\/[1-9]\d*)?|charts(?:\/[1-9]\d*)?|lists(?:\/[1-9]\d*)?|downloads|notices|help|dash(?:\/(?:users|charts|status|reports|discussions|featured|notices|lists))?|me\/(?:notifications|following|feed|library|lists\/[a-f0-9-]{36}))(?:\.data)?$/.test(path)) return true;
   if (/^\/(?:en\/|ja\/)?me\/(?:workbench|imports|charts(?:\/[a-f0-9-]{36}(?:\/(?:review|compare))?)?)(?:\.data)?$/.test(path)) return true;
   if (/^\/api\/v1\/me\/charts(?:\/(?:workbench|bindings\/[a-f0-9-]{36}|[a-f0-9-]{36}(?:\/versions\/[a-f0-9-]{36}\/(?:fingerprint|assets\/(?:maidata|audio|cover)))?))?$/.test(path)) return true;

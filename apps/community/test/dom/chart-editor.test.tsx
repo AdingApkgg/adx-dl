@@ -44,7 +44,7 @@ test("metadata conflict uses the edit revision, reads latest state and keeps the
   await waitFor(() => expect(screen.getAllByRole("alert").some(alert => alert.textContent?.includes("草稿已发生变化"))).toBe(true));
   expect((screen.getByRole("textbox", { name: "标题" }) as HTMLInputElement).value).toBe("My unsaved title");
   expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("External change");
-  expect(requests.filter((row) => row.method === "PATCH")).toEqual([{ path: "/api/v1/me/charts/chart", method: "PATCH", body: { expectedRevision: 2, title: "My unsaved title", artist: "Artist", description: "", credits: "", tags: [], releaseNote: { versionId: "v2", text: "" } } }]);
+  expect(requests.filter((row) => row.method === "PATCH")).toEqual([{ path: "/api/v1/me/charts/chart", method: "PATCH", body: { expectedRevision: 2, title: "My unsaved title", aliases: [], artist: "Artist", description: "", credits: "", tags: [], releaseNote: { versionId: "v2", text: "" } } }]);
   expect(requests.some((row) => row.method === "GET")).toBe(true);
 });
 test("a lost successful metadata response reads current state instead of replaying PATCH", async () => {

@@ -4,7 +4,7 @@ import type { WorkbenchFilters, WorkbenchPage, VersionFingerprint, SourceBinding
 import type { ChartAssetRole, ChartDto, ChartsPageDto } from "@/shared/charts";
 import { replayRequest } from "./storage";
 
-export type ChartPatch = { expectedRevision: number; title?: string; artist?: string; description?: string; credits?: string; tags?: string[]; releaseNote?: { versionId: string; text: string }; currentVersionId?: string };
+export type ChartPatch = { expectedRevision: number; title?: string; artist?: string; description?: string; credits?: string; tags?: string[]; aliases?: string[]; releaseNote?: { versionId: string; text: string }; currentVersionId?: string };
 export function chartsApi(api: ApiClient) {
   const routes = api.api.v1.me.charts;
   const json = (body: unknown, signal?: AbortSignal) => ({ init: {

@@ -328,10 +328,10 @@ export function createStorageDeletionHandler(
       const [fact] = await tx.insert(storageTombstones).values({
         kind: "user_deleted", userId, createdAt: now,
         payload: retained.length || revocations.length ? retentionFact.parse({
-          version: 1,
+          version: 2,
           retained: retained.map(({ chart, identity, publication }) => ({
             ...(identity ? { publicId: identity.publicId.toString() } : {}),
-            version: 1, chartId: chart.id, revision: chart.revision, publication: publicationDto(publication),
+            version: 2, chartId: chart.id, revision: chart.revision, publication: publicationDto(publication),
           })),
         }) : undefined,
       }).returning();

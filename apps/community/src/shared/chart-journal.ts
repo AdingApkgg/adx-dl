@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { normalizeChartTags } from "./chart-metadata";
+import { normalizeChartAliases, normalizeChartTags } from "./chart-metadata";
 import { isPublicChartId } from "./chart-public-id";
 const date = z.string().datetime();
 // Match service validation and PostgreSQL char_length independently of UTF-16 units.
@@ -7,6 +7,7 @@ const chartText = z.string().refine((value) => [...value].length <= 120);
 const publication = z
   .object({
     versionId: z.string().uuid(),
+    aliases: z.undefined().optional(),
     title: chartText.refine((value) => value.length > 0),
     artist: chartText,
     description: z.string().refine(value => [...value].length <= 2000).default(""),
@@ -28,7 +29,7 @@ export const moderationFact = z.object({
   publication,
   author: z.object({ publicId: z.string().refine(isPublicChartId), name: z.string().min(1).max(120) }).strict().nullable(),
 }).strict();
-export const permissionFact = z
+const permissionV1 = z
   .object({
     version: z.literal(1),
     chartId: z.string().uuid(),
@@ -39,12 +40,22 @@ export const permissionFact = z
     moderation: moderationFact.optional(),
   })
   .strict();
-export const retentionFact = z
+const retentionV1 = z
   .object({
     version: z.literal(1),
-    retained: z.array(permissionFact.extend({ publication })).max(50),
+    retained: z.array(permissionV1.extend({ publication })).max(50),
   })
   .strict();
+const publicationV2 = publication.extend({
+  aliases: z.array(z.string()).max(8).refine(values => {
+    try { return JSON.stringify(normalizeChartAliases(values)) === JSON.stringify(values); } catch { return false; }
+  }).default([]),
+}).strict();
+const moderationV2 = moderationFact.extend({ publication: publicationV2 }).strict();
+const permissionV2 = permissionV1.extend({ version: z.literal(2), publication: publicationV2.nullable(), moderation: moderationV2.optional() }).strict();
+const retentionV2 = z.object({version:z.literal(2), retained:z.array(permissionV2.extend({publication:publicationV2})).max(50)}).strict();
+export const permissionFact = z.discriminatedUnion("version", [permissionV1, permissionV2]);
+export const retentionFact = z.discriminatedUnion("version", [retentionV1, retentionV2]);
 export type PermissionFact = z.infer<typeof permissionFact>;
 export type RetentionFact = z.infer<typeof retentionFact>;
 export type ChartJournalPayload = PermissionFact | RetentionFact;

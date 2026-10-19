@@ -25,9 +25,12 @@ export const exported = sql`coalesce((select exported_sequence from storage_jour
 /** All list/count/search/activity queries use this same exported-fact boundary. */
 export function visible(entity:"topic"|"message",alias:string):SQL {
  const a=sql.raw(alias);
- return sql`${a}.state='visible' and ${a}.body is not null and exists(select 1 from "user" u where u.id=${a}.author_id and u.status='active') and exists(select 1 from community_content_states s where s.key=${entity}||':'||${a}.id::text and s.fact->>'state'='visible' and s.revision=${a}.revision and s.fact->>'hash'=${a}.content_hash and s.journal_sequence<=${exported})`;
+ const bodyHash=entity==="topic"?sql`jsonb_build_object('title',${a}.title,'body',${a}.body,'chartIds',${a}.linked_chart_ids)`:
+  sql`jsonb_build_object('body',${a}.body,'difficulty',${a}.difficulty,'timestampMs',${a}.timestamp_ms,'rootId',${a}.root_id,'replyToId',${a}.reply_to_id,'topicId',${a}.topic_id,'chartId',${a}.chart_id,'versionId',${a}.version_id)`;
+ const integrity=entity==="topic"?sql`adxc_topic_hash(${a}.title,${a}.body,${a}.linked_chart_ids)`:sql`encode(sha256(convert_to(adxc_canonical_jsonb(${bodyHash}),'UTF8')),'hex')`;
+ return sql`${integrity}=${a}.content_hash and ${a}.state='visible' and ${a}.body is not null and exists(select 1 from "user" u where u.id=${a}.author_id and u.status='active') and exists(select 1 from community_content_states s where s.key=${entity}||':'||${a}.id::text and adxc_community_fact_valid(s.fact) and s.fact->>'entity'=${entity} and s.fact->>'id'=${a}.id::text and s.fact->'revision'=to_jsonb(s.revision) and s.fact->>'state'='visible' and s.revision=${a}.revision and s.fact->>'hash'=${a}.content_hash and s.journal_sequence<=${exported})`;
 }
-export const topicControl = (a="t") => sql`exists(select 1 from community_content_states c where c.key='topic_control:'||${sql.raw(a)}.id::text and c.journal_sequence<=${exported} and c.fact->>'state'='control')`;
+export const topicControl = (a="t") => sql`exists(select 1 from community_content_states c where c.key='topic_control:'||${sql.raw(a)}.id::text and c.journal_sequence<=${exported} and adxc_community_fact_valid(c.fact) and c.fact->>'entity'='topic_control' and c.fact->>'id'=${sql.raw(a)}.id::text and c.fact->'revision'=to_jsonb(c.revision) and c.fact->>'state'='control')`;
 export function topicAllowed(a="t"):SQL { return sql`${sql.raw(a)}.state<>'hidden' and ${sql.raw(a)}.state<>'deleted' and not exists(select 1 from community_content_states h where h.key='topic:'||${sql.raw(a)}.id::text and h.fact->>'state' in ('hidden','deleted')) and ${topicControl(a)}`; }
 export const effectiveBoard = (a="t") => sql`(select c.fact->'controls'->>'board' from community_content_states c where c.key='topic_control:'||${sql.raw(a)}.id::text)`;
 export const effectivePin = (a="t") => sql`(select (c.fact->'controls'->>'pin')::int from community_content_states c where c.key='topic_control:'||${sql.raw(a)}.id::text)`;

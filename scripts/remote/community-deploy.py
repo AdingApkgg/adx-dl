@@ -17,6 +17,8 @@ modes.add_argument('--no-pull',action='store_true',help='deploy the explicit pro
 args=parser.parse_args()
 if args.before_acceptance is not None and (not args.before_acceptance.is_absolute() or not args.before_acceptance.is_file()):
     parser.error('ABSOLUTE_BEFORE_ACCEPTANCE_PYTHON_FILE_REQUIRED')
+if 'PRODUCTION_PREVIEW_CHART' not in os.environ and 'PRODUCTION_PREVIEW_DIFFICULTY' not in os.environ:
+    os.environ.update(PRODUCTION_PREVIEW_CHART='1',PRODUCTION_PREVIEW_DIFFICULTY='6')
 preview_chart=os.environ.get('PRODUCTION_PREVIEW_CHART','')
 preview_difficulty=os.environ.get('PRODUCTION_PREVIEW_DIFFICULTY','')
 if (preview_chart or preview_difficulty) and (not re.fullmatch('[1-9][0-9]{0,19}',preview_chart) or not re.fullmatch('[1-7]',preview_difficulty)):

@@ -72,6 +72,7 @@ describe("页头的服务端渲染", () => {
       expect(links(html), path).toContainEqual({ href: `${home === "/" ? "" : home.replace(/\/$/, "")}/charts`, text: m.public_charts_title({}, { locale }) });
       expect(links(html), path).toContainEqual({ href: `${home === "/" ? "" : home.replace(/\/$/, "")}/lists`, text: m.library_public_title({}, { locale }) });
       expect(links(html), path).toContainEqual({ href: `${home === "/" ? "" : home.replace(/\/$/, "")}/downloads`, text: m.download_title({}, { locale }) });
+      expect(links(html), path).toContainEqual({href:`${home === "/" ? "" : home.replace(/\/$/, "")}/discover`,text:m.discovery_title({}, {locale})});
       const language = m[`language_${locale}`]();
       expect(html, path).toContain(`aria-label="${m.nav_language({ language }, { locale })}"`);
     }
@@ -87,7 +88,7 @@ describe("页头的服务端渲染", () => {
 
   test("没登录、已经在登录页上：不再显示'登录'按钮", async () => {
     for (const path of ["/login?next=%2F", "/en/login", "/login/", "/en/login/"]) {
-      expect(links(await renderHeader(path, null)), path).toHaveLength(7);
+      expect(links(await renderHeader(path, null)), path).toHaveLength(8);
     }
   });
 
@@ -98,7 +99,7 @@ describe("页头的服务端渲染", () => {
       expect(html).toContain(`aria-label="${m.nav_account_menu({ name: "阿丁" })}"`);
       expect(html).toContain(">阿</text>");
       expect(html).not.toContain(m.nav_sign_in());
-      expect(links(html)).toHaveLength(me.status === "active" ? 8 : 7);
+      expect(links(html)).toHaveLength(me.status === "active" ? 9 : 8);
       expect(links(html).some(link => link.href === "/me/notifications")).toBe(me.status === "active");
     }
   });
@@ -109,6 +110,6 @@ describe("页头的服务端渲染", () => {
 
     expect(html).not.toContain(m.nav_sign_in());
     expect(html).not.toContain(m.nav_account_menu({ name: "阿丁" }));
-    expect(links(html)).toHaveLength(7);
+    expect(links(html)).toHaveLength(8);
   });
 });

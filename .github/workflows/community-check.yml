@@ -122,6 +122,14 @@ jobs:
         working-directory: packages/ui
         run: bun run check
 
+      - name: Controlled discovery workload (rollback scoped, synthetic)
+        working-directory: apps/community
+        env:
+          DISCOVERY_PERF: '1'
+          DISCOVERY_PERF_PROFILE: '1'
+          DISCOVERY_PERF_REPORT: ${{ runner.temp }}/community-discovery-performance.json
+        run: bun test --timeout 180000 src/server/discovery/performance.test.ts
+
       # check：lint、编译文案、类型检查、bun test（单元、集成、服务端渲染），最后是 vitest run（交互测试）。
       - name: Lint, typecheck and test
         working-directory: apps/community
@@ -200,6 +208,17 @@ jobs:
       - name: Clean isolated acceptance resources
         if: always() && (steps.acceptance.outputs.browser == 'true' || steps.acceptance.outputs.restore == 'true')
         run: bash apps/community/test/acceptance/run.sh down
+
+      - name: Upload controlled discovery diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: community-discovery-performance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/community-discovery-performance.json
+            ${{ runner.temp }}/community-discovery-performance.json.plans.json
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload acceptance evidence
         if: always() && (steps.acceptance.outputs.browser == 'true' || steps.acceptance.outputs.restore == 'true')

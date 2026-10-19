@@ -187,6 +187,23 @@ try {
     assert.equal(new URL(await download.getAttribute('href'), origin).origin, origin);
     await download.waitFor();
   });
+  await step('production_public_discovery_search',async()=>{
+    const result=await json('/api/v1/search?type=charts&q=1');assert.equal(result.groups.charts.status,'ready');assert.ok(result.groups.charts.items.some(h=>h.publicId==='1'));
+    const suggestions=await json('/api/v1/search/suggestions?q=1');assert.ok(suggestions.some(h=>h.publicId==='1'));
+    const mismatch=await json('/api/v1/search?type=charts&q=1&designer=adxc-no-such-designer');assert.equal(mismatch.groups.charts.total,0);
+    for(const path of ['/discover','/search?type=charts&q=1','/authors','/tags','/en/search?q=1','/ja/search?q=1'])await visit(path);
+    for(const width of [320,390]){await page.setViewportSize({width,height:844});await visit('/search?type=charts&q=1');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}
+    await page.setViewportSize({width:1280,height:900});
+    const checks=await page.evaluate(async()=>{
+      const parser=new DOMParser(),docs={};
+      for(const path of ['/sitemap.xml','/sitemaps/charts-0.xml','/feed.xml']){const r=await fetch(path,{cache:'no-store'}),text=await r.text(),doc=parser.parseFromString(text,'application/xml');docs[path]={status:r.status,cache:r.headers.get('cache-control'),valid:!doc.querySelector('parsererror'),links:[...doc.querySelectorAll(path==='/feed.xml'?'item > link':'loc')].map(n=>n.textContent),guids:[...doc.querySelectorAll('item > guid')].map(n=>n.textContent)};}
+      let next='/api/v1/charts?sort=collected',latest=[];while(next&&latest.length<30){const r=await fetch(next,{cache:'no-store'});if(!r.ok)throw Error('FEED_REFERENCE_QUERY_FAILED');const p=await r.json();latest.push(...p.items.map(c=>location.origin+'/charts/'+c.publicId));next=p.nextCursor?'/api/v1/charts?sort=collected&cursor='+encodeURIComponent(p.nextCursor):null;}
+      return {docs,latest:latest.slice(0,30)};
+    });
+    assert.ok(Object.values(checks.docs).every(c=>c.status===200&&c.valid&&/no-store/.test(c.cache)));
+    assert.ok(checks.docs['/sitemaps/charts-0.xml'].links.includes(origin+'/charts/1'));
+    assert.deepEqual(checks.docs['/feed.xml'].links,checks.latest);assert.deepEqual(checks.docs['/feed.xml'].guids,checks.latest);
+  });
   if (previewRequired) await step('production_required_chart_preview', async () => {
     const difficulty = Number(previewDifficulty);
     await visit(`/charts/${previewChart}`);
@@ -372,6 +389,15 @@ try {
     });
   }
   if (bridgeUrl) {
+    await step('production_authenticated_discovery_library',async()=>{
+      await visit('/search?type=charts&q=1');
+      await page.getByRole('checkbox',{name:'选择谱面 #1',exact:true}).check();
+      const bar=page.locator('aside').filter({has:page.getByRole('button',{name:'加入谱单',exact:true})});
+      await bar.getByRole('button',{name:'加入谱单',exact:true}).click();await bar.getByLabel('谱单名称',{exact:true}).waitFor();await bar.getByRole('button',{name:'加入下载队列',exact:true}).waitFor();
+      await bar.getByRole('button',{name:'清除选择',exact:true}).click();
+      await visit('/me/library');await json('/api/v1/me/lists');await visit('/downloads');
+      if(role==='admin'){const status=await json('/api/v1/dash/status');assert.equal(status.discovery.ready,true);assert.deepEqual(status.discovery.permissionVersions,[1,2]);}
+    });
     await step('production_bridge_write_denial_and_session_revocation', async () => {
       const headers = { authorization: `Bearer ${bridgeKey}` };
       assert.equal((await fetch(bridgeUrl + '/api/v1/me')).status, 401);

@@ -14,6 +14,7 @@ export const charts = pgTable("charts", {
   description: text().notNull().default(""),
   credits: text().notNull().default(""),
   tags: jsonb().$type<ChartTag[]>().notNull().default([]),
+  aliases: jsonb().$type<string[]>().notNull().default([]),
   // Nullable solely during the atomic chart + first-version insertion.
   currentVersionId: uuid(),
   revision: integer().notNull().default(1),
@@ -60,6 +61,7 @@ export const chartPublications = pgTable("chart_publications", {
   description: text().notNull().default(""),
   credits: text().notNull().default(""),
   tags: jsonb().$type<ChartTag[]>().notNull().default([]),
+  aliases: jsonb().$type<string[]>().notNull().default([]),
   releaseNote: text().notNull().default(""),
   publishedAt: timestamp(tz).notNull(),
   updatedAt: timestamp(tz).notNull(),

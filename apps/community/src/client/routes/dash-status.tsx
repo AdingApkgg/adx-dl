@@ -28,6 +28,7 @@ export default function DashStatus({ loaderData: state }: Route.ComponentProps) 
         { label: m.dash_purge_incomplete(), value: state.queues.purgeIncomplete }, { label: m.dash_revoking(), value: state.queues.revoking },
         { label: m.dash_maintenance(), value: state.maintenance.active ? m.dash_maintenance_active() : m.dash_maintenance_idle() },
       ]} /></DashSection>
+      <DashSection title={m.discovery_status()}><p>{state.discovery?.ready?m.discovery_status_ready():m.discovery_status_unavailable()}</p><p className="text-sm">{state.discovery?.performance.status==="passed"&&state.discovery.performance.checkedAt&&state.discovery.performance.p95Ms!==null?m.discovery_perf_receipt({date:dashDate(state.discovery.performance.checkedAt),ms:String(state.discovery.performance.p95Ms)}):m.discovery_perf_not_run()}</p></DashSection>
       <DashSection title={m.library_dash_title()}><p>{m.library_status_counts({lists:String(state.library?.lists??0),publications:String(state.library?.publications??0),pending:String(state.library?.pendingControls??0)})} · {state.library?.ready?m.dash_ok():m.dash_unavailable()}</p></DashSection>
       <DashSection title={m.following_status_title()}><DashFacts rows={[
         {label:m.following_status_ready(),value:state.following?.ready?m.dash_ok():m.dash_unavailable()},

@@ -1,3 +1,4 @@
+import {exerciseDiscovery} from "./discovery-browser.mjs";
 import {exerciseAuthor} from "./author-browser.mjs";
 import {exerciseLibrary} from "./library-browser.mjs";
 import { exerciseFollowing } from "./following-browser.mjs";
@@ -98,14 +99,23 @@ function wav() {
   return bytes;
 }
 
-const steps = [], diagnostics = [];
-let phase = "launch", browser, page, owner, other, anonymous;
+const steps = [], diagnostics = [], suiteFailures = [];
+let phase = "launch", browser, page, owner, other, anonymous, publicVisitor;
 const startedAt = Date.now();
 async function step(name, work) {
   phase = name;
   await work();
   steps.push(name);
   console.log(`ACCEPTANCE_STEP_OK ${name}`);
+}
+// Independent synthetic journeys may collect failures together; none can turn a failed run green.
+async function independentSuite(name, work) {
+  try { await work(); return true; }
+  catch (error) {
+    suiteFailures.push({ suite: name, phase, error: sanitized(error.message) });
+    console.error(`ACCEPTANCE_SUITE_FAILED ${name}: ${sanitized(error.message)}`);
+    return false;
+  }
 }
 async function json(context, path, status = 200) {
   const response = await context.request.get(new URL(path, origin).href, { timeout: 10000 });
@@ -287,7 +297,7 @@ async function acceptance() {
     const source = `/api/v1/files/${draft.versions[0].sourceFileId}/content`;
     await denied(anonymous, source, 401); await denied(other, source, 404);
   });
-  let publicChart, publicVisitor;
+  let publicChart;
   const publicBase = () => `/api/v1/charts/${publicChart?.publicId ?? draft.id}`;
   const publicAssets = () => ["maidata", "audio", "cover"].map(role => `${publicBase()}/versions/${draft.currentVersionId}/assets/${role}`);
   await step("private_draft_not_public_and_explicit_version_confirmation", async () => {
@@ -355,7 +365,7 @@ async function acceptance() {
     await visitor.setViewportSize({ width: 1440, height: 900 });
     const home = await visitor.goto(origin.href);
     assert.equal(home.headers()["cache-control"], "private, no-store");
-    const latest = visitor.getByRole("region", { name: "最新公开谱面", exact: true });
+    const latest = visitor.locator("section").filter({ has: visitor.getByRole("heading", { name: "最近公开更新", exact: true }) }).getByRole("region", { name: "公开谱面", exact: true });
     await latest.getByRole("link", { name: /CI private draft/ }).waitFor();
     assert.ok(await latest.locator("ul").first().evaluate(el => el.getBoundingClientRect().width > 1000));
     if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-home-desktop.png"), fullPage: true });
@@ -365,7 +375,9 @@ async function acceptance() {
     }
     if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-home-mobile.png"), fullPage: true });
     await visitor.setViewportSize({ width: 1440, height: 900 });
-    await visitor.getByRole("link", { name: "浏览公开谱面", exact: true }).click();
+    await latest.locator('a[href="/charts"]').click();
+    await visitor.waitForURL(u => u.pathname === "/charts");
+    await visitor.getByRole("heading", { level: 1, name: "公开谱面", exact: true }).waitFor();
     await visitor.getByRole("link", { name: /CI private draft/ }).click();
     await visitor.getByRole("heading", { level: 1, name: "CI private draft", exact: true }).waitFor();
     assert.equal(new URL(visitor.url()).pathname, `/charts/${publicChart.publicId}`);
@@ -428,7 +440,7 @@ async function acceptance() {
       }
     }
   });
-  await exercisePlatform({ owner, other, anonymous, page, origin, chart: { ...publicChart, id: draft.id }, evidenceDirectory, step });
+  await independentSuite("platform", () => exercisePlatform({ owner, other, anonymous, page, origin, chart: { ...publicChart, id: draft.id }, evidenceDirectory, step }));
   await step("withdrawal_reauthorizes_all_old_asset_and_download_requests", async () => {
     await page.getByRole("button", { name: "撤回公开", exact: true }).click();
     const [withdrawn] = await Promise.all([
@@ -445,7 +457,9 @@ async function acceptance() {
     assert.equal((await json(anonymous, "/api/v1/charts")).items.some(c => c.id === draft.id), false);
     await publicVisitor.getByRole("banner").getByRole("link", { name: "AstroDX 自制谱社区", exact: true }).click();
     await publicVisitor.waitForURL(url => url.pathname === "/");
-    await publicVisitor.getByText("还没有公开谱面。", { exact: true }).waitFor();
+    await publicVisitor.getByRole("heading", { level: 1, name: "发现好谱", exact: true }).waitFor();
+    const updated = publicVisitor.locator("section").filter({ has: publicVisitor.getByRole("heading", { name: "最近公开更新", exact: true }) }).getByRole("region", { name: "公开谱面", exact: true });
+    await updated.getByText("没有符合条件的公开内容。", { exact: true }).waitFor();
     assert.equal(await publicVisitor.getByRole("link", { name: /CI private draft/ }).count(), 0);
     await publicVisitor.close();
     assert.equal((await json(owner, `/api/v1/me/charts/${draft.id}`)).versions.length, 2);
@@ -631,9 +645,11 @@ async function acceptance() {
     assert.equal(republished.status(), 409); assert.equal((await republished.json()).error.code, "CHART_MODERATED");
     await denied(anonymous, "/api/v1/charts/2", 404);
   });
-  await exerciseLibrary({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Library browser\n&inote_4=(120){4}1,2,E\n`)]])});
-  await exerciseFollowing({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Following browser\n&inote_4=(120){4}1,2,E\n`)]])});
-  await exerciseAuthor({owner,other,anonymous,origin,step,evidenceDirectory,zip:(label,next=false)=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Creator browser\n&inote_4=(120){4}${next?"1,(240)3,4":"1,2"},E\n`)]])});
+  await independentSuite("library", () => exerciseLibrary({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Library browser\n&inote_4=(120){4}1,2,E\n`)]])}));
+  await independentSuite("following", () => exerciseFollowing({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Following browser\n&inote_4=(120){4}1,2,E\n`)]])}));
+  const authorPassed = await independentSuite("author", () => exerciseAuthor({owner,other,anonymous,origin,step,evidenceDirectory,zip:(label,next=false)=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Creator browser\n&inote_4=(120){4}${next?"1,(240)3,4":"1,2"},E\n`)]])}));
+  if (authorPassed) await independentSuite("discovery", () => exerciseDiscovery({owner,other,anonymous,origin,step,evidenceDirectory,independentSuite}));
+  assert.deepEqual(suiteFailures, [], "all independent synthetic journeys must pass");
   assert.equal(diagnostics.filter(row => row.type === "pageerror").length, 0, "uncaught browser errors");
   assert.equal(diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length, 0, "hydration errors");
 }
@@ -647,10 +663,11 @@ try {
   if (evidenceDirectory) await writeFile(join(evidenceDirectory, "browser-result.json"), JSON.stringify(result, null, 2) + "\n", { mode: 0o600 });
   console.log("ACCEPTANCE_BROWSER_PASSED");
 } catch (error) {
-  const result = { status: "failed", phase, steps, elapsedMs: Date.now() - startedAt, error: sanitized(error.message), diagnostics: diagnostics.slice(-40) };
+  const result = { status: "failed", phase, steps, elapsedMs: Date.now() - startedAt, error: sanitized(error.message), suiteFailures, diagnostics: diagnostics.slice(-40) };
   if (evidenceDirectory) {
     await writeFile(join(evidenceDirectory, "browser-result.json"), JSON.stringify(result, null, 2) + "\n", { mode: 0o600 });
-    if (page && !page.isClosed()) await page.screenshot({ path: join(evidenceDirectory, "browser-failure.png"), fullPage: true, timeout: 5000 }).catch(() => {});
+    const failedPage = phase === "anonymous_home_catalog_detail_lazy_native_preview_exact_zip" ? publicVisitor : page;
+    if (failedPage && !failedPage.isClosed()) await failedPage.screenshot({ path: join(evidenceDirectory, "browser-failure.png"), fullPage: true, timeout: 5000 }).catch(() => {});
   }
   console.error(`ACCEPTANCE_BROWSER_FAILED ${phase}: ${sanitized(error.message)}`);
   process.exitCode = 1;

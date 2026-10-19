@@ -1,3 +1,4 @@
+import {DiscoverySearch} from "./discovery-search";
 import {NotificationIndicator} from "./notification-indicator";
 import { Link } from "react-router";
 
@@ -21,7 +22,9 @@ export function SiteHeader() {
         <SettingsSheet />
         <AccountMenu />
       </div>
+      <div className="mx-auto w-full max-w-3xl px-4 pb-3"><DiscoverySearch compact/></div>
       <nav aria-label={m.site_navigation()} className="mx-auto flex max-w-3xl items-center gap-4 overflow-x-auto px-4 pb-2 text-sm">
+       <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/discover")}>{m.discovery_title()}</Link>
        <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/charts")}>{m.public_charts_title()}</Link>
        <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/forum")}>{m.site_forum()}</Link>
        <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/help")}>{m.site_help()}</Link>

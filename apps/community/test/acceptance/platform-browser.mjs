@@ -111,7 +111,7 @@ export async function exercisePlatform({ owner, other, anonymous, page, origin, 
       assert.deepEqual((await read(anonymous, "/api/v1/site/featured")).ids, [chart.publicId]);
       await page.goto(url("/dash/notices"));
       await page.getByRole("button", { name: "新建公告", exact: true }).click();
-      const editor = page.locator("form").first();
+      const editor = page.locator("main form").filter({ has: page.getByRole("button", { name: "保存草稿", exact: true }) }).first();
       await editor.getByRole("textbox", { name: "标题", exact: true }).first().fill("Browser site notice");
       await editor.getByRole("textbox", { name: "正文", exact: true }).first().fill("Public browser notice");
       // The new notice UUID is client generated; match this single PUT without exposing session data.

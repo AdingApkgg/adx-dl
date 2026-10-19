@@ -88,7 +88,7 @@ test("built anonymous charts: real S3 HTTP metadata/failures/hash blocks, bounde
     await db.execute("alter table chart_publications rename to acceptance_unavailable_publications"); renamed = true;
     for (const path of [`/charts/${chart.id}`, `/charts/${chart.id}.data`, "/charts", "/charts.data"]) {
       const response = await fetch(server.url(path)); expect(response.status).toBe(503); expect(response.headers.get("cache-control")).toBe("private, no-store");
-      if (!path.endsWith(".data")) expect(await response.text()).toContain('name="robots" content="noindex"'); else await response.arrayBuffer();
+      if (!path.endsWith(".data")) expect(await response.text()).toMatch(/name="robots" content="noindex(?:,follow)?"/); else await response.arrayBuffer();
     }
   } finally {
     hold = false;

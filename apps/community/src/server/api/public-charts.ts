@@ -1,3 +1,6 @@
+import {publicChartFiltersFromParams,publicChartSearchParams} from "@/shared/public-chart-search";
+import {HTTPException} from "hono/http-exception";
+import {randomPublicChart,containingPublicLists} from "../discovery/catalog";
 import { Hono, type Context } from "hono";
 import type { AppEnv } from "../app-env";
 import {
@@ -19,6 +22,7 @@ function storage(c: Context<AppEnv>) {
   if (!ctx) throw new StorageUnavailableError();
   return ctx;
 }
+function filters(c:Context<AppEnv>){try{return Object.fromEntries(publicChartSearchParams(publicChartFiltersFromParams(new URL(c.req.url).searchParams)));}catch{throw new HTTPException(400);}}
 export const publicChartRoutes = new Hono<AppEnv>()
   .use(async (c, next) => {
     c.header("cache-control", "private, no-store");
@@ -29,12 +33,14 @@ export const publicChartRoutes = new Hono<AppEnv>()
     c.json(
       await listPublicCharts(storage(c), {
         cursor: c.req.query("cursor"),
-        tag: c.req.query("tag"), q: c.req.query("q"), difficulty: c.req.query("difficulty"), sort: c.req.query("sort"), author: c.req.query("author"),
+        ...filters(c),
         ...(c.req.query("limit") !== undefined ? { limit: Number(c.req.query("limit")) } : {}),
       }),
     ),
   )
   .get("/tags", async c => c.json(await suggestPublicChartTags(storage(c), c.req.query("q") ?? "")))
+  .get("/random",async c=>c.json(await randomPublicChart(storage(c),filters(c))))
+  .get("/:id/public-lists",async c=>c.json(await containingPublicLists(storage(c),c.req.param("id"))))
   .get("/:id/related", async c => c.json(await relatedPublicCharts(storage(c), c.req.param("id"))))
   .get("/:id", async (c) => c.json(await getPublicChart(storage(c), c.req.param("id"))))
   .on(["GET", "HEAD"], "/:id/download", async (c) => {

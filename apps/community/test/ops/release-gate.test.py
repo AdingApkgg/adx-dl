@@ -50,6 +50,10 @@ class ReleaseGateTests(unittest.TestCase):
    self.receipt=copy.deepcopy(original);self.receipt['result']['steps'].remove(step);self.write_receipt()
    with self.assertRaises(ValueError):self.invoke('--await')
    self.assertEqual((self.root/'.deploy-revision').read_text(),'old\n')
+ def test_discovery_groups_are_mandatory_even_with_previous_complete_receipt(self):
+  for step in ['production_public_discovery_search','production_authenticated_discovery_library']:
+   receipt=copy.deepcopy(self.receipt);receipt['result']['steps'].remove(step)
+   with self.assertRaisesRegex(ValueError,'RECEIPT_REJECTED'):gate.validate(receipt,self.ready)
  def test_optional_preview_gate_requires_exact_target_and_complete_observations(self):
   self.ready['requiredPreview']={'chart':'1','difficulty':6}
   with self.assertRaisesRegex(ValueError,'RECEIPT_REJECTED'):gate.validate(self.receipt,self.ready)

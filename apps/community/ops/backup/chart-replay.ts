@@ -55,8 +55,8 @@ export async function replayChartPermission(
   if (!p.publication) return;
   const s = p.publication;
   const restored = await c.query(
-    `insert into chart_publications(chart_id,version_id,title,artist,published_at,updated_at,description,credits,tags,release_note)
- select ch.id,v.id,$3,$4,$5,$6,$7,$8,$9,$10 from charts ch join chart_versions v on v.chart_id=ch.id
+    `insert into chart_publications(chart_id,version_id,title,artist,published_at,updated_at,description,credits,tags,release_note,aliases)
+ select ch.id,v.id,$3,$4,$5,$6,$7,$8,$9,$10,$11 from charts ch join chart_versions v on v.chart_id=ch.id
  join files f on f.id=v.source_file_id join blobs b on b.id=f.blob_id
  join blob_derivatives d on d.id=v.preview_derivative_id and d.source_blob_id=b.id
  join derived_objects o on o.id=d.derived_object_id
@@ -64,7 +64,7 @@ export async function replayChartPermission(
  and f.state='ready' and f.deleted_at is null and f.purpose='chart-source' and b.state='ready'
  and d.state='ready' and d.recipe='chart-preview-v1' and o.state='ready'
  and not exists(select 1 from blob_blocks where sha256 in(b.sha256,o.output_sha256))`,
-    [p.chartId, s.versionId, s.title, s.artist, s.publishedAt, s.updatedAt, s.description, s.credits, JSON.stringify(s.tags), s.releaseNote],
+    [p.chartId, s.versionId, s.title, s.artist, s.publishedAt, s.updatedAt, s.description, s.credits, JSON.stringify(s.tags), s.releaseNote, JSON.stringify(s.aliases ?? [])],
   );
   if (!restored.rowCount) pending();
 }
@@ -83,9 +83,9 @@ export async function replayDeletedUserCharts(
     }
     // A backup predating the selected version still needs a stable anonymous recovery anchor.
     await c.query(
-      `insert into charts(id,owner_id,title,artist,revision,publication_sequence,description,credits,tags)
-       values($1,null,$2,$3,$4,$5,$6,$7,$8) on conflict(id) do nothing`,
-      [fact.chartId, fact.publication.title, fact.publication.artist, fact.revision, r.sequence, fact.publication.description, fact.publication.credits, JSON.stringify(fact.publication.tags)],
+      `insert into charts(id,owner_id,title,artist,revision,publication_sequence,description,credits,tags,aliases)
+       values($1,null,$2,$3,$4,$5,$6,$7,$8,$9) on conflict(id) do nothing`,
+      [fact.chartId, fact.publication.title, fact.publication.artist, fact.revision, r.sequence, fact.publication.description, fact.publication.credits, JSON.stringify(fact.publication.tags), JSON.stringify(fact.publication.aliases ?? [])],
     );
     const chart = await c.query(
       "select owner_id,publication_sequence from charts where id=$1 for update",
@@ -105,13 +105,13 @@ export async function replayDeletedUserCharts(
     // Retention does not depend on derived bytes being ready. Keep the exact version/source
     // reference so rebuild and a replay of this fact can reopen it; all other history is private.
     await c.query(
-      "update charts set current_version_id=$2,title=$3,artist=$4,owner_id=null,description=$5,credits=$6,tags=$7 where id=$1",
+      "update charts set current_version_id=$2,title=$3,artist=$4,owner_id=null,description=$5,credits=$6,tags=$7,aliases=$8 where id=$1",
       [
         fact.chartId,
         version.rowCount ? fact.publication.versionId : null,
         fact.publication.title,
         fact.publication.artist,
-        fact.publication.description, fact.publication.credits, JSON.stringify(fact.publication.tags),
+        fact.publication.description, fact.publication.credits, JSON.stringify(fact.publication.tags), JSON.stringify(fact.publication.aliases ?? []),
       ],
     );
     await c.query("update chart_versions set release_note=$3 where chart_id=$1 and id=$2",[fact.chartId,fact.publication.versionId,fact.publication.releaseNote]);
@@ -170,8 +170,8 @@ export async function numberRestoredPublications(c: Client, durableSequence: num
     const identity = await c.query("insert into chart_public_ids(chart_id) values($1) returning public_id::text as id", [row.id]);
     const state = await c.query(`select ch.revision,p.* from chart_publications p join charts ch on ch.id=p.chart_id where ch.id=$1`, [row.id]);
     const p = state.rows[0];
-    const payload = permissionFact.parse({ version: 1, chartId: row.id, publicId: identity.rows[0].id, revision: p.revision,
-      publication: { versionId: p.version_id, title: p.title, artist: p.artist, description:p.description,credits:p.credits,tags:p.tags,releaseNote:p.release_note,publishedAt: p.published_at.toISOString(), updatedAt: p.updated_at.toISOString() } });
+    const payload = permissionFact.parse({ version: 2, chartId: row.id, publicId: identity.rows[0].id, revision: p.revision,
+      publication: { versionId: p.version_id, title: p.title, artist: p.artist, description:p.description,credits:p.credits,tags:p.tags,aliases:p.aliases??[],releaseNote:p.release_note,publishedAt: p.published_at.toISOString(), updatedAt: p.updated_at.toISOString() } });
     const fact = await c.query("insert into storage_tombstones(kind,payload) values('chart_permission',$1) returning sequence", [JSON.stringify(payload)]);
     await c.query("update charts set publication_sequence=$2 where id=$1", [row.id, fact.rows[0].sequence]);
   }
