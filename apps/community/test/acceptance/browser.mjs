@@ -518,7 +518,7 @@ async function acceptance() {
     await page.getByText("管理员 #1", { exact: true }).waitFor();
     assert.match(await page.locator('meta[name="robots"]').getAttribute("content"), /noindex/);
     const navigation = page.getByRole("navigation", { name: "社区管理后台", exact: true });
-    assert.equal(await navigation.getByRole("link").count(), 8);
+    assert.deepEqual(await navigation.getByRole("link").evaluateAll(links=>links.map(link=>link.getAttribute("href"))), ["/dash/lists","/dash/discussions","/dash/featured","/dash/notices","/dash","/dash/users","/dash/charts","/dash/status","/dash/reports"]);
     if (evidenceDirectory) await page.screenshot({ path: join(evidenceDirectory, "dash-desktop.png"), fullPage: true });
     await navigation.getByRole("link", { name: "用户列表", exact: true }).click();
     await page.waitForURL(url => url.pathname === "/dash/users");
