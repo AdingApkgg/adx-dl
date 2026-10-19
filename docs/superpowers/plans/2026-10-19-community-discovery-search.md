@@ -66,7 +66,9 @@
 
 ### Task 7: One concentrated verification and formal release
 **Files:** release evidence/ledger plus identified fixes only.
-- [ ] Open release window; configured Linux builder lint/types/unit/PG/DOM/HTTP/build/native/perf/bounded restore and failure correction. Preserve actual evidence; no local heavy work.
-- [ ] Migration rehearsal and source-data invariants; prebackup; push/attach PR; full CI and exact merged tree.
-- [ ] Formal community-deploy.py with mandatory logged-in headless receipt + chart1 slot6; accepted marker only on all pass; postbackup and source/serving/accepted/old IDs/roles/session/helper cleanup.
-- [ ] Final evidence and honest limitations, one complete delivery.
+- [x] Open release window; configured Linux builder lint/types/unit/PG/DOM/HTTP/build/native/perf/bounded restore and failure correction. Preserve actual evidence; no local heavy work.
+- [x] Migration rehearsal and source-data invariants; prebackup; push/attach PR; full CI and exact merged tree.
+- [x] Formal community-deploy.py with mandatory logged-in headless receipt + chart1 slot6; accepted marker only on all pass; postbackup and source/serving/accepted/old IDs/roles/session/helper cleanup.
+- [x] Final evidence and honest limitations, one complete delivery.
+
+Final release evidence: docs/verification/community-discovery-search-2026-10-19.md. Application106f4f9; external acceptance-label correction e0734eb; formal17groups and postbackup passed.
