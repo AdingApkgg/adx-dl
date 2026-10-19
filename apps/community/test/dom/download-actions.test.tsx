@@ -1,0 +1,10 @@
+import {act,fireEvent,render,screen,waitFor} from '@testing-library/react';
+import {MemoryRouter} from 'react-router';
+import {afterEach,expect,test,vi} from 'vitest';
+import {m} from '@/paraglide/messages.js';
+const fixture=vi.hoisted(()=>({scope:'a',enqueue:vi.fn(async()=>true)}));
+vi.mock('@/client/downloads/provider',()=>({useDownloads:()=>({snapshot:{scope:fixture.scope},store:{enqueue:fixture.enqueue}})}));
+import {DownloadAddButton} from '@/client/components/download-actions';
+const item={publicId:'1',versionId:'12345678-1234-4234-8234-123456789abc',size:1048576,sha256:'a'.repeat(64),url:'/api/v1/charts/1/download?expectedVersion=12345678-1234-4234-8234-123456789abc'};
+afterEach(()=>{vi.unstubAllGlobals();fixture.enqueue.mockClear();fixture.scope='a';});
+test('queue requires an explicit size preview and cannot carry confirmation across accounts',async()=>{vi.stubGlobal('fetch',vi.fn(async()=>Response.json({items:[item]})));const view=()=> <MemoryRouter><DownloadAddButton publicIds={['1']}/></MemoryRouter>;const result=render(view());fireEvent.click(screen.getByRole('button',{name:m.download_add()}));await screen.findByText(m.download_plan_summary({count:'1',bytes:'1.00'}));expect(fixture.enqueue).not.toHaveBeenCalled();fixture.scope='b';await act(async()=>result.rerender(view()));expect(screen.queryByRole('button',{name:m.download_confirm()})).toBeNull();fireEvent.click(screen.getByRole('button',{name:m.download_add()}));await screen.findByRole('button',{name:m.download_confirm()});fireEvent.click(screen.getByRole('button',{name:m.download_confirm()}));await waitFor(()=>expect(fixture.enqueue).toHaveBeenCalledWith(['1'],'files',[item]));});

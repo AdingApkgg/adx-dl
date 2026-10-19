@@ -1,3 +1,4 @@
+import {DownloadAddButton} from "../components/download-actions";
 import { FollowAuthor } from "../components/follow-author";
 import {ChartDiscussion} from "../components/chart-discussion";
 import { DownloadIcon, PlayCircleIcon } from "lucide-react";
@@ -69,6 +70,7 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
         <div role="group" aria-label={m.public_chart_actions()} className="flex flex-wrap items-start gap-3">
           {canPreview ? <Button asChild variant="secondary" className="min-h-11"><a href="#chart-preview"><PlayCircleIcon aria-hidden="true" />{m.public_chart_preview_action()}</a></Button> : null}
           <Button asChild className="min-h-11"><a href={publicChartDownloadUrl(chart.publicId)} download><DownloadIcon aria-hidden="true" />{m.public_chart_download()}</a></Button>
+          <DownloadAddButton publicIds={[chart.publicId]}/>
           <ShareChartButton key={chart.id} title={chart.title} publicId={chart.publicId} />
         </div>
         <ChartCommunityActions chart={chart} />

@@ -1,3 +1,4 @@
+import {AddToList} from "./library-actions";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { Textarea } from "@astrodx/ui/components/textarea";
@@ -48,7 +49,7 @@ function SignedInActions({ chart, userId }: { chart: PublicChartDto; userId: str
     } catch (error) { if (alive.current) failed(error); }
     finally { if (alive.current) setReportPending(false); }
   }
-  return <div className="space-y-3">
+  return <div className="space-y-3"><AddToList publicIds={[chart.publicId]}/>
     <div className="flex flex-wrap gap-3">
       {favorite.isError && !favorite.data ? <Button variant="outline" disabled={favorite.isFetching} onClick={() => void favorite.refetch()}>{m.favorite_retry()}</Button>
         : <Button type="button" variant="outline" className="min-h-11" disabled={pending || !favorite.data} aria-pressed={favorite.data?.favorited ?? false} onClick={() => void toggleFavorite()}>

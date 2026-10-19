@@ -26,6 +26,8 @@ export function SiteHeader() {
        <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/forum")}>{m.site_forum()}</Link>
        <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/help")}>{m.site_help()}</Link>
        <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/notices")}>{m.site_notices()}</Link>
+       <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/lists")}>{m.library_public_title()}</Link>
+       <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/downloads")}>{m.download_title()}</Link>
        <NotificationIndicator/>
       </nav>
     </header>

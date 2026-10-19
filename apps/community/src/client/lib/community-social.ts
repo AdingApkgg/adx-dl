@@ -24,6 +24,10 @@ export function socialError(error: unknown): string {
   const code = error instanceof ApiError ? error.code : "";
   if (code === "FAVORITE_LIMIT") return m.favorite_limit();
   if (code === "REPORT_LIMIT") return m.report_limit();
+  if (code === "LIBRARY_CHANGED") return m.library_changed();
+  if (code === "LIBRARY_LIMIT") return m.library_limit();
+  if (code === "LIBRARY_MODERATED") return m.library_moderated();
+  if (code === "LIBRARY_ENTRIES_UNAVAILABLE") return m.library_unavailable();
   if (code === "REPORT_CHANGED") return m.report_changed();
   if (code === "REPORT_MODERATION_REQUIRED") return m.report_moderation_required();
   return m.social_unconfirmed();

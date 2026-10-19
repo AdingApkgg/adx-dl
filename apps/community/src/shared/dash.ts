@@ -20,6 +20,7 @@ export type DashChart = {
 export type DashChartsPage = { items: DashChart[]; nextCursor: string | null };
 export type DashStatus = {
   capturedAt: string;
+  library?: import("./library").LibraryStatus|null;
   following?: import("./following").FollowingStatus;
   qq?: import("./napcat").NapcatObservation;
   checks: { name: string; status: "ok" | "unavailable" }[];

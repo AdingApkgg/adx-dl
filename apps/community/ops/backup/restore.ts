@@ -1,3 +1,4 @@
+import {replayLibraryFact,finishLibraryReplay,purgeLibraryUser} from "./library-replay";
 import { replayFollowingFact, finishFollowingReplay, purgeFollowingUser } from "./following-replay";
 import { replayCommunityContent, finishCommunityReplay } from "./community-replay";
 import { replayDiscussionUserDeletion } from "../../src/server/discussions/deletion";
@@ -261,13 +262,16 @@ export async function replayJournal(
       const reportPending = (diagnostic: ChartRestorePending) => {
         if (latestPermission.get(diagnostic.chartId) === r.sequence) pending.push(diagnostic);
       };
-      if (r.kind === "private_social") {
+      if (r.kind === "private_library") {
+        await replayLibraryFact(c,r);
+      } else if (r.kind === "private_social") {
         await replayFollowingFact(c,r);
       } else if (r.kind === "community_content") {
         await replayCommunityContent(c,r);
       } else if (r.kind === "user_public_id") {
         await replayUserPublicId(c, r);
       } else if (r.kind === "user_deleted") {
+        await purgeLibraryUser(c,r.userId!);
         await purgeFollowingUser(c,r.userId!);
         await replayDiscussionUserDeletion(c,r.userId!);
         await replayDeletedUserCharts(c, r, reportPending);
@@ -342,6 +346,7 @@ export async function replayJournal(
     }
     await finishCommunityReplay(c,head.sequence);
     await finishFollowingReplay(c,head.sequence);
+    await finishLibraryReplay(c,head.sequence);
     // A dump is captured inside its own backup. Its running token owns no target job.
     // Preserve earlier completed evidence, but never interpret restored in-flight work as live.
     await c.query("update storage_backup_status set status='unknown',run_id=gen_random_uuid(),finished_at=null where status='running'");

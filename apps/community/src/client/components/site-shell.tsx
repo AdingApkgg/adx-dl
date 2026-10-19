@@ -1,3 +1,5 @@
+import {DownloadDock} from "./download-actions";
+import {LibrarySelectionBar} from "./library-actions";
 import { useLocation } from "react-router";
 import { deLocalizeHref } from "@/paraglide/runtime.js";
 import type { ReactNode } from "react";
@@ -14,7 +16,8 @@ export function SiteShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-dvh flex-col">
       <SiteHeader />
       <LocaleSuggestion />
-      <div className={`mx-auto w-full ${publicCharts ? "max-w-7xl" : "max-w-3xl"} flex-1 px-4 py-8`}>{children}</div>
+      <div className={`mx-auto w-full ${publicCharts ? "max-w-7xl" : "max-w-3xl"} flex-1 px-4 py-8`}><LibrarySelectionBar/>{children}</div>
+      <DownloadDock/>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import {clearDeviceDownloads} from "../downloads/provider";
 import { Button } from "@astrodx/ui/components/button";
 import {
   DropdownMenu,
@@ -52,6 +53,7 @@ export function AccountMenu() {
       toast.error(errorMessage(error) ?? m.error_unknown());
       return;
     }
+    await clearDeviceDownloads();
     if (me) clearUploadRecords(me.id);
     window.location.assign(localizeHref("/"));
   }
@@ -75,6 +77,7 @@ export function AccountMenu() {
             <DropdownMenuItem asChild><Link to={localizeHref("/me/following")}>{m.following_title()}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to={localizeHref("/me/discussions")}>{m.site_my_discussions()}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to={localizeHref("/me/notifications")}>{m.site_notifications()}</Link></DropdownMenuItem>
+            <DropdownMenuItem asChild><Link to={localizeHref("/me/library")}>{m.library_title()}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to={localizeHref("/me/favorites")}>{m.my_favorites()}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to={localizeHref("/me/reports")}>{m.my_reports()}</Link></DropdownMenuItem>
             {me.isAdmin ? <DropdownMenuItem asChild><Link to={localizeHref("/dash")}>{m.dash_title()}</Link></DropdownMenuItem> : null}

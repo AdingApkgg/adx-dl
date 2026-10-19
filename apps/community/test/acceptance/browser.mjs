@@ -1,3 +1,4 @@
+import {exerciseLibrary} from "./library-browser.mjs";
 import { exerciseFollowing } from "./following-browser.mjs";
 // Run only on a remote Linux runner against the isolated acceptance Compose project.
 // Playwright is installed outside the repository; no product dependency is needed.
@@ -517,7 +518,7 @@ async function acceptance() {
     await page.getByText("管理员 #1", { exact: true }).waitFor();
     assert.match(await page.locator('meta[name="robots"]').getAttribute("content"), /noindex/);
     const navigation = page.getByRole("navigation", { name: "社区管理后台", exact: true });
-    assert.equal(await navigation.getByRole("link").count(), 8);
+    assert.deepEqual(await navigation.getByRole("link").evaluateAll(links=>links.map(link=>link.getAttribute("href"))), ["/dash/lists","/dash/discussions","/dash/featured","/dash/notices","/dash","/dash/users","/dash/charts","/dash/status","/dash/reports"]);
     if (evidenceDirectory) await page.screenshot({ path: join(evidenceDirectory, "dash-desktop.png"), fullPage: true });
     await navigation.getByRole("link", { name: "用户列表", exact: true }).click();
     await page.waitForURL(url => url.pathname === "/dash/users");
@@ -625,6 +626,7 @@ async function acceptance() {
     assert.equal(republished.status(), 409); assert.equal((await republished.json()).error.code, "CHART_MODERATED");
     await denied(anonymous, "/api/v1/charts/2", 404);
   });
+  await exerciseLibrary({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Library browser\n&inote_4=(120){4}1,2,E\n`)]])});
   await exerciseFollowing({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Following browser\n&inote_4=(120){4}1,2,E\n`)]])});
   assert.equal(diagnostics.filter(row => row.type === "pageerror").length, 0, "uncaught browser errors");
   assert.equal(diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length, 0, "hydration errors");

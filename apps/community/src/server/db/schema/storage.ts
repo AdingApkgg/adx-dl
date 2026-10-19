@@ -1,3 +1,4 @@
+import type { PrivateLibraryFact } from "@/shared/private-library-journal";
 import type { PrivateSocialFact } from "@/shared/private-social-journal";
 import type { CommunityContentFact } from "@/shared/community-content-journal";
 import type { ChartJournalPayload } from "@/shared/chart-journal";
@@ -446,22 +447,22 @@ export const storageTombstones = pgTable(
   "storage_tombstones",
   {
     sequence: bigint({ mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
-    kind: text({ enum: ["user_deleted", "file_deleted", "hash_blocked", "media_revoked", "chart_permission", "user_public_id", "community_content", "private_social"] }).notNull(),
+    kind: text({ enum: ["user_deleted", "file_deleted", "hash_blocked", "media_revoked", "chart_permission", "user_public_id", "community_content", "private_social", "private_library"] }).notNull(),
     userId: text(),
     fileId: uuid(),
     sha256: text(),
     generation: bigint({ mode: "number" }),
-    payload: jsonb().$type<ChartJournalPayload | UserPublicIdFact | CommunityContentFact | PrivateSocialFact>(),
+    payload: jsonb().$type<ChartJournalPayload | UserPublicIdFact | CommunityContentFact | PrivateSocialFact | PrivateLibraryFact>(),
     createdAt: createdAt(),
   },
   (t) => [
     check(
       "storage_tombstones_kind_check",
-      sql`${t.kind} in ('user_deleted','file_deleted','hash_blocked','media_revoked','chart_permission','user_public_id','community_content','private_social')`,
+      sql`${t.kind} in ('user_deleted','file_deleted','hash_blocked','media_revoked','chart_permission','user_public_id','community_content','private_social','private_library')`,
     ),
     check(
       "storage_tombstones_subject_check",
-      sql`(${t.kind} = 'private_social' and ${t.payload} is not null) or (${t.kind} = 'community_content' and ${t.payload} is not null) or (${t.kind} = 'user_public_id' and ${t.userId} is not null and ${t.payload} is not null) or (${t.kind} = 'chart_permission' and ${t.payload} is not null) or (${t.kind} = 'user_deleted' and ${t.userId} is not null) or (${t.kind} = 'file_deleted' and ${t.fileId} is not null) or (${t.kind} in ('hash_blocked','media_revoked') and ${t.sha256} is not null)`,
+      sql`(${t.kind} in ('private_social','private_library') and ${t.payload} is not null) or (${t.kind} = 'community_content' and ${t.payload} is not null) or (${t.kind} = 'user_public_id' and ${t.userId} is not null and ${t.payload} is not null) or (${t.kind} = 'chart_permission' and ${t.payload} is not null) or (${t.kind} = 'user_deleted' and ${t.userId} is not null) or (${t.kind} = 'file_deleted' and ${t.fileId} is not null) or (${t.kind} in ('hash_blocked','media_revoked') and ${t.sha256} is not null)`,
     ),
     check("storage_tombstones_hash_check", sql`${t.sha256} is null or ${t.sha256} ~ '^[0-9a-f]{64}$'`),
     check(

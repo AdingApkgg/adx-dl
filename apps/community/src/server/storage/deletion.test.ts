@@ -202,7 +202,7 @@ test("final purge always deletes personal photos and recovery/outbox facts outli
 test("registry binds every real business FK deletion partner and keeps storage last", async () => {
   const { createDeletionHandlers } = await handlers();
   const registry = createDeletionHandlers(fixture.ctx, [future]);
-  expect(registry.map((h) => h.name)).toEqual(["future-fixture", "charts", "discussions", "following", "storage"]);
+  expect(registry.map((h) => h.name)).toEqual(["future-fixture", "charts", "discussions", "following", "library", "storage"]);
   expect(() => createDeletionHandlers(fixture.ctx, [{ ...future, name: "storage" }])).toThrow();
 });
 

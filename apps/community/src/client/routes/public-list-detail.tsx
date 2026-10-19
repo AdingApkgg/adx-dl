@@ -1,0 +1,34 @@
+import {data,Link,useNavigate} from "react-router";
+import {Button} from "@astrodx/ui/components/button";
+import {Textarea} from "@astrodx/ui/components/textarea";
+import {useState,useRef} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {m} from "@/paraglide/messages.js";
+import {localizeHref} from "@/paraglide/runtime.js";
+import {ApiError} from "@/shared/api-client";
+import {apiContext} from "@/shared/router-context";
+import type {PublicList} from "@/shared/library";
+import {libraryApi} from "../queries/library";
+import {meQuery} from "../queries/me";
+import {getRenderApi} from "../lib/browser";
+import {loginHref} from "../lib/require-user";
+import {socialError,reportCategory} from "../lib/community-social";
+import {PageTitle} from "../components/page-title";
+import {PublicChartCard,PUBLIC_CHART_GRID_CLASS} from "../components/public-chart-card";
+import {ShareChartButton} from "../components/share-chart-button";
+import {LibraryPager} from "../components/library-ui";
+import {ErrorCard} from "../components/error-card";
+import {canonicalLink,localeAlternates,originFrom,openGraph} from "../lib/seo";
+import {getLocale} from "@/paraglide/runtime.js";
+import type {Route} from "./+types/public-list-detail";
+export {headers,shouldRevalidate} from "./public-charts";
+export async function loader({context,params,url}:Route.LoaderArgs){try{return data(await libraryApi(context.get(apiContext)).publicList(params.id,url.searchParams.get('cursor')??undefined),{headers:{'Cache-Control':'private, no-store'}});}catch(e){throw data(null,{status:e instanceof ApiError&&e.status<500?e.status:503});}}
+export function meta({loaderData,matches,location}:Route.MetaArgs){if(!loaderData)return [{title:m.library_public_title()},{name:'robots',content:'noindex'}];const origin=originFrom(matches),canonical=canonicalLink(origin,location.pathname);return [{title:`${loaderData.name} - ${m.site_name()}`},{name:'description',content:loaderData.description.slice(0,160)},canonical,...localeAlternates(origin,location.pathname),...openGraph({title:loaderData.name,description:loaderData.description.slice(0,160),url:canonical.href,locale:getLocale(),siteName:m.site_name()}),...(location.search?[{name:'robots',content:'noindex'}]:[])];}
+export default function PublicListDetail({loaderData:list}:Route.ComponentProps){return <main className="space-y-6"><Link className="underline" to={localizeHref('/lists')}>{m.library_public_title()}</Link><PageTitle description={list.description}>{list.name}</PageTitle><p>#{list.publicId} · {m.library_count({count:String(list.total)})} · <Link className="underline" to={localizeHref(`/u/${list.author.publicId}`)}>{list.author.name}</Link></p><p className="text-sm text-muted-foreground">{m.library_current_version_hint()}</p><ShareChartButton title={list.name} publicId={list.publicId} resource="lists"/><ListActions key={`${list.publicId}/${list.revision}`} list={list}/><ol className={PUBLIC_CHART_GRID_CLASS}>{list.entries.map((e,index)=><li key={`${e.publicId??'missing'}/${index}`}>{e.chart?<PublicChartCard chart={e.chart}/>:<div className="rounded-xl border p-4">{m.favorite_unavailable()}</div>}</li>)}</ol><LibraryPager nextCursor={list.nextCursor}/></main>;}
+function ListActions({list}:{list:PublicList}){const {data:me}=useQuery(meQuery(getRenderApi()));if(me===undefined)return null;if(!me)return <Button asChild variant="outline"><Link to={loginHref(localizeHref(`/lists/${list.publicId}`))}>{m.library_copy()}</Link></Button>;if(me.status!=='active')return null;return <SignedInListActions key={me.id} list={list}/>;}
+function SignedInListActions({list}:{list:PublicList}){const api=libraryApi(getRenderApi()),navigate=useNavigate();const [preview,setPreview]=useState<{ids:string[];unavailable:number}|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null),[reporting,setReporting]=useState(false),[details,setDetails]=useState(''),[reported,setReported]=useState(false),[category,setCategory]=useState<import('@/shared/library').LibraryReport['category']>('other');const copyId=useRef<string|null>(null);
+ async function copyPreview(){setBusy(true);setError(null);try{let page=await api.publicList(list.publicId),entries=[...page.entries];if(page.revision!==list.revision)throw new Error(m.library_changed());for(let i=0;page.nextCursor&&i<10;i++){page=await api.publicList(list.publicId,page.nextCursor);if(page.revision!==list.revision)throw new Error(m.library_changed());entries.push(...page.entries);}setPreview({ids:entries.filter(e=>e.chart).map(e=>e.publicId!),unavailable:entries.filter(e=>!e.chart).length});}catch(e){setError(e instanceof ApiError?socialError(e):m.library_changed());}finally{setBusy(false);}}
+ async function copy(){if(!preview)return;setBusy(true);setError(null);try{copyId.current??=crypto.randomUUID();const saved=await api.copy(list.publicId,{id:copyId.current,expectedRevision:list.revision,publicIds:preview.ids});await navigate(localizeHref(`/me/lists/${saved.id}`));}catch(e){setError(socialError(e));}finally{setBusy(false);}}
+ async function report(){setBusy(true);setError(null);try{await api.report(list.publicId,{category,details:details.trim()});setReported(true);setReporting(false);}catch(e){setError(socialError(e));}finally{setBusy(false);}}
+ return <section className="space-y-3"><div className="flex flex-wrap gap-3"><Button variant="outline" disabled={busy} onClick={()=>void copyPreview()}>{m.library_copy()}</Button><Button variant="outline" disabled={busy} onClick={()=>setReporting(v=>!v)}>{m.library_report()}</Button></div>{preview?<div className="space-y-3 rounded-xl border p-4"><p>{m.library_copy_preview({available:String(preview.ids.length),unavailable:String(preview.unavailable)})}</p><Button disabled={busy||!preview.ids.length} onClick={()=>void copy()}>{m.library_confirm_copy()}</Button></div>:null}{reporting?<form className="space-y-3 rounded-xl border p-4" onSubmit={e=>{e.preventDefault();void report();}}><label className="grid gap-1 text-sm">{m.report_category()}<select className="min-h-11 rounded border bg-background px-2" value={category} onChange={e=>setCategory(e.target.value as typeof category)}>{(['copyright','inappropriate','broken','other'] as const).map(v=><option key={v} value={v}>{reportCategory(v)}</option>)}</select></label><label className="grid gap-1">{m.report_details()}<Textarea required value={details} onChange={e=>setDetails(e.target.value)} maxLength={1000}/></label><Button disabled={busy||!details.trim()||[...details.trim()].length>500}>{m.report_submit()}</Button></form>:null}{reported?<p role="status">{m.report_received()} <Link className="underline" to={localizeHref('/me/library?view=reports')}>{m.library_reports()}</Link></p>:null}{error?<p role="alert">{error}</p>:null}</section>;}
+export function ErrorBoundary({error}:Route.ErrorBoundaryProps){return <ErrorCard error={error}/>;}

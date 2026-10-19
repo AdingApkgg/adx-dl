@@ -1,3 +1,6 @@
+import {libraryApi} from "../queries/library";
+import {PublicListCard} from "../components/library-ui";
+import type {PublicListSummary} from "@/shared/library";
 import type {FeaturedState,NoticePage,PublicNotice} from "@/shared/community-site";
 import {siteApi} from "../queries/community-site";
 import {SiteNoticeList} from "../components/site-notice-list";
@@ -29,11 +32,11 @@ import type { Route } from "./+types/home";
 export async function loader({ context }: Route.LoaderArgs) {
   const queryClient = context.get(queryClientContext);
   const api = context.get(apiContext);
-  const [publicCharts,featured,notices] = await Promise.all([
-    publicChartsApi(api).list(undefined, 8).catch(() => null), siteApi(api).featured().catch(()=>null),siteApi(api).notices().catch(()=>null),
+  const [publicCharts,featured,notices,lists] = await Promise.all([
+    publicChartsApi(api).list(undefined, 8).catch(() => null), siteApi(api).featured().catch(()=>null),siteApi(api).notices().catch(()=>null),libraryApi(api).publicLists().catch(()=>null),
     queryClient.query(metaQuery(api)), queryClient.query(meQuery(api)).catch(() => undefined),
   ]);
-  return { dehydratedState: dehydrate(queryClient), publicCharts,featured,notices };
+  return { dehydratedState: dehydrate(queryClient), publicCharts,featured,notices,lists };
 }
 
 // 站内切换：缓存里有就直接用，哪怕已经过期（staleTime: "static"），跳转不用等请求；
@@ -41,12 +44,12 @@ export async function loader({ context }: Route.LoaderArgs) {
 // me 和 loader 一样：取不到就渲染成"未登录"，组件挂载后 useQuery 会重试。
 export async function clientLoader() {
   const queryClient = getBrowserQueryClient();
-  const [publicCharts,featured,notices] = await Promise.all([
-    publicChartsApi(getBrowserApi()).list(undefined, 8).catch(() => null), siteApi(getBrowserApi()).featured().catch(()=>null),siteApi(getBrowserApi()).notices().catch(()=>null),
+  const [publicCharts,featured,notices,lists] = await Promise.all([
+    publicChartsApi(getBrowserApi()).list(undefined, 8).catch(() => null), siteApi(getBrowserApi()).featured().catch(()=>null),siteApi(getBrowserApi()).notices().catch(()=>null),libraryApi(getBrowserApi()).publicLists().catch(()=>null),
     queryClient.query({ ...metaQuery(getBrowserApi()), staleTime: "static" }),
     queryClient.query({ ...meQuery(getBrowserApi()), staleTime: "static" }).catch(() => undefined),
   ]);
-  return { dehydratedState: null, publicCharts,featured,notices };
+  return { dehydratedState: null, publicCharts,featured,notices,lists };
 }
 
 export function meta({ matches, location }: Route.MetaArgs) {
@@ -70,12 +73,12 @@ export function meta({ matches, location }: Route.MetaArgs) {
 export default function Home({ loaderData }: Route.ComponentProps) {
   return (
     <HydrationBoundary state={loaderData.dehydratedState ?? undefined}>
-      <HomeContent publicCharts={loaderData.publicCharts} featured={loaderData.featured} notices={loaderData.notices} />
+      <HomeContent publicCharts={loaderData.publicCharts} featured={loaderData.featured} notices={loaderData.notices} lists={loaderData.lists?.items??null} />
     </HydrationBoundary>
   );
 }
 
-function HomeContent({ publicCharts,featured,notices }: { publicCharts: PublicChartsPageDto | null;featured:FeaturedState|null;notices:NoticePage<PublicNotice>|null }) {
+function HomeContent({ publicCharts,featured,notices,lists }: { publicCharts: PublicChartsPageDto | null;featured:FeaturedState|null;notices:NoticePage<PublicNotice>|null;lists:PublicListSummary[]|null }) {
   const { data } = useQuery(metaQuery(getRenderApi()));
   const { data: me } = useQuery(meQuery(getRenderApi()));
 
@@ -87,6 +90,7 @@ function HomeContent({ publicCharts,featured,notices }: { publicCharts: PublicCh
       <nav className="flex flex-wrap gap-3"><Link className={textLinkClass} to={localizeHref("/forum")}>{m.site_forum()}</Link><Link className={textLinkClass} to={localizeHref("/help")}>{m.site_help()}</Link><Link className={textLinkClass} to={localizeHref("/notices")}>{m.site_notices()}</Link></nav>
       {notices?.items.length?<section className="space-y-3"><h2 className="text-xl font-semibold">{m.site_notices()}</h2><SiteNoticeList items={notices.items.slice(0,3)}/></section>:notices===null?<p role="status">{m.site_notices_unavailable()}</p>:null}
       {featured?.items.length?<section className="space-y-3"><h2 className="text-xl font-semibold">{m.site_featured()}</h2><ul className={PUBLIC_CHART_GRID_CLASS}>{featured.items.map(chart=><li key={chart.id}><PublicChartCard chart={chart} headingLevel={3}/></li>)}</ul></section>:featured===null?<p role="status">{m.site_featured_unavailable()}</p>:null}
+      <section className="space-y-3"><h2 className="text-xl font-semibold"><Link to={localizeHref("/lists")} className="underline">{m.library_public_title()}</Link></h2>{lists===null?<p role="status">{m.library_unavailable()}</p>:lists.length?<ul className="grid gap-3 sm:grid-cols-2">{lists.slice(0,4).map(list=><li key={list.publicId}><PublicListCard list={list}/></li>)}</ul>:<p>{m.library_public_empty()}</p>}</section>
       <Card size="sm">
         <CardContent className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
           {me ? (
