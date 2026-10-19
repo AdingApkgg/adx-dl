@@ -1,7 +1,7 @@
 {
   "status": "passed",
-  "checkedAt": "2026-10-19T11:32:19.728Z",
-  "p95Ms": 1018,
+  "checkedAt": "2026-10-19T11:54:14.078Z",
+  "p95Ms": 1177,
   "samples": 24,
   "fixtures": {
     "charts": 5000,
