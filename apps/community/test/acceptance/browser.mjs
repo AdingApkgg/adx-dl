@@ -367,6 +367,7 @@ async function acceptance() {
     if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-home-mobile.png"), fullPage: true });
     await visitor.setViewportSize({ width: 1440, height: 900 });
     await latest.locator('a[href="/charts"]').click();
+    await visitor.waitForURL(u => u.pathname === "/charts");
     await visitor.getByRole("link", { name: /CI private draft/ }).click();
     await visitor.getByRole("heading", { level: 1, name: "CI private draft", exact: true }).waitFor();
     assert.equal(new URL(visitor.url()).pathname, `/charts/${publicChart.publicId}`);
