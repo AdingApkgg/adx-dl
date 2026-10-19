@@ -7,6 +7,8 @@ MODULE=${ACCEPTANCE_PLAYWRIGHT_PATH:-/home/i/astrodx-verify/public-browser-20261
 STATE=${PRODUCTION_STORAGE_STATE:-}
 ROLE=${PRODUCTION_AUTH_ROLE:-admin}
 USER_ID=${PRODUCTION_EXPECT_USER_ID:-}
+PREVIEW_CHART=${PRODUCTION_PREVIEW_CHART:-}
+PREVIEW_DIFFICULTY=${PRODUCTION_PREVIEW_DIFFICULTY:-}
 if [[ ${1:-} == --help || ${1:-} == -h ]]; then
   echo 'usage: scripts/remote/community-smoke.sh [--authenticated|--anonymous] (default: authenticated through trusted SSH)'
   exit 0
@@ -22,12 +24,15 @@ if [[ ${1:-} == --anonymous ]]; then shift; STATE=; fi
 [[ -z $STATE || $STATE =~ ^/[A-Za-z0-9_./-]+$ ]] || exit 2
 [[ $ROLE == admin || $ROLE == user ]] || exit 2
 [[ -z $USER_ID || $USER_ID =~ ^[1-9][0-9]*$ ]] || exit 2
+if [[ -n $PREVIEW_CHART || -n $PREVIEW_DIFFICULTY ]]; then
+  [[ $PREVIEW_CHART =~ ^[1-9][0-9]{0,19}$ && $PREVIEW_DIFFICULTY =~ ^[1-7]$ ]] || { echo 'VALID_PREVIEW_TARGET_REQUIRED' >&2; exit 2; }
+fi
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 TREE=$(git -C "$ROOT" rev-parse 'HEAD^{tree}')
 SOURCE=$(base64 < "$ROOT/apps/community/test/acceptance/production-smoke.mjs" | tr -d '\n')
 # No session file or browser profile is copied from this machine.
 {
-  printf "expected='%s'\nmodule='%s'\nstate='%s'\nrole='%s'\nuser_id='%s'\ntree='%s'\nsource='%s'\n" "$EXPECTED" "$MODULE" "$STATE" "$ROLE" "$USER_ID" "$TREE" "$SOURCE"
+  printf "expected='%s'\nmodule='%s'\nstate='%s'\nrole='%s'\nuser_id='%s'\ntree='%s'\nsource='%s'\npreview_chart='%s'\npreview_difficulty='%s'\n" "$EXPECTED" "$MODULE" "$STATE" "$ROLE" "$USER_ID" "$TREE" "$SOURCE" "$PREVIEW_CHART" "$PREVIEW_DIFFICULTY"
   cat <<'PY'
 import base64, hashlib, json, os, pathlib, subprocess, tempfile
 if os.uname().sysname != 'Linux' or os.uname().nodename != expected:
@@ -40,10 +45,13 @@ script = base64.b64decode(source, validate=True)
 (root / 'smoke.mjs').write_bytes(script)
 (root / 'source.json').write_text(json.dumps({'baseTree': tree, 'smokeSha256': hashlib.sha256(script).hexdigest()}) + '\n')
 env = dict(os.environ, ACCEPTANCE_PLAYWRIGHT_PATH=module, PRODUCTION_EVIDENCE_DIR=str(root / 'evidence'), PRODUCTION_TOOL_BASE_TREE=tree, PRODUCTION_SMOKE_SHA256=hashlib.sha256(script).hexdigest(), PRODUCTION_AUTH_ROLE=role)
-for key in ['PRODUCTION_STORAGE_STATE', 'PRODUCTION_EXPECT_USER_ID']:
+for key in ['PRODUCTION_STORAGE_STATE', 'PRODUCTION_EXPECT_USER_ID', 'PRODUCTION_PREVIEW_CHART', 'PRODUCTION_PREVIEW_DIFFICULTY']:
     env.pop(key, None)
 if state: env['PRODUCTION_STORAGE_STATE'] = state
 if user_id: env['PRODUCTION_EXPECT_USER_ID'] = user_id
+if preview_chart:
+    env['PRODUCTION_PREVIEW_CHART'] = preview_chart
+    env['PRODUCTION_PREVIEW_DIFFICULTY'] = preview_difficulty
 print('REMOTE_HEADLESS_EVIDENCE ' + str(root), flush=True)
 run = subprocess.run(['timeout', '--signal=TERM', '--kill-after=10s', '300s', 'node', str(root / 'smoke.mjs')], env=env)
 result = root / 'evidence/result.json'

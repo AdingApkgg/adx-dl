@@ -37,6 +37,11 @@ else:
                 env.pop(key,None)
         overlay = deployment/'.superpowers/napcat-reuse.compose.yaml'
         env.update(COMMUNITY_DEPLOY_DIR=str(deployment),COMMUNITY_RELEASE_ID=task['releaseId'],COMMUNITY_RELEASE_DIR=str(root),COMMUNITY_SMOKE_SHA256=task['smokeSha256'],COMMUNITY_RELEASE_TIMEOUT='600',COMMUNITY_RELEASE_SOURCE_REVISION=task['baseCommit'])
+        for key in ['PRODUCTION_PREVIEW_CHART','PRODUCTION_PREVIEW_DIFFICULTY']:
+            env.pop(key,None)
+        preview_env=task.get('previewEnv',{})
+        assert set(preview_env).issubset({'PRODUCTION_PREVIEW_CHART','PRODUCTION_PREVIEW_DIFFICULTY'})
+        env.update(preview_env)
         if overlay.is_file():env['COMPOSE_FILE']='compose.yaml:.superpowers/napcat-reuse.compose.yaml'
         args=['bash',str(tools/'apps/community/deploy.sh')]
         if task['mode']:args.append(task['mode'])

@@ -1,4 +1,4 @@
-import copy, datetime as dt, importlib.util, json, os, pathlib, shlex, stat, tempfile, time, unittest
+import ast, copy, datetime as dt, importlib.util, json, os, pathlib, shlex, stat, subprocess, sys, tempfile, time, unittest
 from unittest.mock import patch
 
 SOURCE = pathlib.Path(__file__).resolve().parents[2]/'ops/release/await-acceptance.py'
@@ -50,6 +50,29 @@ class ReleaseGateTests(unittest.TestCase):
    self.receipt=copy.deepcopy(original);self.receipt['result']['steps'].remove(step);self.write_receipt()
    with self.assertRaises(ValueError):self.invoke('--await')
    self.assertEqual((self.root/'.deploy-revision').read_text(),'old\n')
+ def test_optional_preview_gate_requires_exact_target_and_complete_observations(self):
+  self.ready['requiredPreview']={'chart':'1','difficulty':6}
+  with self.assertRaisesRegex(ValueError,'RECEIPT_REJECTED'):gate.validate(self.receipt,self.ready)
+  proof=dict(chart='1',difficulty=6,apiSupported=True,slotWarnings=0,maidataLoaded=True,maidataMatchesSummary=True,ready=True,clockAdvanced=True,pauseStable=True,seekSucceeded=True)
+  self.receipt['result']['previewCoverage']=proof
+  with self.assertRaisesRegex(ValueError,'RECEIPT_REJECTED'):gate.validate(self.receipt,self.ready)
+  self.receipt['result']['steps'].append('production_required_chart_preview')
+  gate.validate(self.receipt,self.ready)
+  for key,value in [('chart','2'),('difficulty',5),('apiSupported',False),('slotWarnings',1),('slotWarnings',False),('maidataLoaded',False),('maidataMatchesSummary',False),('ready',False),('clockAdvanced',False),('pauseStable',False),('seekSucceeded',False)]:
+   with self.subTest(key=key):
+    receipt=copy.deepcopy(self.receipt);receipt['result']['previewCoverage'][key]=value
+    with self.assertRaisesRegex(ValueError,'RECEIPT_REJECTED'):gate.validate(receipt,self.ready)
+ def test_preview_requirement_is_bound_to_release_context(self):
+  self.env.update(PRODUCTION_PREVIEW_CHART='1',PRODUCTION_PREVIEW_DIFFICULTY='6')
+  self.write_receipt()
+  with self.assertRaisesRegex(ValueError,'RECEIPT_REJECTED'):self.invoke('--await')
+  self.assertEqual(json.loads((self.context/'ready.json').read_text())['requiredPreview'],dict(chart='1',difficulty=6))
+  self.assertEqual((self.root/'.deploy-revision').read_text(),'old\n')
+ def test_partial_or_invalid_preview_configuration_fails_preflight(self):
+  for chart,difficulty in [('1',''),('','6'),('0','6'),('1','8'),('1','6.0')]:
+   with self.subTest(chart=chart,difficulty=difficulty):
+    self.env.update(PRODUCTION_PREVIEW_CHART=chart,PRODUCTION_PREVIEW_DIFFICULTY=difficulty)
+    with self.assertRaisesRegex(ValueError,'PREVIEW_TARGET'):self.invoke('--preflight')
  def test_old_pass_cannot_complete_a_new_deployment(self):
   self.receipt['result']['startedAt']=(dt.datetime.now(dt.timezone.utc)-dt.timedelta(hours=1)).isoformat()
   self.write_receipt()
@@ -101,6 +124,53 @@ class ReleaseGateTests(unittest.TestCase):
     old=self.env[key];self.env[key]=value
     with self.assertRaises(ValueError):self.invoke('--preflight')
     self.env[key]=old
+
+class BeforeAcceptanceHookTests(unittest.TestCase):
+ def test_hook_gets_release_environment_and_failure_stops_acceptance(self):
+  source=(pathlib.Path(__file__).resolve().parents[4]/'scripts/remote/community-deploy.py').read_text()
+  functions=[node for node in ast.parse(source).body if isinstance(node,ast.FunctionDef) and node.name=='run_before_acceptance']
+  self.assertEqual(len(functions),1)
+  namespace=dict(subprocess=subprocess,sys=sys)
+  exec(compile(ast.Module(body=functions,type_ignores=[]),'community-deploy.py','exec'),namespace)
+  run=namespace['run_before_acceptance']
+  with tempfile.TemporaryDirectory() as directory:
+   root=pathlib.Path(directory);hook=root/'hook with spaces.py';output=root/'proof.json'
+   hook.write_text('import json,os,pathlib\npathlib.Path(os.environ["HOOK_PROOF"]).write_text(json.dumps({key:os.environ[key] for key in ["PRODUCTION_EXPECT_REVISION","COMMUNITY_RELEASE_ID"]}))\n')
+   env=dict(os.environ,HOOK_PROOF=str(output),PRODUCTION_EXPECT_REVISION='a'*40,COMMUNITY_RELEASE_ID='b'*32)
+   run(hook,env)
+   self.assertEqual(json.loads(output.read_text()),dict(PRODUCTION_EXPECT_REVISION='a'*40,COMMUNITY_RELEASE_ID='b'*32))
+   hook.write_text('raise SystemExit(9)\n')
+   with self.assertRaises(subprocess.CalledProcessError):run(hook,env)
+ def test_no_hook_does_not_run_subprocess(self):
+  source=(pathlib.Path(__file__).resolve().parents[4]/'scripts/remote/community-deploy.py').read_text()
+  functions=[node for node in ast.parse(source).body if isinstance(node,ast.FunctionDef) and node.name=='run_before_acceptance']
+  self.assertEqual(len(functions),1)
+  namespace=dict(subprocess=subprocess,sys=sys)
+  exec(compile(ast.Module(body=functions,type_ignores=[]),'community-deploy.py','exec'),namespace)
+  with patch('subprocess.run') as invoke:
+   namespace['run_before_acceptance'](None,{})
+   invoke.assert_not_called()
+
+class SmokeParameterTests(unittest.TestCase):
+ def test_anonymous_remote_payload_forwards_only_the_explicit_preview_target(self):
+  repository=pathlib.Path(__file__).resolve().parents[4]
+  with tempfile.TemporaryDirectory() as directory:
+   root=pathlib.Path(directory);ssh=root/'ssh';payload=root/'payload.py'
+   git=root/'git';git.write_text('#!'+sys.executable+'\nprint("'+ 'a'*40 +'")\n');git.chmod(0o700)
+   ssh.write_text('#!'+sys.executable+'\nimport os,pathlib,sys\npathlib.Path(os.environ["PAYLOAD_FILE"]).write_text(sys.stdin.read())\n');ssh.chmod(0o700)
+   env=dict(os.environ,PATH=str(root)+os.pathsep+os.environ['PATH'],PAYLOAD_FILE=str(payload),PRODUCTION_PREVIEW_CHART='1',PRODUCTION_PREVIEW_DIFFICULTY='6')
+   subprocess.run(['bash',str(repository/'scripts/remote/community-smoke.sh'),'--anonymous'],env=env,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+   tree=ast.parse(payload.read_text())
+   values={node.targets[0].id:node.value.value for node in tree.body if isinstance(node,ast.Assign) and len(node.targets)==1 and isinstance(node.targets[0],ast.Name) and isinstance(node.value,ast.Constant)}
+   self.assertEqual(values['preview_chart'],'1');self.assertEqual(values['preview_difficulty'],'6')
+   self.assertNotIn('bridgeKey',values)
+ def test_partial_preview_parameters_fail_before_any_ssh_or_session(self):
+  repository=pathlib.Path(__file__).resolve().parents[4]
+  env=dict(os.environ,PRODUCTION_PREVIEW_CHART='1',PRODUCTION_PREVIEW_DIFFICULTY='')
+  for command in [[sys.executable,str(repository/'scripts/remote/community-auth-smoke.py')],['bash',str(repository/'scripts/remote/community-smoke.sh'),'--anonymous']]:
+   with self.subTest(command=command):
+    result=subprocess.run(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+    self.assertNotEqual(result.returncode,0);self.assertIn('VALID_PREVIEW_TARGET_REQUIRED',result.stderr)
 
 class ReleaseSourcePermissionsTests(unittest.TestCase):
  def test_public_checkout_is_readable_while_release_context_and_env_stay_private(self):

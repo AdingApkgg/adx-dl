@@ -545,7 +545,10 @@ function parseNotes(chartBody: string, initialBpm: number, budget?: ParseBudget)
         );
 
         if (budget && !parsedNotes.length && noteStr !== "E") {
-          const outOfRange = /^\d+[hbx$]*($|\[)/i.test(noteStr) || /^([ABDE]\d+|C\d+)[hbfx]*(\[.*\])?$/i.test(noteStr);
+          const button = /^(\d+)[hbx$]*(?:$|\[)/i.exec(noteStr);
+          const touch = /^([ABCDE])(\d+)[hbfx]*(?:\[.*\])?$/i.exec(noteStr);
+          const outOfRange = (button !== null && (Number(button[1]) < 1 || Number(button[1]) > 8)) ||
+            (touch !== null && (Number(touch[2]) < 1 || Number(touch[2]) > (touch[1].toUpperCase() === "C" ? 2 : 8)));
           budget.diagnostic(outOfRange ? "NOTE_OUT_OF_RANGE" : "UNKNOWN_TOKEN", startLine, startPos);
         }
         if (budget) {
@@ -585,17 +588,19 @@ function parseNotes(chartBody: string, initialBpm: number, budget?: ParseBudget)
   };
 }
 
-/** 计算 Hold 持续拍数，支持 `[分频:拍数]` 和 `[#秒数]` 两种记号。 */
+/** MajSimai Hold timing: omitted = zero; ratio, seconds or note-local BPM, in chart beats. */
 function parseHoldDuration(
   divisor: string | undefined,
   beats: string | undefined,
   seconds: string | undefined,
   bpm: number,
+  timingBpm?: string,
 ): number {
   if (divisor) {
-    return (4 / parseFloat(divisor)) * parseFloat(beats!);
+    const duration = (4 / parseFloat(divisor)) * parseFloat(beats!);
+    return timingBpm ? duration * bpm / parseFloat(timingBpm) : duration;
   }
-  return (parseFloat(seconds!) * bpm) / 60;
+  return seconds === undefined ? 0 : (parseFloat(seconds) * bpm) / 60;
 }
 
 /** 解析单个音符记号（Tap、Hold、Slide、Touch 等）；键位或感应区越界时返回空数组。 */
@@ -613,14 +618,15 @@ function parseNoteString(
   const notes: Note[] = [];
   const delayOffset = hasDelayMarker ? 1 : 0;
 
-  const holdMatch = noteStr.match(/^(\d+)[hbx]{1,3}\[(?:([\d.]+):([\d.]+)|#([\d.]+))\][bx]*$/i);
-  if (holdMatch) {
+  const holdMatch = noteStr.match(/^(\d+)([hbx]{1,3})(?:\[(?:(?:([\d.]+)#)?([\d.]+):([\d.]+)|#([\d.]+))\])?([bx]*)$/i);
+  if (holdMatch && /h/i.test(holdMatch[2])) {
     if (budget && budget.maxNotes < 2) throw new ParseLimitError();
     const position = parseInt(holdMatch[1]) as ButtonPosition;
-    const holdDuration = parseHoldDuration(holdMatch[2], holdMatch[3], holdMatch[4], bpm);
-    const lowerNoteStr = noteStr.toLowerCase();
-    const isBreakHold = lowerNoteStr.includes("b");
-    const isEx = lowerNoteStr.includes("x");
+    // MajSimai retains the Hold type even when its head and tail share one timestamp.
+    const holdDuration = parseHoldDuration(holdMatch[4], holdMatch[5], holdMatch[6], bpm, holdMatch[3]);
+    const modifiers = (holdMatch[2] + holdMatch[7]).toLowerCase();
+    const isBreakHold = modifiers.includes("b");
+    const isEx = modifiers.includes("x");
 
     if (position >= 1 && position <= 8) {
       const durationMs = (60000 * holdDuration) / bpm;
@@ -842,12 +848,12 @@ function parseNoteString(
   }
 
   const touchMatch = noteStr.match(
-    /^([ABCDE])(\d*)([hbfx]*)(?:\[(?:([\d.]+):([\d.]+)|#([\d.]+))\])?$/i,
+    /^([ABCDE])(\d*)([hbfx]*)(?:\[(?:(?:([\d.]+)#)?([\d.]+):([\d.]+)|#([\d.]+))\])?([bfx]*)$/i,
   );
   if (touchMatch) {
     const region = touchMatch[1].toUpperCase();
     const sensorNum = touchMatch[2] ? parseInt(touchMatch[2]) : null;
-    const modifiers = touchMatch[3] ? touchMatch[3].toLowerCase() : "";
+    const modifiers = (touchMatch[3] + touchMatch[8]).toLowerCase();
 
     let isValidTouch = false;
     if (region === "C") {
@@ -861,9 +867,9 @@ function parseNoteString(
       const isHold = modifiers.includes("h");
       const hasFirework = modifiers.includes("f");
 
-      if (isHold && (touchMatch[4] || touchMatch[6])) {
+      if (isHold) {
         if (budget && budget.maxNotes < 2) throw new ParseLimitError();
-        const holdDuration = parseHoldDuration(touchMatch[4], touchMatch[5], touchMatch[6], bpm);
+        const holdDuration = parseHoldDuration(touchMatch[5], touchMatch[6], touchMatch[7], bpm, touchMatch[4]);
         const durationMs = (60000 * holdDuration) / bpm;
 
         const touchHoldStart: TouchHoldStartNote = {

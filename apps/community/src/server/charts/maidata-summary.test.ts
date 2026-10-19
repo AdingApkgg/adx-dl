@@ -96,3 +96,19 @@ describe("private maidata summary", () => {
     expect(diagnostics).toContain("UNKNOWN_TOKEN");
   });
 });
+
+
+test("Majdata short Holds keep the affected difficulty previewable without ignoring invalid slots", () => {
+  const text = "&inote_5=(125){4},E\n&inote_6=(200){4}8bh/2bh,4bh,5bh,Ch,1h[150#2:1],E\n&inote_7=(120)9h,E";
+  const summary = summarizeMaidata(encode(text));
+  expect(summary.difficulties.find((row) => row.difficulty === 6)).toMatchObject({
+    previewSupported: true, noteCount: 12,
+  });
+  expect(summary.warnings.filter((warning) => warning.difficulty === 6)).toEqual([]);
+  expect(summary.difficulties.find((row) => row.difficulty === 7)?.previewSupported).toBe(false);
+  expect(summary.warnings).toContainEqual(expect.objectContaining({ difficulty: 7, code: "NOTE_OUT_OF_RANGE" }));
+  const chart = parseSimaiChart(normalizeChartMaidata(text).text, 6);
+  const expected = summary.difficulties.find((row) => row.difficulty === 6)!;
+  expect(expected.noteCount).not.toBeNull();
+  expect(chart.notes.length).toBe(expected.noteCount!);
+});
