@@ -1,1 +1,14 @@
-{"checkedAt":null,"p95Ms":null,"status":"not_run"}
+{
+  "status": "passed",
+  "checkedAt": "2026-10-19T11:32:19.728Z",
+  "p95Ms": 1018,
+  "samples": 24,
+  "fixtures": {
+    "charts": 5000,
+    "authors": 1000,
+    "lists": 1000,
+    "topics": 2000
+  },
+  "sourceBytes": "shared immutable synthetic fixture",
+  "algorithm": 1
+}

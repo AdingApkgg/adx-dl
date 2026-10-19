@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useRouteLoaderData } from "react-router";
 
 import { getLocale } from "@/paraglide/runtime.js";
@@ -75,6 +75,14 @@ export function Layout({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  useEffect(()=>{
+    const isPublic=()=>/^\/(?:en\/|ja\/)?(?:$|search(?:\/|$)|discover(?:\/|$)|charts(?:\/|$)|authors(?:\/|$)|tags(?:\/|$)|u(?:\/|$)|lists(?:\/|$)|forum(?:\/|$))/.test(location.pathname);
+    // A frozen page must not reveal an obsolete permission snapshot on Back.
+    const hide=(event:PageTransitionEvent)=>{if(event.persisted&&isPublic())document.body.style.visibility='hidden';};
+    const show=(event:PageTransitionEvent)=>{if(event.persisted&&isPublic())location.reload();else document.body.style.visibility='';};
+    window.addEventListener('pagehide',hide);window.addEventListener('pageshow',show);
+    return()=>{window.removeEventListener('pagehide',hide);window.removeEventListener('pageshow',show);};
+  },[]);
   // 服务端每次渲染新建一个（请求之间不能共享缓存）；浏览器里用同一个单例。
   const [queryClient] = useState(() => (typeof window === "undefined" ? makeQueryClient() : getBrowserQueryClient()));
   return (

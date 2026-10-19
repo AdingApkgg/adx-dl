@@ -30,3 +30,13 @@ test("tag filters are retained only within the same normalized public list scope
   expect(samePublicListScope("/charts?tag=abc", "/charts?tag=other&cursor=next")).toBe(false);
   expect(publicListHref("/charts?tag=a%2Fb")).toBeNull();
 });
+
+ test("search return links retain AND filters, view and scoped cursors",()=>{
+ const base='/ja/search?type=charts&q=star&tag%5B%5D=one&tag%5B%5D=two&level%5B%5D=78&level%5B%5D=13%3F&preview=1&view=list';
+ expect(publicListHref(base+'&cursor=abc')).toBe(base+'&cursor=abc');
+ expect(samePublicListScope(base,base+'&cursor=abc')).toBe(true);
+ expect(samePublicListScope(base,base.replace('two','other'))).toBe(false);
+ expect(samePublicListScope(base,base.replace('view=list','view=grid'))).toBe(false);
+ expect(publicListHref('/search?type=all&cursor=abc')).toBeNull();
+ expect(publicListHref('/search?type=charts&view=bad')).toBeNull();
+ });

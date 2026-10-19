@@ -21,7 +21,7 @@ test.skipIf(process.env.DISCOVERY_PERF!=='1')('controlled live search workload: 
  try{await f.ctx.db.transaction(async tx=>{
   await tx.execute(sql`set local statement_timeout='0'`);
   const ctx={...f.ctx,db:tx as unknown as StorageContext['db']};
-  const [blob]=await tx.insert(blobs).values({policyId:f.policy.id,sha256:hash(crypto.randomUUID()),key:crypto.randomUUID(),size:10,state:'ready',detectedMime:'application/zip'}).returning();
+  const [blob]=await tx.insert(blobs).values({policyId:f.policy.id,sha256:hash(crypto.randomUUID()),key:crypto.randomUUID(),size:10,state:'ready',verifiedAt:new Date(),detectedMime:'application/zip'}).returning();
   const [output]=await tx.insert(derivedObjects).values({policyId:f.policy.id,outputSha256:hash(crypto.randomUUID()),key:crypto.randomUUID(),size:12+chartManifestBytes(manifest as never).length+4,mime:CHART_PREVIEW_MIME,state:'ready',properties:{chartPreview:manifest}}).returning();
   const [recipe]=await tx.insert(blobDerivatives).values({sourceBlobId:blob.id,recipe:'chart-preview-v1',recipeBuild:'discovery-perf-fixture',derivedObjectId:output.id,state:'ready'}).returning();
   await tx.execute(sql`create temp table adxc_perf_users on commit drop as select uuidv7()::text id,g i from generate_series(1,1000) g`);
@@ -41,7 +41,8 @@ test.skipIf(process.env.DISCOVERY_PERF!=='1')('controlled live search workload: 
   await tx.execute(sql`insert into forum_public_ids(topic_id,journal_sequence) select id,1 from discussion_topics where author_id in(select id from adxc_perf_users)`);
   await tx.execute(sql`insert into community_content_states(key,entity,entity_id,revision,fact,journal_sequence) select 'topic:'||id::text,'topic',id::text,1,jsonb_build_object('version',1,'entity','topic','id',id::text,'revision',1,'state','visible','hash',content_hash),1 from discussion_topics where author_id in(select id from adxc_perf_users)`);
   await tx.execute(sql`insert into community_content_states(key,entity,entity_id,revision,fact,journal_sequence) select 'topic_control:'||id::text,'topic_control',id::text,1,jsonb_build_object('version',1,'entity','topic_control','id',id::text,'revision',1,'state','control','controls',jsonb_build_object('board','general','locked',false)),1 from discussion_topics where author_id in(select id from adxc_perf_users)`);
-  await tx.execute(sql`update storage_journal_progress set exported_sequence=(select max(sequence) from storage_tombstones) where id='global'`);
+  // Synthetic visibility watermark only, rolled back with this workload; real chain export is covered by native restore.
+  await tx.execute(sql`update storage_journal_progress set exported_sequence=(select max(sequence) from storage_tombstones),chain_hash=repeat('a',64),exported_at=clock_timestamp() where id='global'`);
   await tx.execute(sql`analyze charts;analyze chart_versions;analyze chart_publications;analyze files;analyze discussion_topics;analyze chart_lists;analyze community_content_states`);
   const cases=[{q:'perf',type:'charts'},{q:'perf',type:'all'},{q:'perf',type:'authors'},{q:'perf',type:'lists'},{q:'perf',type:'topics'},{q:'perf',type:'charts',difficulty:'4',levels:'["13+"]',preview:'1'}];
   for(let round=0;round<5;round++)for(const c of cases){const input=parseDiscoveryInput(new URLSearchParams(c as Record<string,string>)),start=performance.now();const r=await searchPublic(ctx,input);const elapsed=performance.now()-start;

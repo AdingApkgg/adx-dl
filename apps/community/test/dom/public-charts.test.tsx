@@ -64,7 +64,7 @@ test("SSR loaders use only public API, no-store, and fetch fresh state for every
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(String(input)).pathname; paths.push(path);
     expect(init?.cache).toBe("no-store");
-    return Response.json(path.endsWith("/related") ? [] : path.endsWith("/42") ? current : { items: [current], nextCursor: null });
+    return Response.json(path.endsWith("/related") || path.endsWith("/public-lists") ? [] : path.endsWith("/42") ? current : { items: [current], nextCursor: null });
   }));
   const ctx = context();
   const args = { context: ctx, params: { id: "42" } } as unknown as Parameters<typeof detailLoader>[0];
@@ -74,7 +74,7 @@ test("SSR loaders use only public API, no-store, and fetch fresh state for every
   const result = await catalogLoader({ context: ctx, url: new URL("https://community.test/charts") } as unknown as Parameters<typeof catalogLoader>[0]);
   expect(result.init?.headers).toMatchObject({ "Cache-Control": "private, no-store" });
   expect(catalogHeaders()).toMatchObject({ "Cache-Control": "private, no-store" });
-  expect(paths).toEqual(["/api/v1/charts/42", "/api/v1/charts/42/related", "/api/v1/charts/42", "/api/v1/charts/42/related", "/api/v1/charts"]);
+  expect(paths).toEqual(["/api/v1/charts/42", "/api/v1/charts/42/related", "/api/v1/charts", "/api/v1/charts/42/public-lists", "/api/v1/charts/42", "/api/v1/charts/42/related", "/api/v1/charts", "/api/v1/charts/42/public-lists", "/api/v1/charts"]);
 });
 test.each([404, 503])("public detail error %s stays no-store and noindex without private fallback", async status => {
   const fetcher = vi.fn(async () => Response.json({ error: { code: "NOT_FOUND", message: "Unavailable" } }, { status }));
@@ -89,7 +89,7 @@ test("detail metadata derives only published snapshot and catalog cursor pages a
   const head = detailMeta({ loaderData: chart, matches, location: { pathname: "/charts/42" } } as unknown as Parameters<typeof detailMeta>[0]);
   expect(JSON.stringify(head)).toContain("Published title");
   expect(JSON.stringify(head)).not.toContain("Private");
-  expect(catalogMeta({ loaderData: { items: [chart] }, matches, location: { pathname: "/charts", search: "?cursor=next" } } as unknown as Parameters<typeof catalogMeta>[0])).toContainEqual({ name: "robots", content: "noindex" });
+  expect(catalogMeta({ loaderData: { items: [chart] }, matches, location: { pathname: "/charts", search: "?cursor=next" } } as unknown as Parameters<typeof catalogMeta>[0])).toContainEqual({ name: "robots", content: "noindex,follow" });
 });
 
 test("public card difficulty pills name the playable difficulty without relying on color", () => {

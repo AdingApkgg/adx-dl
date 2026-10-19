@@ -29,12 +29,16 @@ export async function exerciseDiscovery({owner,other,anonymous,origin,step,evide
  });
  await step('discovery_directories_languages_mobile_and_public_xml',async()=>{
   for(const prefix of ['','/en','/ja'])for(const path of ['/discover','/authors','/tags','/search?type=lists','/search?type=topics']){await reader.goto(url(prefix+path));await reader.locator('main h1').waitFor();for(const width of [320,390,1280]){await reader.setViewportSize({width,height:900});assert.equal(await reader.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}}
-  for(const path of ['/sitemap.xml','/sitemaps/charts-0.xml','/feed.xml']){const r=await anonymous.request.get(url(path));assert.equal(r.status(),200);assert.match(r.headers()['cache-control'],/no-store/);assert.ok((await r.text()).includes(`/charts/${chart.publicId}`)||path==='/sitemap.xml');}
+  const bucket=((BigInt(chart.publicId)-1n)/1000n).toString();
+  for(const path of ['/sitemap.xml',`/sitemaps/charts-${bucket}.xml`,'/feed.xml']){const r=await anonymous.request.get(url(path));assert.equal(r.status(),200);assert.match(r.headers()['cache-control'],/no-store/);const text=await r.text();if(path.startsWith('/sitemaps/'))assert.ok(text.includes(`<loc>${url(`/charts/${chart.publicId}`)}</loc>`));if(path==='/feed.xml'){let next='/api/v1/charts?sort=collected',expected=[];while(next&&expected.length<30){const p=await get(anonymous,next);expected.push(...p.items.map(c=>url(`/charts/${c.publicId}`)));next=p.nextCursor?'/api/v1/charts?sort=collected&cursor='+encodeURIComponent(p.nextCursor):null;}assert.deepEqual([...text.matchAll(/<guid isPermaLink="true">([^<]+)<\/guid>/g)].map(m=>m[1]),expected.slice(0,30));}}
+
  });
  await step('discovery_withdrawal_removes_suggestions_results_counts_and_xml',async()=>{
+  await reader.goto(url(`/search?${new URLSearchParams({q:alias,type:'charts'})}`));await reader.locator('main').getByRole('link',{name:chart.publication.title,exact:true}).first().waitFor();await reader.goto(url('/help/search'));
   const r=await other.request.delete(url(`/api/v1/me/charts/${chart.id}/publication`),{headers:{origin:origin.origin},data:{expectedRevision:chart.revision}});assert.equal(r.status(),200);
   assert.equal((await get(anonymous,`/api/v1/search?type=charts&q=${encodeURIComponent(alias)}`)).groups.charts.total,0);
   assert.deepEqual(await get(anonymous,`/api/v1/search/suggestions?q=${encodeURIComponent(alias)}`),[]);
+  await reader.goBack();await reader.locator('main h1').waitFor();await reader.locator('main').getByRole('link',{name:chart.publication.title,exact:true}).waitFor({state:'detached'});
   for(const path of ['/sitemaps/charts-0.xml','/feed.xml'])assert.equal((await (await anonymous.request.get(url(path))).text()).includes(`/charts/${chart.publicId}<`),false);
   assert.equal(errors.length,0);
  });

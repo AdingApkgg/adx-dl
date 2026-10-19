@@ -19,7 +19,7 @@ export async function loader({ context, url }: Route.LoaderArgs) {
   try {
     const filters = publicChartFiltersFromParams(url.searchParams);
     const page = await publicChartsApi(context.get(apiContext)).list(url.searchParams.get("cursor") ?? undefined, undefined,
-      { ...filters, difficulty: filters.difficulty ? String(filters.difficulty) : undefined });
+      filters);
     return data(page, { headers: publicHeaders });
   } catch (error) {
     throw data(null, { status: error instanceof RangeError ? 400 : error instanceof ApiError && error.status < 500 ? error.status : 503, headers: publicHeaders });

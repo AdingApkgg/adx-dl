@@ -133,7 +133,10 @@ describe("createApp", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("text/plain; charset=UTF-8");
     expect(res.headers.get("cache-control")).toBe("public, max-age=86400");
-    expect(await res.text()).toBe("User-agent: *\nDisallow: /api/\nDisallow: /_s/\n");
+    const robots=await res.text();
+    expect(robots).toStartWith("User-agent: *\nDisallow: /api/\nDisallow: /_s/\n");
+    for(const prefix of ["","/en","/ja"])for(const path of ["/me/","/settings/","/dash","/login","/onboarding","/account-deletion"])expect(robots).toContain(`Disallow: ${prefix}${path}\n`);
+    expect(robots).not.toContain("Disallow: /charts");
   });
 
   test("安全响应头已经挂上", async () => {

@@ -13,13 +13,14 @@ function list(value:string|undefined,max:number,normalize:(s:string)=>string):st
 export function parsePublicChartFilters(input:PublicChartSearchInput={}):PublicChartFilters {
  if((input.q?.length??0)>240)throw new RangeError("Invalid search");
  const q=(input.q??"").trim();
+// biome-ignore lint/suspicious/noControlCharactersInRegex: Reject forbidden controls in untrusted public input.
  if([...q].length>120||/[\u0000-\u001f\u007f\uD800-\uDFFF]/u.test(q))throw new RangeError("Invalid search");
  const difficulty=input.difficulty||undefined,author=input.author||undefined,sort=input.sort||"updated";
  if(difficulty!==undefined&&!/^[1-7]$/.test(difficulty)||author!==undefined&&!isPublicUserId(author)||!["updated","published","collected","title","relevance"].includes(sort))throw new RangeError("Invalid filters");
  if(input.tag&&input.tags)throw new RangeError("Conflicting tag filters");
  const tag=input.tag?normalizeChartTags([input.tag])[0]?.key:undefined;
  const tags=list(input.tags,5,v=>normalizeChartTags([v])[0].key);
- const normalize=(v:string)=>{const t=v.normalize("NFKC").trim().replace(/[A-Z]/g,c=>c.toLowerCase());if(!t||[...t].length>120||/[\p{Cc}\uD800-\uDFFF]/u.test(t))throw new RangeError("Invalid filter value");return t;};
+ const normalize=(v:string)=>{const t=v.normalize("NFKC").trim().replace(/\s+/gu," ").replace(/[A-Z]/g,c=>c.toLowerCase());if(!t||[...t].length>120||/[\p{Cc}\uD800-\uDFFF]/u.test(t))throw new RangeError("Invalid filter value");return t;};
  const levels=list(input.levels,8,normalize),designer=input.designer?normalize(input.designer):undefined;
  const seconds=(v:string|undefined)=>{if(v===undefined||v==="")return undefined;if(!/^(0|[1-9]\d{0,3})$/.test(v)||Number(v)>3600)throw new RangeError("Invalid duration");return Number(v);};
  const minSeconds=seconds(input.minSeconds),maxSeconds=seconds(input.maxSeconds);

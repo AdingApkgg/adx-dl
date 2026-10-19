@@ -65,7 +65,7 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     catch { throw data(null, { status: 400, headers: profileHeaders }); }
     try {
       works = await publicChartsApi(api).list(url.searchParams.get("cursor") ?? undefined, undefined,
-        { ...worksFilters, difficulty: worksFilters.difficulty ? String(worksFilters.difficulty) : undefined });
+        worksFilters);
     } catch (error) {
       if (error instanceof ApiError && error.status < 500) throw data(null, { status: error.status, headers: profileHeaders });
       // Profile remains readable, but unavailable works must not look like an empty list.

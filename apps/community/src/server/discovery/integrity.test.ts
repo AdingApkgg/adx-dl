@@ -20,3 +20,21 @@ test('SQL rejects the same adversarial manifests as final TS resolver before que
 });
 
 test('SQL query normalization equals browser normalization for Unicode whitespace and ASCII folding',async()=>{const {normalizeSearchText}=await import('@/shared/discovery-search');for(const value of [' ＡＢＣ　日本語\t%_  ','\uFEFFABC\u2028DEF\u2029','\u0085Case','e\u0301clair']){const r=await db().execute(sql`select adxc_text_key(${value}) k`);expect(r.rows[0]?.k).toBe(normalizeSearchText(value));}});
+
+ test('SQL strict fact guards agree with final parsers on unknown formats and malformed public snapshots',async()=>{
+ const {communityContentFact}=await import('@/shared/community-content-journal');const {privateLibraryFact}=await import('@/shared/private-library-journal');
+ const topic={version:1,entity:'topic',id:'01a14290-a0ba-7ba8-90fd-e167e04eb88e',revision:1,state:'visible',hash:'a'.repeat(64),authorId:'user'};
+ const control={...topic,entity:'topic_control',state:'control',controls:{board:'general',locked:false,pin:1}};
+ const list={version:1,entity:'list',id:topic.id,userId:'user',revision:2,publicId:'1',draft:{name:'Example',description:'',chartIds:[topic.id]},publication:{name:'Example',description:'line\nnext',chartIds:[topic.id],revision:1,publicId:'1',publishedAt:'2026-10-19T00:00:00.000Z',ownerCutoff:0},deleted:false,createdAt:'2026-10-19T00:00:00.000Z',updatedAt:'2026-10-19T00:00:00.000Z'};
+ for(const f of [topic,{...topic,version:9},{...topic,extra:true},{...topic,hash:null},{...topic,revision:'1'},control,{...control,controls:{...control.controls,unknown:true}},{...control,controls:{locked:'false'}}]){
+ const r=await db().execute(sql`select adxc_community_fact_valid(${JSON.stringify(f)}::jsonb) ok`);expect(r.rows[0]?.ok).toBe(communityContentFact.safeParse(f).success);
+ }
+ for(const f of [list,{...list,version:2},{...list,entity:'other'},{...list,unknown:true},{...list,publication:{...list.publication,revision:3}},{...list,publication:{...list.publication,publishedAt:'2026-10-19T24:00:00Z'}},{...list,publication:{...list.publication,name:' trim '}},{...list,publication:{...list.publication,name:'A\u200bB'}},{...list,draft:{...list.draft,chartIds:['bad']}}]){
+ const r=await db().execute(sql`select adxc_library_public_valid(${JSON.stringify(f)}::jsonb,'1') ok`);expect(r.rows[0]?.ok).toBe(privateLibraryFact.safeParse(f).success);
+ }
+ });
+
+ test('ranked live SQL compiles independently of the public error boundary',async()=>{
+ const {queryGroup,queryFacets}=await import('./search');const {parsePublicChartFilters}=await import('@/shared/public-chart-search');const ctx={db:db()} as import('../storage/contracts').StorageContext;
+ expect((await queryGroup(ctx,'charts',parsePublicChartFilters())).status).toBe('ready');await queryFacets(ctx,parsePublicChartFilters());
+ });

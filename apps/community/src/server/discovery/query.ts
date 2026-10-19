@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import {sql,type SQL} from 'drizzle-orm';
 import {HTTPException} from 'hono/http-exception';
 import type {StorageContext} from '../storage/contracts';
-import {StorageUnavailableError} from '../storage/errors';
+import {StorageError,StorageUnavailableError} from '../storage/errors';
 import {rows} from '../discussions/core';
 import type {PublicChartFilters} from '@/shared/public-chart-search';
 import {normalizeSearchText,searchTerms,type SearchType} from '@/shared/discovery-search';
@@ -16,10 +16,11 @@ export function decodeCursor(value:string|undefined,scope:string):Cursor|null {
  return c;}catch{throw new HTTPException(409,{message:'Search changed; refresh results'});}
 }
 export function encodeCursor(c:Cursor):string{return Buffer.from(JSON.stringify(c)).toString('base64url');}
+const textArray=(values:readonly string[])=>sql`array[${sql.join(values.map(v=>sql`${v}`),sql`, `)}]::text[]`;
 /** Known static column expressions only. No untrusted identifier enters sql.raw. */
 export function chartSlotFilter(f:PublicChartFilters):SQL {
  return sql`(${f.difficulty??null}::integer is null or (d->>'difficulty')::integer=${f.difficulty??null}) and
- (${!f.levels?.length} or adxc_text_key(d->>'level')=any(${f.levels??[]}::text[])) and
+ (${!f.levels?.length} or adxc_text_key(d->>'level')=any(${textArray(f.levels??[])})) and
  (${!f.designer} or adxc_text_key(d->>'designer')=adxc_text_key(${f.designer??''})) and
  (${f.minSeconds===undefined} or (d->>'durationMs')::integer>=${(f.minSeconds??0)*1000}) and
  (${f.maxSeconds===undefined} or (d->>'durationMs')::integer<=${(f.maxSeconds??3600)*1000}) and
@@ -41,7 +42,7 @@ export function rankSelect(q:string):SQL {
  when f->>'kind'='title' and adxc_text_key(f->>'value')=${n} then 6
  when f->>'kind' in('title','alias') and strpos(adxc_text_key(f->>'value'),${n})=1 then 5
  when f->>'kind' in('title','alias') and strpos(adxc_text_key(f->>'value'),${n})>0 then 4
- when f->>'kind'<>'id' and exists(select 1 from unnest(${terms}::text[]) term where strpos(adxc_text_key(f->>'value'),term)>0) then case when f->>'kind'='body' then 2 else 3 end
+ when f->>'kind'<>'id' and exists(select 1 from unnest(${textArray(terms)}) term where strpos(adxc_text_key(f->>'value'),term)>0) then case when f->>'kind'='body' then 2 else 3 end
  else 0 end::integer score from jsonb_array_elements(c.fields) with ordinality f0(f,ord) order by score desc,ord limit 1`;
 }
 export function orderBy(f:PublicChartFilters):SQL {
@@ -56,16 +57,16 @@ export function afterCursor(f:PublicChartFilters,c:Cursor|null):SQL {
  const tail=sql`(at<${c.at}::timestamptz or (at=${c.at}::timestamptz and public_id::bigint>${c.id}::bigint))`;
  return f.sort==='relevance'?sql`(score<${c.score} or (score=${c.score} and ${tail}))`:tail;
 }
-export async function snapshot<T>(ctx:StorageContext,run:(ctx:StorageContext,deadline:number)=>Promise<T>):Promise<T>{
+export async function snapshot<T>(ctx:StorageContext,run:(ctx:StorageContext,deadline:number)=>Promise<T>,options:{partial?:boolean}={}):Promise<T>{
  const deadline=performance.now()+2500;
- try{return await ctx.db.transaction(async tx=>{if(performance.now()>=deadline)throw new StorageUnavailableError();await tx.execute(sql`set local statement_timeout='1500ms'`);const r=await run({...ctx,db:tx as unknown as StorageContext['db']},deadline);if(performance.now()>deadline)throw new StorageUnavailableError();return r;},{isolationLevel:'repeatable read',accessMode:'read only'});}catch(e){if(e instanceof HTTPException)throw e;if(e instanceof RangeError)throw invalid();throw new StorageUnavailableError();}
+ try{return await ctx.db.transaction(async tx=>{if(performance.now()>=deadline)throw new StorageUnavailableError();await tx.execute(sql`set local statement_timeout='1500ms'`);const r=await run({...ctx,db:tx as unknown as StorageContext['db']},deadline);if(!options.partial&&performance.now()>deadline)throw new StorageUnavailableError();return r;},{isolationLevel:'repeatable read',accessMode:'read only'});}catch(e){if(e instanceof HTTPException||e instanceof StorageError)throw e;if(e instanceof RangeError)throw invalid();throw new StorageUnavailableError();}
 }
 export async function groupSavepoint<T>(ctx:StorageContext,type:SearchType,deadline:number,run:()=>Promise<T>):Promise<T|null>{
  if(performance.now()>=deadline)return null;
  // Names are selected from the static entity union; all operations use the same connection/snapshot.
  const name=sql.raw('search_'+type);
  await ctx.db.execute(sql`savepoint ${name}`);
- try{await ctx.db.execute(sql`select set_config('statement_timeout',${String(Math.max(1,Math.min(1500,Math.floor(deadline-performance.now()))))},true)`);const r=await run();await ctx.db.execute(sql`release savepoint ${name}`);return r;}
- catch(e){await ctx.db.execute(sql`rollback to savepoint ${name}`);await ctx.db.execute(sql`release savepoint ${name}`);if(e instanceof HTTPException)throw e;return null;}
+ try{await ctx.db.execute(sql`select set_config('statement_timeout',${String(Math.max(1,Math.min(1500,Math.floor(deadline-performance.now()))))},true)`);const r=await run();await ctx.db.execute(sql`release savepoint ${name}`);return performance.now()>deadline?null:r;}
+ catch(e){await ctx.db.execute(sql`rollback to savepoint ${name}`);await ctx.db.execute(sql`release savepoint ${name}`);if(e instanceof HTTPException||e instanceof StorageError)throw e;return null;}
 }
 export {rows};

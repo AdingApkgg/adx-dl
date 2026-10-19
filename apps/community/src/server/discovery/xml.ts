@@ -5,6 +5,7 @@ import type {StorageContext} from '../storage/contracts';
 import {entityRelation} from './visibility';
 import {snapshot,groupSavepoint,rows,invalid} from './query';
 import type {SearchType} from '@/shared/discovery-search';
+// biome-ignore lint/suspicious/noControlCharactersInRegex: Reject forbidden controls in untrusted public input.
 export function xmlEscape(v:string):string{return v.replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]!)).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'');}
 const types=['charts','lists','authors'] as const;
 const route=(type:typeof types[number])=>type==='authors'?'u':type;

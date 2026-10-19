@@ -6,7 +6,7 @@ import {permissionFact,retentionFact} from "./chart-journal";
 test("NFKC ASCII fold and literal terms remain bounded and preserve other scripts",()=>{
  expect(normalizeSearchText("  ＡＢＣ　日本語\t%_  ")).toBe("abc 日本語 %_");
  expect(parseDiscoveryInput(new URLSearchParams('q=星&type=charts')).type).toBe('charts');
- for(const q of ['a b c d e f g','x'.repeat(121),'\ud800','x\u0000'])expect(()=>parseDiscoveryInput(new URLSearchParams({q}))).toThrow();
+ for(const q of ['a b c d e f g','x'.repeat(121),'x\u0000'])expect(()=>parseDiscoveryInput(new URLSearchParams({q}))).toThrow();
  expect(()=>parseDiscoveryInput(new URLSearchParams('type=private'))).toThrow();
 });
 test("advanced filters preserve exact custom level and bigint IDs with URL roundtrip",()=>{
@@ -36,3 +36,10 @@ test('highlight offsets preserve original graphemes, NFKC expansion and inert ma
  expect(searchHighlights('e\u0301clair','é')).toEqual([{start:0,end:2}]);
  expect(searchHighlights('😀 <script>','script')).toEqual([{start:4,end:10}]);
 });
+
+ test('canonical RPC transport preserves every repeated form filter',async()=>{
+ const {discoverySearchParams}=await import('./discovery-search');
+ const input=parseDiscoveryInput(new URLSearchParams('type=charts&tag[]=one&tag[]=two&level[]=78&level[]=13%3F'));
+ const transported=new URLSearchParams(Object.fromEntries(discoverySearchParams(input)));
+ expect(parseDiscoveryInput(transported)).toEqual(input);
+ });

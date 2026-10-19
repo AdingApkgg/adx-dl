@@ -25,7 +25,7 @@ const difficultyStyles: Record<ChartDifficulty, { name: string; tone: string }> 
 export function publicDifficultyName(difficulty: ChartDifficulty): string {
   return difficultyStyles[difficulty].name || m.chart_difficulty({ difficulty: String(difficulty) });
 }
-function PublicDifficultyPill({ row }: { row: ChartDifficultySummary }) {
+export function PublicDifficultyPill({ row }: { row: ChartDifficultySummary }) {
   const style = difficultyStyles[row.difficulty];
   return <span className={cn("inline-flex max-w-full flex-wrap items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold tabular-nums", style.tone)}>
     <span>{style.name || m.chart_difficulty({ difficulty: String(row.difficulty) })}</span>

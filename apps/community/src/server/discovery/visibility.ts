@@ -5,7 +5,7 @@ import type {StorageContext} from '../storage/contracts';
 import {publicListAllowed} from '../library/core';
 import {visible,topicAllowed,effectiveBoard,exported} from '../discussions/core';
 import type {SearchType} from '@/shared/discovery-search';
-const field=(kind:string,value:SQLWrapper)=>sql`jsonb_build_object('kind',${kind},'value',coalesce(${value},''))`;
+const field=(kind:string,value:SQLWrapper)=>sql`jsonb_build_object('kind',${kind}::text,'value',coalesce(${value},''))`;
 /** Single live chart authority used by search, facets, directories, random and XML. */
 export function chartRelation(ctx:StorageContext):SQL {
  const author=sql`case when ${userPublicIds.journalSequence}<=${exported} and ${user.status}='active' then jsonb_build_object('id',${user.id},'publicId',${userPublicIds.publicId}::text,'name',${user.name},'image',${user.image}) else null end`;
@@ -26,10 +26,10 @@ export function listRelation():SQL {
 }
 export function topicRelation():SQL {
  return sql`select t.id::text,p.public_id::text,t.author_id owner_id,t.title,t.body description,coalesce(t.edited_at,t.created_at) at,t.created_at published,
- jsonb_build_object('publicId',p.public_id::text,'boardId',${effectiveBoard()},'title',t.title,'description',left(t.body,120)) data,
+ jsonb_build_object('publicId',p.public_id::text,'boardId',${effectiveBoard()},'title',t.title,'description',left(t.body,120),'boardName',(select name from discussion_boards where id=${effectiveBoard()})) data,
  jsonb_build_array(${field('id',sql`p.public_id::text`)},${field('title',sql`t.title`)},${field('author',sql`case when up.journal_sequence<=${exported} then u.name else '' end`)},${field('body',sql`t.body`)}) fields
  from discussion_topics t join forum_public_ids p on p.topic_id=t.id join "user" u on u.id=t.author_id left join user_public_ids up on up.user_id=u.id
- where ${visible('topic','t')} and ${topicAllowed()} and t.title is not null and p.journal_sequence<=${exported} and not exists(select 1 from community_content_states ctl where ctl.key='topic_control:'||t.id::text and coalesce((ctl.fact->'controls'->>'removedRoot')::boolean,false))`;
+ where ${visible('topic','t')} and ${topicAllowed()} and t.title is not null and p.journal_sequence<=${exported} and not exists(select 1 from community_content_states ctl where ctl.key='topic_control:'||t.id::text and ctl.fact->'controls'->'removedRoot'='true'::jsonb)`;
 }
 export function authorRelation(ctx:StorageContext):SQL {
  return sql`with contributions as (select owner_id,at from (${chartRelation(ctx)}) c where owner_id is not null union all select owner_id,at from (${listRelation()}) l union all select owner_id,at from (${topicRelation()}) t), contribution as (select owner_id,count(*)::integer n,max(at) at from contributions group by owner_id)

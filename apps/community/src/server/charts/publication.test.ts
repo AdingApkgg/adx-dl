@@ -1339,7 +1339,7 @@ test("restoring a legacy publication issues a durable number before a later rest
   const now = new Date();
   const publication = { description: "", credits: "", tags: [], releaseNote: "", chartId: a.id, versionId: a.currentVersionId, title: a.title, artist: a.artist, publishedAt: now, updatedAt: now };
   await ctx.db.insert(chartPublications).values(publication);
-  const [legacy] = await ctx.db.insert(storageTombstones).values({ kind: "chart_permission", payload: { version: 1, chartId: a.id, revision: 2, publication: publicationDto(publication) } }).returning();
+  const [legacy] = await ctx.db.insert(storageTombstones).values({ kind: "chart_permission", payload: { version: 1, chartId: a.id, revision: 2, publication: (({aliases:_aliases,...legacy})=>legacy)(publicationDto({...publication,aliases:[]})) } }).returning();
   await ctx.db.update(charts).set({ revision: 2, publicationSequence: legacy.sequence }).where(eq(charts.id, a.id));
   await ctx.exportChartJournal!();
   const client = new Client({ connectionString: testDatabaseUrl() }); await client.connect();
@@ -1480,7 +1480,8 @@ test("restore preserves a moderation with no chart and older permission or anony
     await c.query("delete from chart_moderations where chart_id=$1", [chart.id]);
     await replayChartPermission(c, record, fact.payload);
     expect((await c.query("select reason from chart_moderations where chart_id=$1", [chart.id])).rows).toEqual([{ reason: "Permanent takedown" }]);
-    const oldFact = { version: 1 as const, chartId: chart.id, publicId: chart.publicId!, revision: 2, publication };
+    const {aliases:_oldAliases,...oldPublication}=publication;
+    const oldFact = { version: 1 as const, chartId: chart.id, publicId: chart.publicId!, revision: 2, publication:oldPublication };
     await replayChartPermission(c, { ...record, sequence: fact.sequence - 1 }, oldFact);
     await replayDeletedUserCharts(c, { ...record, sequence: fact.sequence + 1, kind: "user_deleted", userId: owner, payload: { version: 1, retained: [oldFact] } });
     expect((await c.query("select 1 from chart_publications where chart_id=$1", [chart.id])).rowCount).toBe(0);
@@ -1748,7 +1749,7 @@ test("aliases remain private until explicit v2 publication and same-version upda
  c=await publishChart(fixture.ctx,owner,c.id,{expectedRevision:c.revision,versionId:version,confirmOriginalArchive:true});
  expect((await getPublicChart(fixture.ctx,number!)).aliases).toEqual(['ＡＢＣ','日本語']);
  expect(c.currentVersionId).toBe(version);expect(c.publicId).toBe(number);expect(c.publication?.publishedAt).toBe(old.publishedAt);
- await withdrawChart(fixture.ctx,owner,c.id,{expectedRevision:c.revision});
+ await withdrawChart(fixture.ctx,owner,c.id,c.revision);
  await expect(getPublicChart(fixture.ctx,number!)).rejects.toMatchObject({status:404});
 });
 
@@ -1771,5 +1772,5 @@ test('live discovery matches aliases, same-slot dimensions and removes corrupted
  await fixture.ctx.db.update(derivedObjects).set({properties:{chartPreview:{...o.properties.chartPreview as object,unknown:true}}}).where(eq(derivedObjects.id,o.id));
  expect((await search()).groups.charts.total).toBe(0);expect(await suggestPublic(fixture.ctx,token)).toEqual([]);
  await fixture.ctx.db.update(derivedObjects).set({properties:o.properties}).where(eq(derivedObjects.id,o.id));
- await withdrawChart(fixture.ctx,owner,c.id,{expectedRevision:c.revision});expect((await search()).groups.charts.total).toBe(0);
+ await withdrawChart(fixture.ctx,owner,c.id,c.revision);expect((await search()).groups.charts.total).toBe(0);
 });

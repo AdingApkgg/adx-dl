@@ -8,6 +8,7 @@ import type {PublicChartDto} from '@/shared/charts';
 import type {PublicListSummary} from '@/shared/library';
 import type {StorageContext} from '../storage/contracts';
 import {StorageError,StorageUnavailableError} from '../storage/errors';
+import {assertLibraryReady} from '../library/core';
 import {chartRelation,listRelation} from './visibility';
 import {snapshot,groupSavepoint,rows,key,chartFilter,termMatch,invalid} from './query';
 import {queryGroup,unavailable} from './search';
@@ -23,7 +24,7 @@ export async function tagPageIn(ctx:StorageContext,input:{q?:string;cursor?:stri
 export const tagDirectory=(ctx:StorageContext,input:{q?:string;cursor?:string}={})=>snapshot(ctx,tx=>tagPageIn(tx,input));
 export async function authorDirectory(ctx:StorageContext,input:{q?:string;cursor?:string;sort?:string}={}):Promise<DirectoryPage<AuthorSummary>> {
  if(input.sort&&input.sort!=='name'&&input.sort!=='recent')throw invalid();
- let f;try{f=parsePublicChartFilters({q:input.q,sort:input.sort==='recent'?'updated':'title'});}catch{throw invalid();}
+ let f:ReturnType<typeof parsePublicChartFilters>;try{f=parsePublicChartFilters({q:input.q,sort:input.sort==='recent'?'updated':'title'});}catch{throw invalid();}
  return snapshot(ctx,async tx=>{const g=await queryGroup(tx,'authors',f,input.cursor);return {items:g.items.map(h=>({publicId:h.publicId,name:h.title,bio:h.description,image:h.image??null,count:h.count??0,updatedAt:h.updatedAt})),nextCursor:g.nextCursor};});
 }
 async function randomIn(ctx:StorageContext,input:PublicChartSearchInput={},date?:string):Promise<PublicChartDto|null> {
@@ -38,6 +39,7 @@ export async function containingPublicLists(ctx:StorageContext,id:string):Promis
  if(!isPublicChartId(id))throw invalid();
  return snapshot(ctx,async tx=>{
  const [chart]=await rows<{id:string}>(tx.db,sql`select c.id from (${chartRelation(tx)}) c where c.public_id=${id}`);if(!chart)throw new StorageError(404,'NOT_FOUND');
+ await assertLibraryReady(tx.db);
  const result=await rows<{data:PublicListSummary}>(tx.db,sql`select c.data from (${listRelation()}) c join chart_lists l on l.id::text=c.id where l.fact->'publication'->'chartIds' @> ${JSON.stringify([chart.id])}::jsonb order by c.at desc,c.public_id::bigint asc limit 6`);return result.map(r=>r.data);
  });
 }
@@ -49,7 +51,7 @@ export async function discoverPublic(ctx:StorageContext):Promise<DiscoveryPage> 
  const tags=await groupSavepoint(tx,'charts',deadline,()=>tagPageIn(tx,{limit:12}));
  const random=await groupSavepoint(tx,'charts',deadline,()=>randomIn(tx,{},(ctx.now?.()??new Date()).toISOString().slice(0,10)));
  return {collected,updated,lists,tags:{status:tags?'ready':'unavailable',items:tags?.items??[]},daily:random??null,randomAvailable:random!==null};
- });
+ },{partial:true});
 }
 export async function discoveryStatus(ctx:StorageContext) {
  try{const [r]=await rows<{ready:boolean}>(ctx.db,sql`select to_regprocedure('adxc_manifest_valid(jsonb,bigint,text)') is not null and exists(select 1 from information_schema.columns where table_name='chart_publications' and column_name='aliases') ready`);return {ready:!!r?.ready,permissionVersions:[1,2],algorithm:1,performance:performanceVerification};}catch{throw new StorageUnavailableError();}

@@ -11,7 +11,7 @@ export const empty=():SearchGroup=>({status:'ready',items:[],total:0,nextCursor:
 export type HitRow={id:string;public_id:string;title:string;description:string;at:string;kind:string;label:string;score:number;data:Record<string,unknown>};
 const paths:Record<SearchType,string>={charts:'charts',authors:'u',lists:'lists',topics:'forum'};
 function hit(type:SearchType,r:HitRow):SearchHit {
- return {type,publicId:r.public_id,title:r.title,description:[...(r.description??'')].slice(0,120).join(''),url:`/${paths[type]}/${r.public_id}`,updatedAt:new Date(r.at).toISOString(),reason:r.score>0?{kind:r.kind as NonNullable<SearchHit['reason']>['kind'],label:r.label}:null,...(type==='charts'?{chart:r.data as unknown as PublicChartDto}:{}),...(type==='authors'?{image:r.data.image as string|null,count:Number(r.data.count)}:{}),...(type==='lists'?{count:Number(r.data.total)}:{})};
+ return {type,publicId:r.public_id,title:r.title,description:[...(r.description??'')].slice(0,120).join(''),url:`/${paths[type]}/${r.public_id}`,updatedAt:new Date(r.at).toISOString(),reason:r.score>0?{kind:r.kind as NonNullable<SearchHit['reason']>['kind'],label:r.label}:null,...(type==='charts'?{chart:r.data as unknown as PublicChartDto}:{}),...(type==='authors'?{image:r.data.image as string|null,count:Number(r.data.count)}:{}),...(type==='lists'?{count:Number(r.data.total)}:{}),...(type==='topics'?{board:{id:String(r.data.boardId),name:String(r.data.boardName)}}:{})};
 }
 export function rankedRelation(ctx:StorageContext,type:SearchType,f:PublicChartFilters):SQL {
  return sql`select c.*,date_trunc('milliseconds',${f.sort==='published'?sql`c.published`:sql`c.at`}) sort_at,b.kind,b.label,b.score from (${entityRelation(ctx,type)}) c cross join lateral(${rankSelect(f.q)}) b where ${termMatch(f.q)} and ${type==='charts'?chartFilter(f):sql`true`}`;
@@ -42,7 +42,7 @@ export async function searchPublic(ctx:StorageContext,input:DiscoveryInput):Prom
   let facets:SearchFacets|null=null;
   if(input.type==='charts'&&groups.charts.status==='ready')facets=await groupSavepoint(tx,'charts',deadline,()=>queryFacets(tx,input.filters));
   return {type:input.type,query:input.filters.q,groups,facets};
- });
+ },{partial:input.type==='all'});
 }
 export async function suggestPublic(ctx:StorageContext,q:string):Promise<SearchHit[]> {
  if(!normalizeSearchText(q))return [];
@@ -61,5 +61,7 @@ export async function catalogPublic(ctx:StorageContext,input:PublicChartSearchIn
   const [r]=await rows<{n:string}>(ctx.db,sql`select public_id::text n from chart_public_ids where chart_id=${c.id}::uuid`);if(!r)throw invalid();
   cursor=encodeCursor({scope:key({algorithm:1,type:'charts',f:{...f,q:normalizeSearchText(f.q)}}),score:0,at:c.at,id:r.n,title:''});
  }}catch{throw invalid();}}
+ // The legacy catalog keeps its existing 400 contract; new search uses 409 for stale scope.
+ if(cursor){try{decodeCursor(cursor,key({algorithm:1,type:'charts',f:{...f,q:normalizeSearchText(f.q)}}));}catch{throw invalid();}}
  return snapshot(ctx,async(tx,deadline)=>{const p=await queryGroup(tx,'charts',f,cursor,limit);const facets=input.limit===undefined?await groupSavepoint(tx,'charts',deadline,()=>queryFacets(tx,f)):null;return {items:p.items.map(h=>h.chart!),nextCursor:p.nextCursor,total:p.total,facets};});
 }
