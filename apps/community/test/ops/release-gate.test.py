@@ -39,6 +39,11 @@ class ReleaseGateTests(unittest.TestCase):
   self.write_receipt()
   with self.assertRaises(ValueError):self.invoke('--await')
   self.assertEqual((self.root/'.deploy-revision').read_text(),'old\n')
+ def test_author_workbench_and_review_steps_are_mandatory(self):
+  for step in ['production_author_workbench_and_imports','production_author_review_compare_and_denials']:
+   with self.subTest(step=step):
+    receipt=copy.deepcopy(self.receipt);receipt['result']['steps'].remove(step)
+    with self.assertRaisesRegex(ValueError,'RECEIPT_REJECTED'):gate.validate(receipt,self.ready)
  def test_library_and_download_steps_are_mandatory(self):
   original=copy.deepcopy(self.receipt)
   for step in ['production_library_and_public_lists','production_download_center_and_list_admin']:

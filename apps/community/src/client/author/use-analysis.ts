@@ -10,7 +10,7 @@ export type AuthorAnalysis={sources:string[];fingerprints:VersionFingerprint[];r
 export async function readBoundedSource(url:string,signal:AbortSignal){
  const response=await expectOk(await fetch(url,{signal,cache:"no-store",credentials:"same-origin",redirect:"error"}));
  if(Number(response.headers.get("content-length"))>1048576){await response.body?.cancel();throw Error("SOURCE_LIMIT");}
- if(!response.body)throw Error("SOURCE_MISSING");const reader=response.body.getReader(),decoder=new TextDecoder("utf-8",{fatal:true});let size=0,text="";
+ if(!response.body)throw Error("SOURCE_MISSING");const reader=response.body.getReader(),decoder=new TextDecoder("utf-8",{fatal:true,ignoreBOM:true});let size=0,text="";
  try{while(true){const next=await reader.read();signal.throwIfAborted();if(next.done)break;size+=next.value.byteLength;if(size>1048576)throw Error("SOURCE_LIMIT");text+=decoder.decode(next.value,{stream:true});}return text+decoder.decode();}
  finally{await reader.cancel().catch(()=>{});}
 }

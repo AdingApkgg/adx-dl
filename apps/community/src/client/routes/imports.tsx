@@ -23,7 +23,7 @@ export function importPhaseLabel(phase:ImportRow["phase"]){const labels={confirm
 function ImportPlan(){
  const imports=useImports(),{data:me}=useQuery(meQuery(getRenderApi())),page=useQuery({...workbenchQuery(getRenderApi(),me?.id??""),enabled:me?.status==="active"});
  const [selected,setSelected]=useState<string[]>([]),[parts,setParts]=useState<ChartParts>({}),[error,setError]=useState<unknown>(),id=useId();
- if(!imports||!me||me.status!=="active")return null;
+ if(!imports||!me||me.status!=="active"||imports.snapshot.scope!==me.id)return <main><PageTitle>{m.author_imports()}</PageTitle><p role="status">{m.author_analysis_loading()}</p></main>;
  const {store,snapshot}=imports,run=(fn:()=>Promise<unknown>)=>{setError(undefined);void fn().catch(setError);},busy=snapshot.busy;
  const rows=snapshot.rows,chosen=rows.filter(r=>selected.includes(r.id)),allIds=rows.map(r=>r.id);
  const failure=error??page.error;

@@ -955,5 +955,7 @@
   "author_phase_uncertain": "Result uncertain",
   "author_phase_paused": "Paused / reselect file",
   "author_phase_failed": "Failed",
-  "author_phase_cancelled": "Cancelled"
+  "author_phase_cancelled": "Cancelled",
+  "author_help": "The creator workbench summarizes your charts, warnings, private changes and capacity. Batch import supports10 rows and256 MiB of raw files, processing one archive at a time. Explicitly map each row to a new chart or an existing chart version, then save ready rows privately. Import never publishes automatically.\nReview reads source with the central parser; viewing history does not change the current version. Comparison is owner-only and falls back to summaries and independent source when budgets are exceeded. Review and explicitly save release-note drafts. Publication always requires a separate version choice and confirmation; warnings are advisory.",
+  "author_privacy": "Import plans keep bounded metadata on this device for24 hours, without original files, source or credentials; they are not server backups. Refresh, sign-out and account changes stop processing. Recovery requires original-file verification or reconciliation with current server results. Review and comparison are session-derived, adding no cloud history or historical public access."
 }
