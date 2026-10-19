@@ -12,6 +12,7 @@ import {
 import type { DbTransaction, StorageContext } from "../server/storage/contracts";
 import { StorageError } from "../server/storage/errors";
 import { objectKey } from "../server/storage/keys";
+import { recipeBuildFor } from "../server/charts/recipe";
 import { withStorageTransaction } from "../server/storage/transactions";
 import { settleSuccessfulQuarantineDelete, withPurgeTransaction, type PurgeBudget } from "../server/storage/publication";
 import { assertStorageNamespace, storageNamespaceCandidate } from "./storage-delete";
@@ -458,7 +459,10 @@ export async function requestMissingDerivedRebuild(
           eq(blobs.state, "ready"),
         ),
       )
-      .orderBy(blobDerivatives.id)
+      // Content-addressed outputs may be shared by historical and current builds.
+      // Prefer a build this deployment can reproduce without changing the recorded output.
+      .orderBy(sql`case when (${blobDerivatives.recipe}='chart-preview-v1' and ${blobDerivatives.recipeBuild}=${recipeBuildFor(ctx, "chart-source")})
+        or (${blobDerivatives.recipe}='avatar-v1' and ${blobDerivatives.recipeBuild}=${recipeBuildFor(ctx, "avatar")}) then 0 else 1 end`, blobDerivatives.id)
       .limit(1);
   const [source] = budget ? await withPurgeTransaction(ctx.db, budget, query) : await query(ctx.db);
   if (!source) return false;
@@ -484,7 +488,9 @@ export async function requestMissingDerivedRebuild(
     )
       return false;
     const current = output.properties.rebuild as Partial<DerivedRebuildIntent> | undefined;
-    if (current?.state === "pending" && current.generation === data.generation) return true;
+    if (current?.state === "pending" && current.generation === data.generation && current.recipeId === recipe.id) return true;
+    // Never replace an intent after a physical writer has acquired it, including expired leases.
+    if (output.leaseUntil !== null) return false;
     const { id, ...rebuild }: DerivedRebuildIntent = {
       id: output.id,
       state: "pending",

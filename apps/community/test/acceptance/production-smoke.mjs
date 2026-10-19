@@ -1,5 +1,6 @@
 // Remote Linux only. Production business content is never mutated by this check.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { lstat, mkdir, readFile, writeFile, chmod } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -20,6 +21,7 @@ const staticCache = new Map();
 let staticBytes = 0, cacheHits = 0, routeFailures = 0, targetPath = null;
 let phase = 'setup', browser, page;
 const authorCoverage={workbench:false,imports:false,review:"not-run",compare:"not-run"};
+let previewCoverage = null;
 let authenticated = 'not-configured';
 const started = Date.now();
 const statePath = env.PRODUCTION_STORAGE_STATE;
@@ -42,7 +44,7 @@ async function result(status) {
     startedAt: new Date(started).toISOString(), elapsedMs: Date.now() - started,
     toolBaseTree: env.PRODUCTION_TOOL_BASE_TREE || null,
     smokeSha256: env.PRODUCTION_SMOKE_SHA256 || null,
-    authorCoverage, authenticated, role: hasAuth ? role : null, authTransport: bridgeUrl ? 'ssh-readonly-bridge-to-public-production' : statePath ? 'explicit-state' : null,
+    authorCoverage, previewCoverage, authenticated, role: hasAuth ? role : null, authTransport: bridgeUrl ? 'ssh-readonly-bridge-to-public-production' : statePath ? 'explicit-state' : null,
     productionRevision: env.PRODUCTION_EXPECT_REVISION || null, sessionRevoked, steps,
     failedStage: status === 'failed' ? phase : null, failedPath: status === 'failed' ? targetPath : null,
     staticCacheHits: cacheHits, routeFailures,
@@ -51,6 +53,14 @@ async function result(status) {
   }, null, 2) + '\n', { mode: 0o600 });
 }
 try {
+  const previewChart = env.PRODUCTION_PREVIEW_CHART || '';
+  const previewDifficulty = env.PRODUCTION_PREVIEW_DIFFICULTY || '';
+  const previewRequired = Boolean(previewChart || previewDifficulty);
+  if (previewRequired) {
+    assert.match(previewChart, /^[1-9]\d{0,19}$/, 'VALID_PREVIEW_TARGET_REQUIRED');
+    assert.match(previewDifficulty, /^[1-7]$/, 'VALID_PREVIEW_TARGET_REQUIRED');
+    previewCoverage = { chart: previewChart, difficulty: Number(previewDifficulty) };
+  }
   assert.ok(!(statePath && bridgeUrl), 'ONE_AUTH_TRANSPORT_REQUIRED');
   if (bridgeUrl) {
     const at = new URL(bridgeUrl);
@@ -176,6 +186,68 @@ try {
     const download = page.getByRole('link', { name: '下载原始 ZIP', exact: true });
     assert.equal(new URL(await download.getAttribute('href'), origin).origin, origin);
     await download.waitFor();
+  });
+  if (previewRequired) await step('production_required_chart_preview', async () => {
+    const difficulty = Number(previewDifficulty);
+    await visit(`/charts/${previewChart}`);
+    const chart = await json(`/api/v1/charts/${previewChart}`);
+    assert.equal(chart.publicId, previewChart, 'PREVIEW_CHART_ID_MISMATCH');
+    const slot = chart.summary.difficulties.find(row => row.difficulty === difficulty);
+    assert.equal(slot?.previewSupported, true, 'REQUIRED_SLOT_PREVIEW_UNSUPPORTED');
+    assert.ok(Number.isFinite(slot.durationMs) && slot.durationMs > 3000, 'PREVIEW_DURATION_REQUIRED');
+    previewCoverage.apiSupported = true;
+    // Global parse failures also invalidate this slot; warnings for other slots do not.
+    const warnings = chart.summary.warnings.filter(warning => warning.difficulty === difficulty || warning.difficulty === undefined);
+    assert.equal(warnings.length, 0, 'REQUIRED_SLOT_HAS_PARSE_WARNINGS');
+    previewCoverage.slotWarnings = warnings.length;
+    const preview = page.getByRole('region', { name: '公开谱面预览', exact: true });
+    await preview.getByRole('combobox', { name: '难度', exact: true }).selectOption(previewDifficulty);
+    const maidataPath = `/api/v1/charts/${previewChart}/versions/${chart.versionId}/assets/maidata`;
+    const maidataResponse = page.waitForResponse(response => new URL(response.url()).pathname === maidataPath, { timeout: 60000 });
+    const [maidata] = await Promise.all([maidataResponse, preview.getByRole('button', { name: '加载预览', exact: true }).click()]);
+    assert.equal(maidata.status(), 200, 'PREVIEW_MAIDATA_LOAD_FAILED');
+    const source = await maidata.body();
+    assert.ok(source.length > 0, 'PREVIEW_MAIDATA_EMPTY');
+    previewCoverage.maidataLoaded = true;
+    assert.equal(createHash('md5').update(source).digest('base64'), chart.summary.maidataMd5Base64, 'PREVIEW_MAIDATA_SUMMARY_MISMATCH');
+    previewCoverage.maidataMatchesSummary = true;
+    const controls = preview.getByRole('group', { name: '预览播放控制', exact: true });
+    const play = controls.getByRole('button', { name: '播放', exact: true });
+    await play.click({ trial: true, timeout: 60000 });
+    const seek = preview.getByRole('slider', { name: '拖动预览时间轴', exact: true });
+    assert.equal(await seek.isEnabled(), true, 'PREVIEW_SEEK_NOT_READY');
+    assert.equal(await preview.getByRole('alert').count(), 0, 'PREVIEW_RENDER_ERROR');
+    previewCoverage.ready = true;
+    const position = async () => Number(await seek.inputValue());
+    const beforePlay = await position();
+    // A real scoped Play click supplies the audio user activation in headless Chromium.
+    await play.click();
+    await controls.getByRole('button', { name: '暂停', exact: true }).waitFor();
+    await page.waitForFunction(start => {
+      const slider = document.querySelector('#chart-preview input[aria-label="拖动预览时间轴"]');
+      return slider && Number(slider.value) > start + 0.25;
+    }, beforePlay, { timeout: 15000 });
+    const advanced = await position();
+    assert.ok(advanced > beforePlay + 0.25, 'PREVIEW_CLOCK_DID_NOT_ADVANCE');
+    previewCoverage.clockAdvanced = true;
+    await controls.getByRole('button', { name: '暂停', exact: true }).click();
+    await play.waitFor();
+    const paused = await position();
+    await page.waitForTimeout(500);
+    const afterPause = await position();
+    assert.ok(Math.abs(afterPause - paused) <= 0.03, 'PREVIEW_PAUSED_CLOCK_ADVANCED');
+    previewCoverage.pauseStable = true;
+    // Exercise the actual accessible range control with pointer input.
+    const bounds = await seek.boundingBox();
+    assert.ok(bounds && bounds.width > 0, 'PREVIEW_SEEK_CONTROL_MISSING');
+    await seek.click({ position: { x: bounds.width * 0.45, y: bounds.height / 2 } });
+    const afterSeek = await position(), duration = slot.durationMs / 1000;
+    assert.ok(afterSeek > duration * 0.35 && afterSeek < duration * 0.55 && Math.abs(afterSeek - afterPause) > 0.1, 'PREVIEW_SEEK_FAILED');
+    assert.equal(await controls.getByRole('button', { name: '播放', exact: true }).isEnabled(), true);
+    assert.equal(await preview.getByRole('alert').count(), 0, 'PREVIEW_RENDER_ERROR');
+    previewCoverage.seekSucceeded = true;
+    previewCoverage.clockSeconds = { beforePlay, advanced, paused, afterPause, afterSeek };
+    await controls.getByRole('button', { name: '关闭预览', exact: true }).click();
   });
   await step('legacy_chart_and_user_redirects', async () => {
     for (const [legacy, canonical] of [['/charts/01a14290-a0ba-7ba8-90fd-e167e04eb88e', '/charts/1'], ['/u/ted4rhkpt8', '/u/1']]) {

@@ -20,6 +20,7 @@ COPY apps/community/messages apps/community/messages
 COPY apps/community/src apps/community/src
 COPY apps/community/ops/backup/*.ts apps/community/ops/backup/
 COPY apps/community/ops/seaweed/*.ts apps/community/ops/seaweed/
+COPY apps/community/ops/charts/*.ts apps/community/ops/charts/
 # tsconfig 继承 @astrodx/tsconfig；共享界面包只放源码，构建时打进产物。
 COPY packages/tsconfig/base.json packages/tsconfig/
 COPY packages/ui/tsconfig.json packages/ui/
@@ -53,6 +54,7 @@ COPY --from=builder /repo/apps/community/src apps/community/src
 COPY packages/maimai-chart-engine/src packages/maimai-chart-engine/src
 COPY apps/community/ops/backup/*.ts apps/community/ops/backup/
 COPY apps/community/ops/seaweed/*.ts apps/community/ops/seaweed/
+COPY apps/community/ops/charts/*.ts apps/community/ops/charts/
 WORKDIR /repo/apps/community
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
 EXPOSE 3000

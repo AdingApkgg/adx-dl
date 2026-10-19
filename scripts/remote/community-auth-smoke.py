@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """SSH-owned, one-run production auth. The Mac relays TCP; Chromium runs on Linux."""
-import base64, json, os, pathlib, secrets, socket, subprocess, sys, tempfile, time, urllib.request
+import base64, json, os, pathlib, re, secrets, socket, subprocess, sys, tempfile, time, urllib.request
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 BUILD = os.environ.get('ASTRODX_BUILD_HOST', 'i@localhost-1.tailac9c6f.ts.net')
 PROD = os.environ.get('ASTRODX_PRODUCTION_HOST', 'i@arch.tailac9c6f.ts.net')
+preview_chart = os.environ.get('PRODUCTION_PREVIEW_CHART', '')
+preview_difficulty = os.environ.get('PRODUCTION_PREVIEW_DIFFICULTY', '')
+if (preview_chart or preview_difficulty) and (not re.fullmatch('[1-9][0-9]{0,19}', preview_chart) or not re.fullmatch('[1-7]', preview_difficulty)):
+    raise SystemExit('VALID_PREVIEW_TARGET_REQUIRED')
+preview_env = {key: os.environ[key] for key in ['PRODUCTION_PREVIEW_CHART', 'PRODUCTION_PREVIEW_DIFFICULTY'] if os.environ.get(key)}
 run_id, capability = secrets.token_hex(16), secrets.token_hex(32)
 source = ROOT / 'apps/community/ops/acceptance/auth-bridge.ts'
 remote = (ROOT / 'scripts/remote/community-auth-host.py').read_text()
@@ -51,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='adxc-smoke-ssh-') as scratch:
             choose = "import socket,os\nassert os.uname().nodename=='localhost'\nwith socket.socket() as s:\n s.bind(('127.0.0.1',0));print(s.getsockname()[1])\n"
             remote_port = int(builder(choose,capture=True).stdout.strip())
             reverse = tunnel(['-R',f'127.0.0.1:{remote_port}:127.0.0.1:{local_port}',BUILD],errors)
-            payload = dict(runId=run_id,key=capability,port=remote_port,source=base64.b64encode(tools.read_bytes()).decode(),tree=base_tree,revision=ready['productionRevision'],module=os.environ.get('ACCEPTANCE_PLAYWRIGHT_PATH','/home/i/astrodx-verify/public-browser-20261016/node_modules/playwright/index.mjs'))
+            payload = dict(previewEnv=preview_env,runId=run_id,key=capability,port=remote_port,source=base64.b64encode(tools.read_bytes()).decode(),tree=base_tree,revision=ready['productionRevision'],module=os.environ.get('ACCEPTANCE_PLAYWRIGHT_PATH','/home/i/astrodx-verify/public-browser-20261016/node_modules/playwright/index.mjs'))
             script = 'import json\ntask=json.loads(' + repr(json.dumps(payload)) + ')\n' + r'''
 import base64, hashlib, os, pathlib, subprocess, time, urllib.request
 assert os.uname().nodename == 'localhost'
@@ -72,6 +77,8 @@ try:
  else: raise RuntimeError('BUILDER_AUTH_TUNNEL_NOT_READY')
  env=dict(os.environ,PRODUCTION_AUTH_BRIDGE=bridge,PRODUCTION_BRIDGE_KEY_FILE=str(key_file),PRODUCTION_AUTH_ROLE='admin',PRODUCTION_EXPECT_USER_ID='1',PRODUCTION_EXPECT_REVISION=task['revision'],PRODUCTION_EVIDENCE_DIR=str(root/'evidence'),PRODUCTION_TOOL_BASE_TREE=task['tree'],PRODUCTION_SMOKE_SHA256=hashlib.sha256(script).hexdigest(),ACCEPTANCE_PLAYWRIGHT_PATH=task['module'])
  env.pop('PRODUCTION_STORAGE_STATE',None)
+ for key in ['PRODUCTION_PREVIEW_CHART','PRODUCTION_PREVIEW_DIFFICULTY']: env.pop(key,None)
+ env.update(task['previewEnv'])
  print('REMOTE_AUTH_HEADLESS_EVIDENCE '+str(root),flush=True)
  result=subprocess.run(['timeout','--signal=TERM','--kill-after=10s','300s','node',str(root/'smoke.mjs')],env=env)
  proof=root/'evidence/result.json'

@@ -36,6 +36,14 @@ def private_file(path):
         raise ValueError('PRIVATE_RECEIPT_REQUIRED')
     return json.loads(path.read_text())
 
+def required_preview():
+    chart = os.environ.get('PRODUCTION_PREVIEW_CHART', '')
+    difficulty = os.environ.get('PRODUCTION_PREVIEW_DIFFICULTY', '')
+    if not chart and not difficulty: return None
+    if not re.fullmatch('[1-9][0-9]{0,19}', chart) or not re.fullmatch('[1-7]', difficulty):
+        raise ValueError('VALID_PREVIEW_TARGET_REQUIRED')
+    return {'chart':chart, 'difficulty':int(difficulty)}
+
 def context():
     run = os.environ.get('COMMUNITY_RELEASE_ID', '')
     directory = pathlib.Path(os.environ.get('COMMUNITY_RELEASE_DIR', '.'))
@@ -47,6 +55,7 @@ def context():
         raise ValueError('RELEASE_DIRECTORY_NOT_OWNED')
     digest = os.environ.get('COMMUNITY_SMOKE_SHA256', '')
     if not re.fullmatch('[a-f0-9]{64}', digest): raise ValueError('SMOKE_SCRIPT_DIGEST_REQUIRED')
+    required_preview()
     return run, directory, int(timeout), digest
 
 def runtime_snapshot():
@@ -78,6 +87,16 @@ def validate(receipt, ready):
         cleanup.get('webNotRestarted') is True,
         cleanup.get('runId') == receipt.get('smokeRunId'),
     ]
+    if ready.get('requiredPreview'):
+        preview = result.get('previewCoverage') or {}
+        target = ready['requiredPreview']
+        checks.extend([
+            'production_required_chart_preview' in result.get('steps', []),
+            preview.get('chart') == target['chart'],
+            type(preview.get('difficulty')) is int and preview['difficulty'] == target['difficulty'],
+            type(preview.get('slotWarnings')) is int and preview['slotWarnings'] == 0,
+            all(preview.get(key) is True for key in ['apiSupported','maidataLoaded','maidataMatchesSummary','ready','clockAdvanced','pauseStable','seekSucceeded']),
+        ])
     if not all(checks): raise ValueError('HEADLESS_RELEASE_RECEIPT_REJECTED')
     started = dt.datetime.fromisoformat(result['startedAt'].replace('Z','+00:00')).timestamp()
     if started < ready['startedAt'] - 5 or started > time.time() + 5 or time.time() - started > 900:
@@ -97,6 +116,7 @@ def main():
         return
     if mode == '--await':
         ready = { 'releaseId':run, 'revision':revision, 'startedAt':time.time(), 'smokeSha256':digest, 'runtime':runtime_snapshot() }
+        if required_preview(): ready['requiredPreview'] = required_preview()
         atomic(directory/'ready.json', ready)
         atomic('.release-status.json', { 'status':'awaiting_acceptance', **ready })
         print('== 应用已切换，自动等待生产登录态验收', flush=True)
