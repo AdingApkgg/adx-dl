@@ -24,8 +24,9 @@ export function samePublicListScope(href: unknown, current: string): href is str
   if (!candidate) return false;
   try {
     const a = new URL(candidate, "https://community.invalid"), b = new URL(current, "https://community.invalid");
-    return a.pathname === b.pathname && (a.searchParams.get("type")??"all") === (b.searchParams.get("type")??"all") && (a.searchParams.get("view")??"grid") === (b.searchParams.get("view")??"grid") && publicChartSearchParams(publicChartFiltersFromParams(a.searchParams)).toString() ===
-      publicChartSearchParams(publicChartFiltersFromParams(b.searchParams)).toString();
+    const filters=(url:URL)=>/\/search$/.test(url.pathname)?parseDiscoveryInput(url.searchParams).filters:publicChartFiltersFromParams(url.searchParams);
+    return a.pathname === b.pathname && (a.searchParams.get("type")??"all") === (b.searchParams.get("type")??"all") && (a.searchParams.get("view")??"grid") === (b.searchParams.get("view")??"grid") && publicChartSearchParams(filters(a)).toString() ===
+      publicChartSearchParams(filters(b)).toString();
   } catch { return false; }
 }
 

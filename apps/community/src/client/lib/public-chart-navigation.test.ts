@@ -40,3 +40,8 @@ test("tag filters are retained only within the same normalized public list scope
  expect(publicListHref('/search?type=all&cursor=abc')).toBeNull();
  expect(publicListHref('/search?type=charts&view=bad')).toBeNull();
  });
+
+test("implicit search relevance remains the same scope as explicit next-page sorting",()=>{
+ expect(samePublicListScope('/search?type=charts&q=star','/search?type=charts&q=star&sort=relevance&cursor=next')).toBe(true);
+ expect(samePublicListScope('/charts?q=star','/charts?q=star&sort=relevance&cursor=next')).toBe(false);
+});

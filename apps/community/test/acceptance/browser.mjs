@@ -356,7 +356,7 @@ async function acceptance() {
     await visitor.setViewportSize({ width: 1440, height: 900 });
     const home = await visitor.goto(origin.href);
     assert.equal(home.headers()["cache-control"], "private, no-store");
-    const latest = visitor.getByRole("region", { name: "最新公开谱面", exact: true });
+    const latest = visitor.locator("section").filter({ has: visitor.getByRole("heading", { name: "最近公开更新", exact: true }) }).getByRole("region", { name: "公开谱面", exact: true });
     await latest.getByRole("link", { name: /CI private draft/ }).waitFor();
     assert.ok(await latest.locator("ul").first().evaluate(el => el.getBoundingClientRect().width > 1000));
     if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-home-desktop.png"), fullPage: true });
@@ -366,7 +366,7 @@ async function acceptance() {
     }
     if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-home-mobile.png"), fullPage: true });
     await visitor.setViewportSize({ width: 1440, height: 900 });
-    await visitor.getByRole("link", { name: "浏览公开谱面", exact: true }).click();
+    await latest.locator('a[href="/charts"]').click();
     await visitor.getByRole("link", { name: /CI private draft/ }).click();
     await visitor.getByRole("heading", { level: 1, name: "CI private draft", exact: true }).waitFor();
     assert.equal(new URL(visitor.url()).pathname, `/charts/${publicChart.publicId}`);
