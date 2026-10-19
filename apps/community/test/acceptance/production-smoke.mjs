@@ -206,7 +206,16 @@ try {
     const maidataResponse = page.waitForResponse(response => new URL(response.url()).pathname === maidataPath, { timeout: 60000 });
     const [maidata] = await Promise.all([maidataResponse, preview.getByRole('button', { name: '加载预览', exact: true }).click()]);
     assert.equal(maidata.status(), 200, 'PREVIEW_MAIDATA_LOAD_FAILED');
-    const source = await maidata.body();
+    // Chromium's inspector text-body transport can remove a UTF-8 BOM.
+    // Hash the bytes fetch exposes to the application, not re-encoded inspector text.
+    const rawSource = await page.evaluate(async path => {
+      const response = await fetch(path, { credentials: 'same-origin', cache: 'no-store' });
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.length > 1048576) throw new Error('PREVIEW_SOURCE_LIMIT');
+      return { status: response.status, bytes: Array.from(bytes) };
+    }, maidataPath);
+    assert.equal(rawSource.status, 200, 'PREVIEW_MAIDATA_RAW_LOAD_FAILED');
+    const source = Buffer.from(rawSource.bytes);
     assert.ok(source.length > 0, 'PREVIEW_MAIDATA_EMPTY');
     previewCoverage.maidataLoaded = true;
     assert.equal(createHash('md5').update(source).digest('base64'), chart.summary.maidataMd5Base64, 'PREVIEW_MAIDATA_SUMMARY_MISMATCH');
