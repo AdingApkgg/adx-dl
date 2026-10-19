@@ -1,3 +1,4 @@
+import {sweepLibraryOrphans} from "../library/deletion";
 import { assertFollowingReady } from "../following/core";
 import { authorUpdateDto, readUpdateNotifications } from "../following/notifications";
 import { sql } from "drizzle-orm";
@@ -15,6 +16,7 @@ function unavailable(error:unknown) {if(error instanceof StorageError&&[404,409]
 async function eventMessage(ctx:StorageContext,e:EventRow) {if(!e.message_id)return null;const [m]=await rows<MessageRow>(ctx.db,sql`select * from discussion_messages where id=${e.message_id}::uuid`);if(!m||!await factMatches(ctx.db,"message",m)||!await author(ctx.db,m.author_id))return null;try{const c=await messageContext(ctx,m);if(c.topic){const dto=await topicDto(ctx,c.topic.t);if(dto.state!=="visible")return null;}return {m,c};}catch(error){if(unavailable(error))return null;throw error;}}
 /** Scheduled bounded outbox delivery. At most 20 events x 100 recipients each invocation. */
 export async function dispatchDiscussionOutbox(ctx:StorageContext) {
+ await sweepLibraryOrphans(ctx);
  const events=await rows<EventRow>(ctx.db,sql`select * from discussion_outbox where not completed and sequence<=${exported} order by created_at,id limit 20`);
  for(const e of events){let message:Awaited<ReturnType<typeof eventMessage>>=null;if(e.kind==="message"){message=await eventMessage(ctx,e);if(!message){await withStorageTransaction(ctx.db,tx=>tx.execute(sql`update discussion_outbox set completed=true where id=${e.id}::uuid`));continue;}}
  let direct:string|null=e.recipient_id;
@@ -51,7 +53,7 @@ export async function notificationDto(ctx:StorageContext,n:NotificationRow):Prom
  if(n.message_id){const [m]=await rows<MessageRow>(ctx.db,sql`select * from discussion_messages where id=${n.message_id}::uuid`);if(m){try{const c=await messageContext(ctx,m,n.user_id);message=await messageDto(ctx,m,c.chart);if(message.state==="visible"){if(c.topic){topic=await topicDto(ctx,c.topic.t,n.user_id);if(topic.state==="visible")href=`/forum/${topic.publicId}#message-${message.id}`;}else if(c.chart)href=`/charts/${c.chart.publicId}#message-${message.id}`;}if(!href)message=null;}catch(error){if(!unavailable(error))throw error;}}}
  if(n.decision_id){const [d]=await rows<{public_reason:string}>(ctx.db,sql`select public_reason from discussion_decisions where id=${n.decision_id}::uuid and recipient_id=${n.user_id}`);if(d)publicReason=d.public_reason;}
  if(n.report_id&&n.kind==="chart_report_resolution"){const [r]=await rows<{resolution_note:string}>(ctx.db,sql`select resolution_note from chart_reports where id=${n.report_id}::uuid and reporter_id=${n.user_id}`);if(r){publicReason=r.resolution_note;href="/me/reports";}}
- if(n.report_id&&n.kind!=="chart_report_resolution"){const [r]=await rows<{resolution_note:string}>(ctx.db,sql`select resolution_note from discussion_reports where id=${n.report_id}::uuid and reporter_id=${n.user_id}`);if(r){publicReason=r.resolution_note;href="/me/discussions?kind=reports";}}
+ if(n.report_id&&n.kind!=="chart_report_resolution"){const [r]=await rows<{resolution_note:string}>(ctx.db,sql`select resolution_note from discussion_reports where id=${n.report_id}::uuid and reporter_id=${n.user_id}`);if(r){publicReason=r.resolution_note;href="/me/discussions?kind=reports";}else{const [lr]=await rows<{resolution_note:string}>(ctx.db,sql`select resolution_note from chart_list_reports where id=${n.report_id}::uuid and reporter_id=${n.user_id}`);if(lr){publicReason=lr.resolution_note;href="/me/library?view=reports";}}}
  return {id:n.id,kind:n.kind==="chart_report_resolution"?"report_resolution":n.kind,createdAt:stamp(n.created_at),eventAt:stamp(n.event_at),read:!!n.read_at,available:!!href||!!publicReason,href,topic,message,publicReason};
 }
 export async function listNotifications(ctx:StorageContext,userId:string,input:{cursor?:string;unread?:boolean;kind?:"author_update"}) {

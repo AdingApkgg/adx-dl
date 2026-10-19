@@ -40,8 +40,8 @@ export async function createChartReport(ctx: StorageContext, reporterId: string,
     if (existing) return existing;
     const [published] = await tx.select({ versionId: chartPublications.versionId }).from(chartPublications).where(eq(chartPublications.chartId, chart.id));
     if (published?.versionId !== chart.versionId) throw new StorageError(409, "REPORT_CHANGED");
-    const [count] = await tx.select({ daily: sql<number>`(count(*) filter(where ${chartReports.createdAt}>clock_timestamp()-interval '24 hours')+(select count(*) from discussion_reports dr where dr.reporter_id=${reporterId} and dr.created_at>clock_timestamp()-interval '24 hours'))::int`,
-      open: sql<number>`(count(*) filter(where ${chartReports.status}='open')+(select count(*) from discussion_reports dr where dr.reporter_id=${reporterId} and dr.status='open'))::int` }).from(chartReports).where(eq(chartReports.reporterId, reporterId));
+    const [count] = await tx.select({ daily: sql<number>`(count(*) filter(where ${chartReports.createdAt}>clock_timestamp()-interval '24 hours')+(select count(*) from discussion_reports dr where dr.reporter_id=${reporterId} and dr.created_at>clock_timestamp()-interval '24 hours')+(select count(*) from chart_list_reports lr where lr.reporter_id=${reporterId} and lr.created_at>clock_timestamp()-interval '24 hours'))::int`,
+      open: sql<number>`(count(*) filter(where ${chartReports.status}='open')+(select count(*) from discussion_reports dr where dr.reporter_id=${reporterId} and dr.status='open')+(select count(*) from chart_list_reports lr where lr.reporter_id=${reporterId} and lr.status='open'))::int` }).from(chartReports).where(eq(chartReports.reporterId, reporterId));
     if (count.daily >= REPORT_DAILY_LIMIT || count.open >= REPORT_OPEN_LIMIT) throw new StorageError(429, "REPORT_LIMIT", "REPORT_LIMIT", 3600);
     const [saved] = await tx.insert(chartReports).values({ reporterId, chartId: chart.id, publicId, versionId: chart.versionId,
       title: chart.title, artist: chart.artist, category: input.category, details }).returning();

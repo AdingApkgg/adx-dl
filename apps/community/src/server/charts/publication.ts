@@ -249,7 +249,7 @@ export async function getPublicChart(ctx: StorageContext, id: string) {
 }
 /** One bounded authorization query for private collections; unavailable IDs never expose old snapshots. */
 export async function getPublicChartsByIds(ctx: StorageContext, ids: readonly string[]): Promise<PublicChartDto[]> {
-  if (ids.length > 50 || ids.some(id => !UUID_PATTERN.test(id))) throw invalid();
+  if (ids.length > 200 || ids.some(id => !UUID_PATTERN.test(id))) throw invalid();
   if (!ids.length) return [];
   return (await query(ctx).where(and(allowed(), inArray(charts.id, [...ids])))).map(publicDto);
 }

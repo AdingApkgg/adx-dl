@@ -10,3 +10,5 @@ export * from "./community-site";
 export * from "./discussions";
 
 export * from "./following";
+
+export * from "./library";

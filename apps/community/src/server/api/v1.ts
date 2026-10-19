@@ -1,3 +1,4 @@
+import { libraryRoutes,publicListRoutes,dashLibraryRoutes } from "./library";
 import { followingRoutes } from "./following";
 import {communitySiteRoutes} from "./community-site";
 import {discussionRoutes} from "./discussions";
@@ -19,6 +20,9 @@ export const apiV1 = new Hono<AppEnv>()
   .get("/meta", (c) => c.json({ name: "astrodx-community", apiVersion: 1 as const }))
   // 登录页的配置：Turnstile 站点密钥、QQ 登录能不能用。不要求登录。
   .get("/login-options", async (c) => c.json(await c.get("services").loginOptions()))
+  .route("/me/lists", libraryRoutes)
+  .route("/lists", publicListRoutes)
+  .route("/dash/lists", dashLibraryRoutes)
   .route("/site", communitySiteRoutes)
   .route("/discussions", discussionRoutes)
   .route("/me/following", followingRoutes)

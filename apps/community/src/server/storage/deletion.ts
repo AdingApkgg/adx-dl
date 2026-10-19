@@ -1,3 +1,4 @@
+import {libraryDeletionHandler} from "../library/deletion";
 import { followingDeletionHandler } from "../following/deletion";
 import {discussionDeletionHandler} from "../discussions/deletion";
 import { retentionFact } from "@/shared/chart-journal";
@@ -349,7 +350,9 @@ export function createDeletionHandlers(
   const chartModules = business.some(h => h.name === "charts") ? business : [...business, chartDeletionHandler];
   const modules = chartModules.some(h=>h.name===discussionDeletionHandler.name)?chartModules:[...chartModules,discussionDeletionHandler];
   const following = followingDeletionHandler(ctx);
-  const allModules = modules.some(h=>h.name===following.name)?modules:[...modules,following];
+  const followedModules = modules.some(h=>h.name===following.name)?modules:[...modules,following];
+  const library=libraryDeletionHandler(ctx);
+  const allModules=followedModules.some(h=>h.name===library.name)?followedModules:[...followedModules,library];
   const names = new Set(allModules.map((h) => h.name));
   if (names.size !== allModules.length || names.has("storage"))
     throw new Error("Duplicate deletion registration");
