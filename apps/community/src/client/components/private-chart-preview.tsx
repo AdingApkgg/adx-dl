@@ -1,3 +1,5 @@
+import {ShareChartButton} from "./share-chart-button";
+import {previewShareParams} from "@/shared/discovery-search";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { MaximizeIcon, MinimizeIcon, Volume2Icon, VolumeXIcon } from "lucide-react";
@@ -17,14 +19,14 @@ import { publicDifficultyName } from "./public-chart-card";
 
 type Props = {
   id: string; versionId: string; summary: ChartImportSummary; assetUrl?: typeof chartAssetUrl; sectionId?: string;
-  controlledDifficulty?: ChartDifficulty; externalSeek?: {token:number;seconds:number}|null; initialPosition?: number; onPosition?: (seconds:number)=>void;
+  enableShare?:boolean; initialDifficulty?:ChartDifficulty; controlledDifficulty?: ChartDifficulty; externalSeek?: {token:number;seconds:number}|null; initialPosition?: number; onPosition?: (seconds:number)=>void;
 };
 export function PrivateChartPreview(props: Props) {
   return <ChartPreview key={`${props.id}/${props.versionId}`} {...props} />;
 }
-function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectionId, controlledDifficulty, externalSeek, initialPosition = 0, onPosition }: Props) {
+function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectionId, enableShare=false, initialDifficulty, controlledDifficulty, externalSeek, initialPosition = 0, onPosition }: Props) {
   const previewTitle = assetUrl === chartAssetUrl ? m.chart_preview() : m.public_chart_preview();
-  const [difficulty, setDifficulty] = useState<ChartDifficulty | undefined>(() => controlledDifficulty ?? summary.difficulties.find(row => row.previewSupported)?.difficulty);
+  const [difficulty, setDifficulty] = useState<ChartDifficulty | undefined>(() => controlledDifficulty ?? initialDifficulty ?? summary.difficulties.find(row => row.previewSupported)?.difficulty);
   const [opened, setOpened] = useState(false);
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -198,7 +200,7 @@ function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectio
       onReady: value => {
         setReady(value); const target = discussionSeek.current ?? (initialSeek.current > 0 && difficulty ? {difficulty,ms:initialSeek.current*1000} : null);
         if(value) initialSeek.current=0;
-        if (value && target?.difficulty === difficulty && player.current) { player.current.pause(); player.current.setRange(null, false); player.current.seek(target.ms / 1000); discussionSeek.current = null; }
+        if (value && target?.difficulty === difficulty && player.current) { player.current.pause(); player.current.setRange(null, false); player.current.seek(Math.max(0,Math.min(duration,target.ms / 1000))); discussionSeek.current = null; }
       }, onPlaying: setPlaying, onPosition: seconds => {setPosition(seconds);positionCallback.current?.(seconds);}, onNotes: setNotes,
       onSilent: () => setSilent(true), onCoverFailed: () => setCoverFailed(true), onLoopDisabled: () => setLoopEnabled(false),
       onError: failure => {
@@ -225,14 +227,14 @@ function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectio
     <h2 className="font-semibold">{previewTitle}</h2>
     <p className="text-sm text-muted-foreground">{m.chart_preview_hint()}</p>
     <label className="block text-sm">{m.chart_difficulties()}
-      <select value={difficulty ?? ""} disabled={exporting || controlledDifficulty !== undefined} onChange={event => setDifficulty(Number(event.target.value) as ChartDifficulty)} className="ml-2 min-h-11 rounded border bg-background px-2 py-1">
+      <select value={difficulty ?? ""} disabled={exporting || controlledDifficulty !== undefined} onChange={event => {initialSeek.current=0;setDifficulty(Number(event.target.value) as ChartDifficulty);}} className="ml-2 min-h-11 rounded border bg-background px-2 py-1">
         {!difficulty ? <option value="">{m.chart_unsupported()}</option> : null}
         {summary.difficulties.map(row => <option key={row.difficulty} value={row.difficulty} disabled={!row.previewSupported}>
           {publicDifficultyName(row.difficulty)}{row.previewSupported ? "" : ` · ${m.chart_unsupported()}`}
         </option>)}
       </select>
     </label>
-    {!opened ? <Button className="min-h-11" disabled={!difficulty} onClick={() => setOpened(true)}>{m.chart_preview_load()}</Button> : <>
+    {!opened ? <Button className="min-h-11" disabled={!difficulty || !summary.difficulties.find(d=>d.difficulty===difficulty)?.previewSupported} onClick={() => setOpened(true)}>{m.chart_preview_load()}</Button> : <>
       <div className={`mx-auto aspect-square w-full bg-black ${fullscreen ? "max-w-[min(65dvh,100%)]" : "max-w-lg"}`}><canvas ref={canvas} aria-label={previewTitle} className="h-full w-full" /></div>
       {!ready && !error ? <p role="status">{m.chart_preview_loading()}</p> : null}
       {silent ? <p role="status" className="text-sm">{m.chart_preview_silent()}</p> : null}
@@ -286,6 +288,7 @@ function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectio
         {exportState === "failed" ? <p role="alert">{m.chart_preview_export_failed()}</p> : null}
         {download ? <a href={download.url} download={download.name} className="inline-flex min-h-11 items-center underline">{m.chart_preview_export_download()}</a> : null}
       </div>
+      {enableShare&&assetUrl!==chartAssetUrl&&/^[1-9]\d{0,18}$/.test(id)&&difficulty?<ShareChartButton title={summary.title} publicId={id} searchParams={previewShareParams({difficulty,seconds:position}).toString()} label={m.discovery_share_position()}/>:null}
       <p className="text-xs text-muted-foreground">{m.chart_preview_shortcuts()}</p>
       {rate !== 1 ? <p className="text-xs text-muted-foreground">{m.chart_preview_rate_pitch()}</p> : null}
     </>}

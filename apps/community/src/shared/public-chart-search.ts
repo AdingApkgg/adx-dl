@@ -28,9 +28,12 @@ export function parsePublicChartFilters(input:PublicChartSearchInput={}):PublicC
 }
 export function publicChartFiltersFromParams(params:URLSearchParams):PublicChartFilters {
  for(const key of fields)if(params.getAll(key).length>1)throw new RangeError("Duplicate filter");
- return parsePublicChartFilters(Object.fromEntries(fields.map(key=>[key,params.get(key)??undefined])));
+ const input:PublicChartSearchInput=Object.fromEntries(fields.map(key=>[key,params.get(key)??undefined]));
+ for(const [param,field] of [["tagLines","tags"],["levelLines","levels"]] as const){const text=params.get(param);if(text){if(text.length>2048||input[field]||field==="tags"&&input.tag)throw new RangeError("Conflicting filters");input[field]=JSON.stringify(text.split(/\r?\n/).map(t=>t.trim()).filter(Boolean));}}
+ for(const [param,field] of [["tag[]","tags"],["level[]","levels"]] as const){const v=params.getAll(param).map(s=>s.trim()).filter(Boolean);if(v.length){if(input[field]||field==="tags"&&input.tag)throw new RangeError("Conflicting filters");input[field]=JSON.stringify(v);}}
+ return parsePublicChartFilters(input);
 }
 export function publicChartSearchParams(filters:PublicChartFilters):URLSearchParams {
  const p=new URLSearchParams();
- for(const key of fields){const v=filters[key as keyof PublicChartFilters];if(v===undefined||v===""||key==="sort"&&v==="updated")continue;p.set(key,Array.isArray(v)?JSON.stringify(v):typeof v==="boolean"?"1":String(v));}return p;
+ for(const key of fields){const v=filters[key as keyof PublicChartFilters];if(v===undefined||v===""||Array.isArray(v)&&!v.length||key==="sort"&&v==="updated")continue;p.set(key,Array.isArray(v)?JSON.stringify(v):typeof v==="boolean"?"1":String(v));}return p;
 }

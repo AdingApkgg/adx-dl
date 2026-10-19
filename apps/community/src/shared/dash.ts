@@ -20,6 +20,7 @@ export type DashChart = {
 export type DashChartsPage = { items: DashChart[]; nextCursor: string | null };
 export type DashStatus = {
   capturedAt: string;
+  discovery?: {ready:boolean;permissionVersions:number[];algorithm:number;performance:{checkedAt:string|null;p95Ms:number|null;status:string}}|null;
   library?: import("./library").LibraryStatus|null;
   following?: import("./following").FollowingStatus;
   qq?: import("./napcat").NapcatObservation;

@@ -29,7 +29,7 @@ export function meta({ loaderData, matches, location }: Route.MetaArgs) {
   const origin = originFrom(matches);
   return [{ title: `${m.public_charts_title()} - ${m.site_name()}` },
     { name: "description", content: m.public_charts_description() },
-    ...(!loaderData || location.search ? [{ name: "robots", content: "noindex" }] : []),
+    ...(!loaderData || location.search ? [{ name: "robots", content: "noindex,follow" }] : []),
     canonicalLink(origin, location.pathname), ...localeAlternates(origin, location.pathname)];
 }
 export default function PublicCharts({ loaderData }: Route.ComponentProps) {
@@ -39,7 +39,7 @@ export default function PublicCharts({ loaderData }: Route.ComponentProps) {
   return <main className="space-y-6">
     <PageTitle description={m.public_charts_description()}>{m.public_charts_title()}</PageTitle>
     <Link to={localizeHref("/me/charts")} className={textLinkClass}>{m.charts_title()}</Link>
-    <PublicChartSearchForm filters={filters} base={base} />
+    <PublicChartSearchForm filters={filters} base={base} facets={loaderData.facets} />
     <PublicChartBrowser page={loaderData} filters={filters} base={base} />
   </main>;
 }

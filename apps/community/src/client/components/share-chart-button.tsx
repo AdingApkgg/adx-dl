@@ -6,7 +6,7 @@ import { useLocation } from "react-router";
 import { localizeHref } from "@/paraglide/runtime.js";
 import { m } from "@/paraglide/messages.js";
 
-export function ShareChartButton({ title, publicId, resource="charts" }: { title: string; publicId: string; resource?: "charts"|"lists" }) {
+export function ShareChartButton({ title, publicId, resource="charts",searchParams,label }: { title: string; publicId: string; resource?: "charts"|"lists"|"u"|"forum"|"search";searchParams?:string;label?:string }) {
   const { pathname } = useLocation();
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -21,7 +21,9 @@ export function ShareChartButton({ title, publicId, resource="charts" }: { title
     if (busy) return;
     const locale = /^\/(en|ja)(?:\/|$)/.exec(pathname)?.[1];
     const path = locale ? `/${locale}/${resource}/${publicId}` : localizeHref(`/${resource}/${publicId}`);
-    const url = new URL(path, window.location.origin).href;
+    const target = new URL(resource === "search" ? (locale ? `/${locale}/search` : localizeHref("/search")) : path, window.location.origin);
+    if(searchParams)target.search=searchParams;
+    const url = target.href;
     setBusy(true); setCopied(false); setManualUrl(null);
     try {
       if (typeof navigator.share === "function") {
@@ -35,7 +37,7 @@ export function ShareChartButton({ title, publicId, resource="charts" }: { title
   }
   return <>
     <Button ref={button} type="button" variant="outline" className="min-h-11" disabled={busy} onClick={() => void share()}>
-      <Share2Icon aria-hidden="true" />{m.public_chart_share()}
+      <Share2Icon aria-hidden="true" />{label??m.public_chart_share()}
     </Button>
     {copied ? <p role="status" className="basis-full text-sm text-muted-foreground">{m.public_chart_link_copied()}</p> : null}
     {manualUrl ? <div className="w-full basis-full space-y-2 rounded-lg border p-3">

@@ -1,3 +1,4 @@
+import {ShareChartButton} from "../components/share-chart-button";
 import { FollowAuthor } from "../components/follow-author";
 import { Button } from "@astrodx/ui/components/button";
 import { Card, CardContent } from "@astrodx/ui/components/card";
@@ -148,7 +149,7 @@ function UserContent({ id, works, worksFilters }: { id: string; works: PublicCha
       </Card>
       <section aria-labelledby="author-public-charts" className="space-y-4">
         <h2 id="author-public-charts" className="text-xl font-semibold">{m.user_public_charts()}</h2>
-        {works && worksFilters ? <><PublicChartSearchForm filters={worksFilters} base={localizeHref(`/u/${profile.publicId}`)} />
+        {works && worksFilters ? <><ShareChartButton title={profile.name} resource="u" publicId={profile.publicId}/><PublicChartSearchForm filters={worksFilters} base={localizeHref(`/u/${profile.publicId}`)} />
           <PublicChartBrowser page={works} filters={worksFilters} base={localizeHref(`/u/${profile.publicId}`)} headingLevel={3} /></>
           : <p role="status" className="text-sm text-muted-foreground">{m.public_charts_unavailable()}</p>}
       </section>

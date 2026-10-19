@@ -14,7 +14,7 @@ export function searchTerms(value: string): string[] {
 }
 export type DiscoveryInput = {type:SearchKind;filters:PublicChartFilters;cursor?:string};
 export function parseDiscoveryInput(params:URLSearchParams):DiscoveryInput {
-  for (const key of params.keys()) if (params.getAll(key).length !== 1) throw new RangeError("Duplicate search field");
+  for (const key of params.keys()) if (!["tag[]","level[]"].includes(key) && params.getAll(key).length !== 1) throw new RangeError("Duplicate search field");
   const type = params.get("type") ?? "all";
   if (type !== "all" && !SEARCH_TYPES.includes(type as SearchType)) throw new RangeError("Invalid search type");
   const filters = publicChartFiltersFromParams(params);
@@ -22,7 +22,7 @@ export function parseDiscoveryInput(params:URLSearchParams):DiscoveryInput {
   if (type !== "all" && type !== "charts" && !["relevance","published","updated"].includes(filters.sort)) throw new RangeError("Invalid search sort");
   const cursor = params.get("cursor") || undefined;
   if (cursor && (cursor.length > 1024 || type === "all")) throw new RangeError("Invalid search cursor");
-  return {type:type as SearchKind,filters:params.has("sort")?filters:parsePublicChartFilters({...Object.fromEntries(params),sort:"relevance"}),...(cursor?{cursor}:{})};
+  return {type:type as SearchKind,filters:params.has("sort")?filters:{...filters,sort:"relevance"},...(cursor?{cursor}:{})};
 }
 export type SearchReason = {kind:"id"|"title"|"alias"|"author"|"artist"|"designer"|"tag"|"body";label:string};
 export type SearchHit = {type:SearchType;publicId:string;title:string;description:string;url:string;updatedAt:string;reason:SearchReason|null;chart?:PublicChartDto;image?:string|null;count?:number};

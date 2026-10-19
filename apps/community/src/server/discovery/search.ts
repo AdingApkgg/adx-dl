@@ -61,5 +61,5 @@ export async function catalogPublic(ctx:StorageContext,input:PublicChartSearchIn
   const [r]=await rows<{n:string}>(ctx.db,sql`select public_id::text n from chart_public_ids where chart_id=${c.id}::uuid`);if(!r)throw invalid();
   cursor=encodeCursor({scope:key({algorithm:1,type:'charts',f:{...f,q:normalizeSearchText(f.q)}}),score:0,at:c.at,id:r.n,title:''});
  }}catch{throw invalid();}}
- return snapshot(ctx,async tx=>{const p=await queryGroup(tx,'charts',f,cursor,limit);return {items:p.items.map(h=>h.chart!),nextCursor:p.nextCursor};});
+ return snapshot(ctx,async(tx,deadline)=>{const p=await queryGroup(tx,'charts',f,cursor,limit);const facets=input.limit===undefined?await groupSavepoint(tx,'charts',deadline,()=>queryFacets(tx,f)):null;return {items:p.items.map(h=>h.chart!),nextCursor:p.nextCursor,total:p.total,facets};});
 }

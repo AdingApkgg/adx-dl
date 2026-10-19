@@ -43,7 +43,7 @@ export type ChartVersionDto = {
 };
 export type ChartPublicationDto = ChartMetadata & { releaseNote: string; versionId: string; title: string; artist: string; publishedAt: string; updatedAt: string };
 export type PublicChartDto = ChartPublicationDto & { id: string; publicId: string; ordinal: number; summary: ChartImportSummary; sourceSize: number; author: { id: string; publicId: string | null; name: string; image: string | null } | null };
-export type PublicChartsPageDto = { items: PublicChartDto[]; nextCursor: string | null };
+export type PublicChartsPageDto = { items: PublicChartDto[]; nextCursor: string | null; total?:number|null; facets?:import("./discovery-search").SearchFacets|null };
 export type ChartDto = ChartMetadata & {
   publicId?: string | null; // Server always supplies this; private drafts have no public number.
   publicationPending?: boolean; // Always supplied by the server; false is required for a durable success.

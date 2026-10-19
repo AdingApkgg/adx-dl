@@ -1,3 +1,4 @@
+import {discoveryStatus} from "../discovery/catalog";
 import {libraryStatus} from "../library/moderation";
 import { followingStatus } from "../following/notifications";
 import { eq, sql, type SQL } from "drizzle-orm";
@@ -179,7 +180,7 @@ export async function dashStatus(services: ApiServices): Promise<DashStatus> {
   let qq = unknownNapcatObservation();
   try { if (services.napcatObservation) qq = await withTimeout(services.napcatObservation(), 250); }
   catch { /* Missing Redis evidence is unknown, never an offline claim. */ }
-  return { capturedAt: new Date().toISOString(), qq, checks, roles, library:services.storage?await libraryStatus(services.storage):null, following:await followingStatus(services),
+  return { capturedAt: new Date().toISOString(), qq, checks, roles, discovery:services.storage?await discoveryStatus(services.storage).catch(()=>null):null, library:services.storage?await libraryStatus(services.storage):null, following:await followingStatus(services),
     queues: { storageDead, mediaPurgeDead, purgeIncomplete: counts.purgeIncomplete, revoking: counts.revoking },
     journal: { exportedSequence: journal?.exportedSequence ?? "0", exportedAt: journal?.exportedAt ?? null, pending: counts.pending },
     maintenance: { active: counts.active },

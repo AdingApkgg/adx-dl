@@ -17,11 +17,11 @@ import { chartsApi } from "../queries/charts";
 import { ChartSummary } from "./chart-summary";
 import { PrivateChartPreview } from "./private-chart-preview";
 
-type Intent = { versionId: string; title: string; artist: string; description: string; credits: string; tags: ChartDto["tags"]; releaseNote: string } | null;
+type Intent = { versionId: string; title: string; artist: string; description: string; credits: string; tags: ChartDto["tags"]; aliases?:string[]; releaseNote: string } | null;
 function matches(chart: ChartDto, intent: Intent) {
   if (chart.publicationPending !== false) return false;
   return intent === null ? chart.publication === null : chart.publication?.versionId === intent.versionId &&
-    chart.publication.title === intent.title && chart.publication.artist === intent.artist && chart.publication.description === intent.description && chart.publication.credits === intent.credits && JSON.stringify(chart.publication.tags) === JSON.stringify(intent.tags) && chart.publication.releaseNote === intent.releaseNote;
+    chart.publication.title === intent.title && chart.publication.artist === intent.artist && chart.publication.description === intent.description && chart.publication.credits === intent.credits && JSON.stringify(chart.publication.tags) === JSON.stringify(intent.tags) && JSON.stringify(chart.publication.aliases??[])===JSON.stringify(intent.aliases??[]) && chart.publication.releaseNote === intent.releaseNote;
 }
 export function ChartPublication({ chart, busy, setBusy, refresh }: {
   chart: ChartDto; busy: boolean; setBusy: (busy: boolean) => void;
@@ -51,7 +51,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
   const [error, setError] = useState<unknown>();
   const uncertain = reconcile || chart.publicationPending !== false;
   const publishedVersion = chart.versions.find(version => version.id === chart.publication?.versionId);
-  const privateChanges = !uncertain && chart.publication && (chart.currentVersionId !== chart.publication.versionId || chart.title !== chart.publication.title || chart.artist !== chart.publication.artist || chart.description !== chart.publication.description || chart.credits !== chart.publication.credits || JSON.stringify(chart.tags) !== JSON.stringify(chart.publication.tags) || publishedVersion?.releaseNote !== chart.publication.releaseNote);
+  const privateChanges = !uncertain && chart.publication && (chart.currentVersionId !== chart.publication.versionId || chart.title !== chart.publication.title || chart.artist !== chart.publication.artist || chart.description !== chart.publication.description || chart.credits !== chart.publication.credits || JSON.stringify(chart.tags) !== JSON.stringify(chart.publication.tags) || JSON.stringify(chart.aliases??[])!==JSON.stringify(chart.publication.aliases??[]) || publishedVersion?.releaseNote !== chart.publication.releaseNote);
   const selected = chart.versions.find((version) => version.id === versionId);
   const api = chartsApi(getRenderApi());
   const accept = async (actual: ChartDto, target: Intent, allowSuccess: boolean) => {
@@ -125,7 +125,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
     </div></div> : null}
     <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} disabled={!interactive || busy || !selected || reconcile || uncertain} onChange={(event) => setConfirmed(event.target.checked)} />{m.chart_publication_archive()}</label>
     <div className="flex flex-wrap gap-2">
-      <Button disabled={!interactive || busy || !selected || !confirmed || reconcile || uncertain} onClick={() => void mutate({ versionId, title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits, tags: chart.tags, releaseNote: selected?.releaseNote ?? "" })}>{chart.publication ? m.chart_publication_update() : m.chart_publication_confirm()}</Button>
+      <Button disabled={!interactive || busy || !selected || !confirmed || reconcile || uncertain} onClick={() => void mutate({ versionId, title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits, tags: chart.tags, aliases:chart.aliases??[], releaseNote: selected?.releaseNote ?? "" })}>{chart.publication ? m.chart_publication_update() : m.chart_publication_confirm()}</Button>
       {chart.publication ? <Button variant="outline" disabled={!interactive || busy || reconcile || uncertain} onClick={() => setWithdrawing(true)}>{m.chart_publication_withdraw()}</Button> : null}
       {reconcile || uncertain ? <Button variant="outline" disabled={!interactive || busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
     </div>
@@ -139,6 +139,6 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
   </section>;
 }
 
-function SnapshotMetadata({ value }: { value: { description: string; credits: string; tags: ChartDto["tags"]; releaseNote: string } }) {
-  return <dl className="space-y-2 break-words text-sm"><div><dt>{m.chart_metadata_description()}</dt><dd className="whitespace-pre-wrap">{value.description || "—"}</dd></div><div><dt>{m.chart_metadata_credits()}</dt><dd className="whitespace-pre-wrap">{value.credits || "—"}</dd></div><div><dt>{m.chart_metadata_tags()}</dt><dd>{value.tags.map(tag => tag.label).join(" · ") || "—"}</dd></div><div><dt>{m.chart_metadata_release_note()}</dt><dd className="whitespace-pre-wrap">{value.releaseNote || "—"}</dd></div></dl>;
+function SnapshotMetadata({ value }: { value: { description: string; credits: string; tags: ChartDto["tags"]; aliases?:string[]; releaseNote: string } }) {
+  return <dl className="space-y-2 break-words text-sm"><div><dt>{m.discovery_aliases()}</dt><dd>{(value.aliases??[]).join(" · ")||"—"}</dd></div><div><dt>{m.chart_metadata_description()}</dt><dd className="whitespace-pre-wrap">{value.description || "—"}</dd></div><div><dt>{m.chart_metadata_credits()}</dt><dd className="whitespace-pre-wrap">{value.credits || "—"}</dd></div><div><dt>{m.chart_metadata_tags()}</dt><dd>{value.tags.map(tag => tag.label).join(" · ") || "—"}</dd></div><div><dt>{m.chart_metadata_release_note()}</dt><dd className="whitespace-pre-wrap">{value.releaseNote || "—"}</dd></div></dl>;
 }
