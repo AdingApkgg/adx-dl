@@ -53,3 +53,4 @@ export function chartAssetUrl(id: string, versionId: string, role: ChartAssetRol
 }
 
 export const workbenchQuery=(api:ApiClient,ownerId:string,filters:WorkbenchFilters={})=>queryOptions({queryKey:["me","author-workbench",ownerId,filters] as const,queryFn:({signal})=>chartsApi(api).workbench(filters,signal)});
+export const authorChartQuery=(api:ApiClient,ownerId:string,id:string)=>queryOptions({queryKey:["me","author-chart",ownerId,id] as const,queryFn:({signal})=>chartsApi(api).get(id,signal)});

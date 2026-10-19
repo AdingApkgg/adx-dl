@@ -92,8 +92,8 @@ export function createApp(deps: AppDeps) {
   app.use("*", async (c, next) => {
     const privateDash = /^\/(?:(?:zh|en|ja)\/)?dash(?:\/|\.data$|$)/.test(c.req.path)
       || /^\/api\/v1\/dash(?:\/|$)/.test(c.req.path)
-      || /^\/(?:(?:zh|en|ja)\/)?me\/(?:favorites|reports)(?:\/|\.data$|$)/.test(c.req.path)
-      || /^\/api\/v1\/me\/(?:favorites|reports)(?:\/|$)/.test(c.req.path);
+      || /^\/(?:(?:zh|en|ja)\/)?me\/(?:favorites|reports|workbench|imports|charts)(?:\/|\.data$|$)/.test(c.req.path)
+      || /^\/api\/v1\/me\/(?:favorites|reports|workbench|imports|charts)(?:\/|$)/.test(c.req.path);
     await next();
     if (privateDash) {
       c.res.headers.set("Cache-Control", "private, no-store");

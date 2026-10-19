@@ -72,6 +72,7 @@ export function AccountMenu() {
         <DropdownMenuLabel className="truncate">{me.name}</DropdownMenuLabel>
         {pending ? null : (
           <>
+            <DropdownMenuItem asChild><Link to={localizeHref("/me/workbench")}>{m.author_workbench()}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link to={localizeHref("/me/charts")}>{m.charts_title()}</Link>
             </DropdownMenuItem>

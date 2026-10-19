@@ -17,13 +17,14 @@ import { publicDifficultyName } from "./public-chart-card";
 
 type Props = {
   id: string; versionId: string; summary: ChartImportSummary; assetUrl?: typeof chartAssetUrl; sectionId?: string;
+  controlledDifficulty?: ChartDifficulty; externalSeek?: {token:number;seconds:number}|null; initialPosition?: number; onPosition?: (seconds:number)=>void;
 };
 export function PrivateChartPreview(props: Props) {
   return <ChartPreview key={`${props.id}/${props.versionId}`} {...props} />;
 }
-function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectionId }: Props) {
+function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectionId, controlledDifficulty, externalSeek, initialPosition = 0, onPosition }: Props) {
   const previewTitle = assetUrl === chartAssetUrl ? m.chart_preview() : m.public_chart_preview();
-  const [difficulty, setDifficulty] = useState<ChartDifficulty | undefined>(() => summary.difficulties.find(row => row.previewSupported)?.difficulty);
+  const [difficulty, setDifficulty] = useState<ChartDifficulty | undefined>(() => controlledDifficulty ?? summary.difficulties.find(row => row.previewSupported)?.difficulty);
   const [opened, setOpened] = useState(false);
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -54,7 +55,15 @@ function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectio
   const player = useRef<PreviewPlayer | null>(null);
   const duration = (summary.difficulties.find(row => row.difficulty === difficulty)?.durationMs ?? 0) / 1000;
 
+  const positionCallback = useRef(onPosition); positionCallback.current = onPosition;
+  const initialSeek = useRef(initialPosition);
   const discussionSeek = useRef<{ difficulty: ChartDifficulty; ms: number } | null>(null);
+  useEffect(() => {
+    if (!externalSeek || !difficulty || exporting || !Number.isFinite(externalSeek.seconds) || externalSeek.seconds < 0 || externalSeek.seconds > duration) return;
+    player.current?.pause(); setRange(null);setLoopEnabled(false);player.current?.setRange(null,false);
+    if(opened && ready && player.current){player.current.seek(externalSeek.seconds);discussionSeek.current=null;}
+    else{discussionSeek.current={difficulty,ms:externalSeek.seconds*1000};setOpened(true);}
+  }, [externalSeek?.token, difficulty, exporting]);
   useEffect(() => {
     if (assetUrl === chartAssetUrl) return;
     const seek = (event: Event) => {
@@ -185,9 +194,10 @@ function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectio
       id, versionId, difficulty, duration, summary, canvas: canvas.current, assetUrl,
       rate: settings.current.rate, volume: settings.current.muted ? 0 : settings.current.volume, mirror: settings.current.mirror,
       onReady: value => {
-        setReady(value); const target = discussionSeek.current;
+        setReady(value); const target = discussionSeek.current ?? (initialSeek.current > 0 && difficulty ? {difficulty,ms:initialSeek.current*1000} : null);
+        if(value) initialSeek.current=0;
         if (value && target?.difficulty === difficulty && player.current) { player.current.pause(); player.current.setRange(null, false); player.current.seek(target.ms / 1000); discussionSeek.current = null; }
-      }, onPlaying: setPlaying, onPosition: setPosition, onNotes: setNotes,
+      }, onPlaying: setPlaying, onPosition: seconds => {setPosition(seconds);positionCallback.current?.(seconds);}, onNotes: setNotes,
       onSilent: () => setSilent(true), onCoverFailed: () => setCoverFailed(true), onLoopDisabled: () => setLoopEnabled(false),
       onError: failure => {
         discussionSeek.current = null;
@@ -213,7 +223,7 @@ function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectio
     <h2 className="font-semibold">{previewTitle}</h2>
     <p className="text-sm text-muted-foreground">{m.chart_preview_hint()}</p>
     <label className="block text-sm">{m.chart_difficulties()}
-      <select value={difficulty ?? ""} disabled={exporting} onChange={event => setDifficulty(Number(event.target.value) as ChartDifficulty)} className="ml-2 min-h-11 rounded border bg-background px-2 py-1">
+      <select value={difficulty ?? ""} disabled={exporting || controlledDifficulty !== undefined} onChange={event => setDifficulty(Number(event.target.value) as ChartDifficulty)} className="ml-2 min-h-11 rounded border bg-background px-2 py-1">
         {!difficulty ? <option value="">{m.chart_unsupported()}</option> : null}
         {summary.difficulties.map(row => <option key={row.difficulty} value={row.difficulty} disabled={!row.previewSupported}>
           {publicDifficultyName(row.difficulty)}{row.previewSupported ? "" : ` · ${m.chart_unsupported()}`}
