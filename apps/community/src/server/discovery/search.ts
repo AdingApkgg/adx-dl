@@ -16,12 +16,15 @@ function hit(type:SearchType,r:HitRow):SearchHit {
 export function rankedRelation(ctx:StorageContext,type:SearchType,f:PublicChartFilters):SQL {
  return sql`select c.*,date_trunc('milliseconds',${f.sort==='published'?sql`c.published`:sql`c.at`}) sort_at,b.kind,b.label,b.score from (${entityRelation(ctx,type)}) c cross join lateral(${rankSelect(f.q)}) b where ${termMatch(f.q)} and ${type==='charts'?chartFilter(f):sql`true`}`;
 }
+export function groupStatement(ctx:StorageContext,type:SearchType,f:PublicChartFilters,cursor:Cursor|null,limit:number):SQL {
+ const ranked=rankedRelation(ctx,type,f);
+ return sql`with ranked0 as materialized(${ranked}), ranked as(select id,public_id,title,description,sort_at at,kind,label,score,data from ranked0)
+ select (select count(*)::integer from ranked) total,coalesce((select jsonb_agg(p) from (select * from ranked where ${afterCursor(f,cursor)} order by ${orderBy(f)} limit ${limit+1}) p),'[]'::jsonb) items`;
+}
 export async function queryGroup(ctx:StorageContext,type:SearchType,f:PublicChartFilters,after?:string,limit=20):Promise<SearchGroup> {
  if(type==='lists'){const [ready]=await rows<{ready:boolean}>(ctx.db,sql`select ready from chart_library_status where id='global'`);if(!ready?.ready)throw new StorageUnavailableError();}
  const scope=key({algorithm:1,type,f:{...f,q:normalizeSearchText(f.q)}}),cursor=decodeCursor(after,scope);
- const ranked=rankedRelation(ctx,type,f);
- const [r]=await rows<{total:number;items:HitRow[]}>(ctx.db,sql`with ranked0 as materialized(${ranked}), ranked as(select id,public_id,title,description,sort_at at,kind,label,score,data from ranked0)
- select (select count(*)::integer from ranked) total,coalesce((select jsonb_agg(p) from (select * from ranked where ${afterCursor(f,cursor)} order by ${orderBy(f)} limit ${limit+1}) p),'[]'::jsonb) items`);
+ const [r]=await rows<{total:number;items:HitRow[]}>(ctx.db,groupStatement(ctx,type,f,cursor,limit));
  const selected=(r?.items??[]).slice(0,limit),last=selected.at(-1);
  return {status:'ready',items:selected.map(row=>hit(type,row)),total:r?.total??0,nextCursor:(r?.items.length??0)>limit&&last?encodeCursor({scope,score:last.score,at:new Date(last.at).toISOString(),id:last.public_id,title:normalizeSearchText(last.title)}):null};
 }

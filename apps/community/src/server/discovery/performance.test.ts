@@ -8,7 +8,7 @@ import {readyContext} from '../../../test/storage/ready-file';
 import {blobs,derivedObjects,blobDerivatives} from '../db/schema';
 import {chartManifestBytes} from '../charts/artifact';
 import {CHART_PREVIEW_MIME} from '../charts/recipe';
-import {searchPublic} from './search';
+import {searchPublic,groupStatement} from './search';
 import {parseDiscoveryInput} from '@/shared/discovery-search';
 import type {StorageContext} from '../storage/contracts';
 /** Opt-in only: a dedicated _test database, rollback-scoped synthetic metadata, no media/object-store writes. */
@@ -17,7 +17,7 @@ test.skipIf(process.env.DISCOVERY_PERF!=='1')('controlled live search workload: 
  const f=await readyContext(),hash=(s:string)=>createHash('sha256').update(s).digest('hex');
  const summary={title:'Perf original',artist:'Perf artist',maidataMd5Base64:'A'.repeat(22)+'==',difficulties:[{difficulty:4,level:'13+',designer:'Perf designer',noteCount:2,durationMs:3000,previewSupported:true}],warnings:[],audio:null,hasCover:false};
  const manifest={format:1,summary,assets:[{role:'maidata',path:'maidata.txt',mime:'text/plain; charset=utf-8',size:4,sha256:'a'.repeat(64),offset:0}]} as const;
- const rollback={},samples:number[]=[];let report:Record<string,unknown>|undefined;
+ const rollback={},samples:number[]=[],byCase:Record<string,number[]>={};let report:Record<string,unknown>|undefined;
  try{await f.ctx.db.transaction(async tx=>{
   await tx.execute(sql`set local statement_timeout='0'`);
   const ctx={...f.ctx,db:tx as unknown as StorageContext['db']};
@@ -45,8 +45,10 @@ test.skipIf(process.env.DISCOVERY_PERF!=='1')('controlled live search workload: 
   await tx.execute(sql`update storage_journal_progress set exported_sequence=(select max(sequence) from storage_tombstones),chain_hash=repeat('a',64),exported_at=clock_timestamp() where id='global'`);
   await tx.execute(sql`analyze charts;analyze chart_versions;analyze chart_publications;analyze files;analyze discussion_topics;analyze chart_lists;analyze community_content_states`);
   const cases=[{q:'perf',type:'charts'},{q:'perf',type:'all'},{q:'perf',type:'authors'},{q:'perf',type:'lists'},{q:'perf',type:'topics'},{q:'perf',type:'charts',difficulty:'4',levels:'["13+"]',preview:'1'}];
+  if(process.env.DISCOVERY_PERF_PROFILE==='1'&&process.env.DISCOVERY_PERF_REPORT){const plans:Record<string,unknown>={};for(const type of ['charts','authors','lists','topics'] as const){const f=parseDiscoveryInput(new URLSearchParams({q:'perf',type})).filters;plans[type]=(await tx.execute(sql`explain(analyze,buffers,format json) ${groupStatement(ctx,type,f,null,20)}`)).rows;}await writeFile(process.env.DISCOVERY_PERF_REPORT+'.plans.json',JSON.stringify(plans),{mode:0o600});}
   for(let round=0;round<5;round++)for(const c of cases){const input=parseDiscoveryInput(new URLSearchParams(c as Record<string,string>)),start=performance.now();const r=await searchPublic(ctx,input);const elapsed=performance.now()-start;
-    expect(Object.values(r.groups).some(g=>g.status==='unavailable')).toBe(false);if(c.type==='charts')expect(r.groups.charts.total).toBe(5000);if(c.type==='authors')expect(r.groups.authors.total).toBe(1000);if(c.type==='lists')expect(r.groups.lists.total).toBe(1000);if(c.type==='topics')expect(r.groups.topics.total).toBe(2000);if(round>0)samples.push(elapsed);}
+    expect(Object.values(r.groups).some(g=>g.status==='unavailable')).toBe(false);if(c.type==='charts')expect(r.groups.charts.total).toBe(5000);if(c.type==='authors')expect(r.groups.authors.total).toBe(1000);if(c.type==='lists')expect(r.groups.lists.total).toBe(1000);if(c.type==='topics')expect(r.groups.topics.total).toBe(2000);if(round>0){samples.push(elapsed);(byCase[JSON.stringify(c)]??=[]).push(Math.round(elapsed));}}
+  console.log('DISCOVERY_CASE_TIMES '+JSON.stringify(byCase));
   samples.sort((a,b)=>a-b);const p95=Math.ceil(samples[Math.ceil(samples.length*.95)-1]);expect(p95).toBeLessThan(1500);
   report={status:'passed',checkedAt:new Date().toISOString(),p95Ms:p95,samples:samples.length,fixtures:{charts:5000,authors:1000,lists:1000,topics:2000},sourceBytes:'shared immutable synthetic fixture',algorithm:1};throw rollback;
  });}catch(e){if(e!==rollback)throw e;}

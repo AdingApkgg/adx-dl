@@ -76,7 +76,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
 export default function App() {
   useEffect(()=>{
-    const isPublic=()=>/^\/(?:en\/|ja\/)?(?:$|search(?:\/|$)|discover(?:\/|$)|charts(?:\/|$)|authors(?:\/|$)|tags(?:\/|$)|u(?:\/|$)|lists(?:\/|$)|forum(?:\/|$))/.test(location.pathname);
+    const isPublic=()=>/^\/(?:en(?:\/|$)|ja(?:\/|$))?(?:$|search(?:\/|$)|discover(?:\/|$)|charts(?:\/|$)|authors(?:\/|$)|tags(?:\/|$)|u(?:\/|$)|lists(?:\/|$)|forum(?:\/|$))/.test(location.pathname);
     // A frozen page must not reveal an obsolete permission snapshot on Back.
     const hide=(event:PageTransitionEvent)=>{if(event.persisted&&isPublic())document.body.style.visibility='hidden';};
     const show=(event:PageTransitionEvent)=>{if(event.persisted&&isPublic())location.reload();else document.body.style.visibility='';};
