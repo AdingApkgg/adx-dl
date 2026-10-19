@@ -1751,3 +1751,25 @@ test("aliases remain private until explicit v2 publication and same-version upda
  await withdrawChart(fixture.ctx,owner,c.id,{expectedRevision:c.revision});
  await expect(getPublicChart(fixture.ctx,number!)).rejects.toMatchObject({status:404});
 });
+
+test('live discovery matches aliases, same-slot dimensions and removes corrupted or withdrawn candidates before counts',async()=>{
+ const {updateChart}=await import('./service');const {publishChart,withdrawChart}=await import('./publication');
+ const {searchPublic,suggestPublic}=await import('../discovery/search');const {parseDiscoveryInput}=await import('@/shared/discovery-search');
+ const owner=await readyOwner(fixture.ctx);let c=await createChart(fixture.ctx,owner,(await chartFile(owner,{title:'Discovery controlled source',designer:'OneSlot'})).file.id);
+ const token='Alias'+crypto.randomUUID();c=await updateChart(fixture.ctx,owner,c.id,{expectedRevision:c.revision,aliases:[token]});
+ const search=(extra:Record<string,string>={})=>searchPublic(fixture.ctx,parseDiscoveryInput(new URLSearchParams({q:token,type:'charts',...extra})));
+ expect((await search()).groups.charts.total).toBe(0);
+ c=await publishChart(fixture.ctx,owner,c.id,{expectedRevision:c.revision,versionId:c.currentVersionId,confirmOriginalArchive:true});
+ expect((await search()).groups.charts.items[0]?.reason?.kind).toBe('alias');
+ expect((await search({difficulty:'4',designer:'oneslot',preview:'1'})).groups.charts.total).toBe(1);
+ expect((await search({difficulty:'6',designer:'oneslot'})).groups.charts.total).toBe(0);
+ expect((await search({levels:'["78"]'})).groups.charts.total).toBe(0);
+ expect((await suggestPublic(fixture.ctx,token)).map(h=>h.publicId)).toEqual([c.publicId!]);
+ const [v]=await fixture.ctx.db.select().from(chartVersions).where(eq(chartVersions.id,c.currentVersionId));
+ const [d]=await fixture.ctx.db.select().from(blobDerivatives).where(eq(blobDerivatives.id,v.previewDerivativeId));
+ const [o]=await fixture.ctx.db.select().from(derivedObjects).where(eq(derivedObjects.id,d.derivedObjectId!));
+ await fixture.ctx.db.update(derivedObjects).set({properties:{chartPreview:{...o.properties.chartPreview as object,unknown:true}}}).where(eq(derivedObjects.id,o.id));
+ expect((await search()).groups.charts.total).toBe(0);expect(await suggestPublic(fixture.ctx,token)).toEqual([]);
+ await fixture.ctx.db.update(derivedObjects).set({properties:o.properties}).where(eq(derivedObjects.id,o.id));
+ await withdrawChart(fixture.ctx,owner,c.id,{expectedRevision:c.revision});expect((await search()).groups.charts.total).toBe(0);
+});

@@ -1,3 +1,4 @@
+import {sitemapIndex,sitemapPart,publicFeed} from "./discovery/xml";
 import { createDeletionHandlers } from "./storage/deletion";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -34,7 +35,7 @@ const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 // spec 第 11.5 节。不收录的页面靠各自的 noindex，不在这里挡：挡了，爬虫就看不到 noindex，照样可能按外链收录地址。
 // sitemap 等子项目 3、4 有了内容再加。
-const ROBOTS_TXT = "User-agent: *\nDisallow: /api/\nDisallow: /_s/\n";
+const ROBOTS_TXT = "User-agent: *\nDisallow: /api/\nDisallow: /_s/\n" + ["", "/en", "/ja", "/zh"].flatMap(prefix => ["/me/", "/settings/", "/dash", "/login", "/onboarding", "/account-deletion"].map(path => `Disallow: ${prefix}${path}\n`)).join("");
 
 // /api/v1/* 的请求体上限，和 /api/auth/*（auth/mount.ts）一样是 64 KiB。现有的请求体都是很小的 JSON；
 // 以后有接口要收更大的内容，要改这里：后面挂的中间件放不宽这里的上限。
@@ -276,7 +277,13 @@ export function createApp(deps: AppDeps) {
   })) app.use("/api/v1/*", middleware);
   // spec 第 10.6 节：注销冷静期里除了几个接口，一律 403 ACCOUNT_PENDING_DELETION。
   app.use("/api/v1/*", pendingDeletionGuard());
+  app.use("/api/v1/search/suggestions",rateLimit<AppEnv>({store:deps.rateLimitStore,name:"search-suggestions-ip",limit:60,windowSec:60,key:c=>rateLimitKeyForIp(c.get("clientIp")),onStoreError:onRateLimitStoreError}));
   app.route("/", apiRoutes);
+  const xmlStorage=()=>{if(!services.storage)throw new StorageError(503,"STORAGE_UNAVAILABLE");return services.storage;};
+  for(const path of ["/sitemap.xml","/sitemaps/*","/feed.xml"])app.use(path,async(c,next)=>{c.header("cache-control","private, no-store");c.header("x-content-type-options","nosniff");await next();});
+  app.get("/sitemap.xml",async c=>c.body(await sitemapIndex(xmlStorage(),deps.publicOrigin),200,{"Content-Type":"application/xml; charset=utf-8"}));
+  app.get("/sitemaps/:name",async c=>c.body(await sitemapPart(xmlStorage(),deps.publicOrigin,c.req.param("name")),200,{"Content-Type":"application/xml; charset=utf-8"}));
+  app.get("/feed.xml",async c=>c.body(await publicFeed(xmlStorage(),deps.publicOrigin),200,{"Content-Type":"application/rss+xml; charset=utf-8"}));
 
   // 必须是最后一个 /api 路由：没有它，未知接口会落到 React Router，拿到一个 HTML 404。
   app.all("/api/*", (c) => jsonError(c, 404, "NOT_FOUND", "Not found"));

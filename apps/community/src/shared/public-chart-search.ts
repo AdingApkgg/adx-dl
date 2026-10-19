@@ -7,7 +7,7 @@ export const PUBLIC_CHART_SEARCH_MAX=120;
 const fields=["q","difficulty","sort","author","tag","tags","levels","designer","minSeconds","maxSeconds","preview"] as const;
 function list(value:string|undefined,max:number,normalize:(s:string)=>string):string[]|undefined {
  if(!value)return undefined;if(value.length>2048)throw new RangeError("Invalid filters");
- const a:unknown=JSON.parse(value);if(!Array.isArray(a)||a.length>max||a.some(v=>typeof v!=="string"))throw new RangeError("Invalid filters");
+ let a:unknown;try{a=JSON.parse(value);}catch{throw new RangeError("Invalid filters");}if(!Array.isArray(a)||a.length>max||a.some(v=>typeof v!=="string"))throw new RangeError("Invalid filters");
  return [...new Set((a as string[]).map(normalize))];
 }
 export function parsePublicChartFilters(input:PublicChartSearchInput={}):PublicChartFilters {

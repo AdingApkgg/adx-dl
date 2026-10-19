@@ -230,7 +230,7 @@ export function publicChartDto(r: Row): PublicChartDto {
     ordinal: r.v.ordinal,
     summary: r.v.summary,
     sourceSize: r.file.size,
-    author: r.authorId ? { id: r.authorId, publicId: r.authorPublicId?.toString() ?? null, name: r.authorName!, image: r.authorImage } : null,
+    author: r.authorId && r.authorPublicId ? { id: r.authorId, publicId: r.authorPublicId?.toString() ?? null, name: r.authorName!, image: r.authorImage } : null,
   };
 }
 async function resolved(ctx: StorageContext, id: string) {
@@ -260,46 +260,8 @@ export async function listPublicCharts(
   ctx: StorageContext,
   input: { limit?: number; cursor?: string } & PublicChartSearchInput = {},
 ): Promise<PublicChartsPageDto> {
-  const limit = input.limit ?? 24;
-  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) throw invalid();
-  const filters = (() => { try { return parsePublicChartFilters(input); } catch { throw invalid(); } })();
-  const scope = createHash("sha256").update(JSON.stringify(filters)).digest("hex");
-  const isDefault = !filters.q && !filters.difficulty && !filters.author && !filters.tag && filters.sort === "updated";
-  let cursor: { at: string; id: string; scope?: string } | undefined;
-  if (input.cursor !== undefined) {
-    try {
-      if (input.cursor.length > 512 || !/^[A-Za-z0-9_-]+$/.test(input.cursor)) throw invalid();
-      cursor = JSON.parse(Buffer.from(input.cursor, "base64url").toString());
-      if (!cursor || typeof cursor.id !== "string" || typeof cursor.at !== "string" ||
-        !UUID_PATTERN.test(cursor.id) || new Date(cursor.at).toISOString() !== cursor.at ||
-        (Object.keys(cursor).sort().join() !== "at,id,scope" && Object.keys(cursor).sort().join() !== "at,id") ||
-        (cursor.scope === undefined ? !isDefault : cursor.scope !== scope)) throw invalid();
-    } catch { throw invalid(); }
-  }
-  const timestamp = filters.sort === "published" ? chartPublications.publishedAt : chartPublications.updatedAt;
-  const durableAuthor = sql`${userPublicIds.journalSequence}<=(select exported_sequence from storage_journal_progress where id='global')`;
-  const search = filters.q ? or(
-    sql`strpos(lower(${chartPublications.title}),lower(${filters.q}))>0`,
-    sql`strpos(lower(${chartPublications.artist}),lower(${filters.q}))>0`,
-    and(durableAuthor, sql`strpos(lower(${user.name}),lower(${filters.q}))>0`),
-    sql`exists(select 1 from jsonb_array_elements(${chartPublications.tags}) tag where strpos(tag->>'key',lower(${filters.q}))>0)`,
-    sql`exists(select 1 from jsonb_array_elements(${chartVersions.summary}->'difficulties') difficulty where strpos(lower(difficulty->>'designer'),lower(${filters.q}))>0)`,
-    isPublicChartId(filters.q) ? eq(chartPublicIds.publicId, BigInt(filters.q)) : undefined,
-  ) : undefined;
-  const rows = await publicChartQuery(ctx).where(and(
-    publicChartAllowed(), search,
-    filters.tag ? sql`${chartPublications.tags} @> ${JSON.stringify([{ key: filters.tag }])}::jsonb` : undefined,
-    filters.author ? and(eq(userPublicIds.publicId, BigInt(filters.author)), durableAuthor) : undefined,
-    filters.difficulty ? sql`exists(select 1 from jsonb_array_elements(${chartVersions.summary}->'difficulties') d where d->>'difficulty'=${String(filters.difficulty)})` : undefined,
-    cursor ? or(lt(timestamp, new Date(cursor.at)), and(eq(timestamp, new Date(cursor.at)), lt(charts.id, cursor.id))) : undefined,
-  )).orderBy(desc(timestamp), desc(charts.id)).limit(limit + 1);
-  const page = rows.slice(0, limit), last = page.at(-1);
-  return {
-    items: page.map(publicChartDto),
-    nextCursor: rows.length > limit && last ? Buffer.from(JSON.stringify({
-      at: (filters.sort === "published" ? last.p.publishedAt : last.p.updatedAt).toISOString(), id: last.chart.id, scope,
-    })).toString("base64url") : null,
-  };
+  const {catalogPublic}=await import('../discovery/search');
+  return catalogPublic(ctx,input);
 }
 export async function resolvePublicChartAsset(
   ctx: StorageContext,
