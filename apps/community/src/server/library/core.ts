@@ -28,6 +28,9 @@ export function publicListAllowed(alias="l"):SQL{const a=sql.raw(alias);return s
  and ${a}.journal_sequence<=${exported}
  and coalesce((${a}.fact->'publication'->>'ownerCutoff')::bigint,-1)=coalesce((select journal_sequence from chart_library_accounts where user_id=${a}.owner_id),0)
  and not exists(select 1 from chart_list_controls ctl where ctl.id=${a}.id and ((ctl.fact->>'hidden')::boolean or ctl.journal_sequence>${exported}))
+ and exists(select 1 from chart_library_states st where st.key='list:'||${a}.id::text and st.fact=${a}.fact and st.revision=${a}.revision and st.journal_sequence=${a}.journal_sequence)
+ and exists(select 1 from chart_list_public_ids li where li.list_id=${a}.id and li.public_id=${a}.public_id)
+ and adxc_library_public_valid(${a}.fact,${a}.public_id::text)
  and exists(select 1 from user_public_ids p where p.user_id=${a}.owner_id and p.journal_sequence<=${exported})`;}
 export async function chartEntries(ctx:StorageContext,ids:readonly string[]):Promise<LibraryEntry[]>{if(!ids.length)return [];const charts=await getPublicChartsByIds(ctx,ids),byId=new Map(charts.map(c=>[c.id,c]));const identities=await rows<{chart_id:string;public_id:string}>(ctx.db,sql`select chart_id,public_id::text from chart_public_ids where chart_id in(${sql.join(ids.map(id=>sql`${id}::uuid`),sql`,`)})`);const numbers=new Map(identities.map(i=>[i.chart_id,i.public_id]));return ids.map(id=>({id,publicId:numbers.get(id)??null,chart:byId.get(id)??null}));}
 /** Existing unavailable entries may be retained/removed; every newly added ID must be public now. */

@@ -159,8 +159,8 @@ export async function withdrawChart(
   return getChart(ctx, userId, id);
 }
 // One authorization query for each request, including validators and HEAD. No File permission is changed.
-function query(ctx: StorageContext) {
-  return visibilityQuery(ctx.db.select({
+export function publicChartQuery(ctx: StorageContext) {
+  return publicChartVisibilityQuery(ctx.db.select({
       chart: charts,
       publicId: chartPublicIds.publicId,
       p: chartPublications,
@@ -177,7 +177,7 @@ function query(ctx: StorageContext) {
       authorImage: user.image,
     }).from(chartPublications).$dynamic());
 }
-function visibilityQuery<T extends PgSelect>(selection: T) {
+export function publicChartVisibilityQuery<T extends PgSelect>(selection: T) {
   return selection
     .innerJoin(charts, eq(charts.id, chartPublications.chartId))
     .innerJoin(chartPublicIds, eq(chartPublicIds.chartId, charts.id))
@@ -198,8 +198,10 @@ function visibilityQuery<T extends PgSelect>(selection: T) {
     )
     .innerJoin(derivedObjects, eq(derivedObjects.id, blobDerivatives.derivedObjectId));
 }
-function allowed() {
+export function publicChartAllowed() {
   return and(
+    sql`adxc_manifest_valid(${derivedObjects.properties}->'chartPreview', ${derivedObjects.size}, ${chartVersions.maidataMd5Base64})`,
+    sql`${chartVersions.summary}=${derivedObjects.properties}->'chartPreview'->'summary'`,
     isNull(charts.deletedAt),
     sql`not exists(select 1 from ${chartModerations} where chart_id=${charts.id})`,
     isNull(chartVersions.deletedAt),
@@ -219,8 +221,8 @@ function allowed() {
     sql`not exists(select 1 from ${blobBlocks} where sha256 in (${blobs.sha256},${derivedObjects.outputSha256}))`,
   );
 }
-type Row = Awaited<ReturnType<typeof query>>[number];
-function publicDto(r: Row): PublicChartDto {
+type Row = Awaited<ReturnType<typeof publicChartQuery>>[number];
+export function publicChartDto(r: Row): PublicChartDto {
   return {
     id: r.chart.id,
     publicId: r.publicId.toString(),
@@ -235,7 +237,7 @@ async function resolved(ctx: StorageContext, id: string) {
   const identity = UUID_PATTERN.test(id) ? eq(charts.id, id.toLowerCase())
     : isPublicChartId(id) ? eq(chartPublicIds.publicId, BigInt(id)) : null;
   if (!identity) throw missing();
-  const [r] = await query(ctx).where(and(allowed(), identity));
+  const [r] = await publicChartQuery(ctx).where(and(publicChartAllowed(), identity));
   if (!r) throw missing();
   try {
     const m = validateChartPreviewManifest(r.output.properties.chartPreview, r.output.size);
@@ -246,13 +248,13 @@ async function resolved(ctx: StorageContext, id: string) {
   }
 }
 export async function getPublicChart(ctx: StorageContext, id: string) {
-  return publicDto((await resolved(ctx, id)).r);
+  return publicChartDto((await resolved(ctx, id)).r);
 }
 /** One bounded authorization query for private collections; unavailable IDs never expose old snapshots. */
 export async function getPublicChartsByIds(ctx: StorageContext, ids: readonly string[]): Promise<PublicChartDto[]> {
   if (ids.length > 200 || ids.some(id => !UUID_PATTERN.test(id))) throw invalid();
   if (!ids.length) return [];
-  return (await query(ctx).where(and(allowed(), inArray(charts.id, [...ids])))).map(publicDto);
+  return (await publicChartQuery(ctx).where(and(publicChartAllowed(), inArray(charts.id, [...ids])))).map(publicChartDto);
 }
 export async function listPublicCharts(
   ctx: StorageContext,
@@ -284,8 +286,8 @@ export async function listPublicCharts(
     sql`exists(select 1 from jsonb_array_elements(${chartVersions.summary}->'difficulties') difficulty where strpos(lower(difficulty->>'designer'),lower(${filters.q}))>0)`,
     isPublicChartId(filters.q) ? eq(chartPublicIds.publicId, BigInt(filters.q)) : undefined,
   ) : undefined;
-  const rows = await query(ctx).where(and(
-    allowed(), search,
+  const rows = await publicChartQuery(ctx).where(and(
+    publicChartAllowed(), search,
     filters.tag ? sql`${chartPublications.tags} @> ${JSON.stringify([{ key: filters.tag }])}::jsonb` : undefined,
     filters.author ? and(eq(userPublicIds.publicId, BigInt(filters.author)), durableAuthor) : undefined,
     filters.difficulty ? sql`exists(select 1 from jsonb_array_elements(${chartVersions.summary}->'difficulties') d where d->>'difficulty'=${String(filters.difficulty)})` : undefined,
@@ -293,7 +295,7 @@ export async function listPublicCharts(
   )).orderBy(desc(timestamp), desc(charts.id)).limit(limit + 1);
   const page = rows.slice(0, limit), last = page.at(-1);
   return {
-    items: page.map(publicDto),
+    items: page.map(publicChartDto),
     nextCursor: rows.length > limit && last ? Buffer.from(JSON.stringify({
       at: (filters.sort === "published" ? last.p.publishedAt : last.p.updatedAt).toISOString(), id: last.chart.id, scope,
     })).toString("base64url") : null,
@@ -339,7 +341,7 @@ export async function suggestPublicChartTags(ctx: StorageContext, input = "") {
   if (input.length > 40 || [...input].length > 20 || /[\p{Cc}\p{Cf}]/u.test(input)) throw invalid();
   const prefix = input.normalize("NFKC").trim().replace(/[A-Z]/g, letter => letter.toLowerCase());
   if ([...prefix].length > 20) throw invalid();
-  const visible = visibilityQuery(ctx.db.select({ tags: chartPublications.tags }).from(chartPublications).$dynamic()).where(allowed()).as("visible_tag_charts");
+  const visible = publicChartVisibilityQuery(ctx.db.select({ tags: chartPublications.tags }).from(chartPublications).$dynamic()).where(publicChartAllowed()).as("visible_tag_charts");
   const key = sql<string>`tag.value->>'key'`, label = sql<string>`min(tag.value->>'label')`;
   return ctx.db.select({ key, label, count: sql<number>`count(*)::integer` }).from(visible)
     .innerJoin(sql`lateral jsonb_array_elements(${visible.tags}) as tag(value)`, sql`true`)
@@ -351,12 +353,12 @@ export async function relatedPublicCharts(ctx: StorageContext, id: string): Prom
   if (!target.tags.length) return [];
   // Resolve the source again in the same authorization query, so withdrawal cannot turn
   // an inaccessible source into a tag-discovery oracle between requests.
-  const source = visibilityQuery(ctx.db.select({ tags: chartPublications.tags }).from(chartPublications).$dynamic()).where(and(allowed(), eq(charts.id, target.id))).as("related_source");
+  const source = publicChartVisibilityQuery(ctx.db.select({ tags: chartPublications.tags }).from(chartPublications).$dynamic()).where(and(publicChartAllowed(), eq(charts.id, target.id))).as("related_source");
   const score = sql<number>`(select count(*)::integer from jsonb_array_elements(${chartPublications.tags}) tag
     where tag->>'key' in (select source_tag->>'key' from ${source}, jsonb_array_elements(${source.tags}) source_tag))`;
-  return (await query(ctx).where(and(allowed(), sql`${charts.id}<>${target.id}`, sql`${score}>0`))
-    .orderBy(desc(score), desc(chartPublications.updatedAt), desc(charts.id)).limit(6)).map(publicDto);
+  return (await publicChartQuery(ctx).where(and(publicChartAllowed(), sql`${charts.id}<>${target.id}`, sql`${score}>0`))
+    .orderBy(desc(score), desc(chartPublications.updatedAt), desc(charts.id)).limit(6)).map(publicChartDto);
 }
 
 /** One bounded current authorization query; no object keys or stale file-version path is returned. */
-export async function createPublicDownloadPlan(ctx:StorageContext,publicIds:string[]):Promise<DownloadPlan>{const parsed=downloadPlanInput.safeParse({publicIds});if(!parsed.success)throw invalid();const rr=await query(ctx).where(and(allowed(),inArray(chartPublicIds.publicId,publicIds.map(BigInt))));const byNumber=new Map(rr.map(r=>[r.publicId.toString(),r]));const items=publicIds.map(publicId=>{const r=byNumber.get(publicId);if(!r)throw missing();const manifest=validateChartPreviewManifest(r.output.properties.chartPreview,r.output.size);if(manifest.summary.maidataMd5Base64!==r.v.maidataMd5Base64)throw missing();return {publicId,versionId:r.p.versionId,size:r.blob.size,sha256:r.blob.sha256,url:`/api/v1/charts/${publicId}/download?expectedVersion=${r.p.versionId}`};});return {items,totalBytes:items.reduce((sum,i)=>sum+i.size,0)};}
+export async function createPublicDownloadPlan(ctx:StorageContext,publicIds:string[]):Promise<DownloadPlan>{const parsed=downloadPlanInput.safeParse({publicIds});if(!parsed.success)throw invalid();const rr=await publicChartQuery(ctx).where(and(publicChartAllowed(),inArray(chartPublicIds.publicId,publicIds.map(BigInt))));const byNumber=new Map(rr.map(r=>[r.publicId.toString(),r]));const items=publicIds.map(publicId=>{const r=byNumber.get(publicId);if(!r)throw missing();const manifest=validateChartPreviewManifest(r.output.properties.chartPreview,r.output.size);if(manifest.summary.maidataMd5Base64!==r.v.maidataMd5Base64)throw missing();return {publicId,versionId:r.p.versionId,size:r.blob.size,sha256:r.blob.sha256,url:`/api/v1/charts/${publicId}/download?expectedVersion=${r.p.versionId}`};});return {items,totalBytes:items.reduce((sum,i)=>sum+i.size,0)};}
