@@ -28,6 +28,8 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
   refresh: (chart: ChartDto) => Promise<void>;
 }) {
   const location = useLocation();
+  const [interactive,setInteractive]=useState(false);
+  useEffect(()=>setInteractive(true),[]);
   const fail = (error: unknown) => {
     const target = accountErrorRedirect(error, `${location.pathname}${location.search}`);
     if (target) window.location.assign(target);
@@ -102,7 +104,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
     </div> : !uncertain ? <p>{m.chart_publication_private()}</p> : null}
     {privateChanges ? <p className="rounded-md border bg-muted/50 p-3 text-sm">{m.chart_publication_private_changes()}</p> : null}
     <label className="block">{m.chart_publication_version()}
-      <select value={versionId} disabled={busy || reconcile || uncertain} onChange={(event) => { setVersionId(event.target.value); setConfirmed(false); setStatus(""); }} className="ml-2 rounded border p-2">
+      <select value={versionId} disabled={!interactive || busy || reconcile || uncertain} onChange={(event) => { setVersionId(event.target.value); setConfirmed(false); setStatus(""); }} className="ml-2 rounded border p-2">
         <option value="">{m.chart_publication_choose()}</option>
         {chart.versions.map((version) => <option key={version.id} value={version.id}>{m.chart_version({ number: String(version.ordinal) })}</option>)}
       </select>
@@ -121,16 +123,16 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
       <p className="text-xs text-muted-foreground">{m.chart_metadata_comparison_hint()}</p>
       <PrivateChartPreview key={selected.id} id={chart.id} versionId={selected.id} summary={selected.summary} />
     </div></div> : null}
-    <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} disabled={busy || !selected || reconcile || uncertain} onChange={(event) => setConfirmed(event.target.checked)} />{m.chart_publication_archive()}</label>
+    <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} disabled={!interactive || busy || !selected || reconcile || uncertain} onChange={(event) => setConfirmed(event.target.checked)} />{m.chart_publication_archive()}</label>
     <div className="flex flex-wrap gap-2">
-      <Button disabled={busy || !selected || !confirmed || reconcile || uncertain} onClick={() => void mutate({ versionId, title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits, tags: chart.tags, releaseNote: selected?.releaseNote ?? "" })}>{chart.publication ? m.chart_publication_update() : m.chart_publication_confirm()}</Button>
-      {chart.publication ? <Button variant="outline" disabled={busy || reconcile || uncertain} onClick={() => setWithdrawing(true)}>{m.chart_publication_withdraw()}</Button> : null}
-      {reconcile || uncertain ? <Button variant="outline" disabled={busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
+      <Button disabled={!interactive || busy || !selected || !confirmed || reconcile || uncertain} onClick={() => void mutate({ versionId, title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits, tags: chart.tags, releaseNote: selected?.releaseNote ?? "" })}>{chart.publication ? m.chart_publication_update() : m.chart_publication_confirm()}</Button>
+      {chart.publication ? <Button variant="outline" disabled={!interactive || busy || reconcile || uncertain} onClick={() => setWithdrawing(true)}>{m.chart_publication_withdraw()}</Button> : null}
+      {reconcile || uncertain ? <Button variant="outline" disabled={!interactive || busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
     </div>
     {withdrawing ? <div role="alertdialog" aria-label={m.chart_publication_withdraw()} className="space-y-2 rounded border p-3">
       <p>{m.chart_publication_withdraw_hint()}</p>
-      <Button disabled={busy || reconcile || uncertain} onClick={() => void mutate(null)}>{m.chart_publication_withdraw_confirm()}</Button>{" "}
-      <Button variant="outline" disabled={busy} onClick={() => setWithdrawing(false)}>{m.avatar_cancel()}</Button>
+      <Button disabled={!interactive || busy || reconcile || uncertain} onClick={() => void mutate(null)}>{m.chart_publication_withdraw_confirm()}</Button>{" "}
+      <Button variant="outline" disabled={!interactive || busy} onClick={() => setWithdrawing(false)}>{m.avatar_cancel()}</Button>
     </div> : null}
     {status ? <p role="status">{status}</p> : null}
     {error ? <Alert role="alert" variant="destructive">{chartErrorMessage(error)}</Alert> : null}
