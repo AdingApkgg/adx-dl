@@ -87,6 +87,7 @@ function Detail({ id }: { id: string }) {
     finally { setPending(false); }
   }
   return <main className="space-y-6">
+    <nav className="flex flex-wrap gap-3"><Link className={textLinkClass} to={localizeHref(`/me/charts/${id}/review`)}>{m.author_review()}</Link><Link className={textLinkClass} to={localizeHref(`/me/charts/${id}/compare`)}>{m.author_compare()}</Link><Link className={textLinkClass} to={localizeHref("/me/workbench")}>{m.author_workbench()}</Link></nav>
     <PageTitle description={m.charts_private_hint()}>{chart.title}</PageTitle>
     <Link to={localizeHref("/me/charts")} className={textLinkClass}>{m.charts_title()}</Link>
     <ChartMetadataEditor chart={chart} busy={pending} setBusy={setPending} refresh={refresh} onDirty={setMetadataUnsaved} />

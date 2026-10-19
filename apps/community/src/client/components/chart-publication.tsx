@@ -6,6 +6,9 @@ import { Link, useLocation } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
 import { ApiError } from "@/shared/api-client";
+import type { VersionFingerprint } from "@/shared/author-workbench";
+import { publicationConfirmationKey } from "../author/publication-review";
+import { compareFingerprints } from "../author/compare";
 import type { ChartDto } from "@/shared/charts";
 import { accountErrorRedirect } from "../lib/account-errors";
 import { getRenderApi } from "../lib/browser";
@@ -30,8 +33,15 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
     if (target) window.location.assign(target);
   };
   const [versionId, setVersionId] = useState("");
-  const [confirmed, setConfirmed] = useState(false);
-  useEffect(() => { setConfirmed(false); }, [chart.revision]);
+  const confirmationKey = publicationConfirmationKey(chart,versionId);
+  const [confirmedKey,setConfirmedKey] = useState<string|null>(null);
+  const confirmed = confirmedKey === confirmationKey;
+  const setConfirmed = (value:boolean) => setConfirmedKey(value?confirmationKey:null);
+  const [fingerprints,setFingerprints]=useState<{key:string;items:VersionFingerprint[];error:unknown}>({key:"",items:[],error:null});
+  const fingerprintKey=JSON.stringify([chart.id,versionId,chart.publication?.versionId]);
+  useEffect(()=>{const aborter=new AbortController();setFingerprints({key:fingerprintKey,items:[],error:null});if(!versionId)return()=>aborter.abort();
+    void(async()=>{const api=chartsApi(getRenderApi()),items=[await api.fingerprint(chart.id,versionId,aborter.signal)];if(chart.publication?.versionId&&chart.publication.versionId!==versionId)items.unshift(await api.fingerprint(chart.id,chart.publication.versionId,aborter.signal));if(!aborter.signal.aborted)setFingerprints({key:fingerprintKey,items,error:null});})().catch(error=>{if(!aborter.signal.aborted)setFingerprints({key:fingerprintKey,items:[],error});});return()=>aborter.abort();
+  },[fingerprintKey]);
   const [withdrawing, setWithdrawing] = useState(false);
   const [reconcile, setReconcile] = useState(false);
   const [intent, setIntent] = useState<Intent>(null);
@@ -75,7 +85,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
     catch (failure) { setError(failure); fail(failure); }
     finally { setBusy(false); }
   }
-  return <section aria-label={m.chart_publication()} className="space-y-3 rounded-lg border p-4">
+  return <section id="publication" aria-label={m.chart_publication()} className="space-y-3 rounded-lg border p-4">
     <div className="flex flex-wrap items-center gap-2">
       <h2 className="font-semibold">{m.chart_publication()}</h2>
     <a href={localizeHref("/help/publication")} className="inline-flex min-h-11 items-center text-sm underline">{m.site_help_publication_title()}</a>
@@ -83,7 +93,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
         {uncertain ? m.chart_publication_status_pending() : chart.publication ? m.chart_publication_status_public() : m.chart_publication_status_private()}
       </Badge>
     </div>
-    <p className="text-sm">{m.chart_publication_hint()}</p>
+    <p className="text-sm">{m.chart_publication_hint()}</p><p className="text-sm">{m.author_saved_metadata()}</p>
     {chart.publication && !uncertain ? <div className="space-y-1 text-sm">
       <p>{m.chart_publication_current({ title: chart.publication.title, artist: chart.publication.artist })}</p>
       {publishedVersion ? <p>{m.chart_publication_published_version({ number: String(publishedVersion.ordinal) })}</p> : null}
@@ -97,6 +107,8 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
         {chart.versions.map((version) => <option key={version.id} value={version.id}>{m.chart_version({ number: String(version.ordinal) })}</option>)}
       </select>
     </label>
+    {selected ? <nav className="flex flex-wrap gap-3"><Link className="underline" to={localizeHref(`/me/charts/${chart.id}/review?version=${selected.id}`)}>{m.author_review()}</Link><Link className="underline" to={localizeHref(`/me/charts/${chart.id}/compare?right=${selected.id}${chart.publication?`&left=${chart.publication.versionId}`:""}`)}>{m.author_compare()}</Link></nav>:null}
+    {selected&&fingerprints.key===fingerprintKey?<div className="space-y-2 rounded border p-3"><h3>{m.author_package()}</h3>{fingerprints.error?<p role="status">{m.author_analysis_failed()}</p>:!fingerprints.items.length?<p>{m.author_analysis_loading()}</p>:<>{fingerprints.items.map(f=><p key={f.versionId} className="break-all font-mono text-xs">SHA256 {f.source.sha256} · {f.source.size} B</p>)}{fingerprints.items.length===2?<p>{compareFingerprints(fingerprints.items[0],fingerprints.items[1]).archiveSame?m.author_unchanged():compareFingerprints(fingerprints.items[0],fingerprints.items[1]).previewSame?m.author_archive_changed():m.author_different()}</p>:null}</>}</div>:null}
     {selected ? <div className="grid gap-3 md:grid-cols-2">
       {chart.publication ? <div className="space-y-2 rounded border p-3"><h3 className="font-semibold">{m.chart_metadata_current_snapshot()}</h3><p>{chart.publication.title} · {chart.publication.artist || "—"}</p>
         {publishedVersion ? <><p>{m.chart_version({ number: String(publishedVersion.ordinal) })} · {(publishedVersion.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p><ChartSummary summary={publishedVersion.summary} /></> : <p>{m.chart_metadata_unknown()}</p>}
@@ -104,7 +116,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
       <div className="space-y-2 rounded border p-3"><h3 className="font-semibold">{m.chart_metadata_selected_snapshot()}</h3>
       <p className="break-words font-semibold">{chart.title} · {chart.artist || "—"}</p>
       <p>{m.chart_version({ number: String(selected.ordinal) })} · {(selected.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p>
-      <ChartSummary summary={selected.summary} />
+      <ChartSummary summary={selected.summary} /><p className="text-sm">{m.author_advisory()}</p>
       <SnapshotMetadata value={{ ...chart, releaseNote: selected.releaseNote }} />
       <p className="text-xs text-muted-foreground">{m.chart_metadata_comparison_hint()}</p>
       <PrivateChartPreview key={selected.id} id={chart.id} versionId={selected.id} summary={selected.summary} />

@@ -1,6 +1,6 @@
 import {Alert} from "@astrodx/ui/components/alert";
 import {Button} from "@astrodx/ui/components/button";
-import {HydrationBoundary,useQuery} from "@tanstack/react-query";
+import {HydrationBoundary,useQuery,useQueryClient} from "@tanstack/react-query";
 import {useRef,useState} from "react";
 import {Link,useSearchParams} from "react-router";
 import {m} from "@/paraglide/messages.js";
@@ -11,6 +11,7 @@ import {compareSelection} from "../author/route-selection";
 import {compareFingerprints} from "../author/compare";
 import {useAuthorAnalysis} from "../author/use-analysis";
 import {PageTitle,textLinkClass} from "../components/page-title";
+import {ReleaseNoteDraft} from "../components/release-note-draft";
 import {AuthorReport} from "../components/author-report";
 import {PrivateChartPreview} from "../components/private-chart-preview";
 import {SimaiSource} from "../components/simai-source";
@@ -25,6 +26,7 @@ export function meta(){return [{title:`${m.author_compare()} - ${m.site_name()}`
 export default function Compare({loaderData,params}:Route.ComponentProps){return <HydrationBoundary state={loaderData.dehydratedState}><OwnerCompare actor={loaderData.actor} id={params.id}/></HydrationBoundary>;}
 function OwnerCompare({actor,id}:{actor:string;id:string}){const imports=useImports(),{data:me}=useQuery(meQuery(getRenderApi())),query=useQuery(authorChartQuery(getRenderApi(),actor,id));if(query.error)return <Alert variant="destructive">{chartErrorMessage(query.error)}</Alert>;if(!query.data||me?.id!==actor||imports&&imports.snapshot.scope!==actor)return null;return query.data.versions.length<2?<main className="space-y-4"><PageTitle>{m.author_compare()}</PageTitle><p>{m.author_no_pair()}</p><Link className={textLinkClass} to={localizeHref(`/me/charts/${id}`)}>{m.chart_detail()}</Link></main>:<CompareContent chart={query.data} actor={actor}/>;}
 function CompareContent({chart,actor}:{chart:ChartDto;actor:string}){
+ const client=useQueryClient();
  const [params,setParams]=useSearchParams(),{left,right,difficulty}=compareSelection(chart,params),analysis=useAuthorAnalysis(actor,chart.id,[left.id,right.id],difficulty),[side,setSide]=useState<0|1>(1),positions=useRef(new Map<string,number>()),[position,setPosition]=useState(0),[seek,setSeek]=useState<{token:number;seconds:number}|null>(null),[hunkPage,setHunkPage]=useState(0);
  const versions=[left,right],active=versions[side],supported=active.summary.difficulties.find(d=>d.difficulty===difficulty)?.previewSupported??false;
  const choose=(name:string,value:string)=>{const next=new URLSearchParams(params);next.set(name,value);setSeek(null);setHunkPage(0);setPosition(0);setParams(next);};
@@ -38,6 +40,7 @@ function CompareContent({chart,actor}:{chart:ChartDto;actor:string}){
  <p>{m.author_source()}: {analysis.data.result.sourceSame?m.author_unchanged():m.author_different()}</p><p>BPM: {JSON.stringify(analysis.data.result.analyses[0].bpm)===JSON.stringify(analysis.data.result.analyses[1].bpm)?m.author_unchanged():m.author_different()} · {analysis.data.result.analyses[0].bpm.length} / {analysis.data.result.analyses[1].bpm.length}</p></section>:null}
  <div className="grid min-w-0 gap-4 lg:grid-cols-2">{versions.map((version,index)=><section key={`${index}/${version.id}`} className="min-w-0 space-y-3"><h2 className="font-semibold">{index===0?m.author_left():m.author_right()} · {version.summary.title} · {version.summary.artist}</h2><AuthorReport version={version} analysis={analysis.data?.result.analyses[index]} onSeek={seconds=>jump(index as 0|1,seconds)}/><Button variant={side===index?"default":"outline"} onClick={()=>selectSide(index as 0|1)}>{m.author_active_side()}</Button>{analysis.data?<SimaiSource key={`${version.id}/${difficulty}`} source={analysis.data.sources[index]} analysis={analysis.data.result.analyses[index]} position={side===index?position:positions.current.get(`${version.id}/${difficulty}`)??0} onSeek={seconds=>jump(index as 0|1,seconds)}/>:null}</section>)}</div>
  {diff?<section className="space-y-3 rounded border p-4"><h2>{diff.complete?m.author_diff_complete():m.author_diff_fallback()}</h2><p>{diff.hunks.length}</p><ol className="space-y-2">{diff.hunks.slice(hunkPage*20,(hunkPage+1)*20).map((hunk,i)=><li key={i} className="flex flex-wrap gap-3"><code>L {hunk.leftStart+1}–{hunk.leftEnd} / R {hunk.rightStart+1}–{hunk.rightEnd}</code>{([0,1] as const).map(index=>{const point=analysis.data?.result.analyses[index].statements[index===0?hunk.leftStart:hunk.rightStart];return point?<Button key={index} variant="outline" onClick={()=>jump(index,point.seconds)}>{index===0?m.author_left():m.author_right()} · {point.line}:{point.column}</Button>:null;})}</li>)}</ol><div className="flex gap-2"><Button variant="outline" disabled={!hunkPage} onClick={()=>setHunkPage(p=>p-1)}>{m.chart_previous()}</Button><Button variant="outline" disabled={(hunkPage+1)*20>=diff.hunks.length} onClick={()=>setHunkPage(p=>p+1)}>{m.chart_next()}</Button></div></section>:null}
+ <ReleaseNoteDraft key={right.id} chart={chart} left={left} right={right} analysis={analysis.data} onSaved={async updated=>{client.setQueryData(authorChartQuery(getRenderApi(),actor,chart.id).queryKey,updated);await client.invalidateQueries({queryKey:["me","charts"]});await client.invalidateQueries({queryKey:["me","author-workbench",actor]});}}/>
  {supported?<PrivateChartPreview key={`${active.id}/${difficulty}`} id={chart.id} versionId={active.id} summary={active.summary} controlledDifficulty={difficulty} externalSeek={seek} initialPosition={positions.current.get(`${active.id}/${difficulty}`)??0} onPosition={seconds=>{positions.current.set(`${active.id}/${difficulty}`,seconds);setPosition(seconds);}}/>:<p>{m.author_analysis_failed()}</p>}
  </main>;
 }
