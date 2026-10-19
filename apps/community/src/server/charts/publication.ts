@@ -1,3 +1,4 @@
+import {downloadPlanInput,type DownloadPlan} from "@/shared/downloads";
 import { recordPublicationEvent } from "../following/events";
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
@@ -319,8 +320,10 @@ export async function resolvePublicChartAsset(
     sha256: a.sha256,
   };
 }
-export async function resolvePublicChartDownload(ctx: StorageContext, id: string) {
+export async function resolvePublicChartDownload(ctx: StorageContext, id: string, expectedVersion?: string) {
+  if(expectedVersion!==undefined&&!UUID_PATTERN.test(expectedVersion))throw invalid();
   const { r } = await resolved(ctx, id);
+  if(expectedVersion!==undefined&&r.p.versionId!==expectedVersion)throw new StorageError(409,"CHART_VERSION_CHANGED");
   return {
     bucket: "original" as const,
     key: r.blob.key,
@@ -354,3 +357,6 @@ export async function relatedPublicCharts(ctx: StorageContext, id: string): Prom
   return (await query(ctx).where(and(allowed(), sql`${charts.id}<>${target.id}`, sql`${score}>0`))
     .orderBy(desc(score), desc(chartPublications.updatedAt), desc(charts.id)).limit(6)).map(publicDto);
 }
+
+/** One bounded current authorization query; no object keys or stale file-version path is returned. */
+export async function createPublicDownloadPlan(ctx:StorageContext,publicIds:string[]):Promise<DownloadPlan>{const parsed=downloadPlanInput.safeParse({publicIds});if(!parsed.success)throw invalid();const rr=await query(ctx).where(and(allowed(),inArray(chartPublicIds.publicId,publicIds.map(BigInt))));const byNumber=new Map(rr.map(r=>[r.publicId.toString(),r]));const items=publicIds.map(publicId=>{const r=byNumber.get(publicId);if(!r)throw missing();const manifest=validateChartPreviewManifest(r.output.properties.chartPreview,r.output.size);if(manifest.summary.maidataMd5Base64!==r.v.maidataMd5Base64)throw missing();return {publicId,versionId:r.p.versionId,size:r.blob.size,sha256:r.blob.sha256,url:`/api/v1/charts/${publicId}/download?expectedVersion=${r.p.versionId}`};});return {items,totalBytes:items.reduce((sum,i)=>sum+i.size,0)};}

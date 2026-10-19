@@ -39,7 +39,7 @@ export const publicChartRoutes = new Hono<AppEnv>()
   .get("/:id", async (c) => c.json(await getPublicChart(storage(c), c.req.param("id"))))
   .on(["GET", "HEAD"], "/:id/download", async (c) => {
     const ctx = storage(c),
-      file = await resolvePublicChartDownload(ctx, c.req.param("id"));
+      file = await resolvePublicChartDownload(ctx, c.req.param("id"), c.req.query("expectedVersion"));
     return downloads(rateLimitKeyForIp(c.get("clientIp") ?? "unknown"), c.req.raw, () =>
       representationResponse(ctx, file, c.req.raw, c.req.raw.signal),
     );

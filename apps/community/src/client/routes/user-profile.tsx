@@ -133,6 +133,7 @@ function UserContent({ id, works, worksFilters }: { id: string; works: PublicCha
           </div>
         ) : null}
         <FollowAuthor publicId={profile.publicId}/>
+        <Link className="underline" to={localizeHref(`/lists?author=${profile.publicId}`)}>{m.library_public_title()}</Link>
       </div>
       <Card>
         <CardContent>

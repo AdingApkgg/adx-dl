@@ -6,7 +6,7 @@ import { useLocation } from "react-router";
 import { localizeHref } from "@/paraglide/runtime.js";
 import { m } from "@/paraglide/messages.js";
 
-export function ShareChartButton({ title, publicId }: { title: string; publicId: string }) {
+export function ShareChartButton({ title, publicId, resource="charts" }: { title: string; publicId: string; resource?: "charts"|"lists" }) {
   const { pathname } = useLocation();
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -20,7 +20,7 @@ export function ShareChartButton({ title, publicId }: { title: string; publicId:
   async function share() {
     if (busy) return;
     const locale = /^\/(en|ja)(?:\/|$)/.exec(pathname)?.[1];
-    const path = locale ? `/${locale}/charts/${publicId}` : localizeHref(`/charts/${publicId}`);
+    const path = locale ? `/${locale}/${resource}/${publicId}` : localizeHref(`/${resource}/${publicId}`);
     const url = new URL(path, window.location.origin).href;
     setBusy(true); setCopied(false); setManualUrl(null);
     try {

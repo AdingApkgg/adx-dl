@@ -1,3 +1,4 @@
+import {ChartSelection} from "./library-selection";
 import { cn } from "@astrodx/ui/lib/utils";
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
@@ -58,7 +59,7 @@ export function PublicChartCard({ chart, headingLevel = 2 }: { chart: PublicChar
         <PublicDifficultyPill row={row} />
       </li>)}</ul>
     </div>
-  </Link><PublicChartTags tags={chart.tags} /></article>;
+  </Link><PublicChartTags tags={chart.tags} /><ChartSelection publicId={chart.publicId}/></article>;
 }
 
 export function PublicChartTags({ tags }: { tags: PublicChartDto["tags"] }) {

@@ -39,6 +39,12 @@ class ReleaseGateTests(unittest.TestCase):
   self.write_receipt()
   with self.assertRaises(ValueError):self.invoke('--await')
   self.assertEqual((self.root/'.deploy-revision').read_text(),'old\n')
+ def test_library_and_download_steps_are_mandatory(self):
+  original=copy.deepcopy(self.receipt)
+  for step in ['production_library_and_public_lists','production_download_center_and_list_admin']:
+   self.receipt=copy.deepcopy(original);self.receipt['result']['steps'].remove(step);self.write_receipt()
+   with self.assertRaises(ValueError):self.invoke('--await')
+   self.assertEqual((self.root/'.deploy-revision').read_text(),'old\n')
  def test_old_pass_cannot_complete_a_new_deployment(self):
   self.receipt['result']['startedAt']=(dt.datetime.now(dt.timezone.utc)-dt.timedelta(hours=1)).isoformat()
   self.write_receipt()

@@ -17,6 +17,7 @@ REQUIRED_STEPS = {
     'anonymous_private_routes_denied', 'mobile_catalog_and_forum_320_390',
     'signed_in_notifications_forum_and_comment_composers',
     'production_dashboard_permissions_and_pages', 'production_following_feed_and_alert_settings',
+    'production_library_and_public_lists', 'production_download_center_and_list_admin',
     'production_bridge_write_denial_and_session_revocation',
 }
 

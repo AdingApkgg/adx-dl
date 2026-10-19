@@ -262,12 +262,14 @@ export function createApp(deps: AppDeps) {
       limit: 60,
       windowSec: 60,
       key: (c) =>
-        READ_METHODS.has(c.req.method) || isUploadPartRequest(c.req.method, c.req.path)
+        READ_METHODS.has(c.req.method) || (c.req.method === "POST" && c.req.path === "/api/v1/download-plans") || isUploadPartRequest(c.req.method, c.req.path)
           ? null
           : (c.get("auth")?.user.id ?? null),
       onStoreError: onRateLimitStoreError,
     })
   );
+  // Plans do not mutate business state; give their bounded POST a read-side budget.
+  app.use("/api/v1/download-plans",rateLimit<AppEnv>({store:deps.rateLimitStore,name:"download-plan-ip",limit:120,windowSec:60,key:c=>rateLimitKeyForIp(c.get("clientIp")),onStoreError:onRateLimitStoreError}));
   for (const middleware of uploadRateLimits({
     store: deps.rateLimitStore,
     onStoreError: onRateLimitStoreError,

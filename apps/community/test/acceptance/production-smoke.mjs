@@ -185,7 +185,7 @@ try {
     for (const prefix of ['', '/en', '/ja']) for (const path of ['/forum', '/notices', '/help']) await visit(prefix + path);
   });
   await step('anonymous_private_routes_denied', async () => {
-    for (const path of ['/api/v1/discussions/notifications', '/api/v1/dash/access']) await json(path, 401);
+    for (const path of ['/api/v1/discussions/notifications', '/api/v1/dash/access','/api/v1/me/lists']) await json(path, 401);
     for (const path of ['/me/notifications', '/dash']) {
       await page.goto(origin + path); const at = new URL(page.url());
       assert.equal(at.pathname, '/login'); assert.equal(at.searchParams.get('next'), path);
@@ -233,6 +233,23 @@ try {
       for(const width of [320,390]){await page.setViewportSize({width,height:844});await visit('/me/following');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);}
       await page.setViewportSize({width:1280,height:900});
     });
+    await step('production_library_and_public_lists', async () => {
+      await visit('/me/library');await page.getByRole('heading',{level:1,name:'我的谱库',exact:true}).waitFor();
+      const mine=await json('/api/v1/me/lists');assert.ok(Array.isArray(mine.items));
+      await visit('/me/library?view=reports');await json('/api/v1/me/lists/reports');
+      await visit('/lists');await page.getByRole('heading',{level:1,name:'公开谱单',exact:true}).waitFor();
+      const lists=await json('/api/v1/lists');assert.ok(Array.isArray(lists.items));
+      if(lists.items.length){await visit('/lists/'+lists.items[0].publicId);await page.getByRole('heading',{level:1,name:lists.items[0].name,exact:true}).waitFor();}
+      else await json('/api/v1/lists/9223372036854775807',404);
+      for(const width of [320,390]){await page.setViewportSize({width,height:844});await visit('/lists');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}
+      await page.setViewportSize({width:1280,height:900});
+    });
+    await step('production_download_center_and_list_admin', async () => {
+      await visit('/downloads');await page.getByRole('heading',{level:1,name:'下载中心',exact:true}).waitFor();
+      await page.getByText('还没有下载任务。',{exact:true}).waitFor();
+      if(role==='admin'){await visit('/dash/lists');await page.getByRole('heading',{level:2,name:'公开谱单管理',exact:true}).waitFor();const status=await json('/api/v1/dash/lists/status');assert.equal(status.ready,true);assert.equal(status.pendingControls,0);await json('/api/v1/dash/lists');}
+      else await json('/api/v1/dash/lists',403);
+    });
     await step('production_dashboard_permissions_and_pages', async () => {
       if (role === 'user') { await json('/api/v1/dash/access', 403); return; }
       await json('/api/v1/dash/access');
@@ -247,6 +264,7 @@ try {
       assert.equal(status.roles.length, 3); assert.ok(status.roles.every(r => r.ready));
       assert.ok(status.backup.lastSuccessAt, 'NO_SUCCESSFUL_BACKUP_RECORDED');
       assert.notEqual(status.backup.status, 'failed');
+      assert.equal(status.library?.ready,true);assert.equal(status.library?.pendingControls,0);
       assert.equal(status.following?.ready,true);assert.equal(status.following.pendingControls,0);
       await page.getByRole('heading',{name:'作者更新与私有控制',exact:true}).waitFor();
     });
@@ -256,6 +274,7 @@ try {
       const headers = { authorization: `Bearer ${bridgeKey}` };
       assert.equal((await fetch(bridgeUrl + '/api/v1/me')).status, 401);
       assert.equal((await fetch(bridgeUrl + '/api/auth/get-session', { headers })).status, 403);
+      assert.equal((await fetch(bridgeUrl + '/api/v1/download-plans', { method: 'POST', headers, body: '{}' })).status, 405);
       assert.equal((await fetch(bridgeUrl + '/api/v1/discussions/topics', { method: 'POST', headers, body: '{}' })).status, 405);
       assert.equal((await fetch(bridgeUrl + '/_smoke/revoke', { method: 'POST', headers })).status, 200);
       const response = await page.goto(origin + '/api/v1/me', { waitUntil: 'domcontentloaded' });

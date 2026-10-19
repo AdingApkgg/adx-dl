@@ -1,3 +1,4 @@
+import {libraryRestoreFixture} from "./library-restore-fixture";
 import { followingRestoreFixture } from "./following-restore-fixture";
 import {communityRestoreFixture} from "./community-restore-fixture";
 import { expect } from "bun:test";
@@ -74,13 +75,15 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
   // has no public ID until recovery; retained content stays publicly readable then.
   const retainedChart = rows.find(row => row.kind === "retain")!.chart;
   const community = await communityRestoreFixture(source, f.owner, { id: retainedChart.id, currentVersionId: retainedChart.publication!.versionId });
+  const library=await libraryRestoreFixture(source,f.owner,[retainedChart.id,rows.find(r=>r.kind==="moderate")!.chart.id]);
   let missingVersion = "";
   let lateChart: Awaited<ReturnType<typeof createChart>> | undefined;
   let lateModerated: Awaited<ReturnType<typeof createChart>> | undefined;
   return {
     additionalOriginals: 8,
-    communityCases: [...community.cases,...following!.cases],
+    communityCases: [...community.cases,...following!.cases,...library.cases],
     async commitLaterFacts() {
+      await library.commitLaterFacts();
       await community.commitLaterFacts();
       await following!.commitLaterFacts();
       for (const row of rows) {
@@ -124,6 +127,7 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
       await exportJournal(journal);
     },
     async verify(target: StorageContext) {
+      await library.verify(target);
       await community.verify(target);
       await following!.verify(target);
       for (const [owner, number] of userNumbers) {

@@ -1,0 +1,8 @@
+import {Button} from "@astrodx/ui/components/button";
+import {useState} from "react";
+import {Link} from "react-router";
+import {m} from "@/paraglide/messages.js";
+import {localizeHref} from "@/paraglide/runtime.js";
+import {useDownloads} from "../downloads/provider";
+export function DownloadAddButton({publicIds}:{publicIds:string[]}){const downloads=useDownloads(),[busy,setBusy]=useState(false),[failure,setFailure]=useState(false),[added,setAdded]=useState(false);if(!downloads)return null;async function add(){if(!downloads)return;setBusy(true);setFailure(false);setAdded(false);try{await downloads.store.enqueue(publicIds);setAdded(true);}catch{setFailure(true);}finally{setBusy(false);}}return <div className="space-y-2"><Button variant="outline" disabled={busy||!downloads.snapshot.scope||!publicIds.length||publicIds.length>50} onClick={()=>void add()}>{m.download_add()}</Button>{publicIds.length>50?<p className="text-sm">{m.download_batch_limit()}</p>:null}{failure?<p role="alert">{m.download_failed()}</p>:null}{added?<Link className="block text-sm underline" to={localizeHref('/downloads')}>{m.download_view_queue()}</Link>:null}</div>;}
+export function DownloadDock(){const downloads=useDownloads();if(!downloads?.snapshot.jobs.length)return null;return <aside aria-label={m.download_title()} className="sticky bottom-2 z-20 mx-auto mb-2 flex w-[calc(100%-2rem)] max-w-3xl flex-wrap items-center gap-3 rounded-xl border bg-background p-3 shadow-lg"><Link className="min-h-11 flex-1 break-words py-2 font-medium underline" to={localizeHref('/downloads')}>{m.download_queue_count({count:String(downloads.snapshot.jobs.length)})}</Link><Button variant="outline" onClick={()=>downloads.store.pauseAll()}>{m.download_pause_all()}</Button></aside>;}

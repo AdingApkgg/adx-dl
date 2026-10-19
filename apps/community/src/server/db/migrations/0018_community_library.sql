@@ -6,6 +6,8 @@ CREATE INDEX chart_lists_owner_time ON chart_lists(owner_id,updated_at,id);
 --> statement-breakpoint
 CREATE INDEX chart_lists_public_time ON chart_lists(published_at,id) WHERE public_id IS NOT NULL;
 --> statement-breakpoint
+CREATE TABLE chart_list_public_ids(list_id uuid PRIMARY KEY,public_id bigint UNIQUE NOT NULL);
+--> statement-breakpoint
 CREATE TABLE chart_list_controls(id uuid PRIMARY KEY,revision integer NOT NULL,fact jsonb NOT NULL,journal_sequence bigint NOT NULL);
 --> statement-breakpoint
 CREATE TABLE chart_library_states(key text PRIMARY KEY,revision integer NOT NULL,fact jsonb NOT NULL,journal_sequence bigint NOT NULL);

@@ -7,6 +7,8 @@ const topics=()=>[
  ["upload",m.site_help_upload_title(),m.site_help_upload_body()],
  ["publication",m.site_help_publication_title(),m.site_help_publication_body()],
  ["practice",m.site_help_practice_title(),m.site_help_practice_body()],
+ ["downloads",m.download_title(),m.download_help()],
+ ["library",m.library_title(),m.library_help()],
  ["community",m.site_help_community_title(),m.site_help_community_body()],
 ];
 export const meta=()=>[{title:m.site_help()}];
