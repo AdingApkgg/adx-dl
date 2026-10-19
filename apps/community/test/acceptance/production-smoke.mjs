@@ -19,6 +19,7 @@ const steps = [], pageErrors = [], blockedWrites = [];
 const staticCache = new Map();
 let staticBytes = 0, cacheHits = 0, routeFailures = 0, targetPath = null;
 let phase = 'setup', browser, page;
+const authorCoverage={workbench:false,imports:false,review:"not-run",compare:"not-run"};
 let authenticated = 'not-configured';
 const started = Date.now();
 const statePath = env.PRODUCTION_STORAGE_STATE;
@@ -41,7 +42,7 @@ async function result(status) {
     startedAt: new Date(started).toISOString(), elapsedMs: Date.now() - started,
     toolBaseTree: env.PRODUCTION_TOOL_BASE_TREE || null,
     smokeSha256: env.PRODUCTION_SMOKE_SHA256 || null,
-    authenticated, role: hasAuth ? role : null, authTransport: bridgeUrl ? 'ssh-readonly-bridge-to-public-production' : statePath ? 'explicit-state' : null,
+    authorCoverage, authenticated, role: hasAuth ? role : null, authTransport: bridgeUrl ? 'ssh-readonly-bridge-to-public-production' : statePath ? 'explicit-state' : null,
     productionRevision: env.PRODUCTION_EXPECT_REVISION || null, sessionRevoked, steps,
     failedStage: status === 'failed' ? phase : null, failedPath: status === 'failed' ? targetPath : null,
     staticCacheHits: cacheHits, routeFailures,
@@ -185,8 +186,8 @@ try {
     for (const prefix of ['', '/en', '/ja']) for (const path of ['/forum', '/notices', '/help']) await visit(prefix + path);
   });
   await step('anonymous_private_routes_denied', async () => {
-    for (const path of ['/api/v1/discussions/notifications', '/api/v1/dash/access','/api/v1/me/lists']) await json(path, 401);
-    for (const path of ['/me/notifications', '/dash']) {
+    for (const path of ['/api/v1/discussions/notifications', '/api/v1/dash/access','/api/v1/me/lists','/api/v1/me/charts/workbench']) await json(path, 401);
+    for (const path of ['/me/notifications', '/dash','/me/workbench','/me/imports']) {
       await page.goto(origin + path); const at = new URL(page.url());
       assert.equal(at.pathname, '/login'); assert.equal(at.searchParams.get('next'), path);
     }
@@ -249,6 +250,26 @@ try {
       await page.getByText('还没有下载任务。',{exact:true}).waitFor();
       if(role==='admin'){await visit('/dash/lists');await page.getByRole('heading',{level:2,name:'公开谱单管理',exact:true}).waitFor();const status=await json('/api/v1/dash/lists/status');assert.equal(status.ready,true);assert.equal(status.pendingControls,0);await json('/api/v1/dash/lists');}
       else await json('/api/v1/dash/lists',403);
+    });
+    await step('production_author_workbench_and_imports', async () => {
+      await visit('/me/workbench');await page.getByRole('heading',{level:1,name:'创作者工作台',exact:true}).waitFor();
+      const mine=await json('/api/v1/me/charts/workbench');assert.ok(Array.isArray(mine.items)&&mine.items.length<=20);assert.ok(mine.counts.total<=50);authorCoverage.workbench=true;
+      await visit('/me/imports');await page.getByRole('heading',{level:1,name:'批量导入',exact:true}).waitFor();await page.getByLabel('添加 ADX / ZIP（可多选）',{exact:true}).waitFor();authorCoverage.imports=true;
+      for(const prefix of ['/en','/ja'])for(const path of ['/me/workbench','/me/imports'])await visit(prefix+path);
+      for(const width of [320,390]){await page.setViewportSize({width,height:844});for(const path of ['/me/workbench','/me/imports']){await visit(path);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}}
+      await page.setViewportSize({width:1280,height:900});
+    });
+    await step('production_author_review_compare_and_denials', async () => {
+      const mine=await json('/api/v1/me/charts/workbench'),missing='ffffffff-ffff-4fff-afff-ffffffffffff';
+      await json(`/api/v1/me/charts/${missing}`,404);
+      if(mine.items.length){
+        const chart=await json(`/api/v1/me/charts/${mine.items[0].id}`),version=chart.versions.find(v=>v.id===chart.currentVersionId);assert.ok(version);
+        const fingerprint=await json(`/api/v1/me/charts/${chart.id}/versions/${version.id}/fingerprint`);assert.match(fingerprint.source.sha256,/^[a-f0-9]{64}$/);assert.equal(Object.hasOwn(fingerprint.source,'key'),false);
+        await visit(`/me/charts/${chart.id}/review?version=${version.id}`);await page.getByRole('heading',{level:2,name:'只读 Simai 源码',exact:true}).waitFor({timeout:30000});authorCoverage.review='existing-owned-version';
+        await json(`/api/v1/me/charts/${chart.id}/versions/${missing}/fingerprint`,404);
+        if(chart.versions.length>=2){await visit(`/me/charts/${chart.id}/compare?left=${chart.versions[1].id}&right=${version.id}`);await page.getByRole('heading',{level:2,name:'只读 Simai 源码',exact:true}).first().waitFor({timeout:30000});authorCoverage.compare='existing-owned-pair';}
+        else{const denied=await page.goto(origin+`/me/charts/${chart.id}/compare?left=${missing}&right=${version.id}`,{waitUntil:'domcontentloaded'});assert.equal(denied.status(),404);authorCoverage.compare='no-second-version-valid-missing-id-denied';}
+      }else{for(const suffix of ['review','compare']){const denied=await page.goto(origin+`/me/charts/${missing}/${suffix}`,{waitUntil:'domcontentloaded'});assert.equal(denied.status(),404);}authorCoverage.review='no-owned-version-missing-id-denied';authorCoverage.compare='no-owned-pair-missing-id-denied';}
     });
     await step('production_dashboard_permissions_and_pages', async () => {
       if (role === 'user') { await json('/api/v1/dash/access', 403); return; }

@@ -1,3 +1,4 @@
+import {clearDeviceImports} from "../imports/provider";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@astrodx/ui/components/card";
@@ -161,6 +162,7 @@ function SettingsContent() {
       setPending(false);
       return;
     }
+    await clearDeviceImports();
     if (me) clearUploadRecords(me.id);
     window.location.assign(localizeHref("/"));
   }
@@ -379,6 +381,7 @@ export function DeleteAccountSection({ userId, publicId, here, onDeleted }: Dele
       const result = await okJson(
         await getBrowserApi().api.v1.me.deletion.$post({ json: { deleteContent, confirmId: displayId } })
       );
+      await clearDeviceImports();
       clearUploadRecords(userId);
       onDeleted(result.purgeAt);
       // 响应已经清掉了会话 Cookie：缓存里的当前用户也要忘掉。不然页头还显示头像菜单，之后在页面里跳转

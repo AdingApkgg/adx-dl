@@ -2,7 +2,7 @@ import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { toast } from "@astrodx/ui/components/sonner";
 import { dehydrate, HydrationBoundary, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { data, Link, useLocation, useNavigate } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
@@ -40,7 +40,6 @@ function Detail({ id }: { id: string }) {
   const [metadataUnsaved, setMetadataUnsaved] = useState(false);
   const [pending, setPending] = useState(false); const [error, setError] = useState<unknown>();
   const [deleting, setDeleting] = useState<string | null>(null);
-  const appendRevision = useRef<{ fileId: string; revision: number } | null>(null);
   useEffect(() => {
     if (!queryError) return;
     const target = accountErrorRedirect(queryError, `${location.pathname}${location.search}`);
@@ -87,6 +86,7 @@ function Detail({ id }: { id: string }) {
     finally { setPending(false); }
   }
   return <main className="space-y-6">
+    <nav className="flex flex-wrap gap-3"><Link className={textLinkClass} to={localizeHref(`/me/charts/${id}/review`)}>{m.author_review()}</Link><Link className={textLinkClass} to={localizeHref(`/me/charts/${id}/compare`)}>{m.author_compare()}</Link><Link className={textLinkClass} to={localizeHref("/me/workbench")}>{m.author_workbench()}</Link></nav>
     <PageTitle description={m.charts_private_hint()}>{chart.title}</PageTitle>
     <Link to={localizeHref("/me/charts")} className={textLinkClass}>{m.charts_title()}</Link>
     <ChartMetadataEditor chart={chart} busy={pending} setBusy={setPending} refresh={refresh} onDirty={setMetadataUnsaved} />
@@ -102,15 +102,8 @@ function Detail({ id }: { id: string }) {
         </>}
       </li>)}</ul>
     </section>
-    <ChartUpload userId={me.id} onSave={async (file) => {
-      if (appendRevision.current?.fileId !== file.id) appendRevision.current = { fileId: file.id, revision: chart.revision };
-      try {
-        const updated = await chartsApi(getBrowserApi()).append(id, file.id, appendRevision.current.revision);
-        appendRevision.current = null; await refresh(updated); toast.success(m.chart_saved());
-      } catch (failure) {
-        if (failure instanceof ApiError && failure.code === "CHART_CHANGED") { appendRevision.current = null; await refresh(); }
-        throw failure;
-      }
+    <ChartUpload userId={me.id} target={{kind:"append",id,expectedRevision:chart.revision}} onSaved={async (updated,operation) => {
+      await operation.assertActive();await refresh(updated);await operation.assertActive();toast.success(m.chart_saved());
     }} />
     <Button variant="outline" disabled={pending} onClick={() => setDeleting("chart")}>{m.chart_delete()}</Button>
     {deleting ? <section role="alertdialog" aria-label={m.chart_delete_confirm()} className="space-y-3 rounded border p-4">

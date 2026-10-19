@@ -4,6 +4,7 @@ import {localizeHref} from "@/paraglide/runtime.js";
 import {PageTitle} from "../components/page-title";
 import type {Route} from "./+types/help";
 const topics=()=>[
+ ["author",m.author_workbench(),m.author_help()],
  ["upload",m.site_help_upload_title(),m.site_help_upload_body()],
  ["publication",m.site_help_publication_title(),m.site_help_publication_body()],
  ["practice",m.site_help_practice_title(),m.site_help_practice_body()],

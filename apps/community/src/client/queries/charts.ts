@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { type ApiClient, expectOk, okJson } from "@/shared/api-client";
+import type { WorkbenchFilters, WorkbenchPage, VersionFingerprint, SourceBinding } from "@/shared/author-workbench";
 import type { ChartAssetRole, ChartDto, ChartsPageDto } from "@/shared/charts";
 import { replayRequest } from "./storage";
 
@@ -10,17 +11,22 @@ export function chartsApi(api: ApiClient) {
     headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal,
   } });
   return {
+    workbench: async (filters: WorkbenchFilters = {}, signal?: AbortSignal): Promise<WorkbenchPage> => okJson(await routes.workbench.$get({ query: {q:filters.q,status:filters.status,cursor:filters.cursor,changed:filters.changed?"1":undefined,warnings:filters.warnings?"1":undefined,pending:filters.pending?"1":undefined} }, {init:{signal}})),
+    binding: async (fileId: string, signal?: AbortSignal): Promise<SourceBinding> => okJson(await routes.bindings[":fileId"].$get({param:{fileId}},{init:{signal}})),
+    fingerprint: async (id:string,versionId:string,signal?:AbortSignal):Promise<VersionFingerprint> => okJson(await routes[":id"].versions[":versionId"].fingerprint.$get({param:{id,versionId}},{init:{signal}})),
     list: async (cursor?: string, signal?: AbortSignal, filters: { q?: string; status?: string } = {}): Promise<ChartsPageDto> =>
       okJson(await routes.$get({ query: { ...filters, ...(cursor ? { cursor } : {}) } }, { init: { signal } })),
     get: async (id: string, signal?: AbortSignal): Promise<ChartDto> =>
       okJson(await routes[":id"].$get({ param: { id } }, { init: { signal } })),
+    createOnce: async (fileId:string,signal:AbortSignal):Promise<ChartDto> => okJson(await routes.$post(undefined,json({fileId},signal))),
+    appendOnce: async (id:string,fileId:string,expectedRevision:number,signal:AbortSignal):Promise<ChartDto> => okJson(await routes[":id"].versions.$post({param:{id}},json({fileId,expectedRevision},signal))),
     create: (fileId: string): Promise<ChartDto> =>
       replayRequest(async () => okJson(await routes.$post(undefined, json({ fileId })))),
     append: (id: string, fileId: string, expectedRevision: number): Promise<ChartDto> =>
       replayRequest(async () => okJson(await routes[":id"].versions.$post({ param: { id } }, json({ fileId, expectedRevision })))),
     // PATCH is never automatically replayed after an ambiguous response; the editor fetches current state.
-    patch: async (id: string, body: ChartPatch): Promise<ChartDto> =>
-      okJson(await routes[":id"].$patch({ param: { id } }, json(body))),
+    patch: async (id: string, body: ChartPatch, signal?: AbortSignal): Promise<ChartDto> =>
+      okJson(await routes[":id"].$patch({ param: { id } }, json(body, signal))),
     // Publication mutations must be reconciled with GET, never automatically replayed.
     publish: async (id: string, expectedRevision: number, versionId: string): Promise<ChartDto> =>
       okJson(await routes[":id"].publication.$put({ param: { id } }, json({ expectedRevision, versionId, confirmOriginalArchive: true }))),
@@ -45,3 +51,6 @@ export const chartQuery = (api: ApiClient, id: string) => queryOptions({
 export function chartAssetUrl(id: string, versionId: string, role: ChartAssetRole): string {
   return `/api/v1/me/charts/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/assets/${role}`;
 }
+
+export const workbenchQuery=(api:ApiClient,ownerId:string,filters:WorkbenchFilters={})=>queryOptions({queryKey:["me","author-workbench",ownerId,filters] as const,queryFn:({signal})=>chartsApi(api).workbench(filters,signal)});
+export const authorChartQuery=(api:ApiClient,ownerId:string,id:string)=>queryOptions({queryKey:["me","author-chart",ownerId,id] as const,queryFn:({signal})=>chartsApi(api).get(id,signal)});

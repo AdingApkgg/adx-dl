@@ -59,6 +59,8 @@ async function revoke() {
 }
 const matches = (path: string) => {
   if (/^\/(?:en\/|ja\/)?(?:u\/[1-9]\d*|forum(?:\/new|\/[1-9]\d*)?|charts(?:\/[1-9]\d*)?|lists(?:\/[1-9]\d*)?|downloads|notices|help|dash(?:\/(?:users|charts|status|reports|discussions|featured|notices|lists))?|me\/(?:notifications|following|feed|library|lists\/[a-f0-9-]{36}))(?:\.data)?$/.test(path)) return true;
+  if (/^\/(?:en\/|ja\/)?me\/(?:workbench|imports|charts(?:\/[a-f0-9-]{36}(?:\/(?:review|compare))?)?)(?:\.data)?$/.test(path)) return true;
+  if (/^\/api\/v1\/me\/charts(?:\/(?:workbench|bindings\/[a-f0-9-]{36}|[a-f0-9-]{36}(?:\/versions\/[a-f0-9-]{36}\/(?:fingerprint|assets\/(?:maidata|audio|cover)))?))?$/.test(path)) return true;
   if (/^\/assets\/[A-Za-z0-9_.-]+$/.test(path)) return true;
   if (path === "/api/v1/me") return true;
   if (/^\/api\/v1\/(?:me\/lists(?:\/reports|\/[a-f0-9-]{36})?|lists(?:\/[1-9]\d*)?)$/.test(path)) return true;

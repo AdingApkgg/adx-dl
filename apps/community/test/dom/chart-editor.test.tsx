@@ -1,7 +1,9 @@
 import { QueryClientProvider, dehydrate } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentType } from "react";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import {renderToString} from "react-dom/server";
+import {ChartPublication} from "@/client/components/chart-publication";
+import { MemoryRouter, createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { m } from "@/paraglide/messages.js";
 import ChartDetail from "@/client/routes/chart-detail";
@@ -26,6 +28,7 @@ function setup(handler: (path: string, method: string, body: Record<string, unkn
   vi.stubGlobal("Worker", HashWorker);
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = { path: new URL(String(input)).pathname, method: init?.method ?? "GET", body: typeof init?.body === "string" ? JSON.parse(init.body) : {} };
+    if(request.path.endsWith("/fingerprint"))return Response.json({versionId:request.path.split("/").at(-2),source:{sha256:"a".repeat(64),size:3},assets:{maidata:{sha256:"b".repeat(64),size:3,mime:"text/plain"}}});
     requests.push(request); return handler(request.path, request.method, request.body);
   }));
   const client = makeQueryClient(); client.setQueryData(["me"], { id: "alice", status: "active" }); client.setQueryData(chartQuery(api, "chart").queryKey, start);
@@ -344,4 +347,9 @@ test("publication comparison reads public metadata from its snapshot and checks 
   fireEvent.click(within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }));
   await within(section).findByText("Concurrent description");
   expect(within(section).queryByText("公开快照已保存。")).toBeNull();
+});
+
+test("server-rendered publication controls wait for hydration before accepting a version choice",()=>{
+ const markup=renderToString(<MemoryRouter><ChartPublication chart={initial} busy={false} setBusy={()=>{}} refresh={async()=>{}}/></MemoryRouter>),host=document.createElement("div");host.innerHTML=markup;
+ expect((host.querySelector("select") as HTMLSelectElement).disabled).toBe(true);
 });

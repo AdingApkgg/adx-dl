@@ -22,6 +22,7 @@ export function meta({ matches, location }: Route.MetaArgs) {
 export default function Privacy({ loaderData }: Route.ComponentProps) {
   const sections = [
     { id: "account", title: m.privacy_login_heading(), paragraphs: [m.privacy_google(), m.privacy_awmc(), m.privacy_qq(), m.privacy_passkey(), m.privacy_profile()] },
+    { id: "author", title: m.author_workbench(), paragraphs: [m.author_privacy()] },
     { id: "security", title: m.privacy_security_heading(), paragraphs: [m.privacy_session(), m.privacy_preferences()] },
     { id: "analytics", title: m.privacy_analytics_heading(), paragraphs: [m.privacy_analytics(), m.privacy_analytics_disabled()] },
     { id: "services", title: m.privacy_services_heading(), paragraphs: [m.privacy_services()] },

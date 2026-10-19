@@ -1,3 +1,6 @@
+import {listWorkbench,versionFingerprint,sourceBinding} from "../../src/server/charts/workbench";
+import {chartAssetResponse,resolveChartAsset} from "../../src/server/charts/assets";
+import {analyzeMaidata} from "../../src/client/author/analysis";
 import {libraryRestoreFixture} from "./library-restore-fixture";
 import { followingRestoreFixture } from "./following-restore-fixture";
 import {communityRestoreFixture} from "./community-restore-fixture";
@@ -28,7 +31,8 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
   const deletion = { ...control, exportChartJournal: source.exportChartJournal };
   const hash = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
   async function upload(owner: string, label: string) {
-    const bytes = zipSync({ "maidata.txt": strToU8(`&title=${label}\n&artist=Synthetic public restore\n&inote_4=(120){4}1,2,E\n`) }, { level: 0 });
+    const text=label==="Restore legacy"?`\uFEFF&TiTle=${label}\r\n&artist=Synthetic public restore\r\n&INOTE_4=(120){4}1,2,E\r\n`:`&title=${label}\n&artist=Synthetic public restore\n&inote_4=(120){4}1,2,E\n`;
+    const bytes = zipSync({ "maidata.txt": strToU8(text) }, { level: 0 });
     const dto = await initUpload(source, owner, { purpose: "chart-source", name: "private-original-name.zip", size: bytes.length, sha256: hash(bytes) }, crypto.randomUUID());
     for (let index = 0; index < dto.partCount; index++) {
       const part = bytes.subarray(index * dto.partSize, (index + 1) * dto.partSize);
@@ -81,7 +85,7 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
   let lateModerated: Awaited<ReturnType<typeof createChart>> | undefined;
   return {
     additionalOriginals: 8,
-    communityCases: [...community.cases,...following!.cases,...library.cases],
+    communityCases: [...community.cases,...following!.cases,...library.cases,"author-workbench-restored-projection","author-derived-source-map-rebuilt","author-owner-denial-after-restore"],
     async commitLaterFacts() {
       await library.commitLaterFacts();
       await community.commitLaterFacts();
@@ -158,6 +162,16 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
       }
       for (const row of rows) {
         if (row.kind === "legacy") {
+          const projection=await listWorkbench(target,row.owner,{});
+          expect(projection.items.some(item=>item.id===row.chart.id)).toBe(true);
+          const fingerprint=await versionFingerprint(target,row.owner,row.chart.id,row.chart.currentVersionId);
+          const asset=await resolveChartAsset(target,row.owner,row.chart.id,row.chart.currentVersionId,"maidata");
+          const response=await chartAssetResponse(target,asset,new Request("https://restore.test/private-source"));
+          expect(response.status).toBe(200);const raw=new Uint8Array(await response.arrayBuffer());
+          expect(createHash("sha256").update(raw).digest("hex")).toBe(fingerprint.assets.maidata!.sha256);
+          const analysis=analyzeMaidata(new TextDecoder("utf-8",{fatal:true,ignoreBOM:true}).decode(raw),4);
+          expect(analysis.error).toBeNull();expect(analysis.statements[0]).toMatchObject({line:3,column:10,seconds:2});
+          await expect(versionFingerprint(target,admin,row.chart.id,row.chart.currentVersionId)).rejects.toMatchObject({status:404});
           const visible = await getPublicChart(target, row.chart.id);
           expect(visible.publicId).toMatch(/^[1-9][0-9]*$/);
           expect(BigInt(visible.publicId)).toBeGreaterThan(BigInt(lateChart!.publicId!));
@@ -166,6 +180,10 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
         }
         const [identity] = await target.db.select().from(chartPublicIds).where(eq(chartPublicIds.chartId, row.chart.id));
         expect(identity.publicId.toString()).toBe(row.chart.publicId!);
+        if(row.kind==="retain"||row.kind==="moderate-retain"){
+          await expect(listWorkbench(target,row.owner,{})).rejects.toMatchObject({status:403});
+          await expect(sourceBinding(target,row.owner,row.original.id)).rejects.toMatchObject({status:404});
+        }
         if (row.kind === "moderate" || row.kind === "moderate-retain") {
           const [decision] = await target.db.select().from(chartModerations).where(eq(chartModerations.chartId, row.chart.id));
           expect(decision).toMatchObject({ publicId: BigInt(row.chart.publicId!), actorId: admin, actorPublicId: BigInt(actor.publicId), reason: `Restore takedown ${row.kind}`, revision: row.chart.revision + 1, publication: { title: `Restore ${row.kind}`, versionId: row.chart.publication!.versionId } });

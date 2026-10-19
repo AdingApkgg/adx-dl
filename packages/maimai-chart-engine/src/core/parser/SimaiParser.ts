@@ -29,9 +29,13 @@ interface ParseNotesResult {
   divisorEvents: DivisorEvent[];
 }
 
-export interface ParseDiagnostic { code: string; line?: number }
+export interface ParseDiagnostic { code: string; line?: number; sourceStart?: number }
+/** UTF16 offsets in the exact parser input. beat includes the existing four-beat lead-in. */
+export interface SimaiStatement { difficulty: number; bodyStart: number; bodyEnd: number; sourceStart?: number; sourceEnd?: number; line: number; beat: number }
+
 export interface SimaiParseOptions {
   onDiagnostic?: (diagnostic: ParseDiagnostic) => void;
+  onStatement?: (statement: SimaiStatement) => void;
   maxNotes?: number;
   maxDurationMs?: number;
 }
@@ -41,7 +45,8 @@ export class ParseLimitError extends Error {
 interface ParseBudget {
   maxNotes: number;
   checkDuration: (milliseconds: number) => void;
-  diagnostic: (code: string, line?: number) => void;
+  diagnostic: (code: string, line?: number, bodyOffset?: number) => void;
+  statement?: (start: number, end: number, line: number, beat: number) => void;
 }
 
 const INOTE_MARKERS = [
@@ -136,6 +141,11 @@ export function parseSimaiChart(simaiText: string, difficulty?: ChartDifficulty,
     inotes: {},
   };
 
+  const collectSource = Boolean(options?.onStatement || options?.onDiagnostic);
+  const lineOffsets: number[] = [];
+  if (collectSource) { let at = 0; for (const line of simaiText.split("\n")) { lineOffsets.push(at); at += line.length + 1; } }
+  const bodySources: Record<number, { start: number; length: number }[]> = {};
+  let currentSources: { start: number; length: number }[] = [];
   let currentInote: number | null = null;
   let currentInoteContent: string[] = [];
 
@@ -148,17 +158,20 @@ export function parseSimaiChart(simaiText: string, difficulty?: ChartDifficulty,
       if (inoteMatch) {
         if (currentInote !== null) {
           metadata.inotes[currentInote] = currentInoteContent.join("\n");
+          if (collectSource) bodySources[currentInote] = currentSources;
           metadata.availableDifficulties[currentInote as ChartDifficulty] = true;
         }
 
         currentInote = parseInt(inoteMatch[1]);
         currentInoteContent = inoteMatch[2] ? [inoteMatch[2]] : [];
+        currentSources = inoteMatch[2] && collectSource ? [{ start: lineOffsets[i] + line.indexOf("=") + 1, length: inoteMatch[2].length }] : [];
         continue;
       }
 
       if (currentInote !== null) {
         if (trimmedLine.startsWith("&") && !trimmedLine.startsWith("&inote")) {
           metadata.inotes[currentInote] = currentInoteContent.join("\n");
+          if (collectSource) bodySources[currentInote] = currentSources;
           metadata.availableDifficulties[currentInote as ChartDifficulty] = true;
           currentInote = null;
           currentInoteContent = [];
@@ -166,6 +179,7 @@ export function parseSimaiChart(simaiText: string, difficulty?: ChartDifficulty,
           parseMetadataLine(trimmedLine, metadata);
         } else if (!trimmedLine.startsWith("&")) {
           currentInoteContent.push(line);
+          if (collectSource) currentSources.push({ start: lineOffsets[i], length: line.length });
         }
         continue;
       }
@@ -177,6 +191,7 @@ export function parseSimaiChart(simaiText: string, difficulty?: ChartDifficulty,
 
     if (currentInote !== null) {
       metadata.inotes[currentInote] = currentInoteContent.join("\n");
+          if (collectSource) bodySources[currentInote] = currentSources;
       metadata.availableDifficulties[currentInote as ChartDifficulty] = true;
     }
 
@@ -222,10 +237,22 @@ export function parseSimaiChart(simaiText: string, difficulty?: ChartDifficulty,
       metadata.bpm = 120;
     }
 
+    const spans = bodySources[selectedDifficulty ?? 4] ?? [];
+    const bodyLineOffsets: number[] = []; let bodyOffset = 0;
+    if (collectSource) for (const line of chartBody.split("\n")) { bodyLineOffsets.push(bodyOffset); bodyOffset += line.length + 1; }
+    const spanStarts: number[] = []; let spanAt = 0;
+    for (const span of spans) { spanStarts.push(spanAt); spanAt += span.length + 1; }
+    const sourceOffset = (offset: number, end = false): number | undefined => {
+      let low = 0, high = spanStarts.length;
+      while (low < high) { const mid = (low + high) >>> 1; if (spanStarts[mid] <= offset) low = mid + 1; else high = mid; }
+      const index = low - 1, span = spans[index];
+      if (!span || offset > spanStarts[index] + span.length || (!end && offset === spanStarts[index] + span.length)) return undefined;
+      return span.start + offset - spanStarts[index];
+    };
     let diagnosticCount = 0;
-    const diagnostic = (code: string, line?: number) => {
+    const diagnostic = (code: string, line?: number, bodyOffset?: number) => {
       if (!options?.onDiagnostic) return;
-      if (diagnosticCount < 63) options.onDiagnostic({ code, ...(line === undefined ? {} : { line }) });
+      if (diagnosticCount < 63) options.onDiagnostic({ code, ...(line === undefined ? {} : { line, sourceStart: sourceOffset(bodyOffset ?? bodyLineOffsets[line - 1] ?? -1) }) });
       else if (diagnosticCount === 63) options.onDiagnostic({ code: "WARNINGS_TRUNCATED" });
       diagnosticCount++;
     };
@@ -233,7 +260,9 @@ export function parseSimaiChart(simaiText: string, difficulty?: ChartDifficulty,
     const parseResult = parseNotes(chartBody, metadata.bpm, options ? { maxNotes: options.maxNotes ?? Infinity,
       checkDuration: (milliseconds) => {
         if (!Number.isFinite(milliseconds) || milliseconds < 0 || milliseconds > (options.maxDurationMs ?? Infinity)) throw new ParseLimitError();
-      }, diagnostic } : undefined);
+      }, diagnostic, statement: options.onStatement ? (start, end, line, beat) => options.onStatement!({
+        difficulty: selectedDifficulty ?? 4, bodyStart: start, bodyEnd: end, sourceStart: sourceOffset(start), sourceEnd: sourceOffset(end, true), line, beat: beat + 4,
+      }) : undefined } : undefined);
     const notes = parseResult.notes;
     const bpmEvents = parseResult.bpmEvents;
     const divisorEvents = parseResult.divisorEvents;
@@ -462,6 +491,7 @@ function parseNotes(chartBody: string, initialBpm: number, budget?: ParseBudget)
       continue;
     }
 
+    budget?.statement?.(startPos, pos, startLine, currentBeat);
     const beatIncrement = 4 / divisor;
 
     if (noteContent.trim() !== "") {
@@ -516,7 +546,7 @@ function parseNotes(chartBody: string, initialBpm: number, budget?: ParseBudget)
 
         if (budget && !parsedNotes.length && noteStr !== "E") {
           const outOfRange = /^\d+[hbx$]*($|\[)/i.test(noteStr) || /^([ABDE]\d+|C\d+)[hbfx]*(\[.*\])?$/i.test(noteStr);
-          budget.diagnostic(outOfRange ? "NOTE_OUT_OF_RANGE" : "UNKNOWN_TOKEN", startLine);
+          budget.diagnostic(outOfRange ? "NOTE_OUT_OF_RANGE" : "UNKNOWN_TOKEN", startLine, startPos);
         }
         if (budget) {
           if (notes.length + parsedNotes.length > budget.maxNotes) throw new ParseLimitError();
@@ -524,8 +554,8 @@ function parseNotes(chartBody: string, initialBpm: number, budget?: ParseBudget)
             let endMs = note.timingMs;
             if (note.type === "slide") {
               for (let i = 0; i < (note.allDurationMs?.length ?? 1); i++) endMs = Math.max(endMs, note.timingMs + (note.allDelayMs?.[i] ?? note.delayMs ?? 0) + (note.allDurationMs?.[i] ?? note.durationMs ?? 0));
-              if (note.allSlideSegments?.some((segments) => segments.some((segment) => segment.endPos < 1 || segment.endPos > 8 || (segment.midPos !== undefined && (segment.midPos < 1 || segment.midPos > 8))))) budget.diagnostic("NOTE_OUT_OF_RANGE", startLine);
-              if (!note.slideSegments?.length) budget.diagnostic("UNKNOWN_TOKEN", startLine);
+              if (note.allSlideSegments?.some((segments) => segments.some((segment) => segment.endPos < 1 || segment.endPos > 8 || (segment.midPos !== undefined && (segment.midPos < 1 || segment.midPos > 8))))) budget.diagnostic("NOTE_OUT_OF_RANGE", startLine, startPos);
+              if (!note.slideSegments?.length) budget.diagnostic("UNKNOWN_TOKEN", startLine, startPos);
             } else if ("isHoldStart" in note && note.isHoldStart && "duration" in note) endMs += note.duration * 60000 / note.bpm;
             budget.checkDuration(endMs + 240000 / (firstBpm ?? initialBpm));
           }

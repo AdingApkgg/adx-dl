@@ -127,6 +127,9 @@ jobs:
         working-directory: apps/community
         run: bun run check
 
+      - name: Central chart parser regressions
+        run: bun test packages/maimai-chart-engine
+
       - name: Build
         working-directory: apps/community
         run: bun run build

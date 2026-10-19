@@ -1,3 +1,4 @@
+import {clearDeviceImports} from "../imports/provider";
 import {clearDeviceDownloads} from "../downloads/provider";
 import { Button } from "@astrodx/ui/components/button";
 import {
@@ -53,6 +54,7 @@ export function AccountMenu() {
       toast.error(errorMessage(error) ?? m.error_unknown());
       return;
     }
+    await clearDeviceImports();
     await clearDeviceDownloads();
     if (me) clearUploadRecords(me.id);
     window.location.assign(localizeHref("/"));
@@ -70,6 +72,7 @@ export function AccountMenu() {
         <DropdownMenuLabel className="truncate">{me.name}</DropdownMenuLabel>
         {pending ? null : (
           <>
+            <DropdownMenuItem asChild><Link to={localizeHref("/me/workbench")}>{m.author_workbench()}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link to={localizeHref("/me/charts")}>{m.charts_title()}</Link>
             </DropdownMenuItem>

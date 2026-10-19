@@ -1,0 +1,17 @@
+import {restorePlan,type ImportRow} from "./model";
+export type ImportScope={scope:string;epoch:string};
+export type Executor={owner:string;token:string;webLock?:true};
+let opening:Promise<IDBDatabase>|undefined;
+function db(){if(opening)return opening;opening=new Promise<IDBDatabase>((resolve,reject)=>{if(typeof indexedDB==="undefined"){reject(Error("PERSISTENCE"));return;}const r=indexedDB.open("adxc-imports-v1",1);r.onupgradeneeded=()=>{r.result.createObjectStore("meta",{keyPath:"id"});};r.onsuccess=()=>resolve(r.result);r.onerror=r.onblocked=()=>reject(Error("PERSISTENCE"));});return opening;}
+const result=<T>(r:IDBRequest<T>)=>new Promise<T>((resolve,reject)=>{r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(Error("PERSISTENCE"));});
+async function tx<T>(fn:(s:IDBObjectStore)=>Promise<T>):Promise<T>{const d=await db(),t=d.transaction("meta","readwrite"),done=new Promise<void>((resolve,reject)=>{t.oncomplete=()=>resolve();t.onerror=t.onabort=()=>reject(Error("PERSISTENCE"));});try{const value=await fn(t.objectStore("meta"));await done;return value;}catch(error){try{t.abort();}catch{}await done.catch(()=>{});throw error;}}
+async function guard(s:IDBObjectStore,scope:ImportScope,executor?:Executor){const identity=await result(s.get("identity"));if(identity?.scope!==scope.scope||identity.epoch!==scope.epoch)throw Error("SCOPE_CHANGED");if(executor){const held=await result(s.get("executor"));if(held?.owner!==executor.owner||held.token!==executor.token||held.until<=Date.now())throw Error("EXECUTOR_BUSY");}}
+export const activateImportScope=(scope:string)=>tx(async s=>{const old=await result(s.get("identity"));if(old?.scope===scope)return {...old,changed:false} as ImportScope&{changed:boolean};const identity={id:"identity",scope,epoch:crypto.randomUUID()};s.delete("plan");s.delete("executor");s.put(identity);return {...identity,changed:true};});
+export const loadImportPlan=(scope:ImportScope)=>tx(async s=>{await guard(s,scope);const plan=await result(s.get("plan"));return restorePlan(plan?.rows);});
+export const saveImportPlan=(scope:ImportScope,executor:Executor,rows:ImportRow[])=>tx(async s=>{await guard(s,scope,executor);s.put({id:"plan",rows});});
+export const claimImportExecutor=(scope:ImportScope,executor:Executor)=>tx(async s=>{await guard(s,scope);const held=await result(s.get("executor"));// A granted exclusive Web Lock proves an earlier Web-Lock holder has ended, even if a reload killed its IDB cleanup.
+ if(held&&held.until>Date.now()&&(held.owner!==executor.owner||held.token!==executor.token)&&!(held.webLock===true&&executor.webLock===true))return false;s.put({id:"executor",...executor,until:Date.now()+15000});return true;});
+export const fenceImportExecutor=(scope:ImportScope,executor:Executor)=>tx(async s=>{await guard(s,scope,executor);s.put({id:"executor",...executor,until:Date.now()+15000});});
+export const releaseImportExecutor=(executor:Executor)=>tx(async s=>{const held=await result(s.get("executor"));if(held?.owner===executor.owner&&held.token===executor.token)s.delete("executor");});
+
+export const invalidateImportScope=(scope:ImportScope)=>tx(async s=>{const current=await result(s.get("identity"));if(current?.scope!==scope.scope||current.epoch!==scope.epoch)return;s.put({id:"identity",scope:`inactive:${crypto.randomUUID()}`,epoch:crypto.randomUUID()});s.delete("plan");s.delete("executor");});

@@ -1,0 +1,2 @@
+import type {ChartDto} from "@/shared/charts";
+export function publicationConfirmationKey(chart:ChartDto,versionId:string){return JSON.stringify({id:chart.id,revision:chart.revision,versionId,title:chart.title,artist:chart.artist,description:chart.description,credits:chart.credits,tags:chart.tags,releaseNote:chart.versions.find(v=>v.id===versionId)?.releaseNote??null,publication:chart.publication??null,pending:chart.publicationPending});}

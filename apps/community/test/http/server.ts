@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { initializeRestoreState } from "../../ops/backup/restore";
 import { fileURLToPath } from "node:url";
+import { createServer } from "node:net";
 
 import { RedisClient } from "bun";
 
@@ -21,6 +22,16 @@ const appRoot = fileURLToPath(new URL("../..", import.meta.url));
 /** 构建产物用的 BETTER_AUTH_SECRET：测试要自己签会话 Cookie 时用它。 */
 export const HTTP_TEST_AUTH_SECRET = "http-test-secret-http-test-secret-0123456789";
 
+// Reserve both listeners while checking: fixture PostgreSQL/S3 ports may occupy the internal offset.
+async function freePortPair():Promise<number>{
+ for(let attempt=0;attempt<100;attempt++){
+  const port=40000+Math.floor(Math.random()*10000),listeners:ReturnType<typeof createServer>[]=[];
+  try{for(const selected of [port,port+10000]){const server=createServer();listeners.push(server);await new Promise<void>((resolve,reject)=>{server.once("error",reject);server.listen(selected,"127.0.0.1",()=>resolve());});}return port;}
+  catch{}finally{await Promise.all(listeners.map(server=>new Promise<void>(resolve=>{if(server.listening)server.close(()=>resolve());else resolve();})));}
+ }
+ throw Error("HTTP_TEST_PORT_PAIR_UNAVAILABLE");
+}
+
 // 启动 bun run build 的产物。必须在 apps/community 下启动：静态资源的路径相对于当前目录。
 // extraEnv 盖在默认的环境变量上（比如开统计的那组）。
 export async function startBuiltServer(extraEnv: Record<string, string> = {}): Promise<RunningServer> {
@@ -36,7 +47,7 @@ export async function startBuiltServer(extraEnv: Record<string, string> = {}): P
   const restoreStateDirectory = await mkdtemp(join(tmpdir(), "community-http-restore-state-"));
   await initializeRestoreState(restoreStateDirectory);
   const storage=await storageFixtureConfig();
-  const port = 40_000 + Math.floor(Math.random() * 10_000);
+  const port = await freePortPair();
   const origin = `http://127.0.0.1:${port}`;
   const proc = Bun.spawn(["bun", "./build/server/index.js"], {
     cwd: appRoot,

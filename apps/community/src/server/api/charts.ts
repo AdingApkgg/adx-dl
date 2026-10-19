@@ -7,6 +7,7 @@ import { chartAssetResponse, resolveChartAsset } from "../charts/assets";
 import { appendChartVersion, createChart, deleteChart, deleteChartVersion, getChart, listCharts, updateChart } from "../charts/service";
 import { StorageUnavailableError } from "../storage/errors";
 
+import { listWorkbench, sourceBinding, versionFingerprint } from "../charts/workbench";
 import { publishChart, withdrawChart } from "../charts/publication";
 const expected = z.number().int().min(1).max(2147483647);
 const create = z.object({ fileId: z.string() }).strict();
@@ -31,9 +32,13 @@ export const chartRoutes = new Hono<AppEnv>()
   .use(async (c, next) => {
     c.header("cache-control", "private, no-store");
     c.header("x-content-type-options", "nosniff");
+    c.header("x-robots-tag", "noindex, nofollow");
     currentAuth(c);
     await next();
   })
+  .get("/workbench", async c => c.json(await listWorkbench(storage(c),currentAuth(c).user.id,{q:c.req.query("q"),status:c.req.query("status"),cursor:c.req.query("cursor"),changed:c.req.query("changed")==="1",warnings:c.req.query("warnings")==="1",pending:c.req.query("pending")==="1"})))
+  .get("/bindings/:fileId", async c => c.json(await sourceBinding(storage(c),currentAuth(c).user.id,c.req.param("fileId"))))
+  .get("/:id/versions/:versionId/fingerprint", async c => c.json(await versionFingerprint(storage(c),currentAuth(c).user.id,c.req.param("id"),c.req.param("versionId"))))
   .put("/:id/publication", async c => c.json(await publishChart(
     storage(c), currentAuth(c).user.id, c.req.param("id"),
     await body(c, z.object({ expectedRevision: expected, versionId: z.string(), confirmOriginalArchive: z.literal(true) }).strict()),

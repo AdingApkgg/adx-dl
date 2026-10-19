@@ -1,8 +1,10 @@
+import {exerciseAuthor} from "./author-browser.mjs";
 import {exerciseLibrary} from "./library-browser.mjs";
 import { exerciseFollowing } from "./following-browser.mjs";
 // Run only on a remote Linux runner against the isolated acceptance Compose project.
 // Playwright is installed outside the repository; no product dependency is needed.
 import assert from "node:assert/strict";
+import {chooseFiles} from "./browser-input.mjs";
 import { exercisePlatform } from "./platform-browser.mjs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
@@ -176,7 +178,7 @@ async function acceptance() {
     try {
       await page.goto(new URL("/me/charts/new", origin).href);
       if (mode === "adx") {
-        await page.getByLabel("选择 ADX / ZIP", { exact: true }).setInputFiles({ name: "browser-chart.adx", mimeType: "application/octet-stream", buffer: original });
+        await chooseFiles(page.getByLabel("选择 ADX / ZIP", { exact: true }),{ name: "browser-chart.adx", mimeType: "application/octet-stream", buffer: original });
       } else {
         for (const [label, name, mimeType, buffer] of [
           ["谱面文件（必选）", "my-score.txt", "text/plain", score],
@@ -190,7 +192,10 @@ async function acceptance() {
         assert.equal(uploadStarts, 0, "selection must remain local before assembly");
         await page.getByRole("button", { name: "组装并上传", exact: true }).click();
       }
-      await page.getByRole("button", { name: "保存私有草稿", exact: true }).waitFor({ timeout: 90000 });
+      await Promise.race([
+        page.getByRole("button", {name:"保存私有草稿",exact:true}).waitFor({timeout:90000}),
+        page.getByRole("alert").waitFor({timeout:90000}).then(async()=>{throw Error(await page.getByRole("alert").innerText());}),
+      ]);
       assert.equal(uploadStarts, 1); if (mode === "parts") assert.ok(workers > 0, "real browser packaging Worker must run");
       assert.equal((await json(owner, "/api/v1/me/charts")).items.length, 0);
       const [saved] = await Promise.all([
@@ -245,7 +250,7 @@ async function acceptance() {
   await step("upload_processed_before_explicit_save", async () => {
     const response = await page.goto(new URL("/me/charts/new", origin).href);
     assert.equal(response.status(), 200);
-    await page.getByLabel("选择 ADX / ZIP", { exact: true }).setInputFiles({ name: "ci-chart.zip", mimeType: "application/zip", buffer: zip });
+    await chooseFiles(page.getByLabel("选择 ADX / ZIP", { exact: true }),{ name: "ci-chart.zip", mimeType: "application/zip", buffer: zip });
     await page.getByRole("button", { name: "保存私有草稿", exact: true }).waitFor({ state: "visible", timeout: 90000 });
     assert.equal((await json(owner, "/api/v1/me/charts")).items.length, 0, "processing alone must not create a draft");
     assert.equal(await page.getByRole("alert").count(), 0);
@@ -321,7 +326,7 @@ async function acceptance() {
   });
   await step("newer_private_version_and_metadata_do_not_replace_snapshot", async () => {
     const newer = storedZip([["maidata.txt", Buffer.from("&title=New private version\n&inote_4=(120){4}1,2,E\n")]]);
-    await page.getByLabel("选择 ADX / ZIP", { exact: true }).setInputFiles({ name: "private-newer.zip", mimeType: "application/zip", buffer: newer });
+    await chooseFiles(page.getByLabel("选择 ADX / ZIP", { exact: true }),{ name: "private-newer.zip", mimeType: "application/zip", buffer: newer });
     await page.getByRole("button", { name: "保存私有草稿", exact: true }).waitFor({ timeout: 90000 });
     const [saved] = await Promise.all([
       page.waitForResponse(r => new URL(r.url()).pathname === `/api/v1/me/charts/${draft.id}/versions` && r.request().method() === "POST"),
@@ -458,7 +463,7 @@ async function acceptance() {
   await step("missing_optional_media_and_unsupported_difficulty", async () => {
     const optionalZip = storedZip([["maidata.txt", Buffer.from("&title=Optional media absent\n&inote_4=(120){4}1,9,nonsense,E\n")]]);
     await page.goto(new URL("/me/charts/new", origin).href);
-    await page.getByLabel("选择 ADX / ZIP", { exact: true }).setInputFiles({ name: "optional.zip", mimeType: "application/zip", buffer: optionalZip });
+    await chooseFiles(page.getByLabel("选择 ADX / ZIP", { exact: true }),{ name: "optional.zip", mimeType: "application/zip", buffer: optionalZip });
     await page.getByRole("button", { name: "保存私有草稿", exact: true }).waitFor({ timeout: 90000 });
     const [saved] = await Promise.all([
       page.waitForResponse(r => new URL(r.url()).pathname === "/api/v1/me/charts" && r.request().method() === "POST"),
@@ -628,6 +633,7 @@ async function acceptance() {
   });
   await exerciseLibrary({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Library browser\n&inote_4=(120){4}1,2,E\n`)]])});
   await exerciseFollowing({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Following browser\n&inote_4=(120){4}1,2,E\n`)]])});
+  await exerciseAuthor({owner,other,anonymous,origin,step,evidenceDirectory,zip:(label,next=false)=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Creator browser\n&inote_4=(120){4}${next?"1,(240)3,4":"1,2"},E\n`)]])});
   assert.equal(diagnostics.filter(row => row.type === "pageerror").length, 0, "uncaught browser errors");
   assert.equal(diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length, 0, "hydration errors");
 }
