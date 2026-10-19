@@ -20,7 +20,7 @@ export async function exerciseDiscovery({owner,other,anonymous,origin,step,evide
  });
  await step('discovery_suggestions_same_slot_filters_share_and_library_actions',async()=>{
   await reader.goto(url('/search'));const main=reader.locator('main'),input=main.getByRole('combobox',{name:'搜索公开内容',exact:true});await input.fill(alias);await main.getByRole('listbox').getByRole('link').first().waitFor();await input.press('Escape');await input.press('Enter');await reader.waitForURL(u=>u.pathname==='/search'&&u.searchParams.get('q')===alias);
-  await reader.goto(url(`/search?${new URLSearchParams({q:alias,type:'charts',difficulty:'4',preview:'1',minSeconds:'0',maxSeconds:'3600'})}`));await main.getByRole('heading',{level:3,name:chart.publication.title,exact:true}).first().waitFor();
+  await reader.goto(url(`/search?${new URLSearchParams({q:alias,type:'charts',difficulty:'4',preview:'1',minSeconds:'0',maxSeconds:'3600'})}`));await main.getByRole('heading',{name:chart.publication.title,exact:true}).first().waitFor();
   const api=await get(anonymous,`/api/v1/search?${new URLSearchParams({q:alias,type:'charts',difficulty:'6',preview:'1'})}`);assert.equal(api.groups.charts.total,0);
   await reader.goto(url(`/charts/${chart.publicId}?difficulty=4&t=0.5`));const preview=reader.getByRole('region',{name:'公开谱面预览',exact:true});assert.equal(await preview.locator('canvas').count(),0);await preview.getByRole('button',{name:'加载预览',exact:true}).click();await enabled(preview.getByRole('button',{name:'播放',exact:true}));assert.equal(await preview.getByRole('button',{name:'暂停',exact:true}).count(),0);const seek=preview.getByRole('slider',{name:'拖动预览时间轴',exact:true});assert.ok(Number(await seek.inputValue())>=0.49);await preview.getByRole('button',{name:'分享当前难度与位置',exact:true}).waitFor();
   await reader.goto(url(`/search?${new URLSearchParams({q:alias,type:'charts'})}`));const clear=reader.getByRole('button',{name:'清除选择',exact:true});if(await clear.count())await clear.click();
@@ -34,11 +34,11 @@ export async function exerciseDiscovery({owner,other,anonymous,origin,step,evide
 
  });
  await step('discovery_withdrawal_removes_suggestions_results_counts_and_xml',async()=>{
-  await reader.goto(url(`/search?${new URLSearchParams({q:alias,type:'charts'})}`));await reader.locator('main').getByRole('heading',{level:3,name:chart.publication.title,exact:true}).first().waitFor();await reader.goto(url('/help/search'));
+  await reader.goto(url(`/search?${new URLSearchParams({q:alias,type:'charts'})}`));await reader.locator('main').getByRole('heading',{name:chart.publication.title,exact:true}).first().waitFor();await reader.goto(url('/help/search'));
   const r=await other.request.delete(url(`/api/v1/me/charts/${chart.id}/publication`),{headers:{origin:origin.origin},data:{expectedRevision:chart.revision}});assert.equal(r.status(),200);
   assert.equal((await get(anonymous,`/api/v1/search?type=charts&q=${encodeURIComponent(alias)}`)).groups.charts.total,0);
   assert.deepEqual(await get(anonymous,`/api/v1/search/suggestions?q=${encodeURIComponent(alias)}`),[]);
-  await reader.goBack();await reader.locator('main h1').waitFor();await reader.locator('main').getByRole('heading',{level:3,name:chart.publication.title,exact:true}).waitFor({state:'detached'});
+  await reader.goBack();await reader.locator('main h1').waitFor();await reader.locator('main').getByRole('heading',{name:chart.publication.title,exact:true}).waitFor({state:'detached'});
   for(const path of ['/sitemaps/charts-0.xml','/feed.xml'])assert.equal((await (await anonymous.request.get(url(path))).text()).includes(`/charts/${chart.publicId}<`),false);
   assert.equal(errors.length,0);
  });

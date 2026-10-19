@@ -100,7 +100,7 @@ function wav() {
 }
 
 const steps = [], diagnostics = [];
-let phase = "launch", browser, page, owner, other, anonymous;
+let phase = "launch", browser, page, owner, other, anonymous, publicVisitor;
 const startedAt = Date.now();
 async function step(name, work) {
   phase = name;
@@ -288,7 +288,7 @@ async function acceptance() {
     const source = `/api/v1/files/${draft.versions[0].sourceFileId}/content`;
     await denied(anonymous, source, 401); await denied(other, source, 404);
   });
-  let publicChart, publicVisitor;
+  let publicChart;
   const publicBase = () => `/api/v1/charts/${publicChart?.publicId ?? draft.id}`;
   const publicAssets = () => ["maidata", "audio", "cover"].map(role => `${publicBase()}/versions/${draft.currentVersionId}/assets/${role}`);
   await step("private_draft_not_public_and_explicit_version_confirmation", async () => {
@@ -448,7 +448,9 @@ async function acceptance() {
     assert.equal((await json(anonymous, "/api/v1/charts")).items.some(c => c.id === draft.id), false);
     await publicVisitor.getByRole("banner").getByRole("link", { name: "AstroDX 自制谱社区", exact: true }).click();
     await publicVisitor.waitForURL(url => url.pathname === "/");
-    await publicVisitor.getByText("还没有公开谱面。", { exact: true }).waitFor();
+    await publicVisitor.getByRole("heading", { level: 1, name: "发现好谱", exact: true }).waitFor();
+    const updated = publicVisitor.locator("section").filter({ has: publicVisitor.getByRole("heading", { name: "最近公开更新", exact: true }) }).getByRole("region", { name: "公开谱面", exact: true });
+    await updated.getByText("没有符合条件的公开内容。", { exact: true }).waitFor();
     assert.equal(await publicVisitor.getByRole("link", { name: /CI private draft/ }).count(), 0);
     await publicVisitor.close();
     assert.equal((await json(owner, `/api/v1/me/charts/${draft.id}`)).versions.length, 2);
