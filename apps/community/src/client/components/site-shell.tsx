@@ -15,5 +15,5 @@ export function SiteShell({children}:{children:ReactNode}){
  const path=deLocalizeHref(useLocation().pathname),{data:me}=useQuery(meQuery(getRenderApi()));
  const workspace=Boolean(workspaceSection(path)&&me?.status==="active");
  const wide=workspace||path==="/"||["/charts","/discover","/search","/authors","/tags","/lists","/dash","/forum"].some(root=>path===root||path.startsWith(`${root}/`));
- return <div className="community-shell"><SiteHeader/><LocaleSuggestion/><div className={`community-layout ${wide?"is-wide":""} ${workspace?"is-workspace":""}`}>{workspace?<WorkspaceNavigation/>:null}<div id="main-content" tabIndex={-1} className="community-content"><LibrarySelectionBar/>{children}</div></div><DownloadDock/><SiteFooter/><MobileNavigation/></div>;
+ return <div className="community-shell"><SiteHeader/><LocaleSuggestion/><div className={`community-layout ${wide?"is-wide":""} ${workspace?"is-workspace":""}`}>{workspace?<WorkspaceNavigation/>:null}<div id="main-content" tabIndex={-1} className="community-content">{path!=="/downloads"?<LibrarySelectionBar/>:null}{children}</div></div><DownloadDock/><SiteFooter/><MobileNavigation/></div>;
 }

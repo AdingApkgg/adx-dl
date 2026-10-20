@@ -2,13 +2,15 @@ import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useRevalidator } from "react-router";
+import { Link, useLocation, useRevalidator } from "react-router";
 import { m } from "@/paraglide/messages.js";
+import { localizeHref } from "@/paraglide/runtime.js";
 import type { FavoriteItem } from "@/shared/community-social";
 import { PageTitle } from "../components/page-title";
 import { ErrorCard } from "../components/error-card";
 import { PublicChartCard } from "../components/public-chart-card";
 import { SocialPager } from "../components/social-pager";
+import { LibraryNavigation } from "../components/library-ui";
 import { accountErrorRedirect } from "../lib/account-errors";
 import { getRenderApi } from "../lib/browser";
 import { loadSocial, socialError } from "../lib/community-social";
@@ -21,8 +23,11 @@ export function meta() { return [{ title: `${m.my_favorites()} - ${m.site_name()
 export default function Favorites({ loaderData }: Route.ComponentProps) {
   const { data: me } = useQuery(meQuery(getRenderApi()));
   if (me === null || me && (me.id !== loaderData.userId || me.status !== "active")) return null;
-  return <main className="space-y-6"><PageTitle description={m.favorites_private()}>{m.my_favorites()}</PageTitle>
-    {loaderData.page.items.length ? <ul className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">{loaderData.page.items.map(item => <li key={`${loaderData.userId}/${item.publicId}`}><FavoriteRow item={item} /></li>)}</ul> : <p>{m.favorites_empty()}</p>}
+  return <main className="space-y-6"><header className="community-page-heading"><PageTitle description={m.favorites_private()}>{m.my_favorites()}</PageTitle><Button asChild variant="outline" className="min-h-11"><Link to={localizeHref("/charts")}>{m.public_charts_title()}</Link></Button></header>
+    <LibraryNavigation view="favorites" />
+    <section aria-label={m.my_favorites()} className="space-y-4"><div className="community-section-heading"><h2 className="community-section-title">{m.my_favorites()}</h2><p className="text-xs text-muted-foreground">{m.ui_library_page_count({ count: String(loaderData.page.items.length) })}</p></div>
+    {loaderData.page.items.length ? <ul className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">{loaderData.page.items.map(item => <li key={`${loaderData.userId}/${item.publicId}`} className="min-w-0"><FavoriteRow item={item} /></li>)}</ul> : <div className="community-empty space-y-3"><p className="font-medium text-foreground">{m.favorites_empty()}</p><p>{m.ui_library_favorites_empty_hint()}</p><Button asChild variant="outline" className="min-h-11"><Link to={localizeHref("/charts")}>{m.public_charts_title()}</Link></Button></div>}
+    </section>
     <SocialPager base="/me/favorites" nextCursor={loaderData.page.nextCursor} />
   </main>;
 }

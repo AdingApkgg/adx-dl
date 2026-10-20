@@ -170,3 +170,42 @@ html[data-motion=off] .community-chart-card { transition:none; }
 .community-workbench-list article nav a { display:inline-flex; align-items:center; min-height:2.75rem; font-size:.8rem; }
 @media (min-width:640px) { .community-attention-links,.community-version-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media (min-width:1024px) { .community-forum-layout { grid-template-columns:minmax(0,1fr) 15rem; gap:2rem; } .community-forum-sidebar { grid-column:2; grid-row:1; position:sticky; top:6rem; } .community-forum-layout > div { grid-column:1; grid-row:1; } }
+
+/* Library and downloads retain the main site's compact cards and staged actions. */
+.community-library-tabs { display:flex; flex-wrap:wrap; gap:.35rem; border-bottom:1px solid var(--border); padding-bottom:.75rem; }
+.community-library-tab { display:inline-flex; align-items:center; min-height:2.75rem; padding:.5rem .8rem; border-radius:.65rem; font-size:.8rem; font-weight:600; color:var(--muted-foreground); }
+.community-library-tab:hover { background:var(--muted); color:var(--foreground); }
+.community-library-tab[aria-current=page] { color:var(--primary); background:color-mix(in srgb,var(--primary) 9%,var(--card)); }
+.community-list-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:1rem; list-style:none; padding:0; }
+.community-list-grid > li { min-width:0; }
+.community-list-card { display:flex; height:100%; flex-direction:column; gap:.8rem; min-width:0; overflow-wrap:anywhere; padding:1.25rem; border:1px solid var(--border); border-radius:1rem; background:var(--card); transition:border-color .18s,box-shadow .18s; }
+.community-list-card:hover { border-color:color-mix(in srgb,var(--primary) 35%,var(--border)); box-shadow:0 8px 24px -16px #00000030; }
+.community-list-card > :last-child { margin-top:auto; }
+.community-list-icon { display:grid; place-items:center; width:2.75rem; height:2.75rem; flex-shrink:0; border-radius:.8rem; background:color-mix(in srgb,var(--primary) 9%,var(--card)); color:var(--primary); }
+.community-library-filters { border-top:1px solid var(--border); padding-top:.5rem; }
+.community-library-filters summary { min-height:2.75rem; padding-block:.65rem; cursor:pointer; font-size:.8rem; color:var(--muted-foreground); }
+.community-list-detail-header { border:1px solid var(--border); border-radius:1.25rem; padding:1.25rem; background:linear-gradient(125deg,color-mix(in srgb,var(--primary) 5%,var(--card)),var(--card) 70%); }
+.community-list-unavailable { display:grid; align-content:center; gap:.75rem; height:100%; min-height:12rem; border:1px dashed var(--border); border-radius:1rem; padding:1.25rem; background:var(--card); color:var(--muted-foreground); font-size:.85rem; line-height:1.6; overflow-wrap:anywhere; }
+.community-library-editor-grid { display:grid; align-items:start; gap:1.5rem; }
+.community-library-editor-main,.community-library-editor-sidebar { min-width:0; }
+.community-library-entry { min-width:0; border:1px solid var(--border); border-radius:.85rem; padding:1rem; background:var(--background); }
+.community-library-entry-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; }
+.community-library-entry-actions :where(button,input) { min-height:2.75rem; }
+.community-library-editor-sidebar .community-toolbar > button { flex:1 1 auto; }
+.community-download-page .community-stat-grid > div { padding:1rem .75rem; overflow-wrap:anywhere; }
+.community-download-device { border-left:2px solid var(--border); padding:.25rem 1rem; }
+.community-download-progress { display:block; width:100%; height:.5rem; overflow:hidden; border:0; border-radius:1rem; background:var(--muted); accent-color:var(--primary); }
+.community-download-progress::-webkit-progress-bar { border-radius:1rem; background:var(--muted); }
+.community-download-progress::-webkit-progress-value { border-radius:1rem; background:var(--primary); }
+.community-download-progress::-moz-progress-bar { border-radius:1rem; background:var(--primary); }
+.community-download-items { list-style:none; padding:0; border:1px solid var(--border); border-radius:.75rem; }
+.community-download-items > li { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; padding:.75rem 1rem; }
+.community-download-items > li + li { border-top:1px solid var(--border); }
+.community-download-items > li > div { flex:1 1 10rem; }
+.community-download-history-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem; }
+.community-download-history-row > :first-child { flex:1 1 12rem; }
+.community-download-cleanup { border-top:1px solid var(--border); padding-top:1rem; }
+@media (min-width:640px) { .community-list-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (min-width:1280px) { .community-list-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } .community-library-editor-grid { grid-template-columns:minmax(0,1fr) 18rem; } .community-library-editor-sidebar { position:sticky; top:6rem; } }
+@media (prefers-reduced-motion:reduce) { .community-list-card { transition:none; } }
+html[data-motion=off] .community-list-card { transition:none; }
