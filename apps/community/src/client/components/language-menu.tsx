@@ -62,3 +62,9 @@ export function LanguageMenu() {
     </DropdownMenu>
   );
 }
+
+/** Plain locale links for an already modal navigation sheet: no body portal. */
+export function LanguageOptions(){
+ const location=useLocation(),current=getLocale();
+ return <nav aria-label={m.nav_language({language:languageName(current)})} className="flex flex-wrap gap-2">{languageLinks(`${location.pathname}${location.search}`).map(({locale,href})=><a key={locale} href={href} hrefLang={htmlLang(locale)} lang={htmlLang(locale)} aria-current={locale===current?"true":undefined} onClick={dismissLocalePrompt} className={`inline-flex min-h-11 items-center rounded-lg border px-3 text-sm ${locale===current?"border-primary bg-primary/5 font-semibold text-primary":"text-muted-foreground hover:bg-muted"}`}>{languageName(locale)}</a>)}</nav>;
+}

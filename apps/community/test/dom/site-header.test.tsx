@@ -150,6 +150,7 @@ describe("grouped site navigation",()=>{
   const sheet=screen.getByRole("dialog");
   expect(within(sheet).getByRole("link",{name:m.download_title({},{locale:"en"})}).getAttribute("href")).toBe("/en/downloads");
   expect(within(sheet).getByRole("link",{name:m.site_help({},{locale:"en"})}).getAttribute("href")).toBe("/en/help");
+  expect(within(sheet).getByRole("link",{name:m.language_ja()}).getAttribute("href")).toBe("/ja/charts");
   await user.click(within(sheet).getByRole("link",{name:m.site_help({},{locale:"en"})}));
   expect(screen.queryByRole("dialog")).toBeNull();
  });

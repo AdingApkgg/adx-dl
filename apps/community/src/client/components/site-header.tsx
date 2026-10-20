@@ -9,13 +9,13 @@ import {primarySection,workspaceSection} from "../lib/site-navigation";
 import {getRenderApi} from "../lib/browser";
 import {meQuery} from "../queries/me";
 import {AccountMenu} from "./account-menu";
-import {LanguageMenu} from "./language-menu";
+import {LanguageMenu,LanguageOptions} from "./language-menu";
 import {SettingsSheet} from "./settings-sheet";
 import {NotificationIndicator} from "./notification-indicator";
 function primaryItems(){return [{key:"discover",href:"/",label:m.ui_nav_discover(),icon:CompassIcon},{key:"charts",href:"/charts",label:m.ui_nav_charts(),icon:FileMusicIcon},{key:"lists",href:"/lists",label:m.ui_nav_lists(),icon:LibraryIcon},{key:"forum",href:"/forum",label:m.site_forum(),icon:MessageSquareIcon}] as const;}
 function MoreNavigation(){
  const groups=[{label:m.ui_group_explore(),items:[["/discover",m.discovery_title()],["/authors",m.discovery_authors()],["/tags",m.discovery_tags()],["/lists",m.library_public_title()]]},{label:m.ui_group_site(),items:[["/notices",m.site_notices()],["/help",m.site_help()],["/downloads",m.download_title()],["/privacy",m.privacy_link()]]}];
- return <Sheet><SheetTrigger asChild><Button variant="ghost" size="icon" aria-label={m.ui_more()} title={m.ui_more()}><MenuIcon aria-hidden="true"/></Button></SheetTrigger><SheetContent closeLabel={m.appearance_close()} className="w-[min(90vw,24rem)] gap-6 overflow-y-auto p-6"><SheetHeader className="pr-8"><SheetTitle>{m.site_name()}</SheetTitle><SheetDescription>{m.ui_menu_hint()}</SheetDescription></SheetHeader>{groups.map(group=><nav key={group.label} aria-label={group.label} className="space-y-1"><p className="community-nav-label">{group.label}</p>{group.items.map(([href,label])=><SheetClose key={href} asChild><Link className="community-side-link" to={localizeHref(href)}>{label}</Link></SheetClose>)}</nav>)}<div className="flex flex-wrap items-center gap-2 border-t pt-4"><LanguageMenu/><SettingsSheet/><a className="community-side-link" href="https://adxdls.saop.cc">{m.ui_web_site()}<ArrowUpRightIcon aria-hidden="true" className="size-4"/></a></div></SheetContent></Sheet>;
+ return <Sheet><SheetTrigger asChild><Button variant="ghost" size="icon" aria-label={m.ui_more()} title={m.ui_more()}><MenuIcon aria-hidden="true"/></Button></SheetTrigger><SheetContent closeLabel={m.appearance_close()} className="w-[min(90vw,24rem)] gap-6 overflow-y-auto p-6"><SheetHeader className="pr-8"><SheetTitle>{m.site_name()}</SheetTitle><SheetDescription>{m.ui_menu_hint()}</SheetDescription></SheetHeader>{groups.map(group=><nav key={group.label} aria-label={group.label} className="space-y-1"><p className="community-nav-label">{group.label}</p>{group.items.map(([href,label])=><SheetClose key={href} asChild><Link className="community-side-link" to={localizeHref(href)}>{label}</Link></SheetClose>)}</nav>)}<div className="space-y-4 border-t pt-4"><LanguageOptions/><div className="flex flex-wrap items-center gap-2"><SettingsSheet/><a className="community-side-link" href="https://adxdls.saop.cc">{m.ui_web_site()}<ArrowUpRightIcon aria-hidden="true" className="size-4"/></a></div></div></SheetContent></Sheet>;
 }
 export function SiteHeader(){
  const active=primarySection(deLocalizeHref(useLocation().pathname));
@@ -25,5 +25,5 @@ export function SiteHeader(){
 export function MobileNavigation(){
  const path=deLocalizeHref(useLocation().pathname),active=primarySection(path),{data:me}=useQuery(meQuery(getRenderApi()));
  const items=[...primaryItems().filter(i=>i.key!=="lists"),{key:"mine",href:me?.status==="pending_deletion"?"/account-deletion":"/me/library",label:m.ui_nav_mine(),icon:LibraryIcon}];
- return <nav aria-label={m.ui_mobile_navigation()} className="community-bottom-nav lg:hidden">{items.map(({key,href,label,icon:Icon})=><Link key={key} to={localizeHref(href)} aria-current={key==="mine"?Boolean(workspaceSection(path))?"page":undefined:active===key?"page":undefined} className="community-bottom-link"><Icon aria-hidden="true"/><span>{label}</span></Link>)}</nav>;
+ return <nav aria-label={m.ui_mobile_navigation()} className="community-bottom-nav lg:hidden">{items.map(({key,href,label,icon:Icon})=><Link key={key} to={localizeHref(href)} aria-current={key==="mine"?workspaceSection(path)?"page":undefined:active===key?"page":undefined} className="community-bottom-link"><Icon aria-hidden="true"/><span>{label}</span></Link>)}</nav>;
 }
