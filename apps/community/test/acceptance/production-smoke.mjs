@@ -438,12 +438,22 @@ try {
       await page.getByRole('link',{name:'清除筛选',exact:true}).first().click();await page.waitForURL(u=>u.pathname==='/forum'&&!u.search);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'FORUM_UI_HORIZONTAL_OVERFLOW');
       await visit('/forum/new');await page.locator('.community-topic-editor').waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'EDITOR_UI_HORIZONTAL_OVERFLOW');
       await visit('/me/workbench');const workbench=await json('/api/v1/me/charts/workbench'),meter=page.getByRole('meter',{name:'存储用量',exact:true});await meter.waitFor();assert.equal(Number(await meter.getAttribute('max')),Math.max(1,workbench.usage.quotaBytes));assert.equal(await meter.evaluate(el=>el.max),Math.max(1,workbench.usage.quotaBytes));assert.equal(await page.getByRole('region',{name:'需要关注',exact:true}).getByRole('link').count(),3);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'WORKBENCH_UI_HORIZONTAL_OVERFLOW');
+      // Library and downloads use the same mandatory, read-only UI gate.
+      await visit('/me/library');assert.equal(await page.getByRole('navigation',{name:'谱库导航',exact:true}).locator('[aria-current="page"]').count(),1);
+      await visit('/me/favorites');assert.equal(await page.getByRole('navigation',{name:'谱库导航',exact:true}).getByRole('link',{name:'我的收藏',exact:true}).getAttribute('aria-current'),'page');
+      await visit('/lists?q=UI-no-match&author=1');assert.equal(await page.getByRole('searchbox',{name:'搜索谱单',exact:true}).inputValue(),'UI-no-match');assert.equal(await page.getByRole('textbox',{name:'作者编号',exact:true}).inputValue(),'1');
+      await page.getByRole('link',{name:'清除筛选',exact:true}).first().click();await page.waitForURL(u=>u.pathname==='/lists'&&!u.search);
+      await visit('/me/lists/new');await page.getByRole('region',{name:'基本信息',exact:true}).waitFor();await page.getByRole('complementary',{name:'保存与发布',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'保存私人草稿',exact:true}).isEnabled(),false);
+      for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'LIBRARY_EDITOR_UI_HORIZONTAL_OVERFLOW');await visit('/downloads');await page.getByRole('region',{name:'当前队列',exact:true}).waitFor();await page.getByRole('region',{name:'最近下载',exact:true}).waitFor();assert.equal(await page.locator('.community-download-dock').count(),0);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'DOWNLOAD_UI_HORIZONTAL_OVERFLOW');await visit('/me/lists/new');}
+      await visit('/downloads');await page.locator('#download-help > summary').click();await page.getByText('ZIP 集合包包含各首的原始 ZIP 和清单。请先解压外层，再逐个导入；它不是一份可直接导入的 ADX 谱包。',{exact:true}).waitFor();
     });
     await step('production_bridge_write_denial_and_session_revocation', async () => {
       const headers = { authorization: `Bearer ${bridgeKey}` };
       assert.equal((await fetch(bridgeUrl + '/api/v1/me')).status, 401);
       assert.equal((await fetch(bridgeUrl + '/api/auth/get-session', { headers })).status, 403);
       assert.equal((await fetch(bridgeUrl + '/api/v1/download-plans', { method: 'POST', headers, body: '{}' })).status, 405);
+      assert.equal((await fetch(bridgeUrl + '/api/v1/me/favorites/1', {method:'PUT',headers,body:'{}'})).status,405);
+      assert.equal((await fetch(bridgeUrl + '/api/v1/me/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {method:'PUT',headers,body:'{}'})).status,405);
       assert.equal((await fetch(bridgeUrl + '/api/v1/discussions/topics', { method: 'POST', headers, body: '{}' })).status, 405);
       assert.equal((await fetch(bridgeUrl + '/_smoke/revoke', { method: 'POST', headers })).status, 200);
       const response = await page.goto(origin + '/api/v1/me', { waitUntil: 'domcontentloaded' });
