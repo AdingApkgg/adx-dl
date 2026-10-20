@@ -48,6 +48,9 @@ if task['action'] == 'prepare':
     else: raise RuntimeError('BRIDGE_NOT_READY')
     assert call(port, '/api/v1/me', authenticated=False)[0] == 401
     assert call(port, '/api/auth/get-session')[0] == 403
+    assert call(port, '/login')[0] == 403
+    status, _, headers = call(port, '/')
+    assert status == 200 and not headers.get('Set-Cookie'), 'READONLY_HOMEPAGE_REQUIRED'
     for method in ['POST','PATCH','DELETE']:
         assert call(port, '/api/v1/discussions/topics', method=method)[0] == 405
     status, body, headers = call(port, '/api/v1/me')
