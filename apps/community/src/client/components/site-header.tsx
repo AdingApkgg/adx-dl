@@ -1,38 +1,29 @@
-import {DiscoverySearch} from "./discovery-search";
+import {CompassIcon,FileMusicIcon,LibraryIcon,MenuIcon,MessageSquareIcon,Music2Icon,SearchIcon,UploadIcon,ArrowUpRightIcon} from "lucide-react";
+import {useQuery} from "@tanstack/react-query";
+import {Link,useLocation} from "react-router";
+import {Button} from "@astrodx/ui/components/button";
+import {Sheet,SheetClose,SheetContent,SheetDescription,SheetHeader,SheetTitle,SheetTrigger} from "@astrodx/ui/components/sheet";
+import {m} from "@/paraglide/messages.js";
+import {deLocalizeHref,localizeHref} from "@/paraglide/runtime.js";
+import {primarySection,workspaceSection} from "../lib/site-navigation";
+import {getRenderApi} from "../lib/browser";
+import {meQuery} from "../queries/me";
+import {AccountMenu} from "./account-menu";
+import {LanguageMenu} from "./language-menu";
+import {SettingsSheet} from "./settings-sheet";
 import {NotificationIndicator} from "./notification-indicator";
-import { Link } from "react-router";
-
-import { m } from "@/paraglide/messages.js";
-import { localizeHref } from "@/paraglide/runtime.js";
-
-import { AccountMenu } from "./account-menu";
-import { LanguageMenu } from "./language-menu";
-import { SettingsSheet } from "./settings-sheet";
-
-// 页头（spec 第 7.2 节）：左边站名，回当前语言的首页；右边是语言切换、设置和账号区。
-export function SiteHeader() {
-  return (
-    <header className="border-b bg-background">
-      <div className="mx-auto flex h-14 w-full max-w-3xl items-center gap-1 px-4">
-        <Link to={localizeHref("/")} className="mr-auto truncate font-semibold tracking-tight">
-          {m.site_name()}
-        </Link>
-
-        <LanguageMenu />
-        <SettingsSheet />
-        <AccountMenu />
-      </div>
-      <div className="mx-auto w-full max-w-3xl px-4 pb-3"><DiscoverySearch compact/></div>
-      <nav aria-label={m.site_navigation()} className="mx-auto flex max-w-3xl items-center gap-4 overflow-x-auto px-4 pb-2 text-sm">
-       <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/discover")}>{m.discovery_title()}</Link>
-       <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/charts")}>{m.public_charts_title()}</Link>
-       <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/forum")}>{m.site_forum()}</Link>
-       <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/help")}>{m.site_help()}</Link>
-       <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/notices")}>{m.site_notices()}</Link>
-       <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/lists")}>{m.library_public_title()}</Link>
-       <Link className="inline-flex min-h-11 shrink-0 items-center underline-offset-4 hover:underline" to={localizeHref("/downloads")}>{m.download_title()}</Link>
-       <NotificationIndicator/>
-      </nav>
-    </header>
-  );
+function primaryItems(){return [{key:"discover",href:"/",label:m.ui_nav_discover(),icon:CompassIcon},{key:"charts",href:"/charts",label:m.ui_nav_charts(),icon:FileMusicIcon},{key:"lists",href:"/lists",label:m.ui_nav_lists(),icon:LibraryIcon},{key:"forum",href:"/forum",label:m.site_forum(),icon:MessageSquareIcon}] as const;}
+function MoreNavigation(){
+ const groups=[{label:m.ui_group_explore(),items:[["/discover",m.discovery_title()],["/authors",m.discovery_authors()],["/tags",m.discovery_tags()],["/lists",m.library_public_title()]]},{label:m.ui_group_site(),items:[["/notices",m.site_notices()],["/help",m.site_help()],["/downloads",m.download_title()],["/privacy",m.privacy_link()]]}];
+ return <Sheet><SheetTrigger asChild><Button variant="ghost" size="icon" aria-label={m.ui_more()} title={m.ui_more()}><MenuIcon aria-hidden="true"/></Button></SheetTrigger><SheetContent closeLabel={m.appearance_close()} className="w-[min(90vw,24rem)] gap-6 overflow-y-auto p-6"><SheetHeader className="pr-8"><SheetTitle>{m.site_name()}</SheetTitle><SheetDescription>{m.ui_menu_hint()}</SheetDescription></SheetHeader>{groups.map(group=><nav key={group.label} aria-label={group.label} className="space-y-1"><p className="community-nav-label">{group.label}</p>{group.items.map(([href,label])=><SheetClose key={href} asChild><Link className="community-side-link" to={localizeHref(href)}>{label}</Link></SheetClose>)}</nav>)}<div className="flex flex-wrap items-center gap-2 border-t pt-4"><LanguageMenu/><SettingsSheet/><a className="community-side-link" href="https://adxdls.saop.cc">{m.ui_web_site()}<ArrowUpRightIcon aria-hidden="true" className="size-4"/></a></div></SheetContent></Sheet>;
+}
+export function SiteHeader(){
+ const active=primarySection(deLocalizeHref(useLocation().pathname));
+ const {data:me}=useQuery(meQuery(getRenderApi()));
+ return <header className="community-header"><a href="#main-content" className="community-skip-link">{m.ui_skip_content()}</a><div className="community-header-inner"><Link to={localizeHref("/")} className="community-brand" aria-label={m.site_name()}><span className="community-brand-mark"><Music2Icon aria-hidden="true"/></span><span><span className="block text-sm font-bold tracking-tight">AstroDX</span><span className="block text-[11px] font-medium text-muted-foreground">{m.ui_brand_subtitle()}</span></span></Link><nav aria-label={m.site_navigation()} className="hidden items-center gap-1 lg:flex">{primaryItems().map(({key,href,label,icon:Icon})=><Link key={key} to={localizeHref(href)} aria-current={active===key?"page":undefined} className={`community-primary-link ${active===key?"is-active":""}`}><Icon aria-hidden="true"/>{label}</Link>)}</nav><div className="ml-auto flex shrink-0 items-center gap-0.5"><Button asChild variant="ghost" size="icon"><Link to={localizeHref("/search")} aria-label={m.discovery_search_label()} title={m.discovery_search_label()}><SearchIcon aria-hidden="true"/></Link></Button>{me?.status==="active"?<Button asChild size="sm" className="mr-1 hidden lg:inline-flex"><Link to={localizeHref("/me/charts/new")}><UploadIcon aria-hidden="true"/>{m.chart_new()}</Link></Button>:null}<NotificationIndicator compact/><div className="hidden items-center sm:flex"><LanguageMenu/><SettingsSheet/></div><AccountMenu/><MoreNavigation/></div></div></header>;
+}
+export function MobileNavigation(){
+ const path=deLocalizeHref(useLocation().pathname),active=primarySection(path),{data:me}=useQuery(meQuery(getRenderApi()));
+ const items=[...primaryItems().filter(i=>i.key!=="lists"),{key:"mine",href:me?.status==="pending_deletion"?"/account-deletion":"/me/library",label:m.ui_nav_mine(),icon:LibraryIcon}];
+ return <nav aria-label={m.ui_mobile_navigation()} className="community-bottom-nav lg:hidden">{items.map(({key,href,label,icon:Icon})=><Link key={key} to={localizeHref(href)} aria-current={key==="mine"?Boolean(workspaceSection(path))?"page":undefined:active===key?"page":undefined} className="community-bottom-link"><Icon aria-hidden="true"/><span>{label}</span></Link>)}</nav>;
 }

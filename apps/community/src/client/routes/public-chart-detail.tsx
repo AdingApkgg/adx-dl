@@ -61,8 +61,8 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
   const canPreview = chart.summary.difficulties.some(row => row.previewSupported);
   return <main className="space-y-6">
     <Link to={returnHref ?? localizeHref("/charts")} state={returnState ? publicListBackState(returnState) : undefined} className={textLinkClass}>{returnHref ? /\/me\/favorites$/.test(returnHref.split("?")[0]!) ? m.my_favorites() : /^\/(?:(?:en|ja)\/)?u\//.test(returnHref) ? m.public_chart_back_author() : m.public_chart_back_results() : m.public_charts_title()}</Link>
-    <div className="grid gap-6 md:grid-cols-[minmax(0,18rem)_1fr]">
-      <div className="overflow-hidden rounded-xl border"><PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} /></div>
+    <div className="community-chart-detail-hero community-panel">
+      <div className="community-chart-cover-frame"><PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} /></div>
       <div className="min-w-0 space-y-3 break-words">
         <PageTitle description={chart.artist}>{chart.title}</PageTitle>
         {chart.author ? <Link to={localizeHref(`/u/${chart.author.publicId ?? chart.author.id}`)} state={returnState} className="flex items-center gap-2 underline">
@@ -70,9 +70,7 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
         </Link> : <p>{m.public_chart_author({ name: m.public_chart_anonymous() })}</p>}
         {chart.author?.publicId ? <FollowAuthor publicId={chart.author.publicId}/> : null}
         <p>{m.chart_version({ number: String(chart.ordinal) })} · {(chart.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p>
-        <p className="break-all text-xs text-muted-foreground">{m.chart_publication_version_id({ id: chart.versionId })}</p>
         <time dateTime={chart.updatedAt}>{m.public_chart_updated({ date: chart.updatedAt.slice(0, 10) })}</time>
-        <p className="text-sm text-muted-foreground">{m.public_chart_download_hint()}</p>
         <div role="group" aria-label={m.public_chart_actions()} className="flex flex-wrap items-start gap-3">
           {canPreview ? <Button asChild variant="secondary" className="min-h-11"><a href="#chart-preview"><PlayCircleIcon aria-hidden="true" />{m.public_chart_preview_action()}</a></Button> : null}
           <Button asChild className="min-h-11"><a href={publicChartDownloadUrl(chart.publicId)} download><DownloadIcon aria-hidden="true" />{m.public_chart_download()}</a></Button>
@@ -80,10 +78,13 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
           <ShareChartButton key={chart.id} title={chart.title} publicId={chart.publicId} />
         </div>
         <ChartCommunityActions chart={chart} />
+        <details className="community-source-details"><summary>{m.ui_source_details()}</summary><p>{m.chart_publication_version_id({id:chart.versionId})}</p><p className="mt-2">{m.public_chart_download_hint()}</p></details>
         {!canPreview ? <p className="text-sm text-muted-foreground">{m.public_chart_preview_unavailable()}</p> : null}
       </div>
     </div>
-    <section aria-label={m.chart_metadata_heading()} className="space-y-3 rounded-xl border p-4">
+    {chart.shareInvalid?<p role="status">{m.discovery_share_invalid()}</p>:null}
+    <PrivateChartPreview enableShare initialDifficulty={chart.share?.difficulty} initialPosition={chart.share?.seconds??0} sectionId="chart-preview" key={`${chart.id}/${chart.versionId}/${chart.share?.difficulty??""}/${chart.share?.seconds??""}`} id={chart.publicId} versionId={chart.versionId} summary={chart.summary} assetUrl={publicChartAssetUrl} />
+    <section aria-label={m.chart_metadata_heading()} className="community-panel space-y-3">
       <PublicChartTags tags={chart.tags} />
       {chart.aliases?.length?<p className="break-words text-sm">{m.discovery_aliases()}: {chart.aliases.join(" · ")}</p>:null}
       {chart.description ? <div><h2 className="font-semibold">{m.chart_metadata_description()}</h2><p className="whitespace-pre-wrap break-words">{chart.description}</p></div> : null}
@@ -97,8 +98,6 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
     </section>
     {chart.other===null?<p role="status">{m.discovery_unavailable()}</p>:chart.other?.length?<section className="space-y-3"><h2 className="font-semibold">{m.discovery_other_works()}</h2><ul className={PUBLIC_CHART_GRID_CLASS}>{chart.other.map(c=><li key={c.publicId}><PublicChartCard chart={c} headingLevel={3}/></li>)}</ul></section>:null}
     {chart.lists===null?<p role="status">{m.discovery_unavailable()}</p>:chart.lists?.length?<section className="space-y-3"><h2 className="font-semibold">{m.discovery_containing_lists()}</h2><ul className="grid gap-3 sm:grid-cols-2">{chart.lists.map(l=><li key={l.publicId}><PublicListCard list={l}/></li>)}</ul></section>:null}
-    {chart.shareInvalid?<p role="status">{m.discovery_share_invalid()}</p>:null}
-    <PrivateChartPreview enableShare initialDifficulty={chart.share?.difficulty} initialPosition={chart.share?.seconds??0} sectionId="chart-preview" key={`${chart.id}/${chart.versionId}/${chart.share?.difficulty??""}/${chart.share?.seconds??""}`} id={chart.publicId} versionId={chart.versionId} summary={chart.summary} assetUrl={publicChartAssetUrl} />
   </main>;
 }
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) { return <ErrorCard error={error} />; }

@@ -1,3 +1,4 @@
+import {Music2Icon} from "lucide-react";
 import {SearchText} from "./search-text";
 import {ChartSelection} from "./library-selection";
 import { cn } from "@astrodx/ui/lib/utils";
@@ -9,7 +10,7 @@ import type { ChartDifficulty, ChartDifficultySummary, PublicChartDto } from "@/
 import { publicListCursors } from "../lib/public-chart-navigation";
 import { publicChartAssetUrl } from "../queries/public-charts";
 
-export const PUBLIC_CHART_GRID_CLASS = "grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6";
+export const PUBLIC_CHART_GRID_CLASS = "grid list-none grid-cols-2 gap-3 p-0 sm:gap-4 md:grid-cols-3 xl:grid-cols-4";
 
 // Same slot names and light/dark palette as the web main site's difficulty pills.
 const difficultyStyles: Record<ChartDifficulty, { name: string; tone: string }> = {
@@ -38,10 +39,10 @@ export function PublicCover({ chart }: { chart: PublicChartDto }) {
   const [failed, setFailed] = useState(false);
   return <div className="relative aspect-square overflow-hidden border-b border-border/60 bg-muted">
     {chart.summary.hasCover && !failed ? <img src={publicChartAssetUrl(chart.publicId, chart.versionId, "cover")} alt="" loading="lazy" decoding="async" width={512} height={512} className="h-full w-full object-cover" onError={() => setFailed(true)} /> :
-      <div className="flex h-full items-center justify-center p-3 text-center text-sm text-muted-foreground">{m.chart_cover()} · {m.chart_missing()}</div>}
+      <div className="community-chart-cover-placeholder"><Music2Icon aria-hidden="true" className="size-10 opacity-40"/><span>{m.chart_cover()} · {m.chart_missing()}</span></div>}
   </div>;
 }
-export function PublicChartCard({ chart, headingLevel = 2, query="" }: { chart: PublicChartDto; headingLevel?: 2 | 3; query?:string }) {
+export function PublicChartCard({ chart, headingLevel = 2, query="",selectable=true }: { chart: PublicChartDto; headingLevel?: 2 | 3; query?:string;selectable?:boolean }) {
   const Heading = headingLevel === 3 ? "h3" : "h2";
   const location = useLocation();
   const href = `${location.pathname}${location.search}`;
@@ -50,17 +51,17 @@ export function PublicChartCard({ chart, headingLevel = 2, query="" }: { chart: 
   const privateHistory = privateCursors.filter((cursor): cursor is string => typeof cursor === "string" && (cursor === "" || /^[A-Za-z0-9_-]{1,512}$/.test(cursor)))
     .map(cursor => location.pathname + (cursor ? `?cursor=${cursor}` : ""));
   const history = publicListCursors(favorites ? privateHistory : location.state?.publicChartCursors, href);
-  return <article className="flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card/80"><Link to={localizeHref(`/charts/${chart.publicId}`)} state={{ publicListHref: href, publicListCursors: history }} className="group flex flex-1 flex-col transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+  return <article className="community-chart-card"><Link to={localizeHref(`/charts/${chart.publicId}`)} state={{ publicListHref: href, publicListCursors: history }} className="group flex min-w-0 flex-1 flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
     <PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} />
     <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3 sm:p-4">
-      <Heading className="line-clamp-1 font-semibold leading-snug" title={chart.title}><SearchText text={chart.title} query={query}/></Heading>
+      <Heading className="line-clamp-2 font-semibold leading-snug" title={chart.title}><SearchText text={chart.title} query={query}/></Heading>
       <p className="line-clamp-1 text-sm text-muted-foreground">{chart.artist || "—"}</p>
       <p className="line-clamp-1 text-xs text-muted-foreground">{m.public_chart_author({ name: chart.author?.name ?? m.public_chart_anonymous() })}</p>
       <ul className="mt-auto flex flex-wrap gap-1.5">{chart.summary.difficulties.map(row => <li key={row.difficulty} className="max-w-full">
         <PublicDifficultyPill row={row} />
       </li>)}</ul>
     </div>
-  </Link><PublicChartTags tags={chart.tags} /><ChartSelection publicId={chart.publicId}/></article>;
+  </Link><PublicChartTags tags={chart.tags} />{selectable?<ChartSelection publicId={chart.publicId}/>:null}</article>;
 }
 
 export function PublicChartTags({ tags }: { tags: PublicChartDto["tags"] }) {

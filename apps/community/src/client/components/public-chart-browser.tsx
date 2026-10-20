@@ -1,15 +1,12 @@
 import {SearchText} from "./search-text";
 import { Button } from "@astrodx/ui/components/button";
 import { Input } from "@astrodx/ui/components/input";
-import { ArrowDownUpIcon, ListFilterIcon, SearchIcon } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { localizeHref } from "@/paraglide/runtime.js";
 import { Link, useLocation, useNavigate } from "react-router";
-import { publicChartsApi } from "../queries/public-charts";
-import { getRenderApi } from "../lib/browser";
 import { m } from "@/paraglide/messages.js";
 import type { PublicChartsPageDto } from "@/shared/charts";
-import { publicChartFiltersFromParams, PUBLIC_CHART_SEARCH_MAX, publicChartSearchParams, type PublicChartFilters } from "@/shared/public-chart-search";
+import { publicChartFiltersFromParams, publicChartSearchParams, type PublicChartFilters } from "@/shared/public-chart-search";
 import { publicListReturnState, samePublicListScope } from "../lib/public-chart-navigation";
 import { ChartSelection } from "./library-selection";
 import { PUBLIC_CHART_GRID_CLASS, PublicChartCard, PublicCover, PublicDifficultyPill, publicDifficultyName } from "./public-chart-card";
@@ -26,7 +23,7 @@ export function PublicChartSearchForm({ filters, base, facets }: { filters: Publ
   useEffect(()=>{setTagLines(initialTags);setLevelLines(initialLevels);},[initialTags,initialLevels]);
   const append=(old:string,value:string,max:number)=>{const rows=old.split("\n").map(v=>v.trim()).filter(Boolean);return rows.includes(value)||rows.length>=max?old:[...rows,value].join("\n");};
   const chip=(label:string,next:PublicChartFilters)=><Link key={label} className="min-h-11 rounded-full border px-3 py-2 text-sm underline-offset-4 hover:underline" to={href(next)}>{label} ×</Link>;
-  return <form key={query} method="get" action={base} onSubmit={submit} role="search" aria-label={m.public_charts_search()} className="space-y-4 rounded-xl border bg-card/80 p-4">
+  return <form key={query} method="get" action={base} onSubmit={submit} role="search" aria-label={m.public_charts_search()} className="community-filter space-y-4">
     {search?<input type="hidden" name="type" value="charts"/>:null}
     <div className="flex gap-2"><Input name="q" type="search" defaultValue={filters.q} maxLength={240} aria-label={m.public_charts_search()} placeholder={m.discovery_search_hint()} className="min-h-11 min-w-0 flex-1"/><Button type="submit" className="min-h-11">{m.public_charts_search()}</Button></div>
     <div className="flex flex-wrap gap-3"><label className="flex min-w-0 flex-1 basis-40 flex-col gap-1 text-sm">{m.chart_difficulties()}<select name="difficulty" defaultValue={filters.difficulty??""} className="min-h-11 rounded border bg-background px-3"><option value="">{m.public_charts_all_difficulties()}</option>{([1,2,3,4,5,6,7] as const).map(d=><option key={d} value={d}>{publicDifficultyName(d)}</option>)}</select></label>
@@ -51,7 +48,7 @@ export function PublicChartBrowser({ page, filters, base, headingLevel = 2 }: {
   const [preferred,setPreferred]=useState("grid");
   useEffect(()=>{try{const p=localStorage.getItem("adxc-public-view");if(p==="list")setPreferred(p);}catch{}},[]);
   const viewParam=new URLSearchParams(location.search).get("view"),view=viewParam==="list"||viewParam==="grid"?viewParam:preferred;
-  function changeView(value:string){setPreferred(value);try{localStorage.setItem("adxc-public-view",value);}catch{}const p=new URLSearchParams(location.search);p.set("view",value);void navigate(location.pathname+"?"+p);}
+  function changeView(value:string){setPreferred(value);try{localStorage.setItem("adxc-public-view",value);}catch{}const p=new URLSearchParams(location.search);p.set("view",value);void navigate(`${location.pathname}?${p}`);}
   const current = `${location.pathname}${location.search}`;
   const origin = publicListReturnState(location.state);
   const candidates: unknown[] = Array.isArray(location.state?.publicChartCursors) ? location.state.publicChartCursors.slice(-100) : [];

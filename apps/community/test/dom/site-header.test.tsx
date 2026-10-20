@@ -51,16 +51,13 @@ describe("页头的账号菜单", () => {
     await user.click(screen.getByRole("button", { name: m.nav_account_menu({ name: USER.name }) }));
 
     expect(menuItems()).toEqual([
-      { name: m.author_workbench(), href: "/me/workbench" },
-      { name: m.charts_title(), href: "/me/charts" },
-      { name: m.following_feed_title(), href: "/me/feed" },
-      { name: m.following_title(), href: "/me/following" },
-      { name:m.site_my_discussions(),href:"/me/discussions" },{ name:m.site_notifications(),href:"/me/notifications" },
-      { name:m.library_title(),href:"/me/library" },{ name:m.my_favorites(),href:"/me/favorites" },{ name:m.governance_my_title(),href:"/me/governance" },{ name:m.my_reports(),href:"/me/reports" },
-      { name: m.nav_my_page(), href: `/u/${USER.id}` },
-      { name: m.nav_profile(), href: "/settings/profile" },
-      { name: m.nav_account(), href: "/settings/account" },
-      { name: m.nav_sign_out(), href: null },
+      {name:m.library_title(),href:"/me/library"},
+      {name:m.author_workbench(),href:"/me/workbench"},
+      {name:m.following_feed_title(),href:"/me/feed"},
+      {name:m.nav_my_page(),href:`/u/${USER.id}`},
+      {name:m.nav_profile(),href:"/settings/profile"},
+      {name:m.nav_account(),href:"/settings/account"},
+      {name:m.nav_sign_out(),href:null},
     ]);
   });
 
@@ -68,7 +65,7 @@ describe("页头的账号菜单", () => {
     const user = renderHeader("/en/settings/profile", USER);
     await user.click(screen.getByRole("button", { name: m.nav_account_menu({ name: USER.name }, { locale: "en" }) }));
 
-    expect(menuItems().map((item) => item.href)).toEqual(["/en/me/workbench","/en/me/charts","/en/me/feed","/en/me/following","/en/me/discussions","/en/me/notifications","/en/me/library","/en/me/favorites","/en/me/governance", "/en/me/reports", `/en/u/${USER.id}`, "/en/settings/profile", "/en/settings/account", null]);
+    expect(menuItems().map((item) => item.href)).toEqual(["/en/me/library","/en/me/workbench","/en/me/feed", `/en/u/${USER.id}`, "/en/settings/profile", "/en/settings/account", null]);
   });
 
   test("待注销的用户（在注销提示页上）：菜单里只有退出登录", async () => {
@@ -143,4 +140,24 @@ test("account menu image is decorative; broken image keeps the accessible accoun
   const button=screen.getByRole("button",{name:m.nav_account_menu({name:USER.name})});
   const image=button.querySelector("img")!;expect(image.getAttribute("aria-hidden")).toBe("true");expect(image.getAttribute("alt")).toBe("");
   fireEvent.error(image);expect(button.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");expect(screen.queryByRole("img")).toBeNull();
+});
+
+// Deferred until the consolidated release window, along with responsive browser checks.
+describe("grouped site navigation",()=>{
+ test("more sheet exposes secondary routes in the current locale",async()=>{
+  const user=renderHeader("/en/charts",null);
+  await user.click(screen.getByRole("button",{name:m.ui_more({},{locale:"en"})}));
+  const sheet=screen.getByRole("dialog");
+  expect(within(sheet).getByRole("link",{name:m.download_title({},{locale:"en"})}).getAttribute("href")).toBe("/en/downloads");
+  expect(within(sheet).getByRole("link",{name:m.site_help({},{locale:"en"})}).getAttribute("href")).toBe("/en/help");
+  await user.click(within(sheet).getByRole("link",{name:m.site_help({},{locale:"en"})}));
+  expect(screen.queryByRole("dialog")).toBeNull();
+ });
+ test("detail routes retain chart context without a second search form",()=>{
+  renderHeader("/charts/1",null);
+  const nav=screen.getByRole("navigation",{name:m.site_navigation()});
+  expect(within(nav).getByRole("link",{name:m.ui_nav_charts()}).getAttribute("aria-current")).toBe("page");
+  expect(screen.getByRole("link",{name:m.discovery_search_label()}).getAttribute("href")).toBe("/search");
+  expect(screen.queryByRole("combobox")).toBeNull();
+ });
 });
