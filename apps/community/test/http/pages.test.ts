@@ -106,8 +106,11 @@ describe("页面", () => {
     }
   });
 
-  test("首页经由进程内 API 拿到了数据", async () => {
-    expect(await (await fetch(server.url("/"))).text()).toContain("接口版本 v1");
+  test("首页服务端输出单一搜索和公开浏览入口", async () => {
+    const html=await (await fetch(server.url("/"))).text();
+    expect(html.match(/role="search"/g)).toHaveLength(1);
+    expect(html).toContain('href="/charts"');
+    expect(html).not.toContain("接口版本 v1");
   });
 
   // 首页的 loader 经进程内 API 问了当前用户（没登录是 401），页面据此显示"登录"链接。
@@ -125,7 +128,7 @@ describe("页面", () => {
 
     expect(en).toContain('<html lang="en"');
     expect(en).toContain("AstroDX Community");
-    expect(en).toContain("API v1");
+    expect(en).toContain("Find your next chart. Share your creation.");
     expect(ja).toContain('<html lang="ja"');
     expect(ja).toContain("AstroDX コミュニティ");
   });
