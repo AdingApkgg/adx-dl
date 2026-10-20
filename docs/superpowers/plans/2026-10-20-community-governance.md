@@ -59,7 +59,7 @@
 
 ### Task6: Concentrated remote verification and formal release
 **Files:** gitignored release ledger/evidence plus necessary corrections only.
-- [ ] Run resource-bounded full Linux builder lint/types/unit/PG/DOM/HTTP/build/native/restore; fix failures and affected reruns. No local heavy execution.
-- [ ] Migration transaction rehearsal, baseline/prebackup; push/attach PR; await fullCI and exact merged tested tree.
-- [ ] Formal deploy with all required logged-in headless groups and chart1 slot6; accepted only when passed, postbackup/source-serving-accepted/oldlinks/roles/session/helper cleanup.
-- [ ] Record exact results and limitations; report complete only after these gates.
+- [x] Run resource-bounded full Linux builder lint/types/unit/PG/DOM/HTTP/build/native/restore; fix failures and affected reruns. No local heavy execution.
+- [x] Migration transaction rehearsal, baseline/prebackup; push/attach PR; await fullCI and exact merged tested tree.
+- [x] Formal deploy with all required logged-in headless groups and chart1 slot6; accepted only when passed, postbackup/source-serving-accepted/oldlinks/roles/session/helper cleanup.
+- [x] Record exact results and limitations; report complete only after these gates.
