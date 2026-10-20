@@ -163,6 +163,9 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
     const backupCtx = { ...sourceWeb, config: backupConfig, driver: createS3Driver(backupConfig) };
     const tracker = createStorageIOTracker();
     const roleProcesses: ReturnType<typeof Bun.spawn>[] = [];
+    const governanceSnapshotId=crypto.randomUUID(),governanceLaterId=crypto.randomUUID(),auditSnapshotId=crypto.randomUUID();
+    await f.ctx.db.execute(sql`insert into governance_appeals(id,user_id,decision_key,reason) values(${governanceSnapshotId}::uuid,${good.userId},${'decision:'+crypto.randomUUID()},'Governance snapshot appeal')`);
+    await f.ctx.db.execute(sql`insert into governance_audit_events(id,kind,action,target_type,target_id) values(${auditSnapshotId}::uuid,'moderation','hide','chart','snapshot-proof')`);
     let manifest: Awaited<ReturnType<typeof backupOriginals>>;
     try {
       if (process.env.STORAGE_TEST_REAL_ROLES) {
@@ -265,6 +268,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
     }
     if (roleProcesses.length)
       console.log("proof: actual coordinated snapshot complete; normal roles stopped and reaped");
+    await f.ctx.db.execute(sql`insert into governance_appeals(id,user_id,decision_key,reason) values(${governanceLaterId}::uuid,${good.userId},${'decision:'+crypto.randomUUID()},'After-snapshot private appeal')`);
     expect(manifest.originals).toHaveLength(4 + publicCharts.additionalOriginals);
     expect(manifest.dumps.community.size).toBeGreaterThan(1000);
     expect(manifest.dumps.umami.size).toBeGreaterThan(1000);
@@ -391,7 +395,10 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
         },
         revoke: async () => {},
         verifyInvariants: async () => {
-        await publicCharts.verify(targetWeb);},
+        await publicCharts.verify(targetWeb);
+        const recoveredAppeals=(await target.db.execute(sql`select id,reason from governance_appeals where id in (${governanceSnapshotId}::uuid,${governanceLaterId}::uuid)`)).rows;
+        expect(recoveredAppeals).toEqual([{id:governanceSnapshotId,reason:'Governance snapshot appeal'}]);
+        expect((await target.db.execute(sql`select id from governance_audit_events where id=${auditSnapshotId}::uuid`)).rows).toHaveLength(1);},
       }),
     ).rejects.toThrow();
     expect(sourceStopped).toBe(true);

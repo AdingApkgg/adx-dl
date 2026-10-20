@@ -32,6 +32,7 @@ export default [
     route("lists", "routes/public-lists.tsx"),
     route("lists/:id", "routes/public-list-detail.tsx"),
     route("me/favorites", "routes/favorites.tsx"),
+    route("me/governance", "routes/my-governance.tsx"),
     route("me/reports", "routes/my-reports.tsx"),
     route("me/workbench", "routes/workbench.tsx"),
     route("me/charts/:id/review", "routes/chart-review.tsx"),
@@ -43,6 +44,9 @@ export default [
     route("u/:id", "routes/user-profile.tsx"),
     route("dash", "routes/dash.tsx", [
       index("routes/dash-overview.tsx"),
+      route("governance", "routes/dash-governance.tsx"),
+      route("appeals", "routes/dash-appeals.tsx"),
+      route("audit", "routes/dash-audit.tsx"),
       route("lists", "routes/dash-lists.tsx"),
       route("users", "routes/dash-users.tsx"),
       route("charts", "routes/dash-charts.tsx"),

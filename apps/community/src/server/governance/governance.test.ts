@@ -1,3 +1,11 @@
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { initializeJournal, exportJournal } from "../../../ops/backup/journal";
+import { testDatabaseUrl } from "../testing/services";
+import { prepareTestQueues } from "../testing/test-boss";
+import { recordCommunityFact } from "../community/content-journal";
+import { withSocialUser } from "../services/social-page";
 import { beforeAll, afterAll, expect, test } from "bun:test";
 import { sql } from "drizzle-orm";
 import { resetTestDatabase } from "../testing/test-db";
@@ -9,9 +17,10 @@ import { dispatchDiscussionOutbox, listNotifications } from "../discussions/noti
 let f: Awaited<ReturnType<typeof readyContext>>;
 const owners:string[]=[];
 async function owner(){const id=await readyOwner(f.ctx);owners.push(id);return id;}
-async function decision(recipient:string,actor:string){const id=crypto.randomUUID();await f.ctx.db.execute(sql`insert into discussion_decisions(id,actor_id,recipient_id,entity,entity_id,action,reason,public_reason) values(${id}::uuid,${actor},${recipient},'message',${crypto.randomUUID()},'hide','Internal secret','Public explanation')`);return `decision:${id}`;}
-beforeAll(async()=>{await resetTestDatabase();f=await readyContext();});
-afterAll(async()=>{if(f)await cleanupStorageFixture(f.ctx.db,owners,[f.policy.id]);});
+async function decision(recipient:string,actor:string){const id=crypto.randomUUID(),target=crypto.randomUUID();await withSocialUser(f.ctx.db,actor,async tx=>{await recordCommunityFact(tx,{version:1,entity:"message",id:target,revision:1,state:"hidden"},actor);await tx.execute(sql`insert into discussion_decisions(id,actor_id,recipient_id,entity,entity_id,action,reason,public_reason) values(${id}::uuid,${actor},${recipient},'message',${target},'hide','Internal secret','Public explanation')`);});await f.ctx.exportChartJournal!();return `decision:${id}`;}
+let journalDir:string;
+beforeAll(async()=>{await resetTestDatabase();await prepareTestQueues();f=await readyContext();journalDir=await mkdtemp(join(tmpdir(),"governance-journal-"));const keyFile=join(journalDir,'key');await writeFile(keyFile,crypto.getRandomValues(new Uint8Array(32)),{mode:0o600});const config={directory:join(journalDir,'log'),keyFile,databaseUrl:testDatabaseUrl()};await initializeJournal(config);f.ctx.exportChartJournal=async()=>{await exportJournal(config);};},30000);
+afterAll(async()=>{if(f)await cleanupStorageFixture(f.ctx.db,owners,[f.policy.id]);if(journalDir)await rm(journalDir,{recursive:true,force:true});});
 test("only recipient can appeal; retries keep first text, concurrent submissions create one row",async()=>{
  const author=await owner(),staff=await owner(),other=await owner(),key=await decision(author,staff);
  await expect(createAppeal(f.ctx,other,{decisionKey:key,reason:"foreign"})).rejects.toMatchObject({status:404});
@@ -54,4 +63,14 @@ test("unified report cursor keeps all sources when timestamps and UUIDs coincide
  const page=await governanceTickets(f.ctx,{status:"all"});
  const matching=page.items.filter(x=>x.id===id);expect(matching).toHaveLength(2);
  expect(new Set(matching.map(x=>x.source)).size).toBe(2);expect(JSON.stringify(page)).not.toContain("Private evidence");
+});
+
+test("missing or undurable decision cannot create an appeal; deleting account removes private reason",async()=>{
+ const author=await owner(),staff=await owner(),target=crypto.randomUUID(),id=crypto.randomUUID();
+ await expect(createAppeal(f.ctx,author,{decisionKey:`decision:${crypto.randomUUID()}`,reason:'No decision'})).rejects.toMatchObject({status:404});
+ await f.ctx.db.execute(sql`insert into discussion_decisions(id,actor_id,recipient_id,entity,entity_id,action,reason,public_reason) values(${id}::uuid,${staff},${author},'message',${target},'hide','Internal','Public')`);
+ await expect(createAppeal(f.ctx,author,{decisionKey:`decision:${id}`,reason:'No durable fact'})).rejects.toMatchObject({status:404});
+ const key=await decision(author,staff),saved=await createAppeal(f.ctx,author,{decisionKey:key,reason:'Delete my private text'});
+ await f.ctx.db.execute(sql`delete from "user" where id=${author}`);
+ expect((await f.ctx.db.execute(sql`select id from governance_appeals where id=${saved.id}::uuid`)).rows).toHaveLength(0);
 });

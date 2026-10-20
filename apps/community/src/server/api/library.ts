@@ -21,8 +21,8 @@ const version=z.object({expectedRevision:libraryRevision}).strict();
 const publicQuery=z.object({q:z.string().max(240).optional(),author:z.preprocess(v=>v===''?undefined:v,libraryPublicId.optional()),cursor:z.string().max(512).optional()}).strict();
 const copyInput=z.object({id:libraryId,expectedRevision:libraryRevision,publicIds:z.array(libraryPublicId).max(200)}).strict();
 const reportInput=z.object({category:z.enum(REPORT_CATEGORIES),details:z.string().min(1).max(1000)}).strict();
-const dashQuery=z.object({q:z.string().max(120).optional(),cursor:z.string().max(512).optional()}).strict();
-const reportQuery=z.object({status:z.enum(['open','resolved','all']).optional(),cursor:z.string().max(512).optional()}).strict();
+const dashQuery=z.object({publicId:libraryPublicId.optional(),q:z.string().max(120).optional(),cursor:z.string().max(512).optional()}).strict();
+const reportQuery=z.object({ticket:z.string().uuid().optional(),status:z.enum(['open','resolved','all']).optional(),cursor:z.string().max(512).optional()}).strict();
 const resolution=z.object({status:z.enum(['dismissed','actioned']),note:z.string().min(1).max(1000)}).strict();
 const moderation=z.object({expectedRevision:libraryRevision,publicationRevision:libraryRevision.refine(n=>n>0),hidden:z.boolean(),reason:z.string().min(1).max(1000)}).strict();
 function base(){return new Hono<AppEnv>().use(async(c,next)=>{c.header('cache-control','private, no-store');c.header('x-robots-tag','noindex, nofollow');await next();});}

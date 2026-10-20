@@ -142,6 +142,7 @@ export function DiscussionSignIn() { const location = useLocation(); return <Lin
 
 export function safeDiscussionHref(href: string | null): string | null {
   if (href === "/me/library?view=reports") return `${localizeHref("/me/library")}?view=reports`;
+  if (href === "/me/governance") return localizeHref("/me/governance");
   if (href === "/me/reports") return localizeHref("/me/reports");
   if (href === "/me/discussions?kind=reports") return `${localizeHref("/me/discussions")}?kind=reports`;
   if (!href || !/^\/(?:forum\/[1-9]\d{0,18}|charts\/[1-9]\d{0,18})(?:#message-[A-Za-z0-9_-]{1,100})?$/.test(href)) return null;

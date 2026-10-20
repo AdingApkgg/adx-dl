@@ -35,9 +35,9 @@ export const dashRoutes = new Hono<AppEnv>()
   .get("/users", validatePageQuery, async c => c.json(await dashUsers(c.get("services").db, dashPage(c.req.valid("query")))))
   .get("/charts", validatePageQuery, async c => c.json(await dashCharts(c.get("services").db, dashPage(c.req.valid("query")))))
   .get("/status", async c => c.json(await dashStatus(c.get("services"))))
-  .get("/reports", async c => c.json(await listDashReports(socialStorage(c), reportFilter(c.req.query("status")), {
+  .get("/reports", async c => { const ticket=c.req.query("ticket");if(ticket&&!z.string().uuid().safeParse(ticket).success)return jsonError(c,400,"BAD_REQUEST","Invalid report");return c.json(await listDashReports(socialStorage(c), reportFilter(c.req.query("status")), {
     cursor: c.req.query("cursor"), ...(c.req.query("limit") !== undefined ? { limit: Number(c.req.query("limit")) } : {}),
-  })))
+  },ticket));})
   .post("/reports/:id/resolution", validator("json", (value, c) => {
     const parsed = z.object({ status: z.enum(["dismissed", "actioned"]), note: z.string().max(1000) }).strict().safeParse(value);
     return parsed.success ? parsed.data : jsonError(c, 400, "BAD_REQUEST", "Invalid resolution");

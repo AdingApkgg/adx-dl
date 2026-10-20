@@ -8,7 +8,7 @@ import { governancePage, governanceStamp } from "./page";
 const missing=()=>new StorageError(404,"NOT_FOUND");
 const changed=()=>new StorageError(409,"GOVERNANCE_CHANGED");
 // A decision is not an alternate visibility authority. Verify the related control is durable.
-function decisions(userId:string){return sql`(select d.id,'decision:'||d.id::text key,d.entity,d.entity_id target_id,d.action,d.public_reason,d.created_at
+function decisions(userId:string|SQL){return sql`(select d.id,'decision:'||d.id::text key,d.entity,d.entity_id target_id,d.action,d.public_reason,d.created_at
  from discussion_decisions d where d.recipient_id=${userId} and d.action in ('hide','lock') and (
  (d.entity in ('topic','message') and exists(select 1 from community_content_states c where c.key=(case when d.entity='topic' and d.action='lock' then 'topic_control' else d.entity end)||':'||d.entity_id and c.journal_sequence<=${exported} and adxc_community_fact_valid(c.fact)))
  or (d.entity='list' and exists(select 1 from chart_list_controls c where c.id::text=d.entity_id and c.journal_sequence<=${exported}) and exists(select 1 from chart_library_status where id='global' and ready)))
@@ -28,7 +28,7 @@ const dto=(r:AppealRow,reason:string|null):GovernanceAppeal=>({id:r.id,decisionK
 export async function listAppeals(ctx:StorageContext,input:GovernanceQuery,userId?:string):Promise<GovernancePage<GovernanceAppeal>>{
  if(userId)await requireActiveSocialUser(ctx.db,userId);const status=input.status??"all",p=governancePage(input,`appeals:${userId??'dash'}:${status}`);
  const rr=await governanceRead<GovernanceAppeal&{cursorAt:string}>(ctx,sql`select a.id,a.decision_key "decisionKey",a.reason,a.status,a.revision,${governanceStamp(sql`a.created_at`)} "createdAt",${governanceStamp(sql`a.created_at`)} "cursorAt",${governanceStamp(sql`a.resolved_at`)} "resolvedAt",a.resolution_note "resolutionNote",d.public_reason "publicReason"
- from governance_appeals a left join discussion_decisions d on a.decision_key='decision:'||d.id::text and d.recipient_id=a.user_id
+ from governance_appeals a left join lateral (select public_reason from ${decisions(sql`a.user_id`)} decision where decision.key=a.decision_key) d on true
  where (${!userId} or a.user_id=${userId??''}) and (${status}='all' or (${status}='open' and a.status='open') or (${status}='resolved' and a.status<>'open'))
  and ${p.condition(sql`a.created_at`,sql`a.id`,sql`'appeal'::text`)} order by a.created_at desc,a.id desc limit 21`);
  const selected=rr.slice(0,20),last=selected.at(-1);return {items:selected.map(({cursorAt:_,...r})=>r),nextCursor:rr.length>20&&last?p.encode(last.cursorAt,last.id,"appeal"):null};

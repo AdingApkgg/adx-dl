@@ -26,7 +26,7 @@ export async function governanceTickets(ctx:StorageContext,input:GovernanceQuery
  where (${!input.source} or source=${input.source??""}) and (${status}='all' or (${status}='open' and status='open') or (${status}='resolved' and status<>'open'))
  and ${p.condition(sql`created_at`,sql`id`,sql`source`)} order by created_at desc,id desc,source desc limit 21`);
  const selected=rr.slice(0,20),last=selected.at(-1);
- return {items:selected.map(r=>({...r,href:r.source==='chart'?`/dash/reports?status=${status}#report-${r.id}`:r.source==='discussion'?`/dash/discussions?view=reports&status=${status}#report-${r.id}`:`/dash/lists?view=reports&status=${status}#report-${r.id}`})),nextCursor:rr.length>20&&last?p.encode(last.createdAt,last.id,last.source):null};
+ return {items:selected.map(r=>({...r,href:r.source==='chart'?`/dash/reports?status=${status}&ticket=${r.id}#report-${r.id}`:r.source==='discussion'?`/dash/discussions?view=reports&status=${status}&ticket=${r.id}#report-${r.id}`:`/dash/lists?view=reports&status=${status}&ticket=${r.id}#report-${r.id}`})),nextCursor:rr.length>20&&last?p.encode(last.createdAt,last.id,last.source):null};
 }
 export async function governanceAudit(ctx:StorageContext,input:GovernanceQuery):Promise<GovernancePage<GovernanceAudit>>{
  const p=governancePage(input,`audit:${input.kind??"all"}`);

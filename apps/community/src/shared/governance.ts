@@ -5,7 +5,7 @@ export const governanceSource = z.enum(["chart", "discussion", "list"]);
 export const appealStatus = z.enum(["open", "upheld", "review_required"]);
 export const governanceText = (max:number) => z.string().max(max*2).transform(v=>v.trim()).refine(v=>[...v].length>=1&&[...v].length<=max)
  // biome-ignore lint/suspicious/noControlCharactersInRegex: Reject stored control characters; line breaks and tabs are allowed.
- .refine(v=>!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(v));
+ .refine(v=>!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\ud800-\udfff]/u.test(v));
 export const decisionKeySchema = z.string().regex(/^(decision|chart):[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/);
 export const governanceQuerySchema = z.object({cursor:z.string().max(4096).optional(),source:governanceSource.optional(),status:z.enum(["open","resolved","all"]).optional(),kind:z.enum(["moderation","report_resolution","notice","featured","appeal_resolution"]).optional()}).strict();
 export type GovernanceQuery = z.infer<typeof governanceQuerySchema>;

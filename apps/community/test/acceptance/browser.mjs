@@ -1,3 +1,4 @@
+import { exerciseGovernance } from "./governance-browser.mjs";
 import {exerciseDiscovery} from "./discovery-browser.mjs";
 import {exerciseAuthor} from "./author-browser.mjs";
 import {exerciseLibrary} from "./library-browser.mjs";
@@ -537,7 +538,7 @@ async function acceptance() {
     await page.getByText("管理员 #1", { exact: true }).waitFor();
     assert.match(await page.locator('meta[name="robots"]').getAttribute("content"), /noindex/);
     const navigation = page.getByRole("navigation", { name: "社区管理后台", exact: true });
-    assert.deepEqual(await navigation.getByRole("link").evaluateAll(links=>links.map(link=>link.getAttribute("href"))), ["/dash/lists","/dash/discussions","/dash/featured","/dash/notices","/dash","/dash/users","/dash/charts","/dash/status","/dash/reports"]);
+    assert.deepEqual(await navigation.getByRole("link").evaluateAll(links=>links.map(link=>link.getAttribute("href"))), ["/dash/governance","/dash/appeals","/dash/audit","/dash/lists","/dash/discussions","/dash/featured","/dash/notices","/dash","/dash/users","/dash/charts","/dash/status","/dash/reports"]);
     if (evidenceDirectory) await page.screenshot({ path: join(evidenceDirectory, "dash-desktop.png"), fullPage: true });
     await navigation.getByRole("link", { name: "用户列表", exact: true }).click();
     await page.waitForURL(url => url.pathname === "/dash/users");
@@ -645,6 +646,7 @@ async function acceptance() {
     assert.equal(republished.status(), 409); assert.equal((await republished.json()).error.code, "CHART_MODERATED");
     await denied(anonymous, "/api/v1/charts/2", 404);
   });
+  await independentSuite("governance", () => exerciseGovernance({owner,other,anonymous,origin,step,evidenceDirectory}));
   await independentSuite("library", () => exerciseLibrary({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Library browser\n&inote_4=(120){4}1,2,E\n`)]])}));
   await independentSuite("following", () => exerciseFollowing({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Following browser\n&inote_4=(120){4}1,2,E\n`)]])}));
   const authorPassed = await independentSuite("author", () => exerciseAuthor({owner,other,anonymous,origin,step,evidenceDirectory,zip:(label,next=false)=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Creator browser\n&inote_4=(120){4}${next?"1,(240)3,4":"1,2"},E\n`)]])}));

@@ -82,6 +82,7 @@ export function AccountMenu() {
             <DropdownMenuItem asChild><Link to={localizeHref("/me/notifications")}>{m.site_notifications()}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to={localizeHref("/me/library")}>{m.library_title()}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to={localizeHref("/me/favorites")}>{m.my_favorites()}</Link></DropdownMenuItem>
+            <DropdownMenuItem asChild><Link to={localizeHref("/me/governance")}>{m.governance_my_title()}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to={localizeHref("/me/reports")}>{m.my_reports()}</Link></DropdownMenuItem>
             {me.isAdmin ? <DropdownMenuItem asChild><Link to={localizeHref("/dash")}>{m.dash_title()}</Link></DropdownMenuItem> : null}
             <DropdownMenuItem asChild>
