@@ -18,7 +18,7 @@ export async function exerciseGovernance({owner,other,anonymous,origin,step,evid
   await reader.getByRole('textbox',{name:'标题',exact:true}).fill(title);await reader.getByRole('textbox',{name:'正文',exact:true}).fill('Synthetic governance body');
   topic=await mutation(reader,'/api/v1/discussions/topics',()=>reader.getByRole('button',{name:'明确提交',exact:true}).click());
   await reader.waitForURL(u=>u.pathname===`/forum/${topic.publicId}`);
-  await staff.goto(url(`/dash/discussions?kind=topic&targetId=${topic.id}`));const row=staff.getByRole('article').filter({has:staff.getByText(title,{exact:true})});
+  await staff.goto(url(`/dash/discussions?kind=topic&targetId=${topic.id}`));const row=staff.getByRole('article').filter({has:staff.getByRole('link',{name:`#${topic.publicId} · ${title}`,exact:true})});
   await row.getByLabel('内部管理原因（1–500 字）',{exact:true}).fill('Synthetic internal governance reason');
   await row.getByLabel('告知当事人的原因（1–500 字）',{exact:true}).fill('Synthetic public governance reason');
   await row.getByLabel('我已核对目标、版本与原因，确认执行此操作。',{exact:true}).check();
