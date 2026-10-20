@@ -19,7 +19,7 @@ const owners:string[]=[];
 async function owner(){const id=await readyOwner(f.ctx);owners.push(id);return id;}
 async function decision(recipient:string,actor:string){const id=crypto.randomUUID(),target=crypto.randomUUID();await withSocialUser(f.ctx.db,actor,async tx=>{await recordCommunityFact(tx,{version:1,entity:"message",id:target,revision:1,state:"hidden"},actor);await tx.execute(sql`insert into discussion_decisions(id,actor_id,recipient_id,entity,entity_id,action,reason,public_reason) values(${id}::uuid,${actor},${recipient},'message',${target},'hide','Internal secret','Public explanation')`);});await f.ctx.exportChartJournal!();return `decision:${id}`;}
 let journalDir:string;
-beforeAll(async()=>{await resetTestDatabase();await prepareTestQueues();f=await readyContext();journalDir=await mkdtemp(join(tmpdir(),"governance-journal-"));const keyFile=join(journalDir,'key');await writeFile(keyFile,crypto.getRandomValues(new Uint8Array(32)),{mode:0o600});const config={directory:join(journalDir,'log'),keyFile,databaseUrl:testDatabaseUrl()};await initializeJournal(config);f.ctx.exportChartJournal=async()=>{await exportJournal(config);};},30000);
+beforeAll(async()=>{await resetTestDatabase();await prepareTestQueues();f=await readyContext();journalDir=await mkdtemp(join(tmpdir(),"governance-journal-"));const keyFile=join(journalDir,'key');await writeFile(keyFile,crypto.getRandomValues(new Uint8Array(32)),{mode:0o600});const config={directory:join(journalDir,'log'),keyFile,databaseUrl:testDatabaseUrl()};await f.ctx.db.execute(sql`update storage_journal_progress set exported_sequence=0,chain_hash=null,exported_at=null where id='global'`);await initializeJournal(config);f.ctx.exportChartJournal=async()=>{await exportJournal(config);};},30000);
 afterAll(async()=>{if(f)await cleanupStorageFixture(f.ctx.db,owners,[f.policy.id]);if(journalDir)await rm(journalDir,{recursive:true,force:true});});
 test("only recipient can appeal; retries keep first text, concurrent submissions create one row",async()=>{
  const author=await owner(),staff=await owner(),other=await owner(),key=await decision(author,staff);
@@ -57,12 +57,19 @@ test("appeals enforce user-wide caps while exact recovery remains available",asy
  expect((await createAppeal(f.ctx,author,{decisionKey:first,reason:"Retry"})).reason).toBe("Reason");
 });
 test("unified report cursor keeps all sources when timestamps and UUIDs coincide",async()=>{
- const reporter=await owner(),id=crypto.randomUUID(),chart=crypto.randomUUID(),at="2026-10-20T00:00:00.123456Z";
+ const reporter=await owner(),id=crypto.randomUUID(),chart=crypto.randomUUID(),at="2099-10-20T00:00:00.123456Z";
  await f.ctx.db.execute(sql`insert into chart_reports(id,reporter_id,chart_id,public_id,version_id,title,artist,category,details,created_at) values(${id}::uuid,${reporter},${chart}::uuid,987,${crypto.randomUUID()}::uuid,'Public','Artist','other','Private evidence',${at}::timestamptz)`);
  await f.ctx.db.execute(sql`insert into discussion_reports(id,reporter_id,target_type,target_id,category,details,evidence_expires_at,created_at) values(${id}::uuid,${reporter},'forum_reply',${crypto.randomUUID()}::uuid,'other','Private evidence',clock_timestamp(),${at}::timestamptz)`);
- const page=await governanceTickets(f.ctx,{status:"all"});
- const matching=page.items.filter(x=>x.id===id);expect(matching).toHaveLength(2);
- expect(new Set(matching.map(x=>x.source)).size).toBe(2);expect(JSON.stringify(page)).not.toContain("Private evidence");
+ await f.ctx.db.execute(sql`insert into chart_list_reports(id,list_id,reporter_id,category,details,created_at) values(${id}::uuid,${crypto.randomUUID()}::uuid,${reporter},'other','Private evidence',${at}::timestamptz)`);
+ const ids:string[]=[id];for(let i=0;i<24;i++){const next=crypto.randomUUID();ids.push(next);await f.ctx.db.execute(sql`insert into chart_reports(id,reporter_id,chart_id,public_id,version_id,title,artist,category,details,created_at) values(${next}::uuid,${reporter},${crypto.randomUUID()}::uuid,987,${crypto.randomUUID()}::uuid,'Public','Artist','other','Private evidence',${at}::timestamptz)`);}
+ const first=await governanceTickets(f.ctx,{status:"all"});expect(first.items).toHaveLength(20);expect(first.nextCursor).not.toBeNull();
+ const second=await governanceTickets(f.ctx,{status:"all",cursor:first.nextCursor!});
+ const page={items:[...first.items,...second.items]};
+ expect(new Set(page.items.map(x=>`${x.source}/${x.id}`)).size).toBe(page.items.length);
+ expect(page.items.filter(x=>ids.includes(x.id))).toHaveLength(27);
+ await expect(governanceTickets(f.ctx,{status:'open',cursor:first.nextCursor!})).rejects.toMatchObject({status:400});
+ const matching=page.items.filter(x=>x.id===id);expect(matching).toHaveLength(3);
+ expect(new Set(matching.map(x=>x.source)).size).toBe(3);expect(JSON.stringify(page)).not.toContain("Private evidence");
 });
 
 test("missing or undurable decision cannot create an appeal; deleting account removes private reason",async()=>{

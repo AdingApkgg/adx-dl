@@ -14,4 +14,4 @@ export async function loadGovernance<T>(context:Readonly<RouterContextProvider>,
 }
 export function governanceError(error:unknown){if(error instanceof ApiError){if(error.code==='GOVERNANCE_LIMIT')return m.governance_limit();if(error.code==='GOVERNANCE_CHANGED')return m.governance_changed();if(error.code==='REAUTH_REQUIRED')return m.dash_reauth();}return m.governance_unconfirmed();}
 
-export function governanceFilters(url:URL,keys:(keyof GovernanceQuery)[]):GovernanceQuery{const raw=Object.fromEntries(keys.flatMap(k=>{const v=url.searchParams.get(k);return v?[[k,v]]:[];}));const parsed=governanceQuerySchema.safeParse(raw);if(!parsed.success)throw data(null,{status:400,headers:dashHeaders});return parsed.data;}
+export function governanceFilters(url:URL,keys:(keyof GovernanceQuery)[]):GovernanceQuery{const raw=Object.fromEntries(keys.flatMap(k=>{const v=url.searchParams.get(k);return v?[[k,v]]:[];}));const parsed=governanceQuerySchema.safeParse(raw);if(!parsed.success)throw new ApiError(400,"BAD_REQUEST","Invalid governance filters");return parsed.data;}

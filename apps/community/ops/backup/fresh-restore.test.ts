@@ -4,7 +4,7 @@ import { mkdir, readFile, writeFile, rename, stat, unlink, readdir } from "node:
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { Client } from "pg";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { ingestFixture } from "../../test/storage/ingest-fixture";
 import { storageFixtureConfig } from "../../test/storage/fixture";
 import { createDb } from "../../src/server/db/client";
@@ -164,7 +164,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
     const tracker = createStorageIOTracker();
     const roleProcesses: ReturnType<typeof Bun.spawn>[] = [];
     const governanceSnapshotId=crypto.randomUUID(),governanceLaterId=crypto.randomUUID(),auditSnapshotId=crypto.randomUUID();
-    await f.ctx.db.execute(sql`insert into governance_appeals(id,user_id,decision_key,reason) values(${governanceSnapshotId}::uuid,${good.userId},${'decision:'+crypto.randomUUID()},'Governance snapshot appeal')`);
+    await f.ctx.db.execute(sql`insert into governance_appeals(id,user_id,decision_key,reason) values(${governanceSnapshotId}::uuid,${good.userId},${`decision:${crypto.randomUUID()}`},'Governance snapshot appeal')`);
     await f.ctx.db.execute(sql`insert into governance_audit_events(id,kind,action,target_type,target_id) values(${auditSnapshotId}::uuid,'moderation','hide','chart','snapshot-proof')`);
     const governanceAuditSnapshotCount=Number((await f.ctx.db.execute(sql`select count(*)::int n from governance_audit_events`)).rows[0].n);
     let manifest: Awaited<ReturnType<typeof backupOriginals>>;
@@ -269,7 +269,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
     }
     if (roleProcesses.length)
       console.log("proof: actual coordinated snapshot complete; normal roles stopped and reaped");
-    await f.ctx.db.execute(sql`insert into governance_appeals(id,user_id,decision_key,reason) values(${governanceLaterId}::uuid,${good.userId},${'decision:'+crypto.randomUUID()},'After-snapshot private appeal')`);
+    await f.ctx.db.execute(sql`insert into governance_appeals(id,user_id,decision_key,reason) values(${governanceLaterId}::uuid,${good.userId},${`decision:${crypto.randomUUID()}`},'After-snapshot private appeal')`);
     expect(manifest.originals).toHaveLength(4 + publicCharts.additionalOriginals);
     expect(manifest.dumps.community.size).toBeGreaterThan(1000);
     expect(manifest.dumps.umami.size).toBeGreaterThan(1000);

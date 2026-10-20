@@ -24,7 +24,7 @@ export async function governanceDecisions(ctx:StorageContext,userId:string,input
  const selected=rr.slice(0,20),last=selected.at(-1);return {items:selected.map(({id:_,...d})=>d),nextCursor:rr.length>20&&last?p.encode(last.createdAt,last.id,last.entity):null};
 }
 type AppealRow={id:string;user_id:string;decision_key:string;reason:string;status:GovernanceAppeal['status'];revision:number;created_at:Date;resolved_at:Date|null;resolution_note:string|null};
-const dto=(r:AppealRow,reason:string|null):GovernanceAppeal=>({id:r.id,decisionKey:r.decision_key,reason:r.reason,status:r.status,revision:r.revision,createdAt:r.created_at.toISOString(),resolvedAt:r.resolved_at?.toISOString()??null,resolutionNote:r.resolution_note,publicReason:reason});
+const dto=(r:AppealRow,reason:string|null):GovernanceAppeal=>({id:r.id,decisionKey:r.decision_key,reason:r.reason,status:r.status,revision:r.revision,createdAt:new Date(r.created_at).toISOString(),resolvedAt:r.resolved_at?new Date(r.resolved_at).toISOString():null,resolutionNote:r.resolution_note,publicReason:reason});
 export async function listAppeals(ctx:StorageContext,input:GovernanceQuery,userId?:string):Promise<GovernancePage<GovernanceAppeal>>{
  if(userId)await requireActiveSocialUser(ctx.db,userId);const status=input.status??"all",p=governancePage(input,`appeals:${userId??'dash'}:${status}`);
  const rr=await governanceRead<GovernanceAppeal&{cursorAt:string}>(ctx,sql`select a.id,a.decision_key "decisionKey",a.reason,a.status,a.revision,${governanceStamp(sql`a.created_at`)} "createdAt",${governanceStamp(sql`a.created_at`)} "cursorAt",${governanceStamp(sql`a.resolved_at`)} "resolvedAt",a.resolution_note "resolutionNote",d.public_reason "publicReason"
