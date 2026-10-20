@@ -51,6 +51,8 @@ Files: workbench.tsx, app.css, messages.
 
 Files: UI native acceptance helper, production-smoke.mjs, docs/verification/community-content-ux-2026-10-20.md.
 - [x] One independent static branch review; fixed P2 changed+draft shortcut conflict, prepared regression. Changed-file lint/diff passed.
-- [ ] Enter release window: designated remote centralized verification, then PR hosted CI native business/UI and fresh-volume restore; fix actual failures and confirm tested merge tree.
-- [ ] Prebackup; formal community-deploy.py; all production groups including extended readonly detail/forum/workbench geometry/controls; postbackup and invariants.
-- [ ] Archive private evidence, clean own bounded resources, record release/CI/backup/legacy links and exact browser-vs-device limits; final docs commit.
+- [x] Enter release window: designated remote centralized verification, then PR hosted CI native business/UI and fresh-volume restore; fix actual failures and confirm tested merge tree.
+- [x] Prebackup; formal community-deploy.py; all production groups including extended readonly detail/forum/workbench geometry/controls; postbackup and invariants.
+- [x] Archive private evidence, clean own bounded resources, record release/CI/backup/legacy links and exact browser-vs-device limits; final docs commit.
+
+最终结果：CI 39456933009、48组原生浏览器、全新卷恢复和19组生产门禁通过。见 docs/verification/community-content-ux-2026-10-21.md。
