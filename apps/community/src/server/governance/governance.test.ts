@@ -71,6 +71,8 @@ test("missing or undurable decision cannot create an appeal; deleting account re
  await f.ctx.db.execute(sql`insert into discussion_decisions(id,actor_id,recipient_id,entity,entity_id,action,reason,public_reason) values(${id}::uuid,${staff},${author},'message',${target},'hide','Internal','Public')`);
  await expect(createAppeal(f.ctx,author,{decisionKey:`decision:${id}`,reason:'No durable fact'})).rejects.toMatchObject({status:404});
  const key=await decision(author,staff),saved=await createAppeal(f.ctx,author,{decisionKey:key,reason:'Delete my private text'});
+ await resolveAppeal(f.ctx,staff,saved.id,{expectedRevision:1,status:'upheld',note:'Delete my private feedback'});
  await f.ctx.db.execute(sql`delete from "user" where id=${author}`);
  expect((await f.ctx.db.execute(sql`select id from governance_appeals where id=${saved.id}::uuid`)).rows).toHaveLength(0);
+ expect((await f.ctx.db.execute(sql`select id from discussion_decisions where public_reason='Delete my private feedback' or reason='Delete my private feedback'`)).rows).toHaveLength(0);
 });

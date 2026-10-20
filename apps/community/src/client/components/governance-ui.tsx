@@ -6,6 +6,7 @@ import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
 import type { GovernanceAppeal, GovernanceDecision } from "@/shared/governance";
 import { getBrowserApi } from "../lib/browser";
+import { governanceError } from "../lib/governance";
 import { dashDate } from "../lib/dash";
 import { governanceApi } from "../queries/governance";
 import { useDiscussionLocalDraft, useDiscussionTask } from "./discussion-ui";
@@ -21,7 +22,7 @@ export function GovernanceFilters({source=false,kind=false}:{source?:boolean;kin
  </Form>;
 }
 export function AppealComposer({decision}:{decision:GovernanceDecision}){
- const [form,setForm]=useDiscussionLocalDraft(`appeal:${decision.key}`,()=>({reason:'',confirmed:false}),v=>v.reason.length>0),[done,setDone]=useState(false),task=useDiscussionTask(),revalidator=useRevalidator();
+ const [form,setForm]=useDiscussionLocalDraft(`appeal:${decision.key}`,()=>({reason:'',confirmed:false}),v=>v.reason.length>0),[done,setDone]=useState(false),task=useDiscussionTask(governanceError),revalidator=useRevalidator();
  const length=[...form.reason.trim()].length;
  if(decision.appealId||done)return <p role="status" className="text-sm">{m.governance_submitted()} <Link className="underline" to={`${localizeHref('/me/governance')}?view=appeals`}>{m.governance_my_appeals()}</Link></p>;
  return <form className="space-y-3" onSubmit={async e=>{e.preventDefault();if(!form.confirmed||length<1||length>1000)return;
@@ -31,7 +32,7 @@ export function AppealComposer({decision}:{decision:GovernanceDecision}){
  </form>;
 }
 export function AppealReviewForm({appeal}:{appeal:GovernanceAppeal}){
- const [form,setForm]=useDiscussionLocalDraft(`appeal-review:${appeal.id}`,()=>({status:'upheld' as 'upheld'|'review_required',note:'',confirmed:false}),v=>v.note.length>0),task=useDiscussionTask(),revalidator=useRevalidator(),length=[...form.note.trim()].length;
+ const [form,setForm]=useDiscussionLocalDraft(`appeal-review:${appeal.id}`,()=>({status:'upheld' as 'upheld'|'review_required',note:'',confirmed:false}),v=>v.note.length>0),task=useDiscussionTask(governanceError),revalidator=useRevalidator(),length=[...form.note.trim()].length;
  if(appeal.status!=='open')return <div className="space-y-2 rounded bg-muted p-3"><p>{governanceStatus(appeal.status)}</p><p className="whitespace-pre-wrap break-words">{appeal.resolutionNote}</p><time dateTime={appeal.resolvedAt??undefined}>{dashDate(appeal.resolvedAt)}</time>{form.note?<p className="whitespace-pre-wrap break-words">{m.discussion_unsent_resolution()} · {form.note}</p>:null}</div>;
  return <form className="space-y-3 rounded border p-3" onSubmit={async e=>{e.preventDefault();if(!form.confirmed||length<1||length>500)return;
  if(await task.run(async()=>{const saved=await governanceApi(getBrowserApi()).resolve(appeal.id,{expectedRevision:appeal.revision,status:form.status,note:form.note.trim()});if(saved.id!==appeal.id||saved.status!==form.status||saved.resolutionNote!==form.note.trim())throw new Error('Unconfirmed resolution');})){setForm(v=>({...v,note:'',confirmed:false}));void revalidator.revalidate();}}}>

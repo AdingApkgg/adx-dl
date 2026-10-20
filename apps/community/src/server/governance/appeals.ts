@@ -56,7 +56,7 @@ export async function resolveAppeal(ctx:StorageContext,actorId:string,id:string,
   if(r.revision!==input.expectedRevision)throw changed();
   const [saved]=await rows<AppealRow>(tx,sql`update governance_appeals set status=${input.status},resolution_note=${input.note},resolved_at=clock_timestamp(),revision=revision+1 where id=${id}::uuid returning *`);
   const decisionId=crypto.randomUUID();
-  await tx.execute(sql`insert into discussion_decisions(id,actor_id,recipient_id,entity,entity_id,action,reason,public_reason) values(${decisionId}::uuid,${actorId},${r.user_id},'appeal',${id},${input.status},'',${input.note})`);
+  await tx.execute(sql`insert into discussion_decisions(id,actor_id,recipient_id,entity,entity_id,action,reason,public_reason) values(${decisionId}::uuid,${actorId},${r.user_id},'appeal',${id},${input.status},'','')`);
   await tx.execute(sql`insert into discussion_outbox(actor_id,kind,recipient_id,decision_id,sequence) values(${actorId},'moderation',${r.user_id},${decisionId}::uuid,0)`);
   return dto(saved,publicReason);
  });

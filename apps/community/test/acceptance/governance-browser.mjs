@@ -39,7 +39,7 @@ export async function exerciseGovernance({owner,other,anonymous,origin,step,evid
  await step('governance_worker_result_notification_and_audit',async()=>{
   const deadline=Date.now()+80000;let inbox;
   for(;;){inbox=await get(other,'/api/v1/discussions/notifications');if(inbox.items.some(n=>n.href==='/me/governance'&&n.publicReason==='Synthetic review requires reconsideration'))break;assert.ok(Date.now()<deadline,'appeal result notification deadline');await new Promise(r=>setTimeout(r,1000));}
-  await reader.goto(url('/me/notifications'));await reader.getByRole('link').filter({hasText:'Synthetic review requires reconsideration'}).count();
+  await reader.goto(url('/me/notifications'));const notice=reader.getByRole('article').filter({hasText:'Synthetic review requires reconsideration'});await notice.locator('a[href="/me/governance"]').click();await reader.waitForURL(u=>u.pathname==='/me/governance');await reader.getByRole('heading',{name:'我的处理中心',exact:true}).waitFor();
   const audit=await get(owner,'/api/v1/governance/dash/audit?kind=appeal_resolution');assert.equal(audit.items.filter(e=>e.targetId===appeal.id).length,1);assert.ok(!JSON.stringify(audit).includes('Synthetic author appeal'));
   if(evidenceDirectory)await reader.screenshot({path:join(evidenceDirectory,'governance-private-outcome.png'),fullPage:true});
  });

@@ -13,6 +13,7 @@ export async function replayDiscussionUserDeletion(c:Pick<Client,"query">,userId
  await c.query(`delete from discussion_subscriptions where user_id=$1`,[userId]);
  await c.query(`delete from discussion_requests where user_id=$1`,[userId]);
  await c.query(`delete from discussion_outbox where actor_id=$1 or recipient_id=$1`,[userId]);
+ await c.query(`delete from discussion_decisions where entity='appeal' and recipient_id=$1`,[userId]);
  await c.query(`update discussion_decisions set recipient_id=null where recipient_id=$1`,[userId]);
  await c.query(`update discussion_decisions set actor_id=null where actor_id=$1`,[userId]);
  await c.query(`update discussion_messages set body=null,content_hash='',author_id=null,timestamp_ms=null,state=case when state='hidden' then 'hidden' else 'deleted' end where author_id=$1`,[userId]);

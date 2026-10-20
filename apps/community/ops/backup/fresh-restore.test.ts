@@ -166,6 +166,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
     const governanceSnapshotId=crypto.randomUUID(),governanceLaterId=crypto.randomUUID(),auditSnapshotId=crypto.randomUUID();
     await f.ctx.db.execute(sql`insert into governance_appeals(id,user_id,decision_key,reason) values(${governanceSnapshotId}::uuid,${good.userId},${'decision:'+crypto.randomUUID()},'Governance snapshot appeal')`);
     await f.ctx.db.execute(sql`insert into governance_audit_events(id,kind,action,target_type,target_id) values(${auditSnapshotId}::uuid,'moderation','hide','chart','snapshot-proof')`);
+    const governanceAuditSnapshotCount=Number((await f.ctx.db.execute(sql`select count(*)::int n from governance_audit_events`)).rows[0].n);
     let manifest: Awaited<ReturnType<typeof backupOriginals>>;
     try {
       if (process.env.STORAGE_TEST_REAL_ROLES) {
@@ -395,10 +396,7 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
         },
         revoke: async () => {},
         verifyInvariants: async () => {
-        await publicCharts.verify(targetWeb);
-        const recoveredAppeals=(await target.db.execute(sql`select id,reason from governance_appeals where id in (${governanceSnapshotId}::uuid,${governanceLaterId}::uuid)`)).rows;
-        expect(recoveredAppeals).toEqual([{id:governanceSnapshotId,reason:'Governance snapshot appeal'}]);
-        expect((await target.db.execute(sql`select id from governance_audit_events where id=${auditSnapshotId}::uuid`)).rows).toHaveLength(1);},
+        await publicCharts.verify(targetWeb);},
       }),
     ).rejects.toThrow();
     expect(sourceStopped).toBe(true);
@@ -639,6 +637,10 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
         }),
       verifyInvariants: async () => {
         await publicCharts.verify(targetWeb);
+        const recoveredAppeals=(await target.db.execute(sql`select id,reason from governance_appeals where id in (${governanceSnapshotId}::uuid,${governanceLaterId}::uuid)`)).rows;
+        expect(recoveredAppeals).toEqual([{id:governanceSnapshotId,reason:'Governance snapshot appeal'}]);
+        expect((await target.db.execute(sql`select id from governance_audit_events where id=${auditSnapshotId}::uuid`)).rows).toHaveLength(1);
+        expect((await target.db.execute(sql`select count(*)::int n from governance_audit_events`)).rows[0].n).toBe(governanceAuditSnapshotCount);
         expect(await target.db.select().from(user).where(eq(user.id, deleted.userId))).toHaveLength(
           0,
         );
