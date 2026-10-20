@@ -12,3 +12,5 @@ export * from "./discussions";
 export * from "./following";
 
 export * from "./library";
+
+export * from "./governance";

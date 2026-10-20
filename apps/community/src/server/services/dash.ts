@@ -111,6 +111,7 @@ export async function moderateChart(ctx: StorageContext, actor: { id: string; pu
     throw new HTTPException(400, { message: "Invalid moderation request" });
   id = id.toLowerCase();
   const sequence = await withStorageTransaction(ctx.db, async tx => {
+    await tx.execute(sql`select set_config('adxc.governance_actor',${actor.id},true)`);
     // Immutable retries still recover after the former author's account becomes inactive.
     const [previous] = await tx.select().from(chartModerations).where(eq(chartModerations.chartId, id));
     if (previous) return previous.journalSequence;

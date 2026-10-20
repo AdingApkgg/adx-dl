@@ -17,6 +17,7 @@ async function featuredCharts(ctx:StorageContext,ids:string[]) {
 async function activeActor(tx:Parameters<Parameters<StorageContext["db"]["transaction"]>[0]>[0],actor:string){
  const [row]=await tx.select({status:user.status}).from(user).where(eq(user.id,actor)).for("share");
  if(row?.status!=="active")throw new StorageError(403,"ACCOUNT_INACTIVE");
+ await tx.execute(sql`select set_config('adxc.governance_actor',${actor},true)`);
 }
 const invalid = () => new StorageError(400,"SITE_INVALID");
 const changed = () => new StorageError(409,"SITE_CHANGED");
