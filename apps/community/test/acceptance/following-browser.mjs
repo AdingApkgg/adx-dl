@@ -50,7 +50,7 @@ export async function exerciseFollowing({owner,other,anonymous,origin,step,zip,e
    // Synthetic DOM clones exercise multi-row CSS without creating extra chart data.
    await reader.evaluate(()=>{const list=document.querySelector(".community-social-feed-card")?.parentElement;if(!list)return;for(let n=0;n<6;n++){const clone=list.firstElementChild.cloneNode(true);clone.setAttribute("data-layout-fixture","true");clone.querySelector("h3").textContent=n%2?"多行标题".repeat(15):"短标题";list.append(clone);}});
    for(const width of [320,390,768,1280]){await reader.setViewportSize({width,height:900});const bounds=await reader.locator(".community-social-feed-card").evaluateAll(rows=>rows.map(row=>{const box=row.getBoundingClientRect(),link=row.querySelector('a[href^="/u/"]')?.getBoundingClientRect();return {bottom:box.bottom,linkBottom:link?.bottom};}));assert.ok(bounds.length>=6);for(const row of bounds)assert.ok(row.linkBottom<=row.bottom+1,"multi-row author remains within grid cell");}
-   await reader.evaluate(()=>document.querySelectorAll('[data-layout-fixture]').forEach(node=>node.remove()));
+   await reader.evaluate(()=>document.querySelectorAll('[data-layout-fixture]').forEach(node=>{node.remove();}));
    const response=await other.request.get(url("/api/v1/me/following/feed"));assert.equal(response.headers()["cache-control"],"private, no-store");
    assert.equal((await get(other,"/api/v1/discussions/notifications?kind=author_update")).items.length,0);
   });
