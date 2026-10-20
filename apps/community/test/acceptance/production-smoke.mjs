@@ -302,9 +302,9 @@ try {
     page = await signedIn.newPage();
     await step('signed_in_notifications_forum_and_comment_composers', async () => {
       await visit('/me/notifications');
-      await page.getByRole('heading', { level: 1, name: /^站内通知\s*·\s*\d+$/ }).waitFor();
+      await page.getByRole('heading', { level: 1, name: "站内通知", exact: true }).waitFor();
       await page.getByRole('button', { name: '本页未读标为已读', exact: true }).waitFor();
-      await json('/api/v1/discussions/notifications');
+      const noticeSummary=await json('/api/v1/discussions/notifications');await page.getByText(`全部未读 ${noticeSummary.unreadCount} 条`,{exact:true}).waitFor();
       await visit('/forum');
       await page.getByRole('heading', { level: 1, name: '论坛', exact: true }).waitFor();
       for (const board of ['综合交流', '谱面创作', '问题反馈']) await page.getByRole('link', { name: new RegExp('^' + board) }).waitFor();
@@ -446,6 +446,12 @@ try {
       await visit('/me/lists/new');await page.getByRole('region',{name:'基本信息',exact:true}).waitFor();await page.getByRole('complementary',{name:'保存与发布',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'保存私人草稿',exact:true}).isEnabled(),false);
       for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'LIBRARY_EDITOR_UI_HORIZONTAL_OVERFLOW');await visit('/downloads');await page.getByRole('region',{name:'当前队列',exact:true}).waitFor();await page.getByRole('region',{name:'最近下载',exact:true}).waitFor();assert.equal(await page.locator('.community-download-dock').count(),0);assert.equal(await page.locator('.community-selection-bar').count(),0,'DOWNLOAD_PAGE_NO_SELECTION_BAR');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'DOWNLOAD_UI_HORIZONTAL_OVERFLOW');await visit('/me/lists/new');}
       await visit('/downloads');await page.locator('#download-help > summary').click();await page.getByText('ZIP 集合包包含各首的原始 ZIP 和清单。请先解压外层，再逐个导入；它不是一份可直接导入的 ADX 谱包。',{exact:true}).waitFor();
+      // Profile, following and notification UX remains strictly read-only in production.
+      await visit('/u/1');await page.getByRole('region',{name:'作者资料',exact:true}).waitFor();assert.equal(await page.locator('form[role="search"] [name="author"]').count(),0);assert.equal(await page.getByRole('button',{name:'分享主页',exact:true}).count(),1);
+      for(const path of ['/me/feed','/me/following','/me/notifications']){await visit(path);const nav=page.getByRole('navigation',{name:'关注与通知导航',exact:true});assert.equal(await nav.locator('[aria-current="page"]').count(),1);assert.equal(await nav.locator('[aria-current="page"]').getAttribute('href'),path);}
+      await visit('/me/notifications?kind=author_update&unread=true');const noticeFilters=page.getByRole('region',{name:'筛选通知',exact:true});assert.equal(await noticeFilters.getByRole('combobox',{name:'通知内容',exact:true}).inputValue(),'author_update');assert.equal(await noticeFilters.getByRole('link',{name:'全部',exact:true}).getAttribute('href'),'/me/notifications?kind=author_update');await noticeFilters.getByRole('combobox',{name:'通知内容',exact:true}).selectOption('');await noticeFilters.getByRole('button',{name:'应用',exact:true}).click();await page.waitForURL(u=>u.searchParams.get('unread')==='true'&&!u.searchParams.get('kind'));
+      for(const path of ['/u/1','/me/feed','/me/following','/me/notifications?unread=true&kind=author_update']){await visit(path);for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'SOCIAL_UI_HORIZONTAL_OVERFLOW');}}
+
     });
     await step('production_bridge_write_denial_and_session_revocation', async () => {
       const headers = { authorization: `Bearer ${bridgeKey}` };

@@ -184,3 +184,14 @@ test("active profile requests only its own public works and pending deletion req
   expect(pending.works).toBeNull();
   expect(render(pending)).not.toContain(m.user_public_charts());
 });
+
+
+test("profile keeps sharing with identity and fixes author scope outside the search controls", async () => {
+  const html = render(await visit(ACTIVE));
+  expect(html).toContain('id="author-profile"');
+  expect(html).toContain('href="#author-public-charts"');
+  expect(html).toContain('href="/lists?author=1"');
+  expect(html).not.toContain('name="author"');
+  expect(html).toContain(m.ui_social_share_profile());
+  expect(html).not.toContain(m.discovery_reason_author() + " #1");
+});
