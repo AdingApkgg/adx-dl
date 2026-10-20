@@ -92,6 +92,7 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
     <PrivateChartPreview enableShare initialDifficulty={chart.share?.difficulty} initialPosition={chart.share?.seconds??0} sectionId="chart-preview" key={`${chart.id}/${chart.versionId}/${chart.share?.difficulty??""}/${chart.share?.seconds??""}`} id={chart.publicId} versionId={chart.versionId} summary={chart.summary} assetUrl={publicChartAssetUrl} />
     <section id="chart-information" aria-label={m.chart_metadata_heading()} className="community-panel space-y-5"><h2 className="community-section-title">{m.ui_chart_overview()}</h2>
       <PublicChartTags tags={chart.tags} />
+      {!chart.tags.length&&!chart.aliases?.length&&!chart.description&&!chart.credits&&!chart.releaseNote?<p className="text-sm text-muted-foreground">{m.ui_chart_information_empty()}</p>:null}
       {chart.aliases?.length?<p className="break-words text-sm">{m.discovery_aliases()}: {chart.aliases.join(" · ")}</p>:null}
       {chart.description ? <div><h2 className="font-semibold">{m.chart_metadata_description()}</h2><p className="whitespace-pre-wrap break-words">{chart.description}</p></div> : null}
       {chart.credits ? <div><h2 className="font-semibold">{m.chart_metadata_credits()}</h2><p className="whitespace-pre-wrap break-words">{chart.credits}</p></div> : null}

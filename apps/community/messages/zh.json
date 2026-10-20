@@ -1127,5 +1127,6 @@
   "ui_workbench_no_results": "没有符合筛选条件的作品。",
   "ui_workbench_empty_hint": "从导入第一首谱面开始，也可以打开导入中心整理本机任务。",
   "ui_forum_empty_hint": "尝试其他板块或清除筛选，也可以发起一个新话题。",
-  "ui_workbench_filter_hint": "调整筛选条件，或清除筛选查看全部作品。"
+  "ui_workbench_filter_hint": "调整筛选条件，或清除筛选查看全部作品。",
+  "ui_chart_information_empty": "作者尚未补充作品信息。"
 }

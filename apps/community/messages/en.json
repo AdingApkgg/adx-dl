@@ -1127,5 +1127,6 @@
   "ui_workbench_no_results": "No creations match these filters.",
   "ui_workbench_empty_hint": "Import your first chart, or open the import center to manage local tasks.",
   "ui_forum_empty_hint": "Try another board, clear filters, or start a new topic.",
-  "ui_workbench_filter_hint": "Adjust filters, or clear them to see all your creations."
+  "ui_workbench_filter_hint": "Adjust filters, or clear them to see all your creations.",
+  "ui_chart_information_empty": "The creator has not added further information yet."
 }

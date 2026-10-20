@@ -1127,5 +1127,6 @@
   "ui_workbench_no_results": "条件に一致する作品がありません。",
   "ui_workbench_empty_hint": "最初の譜面を取り込むか、取り込みセンターでこの端末のタスクを管理できます。",
   "ui_forum_empty_hint": "別の掲示板や条件で探すか、新しいトピックを投稿してください。",
-  "ui_workbench_filter_hint": "条件を調整するか、絞り込みを解除してすべての作品を表示してください。"
+  "ui_workbench_filter_hint": "条件を調整するか、絞り込みを解除してすべての作品を表示してください。",
+  "ui_chart_information_empty": "作者による追加の作品情報はまだありません。"
 }
