@@ -79,7 +79,7 @@ test("retained notification data disappears on account change", async () => {
   const { client } = view([notice("private", false, { publicReason: "only original account" })]);
   expect(screen.getByText("only original account")).toBeTruthy();
   await act(async () => { client.setQueryData(["me"], { id: "different", status: "active" }); });
-  expect(screen.queryByText("only original account")).toBeNull();
+  await waitFor(() => expect(screen.queryByText("only original account")).toBeNull());
 });
 test("profile search locks the author without producing an unremovable chip", () => {
   render(<MemoryRouter><PublicChartSearchForm lockedAuthor base="/u/7" filters={{ q: "", sort: "updated", author: "7" }} /></MemoryRouter>);

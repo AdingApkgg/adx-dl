@@ -302,9 +302,9 @@ try {
     page = await signedIn.newPage();
     await step('signed_in_notifications_forum_and_comment_composers', async () => {
       await visit('/me/notifications');
-      await page.getByRole('heading', { level: 1, name: /^站内通知\s*·\s*\d+$/ }).waitFor();
+      await page.getByRole('heading', { level: 1, name: "站内通知", exact: true }).waitFor();
       await page.getByRole('button', { name: '本页未读标为已读', exact: true }).waitFor();
-      await json('/api/v1/discussions/notifications');
+      const noticeSummary=await json('/api/v1/discussions/notifications');await page.getByText(`全部未读 ${noticeSummary.unreadCount} 条`,{exact:true}).waitFor();
       await visit('/forum');
       await page.getByRole('heading', { level: 1, name: '论坛', exact: true }).waitFor();
       for (const board of ['综合交流', '谱面创作', '问题反馈']) await page.getByRole('link', { name: new RegExp('^' + board) }).waitFor();
