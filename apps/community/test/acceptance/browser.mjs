@@ -1,3 +1,4 @@
+import {exerciseContentUx} from "./content-ux-browser.mjs";
 import {exerciseUiLayout} from "./ui-layout-browser.mjs";
 import { exerciseGovernance } from "./governance-browser.mjs";
 import {exerciseDiscovery} from "./discovery-browser.mjs";
@@ -654,6 +655,7 @@ async function acceptance() {
   const authorPassed = await independentSuite("author", () => exerciseAuthor({owner,other,anonymous,origin,step,evidenceDirectory,zip:(label,next=false)=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Creator browser\n&inote_4=(120){4}${next?"1,(240)3,4":"1,2"},E\n`)]])}));
   if (authorPassed) await independentSuite("discovery", () => exerciseDiscovery({owner,other,anonymous,origin,step,evidenceDirectory,independentSuite}));
   await independentSuite("ui_layout",()=>exerciseUiLayout({owner,anonymous,origin,step,evidenceDirectory}));
+  await independentSuite("content_ux",()=>exerciseContentUx({owner,anonymous,origin,step,evidenceDirectory}));
   assert.deepEqual(suiteFailures, [], "all independent synthetic journeys must pass");
   assert.equal(diagnostics.filter(row => row.type === "pageerror").length, 0, "uncaught browser errors");
   assert.equal(diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length, 0, "hydration errors");
