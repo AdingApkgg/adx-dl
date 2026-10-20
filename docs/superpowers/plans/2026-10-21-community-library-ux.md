@@ -44,7 +44,7 @@
 
 ### Task 3: 下载中心与跨页浮层
 
-**Files:** routes/downloads.tsx、components/download-actions.tsx、downloads/presentation.ts、共享 app.css 与 messages。
+**Files:** routes/downloads.tsx、components/download-actions.tsx、components/site-shell.tsx、downloads/presentation.ts、共享 app.css 与 messages。
 **Interfaces:** DownloadStore/persistence/shared contracts 保持；presentation 提供格式化字节、任务派生数量/状态和操作条件，无副作用。
 
 - [ ] 统计、分区、任务按阶段操作、保存语义、清空确认与帮助说明。
