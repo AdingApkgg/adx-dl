@@ -33,11 +33,12 @@ export async function exerciseFollowing({owner,other,anonymous,origin,step,zip,e
  try {
   await step("following_private_relationship_and_default_off_alerts",async()=>{
    const guest=await anonymous.newPage();await guest.goto(url(`/u/${identity.publicId}`));
-   const href=await guest.getByRole("link",{name:"关注作者",exact:true}).getAttribute("href");assert.ok(href.includes("/login?"));await guest.close();
+   const href=await guest.getByRole("link",{name:"关注作者",exact:true}).getAttribute("href");assert.ok(href.includes("/login?"));assert.ok((await guest.getByRole("link",{name:"关注作者",exact:true}).boundingBox()).height>=44);await guest.close();
    for(const path of ["/api/v1/me/following","/api/v1/me/following/feed",relation])assert.equal((await anonymous.request.get(url(path))).status(),401);
    await reader.goto(url(`/u/${identity.publicId}`));
    await reader.getByRole("region",{name:"作者资料",exact:true}).waitFor();assert.equal(await reader.locator('form[role="search"] [name="author"]').count(),0);assert.equal(await reader.getByRole("button",{name:"分享主页",exact:true}).count(),1);await layout(reader,"profile");
 
+   assert.ok((await reader.getByRole("button",{name:"关注作者",exact:true}).boundingBox()).height>=44);
    const followed=await mutate(reader,relation,"PUT",()=>reader.getByRole("button",{name:"关注作者",exact:true}).click());assert.equal(followed.following,true);assert.equal(followed.notify,false);
    assert.equal((await get(owner,"/api/v1/me/following")).items.length,0);
    await writer.goto(url("/me/charts/new"));await chooseFiles(writer.getByLabel("选择 ADX / ZIP",{exact:true}),{name:"following.zip",mimeType:"application/zip",buffer:zip("Following browser release")});
@@ -45,6 +46,11 @@ export async function exerciseFollowing({owner,other,anonymous,origin,step,zip,e
    const draft=await mutate(writer,"/api/v1/me/charts","POST",()=>writer.getByRole("button",{name:"保存私有草稿",exact:true}).click());chart=await publish(draft);
    await reader.goto(url("/me/feed"));await reader.getByRole("heading",{level:3,name:"Following browser release",exact:true}).waitFor();
    await socialCurrent(reader,"/me/feed");await reader.getByRole("heading",{level:2,name:/UTC/}).waitFor();await layout(reader,"feed");
+   const feedRow=reader.locator(".community-social-feed-card").first(),rowBounds=await feedRow.boundingBox(),authorBounds=await feedRow.locator('a[href^="/u/"]').boundingBox();assert.ok(authorBounds.y+authorBounds.height<=rowBounds.y+rowBounds.height+1,"feed author fits inside its grid row");
+   // Synthetic DOM clones exercise multi-row CSS without creating extra chart data.
+   await reader.evaluate(()=>{const list=document.querySelector(".community-social-feed-card")?.parentElement;if(!list)return;for(let n=0;n<6;n++){const clone=list.firstElementChild.cloneNode(true);clone.setAttribute("data-layout-fixture","true");clone.querySelector("h3").textContent=n%2?"多行标题".repeat(15):"短标题";list.append(clone);}});
+   for(const width of [320,390,768,1280]){await reader.setViewportSize({width,height:900});const bounds=await reader.locator(".community-social-feed-card").evaluateAll(rows=>rows.map(row=>{const box=row.getBoundingClientRect(),link=row.querySelector('a[href^="/u/"]')?.getBoundingClientRect();return {bottom:box.bottom,linkBottom:link?.bottom};}));assert.ok(bounds.length>=6);for(const row of bounds)assert.ok(row.linkBottom<=row.bottom+1,"multi-row author remains within grid cell");}
+   await reader.evaluate(()=>document.querySelectorAll('[data-layout-fixture]').forEach(node=>node.remove()));
    const response=await other.request.get(url("/api/v1/me/following/feed"));assert.equal(response.headers()["cache-control"],"private, no-store");
    assert.equal((await get(other,"/api/v1/discussions/notifications?kind=author_update")).items.length,0);
   });

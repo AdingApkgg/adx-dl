@@ -217,7 +217,7 @@ html[data-motion=off] .community-list-card { transition:none; }
 .community-profile-identity > :first-child { flex-shrink:0; }
 .community-profile-bio { max-width:52rem; overflow-wrap:anywhere; }
 .community-profile-actions { display:flex; flex-wrap:wrap; align-items:flex-start; gap:.75rem; border-top:1px solid var(--border); padding-top:1.25rem; }
-.community-profile-actions button, .community-follow-card button { min-height:2.75rem; }
+.community-profile-actions [data-slot="button"], .community-follow-card button { min-height:2.75rem; }
 .community-social-day { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:.5rem; border-top:1px solid var(--border); padding-top:1.25rem; }
 .community-social-page { min-width:0; }
 .community-follow-card { display:flex; min-width:0; flex-direction:column; gap:1rem; overflow-wrap:anywhere; }
@@ -229,3 +229,6 @@ html[data-motion=off] .community-list-card { transition:none; }
 .community-notification-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.75rem; padding-top:.25rem; }
 .community-notification-actions button { min-height:2.75rem; }
 @media (min-width:768px) { .community-profile-panel { padding:2rem; } }
+
+.community-social-feed-card { display:flex; min-width:0; flex-direction:column; gap:.5rem; }
+.community-social-feed-card > .community-chart-card { height:auto; flex:1; }

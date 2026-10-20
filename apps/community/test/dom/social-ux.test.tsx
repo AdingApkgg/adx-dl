@@ -82,7 +82,7 @@ test("retained notification data disappears on account change", async () => {
   expect(screen.queryByText("only original account")).toBeNull();
 });
 test("profile search locks the author without producing an unremovable chip", () => {
-  render(<MemoryRouter><PublicChartSearchForm lockedAuthor base="/u/7" filters={{ sort: "updated", author: "7" }} /></MemoryRouter>);
+  render(<MemoryRouter><PublicChartSearchForm lockedAuthor base="/u/7" filters={{ q: "", sort: "updated", author: "7" }} /></MemoryRouter>);
   const form = screen.getByRole("search"); expect(form.querySelector('[name="author"]')).toBeNull(); expect(screen.queryByRole("link", { name: /#7/ })).toBeNull(); expect(form.getAttribute("action")).toBe("/u/7");
 });
 test("feed groups by UTC day, uses level-three cards and exposes author profiles", () => {
