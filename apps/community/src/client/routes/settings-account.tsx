@@ -175,7 +175,7 @@ function SettingsContent() {
   }
   // 登录方式、登录设备、注销账号各一张卡片，注销那一张用警示色（spec 第 7.5 节）。
   return (
-    <main className="space-y-6">
+    <main className="community-reading space-y-6">
       <PageTitle>{m.settings_account_title()}</PageTitle>
       <p className="text-sm">
         <Link to={localizeHref("/settings/profile")} className={textLinkClass}>
@@ -461,7 +461,7 @@ export function DeletionStarted({ purgeAt }: { purgeAt: string }) {
   const scheduled = at.getTime() - Date.now() > 60_000;
   const date = new Intl.DateTimeFormat(htmlLang(getLocale()), { dateStyle: "medium", timeStyle: "short" }).format(at);
   return (
-    <main className="space-y-6">
+    <main className="community-reading space-y-6">
       <PageTitle>{m.settings_delete_heading()}</PageTitle>
       <Card>
         <CardHeader>

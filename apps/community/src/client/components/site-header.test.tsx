@@ -37,7 +37,7 @@ async function renderHeader(path: string, me?: typeof USER | null): Promise<stri
 function links(html: string): { href: string | undefined; text: string }[] {
   return [...html.matchAll(/<a\b([^>]*)>(.*?)<\/a>/g)].map((match) => ({
     href: /\shref="([^"]*)"/.exec(match[1] ?? "")?.[1],
-    text: match[2] ?? "",
+    text: /\saria-label="([^"]*)"/.exec(match[1] ?? "")?.[1] ?? (match[2] ?? "").replace(/<[^>]*>/g, ""),
   }));
 }
 
@@ -68,11 +68,11 @@ describe("页头的服务端渲染", () => {
     ] as const) {
       const html = await renderHeader(path, null);
 
-      expect(links(html)[0], path).toEqual({ href: home, text: m.site_name({}, { locale }) });
-      expect(links(html), path).toContainEqual({ href: `${home === "/" ? "" : home.replace(/\/$/, "")}/charts`, text: m.public_charts_title({}, { locale }) });
-      expect(links(html), path).toContainEqual({ href: `${home === "/" ? "" : home.replace(/\/$/, "")}/lists`, text: m.library_public_title({}, { locale }) });
-      expect(links(html), path).toContainEqual({ href: `${home === "/" ? "" : home.replace(/\/$/, "")}/downloads`, text: m.download_title({}, { locale }) });
-      expect(links(html), path).toContainEqual({href:`${home === "/" ? "" : home.replace(/\/$/, "")}/discover`,text:m.discovery_title({}, {locale})});
+      expect(links(html), path).toContainEqual({ href: home, text: m.site_name({}, { locale }) });
+      expect(links(html), path).toContainEqual({ href: `${home === "/" ? "" : home.replace(/\/$/, "")}/charts`, text: m.ui_nav_charts({}, { locale }) });
+      expect(links(html), path).toContainEqual({ href: `${home === "/" ? "" : home.replace(/\/$/, "")}/lists`, text: m.ui_nav_lists({}, { locale }) });
+      expect(html,path).toContain(`aria-label="${m.ui_more({}, {locale})}"`);
+      expect(links(html),path).toContainEqual({href:home,text:m.ui_nav_discover({}, {locale})});
       const language = m[`language_${locale}`]();
       expect(html, path).toContain(`aria-label="${m.nav_language({ language }, { locale })}"`);
     }
@@ -88,7 +88,7 @@ describe("页头的服务端渲染", () => {
 
   test("没登录、已经在登录页上：不再显示'登录'按钮", async () => {
     for (const path of ["/login?next=%2F", "/en/login", "/login/", "/en/login/"]) {
-      expect(links(await renderHeader(path, null)), path).toHaveLength(8);
+      expect(links(await renderHeader(path, null)).some(link=>link.href?.includes("/login")),path).toBe(false);
     }
   });
 
@@ -99,7 +99,7 @@ describe("页头的服务端渲染", () => {
       expect(html).toContain(`aria-label="${m.nav_account_menu({ name: "阿丁" })}"`);
       expect(html).toContain(">阿</text>");
       expect(html).not.toContain(m.nav_sign_in());
-      expect(links(html)).toHaveLength(me.status === "active" ? 9 : 8);
+      expect(links(html).some(link=>link.href==="/me/charts/new")).toBe(me.status==="active");
       expect(links(html).some(link => link.href === "/me/notifications")).toBe(me.status === "active");
     }
   });
@@ -110,6 +110,6 @@ describe("页头的服务端渲染", () => {
 
     expect(html).not.toContain(m.nav_sign_in());
     expect(html).not.toContain(m.nav_account_menu({ name: "阿丁" }));
-    expect(links(html)).toHaveLength(8);
+    expect(links(html).some(link=>link.href?.includes("/login"))).toBe(false);
   });
 });

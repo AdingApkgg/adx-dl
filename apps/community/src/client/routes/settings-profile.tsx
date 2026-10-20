@@ -55,7 +55,7 @@ function ProfileContent() {
     return null;
   }
   return (
-    <main className="space-y-6">
+    <main className="community-reading space-y-6">
       <PageTitle>{m.settings_profile_title()}</PageTitle>
       <div className="flex items-center gap-4">
         <Avatar image={profile.image} id={me.id} name={profile.name} size={64} />

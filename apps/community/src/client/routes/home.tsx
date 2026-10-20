@@ -8,10 +8,8 @@ import type {PublicListSummary} from "@/shared/library";
 import type {FeaturedState,NoticePage,PublicNotice} from "@/shared/community-site";
 import {siteApi} from "../queries/community-site";
 import {SiteNoticeList} from "../components/site-notice-list";
-import {PublicChartSearchForm} from "../components/public-chart-browser";
 import { Button } from "@astrodx/ui/components/button";
-import { Card, CardContent } from "@astrodx/ui/components/card";
-import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { Link } from "react-router";
 
 import { m } from "@/paraglide/messages.js";
@@ -21,10 +19,7 @@ import { apiContext, queryClientContext } from "@/shared/router-context";
 
 import { PUBLIC_CHART_GRID_CLASS, PublicChartCard } from "../components/public-chart-card";
 import { publicChartsApi } from "../queries/public-charts";
-import { Avatar } from "../components/avatar";
-import { PageTitle, textLinkClass } from "../components/page-title";
-import { getBrowserApi, getBrowserQueryClient, getRenderApi } from "../lib/browser";
-import { loginHref } from "../lib/require-user";
+import { getBrowserApi, getBrowserQueryClient } from "../lib/browser";
 import { canonicalLink, localeAlternates, openGraph, originFrom } from "../lib/seo";
 import { meQuery } from "../queries/me";
 import { metaQuery } from "../queries/meta";
@@ -83,60 +78,20 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 }
 
 function HomeContent({ publicCharts,featured,notices,lists,discovery }: { publicCharts: PublicChartsPageDto | null;featured:FeaturedState|null;notices:NoticePage<PublicNotice>|null;lists:PublicListSummary[]|null;discovery:DiscoveryPage|null }) {
-  const { data } = useQuery(metaQuery(getRenderApi()));
-  const { data: me } = useQuery(meQuery(getRenderApi()));
-
-  // Public results come from the current navigation, not the account QueryClient cache.
-  return (
-    <main className="space-y-6">
-      <PageTitle description={m.discovery_intro()}>{m.discovery_title()}</PageTitle>
-      <DiscoverySearch/>
-      <nav className="flex flex-wrap gap-3"><Link className={textLinkClass} to={localizeHref("/forum")}>{m.site_forum()}</Link><Link className={textLinkClass} to={localizeHref("/help")}>{m.site_help()}</Link><Link className={textLinkClass} to={localizeHref("/notices")}>{m.site_notices()}</Link></nav>
-      {notices?.items.length?<section className="space-y-3"><h2 className="text-xl font-semibold">{m.site_notices()}</h2><SiteNoticeList items={notices.items.slice(0,3)}/></section>:notices===null?<p role="status">{m.site_notices_unavailable()}</p>:null}
-      {featured?.items.length?<section className="space-y-3"><h2 className="text-xl font-semibold">{m.site_featured()}</h2><ul className={PUBLIC_CHART_GRID_CLASS}>{featured.items.map(chart=><li key={chart.id}><PublicChartCard chart={chart} headingLevel={3}/></li>)}</ul></section>:featured===null?<p role="status">{m.site_featured_unavailable()}</p>:null}
-      {!discovery?<section className="space-y-3"><h2 className="text-xl font-semibold"><Link to={localizeHref("/lists")} className="underline">{m.library_public_title()}</Link></h2>{lists===null?<p role="status">{m.library_unavailable()}</p>:lists.length?<ul className="grid gap-3 sm:grid-cols-2">{lists.slice(0,4).map(list=><li key={list.publicId}><PublicListCard list={list}/></li>)}</ul>:<p>{m.library_public_empty()}</p>}</section>:null}
-      <Card size="sm">
-        <CardContent className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
-          {me ? (
-            <>
-              <Avatar image={me.image} id={me.id} name={me.name} size={32} /> {m.home_signed_in_as({ name: me.name })} ·{" "}
-              <Link to={localizeHref(`/u/${me.publicId ?? me.id}`)} className={textLinkClass}>
-                {m.home_my_page()}
-              </Link>{" "}
-              ·{" "}
-              <Link to={localizeHref("/settings/profile")} className={textLinkClass}>
-                {m.home_profile_settings()}
-              </Link>{" "}
-              ·{" "}
-              <Link to={localizeHref("/settings/account")} className={textLinkClass}>
-                {m.home_account_settings()}
-              </Link>
-            </>
-          ) : (
-            <Button asChild size="sm">
-              <Link to={loginHref(localizeHref("/"))}>{m.home_sign_in()}</Link>
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-      {discovery?<DiscoverySections value={discovery} home/>:<><p role="status">{m.discovery_unavailable()}</p>
-      <section aria-labelledby="latest-public-charts" className="space-y-4">
-        <h2 id="latest-public-charts" className="text-xl font-semibold">{m.public_charts_latest()}</h2>
-        <p className="text-sm text-muted-foreground">{m.public_charts_description()}</p>
-        <Button asChild><Link to={localizeHref("/charts")}>{m.public_charts_browse()}</Link></Button>
-        {" "}<Link to={localizeHref("/me/charts")} className={textLinkClass}>{m.charts_title()}</Link>
-        {publicCharts?.items.length ? <ul className={PUBLIC_CHART_GRID_CLASS}>
-          {publicCharts.items.map(chart => <li key={chart.id}><PublicChartCard chart={chart} headingLevel={3} /></li>)}
-        </ul> : <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
-          {publicCharts === null ? m.public_charts_unavailable() : m.public_charts_empty()}
-        </p>}
-      </section>
-      </>}
-      <p className="text-muted-foreground">{m.home_description()}</p>
-      <Link to={localizeHref("/privacy")} className={textLinkClass}>
-        {m.privacy_link()}
-      </Link>
-      {data ? <p className="text-xs text-muted-foreground">{m.home_api_version({ version: data.apiVersion })}</p> : null}
-    </main>
-  );
+  const daily=discovery?.daily;
+  return <main className="space-y-10">
+    <section className="community-hero" aria-labelledby="community-home-title">
+      <div className="community-hero-copy space-y-6">
+        <p className="text-xs font-semibold tracking-[.18em] text-primary">ASTRODX COMMUNITY</p>
+        <div className="space-y-4"><h1 id="community-home-title" className="community-hero-title">{m.ui_home_title()}</h1><p className="max-w-xl text-pretty text-sm leading-7 text-muted-foreground sm:text-base">{m.ui_home_intro()}</p></div>
+        <DiscoverySearch compact/>
+        <div className="community-toolbar"><Button asChild><Link to={localizeHref("/charts")}>{m.public_charts_browse()}</Link></Button><Button asChild variant="outline"><Link to={localizeHref("/me/charts/new")}>{m.chart_new()}</Link></Button><Link to={localizeHref("/help")} className="inline-flex min-h-11 items-center px-3 text-sm font-medium text-muted-foreground hover:text-foreground">{m.site_help()}</Link></div>
+      </div>
+      {daily?<div className="community-hero-media space-y-3"><p className="text-xs font-semibold text-muted-foreground">{m.discovery_daily()}</p><PublicChartCard chart={daily} headingLevel={2} selectable={false}/></div>:null}
+    </section>
+    {notices?.items.length?<section aria-label={m.site_notices()} className="community-panel"><SiteNoticeList items={notices.items.slice(0,1)}/></section>:notices===null?<p role="status" className="text-sm text-muted-foreground">{m.site_notices_unavailable()}</p>:null}
+    {featured?.items.length?<section className="space-y-4"><div className="community-section-heading"><h2 className="text-xl font-semibold">{m.site_featured()}</h2><Link className="text-sm font-medium text-primary" to={localizeHref("/charts")}>{m.discovery_more()}</Link></div><ul className={PUBLIC_CHART_GRID_CLASS}>{featured.items.map(chart=><li key={chart.id}><PublicChartCard chart={chart} headingLevel={3} selectable={false}/></li>)}</ul></section>:featured===null?<p role="status" className="text-sm text-muted-foreground">{m.site_featured_unavailable()}</p>:null}
+    {discovery?<DiscoverySections value={discovery} home/>:<section className="space-y-4"><div className="community-section-heading"><h2 className="text-xl font-semibold">{m.ui_latest_charts()}</h2><Link className="text-sm text-primary" to={localizeHref("/charts")}>{m.discovery_more()}</Link></div>{publicCharts?.items.length?<ul className={PUBLIC_CHART_GRID_CLASS}>{publicCharts.items.map(chart=><li key={chart.id}><PublicChartCard chart={chart} headingLevel={3} selectable={false}/></li>)}</ul>:<p className="community-empty">{publicCharts===null?m.public_charts_unavailable():m.public_charts_empty()}</p>}</section>}
+    {!discovery&&lists?.length?<section className="space-y-4"><h2 className="text-xl font-semibold">{m.library_public_title()}</h2><ul className="grid gap-4 sm:grid-cols-2">{lists.slice(0,4).map(list=><li key={list.publicId}><PublicListCard list={list}/></li>)}</ul></section>:null}
+  </main>;
 }

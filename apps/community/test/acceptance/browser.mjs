@@ -1,3 +1,4 @@
+import {exerciseUiLayout} from "./ui-layout-browser.mjs";
 import { exerciseGovernance } from "./governance-browser.mjs";
 import {exerciseDiscovery} from "./discovery-browser.mjs";
 import {exerciseAuthor} from "./author-browser.mjs";
@@ -366,7 +367,7 @@ async function acceptance() {
     await visitor.setViewportSize({ width: 1440, height: 900 });
     const home = await visitor.goto(origin.href);
     assert.equal(home.headers()["cache-control"], "private, no-store");
-    const latest = visitor.locator("section").filter({ has: visitor.getByRole("heading", { name: "最近公开更新", exact: true }) }).getByRole("region", { name: "公开谱面", exact: true });
+    const latest = visitor.getByRole("region", { name: "最近公开", exact: true });
     await latest.getByRole("link", { name: /CI private draft/ }).waitFor();
     assert.ok(await latest.locator("ul").first().evaluate(el => el.getBoundingClientRect().width > 1000));
     if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-home-desktop.png"), fullPage: true });
@@ -458,8 +459,8 @@ async function acceptance() {
     assert.equal((await json(anonymous, "/api/v1/charts")).items.some(c => c.id === draft.id), false);
     await publicVisitor.getByRole("banner").getByRole("link", { name: "AstroDX 自制谱社区", exact: true }).click();
     await publicVisitor.waitForURL(url => url.pathname === "/");
-    await publicVisitor.getByRole("heading", { level: 1, name: "发现好谱", exact: true }).waitFor();
-    const updated = publicVisitor.locator("section").filter({ has: publicVisitor.getByRole("heading", { name: "最近公开更新", exact: true }) }).getByRole("region", { name: "公开谱面", exact: true });
+    await publicVisitor.getByRole("heading", { level: 1, name: "发现好谱，分享创作。", exact: true }).waitFor();
+    const updated = publicVisitor.getByRole("region", { name: "最近公开", exact: true });
     await updated.getByText("没有符合条件的公开内容。", { exact: true }).waitFor();
     assert.equal(await publicVisitor.getByRole("link", { name: /CI private draft/ }).count(), 0);
     await publicVisitor.close();
@@ -537,8 +538,9 @@ async function acceptance() {
     await page.getByRole("heading", { level: 1, name: "社区管理后台", exact: true }).waitFor();
     await page.getByText("管理员 #1", { exact: true }).waitFor();
     assert.match(await page.locator('meta[name="robots"]').getAttribute("content"), /noindex/);
-    const navigation = page.getByRole("navigation", { name: "社区管理后台", exact: true });
-    assert.deepEqual(await navigation.getByRole("link").evaluateAll(links=>links.map(link=>link.getAttribute("href"))), ["/dash/governance","/dash/appeals","/dash/audit","/dash/lists","/dash/discussions","/dash/featured","/dash/notices","/dash","/dash/users","/dash/charts","/dash/status","/dash/reports"]);
+    const navigation = page.locator(".community-dash-nav");
+    assert.deepEqual(await navigation.getByRole("link").evaluateAll(links=>links.map(link=>link.getAttribute("href")).sort()), ["/dash/governance","/dash/appeals","/dash/audit","/dash/lists","/dash/discussions","/dash/featured","/dash/notices","/dash","/dash/users","/dash/charts","/dash/status","/dash/reports"].sort());
+    assert.equal(await navigation.getByRole("navigation").count(),4,"four coherent dashboard groups");
     if (evidenceDirectory) await page.screenshot({ path: join(evidenceDirectory, "dash-desktop.png"), fullPage: true });
     await navigation.getByRole("link", { name: "用户列表", exact: true }).click();
     await page.waitForURL(url => url.pathname === "/dash/users");
@@ -582,7 +584,7 @@ async function acceptance() {
     const listing = await json(owner, "/api/v1/dash/charts");
     const before = listing.items.find(chart => chart.id === optionalDraft.id);
     assert.ok(before); assert.equal(before.publicId, "2"); assert.equal(before.status, "public");
-    await page.getByRole("navigation", { name: "社区管理后台", exact: true }).getByRole("link", { name: "公开谱面管理", exact: true }).click();
+    await page.locator(".community-dash-nav").getByRole("link", { name: "公开谱面管理", exact: true }).click();
     await page.waitForURL(url => url.pathname === "/dash/charts");
     const row = page.getByRole("article").filter({ has: page.getByRole("heading", { name: /Optional media absent/ }) });
     await row.getByRole("button", { name: "下架谱面", exact: true }).click();
@@ -651,6 +653,7 @@ async function acceptance() {
   await independentSuite("following", () => exerciseFollowing({owner,other,anonymous,origin,step,evidenceDirectory,zip:label=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Following browser\n&inote_4=(120){4}1,2,E\n`)]])}));
   const authorPassed = await independentSuite("author", () => exerciseAuthor({owner,other,anonymous,origin,step,evidenceDirectory,zip:(label,next=false)=>storedZip([["maidata.txt",Buffer.from(`&title=${label}\n&artist=Creator browser\n&inote_4=(120){4}${next?"1,(240)3,4":"1,2"},E\n`)]])}));
   if (authorPassed) await independentSuite("discovery", () => exerciseDiscovery({owner,other,anonymous,origin,step,evidenceDirectory,independentSuite}));
+  await independentSuite("ui_layout",()=>exerciseUiLayout({owner,anonymous,origin,step,evidenceDirectory}));
   assert.deepEqual(suiteFailures, [], "all independent synthetic journeys must pass");
   assert.equal(diagnostics.filter(row => row.type === "pageerror").length, 0, "uncaught browser errors");
   assert.equal(diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length, 0, "hydration errors");

@@ -57,6 +57,9 @@ class ReleaseGateTests(unittest.TestCase):
  def test_governance_ops_group_is_mandatory(self):
   receipt=copy.deepcopy(self.receipt);receipt['result']['steps'].remove('production_governance_ops')
   with self.assertRaisesRegex(ValueError,'RECEIPT_REJECTED'):gate.validate(receipt,self.ready)
+ def test_ui_navigation_layout_group_is_mandatory(self):
+  receipt=copy.deepcopy(self.receipt);receipt['result']['steps'].remove('production_ui_navigation_layout')
+  with self.assertRaisesRegex(ValueError,'RECEIPT_REJECTED'):gate.validate(receipt,self.ready)
  def test_optional_preview_gate_requires_exact_target_and_complete_observations(self):
   self.ready['requiredPreview']={'chart':'1','difficulty':6}
   with self.assertRaisesRegex(ValueError,'RECEIPT_REJECTED'):gate.validate(self.receipt,self.ready)

@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 // 页面标题（spec 第 7.2 节）：每个页面一个 <h1>，下面可以跟一行说明。
 export function PageTitle({ children, description }: { children: ReactNode; description?: ReactNode }) {
   return (
-    <div className="space-y-1.5">
-      <h1 className="text-2xl font-semibold tracking-tight">{children}</h1>
-      {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+    <div className="min-w-0 space-y-2">
+      <h1 className="text-balance break-words text-2xl font-bold tracking-tight sm:text-3xl">{children}</h1>
+      {description ? <p className="max-w-2xl text-pretty text-sm leading-6 text-muted-foreground">{description}</p> : null}
     </div>
   );
 }

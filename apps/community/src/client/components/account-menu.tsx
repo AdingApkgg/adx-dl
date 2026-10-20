@@ -72,18 +72,10 @@ export function AccountMenu() {
         <DropdownMenuLabel className="truncate">{me.name}</DropdownMenuLabel>
         {pending ? null : (
           <>
-            <DropdownMenuItem asChild><Link to={localizeHref("/me/workbench")}>{m.author_workbench()}</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to={localizeHref("/me/charts")}>{m.charts_title()}</Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to={localizeHref("/me/feed")}>{m.following_feed_title()}</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to={localizeHref("/me/following")}>{m.following_title()}</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to={localizeHref("/me/discussions")}>{m.site_my_discussions()}</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to={localizeHref("/me/notifications")}>{m.site_notifications()}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to={localizeHref("/me/library")}>{m.library_title()}</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to={localizeHref("/me/favorites")}>{m.my_favorites()}</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to={localizeHref("/me/governance")}>{m.governance_my_title()}</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to={localizeHref("/me/reports")}>{m.my_reports()}</Link></DropdownMenuItem>
+            <DropdownMenuItem asChild><Link to={localizeHref("/me/workbench")}>{m.author_workbench()}</Link></DropdownMenuItem>
+            <DropdownMenuItem asChild><Link to={localizeHref("/me/feed")}>{m.following_feed_title()}</Link></DropdownMenuItem>
+            <DropdownMenuSeparator />
             {me.isAdmin ? <DropdownMenuItem asChild><Link to={localizeHref("/dash")}>{m.dash_title()}</Link></DropdownMenuItem> : null}
             <DropdownMenuItem asChild>
               <Link to={localizeHref(`/u/${me.publicId ?? me.id}`)}>{m.nav_my_page()}</Link>

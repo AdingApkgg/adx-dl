@@ -10,7 +10,6 @@ import type { ApiClient } from "@/shared/api-client";
 import { makeQueryClient } from "@/shared/query-client";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
-import { loginHref } from "../lib/require-user";
 import Home, { loader } from "./home";
 
 const USER = { id: "abc2345678", name: "阿丁", image: null, status: "active", createdAt: "2026-09-29T00:00:00.000Z" };
@@ -101,15 +100,16 @@ function links(html: string): { href: string | undefined; text: string }[] {
 describe("首页 loader：当前用户取不到", () => {
   // 500 会被查询客户端重试一次（间隔约 1 秒）才算失败，429 这类 4xx 不重试。
   for (const status of [500, 429]) {
-    test(`/api/v1/me 返回 ${status}：loader 不抛，dehydrate 里有 meta、没有 me，页面渲染出'登录'链接`, async () => {
+    test(`/api/v1/me 返回 ${status}：loader 不抛，dehydrate 里有 meta、没有 me，页面保留浏览和创作入口`, async () => {
       // 用户其实登录着也一样：取不到就当没登录，不能猜。
       const data = await visit(true, { meStatus: status });
       const html = renderLoaderData(data);
 
       expect(dataByKey(data).meta).toEqual(META);
       expect(dataByKey(data)).not.toHaveProperty("me");
-      expect(links(html)).toEqual([{ href:"/forum",text:m.site_forum() },{ href:"/help",text:m.site_help() },{ href:"/notices",text:m.site_notices() },{href:"/lists",text:m.library_public_title()},{ href: loginHref("/"), text: m.home_sign_in() }, { href: "/charts", text: m.public_charts_browse() }, { href: "/me/charts", text: m.charts_title() }, { href: "/privacy", text: m.privacy_link() }]);
-      expect(html).toContain(m.home_api_version({ version: 1 }));
+      expect(links(html)).toContainEqual({href:"/charts",text:m.public_charts_browse()});
+      expect(links(html)).toContainEqual({href:"/me/charts/new",text:m.chart_new()});
+      expect(html).not.toContain(m.home_api_version({version:1}));
     });
   }
 
@@ -118,45 +118,19 @@ describe("首页 loader：当前用户取不到", () => {
   });
 });
 
-describe("首页渲染：登录入口", () => {
-  test("未登录：登录后回到首页，并有公开隐私入口", async () => {
-    const html = await renderHome(false);
-
-    expect(links(html)).toEqual([{ href:"/forum",text:m.site_forum() },{ href:"/help",text:m.site_help() },{ href:"/notices",text:m.site_notices() },{href:"/lists",text:m.library_public_title()},{ href: loginHref("/"), text: m.home_sign_in() }, { href: "/charts", text: m.public_charts_browse() }, { href: "/me/charts", text: m.charts_title() }, { href: "/privacy", text: m.privacy_link() }]);
-    expect(loginHref("/")).toBe("/login?next=%2F");
-    expect(html).not.toContain(m.home_signed_in_as({ name: "阿丁" }));
-  });
-
-  test("已登录：显示默认头像和'已登录：昵称'，链接到我的主页、个人资料和账号设置，没有登录链接", async () => {
-    const html = await renderHome(true);
-
-    expect(html).toContain('<svg width="32" height="32"');
-    expect(html).toContain(">阿</text>");
-    expect(html).toContain(m.home_signed_in_as({ name: "阿丁" }));
-    expect(links(html)).toEqual([{ href:"/forum",text:m.site_forum() },{ href:"/help",text:m.site_help() },{ href:"/notices",text:m.site_notices() },{href:"/lists",text:m.library_public_title()},
-      { href: "/u/abc2345678", text: m.home_my_page() },
-      { href: "/settings/profile", text: m.home_profile_settings() },
-      { href: "/settings/account", text: m.home_account_settings() },
-      { href: "/charts", text: m.public_charts_browse() }, { href: "/me/charts", text: m.charts_title() }, { href: "/privacy", text: m.privacy_link() },
-    ]);
-  });
-
-  test("原有内容不变：站名、简介和接口版本", async () => {
-    for (const signedIn of [false, true]) {
-      const html = await renderHome(signedIn);
-
-      expect(html).toContain(m.site_name());
-      expect(html).toContain(m.home_description());
-      expect(html).toContain(m.home_api_version({ version: 1 }));
-    }
-  });
-});
-
-test("home header uses the published decorative avatar",async()=> {
-  const data=await visit(true);
-  const me=data.dehydratedState.queries.find(q=>q.queryKey[0]==="me")!;
-  me.state.data={...USER,image:"/media/home.jpg"};
-  const html=renderLoaderData(data);expect(html).toContain('src="/media/home.jpg"');expect(html).toContain('alt="" aria-hidden="true"');
+describe("homepage content hierarchy",()=>{
+ test("one search and one title lead to browsing and creation, without account metadata",async()=>{
+  for(const signedIn of [false,true]){
+   const html=await renderHome(signedIn);
+   expect(html.match(/role="search"/g)).toHaveLength(1);
+   expect(html.match(/<h1\b/g)).toHaveLength(1);
+   expect(links(html)).toContainEqual({href:"/charts",text:m.public_charts_browse()});
+   expect(links(html)).toContainEqual({href:"/me/charts/new",text:m.chart_new()});
+   expect(html).toContain(m.ui_home_intro());
+   expect(html).not.toContain(m.home_api_version({version:1}));
+   expect(html).not.toContain(m.home_signed_in_as({name:USER.name}));
+  }
+ });
 });
 
 const PUBLIC_CHART: PublicChartDto = { description:'',credits:'',tags:[],releaseNote:'',
@@ -176,14 +150,14 @@ test("homepage SSR fetches at most eight current public charts without caching a
   expect(html).not.toContain("Unpublished import title");
   expect(html).not.toContain("还没有公开谱面。");
 });
-test("homepage distinguishes public API failure from an empty catalog while preserving sign-in and browsing", async () => {
+test("homepage distinguishes public API failure from an empty catalog while preserving creation and browsing", async () => {
   const data = await visit(false, { chartsStatus: 503 });
   expect(data.publicCharts).toBeNull();
   const html = renderLoaderData(data);
   expect(html).toContain("暂时无法加载公开谱面，请稍后重试。");
   expect(html).not.toContain("还没有公开谱面。");
   expect(links(html)).toContainEqual({ href: "/charts", text: m.public_charts_browse() });
-  expect(links(html)).toContainEqual({ href: loginHref("/"), text: m.home_sign_in() });
+  expect(links(html)).toContainEqual({href:"/me/charts/new",text:m.chart_new()});
 });
 test("homepage reads a fresh public list after withdrawal even with the same request context", async () => {
   const items = [PUBLIC_CHART];

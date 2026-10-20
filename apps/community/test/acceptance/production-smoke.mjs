@@ -407,6 +407,26 @@ try {
         for(const path of ['overview','tickets','appeals','audit'])await json('/api/v1/governance/dash/'+path);
       }else{await json('/api/v1/governance/dash/overview',403);}
     });
+    await step('production_ui_navigation_layout',async()=>{
+      for(const width of [320,390,768,1024,1280]){
+        await page.setViewportSize({width,height:900});await visit('/');
+        assert.equal(await page.getByRole('search').count(),1,'ONE_HOMEPAGE_SEARCH');
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'UI_HORIZONTAL_OVERFLOW');
+        const nav=page.locator('.community-bottom-nav');assert.equal(await nav.isVisible(),width<1024);
+        if(width<1024)assert.equal(await nav.getByRole('link').count(),4);
+      }
+      await page.setViewportSize({width:390,height:900});await visit('/en/charts?sort=title');
+      const more=page.getByRole('button',{name:'More navigation',exact:true});await more.click();
+      const sheet=page.getByRole('dialog',{name:'AstroDX Community',exact:true});await sheet.waitFor();
+      assert.equal(await sheet.getByRole('link',{name:'日本語',exact:true}).getAttribute('href'),'/ja/charts?sort=title');
+      await sheet.getByRole('button',{name:'Open settings',exact:true}).click();
+      const settings=page.getByRole('dialog',{name:'Settings',exact:true});await settings.waitFor();await settings.getByRole('button',{name:'Close settings',exact:true}).click();await settings.waitFor({state:'hidden'});
+      await page.keyboard.press('Escape');await sheet.waitFor({state:'hidden'});assert.equal(await more.evaluate(e=>e===document.activeElement),true,'MORE_FOCUS_RESTORED');
+      for(const path of ['/me/workbench','/me/library',...(role==='admin'?['/dash']:[])]){await visit(path);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'PRIVATE_UI_HORIZONTAL_OVERFLOW');}
+      await page.setViewportSize({width:1280,height:900});await visit('/search?type=charts&q=1');await page.getByRole('checkbox',{name:'选择谱面 #1',exact:true}).check();
+      const bar=page.locator('.community-selection-bar');await bar.waitFor();await page.evaluate(()=>scrollTo(0,400));
+      const box=await bar.boundingBox(),header=await page.locator('.community-header').boundingBox();assert.ok(box.y>=header.y+header.height,'SELECTION_BAR_BELOW_HEADER');await bar.getByRole('button',{name:'加入下载队列',exact:true}).click({trial:true});await bar.getByRole('button',{name:'清空选择',exact:true}).click();
+    });
     await step('production_bridge_write_denial_and_session_revocation', async () => {
       const headers = { authorization: `Bearer ${bridgeKey}` };
       assert.equal((await fetch(bridgeUrl + '/api/v1/me')).status, 401);

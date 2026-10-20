@@ -181,7 +181,7 @@ describe("服务端渲染时的会话续期", () => {
     const html = await res.text();
 
     expect(res.status).toBe(200);
-    expect(html).toContain("已登录：续期测试");
+    expect(html).toContain("aria-label=\"账号菜单：续期测试\"");
     const renewed = sessionCookiesIn(res);
     expect(renewed).toHaveLength(1);
     expect(renewed[0]).toContain("Max-Age=2592000");

@@ -21,7 +21,7 @@ REQUIRED_STEPS = {
     'production_author_workbench_and_imports', 'production_author_review_compare_and_denials',
     'production_bridge_write_denial_and_session_revocation',
     'production_public_discovery_search', 'production_authenticated_discovery_library',
-    'production_governance_ops',
+    'production_governance_ops', 'production_ui_navigation_layout',
 }
 
 def atomic(path, value):
