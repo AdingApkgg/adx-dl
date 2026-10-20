@@ -1,3 +1,4 @@
+import type {ComponentType} from "react";
 import {QueryClientProvider,dehydrate} from "@tanstack/react-query";
 import {fireEvent,render,screen,within} from "@testing-library/react";
 import {createMemoryRouter,RouterProvider} from "react-router";
@@ -10,6 +11,7 @@ import {createApiClient} from "@/shared/api-client";
 import {makeQueryClient} from "@/shared/query-client";
 import type {ChartImportSummary} from "@/shared/charts";
 import {m} from "@/paraglide/messages.js";
+const WorkbenchPage=Workbench as unknown as ComponentType<{loaderData:{actor:string;dehydratedState:ReturnType<typeof dehydrate>}}> ;
 const api=createApiClient("https://community.test");
 vi.mock("@/client/lib/browser",()=>({getRenderApi:()=>api,getBrowserApi:()=>api}));
 const summary:ChartImportSummary={title:"Chart",artist:"Artist",maidataMd5Base64:"hash",audio:null,hasCover:false,warnings:[],difficulties:[{difficulty:6,level:"14+",noteCount:10,durationMs:2000,previewSupported:true},{difficulty:7,level:null,noteCount:null,durationMs:null,previewSupported:false}]};
@@ -25,10 +27,11 @@ test("forum board navigation preserves filters, clears pagination and exposes a 
  expect(screen.getAllByRole("link",{name:m.ui_clear_filters()}).every(a=>a.getAttribute("href")==="/forum")).toBe(true);
 });
 test("workbench uses server quota and reservation and keeps attention filters scoped",()=>{
- const client=makeQueryClient(),filters={q:"星",status:"all",changed:false,warnings:false,pending:false};
+ const client=makeQueryClient(),filters={q:"星",status:"draft",changed:false,warnings:false,pending:false};
  client.setQueryData(workbenchQuery(api,"alice",filters).queryKey,{items:[],nextCursor:null,targets:[],counts:{total:4,private:2,published:2,changed:1,warnings:1,pending:1,hidden:0},usage:{usedBytes:8*1048576,reservedBytes:2*1048576,quotaBytes:64*1048576}});
- const router=createMemoryRouter([{path:"*",element:<QueryClientProvider client={client}><Workbench loaderData={{actor:"alice",dehydratedState:dehydrate(client)}} params={{}} matches={[] as never}/></QueryClientProvider>}],{initialEntries:["/me/workbench?q=星&cursor=old"]});render(<RouterProvider router={router}/>);
+ const router=createMemoryRouter([{path:"*",element:<QueryClientProvider client={client}><WorkbenchPage loaderData={{actor:"alice",dehydratedState:dehydrate(client)}}/></QueryClientProvider>}],{initialEntries:["/me/workbench?q=星&status=draft&cursor=old"]});render(<RouterProvider router={router}/>);
  const meter=screen.getByRole("meter") as HTMLMeterElement;expect(meter.value).toBe(10*1048576);expect(meter.max).toBe(64*1048576);
  const attention=screen.getByRole("region",{name:m.ui_workbench_attention()}),link=within(attention).getByRole("link",{name:new RegExp(m.author_warnings())}),at=new URL(link.getAttribute("href")!,"https://community.test");expect(at.searchParams.get("q")).toBe("星");expect(at.searchParams.get("warnings")).toBe("1");expect(at.searchParams.has("cursor")).toBe(false);
+ const changed=new URL(screen.getByRole("link",{name:m.author_changed(),exact:true}).getAttribute("href")!,"https://community.test");expect(changed.searchParams.get("q")).toBe("星");expect(changed.searchParams.get("changed")).toBe("1");expect(changed.searchParams.has("status")).toBe(false);expect(changed.searchParams.has("cursor")).toBe(false);
  expect(screen.getByText(m.ui_workbench_publish_hint())).toBeTruthy();expect(document.querySelector("#publication")).toBeNull();
 });

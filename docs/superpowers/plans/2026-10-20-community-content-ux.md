@@ -50,7 +50,7 @@ Files: workbench.tsx, app.css, messages.
 ### Task 4: One review and centralized release
 
 Files: UI native acceptance helper, production-smoke.mjs, docs/verification/community-content-ux-2026-10-20.md.
-- [ ] One independent static branch review, address material findings; changed-file lint/diff checks only during development.
+- [x] One independent static branch review; fixed P2 changed+draft shortcut conflict, prepared regression. Changed-file lint/diff passed.
 - [ ] Enter release window: designated remote centralized verification, then PR hosted CI native business/UI and fresh-volume restore; fix actual failures and confirm tested merge tree.
 - [ ] Prebackup; formal community-deploy.py; all production groups including extended readonly detail/forum/workbench geometry/controls; postbackup and invariants.
 - [ ] Archive private evidence, clean own bounded resources, record release/CI/backup/legacy links and exact browser-vs-device limits; final docs commit.
