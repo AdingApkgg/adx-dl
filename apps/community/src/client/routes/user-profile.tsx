@@ -1,7 +1,6 @@
 import {ShareChartButton} from "../components/share-chart-button";
 import { FollowAuthor } from "../components/follow-author";
 import { Button } from "@astrodx/ui/components/button";
-import { Card, CardContent } from "@astrodx/ui/components/card";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
 import { data, Link, redirect, useLocation } from "react-router";
 import { ApiError } from "@/shared/api-client";
@@ -118,38 +117,29 @@ function UserContent({ id, works, worksFilters }: { id: string; works: PublicCha
   return (
     <main className="space-y-6">
       {returnHref && returnHref !== location.pathname + location.search ? <Link to={returnHref} state={returnState ? publicListBackState(returnState) : undefined} className="text-sm underline">{m.public_chart_back_results()}</Link> : null}
-      <div className="flex flex-wrap items-center gap-5">
-        <Avatar image={profile.image} id={profile.id} name={profile.name} size={80} />
-        <div className="min-w-0 flex-1 space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight break-words">{profile.name}</h1>
-          {/* 昵称可以重名：用户 id 和昵称一起显示，别人冒充不了（spec 第 10.5 节）。 */}
-          <p className="text-sm text-muted-foreground">{m.user_page_id({ id: profile.publicId })}</p>
-          {/* 注册日期按 UTC 取年月日：服务端和浏览器算出来一样，hydrate 前后文字不变，搜索引擎也看得到。 */}
-          <p className="text-sm text-muted-foreground">{m.user_page_joined({ date: profile.createdAt.slice(0, 10) })}</p>
-        </div>
-        {me?.id === profile.id ? (
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" size="sm"><Link to={localizeHref("/settings/profile")}>{m.user_page_edit()}</Link></Button>
-            <Button asChild variant="outline" size="sm"><Link to={localizeHref("/me/charts")}>{m.charts_title()}</Link></Button>
+      <section id="author-profile" aria-label={m.ui_social_profile()} className="community-profile-panel community-panel">
+        <div className="community-profile-identity">
+          <Avatar image={profile.image} id={profile.id} name={profile.name} size={80} />
+          <div className="min-w-0 space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{m.ui_social_profile()}</p>
+            <h1 className="break-words text-2xl font-bold tracking-tight sm:text-3xl">{profile.name}</h1>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground"><span>{m.user_page_id({ id: profile.publicId })}</span><span>{m.user_page_joined({ date: profile.createdAt.slice(0, 10) })}</span></div>
           </div>
-        ) : null}
-        <FollowAuthor publicId={profile.publicId}/>
-        <Link className="underline" to={localizeHref(`/lists?author=${profile.publicId}`)}>{m.library_public_title()}</Link>
-      </div>
-      <Card>
-        <CardContent>
-          {profile.bio ? (
-            <p className="break-words" style={{ whiteSpace: "pre-line" }}>
-              {profile.bio}
-            </p>
-          ) : (
-            <p className="text-muted-foreground">{m.user_page_no_bio()}</p>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+        <p className="community-profile-bio break-words text-sm leading-7" style={{ whiteSpace: "pre-line" }}>{profile.bio || m.user_page_no_bio()}</p>
+        <div className="community-profile-actions">
+          <FollowAuthor publicId={profile.publicId} />
+          {me?.id === profile.id ? <Button asChild variant="outline" className="min-h-11"><Link to={localizeHref("/settings/profile")}>{m.user_page_edit()}</Link></Button> : null}
+          {me?.id === profile.id ? <Button asChild variant="outline" className="min-h-11"><Link to={localizeHref("/me/workbench")}>{m.ui_social_workbench()}</Link></Button> : null}
+          <Button asChild variant="outline" className="min-h-11"><Link to={localizeHref(`/lists?author=${profile.publicId}`)}>{m.ui_social_author_lists()}</Link></Button>
+          <ShareChartButton title={profile.name} resource="u" publicId={profile.publicId} label={m.ui_social_share_profile()} />
+        </div>
+      </section>
+      <nav className="community-content-nav" aria-label={m.ui_content_navigation()}><a href="#author-profile">{m.ui_social_profile()}</a><a href="#author-public-charts">{m.user_public_charts()}</a></nav>
       <section aria-labelledby="author-public-charts" className="space-y-4">
-        <h2 id="author-public-charts" className="text-xl font-semibold">{m.user_public_charts()}</h2>
-        {works && worksFilters ? <><ShareChartButton title={profile.name} resource="u" publicId={profile.publicId}/><PublicChartSearchForm filters={worksFilters} base={localizeHref(`/u/${profile.publicId}`)} />
+        <div className="community-section-heading"><h2 id="author-public-charts" className="community-section-title">{m.user_public_charts()}</h2></div>
+        <p className="text-sm leading-6 text-muted-foreground">{m.ui_social_public_works_hint()}</p>
+        {works && worksFilters ? <><PublicChartSearchForm lockedAuthor filters={worksFilters} base={localizeHref(`/u/${profile.publicId}`)} />
           <PublicChartBrowser page={works} filters={worksFilters} base={localizeHref(`/u/${profile.publicId}`)} headingLevel={3} /></>
           : <p role="status" className="text-sm text-muted-foreground">{m.public_charts_unavailable()}</p>}
       </section>

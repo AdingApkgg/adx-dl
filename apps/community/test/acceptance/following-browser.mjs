@@ -10,6 +10,12 @@ export async function exerciseFollowing({owner,other,anonymous,origin,step,zip,e
  async function mutate(page,path,method,action){const [r]=await Promise.all([page.waitForResponse(r=>new URL(r.url()).pathname===path&&r.request().method()===method,{timeout:60000}),action()]);assert.ok(r.ok(),`${method} ${path}: ${r.status()}`);return r.json();}
  const identity=await get(owner,"/api/v1/me"),relation=`/api/v1/me/following/authors/${identity.publicId}`;
  let chart;
+ async function layout(page, label) {
+  for(const width of [320,390,768,1280]) {await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`${label} fits ${width}`);}
+  if(evidenceDirectory) {await page.screenshot({path:join(evidenceDirectory,`social-${label}-desktop.png`),fullPage:true});await page.setViewportSize({width:390,height:900});await page.screenshot({path:join(evidenceDirectory,`social-${label}-mobile.png`),fullPage:true});}
+ }
+ async function socialCurrent(page,path) {const nav=page.getByRole("navigation",{name:"关注与通知导航",exact:true});assert.equal(await nav.locator('[aria-current="page"]').count(),1);assert.equal(await nav.locator('[aria-current="page"]').getAttribute("href"),path);}
+
  async function publish(draft){
   await writer.getByRole("region",{name:"公开发布",exact:true}).getByRole("combobox",{name:/公开版本/}).selectOption(draft.currentVersionId);
   await writer.getByLabel("我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。",{exact:true}).check();
@@ -30,17 +36,21 @@ export async function exerciseFollowing({owner,other,anonymous,origin,step,zip,e
    const href=await guest.getByRole("link",{name:"关注作者",exact:true}).getAttribute("href");assert.ok(href.includes("/login?"));await guest.close();
    for(const path of ["/api/v1/me/following","/api/v1/me/following/feed",relation])assert.equal((await anonymous.request.get(url(path))).status(),401);
    await reader.goto(url(`/u/${identity.publicId}`));
+   await reader.getByRole("region",{name:"作者资料",exact:true}).waitFor();assert.equal(await reader.locator('form[role="search"] [name="author"]').count(),0);assert.equal(await reader.getByRole("button",{name:"分享主页",exact:true}).count(),1);await layout(reader,"profile");
+
    const followed=await mutate(reader,relation,"PUT",()=>reader.getByRole("button",{name:"关注作者",exact:true}).click());assert.equal(followed.following,true);assert.equal(followed.notify,false);
    assert.equal((await get(owner,"/api/v1/me/following")).items.length,0);
    await writer.goto(url("/me/charts/new"));await chooseFiles(writer.getByLabel("选择 ADX / ZIP",{exact:true}),{name:"following.zip",mimeType:"application/zip",buffer:zip("Following browser release")});
    await writer.getByRole("button",{name:"保存私有草稿",exact:true}).waitFor({timeout:90000});
    const draft=await mutate(writer,"/api/v1/me/charts","POST",()=>writer.getByRole("button",{name:"保存私有草稿",exact:true}).click());chart=await publish(draft);
-   await reader.goto(url("/me/feed"));await reader.getByRole("heading",{level:2,name:"Following browser release",exact:true}).waitFor();
+   await reader.goto(url("/me/feed"));await reader.getByRole("heading",{level:3,name:"Following browser release",exact:true}).waitFor();
+   await socialCurrent(reader,"/me/feed");await reader.getByRole("heading",{level:2,name:/UTC/}).waitFor();await layout(reader,"feed");
    const response=await other.request.get(url("/api/v1/me/following/feed"));assert.equal(response.headers()["cache-control"],"private, no-store");
    assert.equal((await get(other,"/api/v1/discussions/notifications?kind=author_update")).items.length,0);
   });
   await step("following_enable_new_version_notify_and_durable_read",async()=>{
    await reader.goto(url("/me/following"));
+   await socialCurrent(reader,"/me/following");await layout(reader,"following");
    const enabled=await mutate(reader,relation,"PUT",()=>reader.getByRole("checkbox",{name:"接收站内更新提醒",exact:true}).click());assert.equal(enabled.notify,true);
    await reader.waitForFunction(()=>document.querySelector('input[type="checkbox"]')?.checked===true);
    assert.equal((await get(other,"/api/v1/discussions/notifications?kind=author_update")).items.length,0);
@@ -48,6 +58,10 @@ export async function exerciseFollowing({owner,other,anonymous,origin,step,zip,e
    const deadline=Date.now()+80000;
    for(;;){const n=await get(other,"/api/v1/discussions/notifications?kind=author_update");if(n.items.some(n=>n.update?.chart?.versionId===chart.currentVersionId))break;assert.ok(Date.now()<deadline,"actual following worker must deliver new version");await new Promise(r=>setTimeout(r,1000));}
    await reader.goto(url("/me/notifications?kind=author_update"));await reader.getByRole("heading",{level:3,name:/作者更新/}).waitFor();
+   await socialCurrent(reader,"/me/notifications");
+   await reader.getByRole("link",{name:"未读",exact:true}).click();await reader.waitForURL(u=>u.searchParams.get("unread")==="true"&&u.searchParams.get("kind")==="author_update");
+   await reader.getByRole("combobox",{name:"通知内容",exact:true}).selectOption("");await reader.getByRole("button",{name:"应用",exact:true}).click();await reader.waitForURL(u=>u.searchParams.get("unread")==="true"&&!u.searchParams.get("kind"));
+   await reader.getByRole("combobox",{name:"通知内容",exact:true}).selectOption("author_update");await reader.getByRole("button",{name:"应用",exact:true}).click();await reader.waitForURL(u=>u.searchParams.get("unread")==="true"&&u.searchParams.get("kind")==="author_update");await layout(reader,"notifications");
    await mutate(reader,"/api/v1/discussions/notifications/read","POST",()=>reader.getByRole("button",{name:"本页未读标为已读",exact:true}).click());
    assert.equal((await get(other,"/api/v1/discussions/notifications?kind=author_update&unread=true")).items.length,0);
    if(evidenceDirectory)await reader.screenshot({path:join(evidenceDirectory,"following-notifications.png"),fullPage:true});
