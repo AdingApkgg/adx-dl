@@ -20,7 +20,7 @@ import { dashApi } from "../queries/dash";
 import { ChartRow } from "./dash-charts";
 import type { Route } from "./+types/dash-reports";
 export { headers, shouldRevalidate } from "../lib/dash";
-export async function loader({ context, url }: Route.LoaderArgs) { return loadDash(context, url, api => api.reports(url.searchParams.get("status") ?? "open", url.searchParams.get("cursor") ?? undefined)); }
+export async function loader({ context, url }: Route.LoaderArgs) { return loadDash(context, url, api => api.reports(url.searchParams.get("status") ?? "open", url.searchParams.get("cursor") ?? undefined, url.searchParams.get("ticket") ?? undefined)); }
 export default function DashReports({ loaderData }: Route.ComponentProps) {
   const location = useLocation(), filter = new URLSearchParams(location.search).get("status") ?? "open";
   return <section className="space-y-5"><h2 className="text-lg font-semibold">{m.dash_reports()}</h2><p className="text-sm text-muted-foreground">{m.dash_reports_hint()}</p>
@@ -49,7 +49,7 @@ function ReportRow({ report }: { report: DashReport }) {
       void revalidator.revalidate();
     } } finally { if (alive.current) setPending(false); }
   }
-  return <article className="space-y-4 rounded-xl border p-4">
+  return <article id={`report-${report.id}`} className="space-y-4 rounded-xl border p-4">
     <div className="space-y-2"><h3 className="break-words font-semibold">{report.title} · #{report.publicId}</h3>
       <p className="break-words text-sm text-muted-foreground">{report.artist}</p>
       <p className="text-sm">{reportCategory(report.category)} · {reportStatus(report.status)}</p>

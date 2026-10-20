@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import { UUID_PATTERN } from "../uuid";
 import { user } from "../db/schema";
@@ -32,6 +32,7 @@ export async function withSocialUser<T>(db: Db, id: string, run: (tx: DbTransact
   return withStorageTransaction(db, async tx => {
     const [account] = await tx.select({ status: user.status }).from(user).where(eq(user.id, id)).for("update");
     if (account?.status !== "active") throw new HTTPException(403);
+    await tx.execute(sql`select set_config('adxc.governance_actor',${id},true)`);
     return run(tx);
   });
 }

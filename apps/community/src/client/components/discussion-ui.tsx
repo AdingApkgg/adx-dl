@@ -35,7 +35,7 @@ export function queryParams(url: URL, keys: string[]) { return Object.fromEntrie
 export const codepoints = (value: string) => Array.from(value.trim()).length;
 export function useDiscussionUser() { return useQuery(meQuery(getRenderApi())).data; }
 export function PrivateDiscussionGuard({ userId, children, admin = false }: { userId: string | null; children: ReactNode; admin?: boolean }) { const me = useDiscussionUser(); return me && me.id === userId && me.status === "active" && (!admin || me.isAdmin) ? children : null; }
-export function useDiscussionTask() {
+export function useDiscussionTask(errorMessage?: (error:unknown)=>string) {
   const [pending, setPending] = useState(false), [failure, setFailure] = useState<string | null>(null), [reauth, setReauth] = useState(false);
   const location = useLocation(), alive = useRef(true), busy = useRef(false);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
@@ -45,7 +45,7 @@ export function useDiscussionTask() {
     catch (error) { if (!alive.current) return false; const target = accountErrorRedirect(error, location.pathname + location.search); if (target) { window.location.assign(target); return false; }
       const status = error instanceof ApiError ? error.status : 0, code = error instanceof ApiError ? error.code : "";
       const fresh = ["REAUTH_REQUIRED", "SESSION_NOT_FRESH"].includes(code); setReauth(fresh);
-      setFailure(fresh ? m.dash_reauth() : code === "REPORT_MODERATION_REQUIRED" ? m.discussion_actioned_hint() : status === 409 ? m.discussion_conflict() : status === 429 ? m.discussion_limit() : status === 404 ? m.discussion_unavailable() : status === 400 ? m.discussion_invalid() : status === 403 ? m.discussion_readonly() : m.discussion_unconfirmed()); return false;
+      setFailure(fresh ? m.dash_reauth() : errorMessage ? errorMessage(error) : code === "REPORT_MODERATION_REQUIRED" ? m.discussion_actioned_hint() : status === 409 ? m.discussion_conflict() : status === 429 ? m.discussion_limit() : status === 404 ? m.discussion_unavailable() : status === 400 ? m.discussion_invalid() : status === 403 ? m.discussion_readonly() : m.discussion_unconfirmed()); return false;
     } finally { busy.current = false; if (alive.current) setPending(false); }
   }
   return { run, pending, failure, feedback: failure ? <Alert variant="destructive">{failure}{reauth ? <> <a href={loginHref(location.pathname + location.search, { reauth: "1" })} className={textLinkClass}>{m.settings_reauth()}</a></> : null}</Alert> : null };
@@ -142,6 +142,7 @@ export function DiscussionSignIn() { const location = useLocation(); return <Lin
 
 export function safeDiscussionHref(href: string | null): string | null {
   if (href === "/me/library?view=reports") return `${localizeHref("/me/library")}?view=reports`;
+  if (href === "/me/governance") return localizeHref("/me/governance");
   if (href === "/me/reports") return localizeHref("/me/reports");
   if (href === "/me/discussions?kind=reports") return `${localizeHref("/me/discussions")}?kind=reports`;
   if (!href || !/^\/(?:forum\/[1-9]\d{0,18}|charts\/[1-9]\d{0,18})(?:#message-[A-Za-z0-9_-]{1,100})?$/.test(href)) return null;

@@ -398,6 +398,15 @@ try {
       await visit('/me/library');await json('/api/v1/me/lists');await visit('/downloads');
       if(role==='admin'){const status=await json('/api/v1/dash/status');assert.equal(status.discovery.ready,true);assert.deepEqual(status.discovery.permissionVersions,[1,2]);}
     });
+    await step('production_governance_ops',async()=>{
+      await visit('/me/governance');await page.getByRole('heading',{name:'我的处理中心',exact:true}).waitFor();
+      await json('/api/v1/governance/me/decisions');await json('/api/v1/governance/me/appeals');
+      await visit('/me/governance?view=appeals');await page.getByRole('heading',{name:'我的处理中心',exact:true}).waitFor();
+      if(role==='admin'){
+        for(const [path,title] of [['/dash/governance','治理与站务'],['/dash/appeals','申诉复核'],['/dash/audit','管理操作记录']]){await visit(path);await page.getByRole('heading',{level:2,name:title,exact:true}).waitFor();}
+        for(const path of ['overview','tickets','appeals','audit'])await json('/api/v1/governance/dash/'+path);
+      }else{await json('/api/v1/governance/dash/overview',403);}
+    });
     await step('production_bridge_write_denial_and_session_revocation', async () => {
       const headers = { authorization: `Bearer ${bridgeKey}` };
       assert.equal((await fetch(bridgeUrl + '/api/v1/me')).status, 401);

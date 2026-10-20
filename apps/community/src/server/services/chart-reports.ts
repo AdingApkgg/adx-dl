@@ -63,11 +63,11 @@ export function reportFilter(value?: string): ReportFilter {
   if (value === "resolved" || value === "all") return value;
   throw new HTTPException(400);
 }
-export async function listDashReports(ctx: StorageContext, filter: ReportFilter, input: SocialPageInput = {}): Promise<DashReportsPage> {
-  const p = socialPage(input, `dash-reports:${filter}`), t = chartReports;
+export async function listDashReports(ctx: StorageContext, filter: ReportFilter, input: SocialPageInput = {}, ticket?: string): Promise<DashReportsPage> {
+  const p = socialPage(input, `dash-reports:${filter}:${ticket??"all"}`), t = chartReports;
   const rows = await ctx.db.select({ row: t, reporterPublicId: sql<bigint | null>`case when ${userPublicIds.journalSequence}<=(select exported_sequence from storage_journal_progress where id='global') then ${userPublicIds.publicId} else null end` })
     .from(t).leftJoin(userPublicIds, eq(userPublicIds.userId, t.reporterId))
-    .where(and(filter === "open" ? eq(t.status, "open") : filter === "resolved" ? sql`${t.status}<>'open'` : undefined,
+    .where(and(ticket ? eq(t.id,ticket) : undefined, filter === "open" ? eq(t.status, "open") : filter === "resolved" ? sql`${t.status}<>'open'` : undefined,
       p.cursor ? or(lt(t.createdAt, new Date(p.cursor.at)), and(eq(t.createdAt, new Date(p.cursor.at)), lt(t.id, p.cursor.id))) : undefined))
     .orderBy(desc(t.createdAt), desc(t.id)).limit(p.limit + 1);
   const page = rows.slice(0, p.limit), last = page.at(-1);

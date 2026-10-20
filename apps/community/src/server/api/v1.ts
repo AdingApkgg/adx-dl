@@ -1,3 +1,4 @@
+import { governanceRoutes } from "./governance";
 import {discoveryRoutes} from "./discovery";
 import {downloadPlanRoutes} from "./download-plans";
 import { libraryRoutes,publicListRoutes,dashLibraryRoutes } from "./library";
@@ -31,6 +32,7 @@ export const apiV1 = new Hono<AppEnv>()
   .route("/discussions", discussionRoutes)
   .route("/me/following", followingRoutes)
   .route("/dash", dashRoutes)
+  .route("/governance", governanceRoutes)
   .route("/uploads", uploadRoutes)
   .route("/files", fileRoutes)
   .route("/me/avatar", avatarRoutes)

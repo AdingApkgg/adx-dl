@@ -39,6 +39,7 @@ export default function Privacy({ loaderData }: Route.ComponentProps) {
           {section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
         </section>
       ))}
+      <section className="space-y-3"><h2 className="text-lg font-semibold">{m.governance_my_title()}</h2><p>{m.governance_privacy()}</p></section>
       <section id="contact" className="space-y-3">
         <h2 className="text-lg font-semibold">{m.privacy_contact_heading()}</h2>
         <p>
