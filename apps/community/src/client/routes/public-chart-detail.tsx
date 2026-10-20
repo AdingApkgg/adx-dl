@@ -13,6 +13,7 @@ import { publicListBackState, publicListReturnState } from "../lib/public-chart-
 import { m } from "@/paraglide/messages.js";
 import { getLocale, localizeHref } from "@/paraglide/runtime.js";
 import type { PublicChartDto } from "@/shared/charts";
+import type { ChartDifficulty } from "@/shared/charts";
 import { ApiError } from "@/shared/api-client";
 import { apiContext } from "@/shared/router-context";
 import { Avatar } from "../components/avatar";
@@ -59,7 +60,11 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
   const returnState = publicListReturnState(location.state);
   const returnHref = returnState?.publicListHref;
   const canPreview = chart.summary.difficulties.some(row => row.previewSupported);
-  return <main className="space-y-6">
+  function previewDifficulty(difficulty: ChartDifficulty) {
+    if (!chart.summary.difficulties.some(row => row.difficulty === difficulty && row.previewSupported)) return;
+    window.dispatchEvent(new CustomEvent("community-preview-seek", {detail:{id:chart.publicId,versionId:chart.versionId,difficulty,ms:0}}));
+  }
+  return <main className="community-chart-page space-y-8">
     <Link to={returnHref ?? localizeHref("/charts")} state={returnState ? publicListBackState(returnState) : undefined} className={textLinkClass}>{returnHref ? /\/me\/favorites$/.test(returnHref.split("?")[0]!) ? m.my_favorites() : /^\/(?:(?:en|ja)\/)?u\//.test(returnHref) ? m.public_chart_back_author() : m.public_chart_back_results() : m.public_charts_title()}</Link>
     <div className="community-chart-detail-hero community-panel">
       <div className="community-chart-cover-frame"><PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} /></div>
@@ -69,8 +74,8 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
           <Avatar image={chart.author.image} id={chart.author.id} name={chart.author.name} size={32} />{m.public_chart_author({ name: chart.author.name })}
         </Link> : <p>{m.public_chart_author({ name: m.public_chart_anonymous() })}</p>}
         {chart.author?.publicId ? <FollowAuthor publicId={chart.author.publicId}/> : null}
-        <p>{m.chart_version({ number: String(chart.ordinal) })} · {(chart.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p>
-        <time dateTime={chart.updatedAt}>{m.public_chart_updated({ date: chart.updatedAt.slice(0, 10) })}</time>
+        <p className="text-sm text-muted-foreground">{m.chart_version({ number: String(chart.ordinal) })} · {(chart.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p>
+        <time className="block text-xs text-muted-foreground" dateTime={chart.updatedAt}>{m.public_chart_updated({ date: chart.updatedAt.slice(0, 10) })}</time>
         <div role="group" aria-label={m.public_chart_actions()} className="flex flex-wrap items-start gap-3">
           {canPreview ? <Button asChild variant="secondary" className="min-h-11"><a href="#chart-preview"><PlayCircleIcon aria-hidden="true" />{m.public_chart_preview_action()}</a></Button> : null}
           <Button asChild className="min-h-11"><a href={publicChartDownloadUrl(chart.publicId)} download><DownloadIcon aria-hidden="true" />{m.public_chart_download()}</a></Button>
@@ -82,18 +87,19 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
         {!canPreview ? <p className="text-sm text-muted-foreground">{m.public_chart_preview_unavailable()}</p> : null}
       </div>
     </div>
+    <nav aria-label={m.ui_content_navigation()} className="community-content-nav">{[["chart-preview",m.public_chart_preview()],["chart-information",m.ui_chart_overview()],["chart-difficulties",m.chart_difficulties()],["chart-discussion",m.discussion_comments()],["chart-recommendations",m.ui_chart_recommendations()]].map(([id,label])=><a key={id} href={`#${id}`}>{label}</a>)}</nav>
     {chart.shareInvalid?<p role="status">{m.discovery_share_invalid()}</p>:null}
     <PrivateChartPreview enableShare initialDifficulty={chart.share?.difficulty} initialPosition={chart.share?.seconds??0} sectionId="chart-preview" key={`${chart.id}/${chart.versionId}/${chart.share?.difficulty??""}/${chart.share?.seconds??""}`} id={chart.publicId} versionId={chart.versionId} summary={chart.summary} assetUrl={publicChartAssetUrl} />
-    <section aria-label={m.chart_metadata_heading()} className="community-panel space-y-3">
+    <section id="chart-information" aria-label={m.chart_metadata_heading()} className="community-panel space-y-5"><h2 className="community-section-title">{m.ui_chart_overview()}</h2>
       <PublicChartTags tags={chart.tags} />
       {chart.aliases?.length?<p className="break-words text-sm">{m.discovery_aliases()}: {chart.aliases.join(" · ")}</p>:null}
       {chart.description ? <div><h2 className="font-semibold">{m.chart_metadata_description()}</h2><p className="whitespace-pre-wrap break-words">{chart.description}</p></div> : null}
       {chart.credits ? <div><h2 className="font-semibold">{m.chart_metadata_credits()}</h2><p className="whitespace-pre-wrap break-words">{chart.credits}</p></div> : null}
       {chart.releaseNote ? <div><h2 className="font-semibold">{m.chart_metadata_release_note()}</h2><p className="whitespace-pre-wrap break-words">{chart.releaseNote}</p></div> : null}
     </section>
-    <ChartSummary summary={chart.summary} />
+    <section id="chart-difficulties" className="community-panel space-y-4"><div><h2 className="community-section-title">{m.chart_difficulties()}</h2><p className="mt-1 text-sm text-muted-foreground">{m.ui_chart_difficulty_hint()}</p></div><ChartSummary summary={chart.summary} onPreview={previewDifficulty}/></section>
     <ChartDiscussion chartId={chart.publicId} versionId={chart.versionId} summary={chart.summary}/>
-    <section className="space-y-3" aria-label={m.chart_metadata_related()}><h2 className="font-semibold">{m.chart_metadata_related()}</h2>
+    <section id="chart-recommendations" className="space-y-4" aria-label={m.chart_metadata_related()}><h2 className="font-semibold">{m.chart_metadata_related()}</h2>
       {chart.related?.length ? <ul className={PUBLIC_CHART_GRID_CLASS}>{chart.related.map(item => <li key={item.id}><PublicChartCard chart={item} headingLevel={3} /></li>)}</ul> : chart.related === null ? <p role="status">{m.chart_metadata_related_unavailable()}</p> : chart.author ? <Link className={textLinkClass} to={localizeHref(`/u/${chart.author.publicId ?? chart.author.id}`)}>{m.public_chart_back_author()}</Link> : null}
     </section>
     {chart.other===null?<p role="status">{m.discovery_unavailable()}</p>:chart.other?.length?<section className="space-y-3"><h2 className="font-semibold">{m.discovery_other_works()}</h2><ul className={PUBLIC_CHART_GRID_CLASS}>{chart.other.map(c=><li key={c.publicId}><PublicChartCard chart={c} headingLevel={3}/></li>)}</ul></section>:null}

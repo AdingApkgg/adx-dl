@@ -28,24 +28,24 @@
 ### Task 1: Chart detail and shared visual patterns
 
 Files: public-chart-detail.tsx, chart-summary.tsx, chart-discussion.tsx, app.css, messages/{zh,en,ja}.json.
-- [ ] Reorganize hero, metadata and contents anchors; preserve return state and lazy preview.
-- [ ] Add optional ChartSummary onPreview(difficulty) callback; use existing scoped seek event for public chart slot cards, preserve private summary default.
-- [ ] Prepare DOM/native assertions for scoped supported/unsupported slot actions and content order; do not run yet.
+- [x] Reorganize hero, metadata and contents anchors; preserve return state and lazy preview.
+- [x] Add optional ChartSummary onPreview(difficulty) callback; use existing scoped seek event for public chart slot cards, preserve private summary default.
+- [x] Prepare DOM/native assertions for scoped supported/unsupported slot actions and content order; do not run yet.
 
 ### Task 2: Forum browsing, reading and composition
 
 Files: forum.tsx, forum-topic.tsx, forum-new.tsx, discussion-ui.tsx, discussion-topic-editor.tsx, app.css, messages.
-- [ ] Board links preserve existing recognized filters except cursor; provide clear filters and advanced chart control.
-- [ ] Compact topic rows, distinct list groups, readable topic main and composer, remove duplicate share action only.
-- [ ] Preserve draft/identity/conflict/reply/report/restore controls; prepare query/empty/locked regressions without running.
+- [x] Board links preserve existing recognized filters except cursor; provide clear filters and advanced chart control.
+- [x] Compact topic rows, distinct list groups, readable topic main and composer, remove duplicate share action only.
+- [x] Preserve draft/identity/conflict/reply/report/restore controls; prepare query/empty/locked regressions without running.
 
 ### Task 3: Creator workbench
 
 Files: workbench.tsx, app.css, messages.
-- [ ] Four key counts plus three actionable filter links; use URL parameters and clear cursor/history on scope change.
-- [ ] Show quota from server with accessible bounded meter and original numeric used/reserved information.
-- [ ] Structure chart cards with explicit status/version comparison/edit/review/compare/publication actions; empty/error/retry retained.
-- [ ] Prepare DOM/native assertions for query links, quota, actor isolation and mobile geometry without running.
+- [x] Four key counts plus three actionable filter links; use URL parameters and clear cursor/history on scope change.
+- [x] Show quota from server with accessible bounded meter and original numeric used/reserved information.
+- [x] Structure chart cards with explicit status/version comparison/edit/review/compare/publication actions; empty/error/retry retained.
+- [x] Prepare DOM/native assertions for query links, quota, actor isolation and mobile geometry without running.
 
 ### Task 4: One review and centralized release
 

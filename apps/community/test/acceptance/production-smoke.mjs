@@ -426,6 +426,18 @@ try {
       await page.setViewportSize({width:1280,height:900});await visit('/search?type=charts&q=1');await page.getByRole('checkbox',{name:'选择谱面 #1',exact:true}).check();
       const bar=page.locator('.community-selection-bar');await bar.waitFor();await page.evaluate(()=>scrollTo(0,400));
       const box=await bar.boundingBox(),header=await page.locator('.community-header').boundingBox();assert.ok(box.y>=header.y+header.height,'SELECTION_BAR_BELOW_HEADER');await bar.getByRole('button',{name:'加入下载队列',exact:true}).click({trial:true});await bar.getByRole('button',{name:'清空选择',exact:true}).click();
+      // Read-only content UX acceptance stays inside the required UI group.
+      await visit('/charts/1');
+      assert.equal(await page.getByRole('navigation',{name:'本页导航',exact:true}).getByRole('link').count(),5);
+      const summary=await json('/api/v1/charts/1'),slot=summary.summary.difficulties.find(d=>d.difficulty===6&&d.previewSupported);assert.ok(slot,'REQUIRED_DIFFICULTY_CARD');
+      const card=page.locator('#chart-difficulties li').nth(summary.summary.difficulties.indexOf(slot));await card.getByRole('button').click();
+      const preview=page.locator('#chart-preview');await preview.locator('canvas').waitFor();assert.equal(await preview.getByRole('combobox',{name:'难度',exact:true}).inputValue(),'6');await preview.getByRole('button',{name:'播放',exact:true}).click({trial:true,timeout:30000});await preview.getByRole('button',{name:'关闭预览',exact:true}).click();
+      await page.setViewportSize({width:320,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'DETAIL_UI_HORIZONTAL_OVERFLOW');
+      await visit('/forum?q=Browser&sort=published&unanswered=true&chart=1');const board=page.getByRole('navigation',{name:'浏览板块',exact:true}).getByRole('link').last(),href=new URL(await board.getAttribute('href'),origin);
+      for(const [key,value] of [['q','Browser'],['sort','published'],['unanswered','true'],['chart','1']])assert.equal(href.searchParams.get(key),value);assert.equal(href.searchParams.has('cursor'),false);await board.click();await page.waitForURL(u=>u.searchParams.has('board'));
+      await page.getByRole('link',{name:'清除筛选',exact:true}).first().click();await page.waitForURL(u=>u.pathname==='/forum'&&!u.search);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'FORUM_UI_HORIZONTAL_OVERFLOW');
+      await visit('/forum/new');await page.locator('.community-topic-editor').waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'EDITOR_UI_HORIZONTAL_OVERFLOW');
+      await visit('/me/workbench');const workbench=await json('/api/v1/me/charts/workbench'),meter=page.getByRole('meter',{name:'存储用量',exact:true});await meter.waitFor();assert.equal(Number(await meter.getAttribute('max')),Math.max(1,workbench.usage.quotaBytes));assert.equal(await page.getByRole('region',{name:'需要关注',exact:true}).getByRole('link').count(),3);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'WORKBENCH_UI_HORIZONTAL_OVERFLOW');
     });
     await step('production_bridge_write_denial_and_session_revocation', async () => {
       const headers = { authorization: `Bearer ${bridgeKey}` };

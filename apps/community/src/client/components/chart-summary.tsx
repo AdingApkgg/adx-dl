@@ -1,5 +1,7 @@
 import { m } from "@/paraglide/messages.js";
-import type { ChartImportSummary } from "@/shared/charts";
+import { PlayCircleIcon } from "lucide-react";
+import { publicDifficultyName } from "./public-chart-card";
+import type { ChartDifficulty, ChartImportSummary } from "@/shared/charts";
 
 function warningMessage(code: string): string {
   switch (code) {
@@ -16,15 +18,16 @@ function warningMessage(code: string): string {
   }
 }
 
-export function ChartSummary({ summary }: { summary: ChartImportSummary }) {
+export function ChartSummary({ summary, onPreview }: { summary: ChartImportSummary; onPreview?: (difficulty: ChartDifficulty) => void }) {
   return <div className="space-y-3 text-sm">
     <dl className="grid grid-cols-2 gap-2">
       <dt>{m.chart_audio()}</dt><dd>{summary.audio ? summary.audio.mime : m.chart_silent()}</dd>
       <dt>{m.chart_cover()}</dt><dd>{summary.hasCover ? m.chart_present() : m.chart_missing()}</dd>
     </dl>
-    <ul className="space-y-1">
-      {summary.difficulties.map((difficulty) => <li key={difficulty.difficulty}>
-        {m.chart_difficulty({ difficulty: String(difficulty.difficulty) })} · {difficulty.level ?? "—"}
+    <ul className={onPreview ? "community-difficulty-grid" : "space-y-1"}>
+      {summary.difficulties.map((difficulty) => <li key={difficulty.difficulty} className={onPreview ? "community-difficulty-card" : undefined}>
+        {onPreview ? <div className="community-section-heading"><span className="font-semibold">{publicDifficultyName(difficulty.difficulty)} · {difficulty.level ?? "—"}</span>{difficulty.previewSupported ? <button type="button" className="community-inline-action" aria-label={m.ui_preview_difficulty({name:publicDifficultyName(difficulty.difficulty)})} onClick={() => onPreview(difficulty.difficulty)}><PlayCircleIcon aria-hidden="true" className="size-4"/>{m.public_chart_preview_action()}</button> : <span className="community-status">{m.chart_unsupported()}</span>}</div> : null}
+        {!onPreview ? <>{m.chart_difficulty({ difficulty: String(difficulty.difficulty) })} · {difficulty.level ?? "—"}</> : null}
         {difficulty.designer ? ` · ${m.chart_metadata_designer()}: ${difficulty.designer}` : ""}
         {difficulty.noteCount === null || difficulty.durationMs === null ? ` · ${m.chart_metadata_unknown()}` : ""}
         {difficulty.noteCount !== null ? ` · ${m.chart_notes({ count: String(difficulty.noteCount) })}` : ""}
