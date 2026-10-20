@@ -30,8 +30,9 @@ export async function exerciseGovernance({owner,other,anonymous,origin,step,evid
   await card.getByLabel('申诉理由',{exact:true}).fill('Synthetic author appeal');await card.getByRole('checkbox').check();
   appeal=await mutation(reader,'/api/v1/governance/me/appeals',()=>card.getByRole('button',{name:'提交申诉',exact:true}).click());
   assert.equal((await owner.request.post(url('/api/v1/governance/me/appeals'),{headers:{origin:origin.origin},data:{decisionKey:appeal.decisionKey,reason:'Foreign appeal'}})).status(),404);
-  await staff.goto(url('/dash/appeals'));const review=staff.locator(`#appeal-${appeal.id}`);
-  await review.getByLabel('复核结果',{exact:true}).selectOption('review_required');await review.getByLabel('给申诉人的反馈',{exact:true}).fill('Synthetic review requires reconsideration');await review.getByRole('checkbox').check();
+  const queue=await get(owner,'/api/v1/governance/dash/appeals?status=open');assert.equal(queue.items.some(r=>r.id===appeal.id),true,'staff queue must include submitted appeal');
+  const response=await staff.goto(url('/dash/appeals'));assert.equal(response.status(),200);await staff.getByRole('heading',{level:2,name:'申诉复核',exact:true}).waitFor();const review=staff.locator(`#appeal-${appeal.id}`);
+  await review.getByRole('combobox',{name:'复核结果',exact:true}).selectOption('review_required');await review.getByLabel('给申诉人的反馈',{exact:true}).fill('Synthetic review requires reconsideration');await review.getByRole('checkbox').check();
   const result=await mutation(staff,`/api/v1/governance/dash/appeals/${appeal.id}/resolution`,()=>review.getByRole('button',{name:'保存复核结果',exact:true}).click());assert.equal(result.status,'review_required');
   assert.equal((await anonymous.request.get(url(`/api/v1/discussions/topics/${topic.publicId}`))).status(),404,'review must not revive hidden topic');
   await reader.goto(url('/me/governance?view=appeals'));await reader.getByText('Synthetic review requires reconsideration',{exact:true}).waitFor();
@@ -50,5 +51,5 @@ export async function exerciseGovernance({owner,other,anonymous,origin,step,evid
   }
  });
  assert.deepEqual(errors,[]);
- }finally{await Promise.allSettled([reader.close(),staff.close()]);}
+ }catch(error){if(evidenceDirectory){await Promise.allSettled([reader.screenshot({path:join(evidenceDirectory,'governance-reader-failure.png'),fullPage:true}),staff.screenshot({path:join(evidenceDirectory,'governance-staff-failure.png'),fullPage:true})]);}throw error;}finally{await Promise.allSettled([reader.close(),staff.close()]);}
 }

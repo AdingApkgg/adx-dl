@@ -26,6 +26,7 @@ test("only recipient can appeal; retries keep first text, concurrent submissions
  await expect(createAppeal(f.ctx,other,{decisionKey:key,reason:"foreign"})).rejects.toMatchObject({status:404});
  const results=await Promise.all([createAppeal(f.ctx,author,{decisionKey:key,reason:"First"}),createAppeal(f.ctx,author,{decisionKey:key,reason:"First"})]);
  expect(results[0].id).toBe(results[1].id);
+ expect((await listAppeals(f.ctx,{status:"open"})).items.some(r=>r.id===results[0].id)).toBe(true);
  expect((await createAppeal(f.ctx,author,{decisionKey:key,reason:"Retry text"})).reason).toBe("First");
  expect((await listAppeals(f.ctx,{},other)).items).toHaveLength(0);
  const decisions=await governanceDecisions(f.ctx,author,{});

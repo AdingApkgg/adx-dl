@@ -34,3 +34,8 @@ test("resolved appeal has no mutable review form",()=>{
  mount(<AppealReviewForm appeal={{id:'a',decisionKey:decision.key,reason:'reason',publicReason:'Public reason',status:'upheld',revision:2,createdAt:decision.createdAt,resolvedAt:decision.createdAt,resolutionNote:'Reviewed'}}/>);
  expect(screen.queryByRole('button',{name:m.governance_resolve()})).toBeNull();
 });
+
+test("open appeal exposes an accessible outcome selector and requires confirmation",()=>{
+ mount(<AppealReviewForm appeal={{id:'a',decisionKey:decision.key,reason:'reason',publicReason:'Public reason',status:'open',revision:1,createdAt:decision.createdAt,resolvedAt:null,resolutionNote:null}}/>);
+ const outcome=screen.getByRole('combobox',{name:m.governance_result()});fireEvent.change(outcome,{target:{value:'review_required'}});expect((outcome as HTMLSelectElement).value).toBe('review_required');expect(screen.getByRole('button',{name:m.governance_resolve()}).hasAttribute('disabled')).toBe(true);
+});
