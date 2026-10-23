@@ -226,7 +226,7 @@ describe("账号设置页渲染：登录方式", () => {
     const withoutEmail = await renderPage({ accounts: [googleAccount(null)] });
 
     expect(withEmail).toContain(m.settings_login_google({ email: "a@example.com" }));
-    expect(listItems(withoutEmail)[0]).toStartWith("Google ");
+    expect(listItems(withoutEmail)[0]?.replace(/<[^>]+>/g, "")).toStartWith("Google");
     expect(withoutEmail).not.toContain(m.settings_login_google({ email: "" }));
   });
 

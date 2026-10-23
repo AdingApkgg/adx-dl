@@ -21,7 +21,7 @@ vi.mock("@/client/lib/auth-client", () => ({ authClient: { signIn: { social: act
 vi.mock("@/client/lib/turnstile", () => ({ useTurnstile: () => ({ ref: { current: null }, token: "fixture-token", failed: false, reset: actions.reset }) }));
 vi.mock("@/client/imports/provider", () => ({ clearDeviceImports: actions.clearImports }));
 const api = createApiClient("https://community.test");
-vi.mock("@/client/lib/browser", () => ({ getRenderApi: () => api, getBrowserApi: () => api }));
+vi.mock("@/client/lib/browser", async importOriginal => ({ ...await importOriginal<typeof import("@/client/lib/browser")>(), getRenderApi: () => api, getBrowserApi: () => api }));
 const USER = { id: "owner", publicId: "1", name: "Owner", image: null, status: "active", isAdmin: true, createdAt: "2026-10-24T00:00:00Z", deletionPurgeAt: null };
 const PROFILE = { name: "Owner", bio: "Private profile draft", image: null, avatarRevision: 0, onboardedAt: USER.createdAt };
 const LOGINS = { accounts: [{ id: "google-owned", provider: "google", email: "owner@example.test", createdAt: USER.createdAt }], passkeys: [] };
@@ -33,8 +33,10 @@ let requests: { method: string; path: string; body: unknown }[];
 beforeEach(() => {
   vi.clearAllMocks(); requests = [];
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const path = new URL(input instanceof Request ? input.url : String(input)).pathname, method = init?.method ?? "GET";
-    requests.push({ path, method, body: init?.body ? JSON.parse(String(init.body)) : null });
+    const path = new URL(input instanceof Request ? input.url : String(input)).pathname;
+    const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+    const body = init?.body ? String(init.body) : input instanceof Request ? await input.clone().text() : "";
+    requests.push({ path, method, body: body ? JSON.parse(body) : null });
     if (method !== "GET") return Response.json({ revoked: 1, ok: true });
     if (path === "/api/v1/me") return Response.json(USER);
     if (path === "/api/v1/me/logins") return Response.json(LOGINS);
@@ -103,8 +105,10 @@ test.each(["profile", "account"] as const)("fresh %s loader never renders retain
     client.setQueryData(["me", key, USER.id], value, { updatedAt: 1 });
   }
   const context = new RouterContextProvider(); context.set(apiContext, api); context.set(queryClientContext, makeQueryClient());
-  const load = kind === "profile" ? profileLoader : accountLoader;
-  const data = await load({ context, url: new URL(`https://community.test/settings/${kind}`), params: {} } as unknown as Parameters<typeof load>[0]);
+  const args = { context, url: new URL(`https://community.test/settings/${kind}`), params: {} };
+  const data = kind === "profile"
+    ? await profileLoader(args as unknown as Parameters<typeof profileLoader>[0])
+    : await accountLoader(args as unknown as Parameters<typeof accountLoader>[0]);
   const Component = kind === "profile" ? Profile : Account;
   const first: string[] = [];
   function FirstCommit() {
