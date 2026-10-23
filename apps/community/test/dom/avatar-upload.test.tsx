@@ -10,7 +10,7 @@ import { createApiClient } from "@/shared/api-client";
 import { makeQueryClient } from "@/shared/query-client";
 
 const ProfilePage = SettingsProfile as unknown as ComponentType<{
-  loaderData: { dehydratedState: ReturnType<typeof dehydrate> };
+  loaderData: { userId: string; dehydratedState: ReturnType<typeof dehydrate> };
 }>;
 const api = createApiClient("https://community.test");
 vi.mock("@/client/lib/browser", () => ({
@@ -156,12 +156,12 @@ function setup(
   window.history.replaceState(null, "", path);
   const client = makeQueryClient();
   client.setQueryData(["me"], me);
-  client.setQueryData(["me", "profile"], profile);
+  client.setQueryData(["me", "profile", me.id], profile);
   client.setQueryData(["users", me.id], { image: me.image });
   render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[path]}>
-        <ProfilePage loaderData={{ dehydratedState: dehydrate(client) }} />
+        <ProfilePage loaderData={{ userId: me.id, dehydratedState: dehydrate(client) }} />
       </MemoryRouter>
     </QueryClientProvider>,
   );

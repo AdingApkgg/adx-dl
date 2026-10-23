@@ -82,7 +82,7 @@ describe("个人资料页", () => {
 
     const byKey = Object.fromEntries(data.dehydratedState.queries.map((query) => [query.queryKey.join("/"), query.state.data]));
     expect(byKey.me).toEqual(USER);
-    expect(byKey["me/profile"]).toEqual(PROFILE);
+    expect(byKey[`me/profile/${USER.id}`]).toEqual(PROFILE);
     const html = render(data);
     expect(html).toContain('<svg width="64"');
     expect(html).toContain(m.user_page_id({ id: USER.id }));

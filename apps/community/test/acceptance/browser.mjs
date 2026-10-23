@@ -1,3 +1,4 @@
+import {exerciseAccountAdminUx} from "./account-admin-ux-browser.mjs";
 import {exerciseContentUx} from "./content-ux-browser.mjs";
 import {exerciseUiLayout} from "./ui-layout-browser.mjs";
 import { exerciseGovernance } from "./governance-browser.mjs";
@@ -656,6 +657,7 @@ async function acceptance() {
   if (authorPassed) await independentSuite("discovery", () => exerciseDiscovery({owner,other,anonymous,origin,step,evidenceDirectory,independentSuite}));
   await independentSuite("ui_layout",()=>exerciseUiLayout({owner,anonymous,origin,step,evidenceDirectory}));
   await independentSuite("content_ux",()=>exerciseContentUx({owner,anonymous,origin,step,evidenceDirectory}));
+  await independentSuite("account_admin_ux",()=>exerciseAccountAdminUx({owner,other,anonymous,origin,step,evidenceDirectory}));
   assert.deepEqual(suiteFailures, [], "all independent synthetic journeys must pass");
   assert.equal(diagnostics.filter(row => row.type === "pageerror").length, 0, "uncaught browser errors");
   assert.equal(diagnostics.filter(row => row.type === "error" && /hydration|hydrating|minified react error/i.test(row.message)).length, 0, "hydration errors");

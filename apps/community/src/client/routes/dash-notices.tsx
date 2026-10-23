@@ -10,15 +10,15 @@ import {siteApi} from "../queries/community-site";
 import {getBrowserApi} from "../lib/browser";
 import {requireUser,loginHref} from "../lib/require-user";
 import {headers as privateHeaders} from "../lib/dash";
-import {DashError} from "../components/dash-ui";
+import { DashError, DashViewHeading, DashEmpty } from "../components/dash-ui";
 import {PrivateDiscussionGuard} from "../components/discussion-ui";
 import type {Route} from "./+types/dash-notices";
 export {headers,shouldRevalidate} from "../lib/dash";
 export async function loader({context,url}:Route.LoaderArgs){const me=await requireUser(context,url);try{return data({userId:me.id,page:await siteApi(context.get(apiContext)).adminNotices(url.searchParams.get("cursor")??undefined)},{headers:privateHeaders()});}catch(e){throw data(null,{status:e instanceof ApiError?e.status:503,headers:privateHeaders()});}}
 const empty=():NoticeDraft=>({title:{zh:""},body:{zh:""},level:"normal",startsAt:null,expiresAt:null,href:null,linkLabel:null,order:0});
 export default function Notices({loaderData}:Route.ComponentProps){return <PrivateDiscussionGuard userId={loaderData.userId} admin><NoticesContent key={loaderData.userId} page={loaderData.page}/></PrivateDiscussionGuard>;}
-function NoticesContent({page}:{page:Route.ComponentProps["loaderData"]["page"]}){const [newId,setNewId]=useState<string|null>(null);return <section className="space-y-5"><h2 className="text-xl font-semibold">{m.site_notices()}</h2><p>{m.site_notice_draft_hint()}</p><Button onClick={()=>setNewId(crypto.randomUUID())}>{m.site_notice_new()}</Button>{newId?<NoticeEditor key={newId} row={page.items.find(row=>row.id===newId)??{id:newId,revision:0,draft:empty(),publication:null,withdrawn:false}}/>:null}
- <ul className="space-y-4">{page.items.filter(row=>row.id!==newId).map(row=><li key={row.id}><NoticeEditor key={row.id} row={row}/></li>)}</ul>
+function NoticesContent({page}:{page:Route.ComponentProps["loaderData"]["page"]}){const [newId,setNewId]=useState<string|null>(null);return <section className="space-y-5"><DashViewHeading title={m.site_notices()} description={m.site_notice_draft_hint()} count={page.items.length} /><Button onClick={()=>setNewId(crypto.randomUUID())}>{m.site_notice_new()}</Button>{newId?<NoticeEditor key={newId} row={page.items.find(row=>row.id===newId)??{id:newId,revision:0,draft:empty(),publication:null,withdrawn:false}}/>:null}
+ <ul className="space-y-4">{page.items.filter(row=>row.id!==newId).map(row=><li key={row.id}><NoticeEditor key={row.id} row={row}/></li>)}</ul>{!page.items.length&&!newId?<DashEmpty/>:null}
  {page.nextCursor?<Link className="underline" to={`${localizeHref("/dash/notices")}?cursor=${encodeURIComponent(page.nextCursor)}`}>{m.chart_next()}</Link>:null}</section>;}
 function NoticeEditor({row}:{row:SiteNotice}){
  const [draft,setDraft]=useState(row.draft),[revision,setRevision]=useState(row.revision),[confirmed,setConfirmed]=useState(false),[pending,setPending]=useState(false),[error,setError]=useState<unknown>(),[saved,setSaved]=useState(row),[latest,setLatest]=useState<SiteNotice|null>(null);

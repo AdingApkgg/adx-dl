@@ -132,8 +132,8 @@ describe("账号设置页 loader", () => {
 
     const byKey = Object.fromEntries(dehydratedState.queries.map((query) => [query.queryKey.join("/"), query.state.data]));
     expect(byKey.me).toEqual(USER);
-    expect(byKey["me/logins"]).toEqual({ accounts, passkeys: [] });
-    expect(byKey["me/sessions"]).toEqual({ sessions: devices });
+    expect(byKey[`me/logins/${USER.id}`]).toEqual({ accounts, passkeys: [] });
+    expect(byKey[`me/sessions/${USER.id}`]).toEqual({ sessions: devices });
     expect(byKey["login-options"]).toEqual(OPTIONS);
   });
 });
@@ -226,7 +226,7 @@ describe("账号设置页渲染：登录方式", () => {
     const withoutEmail = await renderPage({ accounts: [googleAccount(null)] });
 
     expect(withEmail).toContain(m.settings_login_google({ email: "a@example.com" }));
-    expect(listItems(withoutEmail)[0]).toStartWith("Google ");
+    expect(listItems(withoutEmail)[0]?.replace(/<[^>]+>/g, "")).toStartWith("Google");
     expect(withoutEmail).not.toContain(m.settings_login_google({ email: "" }));
   });
 

@@ -291,6 +291,7 @@ try {
     }
   });
   await step('mobile_catalog_and_forum_320_390', async () => {
+    await visit('/login?reauth=1&next=%2Fcharts%2F1');await page.getByRole('navigation',{name:'登录方式导航',exact:true}).waitFor();for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'LOGIN_UI_HORIZONTAL_OVERFLOW');}
     for (const width of [320, 390]) {
       await page.setViewportSize({ width, height: 844 });
       for (const path of ['/charts', '/forum']) {
@@ -446,6 +447,11 @@ try {
       await visit('/me/lists/new');await page.getByRole('region',{name:'基本信息',exact:true}).waitFor();await page.getByRole('complementary',{name:'保存与发布',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'保存私人草稿',exact:true}).isEnabled(),false);
       for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'LIBRARY_EDITOR_UI_HORIZONTAL_OVERFLOW');await visit('/downloads');await page.getByRole('region',{name:'当前队列',exact:true}).waitFor();await page.getByRole('region',{name:'最近下载',exact:true}).waitFor();assert.equal(await page.locator('.community-download-dock').count(),0);assert.equal(await page.locator('.community-selection-bar').count(),0,'DOWNLOAD_PAGE_NO_SELECTION_BAR');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'DOWNLOAD_UI_HORIZONTAL_OVERFLOW');await visit('/me/lists/new');}
       await visit('/downloads');await page.locator('#download-help > summary').click();await page.getByText('ZIP 集合包包含各首的原始 ZIP 和清单。请先解压外层，再逐个导入；它不是一份可直接导入的 ADX 谱包。',{exact:true}).waitFor();
+      // Account/admin UI adds exact read-only routes; never authorize, unlink, revoke or delete production data.
+      for(const path of ['/settings/profile','/settings/account']){await visit(path);const nav=page.getByRole('navigation',{name:'账号设置导航',exact:true});assert.equal(await nav.locator('[aria-current="page"]').count(),1);assert.equal(await nav.locator('[aria-current="page"]').getAttribute('href'),path);for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'SETTINGS_UI_HORIZONTAL_OVERFLOW');}}
+      const accountLogins=await json('/api/v1/me/logins'),accountSessions=await json('/api/v1/me/sessions');assert.ok(Array.isArray(accountLogins.accounts)&&Array.isArray(accountLogins.passkeys)&&Array.isArray(accountSessions.sessions));
+      assert.equal(await page.locator('#account-danger input[name="deleteContent"]').isChecked(),false);assert.equal(await page.locator('#account-danger button[type="submit"]').isEnabled(),false);
+      for(const path of ['/dash','/dash/status','/dash/lists']){await visit(path);for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'ADMIN_UI_HORIZONTAL_OVERFLOW');}assert.equal(await page.locator('.community-dash-nav > div a[aria-current="page"]').getAttribute('href'),path);}
       // Profile, following and notification UX remains strictly read-only in production.
       await visit('/u/1');await page.getByRole('region',{name:'作者资料',exact:true}).waitFor();assert.equal(await page.locator('form[role="search"] [name="author"]').count(),0);assert.equal(await page.getByRole('button',{name:'分享主页',exact:true}).count(),1);
       for(const path of ['/me/feed','/me/following','/me/notifications']){await visit(path);const nav=page.getByRole('navigation',{name:'关注与通知导航',exact:true});assert.equal(await nav.locator('[aria-current="page"]').count(),1);assert.equal(await nav.locator('[aria-current="page"]').getAttribute('href'),path);}
@@ -457,6 +463,9 @@ try {
       const headers = { authorization: `Bearer ${bridgeKey}` };
       assert.equal((await fetch(bridgeUrl + '/api/v1/me')).status, 401);
       assert.equal((await fetch(bridgeUrl + '/api/auth/get-session', { headers })).status, 403);
+      assert.equal((await fetch(bridgeUrl + '/api/v1/me/sessions/blocked', {headers})).status,403);
+      assert.equal((await fetch(bridgeUrl + '/api/v1/me/sessions/blocked', {method:'DELETE',headers})).status,405);
+      assert.equal((await fetch(bridgeUrl + '/api/v1/me/profile', {method:'PATCH',headers,body:'{}'})).status,405);
       assert.equal((await fetch(bridgeUrl + '/api/v1/download-plans', { method: 'POST', headers, body: '{}' })).status, 405);
       assert.equal((await fetch(bridgeUrl + '/api/v1/me/favorites/1', {method:'PUT',headers,body:'{}'})).status,405);
       assert.equal((await fetch(bridgeUrl + '/api/v1/me/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {method:'PUT',headers,body:'{}'})).status,405);

@@ -232,3 +232,25 @@ html[data-motion=off] .community-list-card { transition:none; }
 
 .community-social-feed-card { display:flex; min-width:0; flex-direction:column; gap:.5rem; }
 .community-social-feed-card > .community-chart-card { height:auto; flex:1; }
+
+/* 登录、设置与站务沿用主站设置面板的分组、留白和主题。 */
+.community-auth-layout { width:100%; max-width:62rem; margin-inline:auto; display:grid; gap:2rem; align-items:start; }
+.community-auth-intro { min-width:0; }
+.community-auth-page :where([data-slot="button"],[data-slot="input"]) { min-height:2.75rem; }
+.community-auth-page [data-slot="button"] { height:auto; white-space:normal; }
+.community-settings-page { width:100%; max-width:56rem; margin-inline:auto; min-width:0; }
+.community-settings-page :where([data-slot="button"],[data-slot="input"],summary) { min-height:2.75rem; }
+.community-settings-page [data-slot="button"] { height:auto; white-space:normal; }
+.community-account-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; padding:1rem; overflow-wrap:anywhere; }
+.community-account-row > :first-child { flex-basis:15rem; }
+.community-admin-view-heading { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:space-between; gap:1rem; }
+.community-admin-view-heading > :first-child { flex:1 1 16rem; }
+.community-admin-shortcut { display:flex; flex-direction:column; gap:.5rem; border:1px solid var(--border); border-radius:1rem; padding:1.25rem; background:var(--card); overflow-wrap:anywhere; }
+.community-admin-shortcut:hover { border-color:var(--primary); }
+.community-dash-content :where(article,[data-slot="card"]) { min-width:0; overflow-wrap:anywhere; background:var(--card); }
+.community-dash-content :where([data-slot="button"],summary,input:not([type="checkbox"]),select) { min-height:2.75rem; }
+.community-dash-content [data-slot="button"] { height:auto; white-space:normal; }
+.community-dash-content :where(form,article) { min-width:0; }
+.community-dash-content :where(h2,h3,p,dd) { overflow-wrap:anywhere; }
+.community-dash-content :where(form) :where(label) { min-width:0; }
+@media (min-width:1024px) { .community-auth-layout { grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr); gap:2.5rem; } .community-auth-intro { position:sticky; top:6rem; } }

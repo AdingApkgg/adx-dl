@@ -14,7 +14,7 @@ describe("profileQuery", () => {
   test("键挂在 me 下面，返回接口给的资料", async () => {
     const body = { name: "阿丁", bio: "", onboardedAt: null, image: null, avatarRevision: 0 };
 
-    expect(Array.from(profileQuery(fakeApi(() => Response.json(body))).queryKey)).toEqual(["me", "profile"]);
-    expect(await makeQueryClient().query(profileQuery(fakeApi(() => Response.json(body))))).toEqual(body);
+    expect(Array.from(profileQuery(fakeApi(() => Response.json(body)), "user-one").queryKey)).toEqual(["me", "profile", "user-one"]);
+    expect(await makeQueryClient().query(profileQuery(fakeApi(() => Response.json(body)), "user-one"))).toEqual(body);
   });
 });

@@ -13,7 +13,7 @@ import { NICKNAME_MAX, normalizeNickname } from "@/shared/nickname";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 import { TURNSTILE_ACTIONS } from "@/shared/turnstile-actions";
 
-import { PageTitle, textLinkClass } from "../components/page-title";
+import { PageTitle } from "../components/page-title";
 import { QqCodeForm } from "../components/qq-code-form";
 import { authClient } from "../lib/auth-client";
 import { errorCodeOf, errorMessage } from "../lib/auth-errors";
@@ -90,14 +90,19 @@ function LoginContent() {
   }
   // 三种登录方式各一张卡片（spec 第 7.5 节）。
   return (
-    <main className="mx-auto max-w-md space-y-6">
-      <PageTitle description={reauth ? m.login_reauth_notice() : undefined}>{m.login_title()}</PageTitle>
+    <main className="community-auth-page community-auth-layout">
+      <div className="community-auth-intro space-y-5"><PageTitle description={reauth ? m.login_reauth_notice() : m.ui_auth_intro()}>{m.login_title()}</PageTitle>
+        <div className="community-panel space-y-3"><h2 className="font-semibold">{m.ui_auth_account_title()}</h2><p className="text-sm leading-7 text-muted-foreground">{m.ui_auth_account_hint()}</p><p className="text-sm leading-7 text-muted-foreground">{m.ui_auth_return_hint()}</p><Link to={localizeHref("/privacy")} className="community-inline-action">{m.privacy_link()}</Link></div>
+      </div>
+      <div className="min-w-0 space-y-5">
+      <nav className="community-content-nav" aria-label={m.ui_auth_navigation()}><a href="#login-social">{m.ui_auth_social()}</a><a href="#login-qq">{m.login_qq_heading()}</a><a href="#login-passkey">{m.login_passkey_heading()}</a></nav>
       {callbackMessage ? <Alert variant="destructive">{callbackMessage}</Alert> : null}
 
-      <SocialSignIn next={next} reauth={reauth} />
-      {options.awmc?.available ? <SocialSignIn next={next} reauth={reauth} provider="awmc" /> : null}
-
-      <Card>
+      <Card id="login-social"><CardHeader><CardTitle asChild><h2>{m.ui_auth_social()}</h2></CardTitle><CardDescription>{m.ui_auth_social_hint()}</CardDescription></CardHeader><CardContent className={`grid gap-3 ${options.awmc?.available ? "sm:grid-cols-2" : ""}`}>
+        <SocialSignIn next={next} reauth={reauth} />
+        {options.awmc?.available ? <SocialSignIn next={next} reauth={reauth} provider="awmc" /> : null}
+      </CardContent></Card>
+      <Card id="login-qq">
         <CardHeader>
           <CardTitle asChild>
             <h2>{m.login_qq_heading()}</h2>
@@ -133,9 +138,7 @@ function LoginContent() {
         autofill={options.qq.available}
         onSignedIn={goAfterPasskey}
       />
-      <Link to={localizeHref("/privacy")} className={textLinkClass}>
-        {m.privacy_link()}
-      </Link>
+      </div>
     </main>
   );
 }
@@ -145,25 +148,23 @@ function SocialSignIn({ next, reauth, provider = "google" }: { next: string; rea
   const [error, setError] = useState<string | null>(null);
 
   async function signIn() {
+    if (pending) return;
     setPending(true);
     setError(null);
     // 跳转到授权提供方；Better Auth 区分新老用户，失败时带 error 返回登录页。
-    const res = await authClient.signIn.social({ provider, ...googleRedirects(next, reauth, provider) });
-    if (res.error) {
-      setPending(false);
-      setError(errorMessage(res.error));
-    }
+    try {
+      const res = await authClient.signIn.social({ provider, ...googleRedirects(next, reauth, provider) });
+      if (res.error) { setPending(false); setError(errorMessage(res.error)); }
+    } catch (failure) { setPending(false); setError(errorMessage(failure)); }
   }
 
   return (
-    <Card>
-      <CardContent className="space-y-3">
-        <Button type="button" variant="outline" size="lg" className="w-full" disabled={pending} onClick={signIn}>
+    <div className="min-w-0 space-y-3">
+        <Button type="button" variant="outline" size="lg" className="min-h-11 w-full" disabled={pending} onClick={signIn}>
           {pending ? m.login_working() : provider === "awmc" ? m.login_awmc() : m.login_google()}
         </Button>
         {error ? <Alert variant="destructive">{error}</Alert> : null}
-      </CardContent>
-    </Card>
+    </div>
   );
 }
 
@@ -173,7 +174,8 @@ async function conditionalMediationAvailable(): Promise<boolean> {
     return false;
   }
   // 官方文档的示例漏了 await：Promise 永远是真值（调研报告第 2.4 节）。
-  return credential.isConditionalMediationAvailable();
+  try { return await credential.isConditionalMediationAvailable(); }
+  catch { return false; }
 }
 
 // 这几种错误都发生在用户选中通行密钥之后：挑战（5 分钟）过期了、选中的通行密钥已经被删除、验证没通过。
@@ -209,7 +211,9 @@ function useConditionalPasskey({ enabled, onSignedIn, onError }: ConditionalPass
       if (!(await conditionalMediationAvailable()) || cancelled) {
         return;
       }
-      const res = await authClient.signIn.passkey({ autoFill: true });
+      let res: Awaited<ReturnType<typeof authClient.signIn.passkey>>;
+      try { res = await authClient.signIn.passkey({ autoFill: true }); }
+      catch (failure) { if (!cancelled) { const message = errorMessage(failure); if (message !== null) onError(message); } return; }
       if (cancelled) {
         return;
       }
@@ -257,21 +261,21 @@ function PasskeySection({ siteKey, signedIn, autofill, onSignedIn }: PasskeySect
   const rearm = useConditionalPasskey({ enabled: autofill, onSignedIn, onError: setError });
 
   async function signIn() {
+    if (pending) return;
     setPending(true);
     setError(null);
-    const res = await authClient.signIn.passkey();
-    setPending(false);
-    if (res.data) {
-      onSignedIn(false);
-      return;
-    }
-    setError(errorMessage(res.error));
-    // 按钮登录一开始就中止了挂起的自动填充请求；没有成功结束（出错或用户取消）时让它恢复。
+    try {
+      const res = await authClient.signIn.passkey();
+      if (res.data) { onSignedIn(false); return; }
+      setError(errorMessage(res.error));
+    } catch (failure) { setError(errorMessage(failure)); }
+    finally { setPending(false); }
+    // 没有成功结束（出错或用户取消）时恢复原有自动填充。
     rearm();
   }
 
   return (
-    <Card>
+    <Card id="login-passkey">
       <CardHeader>
         <CardTitle asChild>
           <h2>{m.login_passkey_heading()}</h2>
@@ -315,6 +319,7 @@ function PasskeySignUp({ siteKey, pending, setPending, setError, onSignedIn, rea
 
   async function signUp(event: FormEvent) {
     event.preventDefault();
+    if (pending) return;
     const name = normalizeNickname(nickname);
     if (!name) {
       setError(m.error_nickname_invalid());
@@ -327,19 +332,14 @@ function PasskeySignUp({ siteKey, pending, setPending, setError, onSignedIn, rea
     setError(null);
     // context 原样交给服务端的 resolveUser（昵称和人机验证在浏览器创建凭据之前校验）；
     // createSession 让注册完直接登录，并让建号走事务。不传 name：它会变成系统密码管理器里显示的账号名。
-    const res = await authClient.passkey.addPasskey({
-      context: JSON.stringify({ nickname: name, turnstileToken: turnstile.token }),
-      createSession: true,
-    });
-    setPending(false);
-    turnstile.reset();
-    if (res?.error) {
-      setError(errorMessage(res.error));
-      // 创建凭据同样会中止挂起的自动填充请求；注册没有成功（出错或用户取消）时让它恢复。
-      rearm();
-      return;
-    }
-    onSignedIn(true);
+    try {
+      const res = await authClient.passkey.addPasskey({
+        context: JSON.stringify({ nickname: name, turnstileToken: turnstile.token }), createSession: true,
+      });
+      if (res?.error) { setError(errorMessage(res.error)); rearm(); return; }
+      onSignedIn(true);
+    } catch (failure) { setError(errorMessage(failure)); rearm(); }
+    finally { setPending(false); turnstile.reset(); }
   }
 
   return (

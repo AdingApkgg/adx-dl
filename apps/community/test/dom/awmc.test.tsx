@@ -28,8 +28,8 @@ function page(kind: "login" | "account", enabled: boolean) {
   queryClient.setQueryData(["login-options"], options);
   const logins = { accounts: [{ id: "g", provider: "google", email: null, createdAt: USER.createdAt }], passkeys: [] };
   const sessions = { sessions: [] };
-  queryClient.setQueryData(["me", "logins"], logins);
-  queryClient.setQueryData(["me", "sessions"], sessions);
+  queryClient.setQueryData(["me", "logins", USER.id], logins);
+  queryClient.setQueryData(["me", "sessions", USER.id], sessions);
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const path = new URL(input instanceof Request ? input.url : String(input)).pathname;
     if (path === "/api/v1/me/logins") return Response.json(logins);
@@ -37,8 +37,8 @@ function page(kind: "login" | "account", enabled: boolean) {
     if (path === "/api/v1/me") return Response.json(USER);
     throw new Error(`Unexpected fixture request: ${path}`);
   }));
-  const Component = (kind === "login" ? Login : SettingsAccount) as unknown as ComponentType<{ loaderData: { dehydratedState: ReturnType<typeof dehydrate> } }>;
-  render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[path]}><Component loaderData={{ dehydratedState: dehydrate(queryClient) }} /></MemoryRouter></QueryClientProvider>);
+  const Component = (kind === "login" ? Login : SettingsAccount) as unknown as ComponentType<{ loaderData: { userId: string; dehydratedState: ReturnType<typeof dehydrate> } }>;
+  render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[path]}><Component loaderData={{ userId: USER.id, dehydratedState: dehydrate(queryClient) }} /></MemoryRouter></QueryClientProvider>);
   return userEvent.setup();
 }
 
