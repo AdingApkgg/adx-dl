@@ -70,6 +70,8 @@ const matches = (path: string) => {
   if (/^\/api\/v1\/me\/charts(?:\/(?:workbench|bindings\/[a-f0-9-]{36}|[a-f0-9-]{36}(?:\/versions\/[a-f0-9-]{36}\/(?:fingerprint|assets\/(?:maidata|audio|cover)))?))?$/.test(path)) return true;
   if (/^\/assets\/[A-Za-z0-9_.-]+$/.test(path)) return true;
   if (path === "/api/v1/me") return true;
+  if (/^\/(?:en\/|ja\/)?settings\/(?:profile|account)(?:\.data)?$/.test(path)) return true;
+  if (/^\/api\/v1\/me\/(?:profile|logins|sessions)$/.test(path)) return true;
   if (/^\/api\/v1\/me\/favorites(?:\/[1-9]\d*)?$/.test(path)) return true;
   if (/^\/api\/v1\/(?:me\/lists(?:\/reports|\/[a-f0-9-]{36})?|lists(?:\/[1-9]\d*)?)$/.test(path)) return true;
   if (/^\/api\/v1\/me\/following(?:\/feed|\/authors\/[1-9]\d*)?$/.test(path)) return true;

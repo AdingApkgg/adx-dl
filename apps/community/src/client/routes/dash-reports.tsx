@@ -5,9 +5,8 @@ import { toast } from "@astrodx/ui/components/sonner";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useRevalidator } from "react-router";
 import { m } from "@/paraglide/messages.js";
-import { localizeHref } from "@/paraglide/runtime.js";
 import type { DashReport } from "@/shared/community-social";
-import { DashError } from "../components/dash-ui";
+import { DashError, dashFilterHref, DashViewHeading, DashEmpty } from "../components/dash-ui";
 import { SocialPager } from "../components/social-pager";
 import { textLinkClass } from "../components/page-title";
 import { accountErrorRedirect } from "../lib/account-errors";
@@ -23,9 +22,9 @@ export { headers, shouldRevalidate } from "../lib/dash";
 export async function loader({ context, url }: Route.LoaderArgs) { return loadDash(context, url, api => api.reports(url.searchParams.get("status") ?? "open", url.searchParams.get("cursor") ?? undefined, url.searchParams.get("ticket") ?? undefined)); }
 export default function DashReports({ loaderData }: Route.ComponentProps) {
   const location = useLocation(), filter = new URLSearchParams(location.search).get("status") ?? "open";
-  return <section className="space-y-5"><h2 className="text-lg font-semibold">{m.dash_reports()}</h2><p className="text-sm text-muted-foreground">{m.dash_reports_hint()}</p>
-    <nav aria-label={m.report_status_filter()} className="flex flex-wrap gap-2">{[["open", m.report_open()], ["resolved", m.report_resolved()], ["all", m.report_all()]].map(([status, label]) => <Button asChild key={status} variant={filter === status ? "default" : "outline"}><Link to={`${localizeHref("/dash/reports")}?status=${status}`}>{label}</Link></Button>)}</nav>
-    {loaderData.items.length ? <ul className="list-none space-y-5 p-0">{loaderData.items.map(report => <li key={`${report.id}/${report.status}/${report.chart?.revision ?? "missing"}`}><ReportRow report={report} /></li>)}</ul> : <p>{m.dash_empty()}</p>}
+  return <section className="space-y-5"><DashViewHeading title={m.dash_reports()} description={m.dash_reports_hint()} count={loaderData.items.length} />
+    <nav aria-label={m.report_status_filter()} className="flex flex-wrap gap-2">{[["open", m.report_open()], ["resolved", m.report_resolved()], ["all", m.report_all()]].map(([status, label]) => <Button asChild key={status} variant={filter === status ? "default" : "outline"}><Link aria-current={filter === status ? "page" : undefined} to={dashFilterHref("/dash/reports", location.search, { status })}>{label}</Link></Button>)}</nav>
+    {loaderData.items.length ? <ul className="list-none space-y-5 p-0">{loaderData.items.map(report => <li key={`${report.id}/${report.status}/${report.chart?.revision ?? "missing"}`}><ReportRow report={report} /></li>)}</ul> : <DashEmpty>{m.dash_empty()}</DashEmpty>}
     <SocialPager base="/dash/reports" status={filter} nextCursor={loaderData.nextCursor} />
   </section>;
 }

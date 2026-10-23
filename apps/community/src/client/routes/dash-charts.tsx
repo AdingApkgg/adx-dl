@@ -8,7 +8,7 @@ import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
 import { ApiError } from "@/shared/api-client";
 import type { DashChart } from "@/shared/dash";
-import { DashError, DashPager } from "../components/dash-ui";
+import { DashError, DashPager, DashViewHeading, DashEmpty } from "../components/dash-ui";
 import { textLinkClass } from "../components/page-title";
 import { accountErrorRedirect } from "../lib/account-errors";
 import { errorCodeOf } from "../lib/auth-errors";
@@ -21,8 +21,8 @@ export { headers, shouldRevalidate } from "../lib/dash";
 export async function loader({ context, url }: Route.LoaderArgs) { return loadDash(context, url, api => api.charts(url.searchParams.get("cursor") || undefined)); }
 export default function DashCharts({ loaderData: page }: Route.ComponentProps) {
   return <section className="space-y-4" aria-labelledby="dash-charts-heading">
-    <h2 id="dash-charts-heading" className="text-lg font-semibold">{m.dash_charts()}</h2><p className="text-sm text-muted-foreground">{m.dash_charts_hint()}</p>
-    {page.items.length ? <ul className="list-none space-y-3 p-0">{page.items.map(chart => <li key={`${chart.id}/${chart.revision}`}><ChartRow chart={chart} /></li>)}</ul> : <p>{m.dash_empty()}</p>}
+    <DashViewHeading title={m.dash_charts()} description={m.dash_charts_hint()} count={page.items.length} id="dash-charts-heading" />
+    {page.items.length ? <ul className="list-none space-y-3 p-0">{page.items.map(chart => <li key={`${chart.id}/${chart.revision}`}><ChartRow chart={chart} /></li>)}</ul> : <DashEmpty>{m.dash_empty()}</DashEmpty>}
     <DashPager base="/dash/charts" nextCursor={page.nextCursor} />
   </section>;
 }

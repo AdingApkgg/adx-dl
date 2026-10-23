@@ -14,6 +14,7 @@ import { expectOk, okJson } from "@/shared/api-client";
 import { htmlLang } from "@/shared/i18n/locale";
 import { apiContext, queryClientContext } from "@/shared/router-context";
 
+import { SettingsNavigation } from "../components/settings-navigation";
 import { PageTitle, textLinkClass } from "../components/page-title";
 import { isReauthError, QqCodeForm } from "../components/qq-code-form";
 import { accountErrorRedirect } from "../lib/account-errors";
@@ -29,7 +30,7 @@ import { meQuery } from "../queries/me";
 import type { Route } from "./+types/settings-account";
 
 export async function loader({ context, url }: Route.LoaderArgs) {
-  await requireUser(context, url);
+  const user = await requireUser(context, url);
   const queryClient = context.get(queryClientContext);
   const api = context.get(apiContext);
   await Promise.all([
@@ -37,7 +38,7 @@ export async function loader({ context, url }: Route.LoaderArgs) {
     queryClient.query(sessionsQuery(api)),
     queryClient.query(loginOptionsQuery(api)),
   ]);
-  return { dehydratedState: dehydrate(queryClient) };
+  return { userId: user.id, dehydratedState: dehydrate(queryClient) };
 }
 
 export function meta() {
@@ -50,7 +51,7 @@ export function meta() {
 export default function SettingsAccount({ loaderData }: Route.ComponentProps) {
   return (
     <HydrationBoundary state={loaderData.dehydratedState}>
-      <SettingsContent />
+      <SettingsContent key={loaderData.userId} userId={loaderData.userId} />
     </HydrationBoundary>
   );
 }
@@ -70,7 +71,7 @@ export function returnPath(pathname: string, search: string): string {
 
 // 登录方式、登录设备的列表：一行一项，按钮靠右。
 const listClass = "divide-y rounded-lg border";
-const rowClass = "flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2";
+const rowClass = "community-account-row";
 
 // 设备名来自 User-Agent，构造出来的可以有上千个字符：每个名字最多显示 64 个字符，超出的换成省略号。
 // 按字符（码点）数截，边界上的表情符号不会被劈成半个。
@@ -81,7 +82,7 @@ function clipDeviceName(name: string | null): string | null {
   return chars.length > DEVICE_NAME_MAX ? `${chars.slice(0, DEVICE_NAME_MAX).join("")}…` : name;
 }
 
-function SettingsContent() {
+function SettingsContent({ userId }: { userId: string }) {
   const api = getRenderApi();
   const queryClient = useQueryClient();
   const location = useLocation();
@@ -156,7 +157,9 @@ function SettingsContent() {
   async function signOut() {
     setPending(true);
     setFailure(null);
-    const { error } = await authClient.signOut();
+    let error: unknown;
+    try { ({ error } = await authClient.signOut()); }
+    catch (failure) { error = failure; }
     if (error) {
       setFailure({ message: errorMessage(error) ?? m.error_unknown(), reauth: false });
       setPending(false);
@@ -170,18 +173,16 @@ function SettingsContent() {
   if (deletedAt) {
     return <DeletionStarted purgeAt={deletedAt} />;
   }
-  if (!me || !logins || !sessions || !options) {
+  if (!me || me.id !== userId || me.status !== "active" || !logins || !sessions || !options) {
     return null;
   }
   // 登录方式、登录设备、注销账号各一张卡片，注销那一张用警示色（spec 第 7.5 节）。
   return (
-    <main className="community-reading space-y-6">
-      <PageTitle>{m.settings_account_title()}</PageTitle>
-      <p className="text-sm">
-        <Link to={localizeHref("/settings/profile")} className={textLinkClass}>
-          {m.settings_profile_title()}
-        </Link>
-      </p>
+    <main className="community-settings-page space-y-6">
+      <PageTitle description={m.ui_account_security_hint()}>{m.settings_account_title()}</PageTitle>
+      <SettingsNavigation view="account" />
+      <div className="community-panel space-y-4"><div className="flex flex-wrap justify-between gap-3"><p className="break-words font-semibold">{me.name}</p><span className="text-sm text-muted-foreground">{m.user_page_id({ id: me.publicId ?? me.id })}</span></div><div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground"><p>{m.ui_account_method_count({ count: String(logins.accounts.length + logins.passkeys.length) })}</p><p>{m.ui_account_session_count({ count: String(sessions.sessions.length) })}</p></div></div>
+      <nav className="community-content-nav" aria-label={m.ui_content_navigation()}><a href="#account-logins">{m.settings_logins_heading()}</a><a href="#account-devices">{m.settings_devices_heading()}</a><a href="#account-danger">{m.settings_delete_heading()}</a></nav>
       {callbackMessage ? <Alert variant="destructive">{callbackMessage}</Alert> : null}
       {failure ? (
         <Alert variant="destructive">
@@ -196,17 +197,13 @@ function SettingsContent() {
         </Alert>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle asChild>
-            <h2>{m.settings_logins_heading()}</h2>
-          </CardTitle>
-        </CardHeader>
+      <Card id="account-logins">
+        <CardHeader><CardTitle asChild><h2>{m.settings_logins_heading()}</h2></CardTitle><CardDescription>{m.ui_account_methods_hint()}</CardDescription></CardHeader>
         <CardContent className="space-y-4">
           <ul className={listClass}>
             {logins.accounts.map((item) => (
               <li key={item.id} className={rowClass}>
-                {item.provider === "google"
+                <span className="min-w-0 flex-1 break-words">{item.provider === "google"
                   ? item.email
                     ? m.settings_login_google({ email: item.email })
                     : "Google"
@@ -214,7 +211,7 @@ function SettingsContent() {
                     ? "AWMC"
                     : item.nickname
                     ? m.settings_login_qq({ nickname: item.nickname, number: item.maskedQq })
-                    : m.settings_login_qq_number({ number: item.maskedQq })}{" "}
+                    : m.settings_login_qq_number({ number: item.maskedQq })}</span>
                 <Button
                   type="button"
                   variant="outline"
@@ -228,10 +225,10 @@ function SettingsContent() {
             ))}
             {logins.passkeys.map((item) => (
               <li key={item.id} className={rowClass}>
-                {item.name ?? m.settings_passkey_default_name()} · {m.settings_passkey_added({ date: formatDate(item.createdAt) })} ·{" "}
+                <span className="min-w-0 flex-1 break-words">{item.name ?? m.settings_passkey_default_name()} · {m.settings_passkey_added({ date: formatDate(item.createdAt) })} ·{" "}
                 {item.lastUsedAt
                   ? m.settings_passkey_last_used({ date: formatDate(item.lastUsedAt) })
-                  : m.settings_passkey_never_used()}{" "}
+                  : m.settings_passkey_never_used()}</span>
                 <Button
                   type="button"
                   variant="outline"
@@ -277,7 +274,7 @@ function SettingsContent() {
             </Button>
           </div>
           <details className="rounded-lg border px-3 py-2">
-            <summary className="cursor-pointer text-sm font-medium">{m.settings_link_qq()}</summary>
+            <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium">{m.settings_link_qq()}</summary>
             <div className="pt-3">
               {options.qq.available ? (
                 <QqCodeForm
@@ -297,18 +294,14 @@ function SettingsContent() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle asChild>
-            <h2>{m.settings_devices_heading()}</h2>
-          </CardTitle>
-        </CardHeader>
+      <Card id="account-devices">
+        <CardHeader><CardTitle asChild><h2>{m.settings_devices_heading()}</h2></CardTitle><CardDescription>{m.ui_account_devices_hint()}</CardDescription></CardHeader>
         <CardContent>
           <ul className={listClass}>
             {sessions.sessions.map((item) => (
               <li key={item.id} className={rowClass}>
-                {[clipDeviceName(item.browser), clipDeviceName(item.os)].filter(Boolean).join(" · ") || m.settings_device_unknown()} ·{" "}
-                {placeName(item.country)} · {m.settings_device_last_active({ date: formatDate(item.lastActiveAt) })}{" "}
+                <div className="min-w-0 flex-1 break-words text-sm">{[clipDeviceName(item.browser), clipDeviceName(item.os)].filter(Boolean).join(" · ") || m.settings_device_unknown()} ·{" "}
+                {placeName(item.country)} · {m.settings_device_last_active({ date: formatDate(item.lastActiveAt) })}</div>
                 {item.current ? (
                   <strong className="text-xs font-medium text-primary">{m.settings_device_current()}</strong>
                 ) : (
@@ -345,7 +338,7 @@ function SettingsContent() {
         </Button>
       </div>
 
-      <DeleteAccountSection userId={me.id} publicId={me.publicId} here={here} onDeleted={setDeletedAt} />
+      <section id="account-danger" className="space-y-3" aria-label={m.settings_delete_heading()}><DeleteAccountSection userId={me.id} publicId={me.publicId} here={here} onDeleted={setDeletedAt} /></section>
     </main>
   );
 }
