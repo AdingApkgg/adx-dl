@@ -28,8 +28,8 @@ function page(kind: "login" | "account", enabled: boolean) {
   queryClient.setQueryData(["login-options"], options);
   const logins = { accounts: [{ id: "g", provider: "google", email: null, createdAt: USER.createdAt }], passkeys: [] };
   const sessions = { sessions: [] };
-  queryClient.setQueryData(["me", "logins"], logins);
-  queryClient.setQueryData(["me", "sessions"], sessions);
+  queryClient.setQueryData(["me", "logins", USER.id], logins);
+  queryClient.setQueryData(["me", "sessions", USER.id], sessions);
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const path = new URL(input instanceof Request ? input.url : String(input)).pathname;
     if (path === "/api/v1/me/logins") return Response.json(logins);

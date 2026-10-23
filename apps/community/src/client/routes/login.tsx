@@ -211,7 +211,7 @@ function useConditionalPasskey({ enabled, onSignedIn, onError }: ConditionalPass
       if (!(await conditionalMediationAvailable()) || cancelled) {
         return;
       }
-      let res;
+      let res: Awaited<ReturnType<typeof authClient.signIn.passkey>>;
       try { res = await authClient.signIn.passkey({ autoFill: true }); }
       catch (failure) { if (!cancelled) { const message = errorMessage(failure); if (message !== null) onError(message); } return; }
       if (cancelled) {

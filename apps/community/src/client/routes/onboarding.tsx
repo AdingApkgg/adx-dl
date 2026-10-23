@@ -23,19 +23,20 @@ import { errorMessage } from "../lib/auth-errors";
 import { getBrowserApi, getRenderApi } from "../lib/browser";
 import { safeNextPath } from "../lib/next-path";
 import { loginHref, requireUser } from "../lib/require-user";
+import { meQuery } from "../queries/me";
 import { profileQuery } from "../queries/profile";
 import type { Route } from "./+types/onboarding";
 
 // 首次登录引导（spec 第 10.3 节，用户决定）：新用户登录后先到这里。点过"完成"或"以后再说"就记下来，
 // 之后再打开这个地址直接去 next。
 export async function loader({ context, url }: Route.LoaderArgs) {
-  await requireUser(context, url);
+  const user = await requireUser(context, url);
   const queryClient = context.get(queryClientContext);
-  const profile = await queryClient.query(profileQuery(context.get(apiContext)));
+  const profile = await queryClient.query(profileQuery(context.get(apiContext), user.id));
   if (profile.onboardedAt) {
     throw redirect(safeNextPath(url.searchParams.get("next"), localizeHref("/")));
   }
-  return { dehydratedState: dehydrate(queryClient) };
+  return { userId: user.id, dehydratedState: dehydrate(queryClient) };
 }
 
 export function meta() {
@@ -45,15 +46,17 @@ export function meta() {
 export default function Onboarding({ loaderData }: Route.ComponentProps) {
   return (
     <HydrationBoundary state={loaderData.dehydratedState}>
-      <OnboardingContent />
+      <OnboardingContent key={loaderData.userId} userId={loaderData.userId} />
     </HydrationBoundary>
   );
 }
 
 type Failure = { message: string; reauthHref: string | null };
 
-function OnboardingContent() {
-  const { data: profile } = useQuery(profileQuery(getRenderApi()));
+function OnboardingContent({ userId }: { userId: string }) {
+  const api = getRenderApi();
+  const { data: me } = useQuery(meQuery(api));
+  const { data: profile } = useQuery({ ...profileQuery(api, userId), enabled: me?.id === userId && me.status === "active" });
   const [params] = useSearchParams();
   const location = useLocation();
   const next = safeNextPath(params.get("next"), localizeHref("/"));
@@ -119,7 +122,7 @@ function OnboardingContent() {
     toast.success(m.toast_passkey_added());
   }
 
-  if (!profile) {
+  if (!profile || !me || me.id !== userId || me.status !== "active") {
     return null;
   }
   // 表单卡片（spec 第 7.5 节）：昵称和简介，再加一种登录方式，最后是"完成"和"以后再说"。

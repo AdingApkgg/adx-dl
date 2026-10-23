@@ -1,19 +1,20 @@
-import type { ComponentType } from "react";
+import { type ComponentType, useLayoutEffect } from "react";
 import { dehydrate, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
+import { createMemoryRouter, MemoryRouter, RouterContextProvider, RouterProvider } from "react-router";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { SettingsNavigation } from "@/client/components/settings-navigation";
 import { DashboardNavigation } from "@/client/components/dashboard-navigation";
 import { DashPager, dashFilterHref } from "@/client/components/dash-ui";
 import Login from "@/client/routes/login";
-import SettingsAccount from "@/client/routes/settings-account";
-import SettingsProfile from "@/client/routes/settings-profile";
+import SettingsAccount, { loader as accountLoader } from "@/client/routes/settings-account";
+import SettingsProfile, { loader as profileLoader } from "@/client/routes/settings-profile";
 import Dash from "@/client/routes/dash";
 import DashLists from "@/client/routes/dash-lists";
 import { m } from "@/paraglide/messages.js";
 import { createApiClient } from "@/shared/api-client";
 import { makeQueryClient } from "@/shared/query-client";
+import { apiContext, queryClientContext } from "@/shared/router-context";
 
 const actions = vi.hoisted(() => ({ social: vi.fn(), passkey: vi.fn(), add: vi.fn(), remove: vi.fn(), unlink: vi.fn(), signOut: vi.fn(), clearImports: vi.fn(), reset: vi.fn() }));
 vi.mock("@/client/lib/auth-client", () => ({ authClient: { signIn: { social: actions.social, passkey: actions.passkey }, passkey: { addPasskey: actions.add, deletePasskey: actions.remove }, unlinkAccount: actions.unlink, signOut: actions.signOut } }));
@@ -45,7 +46,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 function view(kind: "login" | "account" | "profile", url?: string, me: typeof USER | null = USER) {
-  const client = makeQueryClient(); client.setQueryData(["me"], me); client.setQueryData(["me", "profile"], PROFILE); client.setQueryData(["me", "logins"], LOGINS); client.setQueryData(["me", "sessions"], SESSIONS); client.setQueryData(["login-options"], OPTIONS);
+  const client = makeQueryClient(); client.setQueryData(["me"], me); client.setQueryData(["me", "profile", USER.id], PROFILE); client.setQueryData(["me", "logins", USER.id], LOGINS); client.setQueryData(["me", "sessions", USER.id], SESSIONS); client.setQueryData(["login-options"], OPTIONS);
   const Component = kind === "login" ? LoginPage : kind === "profile" ? Profile : Account;
   const router = createMemoryRouter([{ path: "*", element: <Component loaderData={{ userId: USER.id, dehydratedState: dehydrate(client) }} /> }], { initialEntries: [url ?? (kind === "login" ? "/login" : `/settings/${kind}`)] });
   render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>);
@@ -84,8 +85,45 @@ test.each(["account", "profile"] as const)("retained %s content is hidden after 
   await act(async () => { client.setQueryData(["me"], { ...USER, id: "another-account", publicId: "2" }); });
   await waitFor(() => expect(screen.queryByRole("heading", { level: 1 })).toBeNull()); expect(document.body.textContent).not.toContain("owner@example.test"); expect(document.body.textContent).not.toContain("Private profile draft");
 });
-test("sign-out transport rejection leaves the session and device data intact", async () => {
-  actions.signOut.mockRejectedValue(new Error("offline")); view("account"); fireEvent.click(screen.getByRole("button", { name: m.settings_sign_out() }));
+test.each(["profile", "account"] as const)("fresh %s loader never renders retained data from the previous identity", async kind => {
+  const nextUser = { ...USER, id: "next-owner", publicId: "2", name: "Next creator" };
+  const nextProfile = { ...PROFILE, name: nextUser.name, bio: "Next account biography" };
+  const nextLogins = { accounts: [{ ...LOGINS.accounts[0]!, id: "next-google", email: "next@example.test" }], passkeys: [] };
+  const nextSessions = { sessions: [{ ...SESSIONS.sessions[0]!, browser: "Next device" }] };
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    const path = new URL(input instanceof Request ? input.url : String(input)).pathname;
+    const bodies: Record<string, unknown> = { "/api/v1/me": nextUser, "/api/v1/me/profile": nextProfile, "/api/v1/me/logins": nextLogins, "/api/v1/me/sessions": nextSessions, "/api/v1/login-options": OPTIONS };
+    if (!(path in bodies)) throw new Error(`Unexpected identity fixture read: ${path}`);
+    return Response.json(bodies[path]);
+  }));
+  const client = makeQueryClient(); client.setQueryData(["me"], nextUser);
+  for (const [key, value] of [["profile", PROFILE], ["logins", LOGINS], ["sessions", SESSIONS]] as const) {
+    // 兼容旧版本留下的全局键，同时保留当前版本账号 A 的独立缓存。
+    client.setQueryData(["me", key], value, { updatedAt: 1 });
+    client.setQueryData(["me", key, USER.id], value, { updatedAt: 1 });
+  }
+  const context = new RouterContextProvider(); context.set(apiContext, api); context.set(queryClientContext, makeQueryClient());
+  const load = kind === "profile" ? profileLoader : accountLoader;
+  const data = await load({ context, url: new URL(`https://community.test/settings/${kind}`), params: {} } as unknown as Parameters<typeof load>[0]);
+  const Component = kind === "profile" ? Profile : Account;
+  const first: string[] = [];
+  function FirstCommit() {
+    useLayoutEffect(() => { first.push(document.body.textContent ?? "", ...Array.from(document.querySelectorAll("input, textarea"), input => (input as HTMLInputElement).value)); }, []);
+    return <Component loaderData={data} />;
+  }
+  const router = createMemoryRouter([{ path: "*", element: <FirstCommit /> }], { initialEntries: [`/settings/${kind}`] });
+  render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>);
+  expect(first.join(" ")).not.toContain("owner@example.test"); expect(first.join(" ")).not.toContain("Private profile draft"); expect(first.join(" ")).not.toContain("Other browser");
+  if (kind === "profile") {
+    expect(first).toContain(nextUser.name); expect(first).toContain(nextProfile.bio);
+    expect(await screen.findByDisplayValue(nextUser.name)).toBeTruthy(); expect(screen.getByDisplayValue(nextProfile.bio)).toBeTruthy(); expect(screen.queryByDisplayValue(PROFILE.name)).toBeNull();
+  } else {
+    expect(first.join(" ")).toContain("next@example.test"); expect(await screen.findByText("next@example.test", { exact: false })).toBeTruthy(); expect(screen.getByText("Next device", { exact: false })).toBeTruthy();
+  }
+  expect(document.body.textContent).not.toContain("owner@example.test"); expect(document.body.textContent).not.toContain("Private profile draft");
+});
+test.each([new Error("offline"), undefined, null])("sign-out transport rejection (%s) leaves the session and device data intact", async failure => {
+  actions.signOut.mockRejectedValue(failure); view("account"); fireEvent.click(screen.getByRole("button", { name: m.settings_sign_out() }));
   await screen.findByText(m.error_unknown()); expect(actions.clearImports).not.toHaveBeenCalled(); expect(screen.getByText("owner@example.test", { exact: false })).toBeTruthy(); expect((screen.getByRole("button", { name: m.settings_sign_out() }) as HTMLButtonElement).disabled).toBe(false);
 });
 test("revoking a device targets only its actual session and keeps the current device actionless", async () => {

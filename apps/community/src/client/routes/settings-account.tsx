@@ -34,8 +34,8 @@ export async function loader({ context, url }: Route.LoaderArgs) {
   const queryClient = context.get(queryClientContext);
   const api = context.get(apiContext);
   await Promise.all([
-    queryClient.query(loginsQuery(api)),
-    queryClient.query(sessionsQuery(api)),
+    queryClient.query(loginsQuery(api, user.id)),
+    queryClient.query(sessionsQuery(api, user.id)),
     queryClient.query(loginOptionsQuery(api)),
   ]);
   return { userId: user.id, dehydratedState: dehydrate(queryClient) };
@@ -89,8 +89,8 @@ function SettingsContent({ userId }: { userId: string }) {
   const [params] = useSearchParams();
   const hydrated = useHydrated();
   const { data: me } = useQuery(meQuery(api));
-  const { data: logins } = useQuery(loginsQuery(api));
-  const { data: sessions } = useQuery(sessionsQuery(api));
+  const { data: logins } = useQuery({ ...loginsQuery(api, userId), enabled: me?.id === userId && me.status === "active" });
+  const { data: sessions } = useQuery({ ...sessionsQuery(api, userId), enabled: me?.id === userId && me.status === "active" });
   const { data: options } = useQuery(loginOptionsQuery(api));
   const [failure, setFailure] = useState<Failure | null>(null);
   const [pending, setPending] = useState(false);
@@ -157,11 +157,11 @@ function SettingsContent({ userId }: { userId: string }) {
   async function signOut() {
     setPending(true);
     setFailure(null);
-    let error: unknown;
-    try { ({ error } = await authClient.signOut()); }
-    catch (failure) { error = failure; }
-    if (error) {
-      setFailure({ message: errorMessage(error) ?? m.error_unknown(), reauth: false });
+    try {
+      const { error } = await authClient.signOut();
+      if (error) throw error;
+    } catch (failure) {
+      setFailure({ message: errorMessage(failure) ?? m.error_unknown(), reauth: false });
       setPending(false);
       return;
     }

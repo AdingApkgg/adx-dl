@@ -132,8 +132,8 @@ describe("账号设置页 loader", () => {
 
     const byKey = Object.fromEntries(dehydratedState.queries.map((query) => [query.queryKey.join("/"), query.state.data]));
     expect(byKey.me).toEqual(USER);
-    expect(byKey["me/logins"]).toEqual({ accounts, passkeys: [] });
-    expect(byKey["me/sessions"]).toEqual({ sessions: devices });
+    expect(byKey[`me/logins/${USER.id}`]).toEqual({ accounts, passkeys: [] });
+    expect(byKey[`me/sessions/${USER.id}`]).toEqual({ sessions: devices });
     expect(byKey["login-options"]).toEqual(OPTIONS);
   });
 });

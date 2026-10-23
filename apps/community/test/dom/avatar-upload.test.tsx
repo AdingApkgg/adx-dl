@@ -156,7 +156,7 @@ function setup(
   window.history.replaceState(null, "", path);
   const client = makeQueryClient();
   client.setQueryData(["me"], me);
-  client.setQueryData(["me", "profile"], profile);
+  client.setQueryData(["me", "profile", me.id], profile);
   client.setQueryData(["users", me.id], { image: me.image });
   render(
     <QueryClientProvider client={client}>

@@ -29,7 +29,7 @@ import type { Route } from "./+types/settings-profile";
 export async function loader({ context, url }: Route.LoaderArgs) {
   const user = await requireUser(context, url);
   const queryClient = context.get(queryClientContext);
-  await queryClient.query(profileQuery(context.get(apiContext)));
+  await queryClient.query(profileQuery(context.get(apiContext), user.id));
   return { userId: user.id, dehydratedState: dehydrate(queryClient) };
 }
 
@@ -51,7 +51,7 @@ export default function SettingsProfile({ loaderData }: Route.ComponentProps) {
 function ProfileContent({ userId }: { userId: string }) {
   const api = getRenderApi();
   const { data: me } = useQuery(meQuery(api));
-  const { data: profile } = useQuery(profileQuery(api));
+  const { data: profile } = useQuery({ ...profileQuery(api, userId), enabled: me?.id === userId && me.status === "active" });
   if (!me || me.id !== userId || me.status !== "active" || !profile) {
     return null;
   }
