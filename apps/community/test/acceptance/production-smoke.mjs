@@ -375,10 +375,11 @@ try {
       await json('/api/v1/dash/access');
       for (const path of ['/dash', '/dash/users', '/dash/charts', '/dash/discussions', '/dash/discussions?view=boards', '/dash/discussions?view=reports', '/dash/featured', '/dash/notices', '/dash/reports', '/dash/status']) {
         await visit(path);
-        const childHeading = path.startsWith('/dash/discussions') ? '讨论管理' : ({ '/dash': '概览', '/dash/users': '用户列表', '/dash/charts': '公开谱面管理', '/dash/featured': '精选谱面', '/dash/notices': '站点公告', '/dash/reports': '举报处理', '/dash/status': '备份记录' })[path];
+        const childHeading = path.startsWith('/dash/discussions') ? '讨论管理' : ({ '/dash': '概览', '/dash/users': '用户列表', '/dash/charts': '公开谱面管理', '/dash/featured': '精选谱面', '/dash/notices': '站点公告', '/dash/reports': '举报处理', '/dash/status': '运行与备份状态' })[path];
         await page.getByRole('heading', { level: 2, name: childHeading, exact: true }).waitFor();
         await page.getByText(`管理员 #${env.PRODUCTION_EXPECT_USER_ID || (await json('/api/v1/dash/access')).publicId}`, { exact: true }).waitFor();
       }
+      await page.getByRole('heading', { level: 3, name: '备份记录', exact: true }).waitFor();
       const status = await json('/api/v1/dash/status');
       assert.ok(status.checks.length >= 6 && status.checks.every(c => c.status === 'ok'));
       assert.equal(status.roles.length, 3); assert.ok(status.roles.every(r => r.ready));
