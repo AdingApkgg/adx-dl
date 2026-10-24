@@ -1,3 +1,4 @@
+import { MotionSurface } from "./motion-ui";
 import {Music2Icon} from "lucide-react";
 import {SearchText} from "./search-text";
 import {ChartSelection} from "./library-selection";
@@ -51,7 +52,7 @@ export function PublicChartCard({ chart, headingLevel = 2, query="",selectable=t
   const privateHistory = privateCursors.filter((cursor): cursor is string => typeof cursor === "string" && (cursor === "" || /^[A-Za-z0-9_-]{1,512}$/.test(cursor)))
     .map(cursor => location.pathname + (cursor ? `?cursor=${cursor}` : ""));
   const history = publicListCursors(favorites ? privateHistory : location.state?.publicChartCursors, href);
-  return <article className="community-chart-card"><Link to={localizeHref(`/charts/${chart.publicId}`)} state={{ publicListHref: href, publicListCursors: history }} className="group flex min-w-0 flex-1 flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+  return <MotionSurface as="article" hover className="community-chart-card"><Link to={localizeHref(`/charts/${chart.publicId}`)} state={{ publicListHref: href, publicListCursors: history }} className="group flex min-w-0 flex-1 flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
     <PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} />
     <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3 sm:p-4">
       <Heading className="line-clamp-2 font-semibold leading-snug" title={chart.title}><SearchText text={chart.title} query={query}/></Heading>
@@ -61,7 +62,7 @@ export function PublicChartCard({ chart, headingLevel = 2, query="",selectable=t
         <PublicDifficultyPill row={row} />
       </li>)}</ul>
     </div>
-  </Link><PublicChartTags tags={chart.tags} />{selectable?<ChartSelection publicId={chart.publicId}/>:null}</article>;
+  </Link><PublicChartTags tags={chart.tags} />{selectable?<ChartSelection publicId={chart.publicId}/>:null}</MotionSurface>;
 }
 
 export function PublicChartTags({ tags }: { tags: PublicChartDto["tags"] }) {

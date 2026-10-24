@@ -1,3 +1,4 @@
+import { MotionSurface, NavigationIndicator } from "./motion-ui";
 import { LibraryIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { Button } from "@astrodx/ui/components/button";
@@ -13,12 +14,12 @@ export function LibraryNavigation({ view }: { view: "lists" | "favorites" | "rep
     { key: "reports", href: "/me/library?view=reports", label: m.library_reports() },
   ];
   return <nav aria-label={m.ui_library_navigation()} className="community-library-tabs">
-    {items.map(item => <Link key={item.key} to={localizeHref(item.href)} className="community-library-tab" aria-current={view === item.key ? "page" : undefined}>{item.label}</Link>)}
+    {items.map(item => <Link key={item.key} to={localizeHref(item.href)} className="community-library-tab community-motion-nav" aria-current={view === item.key ? "page" : undefined}>{view===item.key?<NavigationIndicator group="library"/>:null}{item.label}</Link>)}
   </nav>;
 }
 
 export function PublicListCard({ list }: { list: PublicListSummary }) {
-  return <article className="community-list-card">
+  return <MotionSurface as="article" hover className="community-list-card">
     <div className="community-section-heading">
       <span className="community-list-icon"><LibraryIcon aria-hidden="true" className="size-5" /></span>
       <span className="community-status">#{list.publicId}</span>
@@ -34,7 +35,7 @@ export function PublicListCard({ list }: { list: PublicListSummary }) {
       </div>
       <time dateTime={list.publishedAt} className="block text-xs text-muted-foreground">{m.ui_library_published_at({ date: list.publishedAt.slice(0, 10) })}</time>
     </div>
-  </article>;
+  </MotionSurface>;
 }
 
 export function LibraryPager({ nextCursor }: { nextCursor: string | null }) {

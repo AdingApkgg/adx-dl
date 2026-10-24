@@ -1,3 +1,4 @@
+import { MotionSurface } from "../components/motion-ui";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { useState } from "react";
@@ -48,10 +49,10 @@ function NotificationCenter({ page, userId }: { page: Route.ComponentProps["load
 function NotificationRow({ item, refresh }: { item: DiscussionNotification; refresh: () => void }) {
   const task = useDiscussionTask(), href = item.available ? safeDiscussionHref(item.href) : null;
   const kind = { direct_reply: m.discussion_notice_reply, chart_comment: m.discussion_notice_chart, subscription: m.discussion_notice_subscription, moderation: m.discussion_notice_moderation, report_resolution: m.discussion_notice_resolution, author_update: m.following_updates }[item.kind]();
-  return <article className={`community-notification space-y-4 ${item.read ? "" : "is-unread"}`}>
+  return <MotionSurface as="article" className={`community-notification space-y-4 ${item.read ? "" : "is-unread"}`}>
     <div className="community-notification-head"><h3 className="text-sm font-semibold">{kind}</h3><span className={`community-status ${item.read ? "" : "is-accent"}`}>{item.read ? m.ui_social_notice_read() : m.discussion_unread()}</span><time className="text-xs text-muted-foreground" dateTime={item.eventAt}>{dashDate(item.eventAt)}</time></div>
     <div className="community-notification-body space-y-3">{item.available ? <>{item.update?.chart ? <div className="space-y-2"><p className="break-words font-semibold">{item.update.chart.title}</p>{item.update.author ? <Link className="inline-flex min-h-11 items-center text-sm text-primary hover:underline" to={localizeHref(`/u/${item.update.author.publicId}`)}>{item.update.author.name}</Link> : null}{item.update.state === "updated" ? <p className="text-sm text-muted-foreground">{m.following_version_changed()}</p> : null}</div> : null}{item.topic?.state === "visible" ? <p className="break-words font-medium">{item.topic.title}</p> : null}{item.message?.state === "visible" ? <p className="whitespace-pre-wrap break-words text-sm leading-7 text-muted-foreground">{item.message.body}</p> : null}{item.publicReason ? <p className="whitespace-pre-wrap break-words rounded-lg bg-muted p-3 text-sm leading-7">{item.publicReason}</p> : null}</> : <p className="text-sm text-muted-foreground">{m.discussion_unavailable()}</p>}</div>
     <div className="community-notification-actions">{href ? <Button asChild variant="outline" className="min-h-11"><Link to={href} onClick={() => { if (!item.read) void task.run(() => discussionApi(getBrowserApi()).read([item.id])); }}>{item.update?.state === "updated" ? m.following_open_current() : m.discussion_open()}</Link></Button> : null}{!item.read ? <Button disabled={task.pending} variant="ghost" className="min-h-11" onClick={async () => { if (await task.run(() => discussionApi(getBrowserApi()).read([item.id]))) refresh(); }}>{m.discussion_read()}</Button> : null}</div>{task.feedback}
-  </article>;
+  </MotionSurface>;
 }
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) { return <DiscussionError error={error} />; }

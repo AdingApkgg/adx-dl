@@ -1,3 +1,4 @@
+import { MotionGroup } from "../components/motion-ui";
 import { data, Link, useNavigate } from "react-router";
 import { Button } from "@astrodx/ui/components/button";
 import { Textarea } from "@astrodx/ui/components/textarea";
@@ -44,7 +45,7 @@ export default function PublicListDetail({ loaderData: list }: Route.ComponentPr
     <ListActions key={`${list.publicId}/${list.revision}`} list={list} />
     <section aria-labelledby="list-content" className="space-y-4">
       <div className="community-section-heading"><h2 id="list-content" className="community-section-title">{m.ui_library_entries()}</h2><p className="text-xs text-muted-foreground">{m.ui_library_page_count({ count: String(list.entries.length) })}</p></div>
-      <ol className={PUBLIC_CHART_GRID_CLASS}>{list.entries.map((entry, index) => <li key={`${entry.publicId ?? "missing"}/${index}`} className="min-w-0">{entry.chart ? <PublicChartCard chart={entry.chart} headingLevel={3} /> : <div className="community-list-unavailable"><p className="text-sm font-semibold">{entry.publicId ? m.social_chart_number({ id: entry.publicId }) : m.chart_missing()}</p><p className="text-sm leading-6 text-muted-foreground">{m.ui_library_unavailable_entry()}</p></div>}</li>)}</ol>
+      <MotionGroup as="ol" className={PUBLIC_CHART_GRID_CLASS}>{list.entries.map((entry, index) => <li key={`${entry.publicId ?? "missing"}/${index}`} className="min-w-0">{entry.chart ? <PublicChartCard chart={entry.chart} headingLevel={3} /> : <div className="community-list-unavailable"><p className="text-sm font-semibold">{entry.publicId ? m.social_chart_number({ id: entry.publicId }) : m.chart_missing()}</p><p className="text-sm leading-6 text-muted-foreground">{m.ui_library_unavailable_entry()}</p></div>}</li>)}</MotionGroup>
     </section>
     <LibraryPager nextCursor={list.nextCursor} />
   </main>;

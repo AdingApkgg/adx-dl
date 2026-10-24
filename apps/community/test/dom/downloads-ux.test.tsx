@@ -1,3 +1,4 @@
+import {MotionProvider} from "@astrodx/ui/motion";
 import {afterEach,beforeEach,expect,test,vi} from "vitest";
 import {act,fireEvent,render,screen,within} from "@testing-library/react";
 import {MemoryRouter} from "react-router";
@@ -17,6 +18,9 @@ test("mixed download stages expose honest counts and only relevant pause, retry 
  expect(downloadQueueView(fixture.snapshot.jobs)).toMatchObject({active:1,ready:1,attention:1});
  render(<MemoryRouter><Downloads/></MemoryRouter>);
  const articles=within(screen.getByRole('region',{name:m.ui_download_queue()})).getAllByRole('article');
+ expect(within(articles[0]!).getByRole('status').querySelector('svg')).toBeNull();
+ expect(within(articles[1]!).getByRole('status').querySelector('svg')).not.toBeNull();
+ expect(within(articles[2]!).getByRole('status').querySelector('svg')).toBeNull();
  expect(within(articles[0]!).getByRole('button',{name:m.download_pause()})).toBeTruthy();
  expect(within(articles[1]!).queryByRole('button',{name:m.download_pause()})).toBeNull();
  expect(within(articles[1]!).queryByRole('button',{name:m.download_resume()})).toBeNull();
@@ -31,12 +35,12 @@ test("budget and nonpersistent native save fallbacks stay usable without pretend
  const mixed=job('2','changed','ready');mixed.items.push({...job('3','ready','ready').items[0]!});
  expect(downloadJobView(mixed)).toMatchObject({readyCount:1,allReady:false,needsAttention:true,canResume:true});
 });
-test("clearing device records requires confirmation and history describes a save request",()=>{
+test("clearing device records requires confirmation and history describes a save request",async()=>{
  fixture.snapshot.history=[{id:'history',scope:'alice',finishedAt:Date.parse('2026-10-21T00:00:00Z'),publicIds:['1','2']}];render(<MemoryRouter><Downloads/></MemoryRouter>);
  expect(screen.getByText(m.ui_download_history_hint())).toBeTruthy();expect(document.querySelector('time')?.dateTime).toBe('2026-10-21T00:00:00.000Z');
  fireEvent.click(screen.getByRole('button',{name:m.download_clear()}));expect(fixture.store.clear).not.toHaveBeenCalled();
  fireEvent.click(screen.getByRole('button',{name:m.ui_download_keep()}));expect(fixture.store.clear).not.toHaveBeenCalled();
- fireEvent.click(screen.getByRole('button',{name:m.download_clear()}));fireEvent.click(screen.getByRole('button',{name:m.ui_download_clear_confirm()}));expect(fixture.store.clear).toHaveBeenCalledOnce();
+ fireEvent.click(screen.getByRole('button',{name:m.download_clear()}));await act(async()=>{fireEvent.click(screen.getByRole('button',{name:m.ui_download_clear_confirm()}));});expect(fixture.store.clear).toHaveBeenCalledOnce();
 });
 test("download dock exposes overall progress on other pages and is absent on the download page",()=>{
  fixture.snapshot.jobs=[job('1','fetching','running')];const result=render(<MemoryRouter initialEntries={['/charts']}><DownloadDock/></MemoryRouter>);
@@ -61,4 +65,18 @@ test("a long directory save keeps the single-task cancel action available",async
  expect(fixture.store.saveDirectory).toHaveBeenCalledOnce();expect(screen.getByText(m.ui_download_saving())).toBeTruthy();
  const cancel=screen.getByRole('button',{name:m.download_cancel()}) as HTMLButtonElement;expect(cancel.disabled).toBe(false);
  await act(async()=>{fireEvent.click(cancel);});expect(fixture.store.cancel).toHaveBeenCalledWith('1');await act(async()=>finish());
+});
+
+
+test("identity changes clear visual rolling counts synchronously",()=>{
+ localStorage.setItem("adx-reduce-motion","on");
+ fixture.snapshot.jobs=[job('1','fetching','running'),job('2','ready','ready'),job('3','failed','ready')];
+ const view=()=> <MotionProvider><MemoryRouter><Downloads/></MemoryRouter></MotionProvider>;
+ const result=render(view());
+ const counts=()=>[...result.container.querySelectorAll('.community-stat-grid dd [aria-hidden="true"]')].map(node=>node.textContent);
+ expect(counts()).toEqual(['1','1','1']);
+ fixture.snapshot={scope:null,jobs:[],history:[],persistent:false,busy:false,failure:null};
+ result.rerender(view());expect(counts()).toEqual(['0','0','0']);
+ fixture.snapshot={...fixture.snapshot,scope:'bob'};
+ result.rerender(view());expect(counts()).toEqual(['0','0','0']);
 });

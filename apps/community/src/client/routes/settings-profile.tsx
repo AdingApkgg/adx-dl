@@ -1,6 +1,7 @@
+import { MotionSurface } from "../components/motion-ui";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@astrodx/ui/components/card";
+import { CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@astrodx/ui/components/card";
 import { toast } from "@astrodx/ui/components/sonner";
 import { dehydrate, HydrationBoundary, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
@@ -112,7 +113,7 @@ function ProfileForm({ initialName, initialBio }: { initialName: string; initial
   // 表单卡片（spec 第 7.5 节）。
   return (
     <form onSubmit={save} aria-labelledby="settings-details-title">
-      <Card><CardHeader><CardTitle asChild><h2 id="settings-details-title">{m.ui_account_details()}</h2></CardTitle><CardDescription>{m.ui_account_details_hint()}</CardDescription></CardHeader>
+      <MotionSurface as="card"><CardHeader><CardTitle asChild><h2 id="settings-details-title">{m.ui_account_details()}</h2></CardTitle><CardDescription>{m.ui_account_details_hint()}</CardDescription></CardHeader>
         <CardContent className="space-y-5">
           <ProfileFields name={name} bio={bio} onNameChange={setName} onBioChange={setBio} />
           {error ? <Alert variant="destructive">{error}</Alert> : null}
@@ -122,7 +123,7 @@ function ProfileForm({ initialName, initialBio }: { initialName: string; initial
             {pending ? m.login_working() : m.profile_save()}
           </Button>
         </CardFooter>
-      </Card>
+      </MotionSurface>
     </form>
   );
 }

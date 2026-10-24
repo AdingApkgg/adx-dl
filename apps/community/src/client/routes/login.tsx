@@ -1,6 +1,7 @@
+import { MotionSurface } from "../components/motion-ui";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@astrodx/ui/components/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@astrodx/ui/components/card";
 import { Input } from "@astrodx/ui/components/input";
 import { Label } from "@astrodx/ui/components/label";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
@@ -98,11 +99,11 @@ function LoginContent() {
       <nav className="community-content-nav" aria-label={m.ui_auth_navigation()}><a href="#login-social">{m.ui_auth_social()}</a><a href="#login-qq">{m.login_qq_heading()}</a><a href="#login-passkey">{m.login_passkey_heading()}</a></nav>
       {callbackMessage ? <Alert variant="destructive">{callbackMessage}</Alert> : null}
 
-      <Card id="login-social"><CardHeader><CardTitle asChild><h2>{m.ui_auth_social()}</h2></CardTitle><CardDescription>{m.ui_auth_social_hint()}</CardDescription></CardHeader><CardContent className={`grid gap-3 ${options.awmc?.available ? "sm:grid-cols-2" : ""}`}>
+      <MotionSurface as="card" id="login-social"><CardHeader><CardTitle asChild><h2>{m.ui_auth_social()}</h2></CardTitle><CardDescription>{m.ui_auth_social_hint()}</CardDescription></CardHeader><CardContent className={`grid gap-3 ${options.awmc?.available ? "sm:grid-cols-2" : ""}`}>
         <SocialSignIn next={next} reauth={reauth} />
         {options.awmc?.available ? <SocialSignIn next={next} reauth={reauth} provider="awmc" /> : null}
-      </CardContent></Card>
-      <Card id="login-qq">
+      </CardContent></MotionSurface>
+      <MotionSurface as="card" id="login-qq">
         <CardHeader>
           <CardTitle asChild>
             <h2>{m.login_qq_heading()}</h2>
@@ -130,7 +131,7 @@ function LoginContent() {
           </Button>
           {isRefetchError ? <p role="status" className="text-sm text-muted-foreground">{m.login_qq_retry_failed()}</p> : null}
         </CardContent>}
-      </Card>
+      </MotionSurface>
 
       <PasskeySection
         siteKey={options.turnstileSiteKey}
@@ -275,7 +276,7 @@ function PasskeySection({ siteKey, signedIn, autofill, onSignedIn }: PasskeySect
   }
 
   return (
-    <Card id="login-passkey">
+    <MotionSurface as="card" id="login-passkey">
       <CardHeader>
         <CardTitle asChild>
           <h2>{m.login_passkey_heading()}</h2>
@@ -298,7 +299,7 @@ function PasskeySection({ siteKey, signedIn, autofill, onSignedIn }: PasskeySect
         )}
         {error ? <Alert variant="destructive">{error}</Alert> : null}
       </CardContent>
-    </Card>
+    </MotionSurface>
   );
 }
 
