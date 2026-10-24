@@ -182,6 +182,34 @@ class SmokeParameterTests(unittest.TestCase):
     result=subprocess.run(command,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
     self.assertNotEqual(result.returncode,0);self.assertIn('VALID_PREVIEW_TARGET_REQUIRED',result.stderr)
 
+class AcceptanceProxyTests(unittest.TestCase):
+ def proxy_function(self):
+  source=(pathlib.Path(__file__).resolve().parents[4]/'scripts/remote/community-auth-host.py').read_text()
+  nodes=[node for node in ast.parse(source).body if isinstance(node,ast.FunctionDef) and node.name=='acceptance_proxy']
+  import urllib.parse
+  namespace=dict(os=os,stat=stat,json=json,urllib=urllib)
+  exec(compile(ast.Module(body=nodes,type_ignores=[]),'community-auth-host.py','exec'),namespace)
+  return namespace['acceptance_proxy']
+ def test_default_and_private_local_proxy_override(self):
+  choose=self.proxy_function()
+  with tempfile.TemporaryDirectory() as directory:
+   path=pathlib.Path(directory)/'proxy.json'
+   self.assertEqual(choose(path,'inherited'),'inherited')
+   path.write_text(json.dumps({'httpsProxy':'http://host.docker.internal:20172'}));path.chmod(0o600)
+   self.assertEqual(choose(path,'inherited'),'http://host.docker.internal:20172')
+ def test_rejects_credentials_remote_destinations_and_exposed_settings(self):
+  choose=self.proxy_function()
+  with tempfile.TemporaryDirectory() as directory:
+   path=pathlib.Path(directory)/'proxy.json'
+   for value in ['http://user:secret@host.docker.internal:20172','http://example.com:20172','https://host.docker.internal:20172','http://host.docker.internal:20172/forward?url=x']:
+    with self.subTest(proxy=value):
+     path.write_text(json.dumps({'httpsProxy':value}));path.chmod(0o600)
+     with self.assertRaises(AssertionError):choose(path,'inherited')
+   path.write_text(json.dumps({'httpsProxy':'http://host.docker.internal:20172'}));path.chmod(0o644)
+   with self.assertRaisesRegex(AssertionError,'PRIVATE_OWNED'):choose(path,'inherited')
+   path.unlink();target=pathlib.Path(directory)/'target';target.write_text('{}');target.chmod(0o600);path.symlink_to(target)
+   with self.assertRaisesRegex(AssertionError,'PRIVATE_OWNED'):choose(path,'inherited')
+
 class ReleaseSourcePermissionsTests(unittest.TestCase):
  def test_public_checkout_is_readable_while_release_context_and_env_stay_private(self):
   with tempfile.TemporaryDirectory() as directory:

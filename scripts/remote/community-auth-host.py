@@ -1,5 +1,5 @@
 # Executed only over authenticated SSH, with input injected by the local controller.
-import os, pathlib, subprocess, json, base64, time, urllib.request, urllib.error
+import os, pathlib, subprocess, json, base64, time, urllib.request, urllib.error, urllib.parse, stat
 assert os.uname().nodename == 'arch'
 os.umask(0o077)
 root = pathlib.Path('/home/i/astrodx-verify/auth-smoke') / task['runId']
@@ -15,6 +15,17 @@ def call(port, path, method='GET', authenticated=True):
         with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request, timeout=30) as response:
             return response.status, response.read(), response.headers
     except urllib.error.HTTPError as error: return error.code, error.read(), error.headers
+def acceptance_proxy(settings, inherited):
+    if not settings.exists(): return inherited
+    info = settings.lstat()
+    assert stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid() and info.st_mode & 0o077 == 0, 'PRIVATE_OWNED_PROXY_SETTINGS_REQUIRED'
+    config = json.loads(settings.read_text())
+    assert set(config) == {'httpsProxy'}, 'INVALID_PROXY_SETTINGS'
+    proxy = config['httpsProxy']
+    parsed = urllib.parse.urlsplit(proxy)
+    assert parsed.scheme == 'http' and parsed.hostname == 'host.docker.internal' and parsed.port and not parsed.username and not parsed.password and parsed.path in ['', '/'] and not parsed.query and not parsed.fragment, 'LOCAL_CONFIGURED_PROXY_REQUIRED'
+    return proxy
+
 web = inspect('astrodx-community-web-1')
 assert web['State']['Running']
 if task['action'] == 'prepare':
@@ -30,6 +41,8 @@ if task['action'] == 'prepare':
     env = dict(x.split('=', 1) for x in web['Config']['Env'])
     allowed = ['DATABASE_URL', 'BETTER_AUTH_SECRET', 'PUBLIC_ORIGIN', 'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'COMMUNITY_ADMIN_PUBLIC_IDS', 'HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'NO_PROXY', 'no_proxy']
     env = {k: v for k, v in env.items() if k in allowed}
+    proxy = acceptance_proxy(pathlib.Path.home()/'.config/astrodx-community/acceptance-proxy.json', env.get('HTTPS_PROXY') or env.get('https_proxy'))
+    if proxy: env.update(HTTPS_PROXY=proxy, https_proxy=proxy)
     env.update(SMOKE_RUN_ID=task['runId'], SMOKE_BRIDGE_KEY=task['key'], SMOKE_USER_PUBLIC_ID='1', NODE_ENV='production')
     args = ['run', '-d', '--name', name, '--label', 'adxc.smoke.run=' + task['runId'], '--network', 'astrodx-community_default', '--user', str(os.getuid())+':'+str(os.getgid()), '--add-host', 'host.docker.internal:host-gateway', '--read-only', '--tmpfs', '/tmp:rw,nosuid,nodev,size=16m', '--cpus', '1', '--memory', '512m', '--pids-limit', '128', '--cap-drop=ALL', '--security-opt=no-new-privileges', '--publish', '127.0.0.1::41910', '--mount', 'type=bind,src=' + str(root / 'tools') + ',dst=/repo/apps/community/ops/acceptance,readonly']
     for key in env: args.extend(['-e', key])
