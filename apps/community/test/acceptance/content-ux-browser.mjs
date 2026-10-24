@@ -1,3 +1,4 @@
+import {exerciseMotionPlayer} from "./motion-browser.mjs";
 import assert from "node:assert/strict";
 import {join} from "node:path";
 export async function exerciseContentUx({owner,anonymous,origin,step,evidenceDirectory}){
@@ -11,7 +12,7 @@ export async function exerciseContentUx({owner,anonymous,origin,step,evidenceDir
   const charts=await read(anonymous,"/api/v1/charts"),chart=charts.items.find(c=>c.summary.difficulties.some(d=>d.previewSupported));assert.ok(chart,"published synthetic chart");chartId=chart.publicId;
   await visit(visitor,`/charts/${chart.publicId}`);await geometry(visitor);const nav=visitor.getByRole("navigation",{name:"本页导航",exact:true});assert.equal(await nav.getByRole("link").count(),5);
   const cards=visitor.locator("#chart-difficulties"),slot=chart.summary.difficulties.find(d=>d.previewSupported);assert.equal(await cards.getByRole("button").count(),chart.summary.difficulties.filter(d=>d.previewSupported).length);
-  const card=cards.locator("li").nth(chart.summary.difficulties.indexOf(slot));await card.getByRole("button").click();const preview=visitor.locator("#chart-preview");await preview.locator("canvas").waitFor();assert.equal(await preview.getByRole("combobox",{name:"难度",exact:true}).inputValue(),String(slot.difficulty));await preview.getByRole("button",{name:"播放",exact:true}).click({trial:true,timeout:30000});await preview.getByRole("button",{name:"关闭预览",exact:true}).click();
+  const card=cards.locator("li").nth(chart.summary.difficulties.indexOf(slot));await card.getByRole("button").click();const preview=visitor.locator("#chart-preview");await preview.locator("canvas").waitFor();assert.equal(await preview.getByRole("combobox",{name:"难度",exact:true}).inputValue(),String(slot.difficulty));await preview.getByRole("button",{name:"播放",exact:true}).click({trial:true,timeout:30000});await exerciseMotionPlayer({page:visitor,preview});await preview.getByRole("button",{name:"关闭预览",exact:true}).click();
   await nav.getByRole("link",{name:"作品信息",exact:true}).click();assert.equal(new URL(visitor.url()).hash,"#chart-information");if(evidenceDirectory)await visitor.screenshot({path:join(evidenceDirectory,"content-chart-detail-desktop.png"),fullPage:true});await visitor.setViewportSize({width:390,height:900});if(evidenceDirectory)await visitor.screenshot({path:join(evidenceDirectory,"content-chart-detail-mobile.png"),fullPage:true});
  });
  await step("content_forum_filter_reading_and_editor",async()=>{
