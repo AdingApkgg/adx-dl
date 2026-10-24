@@ -1,3 +1,4 @@
+import {MotionProvider} from "@astrodx/ui/motion";
 import {afterEach,beforeEach,expect,test,vi} from "vitest";
 import {act,fireEvent,render,screen,within} from "@testing-library/react";
 import {MemoryRouter} from "react-router";
@@ -17,6 +18,9 @@ test("mixed download stages expose honest counts and only relevant pause, retry 
  expect(downloadQueueView(fixture.snapshot.jobs)).toMatchObject({active:1,ready:1,attention:1});
  render(<MemoryRouter><Downloads/></MemoryRouter>);
  const articles=within(screen.getByRole('region',{name:m.ui_download_queue()})).getAllByRole('article');
+ expect(within(articles[0]!).getByRole('status').querySelector('svg')).toBeNull();
+ expect(within(articles[1]!).getByRole('status').querySelector('svg')).not.toBeNull();
+ expect(within(articles[2]!).getByRole('status').querySelector('svg')).toBeNull();
  expect(within(articles[0]!).getByRole('button',{name:m.download_pause()})).toBeTruthy();
  expect(within(articles[1]!).queryByRole('button',{name:m.download_pause()})).toBeNull();
  expect(within(articles[1]!).queryByRole('button',{name:m.download_resume()})).toBeNull();
@@ -61,4 +65,18 @@ test("a long directory save keeps the single-task cancel action available",async
  expect(fixture.store.saveDirectory).toHaveBeenCalledOnce();expect(screen.getByText(m.ui_download_saving())).toBeTruthy();
  const cancel=screen.getByRole('button',{name:m.download_cancel()}) as HTMLButtonElement;expect(cancel.disabled).toBe(false);
  await act(async()=>{fireEvent.click(cancel);});expect(fixture.store.cancel).toHaveBeenCalledWith('1');await act(async()=>finish());
+});
+
+
+test("identity changes clear visual rolling counts synchronously",()=>{
+ localStorage.setItem("adx-reduce-motion","on");
+ fixture.snapshot.jobs=[job('1','fetching','running'),job('2','ready','ready'),job('3','failed','ready')];
+ const view=()=> <MotionProvider><MemoryRouter><Downloads/></MemoryRouter></MotionProvider>;
+ const result=render(view());
+ const counts=()=>[...result.container.querySelectorAll('.community-stat-grid dd [aria-hidden="true"]')].map(node=>node.textContent);
+ expect(counts()).toEqual(['1','1','1']);
+ fixture.snapshot={scope:null,jobs:[],history:[],persistent:false,busy:false,failure:null};
+ result.rerender(view());expect(counts()).toEqual(['0','0','0']);
+ fixture.snapshot={...fixture.snapshot,scope:'bob'};
+ result.rerender(view());expect(counts()).toEqual(['0','0','0']);
 });
