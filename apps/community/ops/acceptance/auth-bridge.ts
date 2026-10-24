@@ -58,6 +58,8 @@ async function revoke() {
   event("session_revoked", { verified: true, originalSessionsPreserved: true, rejectedWrites, reads });
 }
 const matches = (path: string) => {
+  // SPA navigation discovers public route modules through this exact read-only endpoint.
+  if (path === "/__manifest") return true;
   // The signed-in UI gate reads the public homepage; keep this exact, not a prefix.
   if (path === "/") return true;
   if (/^\/(?:en\/|ja\/)?(?:me\/governance|dash\/(?:governance|appeals|audit))(?:\.data)?$/.test(path)) return true;
