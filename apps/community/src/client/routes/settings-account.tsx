@@ -1,7 +1,8 @@
+import { MotionSurface } from "../components/motion-ui";
 import {clearDeviceImports} from "../imports/provider";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@astrodx/ui/components/card";
+import { CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@astrodx/ui/components/card";
 import { Input } from "@astrodx/ui/components/input";
 import { toast } from "@astrodx/ui/components/sonner";
 import { dehydrate, HydrationBoundary, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -197,7 +198,7 @@ function SettingsContent({ userId }: { userId: string }) {
         </Alert>
       ) : null}
 
-      <Card id="account-logins">
+      <MotionSurface as="card" id="account-logins">
         <CardHeader><CardTitle asChild><h2>{m.settings_logins_heading()}</h2></CardTitle><CardDescription>{m.ui_account_methods_hint()}</CardDescription></CardHeader>
         <CardContent className="space-y-4">
           <ul className={listClass}>
@@ -292,9 +293,9 @@ function SettingsContent({ userId }: { userId: string }) {
             </div>
           </details>
         </CardContent>
-      </Card>
+      </MotionSurface>
 
-      <Card id="account-devices">
+      <MotionSurface as="card" id="account-devices">
         <CardHeader><CardTitle asChild><h2>{m.settings_devices_heading()}</h2></CardTitle><CardDescription>{m.ui_account_devices_hint()}</CardDescription></CardHeader>
         <CardContent>
           <ul className={listClass}>
@@ -330,7 +331,7 @@ function SettingsContent({ userId }: { userId: string }) {
             {m.settings_revoke_others()}
           </Button>
         </CardFooter>
-      </Card>
+      </MotionSurface>
 
       <div>
         <Button type="button" variant="outline" disabled={pending} onClick={signOut}>
@@ -393,7 +394,7 @@ export function DeleteAccountSection({ userId, publicId, here, onDeleted }: Dele
 
   // 警示色的卡片（spec 第 7.5 节）：边框和标题用 destructive，提交按钮是 destructive 样式。
   return (
-    <Card className="ring-destructive/40">
+    <MotionSurface as="card" className="ring-destructive/40">
       <CardHeader>
         <CardTitle asChild>
           <h2 className="text-destructive">{m.settings_delete_heading()}</h2>
@@ -443,7 +444,7 @@ export function DeleteAccountSection({ userId, publicId, here, onDeleted }: Dele
           </Button>
         </CardFooter>
       </form>
-    </Card>
+    </MotionSurface>
   );
 }
 
@@ -456,7 +457,7 @@ export function DeletionStarted({ purgeAt }: { purgeAt: string }) {
   return (
     <main className="community-reading space-y-6">
       <PageTitle>{m.settings_delete_heading()}</PageTitle>
-      <Card>
+      <MotionSurface as="card">
         <CardHeader>
           <CardTitle asChild>
             <p role="status">{m.settings_delete_done()}</p>
@@ -470,7 +471,7 @@ export function DeletionStarted({ purgeAt }: { purgeAt: string }) {
             <a href={localizeHref("/")}>{m.settings_delete_home()}</a>
           </Button>
         </CardFooter>
-      </Card>
+      </MotionSurface>
     </main>
   );
 }

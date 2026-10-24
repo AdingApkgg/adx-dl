@@ -1,3 +1,4 @@
+import { MotionSurface, MotionGroup } from "../components/motion-ui";
 import {Alert} from "@astrodx/ui/components/alert";
 import {Button} from "@astrodx/ui/components/button";
 import {dehydrate,HydrationBoundary,useQuery} from "@tanstack/react-query";
@@ -43,7 +44,7 @@ function ImportPlan(){
  </fieldset>
  <p>{m.author_total()}: {rows.length} / 10 · {(rows.reduce((n,r)=>n+r.rawSize,0)/1048576).toFixed(2)} / 256 MiB</p>
  <p className="text-sm">{m.author_results_hint()}</p>
- <ul className="space-y-3">{rows.map(row=><li key={row.id} className="space-y-3 rounded-lg border p-4"><label className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={selected.includes(row.id)} onChange={e=>setSelected(s=>e.target.checked?[...s,row.id]:s.filter(i=>i!==row.id))}/><span className="break-all">{row.name}</span></label>
+ <MotionGroup as="ul" className="space-y-3">{rows.map(row=><MotionSurface as="li" key={row.id} className="space-y-3 rounded-lg border p-4"><label className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={selected.includes(row.id)} onChange={e=>setSelected(s=>e.target.checked?[...s,row.id]:s.filter(i=>i!==row.id))}/><span className="break-all">{row.name}</span></label>
  <div className="flex flex-wrap items-center gap-3"><label htmlFor={`${id}-${row.id}`}>{m.author_target()}</label><select id={`${id}-${row.id}`} className="min-h-11 max-w-full rounded border p-2" disabled={busy||["saved","saving","uncertain","cancelled"].includes(row.phase)} value={row.target?.id??""} onChange={e=>{const target=page.data?.targets.find(t=>t.id===e.target.value);run(()=>store.map(row.id,target?{id:target.id,revision:target.revision}:null));}}><option value="">{m.author_new_target()}</option>{page.data?.targets.map(t=><option key={t.id} value={t.id}>{t.title} · {t.versionCount}/20 · r{t.revision}</option>)}</select>{row.target?<span>r{row.target.revision}</span>:null}</div>
  <p role="status">{importPhaseLabel(row.phase)} · {(row.size/1048576).toFixed(2)} MiB</p>{["hashing","uploading"].includes(row.phase)?<progress max={1} value={row.progress} aria-label={importPhaseLabel(row.phase)} className="w-full"/>:null}
  {row.failure?<p role="alert" className="text-destructive">{row.failure}</p>:null}
@@ -52,7 +53,7 @@ function ImportPlan(){
  {row.failure==="CHART_CHANGED"&&row.target?<Button variant="outline" disabled={busy} onClick={()=>run(async()=>{const latest=await page.refetch();const target=latest.data?.targets.find(t=>t.id===row.target!.id);if(!target)throw Error("NOT_FOUND");await store.map(row.id,{id:target.id,revision:target.revision});})}>{m.author_reconfirm()}</Button>:null}
  {!row.fileId&&["paused","failed"].includes(row.phase)?<ImportReselect busy={busy} onSelect={selection=>run(()=>store.reselect(row.id,selection))}/>:null}
  {!["uploading","processing","saving"].includes(row.phase)?<Button variant="outline" disabled={busy} onClick={()=>run(()=>store.remove(row.id))}>{m.author_remove()}</Button>:null}
- </li>)}</ul>
+ </MotionSurface>)}</MotionGroup>
  <div className="flex flex-wrap gap-3"><Button disabled={busy||!rows.length||!page.data||!snapshot.capable} onClick={()=>run(()=>store.start())}>{m.author_start()}</Button><Button disabled={busy||!chosen.some(r=>r.phase==="ready")} onClick={()=>run(async()=>{await store.save(chosen.filter(r=>r.phase==="ready").map(r=>r.id));await page.refetch();})}>{m.author_save_selected()}</Button><Button variant="outline" disabled={busy||!rows.length} onClick={()=>run(()=>store.reconcile(selected.length?selected:allIds))}>{m.author_reconcile()}</Button><Button variant="outline" disabled={!busy} onClick={()=>store.pause()}>{m.author_pause()}</Button><Button variant="outline" disabled={!chosen.length} onClick={()=>run(()=>store.cancel(selected))}>{m.author_cancel_selected()}</Button></div>
  </main>;
 }

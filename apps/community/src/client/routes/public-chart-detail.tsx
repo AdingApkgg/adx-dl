@@ -1,3 +1,4 @@
+import { MotionGroup } from "../components/motion-ui";
 import {discoveryApi} from "../queries/discovery";
 import {parsePreviewShare,type PreviewShare} from "@/shared/discovery-search";
 import {PublicListCard} from "../components/library-ui";
@@ -101,9 +102,9 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
     <section id="chart-difficulties" className="community-panel space-y-4"><div><h2 className="community-section-title">{m.chart_difficulties()}</h2><p className="mt-1 text-sm text-muted-foreground">{m.ui_chart_difficulty_hint()}</p></div><ChartSummary summary={chart.summary} onPreview={previewDifficulty}/></section>
     <ChartDiscussion chartId={chart.publicId} versionId={chart.versionId} summary={chart.summary}/>
     <section id="chart-recommendations" className="space-y-4" aria-label={m.chart_metadata_related()}><h2 className="font-semibold">{m.chart_metadata_related()}</h2>
-      {chart.related?.length ? <ul className={PUBLIC_CHART_GRID_CLASS}>{chart.related.map(item => <li key={item.id}><PublicChartCard chart={item} headingLevel={3} /></li>)}</ul> : chart.related === null ? <p role="status">{m.chart_metadata_related_unavailable()}</p> : chart.author ? <Link className={textLinkClass} to={localizeHref(`/u/${chart.author.publicId ?? chart.author.id}`)}>{m.public_chart_back_author()}</Link> : null}
+      {chart.related?.length ? <MotionGroup as="ul" className={PUBLIC_CHART_GRID_CLASS}>{chart.related.map(item => <li key={item.id}><PublicChartCard chart={item} headingLevel={3} /></li>)}</MotionGroup> : chart.related === null ? <p role="status">{m.chart_metadata_related_unavailable()}</p> : chart.author ? <Link className={textLinkClass} to={localizeHref(`/u/${chart.author.publicId ?? chart.author.id}`)}>{m.public_chart_back_author()}</Link> : null}
     </section>
-    {chart.other===null?<p role="status">{m.discovery_unavailable()}</p>:chart.other?.length?<section className="space-y-3"><h2 className="font-semibold">{m.discovery_other_works()}</h2><ul className={PUBLIC_CHART_GRID_CLASS}>{chart.other.map(c=><li key={c.publicId}><PublicChartCard chart={c} headingLevel={3}/></li>)}</ul></section>:null}
+    {chart.other===null?<p role="status">{m.discovery_unavailable()}</p>:chart.other?.length?<section className="space-y-3"><h2 className="font-semibold">{m.discovery_other_works()}</h2><MotionGroup as="ul" className={PUBLIC_CHART_GRID_CLASS}>{chart.other.map(c=><li key={c.publicId}><PublicChartCard chart={c} headingLevel={3}/></li>)}</MotionGroup></section>:null}
     {chart.lists===null?<p role="status">{m.discovery_unavailable()}</p>:chart.lists?.length?<section className="space-y-3"><h2 className="font-semibold">{m.discovery_containing_lists()}</h2><ul className="grid gap-3 sm:grid-cols-2">{chart.lists.map(l=><li key={l.publicId}><PublicListCard list={l}/></li>)}</ul></section>:null}
   </main>;
 }

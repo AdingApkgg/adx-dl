@@ -1,6 +1,7 @@
+import { MotionSurface } from "./motion-ui";
 import type { ReactNode } from "react";
 import { Button } from "@astrodx/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@astrodx/ui/components/card";
+import { CardContent, CardHeader, CardTitle } from "@astrodx/ui/components/card";
 import { Link, isRouteErrorResponse, useLocation } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
@@ -8,11 +9,11 @@ import { isPublicUserId } from "@/shared/user-public-id";
 import { ErrorCard } from "./error-card";
 
 export function DashViewHeading({ title, description, count, id }: { title: string; description?: string; count?: number; id?: string }) {
-  return <div className="community-admin-view-heading"><div className="min-w-0 space-y-2"><h2 id={id} className="text-xl font-semibold tracking-tight">{title}</h2>{description ? <p className="max-w-3xl text-sm leading-7 text-muted-foreground">{description}</p> : null}</div>{count !== undefined ? <span className="community-status">{m.ui_admin_page_count({ count: String(count) })}</span> : null}</div>;
+  return <MotionSurface className="community-admin-view-heading"><div className="min-w-0 space-y-2"><h2 id={id} className="text-xl font-semibold tracking-tight">{title}</h2>{description ? <p className="max-w-3xl text-sm leading-7 text-muted-foreground">{description}</p> : null}</div>{count !== undefined ? <span className="community-status">{m.ui_admin_page_count({ count: String(count) })}</span> : null}</MotionSurface>;
 }
 export function DashEmpty({ children }: { children?: ReactNode }) { return <p role="status" className="community-empty">{children ?? m.dash_empty()}</p>; }
 export function DashSection({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
-  return <Card id={id} role="region" aria-label={title}><CardHeader><CardTitle asChild><h3>{title}</h3></CardTitle></CardHeader><CardContent>{children}</CardContent></Card>;
+  return <MotionSurface as="card" id={id} role="region" aria-label={title}><CardHeader><CardTitle asChild><h3>{title}</h3></CardTitle></CardHeader><CardContent>{children}</CardContent></MotionSurface>;
 }
 export function dashFilterHref(base: string, search: string, patch: Record<string, string | null>) {
   const params = new URLSearchParams(search); params.delete("cursor");

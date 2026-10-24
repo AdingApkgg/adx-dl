@@ -1,3 +1,4 @@
+import { MotionGroup } from "../components/motion-ui";
 import { data, Form, Link, useLocation } from "react-router";
 import { Button } from "@astrodx/ui/components/button";
 import { Input } from "@astrodx/ui/components/input";
@@ -30,7 +31,7 @@ export default function PublicLists({ loaderData }: Route.ComponentProps) {
       <details open={Boolean(author)} className="community-library-filters"><summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium">{m.ui_library_advanced_filters()}</summary><label className="grid gap-1 pt-2 text-sm">{m.library_author_number()}<Input name="author" inputMode="numeric" maxLength={19} defaultValue={author} className="min-h-11 sm:max-w-xs" /></label></details>
     </Form>
     <section aria-label={m.library_public_title()} className="space-y-4"><div className="community-section-heading"><h2 className="community-section-title">{m.library_public_title()}</h2><p className="text-xs text-muted-foreground">{m.ui_library_page_count({ count: String(loaderData.items.length) })}</p></div>
-      {loaderData.items.length ? <ul className="community-list-grid">{loaderData.items.map(list => <li key={list.publicId}><PublicListCard list={list} /></li>)}</ul> : <div className="community-empty space-y-3"><p className="font-medium text-foreground">{filtered ? m.ui_library_no_results() : m.library_public_empty()}</p><p>{filtered ? m.ui_library_no_results_hint() : m.library_public_hint()}</p><Button asChild variant="outline" className="min-h-11"><Link to={localizeHref(filtered ? "/lists" : "/me/lists/new")}>{filtered ? m.ui_clear_filters() : m.library_new()}</Link></Button></div>}
+      {loaderData.items.length ? <MotionGroup as="ul" className="community-list-grid">{loaderData.items.map(list => <li key={list.publicId}><PublicListCard list={list} /></li>)}</MotionGroup> : <div className="community-empty space-y-3"><p className="font-medium text-foreground">{filtered ? m.ui_library_no_results() : m.library_public_empty()}</p><p>{filtered ? m.ui_library_no_results_hint() : m.library_public_hint()}</p><Button asChild variant="outline" className="min-h-11"><Link to={localizeHref(filtered ? "/lists" : "/me/lists/new")}>{filtered ? m.ui_clear_filters() : m.library_new()}</Link></Button></div>}
     </section>
     <LibraryPager nextCursor={loaderData.nextCursor} />
   </main>;
