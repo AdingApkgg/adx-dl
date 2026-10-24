@@ -19,11 +19,11 @@ beforeEach(() => driver.animate.mockClear());
 
 function Preferences() {
   const { setMode } = useMotionPreference();
-  return <><button onClick={() => setMode("off")}>Disable motion</button><button onClick={() => setMode("on")}>Enable motion</button></>;
+  return <><button type="button" onClick={() => setMode("off")}>Disable motion</button><button type="button" onClick={() => setMode("on")}>Enable motion</button></>;
 }
 function Editor() {
   const [privateVisible, setPrivateVisible] = useState(true);
-  return <><button onClick={() => setPrivateVisible(false)}>Revoke access</button>{privateVisible ? <label>Private draft<input defaultValue="Original" /></label> : null}</>;
+  return <><button type="button" onClick={() => setPrivateVisible(false)}>Revoke access</button>{privateVisible ? <label>Private draft<input defaultValue="Original" /></label> : null}</>;
 }
 function editorRouter(provider = true) {
   const content = <><Preferences /><RouteMotion><Editor /></RouteMotion></>;
@@ -139,4 +139,13 @@ test("success feedback follows React preference immediately in both directions",
   expect(view.container.querySelector("svg.lucide-check")).not.toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Enable motion" }));
   expect(view.container.querySelector("svg.lucide-check")).toBeNull();
+});
+
+
+test("the DOM animation harness preserves an explicitly observed cancellation rejection", async () => {
+  const element = document.createElement("div");
+  const animation = element.animate({ opacity: [0.9, 1] }, { duration: 1000 });
+  const finished = animation.finished;
+  animation.cancel();
+  await expect(finished).rejects.toMatchObject({ name: "AbortError" });
 });

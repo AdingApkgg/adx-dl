@@ -8,6 +8,19 @@ import { afterEach } from "vitest";
 // 不会报警告。
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+// Happy DOM 20.14 提前创建 Animation.finished，取消未读取的动画会产生
+// Chromium 最小复现中不存在的未处理 AbortError。仅标记该取消拒绝已处理：
+// 显式读取 finished 的调用方仍收到拒绝，其他拒绝继续令测试失败。
+if (typeof window !== "undefined" && window.Animation) {
+  const cancel = window.Animation.prototype.cancel;
+  window.Animation.prototype.cancel = function () {
+    void this.finished.catch((error: unknown) => {
+      if (!(error instanceof DOMException && error.name === "AbortError")) throw error;
+    });
+    return cancel.call(this);
+  };
+}
+
 // 每个用例结束后把页面恢复原样（做法和 @astrodx/ui 的 vitest.setup.ts 一样，另外关掉 Sonner 的提示、换回地址）：设置面板和提示条会写 localStorage
 // 和 <html>（dark 类、color-scheme、data-accent、data-motion、data-reduced-motion），用例还可能换过地址。
 afterEach(() => {

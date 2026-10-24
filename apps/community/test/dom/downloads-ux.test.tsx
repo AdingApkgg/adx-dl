@@ -35,12 +35,12 @@ test("budget and nonpersistent native save fallbacks stay usable without pretend
  const mixed=job('2','changed','ready');mixed.items.push({...job('3','ready','ready').items[0]!});
  expect(downloadJobView(mixed)).toMatchObject({readyCount:1,allReady:false,needsAttention:true,canResume:true});
 });
-test("clearing device records requires confirmation and history describes a save request",()=>{
+test("clearing device records requires confirmation and history describes a save request",async()=>{
  fixture.snapshot.history=[{id:'history',scope:'alice',finishedAt:Date.parse('2026-10-21T00:00:00Z'),publicIds:['1','2']}];render(<MemoryRouter><Downloads/></MemoryRouter>);
  expect(screen.getByText(m.ui_download_history_hint())).toBeTruthy();expect(document.querySelector('time')?.dateTime).toBe('2026-10-21T00:00:00.000Z');
  fireEvent.click(screen.getByRole('button',{name:m.download_clear()}));expect(fixture.store.clear).not.toHaveBeenCalled();
  fireEvent.click(screen.getByRole('button',{name:m.ui_download_keep()}));expect(fixture.store.clear).not.toHaveBeenCalled();
- fireEvent.click(screen.getByRole('button',{name:m.download_clear()}));fireEvent.click(screen.getByRole('button',{name:m.ui_download_clear_confirm()}));expect(fixture.store.clear).toHaveBeenCalledOnce();
+ fireEvent.click(screen.getByRole('button',{name:m.download_clear()}));await act(async()=>{fireEvent.click(screen.getByRole('button',{name:m.ui_download_clear_confirm()}));});expect(fixture.store.clear).toHaveBeenCalledOnce();
 });
 test("download dock exposes overall progress on other pages and is absent on the download page",()=>{
  fixture.snapshot.jobs=[job('1','fetching','running')];const result=render(<MemoryRouter initialEntries={['/charts']}><DownloadDock/></MemoryRouter>);
