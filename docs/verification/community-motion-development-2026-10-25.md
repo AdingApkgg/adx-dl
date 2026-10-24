@@ -26,7 +26,7 @@ SSR/no-JS HTML 始终可读；不会先隐藏内容再等动画。关闭动效�
 以下是后续待执行步骤，本轮未执行：
 
 1. 构建机核对 hostname 后，用 `scripts/remote/verify.sh` 对最终提交运行 lint、共享 UI/web 检查，以及 `apps/community` 的 `bun run check`；修复发现的问题。
-2. 构建机使用现有 `apps/community/test/acceptance/run.sh` 完成隔离全量无头验收、真实上传/备份等既有门禁；重点复核 system/on/off、移动布局、粘性选择条/下载 dock、表单与播放器状态、账户切换及权限撤回。
+2. 构建机沿用既有受控隔离环境完成全量无头验收、真实上传/备份等门禁；CI 的 `apps/community/test/acceptance/run.sh` 仅在 GitHub-hosted runner 运行，不绕过其主机/存储保护。重点复核 system/on/off、移动布局、粘性选择条/下载 dock、表单与播放器状态、账户切换及权限撤回。
 3. 经用户授权推送并等待 CI，通过后走 `scripts/remote/community-deploy.py` 正式发布，生产只读登录态无头验收通过才推进发布完成。
 
 静态检查只能证明源码与约束对齐，不能替代类型检查、构建、真实浏览器或生产验收。
@@ -39,4 +39,15 @@ SSR/no-JS HTML 始终可读；不会先隐藏内容再等动画。关闭动效�
 
 ## 静态复核
 
-整批独立复核结果与修复记录将在本节补充；测试仍待集中执行。
+独立只读复核覆盖整批 38 个变更文件及相关实现，发现 4 项 Important、1 项 Minor、无 Critical。已完成一轮代码修正，但未运行测试，因此修正效果仍待集中验证：
+
+1. 下载状态模型没有 `written` 任务阶段，移除不可达比较；准备完成图标只消费真实 allReady。
+2. 锁定版本库的 OS hook 仅记初值；共享 useReducedMotion 改为 useSyncExternalStore 订阅 matchMedia change，保持显式 on/off 优先级，数字反馈也能响应系统变化。这是对“共享包仅增加导出”原计划的必要窄调整，集中阶段须同时检查主站与社区。
+3. 成功图形直接消费当前 React 偏好，避免 HTML data-motion 在 effect 更新前仍保留上一帧值，导致开关失效。
+4. 下载数字按 snapshot.scope、工作台数字按 actor 隔离，身份切换时同步换成新值，不从上一账号数量插值。
+
+对应的系统变化、成功图形双向开关、真实 ready 反馈、身份视觉计数用例均已编写，未执行。
+
+待集中阶段补足的一项 Minor：真实动画中切换偏好后，检查实际 transform/opacity 及连续帧终态。DOM 替身的 complete/stop 调用与浏览器 CSS translate/getAnimations 只能证明部分行为，不能证明 JS 驱动位移没有残留；本轮不声称该验收通过。
+
+复核中的边界裁决：未执行测试遵循用户要求；ready 图形只表达准备完成；既有 saved/added 状态机不顺带改写。正常路由卸载和整页刷新后的草稿存储不属于动画新增保证。complete-stop、sticky、播放器与长列表帧率保留动态验收；正式入口少量重复为现有传输协议保留；不从本轮静态复核推断生产状态。

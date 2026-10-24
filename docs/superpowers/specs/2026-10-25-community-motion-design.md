@@ -8,7 +8,7 @@
 
 ## 统一实现
 
-- 共享包仅补导出已有 Motion 控制 hook，不改变主站调用方式、不增依赖或安装。
+- 共享包补导出已有 Motion 控制 hook，并修复系统减少动画偏好的实时订阅；公共接口和主站调用方式不变，不增依赖或安装。
 - 社区集中维护 RouteMotion、MotionSurface、MotionGroup、NavigationIndicator、MotionSuccess。缓动沿用 EASE_OUT，交互沿用 springSoft；正文进入约0.28–0.36秒、8px以内，卡片悬浮2px，组内间隔0.035秒且最多延迟0.21秒。
 - 页面路径改变时只对当前内容播放进入动画，不按 location.key/search 给 Outlet 加 key，不保留旧页面快照、不等待退出；同页筛选、分页、数据刷新不重新播放整页动画。
 - SSR与无JS始终可读：所有内容表面的 initial=false，进场在客户端观察/导航后触发，最低透明度0.9。不把正文藏在 opacity:0 里等待 observer。
