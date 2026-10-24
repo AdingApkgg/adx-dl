@@ -14,7 +14,8 @@ function decisions(userId:string|SQL){return sql`(select d.id,'decision:'||d.id:
  or (d.entity='list' and exists(select 1 from chart_list_controls c where c.id::text=d.entity_id and c.journal_sequence<=${exported}) and exists(select 1 from chart_library_status where id='global' and ready)))
  union all select m.chart_id,'chart:'||m.chart_id::text,'chart',m.chart_id::text,'hide',m.reason,m.created_at
  from chart_moderations m join charts c on c.id=m.chart_id where c.owner_id=${userId} and m.journal_sequence>0 and m.journal_sequence<=${exported})`;}
-export async function governanceRead<T>(ctx:StorageContext,query:SQL):Promise<T[]>{return ctx.db.transaction(async tx=>{await tx.execute(sql`set local statement_timeout='2s'`);await tx.execute(sql`set local lock_timeout='1s'`);return rows<T>(tx,query);});}
+// Bounded OLTP reads must not spend their deadline compiling a high-cost plan, even for an empty page.
+export async function governanceRead<T>(ctx:StorageContext,query:SQL):Promise<T[]>{return ctx.db.transaction(async tx=>{await tx.execute(sql`set local jit=off`);await tx.execute(sql`set local statement_timeout='2s'`);await tx.execute(sql`set local lock_timeout='1s'`);return rows<T>(tx,query);});}
 async function decision(db:Handle,userId:string,key:string){const [d]=await rows<{public_reason:string}>(db,sql`select public_reason from ${decisions(userId)} d where key=${key}`);return d;}
 export async function governanceDecisions(ctx:StorageContext,userId:string,input:GovernanceQuery):Promise<GovernancePage<GovernanceDecision>>{
  await requireActiveSocialUser(ctx.db,userId);const p=governancePage(input,`decisions:${userId}`);

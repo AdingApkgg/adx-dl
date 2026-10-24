@@ -8,10 +8,12 @@ import { recordCommunityFact } from "../community/content-journal";
 import { withSocialUser } from "../services/social-page";
 import { beforeAll, afterAll, expect, test } from "bun:test";
 import { sql } from "drizzle-orm";
-import { resetTestDatabase } from "../testing/test-db";
+import { resetTestDatabase, testDbHandle } from "../testing/test-db";
+import { drizzle } from "drizzle-orm/node-postgres";
+import * as schema from "../db/schema";
 import { readyContext, readyOwner } from "../../../test/storage/ready-file";
 import { cleanupStorageFixture } from "../../../test/storage/fixture";
-import { createAppeal, resolveAppeal, listAppeals, governanceDecisions } from "./appeals";
+import { createAppeal, resolveAppeal, listAppeals, governanceDecisions, governanceRead } from "./appeals";
 import { governanceTickets, governanceAudit, governanceOverview } from "./core";
 import { dispatchDiscussionOutbox, listNotifications } from "../discussions/notifications";
 let f: Awaited<ReturnType<typeof readyContext>>;
@@ -83,4 +85,18 @@ test("missing or undurable decision cannot create an appeal; deleting account re
  await f.ctx.db.execute(sql`delete from "user" where id=${author}`);
  expect((await f.ctx.db.execute(sql`select id from governance_appeals where id=${saved.id}::uuid`)).rows).toHaveLength(0);
  expect((await f.ctx.db.execute(sql`select id from discussion_decisions where public_reason='Delete my private feedback' or reason='Delete my private feedback'`)).rows).toHaveLength(0);
+});
+
+
+test("bounded governance reads avoid JIT startup and restore session settings after commit and rollback",async()=>{
+ const client=await testDbHandle().pool.connect();
+ try{
+  const before=await client.query("select current_setting('jit') as jit,current_setting('statement_timeout') as timeout,current_setting('lock_timeout') as lock");
+  const ctx={...f.ctx,db:drizzle({client,schema,casing:"snake_case"})};
+  const result=await governanceRead<{jit:string;timeout:string;lock:string}>(ctx,sql`select current_setting('jit') as jit,current_setting('statement_timeout') as timeout,current_setting('lock_timeout') as lock`);
+  expect(result).toEqual([{jit:"off",timeout:"2s",lock:"1s"}]);
+  expect((await client.query("select current_setting('jit') as jit,current_setting('statement_timeout') as timeout,current_setting('lock_timeout') as lock")).rows).toEqual(before.rows);
+  await expect(governanceRead(ctx,sql`select 1/0`)).rejects.toBeTruthy();
+  expect((await client.query("select current_setting('jit') as jit,current_setting('statement_timeout') as timeout,current_setting('lock_timeout') as lock")).rows).toEqual(before.rows);
+ }finally{client.release();}
 });
