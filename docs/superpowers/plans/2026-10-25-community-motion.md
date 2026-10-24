@@ -25,24 +25,24 @@
 
 **Files:** packages/ui/src/motion/index.tsx；新增apps/community/src/client/components/motion-ui.tsx；site-shell.tsx、page-title.tsx、site-header.tsx、app.css。
 **Interfaces:** RouteMotion({children})消费pathname与偏好；MotionSurface({as,hover,children,...HTMLProps})保留语义；MotionGroup({as,children,...HTMLProps})提供最多0.21s级联；NavigationIndicator({group})为纯装饰；MotionSuccess()为偏好安全的成功图形。
-- [ ] 实现共享控制hook导出与上述原语，客户端控制进入且SSR不隐藏，清理在途动画。
-- [ ] 接SiteShell内容区域与标题，顶栏/移动导航活动背景；不对Outlet加key。
-- [ ] 为后续集中阶段补SSR、偏好中断、路由状态/焦点保持的DOM回归；本阶段不执行。
-- [ ] 按功能提交并记录尚未验证。
+- [x] 实现共享控制hook导出与上述原语，客户端控制进入且SSR不隐藏，清理在途动画。
+- [x] 接SiteShell内容区域与标题，顶栏/移动导航活动背景；不对Outlet加key。
+- [x] 为后续集中阶段补SSR、偏好中断、路由状态/焦点保持的DOM回归；本阶段不执行。
+- [x] 按功能提交并记录尚未验证。
 
 ### Task 2: 内容、列表与创作界面
 
 **Files:** public-chart-card.tsx、library-ui.tsx、discovery-ui.tsx、discussion-ui.tsx、social-ui.tsx、dash-ui.tsx；发现/目录/谱单/详情/动态/通知/工作台/导入/登录/设置等对应路由。
 **Interfaces:** 消费Task1的MotionSurface/MotionGroup，保留原标签、React key和业务children；数字只使用现有RollingNumber。
-- [ ] 统一共享卡片、论坛/评论、社会动态、后台标题/面板进入；列表有界级联，主要页面分区保持原结构。
-- [ ] 工作台、导入、下载与账号界面只改展示层，输入/表单/文件对象/队列/播放组件不移动到随状态重建的容器。
-- [ ] 补未来集中阶段覆盖原语状态与集成行为的用例，不运行；按功能提交。
+- [x] 统一共享卡片、论坛/评论、社会动态、后台标题/面板进入；列表有界级联，主要页面分区保持原结构。
+- [x] 工作台、导入、下载与账号界面只改展示层，输入/表单/文件对象/队列/播放组件不移动到随状态重建的容器。
+- [x] 补未来集中阶段覆盖原语状态与集成行为的用例，不运行；按功能提交。
 
 ### Task 3: 操作反馈与交付
 
 **Files:** download-actions.tsx、library-actions.tsx、downloads.tsx、app.css、相关DOM与acceptance脚本、开发交付记录。
 **Interfaces:** MotionSurface/MotionSuccess及原状态机；不新增发信/发布/下载写入副作用。
-- [ ] 选择条/下载浮层/确认面板进入、真实完成图形与有界数量变化，保留native progress和立即卸载。
-- [ ] 将动效偏好与状态保持场景加入现有浏览器验收范围，保持正式19组业务/权限门禁。
+- [x] 选择条/下载浮层/确认面板进入、真实完成图形与有界数量变化，保留native progress和立即卸载。
+- [x] 将动效偏好与状态保持场景加入现有浏览器验收范围，保持正式19组业务/权限门禁。
 - [ ] 完成一次整批新上下文静态复核，修复重要问题；记录未运行测试与待集中验收清单。
 - [ ] 按功能提交，交付开发结果；本轮不推送、部署或声称动态验收通过。
