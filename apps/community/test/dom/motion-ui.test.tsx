@@ -1,5 +1,5 @@
 import { MotionProvider, useMotionPreference } from "@astrodx/ui/motion";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { renderToString } from "react-dom/server";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -98,8 +98,45 @@ test("reordering a long keyed group retains the edited DOM node and direct list 
 
 test("disabled success feedback uses a static decorative icon", () => {
   document.documentElement.dataset.motion = "off";
-  const view = render(<MotionSuccess />);
+  localStorage.setItem("adx-reduce-motion", "off");
+  const view = render(<MotionProvider><MotionSuccess /></MotionProvider>);
   expect(view.container.querySelector("svg.lucide-check")).not.toBeNull();
   expect(view.container.firstElementChild?.getAttribute("aria-hidden")).toBe("true");
   expect(view.container.querySelector('[style*="opacity:0"]')).toBeNull();
+});
+
+
+test("system preference changes settle an active entry, while explicit on overrides the OS", async () => {
+  const listeners = new Set<() => void>();
+  const media = { matches: false, media: "(prefers-reduced-motion: reduce)",
+    addEventListener: (_type: string, listener: () => void) => { listeners.add(listener); },
+    removeEventListener: (_type: string, listener: () => void) => { listeners.delete(listener); },
+    addListener: (listener: () => void) => { listeners.add(listener); },
+    removeListener: (listener: () => void) => { listeners.delete(listener); },
+  };
+  const original = window.matchMedia.bind(window);
+  const spy = vi.spyOn(window, "matchMedia").mockImplementation(query => query === media.media ? media as unknown as MediaQueryList : original(query));
+  try {
+    const router = editorRouter();
+    await act(async () => { await router.navigate("/another-draft"); });
+    expect(driver.animate).toHaveBeenCalledTimes(1);
+    const controls = driver.animate.mock.results[0]!.value;
+    act(() => { media.matches = true; for (const notify of listeners) notify(); });
+    expect(controls.complete).toHaveBeenCalledTimes(1); expect(controls.stop).toHaveBeenCalledTimes(1);
+    await act(async () => { await router.navigate("/third-draft"); });
+    expect(driver.animate).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Enable motion" }));
+    await act(async () => { await router.navigate("/fourth-draft"); });
+    expect(driver.animate).toHaveBeenCalledTimes(2);
+  } finally { cleanup(); spy.mockRestore(); }
+});
+
+test("success feedback follows React preference immediately in both directions", () => {
+  localStorage.setItem("adx-reduce-motion", "on");
+  const view = render(<MotionProvider><Preferences /><MotionSuccess /></MotionProvider>);
+  expect(view.container.querySelector("svg.lucide-check")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Disable motion" }));
+  expect(view.container.querySelector("svg.lucide-check")).not.toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Enable motion" }));
+  expect(view.container.querySelector("svg.lucide-check")).toBeNull();
 });

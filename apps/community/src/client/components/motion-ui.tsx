@@ -12,11 +12,11 @@ const VIEWPORT = { once: true, amount: 0.15 };
 // Read the boot-script preference as well: the provider synchronizes after
 // hydration, while an IntersectionObserver can fire during that first frame.
 function motionBlocked(reduced: boolean) {
-  if (typeof document === "undefined") return true;
+  if (typeof document === "undefined" || reduced) return true;
   const mode = document.documentElement.dataset.motion;
   if (mode === "off") return true;
   if (mode === "on") return false;
-  return reduced || Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+  return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
 }
 
 function useEnterMotion() {
@@ -99,6 +99,6 @@ export function MotionSuccess() {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => { setHydrated(true); }, []);
   return <span className="inline-flex shrink-0 text-primary" aria-hidden="true">
-    {!hydrated || motionBlocked(reduced) ? <CheckIcon className="size-4" /> : <DrawnCheck size={16} withCircle={false} />}
+    {!hydrated || reduced ? <CheckIcon className="size-4" /> : <DrawnCheck size={16} withCircle={false} />}
   </span>;
 }

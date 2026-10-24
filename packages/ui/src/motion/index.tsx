@@ -9,7 +9,6 @@ import {
   useAnimate,
   useMotionValue,
   useMotionValueEvent,
-  useReducedMotion as useOsReducedMotion,
   type HTMLMotionProps,
   type Transition,
   type Variants,
@@ -85,10 +84,24 @@ export function useMotionPreference(): MotionPreference {
  * Import this instead of framer-motion's own `useReducedMotion` so hand-gated
  * animations (parallax, marquees, springs) also honor the site toggle.
  */
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+function systemReducedMotionSnapshot(): boolean {
+  return typeof window !== "undefined" && Boolean(window.matchMedia?.(REDUCED_MOTION_QUERY).matches);
+}
+function subscribeSystemReducedMotion(notify: () => void) {
+  if (typeof window === "undefined" || !window.matchMedia) return () => {};
+  const query = window.matchMedia(REDUCED_MOTION_QUERY);
+  query.addEventListener("change", notify);
+  return () => query.removeEventListener("change", notify);
+}
+const serverReducedMotionSnapshot = () => false;
+
 export function useReducedMotion(): boolean {
-  const os = useOsReducedMotion();
+  // Framer's hook captures the initial OS value. Subscribe directly so manual
+  // animations and numeric feedback also settle when the OS changes mid-page.
+  const os = React.useSyncExternalStore(subscribeSystemReducedMotion, systemReducedMotionSnapshot, serverReducedMotionSnapshot);
   const { mode } = React.useContext(MotionPreferenceContext);
-  return mode === "off" || (mode === "system" && Boolean(os));
+  return mode === "off" || (mode === "system" && os);
 }
 
 /**
