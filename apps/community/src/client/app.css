@@ -254,3 +254,17 @@ html[data-motion=off] .community-list-card { transition:none; }
 .community-dash-content :where(h2,h3,p,dd) { overflow-wrap:anywhere; }
 .community-dash-content :where(form) :where(label) { min-width:0; }
 @media (min-width:1024px) { .community-auth-layout { grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr); gap:2.5rem; } .community-auth-intro { position:sticky; top:6rem; } }
+
+/* Shared Motion easing; native hover uses translate so it composes with the
+   one-time reveal's transform without taking focus or measuring large grids. */
+.community-motion-nav { position:relative; isolation:isolate; }
+.community-nav-indicator { position:absolute; inset:0; z-index:-1; border-radius:inherit; background:color-mix(in srgb,var(--primary) 10%,transparent); pointer-events:none; }
+.community-motion-nav.is-active,.community-motion-nav[aria-current=page] { background:transparent; }
+.community-motion-hover { transition:translate .2s cubic-bezier(.22,1,.36,1),border-color .18s,box-shadow .18s; }
+@media (hover:hover) and (pointer:fine) {
+ .community-motion-hover:hover { translate:0 -2px; }
+}
+@media (prefers-reduced-motion:reduce) {
+ html:not([data-motion=on]) .community-motion-hover { translate:none; transition:none; }
+}
+html[data-motion=off] .community-motion-hover { translate:none; transition:none; }

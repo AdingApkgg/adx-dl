@@ -6,6 +6,7 @@ import {
   MotionConfig,
   animate,
   motion,
+  useAnimate,
   useMotionValue,
   useMotionValueEvent,
   useReducedMotion as useOsReducedMotion,
@@ -16,7 +17,7 @@ import {
 
 import { MOTION_MODES, MOTION_STORAGE_KEY, type MotionMode } from "./constants";
 
-export { AnimatePresence, motion };
+export { AnimatePresence, motion, useAnimate };
 
 // One easing curve shared across the whole site so every reveal, hover, and
 // reflow has the same "personality" (a soft ease-out).
