@@ -40,6 +40,7 @@ export async function exerciseMotion({page,origin,authenticated=false}){
   await page.emulateMedia({reducedMotion:"no-preference"});await choose("system");
   await page.evaluate(()=>{window.__motionRoute=document.querySelector('[data-community-motion="route"]');});await observeEntry();
   await page.locator('.community-primary-link[href="/en/forum"]').click();await page.waitForURL(url=>url.pathname==="/en/forum");
+  await page.locator(".community-forum-page").waitFor();
   await page.waitForFunction(()=>window.__motionObserved===true);await page.emulateMedia({reducedMotion:"reduce"});
   await assertSettled("SYSTEM_CHANGE_SETTLES_REAL_ROUTE_FRAMES");
   assert.equal(await page.evaluate(()=>window.__motionRoute===document.querySelector('[data-community-motion="route"]')),true,"SPA_ROUTE_CONTAINER_RETAINED");

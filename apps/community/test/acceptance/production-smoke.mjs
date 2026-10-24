@@ -486,6 +486,8 @@ try {
       const headers = { authorization: `Bearer ${bridgeKey}` };
       assert.equal((await fetch(bridgeUrl + '/api/v1/me')).status, 401);
       assert.equal((await fetch(bridgeUrl + '/api/auth/get-session', { headers })).status, 403);
+      assert.equal((await fetch(bridgeUrl + '/__manifest/blocked', { headers })).status, 403);
+      assert.equal((await fetch(bridgeUrl + '/__manifest', { method: 'POST', headers })).status, 405);
       assert.equal((await fetch(bridgeUrl + '/api/v1/me/sessions/blocked', {headers})).status,403);
       assert.equal((await fetch(bridgeUrl + '/api/v1/me/sessions/blocked', {method:'DELETE',headers})).status,405);
       assert.equal((await fetch(bridgeUrl + '/api/v1/me/profile', {method:'PATCH',headers,body:'{}'})).status,405);
@@ -559,6 +561,7 @@ async function exerciseMotion({page,origin,authenticated=false}){
   await page.emulateMedia({reducedMotion:"no-preference"});await choose("system");
   await page.evaluate(()=>{window.__motionRoute=document.querySelector('[data-community-motion="route"]');});await observeEntry();
   await page.locator('.community-primary-link[href="/en/forum"]').click();await page.waitForURL(url=>url.pathname==="/en/forum");
+  await page.locator(".community-forum-page").waitFor();
   await page.waitForFunction(()=>window.__motionObserved===true);await page.emulateMedia({reducedMotion:"reduce"});
   await assertSettled("SYSTEM_CHANGE_SETTLES_REAL_ROUTE_FRAMES");
   assert.equal(await page.evaluate(()=>window.__motionRoute===document.querySelector('[data-community-motion="route"]')),true,"SPA_ROUTE_CONTAINER_RETAINED");
