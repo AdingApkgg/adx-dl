@@ -99,6 +99,15 @@ try {
         if (!['GET', 'HEAD', 'OPTIONS'].includes(r.method())) {
           blockedWrites.push(r.method()); return route.abort('blockedbyclient');
         }
+        // Published preview media follows the real browser's public HTTPS path.
+        // Relaying large audio through production -> Mac -> builder adds a second
+        // download and can exhaust the bridge's upstream timeout. Keep private
+        // pages/APIs on the authenticated bridge and reauthorize every media read.
+        if (viaBridge && /^\/api\/v1\/charts\/[1-9]\d*\/versions\/[a-f0-9-]{36}\/assets\/(?:maidata|audio|cover)$/.test(url.pathname)) {
+          const headers = { ...r.headers() };
+          delete headers.cookie; delete headers.authorization;
+          return route.continue({ headers });
+        }
         const fetchOptions = { maxRedirects: 0, timeout: 30000 };
         if (viaBridge) {
           const headers = { ...r.headers(), authorization: `Bearer ${bridgeKey}` };
@@ -375,10 +384,11 @@ try {
       await json('/api/v1/dash/access');
       for (const path of ['/dash', '/dash/users', '/dash/charts', '/dash/discussions', '/dash/discussions?view=boards', '/dash/discussions?view=reports', '/dash/featured', '/dash/notices', '/dash/reports', '/dash/status']) {
         await visit(path);
-        const childHeading = path.startsWith('/dash/discussions') ? '讨论管理' : ({ '/dash': '概览', '/dash/users': '用户列表', '/dash/charts': '公开谱面管理', '/dash/featured': '精选谱面', '/dash/notices': '站点公告', '/dash/reports': '举报处理', '/dash/status': '备份记录' })[path];
+        const childHeading = path.startsWith('/dash/discussions') ? '讨论管理' : ({ '/dash': '概览', '/dash/users': '用户列表', '/dash/charts': '公开谱面管理', '/dash/featured': '精选谱面', '/dash/notices': '站点公告', '/dash/reports': '举报处理', '/dash/status': '运行与备份状态' })[path];
         await page.getByRole('heading', { level: 2, name: childHeading, exact: true }).waitFor();
         await page.getByText(`管理员 #${env.PRODUCTION_EXPECT_USER_ID || (await json('/api/v1/dash/access')).publicId}`, { exact: true }).waitFor();
       }
+      await page.getByRole('heading', { level: 3, name: '备份记录', exact: true }).waitFor();
       const status = await json('/api/v1/dash/status');
       assert.ok(status.checks.length >= 6 && status.checks.every(c => c.status === 'ok'));
       assert.equal(status.roles.length, 3); assert.ok(status.roles.every(r => r.ready));
@@ -431,8 +441,19 @@ try {
       await visit('/charts/1');
       assert.equal(await page.getByRole('navigation',{name:'本页导航',exact:true}).getByRole('link').count(),5);
       const summary=await json('/api/v1/charts/1'),slot=summary.summary.difficulties.find(d=>d.difficulty===6&&d.previewSupported);assert.ok(slot,'REQUIRED_DIFFICULTY_CARD');
-      const card=page.locator('#chart-difficulties li').nth(summary.summary.difficulties.indexOf(slot));await card.getByRole('button').click();
-      const preview=page.locator('#chart-preview');await preview.locator('canvas').waitFor();assert.equal(await preview.getByRole('combobox',{name:'难度',exact:true}).inputValue(),'6');await preview.getByRole('button',{name:'播放',exact:true}).click({trial:true,timeout:30000});await preview.getByRole('button',{name:'关闭预览',exact:true}).click();
+      const card=page.locator('#chart-difficulties li').nth(summary.summary.difficulties.indexOf(slot));
+      const preview=page.locator('#chart-preview');
+      for(let cycle=0;cycle<2;cycle++){
+        const audioPath=`/api/v1/charts/1/versions/${summary.versionId}/assets/audio`;
+        const [audio]=await Promise.all([
+          summary.summary.audio?page.waitForResponse(r=>new URL(r.url()).pathname===audioPath,{timeout:30000}):Promise.resolve(null),
+          card.getByRole('button').click(),
+        ]);
+        if(audio){assert.equal(audio.status(),200,'REOPEN_AUDIO_HTTP_STATUS');assert.ok((await audio.body()).length>0,'REOPEN_AUDIO_BODY_REQUIRED');}
+        await preview.locator('canvas').waitFor();assert.equal(await preview.getByRole('combobox',{name:'难度',exact:true}).inputValue(),'6');
+        await preview.getByRole('button',{name:'播放',exact:true}).click({trial:true,timeout:30000});
+        await preview.getByRole('button',{name:'关闭预览',exact:true}).click();await preview.locator('canvas').waitFor({state:'hidden'});
+      }
       await page.setViewportSize({width:320,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'DETAIL_UI_HORIZONTAL_OVERFLOW');
       await visit('/forum?q=Browser&sort=published&unanswered=true&chart=1');const board=page.getByRole('navigation',{name:'浏览板块',exact:true}).getByRole('link').last(),href=new URL(await board.getAttribute('href'),origin);
       for(const [key,value] of [['q','Browser'],['sort','published'],['unanswered','true'],['chart','1']])assert.equal(href.searchParams.get(key),value);assert.equal(href.searchParams.has('cursor'),false);await board.click();await page.waitForURL(u=>u.searchParams.has('board'));
