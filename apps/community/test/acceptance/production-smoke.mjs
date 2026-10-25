@@ -524,9 +524,22 @@ try {
 } finally { await browser?.close(); }
 
 // 正式验收由 SSH 按摘要传送单文件，故此入口保留自包含断言，不引入相邻模块。
+// Kept in sync with apps/community/test/acceptance/motion-browser.mjs (standalone helper).
 async function exerciseMotion({page,origin,authenticated=false}){
  const url=path=>new URL(path,origin).href;
  const visit=async path=>{const response=await page.goto(url(path));assert.equal(response.status(),200,path);await page.locator("main h1").first().waitFor();};
+ // 诊断包装：保留原 waitForFunction 与默认超时，失败时先给出唯一label与安全状态。
+ async function waitForMotion(label,predicate,arg){
+  const snapshot=async()=>{
+   try{return await page.evaluate(()=>{
+    const transform=el=>el?getComputedStyle(el).transform:"absent";
+    const ambient=document.querySelector('[data-community-motion="ambient"]'),rect=ambient?ambient.getBoundingClientRect():null;
+    return JSON.stringify({path:location.pathname,visibility:document.visibilityState,motion:document.documentElement.dataset.motion??null,reduce:matchMedia('(prefers-reduced-motion: reduce)').matches,hover:matchMedia('(hover: hover)').matches,fine:matchMedia('(hover: hover) and (pointer: fine)').matches,route:transform(document.querySelector('[data-community-motion="route"]')),routeConnected:window.__motionRoute?window.__motionRoute.isConnected:"absent",routeIsCurrent:window.__motionRoute?window.__motionRoute===document.querySelector('[data-community-motion="route"]'):"absent",observed:window.__motionObserved===undefined?"absent":window.__motionObserved,plate:transform(document.querySelector('.community-chart-card .community-artwork-plate')),ambient:ambient?ambient.getAttribute('data-motion-active'):"absent",ambientRect:rect?{top:Math.round(rect.top),bottom:Math.round(rect.bottom)}:null,innerHeight,scrollY:Math.round(scrollY)});
+   });}catch(error){return "STATE_UNAVAILABLE "+error.message;}
+  };
+  try{return await page.waitForFunction(predicate,arg);}
+  catch(error){throw new Error(`MOTION_WAIT_TIMEOUT ${label} ${await snapshot()} :: ${error.message}`);}
+ }
  await page.setViewportSize({width:1280,height:900});await visit("/en/charts");
  const stored=await page.evaluate(()=>localStorage.getItem("adx-reduce-motion"));
  const originalMode=stored==="on"?"on":stored==="off"||stored==="1"?"off":"system";
@@ -541,7 +554,7 @@ async function exerciseMotion({page,origin,authenticated=false}){
   });
  }
  async function assertSettled(label){
-  await page.waitForFunction(()=>{const el=document.querySelector('[data-community-motion="route"]'),style=getComputedStyle(el);return Number(style.opacity)>0.999&&Math.abs(new DOMMatrixReadOnly(style.transform).m42)<0.01;});
+  await waitForMotion(`SETTLED_${label}`,()=>{const el=document.querySelector('[data-community-motion="route"]'),style=getComputedStyle(el);return Number(style.opacity)>0.999&&Math.abs(new DOMMatrixReadOnly(style.transform).m42)<0.01;});
   const frames=await page.locator('[data-community-motion="route"]').evaluate(async el=>{const values=[];for(let i=0;i<4;i++){await new Promise(requestAnimationFrame);const style=getComputedStyle(el);values.push({opacity:Number(style.opacity),y:new DOMMatrixReadOnly(style.transform).m42});}return values;});
   assert.ok(frames.every(frame=>frame.opacity>0.999&&Math.abs(frame.y)<0.01),label);
  }
@@ -550,33 +563,76 @@ async function exerciseMotion({page,origin,authenticated=false}){
   const settings=page.getByRole("dialog",{name:"Settings",exact:true});await settings.waitFor();
   // “Follow system”也出现在主题设置里，用动画组选项的独有说明限定。
   const button=mode==="system"?settings.getByRole("button",{name:/^Follow system Follow your device/}):settings.getByRole("button",{name:labels[mode]});
-  await button.click();await page.waitForFunction(value=>document.documentElement.dataset.motion===value,mode);
+  await button.click();await waitForMotion(`MODE_${mode.toUpperCase()}`,value=>document.documentElement.dataset.motion===value,mode);
   assert.equal(await button.getAttribute("aria-pressed"),"true");
   await settings.getByRole("button",{name:"Close settings",exact:true}).click();await settings.waitFor({state:"hidden"});
+ }
+ async function assertOrbitMovement(orbit,label){
+  const frames=await orbit.evaluate(async el=>{
+   const sample=()=>{const m=new DOMMatrixReadOnly(getComputedStyle(el).transform);return [m.m11,m.m12,m.m21,m.m22,m.m41,m.m42];};
+   const values=[sample()];for(let sampleWindow=0;sampleWindow<2;sampleWindow++){for(let frame=0;frame<6;frame++)await new Promise(requestAnimationFrame);values.push(sample());}return values;
+  });
+  // Numeric movement in both windows rejects a one-time jump and rotate(360)'s
+  // non-identical string representation of an effectively identity matrix.
+  assert.ok(frames.slice(1).every((value,index)=>Math.hypot(...value.map((v,i)=>v-frames[index][i]))>.0005),`${label}: ${JSON.stringify(frames)}`);
+ }
+ async function assertOrbitStopped(orbit,label){
+  const frames=await orbit.evaluate(async el=>{
+   const values=[];for(let frame=0;frame<4;frame++){await new Promise(requestAnimationFrame);const m=new DOMMatrixReadOnly(getComputedStyle(el).transform);values.push([m.m11,m.m12,m.m21,m.m22,m.m41,m.m42]);}return values;
+  });
+  const identity=[1,0,0,1,0,0];
+  assert.ok(frames.every(value=>value.every((v,i)=>Math.abs(v-identity[i])<.00001)),`${label}: ${JSON.stringify(frames)}`);
  }
  try{
   await page.emulateMedia({reducedMotion:"reduce"});await choose("system");
   const card=page.locator(".community-chart-card").first();await card.waitFor();await card.hover();
   assert.equal(await card.evaluate(el=>getComputedStyle(el).translate),"none","SYSTEM_REDUCED_MOTION_HOVER_STATIC");
   await choose("on");await card.hover();
-  await page.waitForFunction(()=>{const card=document.querySelector(".community-chart-card");return card&&parseFloat(getComputedStyle(card).translate.split(/\s+/)[1])< -1.8;});
+  await waitForMotion("HOVER_LIFT",()=>{const card=document.querySelector(".community-chart-card");return card&&parseFloat(getComputedStyle(card).translate.split(/\s+/)[1])< -1.8;});
+  const artwork=card.locator('[data-community-motion="artwork"]'),plate=artwork.locator('.community-artwork-plate');
+  const coverBox=await artwork.boundingBox();assert.ok(coverBox,'ARTWORK_BOUNDS');
+  await page.mouse.move(coverBox.x+coverBox.width*.8,coverBox.y+coverBox.height*.25);
+  await waitForMotion("ARTWORK_TILT",()=>{const el=document.querySelector('.community-chart-card .community-artwork-plate');if(!el)return false;const m=new DOMMatrixReadOnly(getComputedStyle(el).transform);return Math.abs(m.m13)>.01||Math.abs(m.m23)>.01;});
+  assert.ok(Number(await artwork.locator('.community-artwork-sheen').evaluate(el=>getComputedStyle(el).opacity))>0,'ARTWORK_POINTER_HIGHLIGHT');
+  await page.mouse.move(2,2);
+  await waitForMotion("ARTWORK_RETURN",()=>{const el=document.querySelector('.community-chart-card .community-artwork-plate');if(!el)return false;const m=new DOMMatrixReadOnly(getComputedStyle(el).transform);return Math.abs(m.m13)<.001&&Math.abs(m.m23)<.001&&Math.abs(m.m11-1)<.001;});
+  // A touch pointer must not re-enable mouse-only tilt or hijack scrolling.
+  await artwork.dispatchEvent('pointermove',{pointerType:'touch',clientX:coverBox.x+coverBox.width*.8,clientY:coverBox.y+coverBox.height*.25});
+  assert.equal(await plate.evaluate(el=>{const m=new DOMMatrixReadOnly(getComputedStyle(el).transform);return Math.abs(m.m13)<.001&&Math.abs(m.m23)<.001;}),true,'TOUCH_ARTWORK_STAYS_STATIC');
   await page.emulateMedia({reducedMotion:"no-preference"});await choose("system");
   await page.evaluate(()=>{window.__motionRoute=document.querySelector('[data-community-motion="route"]');});await observeEntry();
   await page.locator('.community-primary-link[href="/en/forum"]').click();await page.waitForURL(url=>url.pathname==="/en/forum");
   await page.locator(".community-forum-page").waitFor();
-  await page.waitForFunction(()=>window.__motionObserved===true);await page.emulateMedia({reducedMotion:"reduce"});
+  await waitForMotion("ROUTE_ENTRY_OBSERVED",()=>window.__motionObserved===true);await page.emulateMedia({reducedMotion:"reduce"});
   await assertSettled("SYSTEM_CHANGE_SETTLES_REAL_ROUTE_FRAMES");
   assert.equal(await page.evaluate(()=>window.__motionRoute===document.querySelector('[data-community-motion="route"]')),true,"SPA_ROUTE_CONTAINER_RETAINED");
   await page.emulateMedia({reducedMotion:"no-preference"});await choose("on");
   await page.getByRole("button",{name:"Open settings",exact:true}).filter({visible:true}).click();
   const settings=page.getByRole("dialog",{name:"Settings",exact:true}),off=settings.getByRole("button",{name:labels.off});await off.click({trial:true});
   // 浏览器后退时全局设置仍保持打开，直接用真实开关中断页面进入。
-  await observeEntry();await page.goBack();await page.waitForURL(url=>url.pathname==="/en/charts");await page.waitForFunction(()=>window.__motionObserved===true);
-  await off.click();await page.waitForFunction(()=>document.documentElement.dataset.motion==="off");await assertSettled("EXPLICIT_OFF_SETTLES_REAL_ROUTE_FRAMES");
+  await observeEntry();await page.goBack();await page.waitForURL(url=>url.pathname==="/en/charts");await waitForMotion("ROUTE_ENTRY_OBSERVED_BACK",()=>window.__motionObserved===true);
+  await off.click();await waitForMotion("MODE_OFF_APPLIED",()=>document.documentElement.dataset.motion==="off");await assertSettled("EXPLICIT_OFF_SETTLES_REAL_ROUTE_FRAMES");
   await settings.getByRole("button",{name:"Close settings",exact:true}).click();await settings.waitFor({state:"hidden"});await card.hover();
   assert.equal(await card.evaluate(el=>getComputedStyle(el).translate),"none","EXPLICIT_OFF_HOVER_STATIC");
+  assert.equal(await plate.evaluate(el=>new DOMMatrixReadOnly(getComputedStyle(el).transform).isIdentity),true,'EXPLICIT_OFF_ARTWORK_STATIC');
   await page.reload();await page.locator("main h1").first().waitFor();
   assert.equal(await page.locator("html").getAttribute("data-motion"),"off","OFF_SURVIVES_RELOAD");
+  await page.emulateMedia({reducedMotion:'reduce'});await visit('/en');await choose('system');
+  const scene=page.locator('[data-community-motion="ambient"]');await scene.waitFor();
+  assert.equal(await scene.getAttribute('data-motion-active'),'false','SYSTEM_REDUCED_AMBIENT_INACTIVE');
+  await choose('on');
+  await waitForMotion("AMBIENT_ACTIVE_ON",()=>document.querySelector('[data-community-motion="ambient"]')?.getAttribute('data-motion-active')==='true');
+  const orbit=scene.locator('.community-hero-orbit.is-outer');
+  await assertOrbitMovement(orbit,'MANUAL_ON_OVERRIDES_MOUNTED_OS_REDUCTION');
+  await choose('system');
+  assert.equal(await scene.getAttribute('data-motion-active'),'false','SYSTEM_REDUCTION_STOPS_ORBIT');
+  await assertOrbitStopped(orbit,'SYSTEM_REDUCTION_REST_FRAMES');
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await waitForMotion("AMBIENT_ACTIVE_SYSTEM_RESTORE",()=>document.querySelector('[data-community-motion="ambient"]')?.getAttribute('data-motion-active')==='true');
+  await assertOrbitMovement(orbit,'SYSTEM_CHANGE_RESTARTS_REAL_ORBIT');
+  await choose('off');
+  assert.equal(await scene.getAttribute('data-motion-active'),'false','EXPLICIT_OFF_AMBIENT_INACTIVE');
+  await assertOrbitStopped(orbit,'EXPLICIT_OFF_ORBIT_STATIC');
   if(authenticated){
    await visit("/en/settings/profile");const field=page.locator('input[name="nickname"]');await field.waitFor();const previous=await field.inputValue();
    try{
