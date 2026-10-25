@@ -17,7 +17,11 @@ export function RouteFeedback() {
     const changed = previousPath.current !== location.pathname;
     previousPath.current = location.pathname;
     if (!changed || location.hash) return;
+    const focusAtCommit = document.activeElement, hashAtCommit = window.location.hash;
     const frame = requestAnimationFrame(() => {
+      // Explicit focus/input or a native hash can change before the router's next effect.
+      const active = document.activeElement;
+      if (active !== focusAtCommit || window.location.hash !== hashAtCommit || active?.matches('input,textarea,select,[contenteditable]:not([contenteditable="false"])')) return;
       // A global settings sheet can stay open during Back. Its focus trap owns focus.
       if (document.querySelector('[role="dialog"]:not([data-state="closed"]),[role="alertdialog"]:not([data-state="closed"]),dialog[open]')) return;
       document.getElementById("main-content")?.focus({ preventScroll: true });
