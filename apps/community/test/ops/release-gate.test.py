@@ -1,4 +1,4 @@
-import ast, copy, datetime as dt, importlib.util, json, os, pathlib, shlex, stat, subprocess, sys, tempfile, time, unittest
+import ast, copy, datetime as dt, importlib.util, json, os, pathlib, re, shlex, stat, subprocess, sys, tempfile, time, unittest
 from unittest.mock import patch
 
 SOURCE = pathlib.Path(__file__).resolve().parents[2]/'ops/release/await-acceptance.py'
@@ -231,5 +231,19 @@ class ReleaseSourcePermissionsTests(unittest.TestCase):
    self.assertEqual(stat.S_IMODE(context.stat().st_mode),0o700)
    self.assertEqual(stat.S_IMODE((deployment/'.env').stat().st_mode),0o600)
    self.assertEqual((deployment/'.env').read_text(),'FIXTURE_ONLY=value\n')
+
+class SmokeDeadlineTests(unittest.TestCase):
+ def test_nested_deadlines_leave_shutdown_and_cleanup_inside_the_existing_lease(self):
+  root=pathlib.Path(__file__).resolve().parents[4]
+  auth=(root/'scripts/remote/community-auth-smoke.py').read_text();anonymous=(root/'scripts/remote/community-smoke.sh').read_text()
+  browser=int(re.search(r"'(\d+)s',\s*'node'",auth).group(1));anonymous_browser=int(re.search(r"'(\d+)s',\s*'node'",anonymous).group(1))
+  builder=next(n for n in ast.parse(auth).body if isinstance(n,ast.FunctionDef) and n.name=='builder')
+  ssh=next(k.value.value for n in ast.walk(builder) if isinstance(n,ast.Call) for k in n.keywords if k.arg=='timeout')
+  controller=ast.parse((root/'scripts/remote/community-deploy.py').read_text())
+  outer=next(k.value.value for n in ast.walk(controller) if isinstance(n,ast.Call) and 'community-smoke.sh' in ast.unparse(n) for k in n.keywords if k.arg=='timeout')
+  host=(root/'scripts/remote/community-release-host.py').read_text();gate_seconds=int(re.search(r"COMMUNITY_RELEASE_TIMEOUT='(\d+)'",host).group(1))
+  bridge=(root/'apps/community/ops/acceptance/auth-bridge.ts').read_text();lease=re.search(r"\}, (\d+) \* ([\d_]+)\)\.unref",bridge);lease_seconds=int(lease.group(1))*int(lease.group(2).replace('_',''))//1000
+  self.assertEqual(browser,anonymous_browser);self.assertLess(browser+10,ssh);self.assertLess(ssh,outer)
+  self.assertLessEqual(outer+30,gate_seconds);self.assertLessEqual(gate_seconds,lease_seconds);self.assertLessEqual(lease_seconds,600)
 
 if __name__=='__main__':unittest.main()
