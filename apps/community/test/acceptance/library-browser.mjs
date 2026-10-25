@@ -5,7 +5,7 @@ import {join} from 'node:path';
 /** Disposable real Chromium journey. Writes use visible controls; byte checks read the actual saved files. */
 export async function exerciseLibrary({owner,other,anonymous,origin,step,zip,evidenceDirectory}){
  const writer=await owner.newPage(),reader=await other.newPage(),errors=[];let switcher;for(const p of [writer,reader])p.on('pageerror',e=>errors.push(e.message));const url=p=>new URL(p,origin).href;
- const get=async(context,path)=>{const r=await context.request.get(url(path));assert.equal(r.status(),200,path);return r.json();};
+ const get=async(context,path)=>{const r=await context.request.get(url(path),{maxRetries:1});assert.equal(r.status(),200,path);return r.json();};
  const mutate=async(page,path,method,action)=>{const [r]=await Promise.all([page.waitForResponse(r=>new URL(r.url()).pathname===path&&r.request().method()===method,{timeout:60000}),action()]);assert.ok(r.ok(),`${method} ${path}: ${r.status()}`);return r.json();};
  const original=zip('Library browser original');let chart,list,copied;
  async function downloadGeometry(){for(const width of [320,390,768,1280]){await reader.setViewportSize({width,height:844});assert.equal(await reader.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`populated downloads ${width}`);}await reader.setViewportSize({width:1280,height:900});}
