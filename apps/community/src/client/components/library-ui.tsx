@@ -21,7 +21,7 @@ export function LibraryNavigation({ view }: { view: "lists" | "favorites" | "rep
 export function PublicListCard({ list }: { list: PublicListSummary }) {
   return <MotionSurface as="article" hover className="community-list-card">
     <div className="community-section-heading">
-      <span className="community-list-icon"><LibraryIcon aria-hidden="true" className="size-5" /></span>
+      <span className="community-list-icon community-motion-list-icon"><LibraryIcon aria-hidden="true" className="size-5" /></span>
       <span className="community-status">#{list.publicId}</span>
     </div>
     <div className="min-w-0 space-y-2">

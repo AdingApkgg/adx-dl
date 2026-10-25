@@ -1,4 +1,5 @@
-import { MotionGroup } from "../components/motion-ui";
+import { MotionGroup, MotionSurface } from "../components/motion-ui";
+import { MotionHeroBackdrop } from "../components/motion-hero";
 import {DiscoverySearch} from "../components/discovery-search";
 import {DiscoverySections} from "../components/discovery-ui";
 import {discoveryApi} from "../queries/discovery";
@@ -82,17 +83,18 @@ function HomeContent({ publicCharts,featured,notices,lists,discovery }: { public
   const daily=discovery?.daily;
   return <main className="space-y-10">
     <section className="community-hero" aria-labelledby="community-home-title">
-      <div className="community-hero-copy space-y-6">
-        <p className="text-xs font-semibold tracking-[.18em] text-primary">ASTRODX COMMUNITY</p>
-        <div className="space-y-4"><h1 id="community-home-title" className="community-hero-title">{m.ui_home_title()}</h1><p className="max-w-xl text-pretty text-sm leading-7 text-muted-foreground sm:text-base">{m.ui_home_intro()}</p></div>
+      <MotionHeroBackdrop />
+      <MotionGroup className="community-hero-copy space-y-6">
+        <MotionSurface className="community-hero-eyebrow"><span className="community-hero-beat" aria-hidden="true"><i/><i/><i/><i/></span><p className="text-xs font-semibold tracking-[.18em] text-primary">ASTRODX COMMUNITY</p></MotionSurface>
+        <MotionSurface tone="title" className="space-y-4"><h1 id="community-home-title" className="community-hero-title">{m.ui_home_title()}</h1><p className="max-w-xl text-pretty text-sm leading-7 text-muted-foreground sm:text-base">{m.ui_home_intro()}</p></MotionSurface>
         <DiscoverySearch compact/>
-        <div className="community-toolbar"><Button asChild><Link to={localizeHref("/charts")}>{m.public_charts_browse()}</Link></Button><Button asChild variant="outline"><Link to={localizeHref("/me/charts/new")}>{m.chart_new()}</Link></Button><Link to={localizeHref("/help")} className="inline-flex min-h-11 items-center px-3 text-sm font-medium text-muted-foreground hover:text-foreground">{m.site_help()}</Link></div>
-      </div>
-      {daily?<div className="community-hero-media space-y-3"><p className="text-xs font-semibold text-muted-foreground">{m.discovery_daily()}</p><PublicChartCard chart={daily} headingLevel={2} selectable={false}/></div>:null}
+        <MotionSurface className="community-toolbar"><Button asChild><Link to={localizeHref("/charts")}>{m.public_charts_browse()}</Link></Button><Button asChild variant="outline"><Link to={localizeHref("/me/charts/new")}>{m.chart_new()}</Link></Button><Link to={localizeHref("/help")} className="inline-flex min-h-11 items-center px-3 text-sm font-medium text-muted-foreground hover:text-foreground">{m.site_help()}</Link></MotionSurface>
+      </MotionGroup>
+      {daily?<div className="community-hero-media space-y-3"><p className="text-xs font-semibold text-muted-foreground">{m.discovery_daily()}</p><PublicChartCard chart={daily} motionTone="feature" headingLevel={2} selectable={false}/></div>:null}
     </section>
     {notices?.items.length?<section aria-label={m.site_notices()} className="community-panel"><SiteNoticeList items={notices.items.slice(0,1)}/></section>:notices===null?<p role="status" className="text-sm text-muted-foreground">{m.site_notices_unavailable()}</p>:null}
-    {featured?.items.length?<section className="space-y-4"><div className="community-section-heading"><h2 className="text-xl font-semibold">{m.site_featured()}</h2><Link className="text-sm font-medium text-primary" to={localizeHref("/charts")}>{m.discovery_more()}</Link></div><MotionGroup as="ul" className={PUBLIC_CHART_GRID_CLASS}>{featured.items.map(chart=><li key={chart.id}><PublicChartCard chart={chart} headingLevel={3} selectable={false}/></li>)}</MotionGroup></section>:featured===null?<p role="status" className="text-sm text-muted-foreground">{m.site_featured_unavailable()}</p>:null}
-    {discovery?<DiscoverySections value={discovery} home/>:<section className="space-y-4"><div className="community-section-heading"><h2 className="text-xl font-semibold">{m.ui_latest_charts()}</h2><Link className="text-sm text-primary" to={localizeHref("/charts")}>{m.discovery_more()}</Link></div>{publicCharts?.items.length?<MotionGroup as="ul" className={PUBLIC_CHART_GRID_CLASS}>{publicCharts.items.map(chart=><li key={chart.id}><PublicChartCard chart={chart} headingLevel={3} selectable={false}/></li>)}</MotionGroup>:<p className="community-empty">{publicCharts===null?m.public_charts_unavailable():m.public_charts_empty()}</p>}</section>}
+    {featured?.items.length?<section className="space-y-4"><MotionSurface className="community-section-heading"><h2 className="text-xl font-semibold">{m.site_featured()}</h2><Link className="text-sm font-medium text-primary" to={localizeHref("/charts")}>{m.discovery_more()}</Link></MotionSurface><MotionGroup as="ul" className={PUBLIC_CHART_GRID_CLASS}>{featured.items.map(chart=><li key={chart.id}><PublicChartCard chart={chart} headingLevel={3} selectable={false}/></li>)}</MotionGroup></section>:featured===null?<p role="status" className="text-sm text-muted-foreground">{m.site_featured_unavailable()}</p>:null}
+    {discovery?<DiscoverySections value={discovery} home/>:<section className="space-y-4"><MotionSurface className="community-section-heading"><h2 className="text-xl font-semibold">{m.ui_latest_charts()}</h2><Link className="text-sm text-primary" to={localizeHref("/charts")}>{m.discovery_more()}</Link></MotionSurface>{publicCharts?.items.length?<MotionGroup as="ul" className={PUBLIC_CHART_GRID_CLASS}>{publicCharts.items.map(chart=><li key={chart.id}><PublicChartCard chart={chart} headingLevel={3} selectable={false}/></li>)}</MotionGroup>:<p className="community-empty">{publicCharts===null?m.public_charts_unavailable():m.public_charts_empty()}</p>}</section>}
     {!discovery&&lists?.length?<section className="space-y-4"><h2 className="text-xl font-semibold">{m.library_public_title()}</h2><MotionGroup as="ul" className="grid gap-4 sm:grid-cols-2">{lists.slice(0,4).map(list=><li key={list.publicId}><PublicListCard list={list}/></li>)}</MotionGroup></section>:null}
   </main>;
 }

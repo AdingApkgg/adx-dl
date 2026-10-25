@@ -2,24 +2,24 @@ import { Card } from "@astrodx/ui/components/card";
 import { DrawnCheck, EASE_OUT, motion, springSoft, useAnimate, useReducedMotion } from "@astrodx/ui/motion";
 import { cn } from "@astrodx/ui/lib/utils";
 import { CheckIcon } from "lucide-react";
-import { Children, createContext, createElement, isValidElement, useCallback, useContext, useEffect, useRef, useState, type HTMLAttributes, type ReactNode } from "react";
+import { Children, createContext, createElement, isValidElement, useCallback, useContext, useEffect, useRef, type HTMLAttributes, type ReactNode } from "react";
 import { useLocation } from "react-router";
+import { motionBlocked, useMotionEnabled } from "./motion-preference";
 
 const MotionCard = motion.create(Card);
 const CascadeContext = createContext(0);
 const VIEWPORT = { once: true, amount: 0.15 };
 
-// Read the boot-script preference as well: the provider synchronizes after
-// hydration, while an IntersectionObserver can fire during that first frame.
-function motionBlocked(reduced: boolean) {
-  if (typeof document === "undefined" || reduced) return true;
-  const mode = document.documentElement.dataset.motion;
-  if (mode === "off") return true;
-  if (mode === "on") return false;
-  return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
-}
+type MotionTone = "content" | "title" | "feature" | "dock";
+const ENTER = {
+  content: { distance: 18, duration: 0.48 },
+  title: { distance: 24, duration: 0.58 },
+  feature: { distance: 32, duration: 0.7 },
+  dock: { distance: 20, duration: 0.46 },
+  route: { distance: 16, duration: 0.44 },
+};
 
-function useEnterMotion() {
+function useEnterMotion(tone: MotionTone | "route" = "content") {
   const [scope, animate] = useAnimate<HTMLDivElement>();
   const reduced = useReducedMotion();
   const active = useRef<ReturnType<typeof animate> | null>(null);
@@ -37,10 +37,11 @@ function useEnterMotion() {
   const enter = useCallback((delay = 0) => {
     settle();
     if (!scope.current || motionBlocked(reduced)) return;
-    active.current = animate(scope.current, { opacity: [0.92, 1], y: [8, 0] }, {
-      duration: 0.32, ease: EASE_OUT, delay,
+    const { distance, duration } = ENTER[tone];
+    active.current = animate(scope.current, { opacity: [tone === "route" ? 1 : 0.9, 1], y: [distance, 0] }, {
+      duration, ease: EASE_OUT, delay,
     });
-  }, [animate, reduced, scope, settle]);
+  }, [animate, reduced, scope, settle, tone]);
   return { scope, enter };
 }
 
@@ -48,7 +49,7 @@ function useEnterMotion() {
 export function RouteMotion({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const previous = useRef(pathname);
-  const { scope, enter } = useEnterMotion();
+  const { scope, enter } = useEnterMotion("route");
   useEffect(() => {
     if (previous.current === pathname) return;
     previous.current = pathname;
@@ -60,18 +61,19 @@ export function RouteMotion({ children }: { children: ReactNode }) {
 type SurfaceProps = Omit<HTMLAttributes<HTMLDivElement>, "style" | "onAnimationStart" | "onDrag" | "onDragStart" | "onDragEnd"> & {
   as?: "div" | "article" | "section" | "li" | "aside" | "header" | "card";
   hover?: boolean;
+  tone?: MotionTone;
 };
 
 /** Visible SSR; an optional one-time reveal never owns a child's lifecycle. */
-export function MotionSurface({ as = "div", hover = false, className, children, ...props }: SurfaceProps) {
-  const { scope, enter } = useEnterMotion();
+export function MotionSurface({ as = "div", hover = false, tone = "content", className, children, ...props }: SurfaceProps) {
+  const { scope, enter } = useEnterMotion(tone);
   const delay = useContext(CascadeContext);
   const entered = useRef(false);
   // The tags share the DOM attributes used here; the element stays semantic.
   const Tag = (as === "card" ? MotionCard : motion[as]) as typeof motion.div;
   return <Tag {...props} ref={scope} initial={false} viewport={VIEWPORT}
     onViewportEnter={() => { if (!entered.current) { entered.current = true; enter(delay); } }}
-    className={cn(className, hover && "community-motion-hover")} data-community-motion="surface">
+    className={cn(className, hover && "community-motion-hover")} data-community-motion="surface" data-motion-tone={tone}>
     {children}
   </Tag>;
 }
@@ -80,7 +82,7 @@ export function MotionSurface({ as = "div", hover = false, className, children, 
 export function MotionGroup({ as = "div", children, ...props }: HTMLAttributes<HTMLElement> & { as?: "div" | "ul" | "ol" }) {
   let index = 0;
   const items = Children.map(children, child => isValidElement(child)
-    ? <CascadeContext.Provider value={Math.min(index++, 6) * 0.035}>{child}</CascadeContext.Provider>
+    ? <CascadeContext.Provider value={Math.min(index++, 5) * 0.055}>{child}</CascadeContext.Provider>
     : child);
   return createElement(as, props, items);
 }
@@ -89,16 +91,16 @@ export function MotionGroup({ as = "div", children, ...props }: HTMLAttributes<H
 export function NavigationIndicator({ group }: { group: string }) {
   const reduced = useReducedMotion();
   // Replacing only the decorative node also cancels an in-flight projection.
-  if (reduced) return <span aria-hidden="true" className="community-nav-indicator" />;
+  if (reduced) return <span aria-hidden="true" className="community-nav-indicator"><span className="community-nav-spark" /></span>;
   return <motion.span aria-hidden="true" className="community-nav-indicator" initial={false}
-    layoutId={`community-nav-${group}`} transition={springSoft} />;
+    layoutId={`community-nav-${group}`} transition={{ ...springSoft, stiffness: 390, damping: 32 }}><span className="community-nav-spark" /></motion.span>;
 }
 
 export function MotionSuccess() {
-  const reduced = useReducedMotion();
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => { setHydrated(true); }, []);
-  return <span className="inline-flex shrink-0 text-primary" aria-hidden="true">
-    {!hydrated || reduced ? <CheckIcon className="size-4" /> : <DrawnCheck size={16} withCircle={false} />}
+  const enabled = useMotionEnabled();
+  return <span className="community-motion-success inline-flex shrink-0 text-primary" aria-hidden="true">
+    {enabled ? <motion.span className="community-success-ripple" initial={{ scale: 0.65, opacity: 0.4 }}
+      animate={{ scale: 1.8, opacity: 0 }} transition={{ duration: 0.55, ease: EASE_OUT }} /> : null}
+    {!enabled ? <CheckIcon className="size-4" /> : <DrawnCheck size={16} withCircle={false} />}
   </span>;
 }

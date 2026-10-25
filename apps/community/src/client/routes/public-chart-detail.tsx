@@ -1,4 +1,4 @@
-import { MotionGroup } from "../components/motion-ui";
+import { MotionGroup, MotionSurface } from "../components/motion-ui";
 import {discoveryApi} from "../queries/discovery";
 import {parsePreviewShare,type PreviewShare} from "@/shared/discovery-search";
 import {PublicListCard} from "../components/library-ui";
@@ -68,7 +68,7 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
   return <main className="community-chart-page space-y-8">
     <Link to={returnHref ?? localizeHref("/charts")} state={returnState ? publicListBackState(returnState) : undefined} className={textLinkClass}>{returnHref ? /\/me\/favorites$/.test(returnHref.split("?")[0]!) ? m.my_favorites() : /^\/(?:(?:en|ja)\/)?u\//.test(returnHref) ? m.public_chart_back_author() : m.public_chart_back_results() : m.public_charts_title()}</Link>
     <div className="community-chart-detail-hero community-panel">
-      <div className="community-chart-cover-frame"><PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} /></div>
+      <MotionSurface tone="feature" className="community-chart-cover-frame"><PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} /></MotionSurface>
       <div className="min-w-0 space-y-3 break-words">
         <PageTitle description={chart.artist}>{chart.title}</PageTitle>
         {chart.author ? <Link to={localizeHref(`/u/${chart.author.publicId ?? chart.author.id}`)} state={returnState} className="flex items-center gap-2 underline">

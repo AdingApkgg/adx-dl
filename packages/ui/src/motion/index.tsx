@@ -17,6 +17,8 @@ import {
 import { MOTION_MODES, MOTION_STORAGE_KEY, type MotionMode } from "./constants";
 
 export { AnimatePresence, motion, useAnimate };
+// Consumers share the installed Motion runtime; existing defaults stay intact.
+export { useInView, useSpring } from "framer-motion";
 
 // One easing curve shared across the whole site so every reveal, hover, and
 // reflow has the same "personality" (a soft ease-out).
@@ -39,6 +41,8 @@ export const springSoft: Transition = {
 export { MOTION_MODES, type MotionMode } from "./constants";
 
 type MotionPreference = {
+  /** Persisted preference has synchronized; false during SSR and first hydration. */
+  ready: boolean;
   mode: MotionMode;
   setMode: (mode: MotionMode) => void;
   /** Compatibility handle for the former binary header toggle. */
@@ -47,6 +51,7 @@ type MotionPreference = {
 };
 
 const MotionPreferenceContext = React.createContext<MotionPreference>({
+  ready: false,
   mode: "system",
   setMode: () => {},
   userReduced: false,
@@ -158,12 +163,13 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
 
   const preference = React.useMemo(
     () => ({
+      ready: preferenceReady,
       mode,
       setMode,
       userReduced: mode === "off",
       setUserReduced,
     }),
-    [mode, setMode, setUserReduced]
+    [preferenceReady, mode, setMode, setUserReduced]
   );
 
   return (
