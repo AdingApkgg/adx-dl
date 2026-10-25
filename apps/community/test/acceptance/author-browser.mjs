@@ -87,7 +87,8 @@ export async function exerciseAuthor({owner,other,anonymous,origin,step,zip,evid
   }finally{await page.unroute(pattern,reject);}
   await page.reload();const versions=page.getByRole("region",{name:"历史版本",exact:true});await versions.waitFor();const oldVersion=versions.getByRole("button",{name:"删除版本",exact:true}).first();await oldVersion.click();
   const modal=page.getByRole("alertdialog");await modal.getByRole("button",{name:"删除草稿",exact:true}).click();await modal.waitFor({state:"hidden"});await page.waitForFunction(()=>document.activeElement?.id==="author-versions");
-  assert.equal((await get(other,`/api/v1/me/charts/${firstChart.id}`)).versions.length,1,"EXPLICIT_VERSION_DELETION_SUCCEEDED");assert.equal(errors.length,0,"author confirmation runtime errors");
+  assert.equal((await get(other,`/api/v1/me/charts/${firstChart.id}`)).versions.length,1,"EXPLICIT_VERSION_DELETION_SUCCEEDED");
+  await publication.getByRole("button",{name:"撤回公开",exact:true}).click();await page.getByRole("alertdialog").getByRole("button",{name:"确认撤回",exact:true}).click();await page.getByRole("alertdialog").waitFor({state:"hidden"});await page.waitForFunction(()=>document.activeElement?.id==="publication");assert.equal((await get(other,`/api/v1/me/charts/${firstChart.id}`)).publication,null,"EXPLICIT_WITHDRAWAL_SUCCEEDED");assert.equal(errors.length,0,"author confirmation runtime errors");
  });
  }catch(error){if(evidenceDirectory)await page.screenshot({path:join(evidenceDirectory,"author-failure.png"),fullPage:true,timeout:5000}).catch(()=>{});throw error;}
  finally{await page.close();await extraContext?.close();}

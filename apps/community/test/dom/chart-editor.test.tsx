@@ -419,3 +419,11 @@ test("UX hydration: validated identity retains the editor and input node while t
   act(()=>{client.setQueryData(["me"],{id:"alice",status:"active",name:"Suspended identity"});});
   await waitFor(()=>expect(screen.queryByRole("textbox",{name:m.chart_title_label()})).toBeNull());expect(picker.isConnected).toBe(false);
 });
+
+test("UX withdrawal focus: successful withdrawal returns to the stable publication region",async()=>{
+ const start={...initial,publication,publicationPending:false};let actual=start as ChartDto;
+ setup((_path,method)=>{if(method==="DELETE")actual={...initial,revision:4,publication:null,publicationPending:false};return Response.json(actual);},start);
+ const section=screen.getByRole("region",{name:m.chart_publication()}),trigger=within(section).getByRole("button",{name:m.chart_publication_withdraw()});trigger.focus();fireEvent.click(trigger);
+ fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button",{name:m.chart_publication_withdraw_confirm()}));
+ await screen.findByText(m.chart_publication_withdrawn());await waitFor(()=>expect(document.activeElement).toBe(section));expect(trigger.isConnected).toBe(false);
+});

@@ -93,7 +93,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh, isCurrent = ()
     catch (failure) { setError(failure); fail(failure); }
     finally { if (isCurrent()) setBusy(false); }
   }
-  return <section id="publication" aria-label={m.chart_publication()} className="community-panel space-y-4">
+  return <section tabIndex={-1} id="publication" aria-label={m.chart_publication()} className="community-panel space-y-4">
     <div className="flex flex-wrap items-center gap-2">
       <h2 className="font-semibold">{m.chart_publication()}</h2>
     <a href={localizeHref("/help/publication")} className="inline-flex min-h-11 items-center text-sm underline">{m.site_help_publication_title()}</a>
@@ -135,7 +135,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh, isCurrent = ()
       {chart.publication ? <Button variant="outline" disabled={!interactive || busy || reconcile || uncertain} onClick={() => setWithdrawing(true)}>{m.chart_publication_withdraw()}</Button> : null}
       {!withdrawing && (reconcile || uncertain) ? <Button variant="outline" disabled={!interactive || busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
     </div>
-    <ConfirmationDialog open={withdrawing} onOpenChange={setWithdrawing} title={m.chart_publication_withdraw()} description={m.chart_publication_withdraw_hint()} confirmLabel={m.chart_publication_withdraw_confirm()} cancelLabel={m.dash_cancel()} pending={!interactive || busy} confirmDisabled={reconcile || uncertain} onConfirm={() => void mutate(null)}>
+    <ConfirmationDialog open={withdrawing} onOpenChange={setWithdrawing} title={m.chart_publication_withdraw()} description={m.chart_publication_withdraw_hint()} confirmLabel={m.chart_publication_withdraw_confirm()} cancelLabel={m.dash_cancel()} pending={!interactive || busy} confirmDisabled={reconcile || uncertain} fallbackFocus={() => document.getElementById("publication")} onConfirm={() => void mutate(null)}>
       {status ? <p role="status">{status}</p> : null}
       {error ? <Alert role="alert" variant="destructive">{chartErrorMessage(error)}</Alert> : null}
       {reconcile || uncertain ? <Button variant="outline" disabled={!interactive || busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
