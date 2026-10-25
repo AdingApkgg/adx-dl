@@ -51,10 +51,14 @@
 **Files:** DOM测试、test/acceptance/ui-layout-browser.mjs及自包含production-smoke.mjs；集中验收记录。
 **Interfaces:** 生产既有19组门禁不减少，新增受控慢导航、焦点、遗漏页面布局只读断言纳入原UI组；bridge保留精确/__manifest协议。
 - [x] 整批一次新上下文复核；四项问题已在集中窗口复现并统一修正，实际验证状态见交付记录。
-- [ ] 明确进入发布窗口后，用scripts/remote/verify.sh在构建机集中验证sharedUI/web/community；修复真实失败后完成既有隔离上传/有界备份恢复。
-- [ ] 推送并等待候选CI；通过后合并pre，核对受测树与实际合并树；正式部署及全19组登录态无头验收。
-- [ ] 核对serving/accepted/complete、healthz/readyz、备份和临时会话/密钥/容器清理，只有实际通过后交付发布完成。
+- [x] 明确进入发布窗口后，用scripts/remote/verify.sh在构建机集中验证sharedUI/web/community；修复真实失败后完成既有隔离上传/有界备份恢复。
+- [x] 推送并等待候选CI；通过后合并pre，核对受测树与实际合并树；正式部署及全19组登录态无头验收。
+- [x] 核对serving/accepted/complete、healthz/readyz、备份和临时会话/密钥/容器清理，只有实际通过后交付发布完成。
 
 ## 计划自检
 
 Task1覆盖导航、状态、确认、手机基础；Task2覆盖作者三种工具和源码；Task3覆盖其余记录/阅读与公共状态；Task4承接五项Review Focus的集中验收。共享原语单向依赖，无API/数据库迁移；用户要求的无测试开发与正式发布边界明确。
+
+## 最终验收
+
+2026-10-26：PR50应用da54a7b8已上线，PR51仅补有界验收预算；完整CI、53步隔离与恢复、生产19组、清理及发布后备份通过。详情见docs/verification/community-ux-completion-2026-10-25.md。
