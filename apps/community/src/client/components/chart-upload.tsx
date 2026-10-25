@@ -65,10 +65,10 @@ export function ChartUpload({ userId, target = {kind:"new"}, onSaved }: { userId
   const status = packing ? m.chart_packing() : state.phase === "processing" ? m.chart_processing() :
     state.phase === "hashing" ? m.avatar_hashing() : state.phase === "uploading" ? m.avatar_uploading() :
     state.phase === "ready" ? m.chart_ready() : null;
-  return <section aria-label={m.chart_upload_title()} className="space-y-4 rounded-lg border p-4">
-    <h2 className="font-semibold">{m.chart_upload_title()}</h2>
+  return <section aria-label={m.chart_upload_title()} className="community-panel community-upload-panel space-y-5">
+    <h2 className="community-section-title">{m.chart_upload_title()}</h2>
     <p className="text-sm text-muted-foreground">{m.chart_upload_hint()}</p>
-    <div className="space-y-3">
+    <div className="community-upload-options">
       <div><label htmlFor={`${id}-zip`} className="block text-sm">{resume ? m.avatar_resume({ name: resume.name }) : m.chart_choose_zip()}</label>
         <input id={`${id}-zip`} type="file" accept=".adx,.zip,application/zip" disabled={busy} onChange={(event) => {
           const files = Array.from(event.target.files ?? []); event.target.value = ""; if (files[0]) void choose({ file: files[0] });

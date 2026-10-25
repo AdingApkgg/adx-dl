@@ -1,3 +1,4 @@
+import { EmptyState } from "../components/ui-states";
 import { MotionGroup, MotionSurface } from "../components/motion-ui";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
@@ -27,7 +28,7 @@ export default function Favorites({ loaderData }: Route.ComponentProps) {
   return <main className="space-y-6"><header className="community-page-heading"><PageTitle description={m.favorites_private()}>{m.my_favorites()}</PageTitle><Button asChild variant="outline" className="min-h-11"><Link to={localizeHref("/charts")}>{m.public_charts_title()}</Link></Button></header>
     <LibraryNavigation view="favorites" />
     <section aria-label={m.my_favorites()} className="space-y-4"><div className="community-section-heading"><h2 className="community-section-title">{m.my_favorites()}</h2><p className="text-xs text-muted-foreground">{m.ui_library_page_count({ count: String(loaderData.page.items.length) })}</p></div>
-    {loaderData.page.items.length ? <MotionGroup as="ul" className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">{loaderData.page.items.map(item => <li key={`${loaderData.userId}/${item.publicId}`} className="min-w-0"><FavoriteRow item={item} /></li>)}</MotionGroup> : <div className="community-empty space-y-3"><p className="font-medium text-foreground">{m.favorites_empty()}</p><p>{m.ui_library_favorites_empty_hint()}</p><Button asChild variant="outline" className="min-h-11"><Link to={localizeHref("/charts")}>{m.public_charts_title()}</Link></Button></div>}
+    {loaderData.page.items.length ? <MotionGroup as="ul" className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">{loaderData.page.items.map(item => <li key={`${loaderData.userId}/${item.publicId}`} className="min-w-0"><FavoriteRow item={item} /></li>)}</MotionGroup> : <EmptyState title={m.favorites_empty()} description={m.ui_library_favorites_empty_hint()}><Button asChild variant="outline" className="min-h-11"><Link to={localizeHref("/charts")}>{m.public_charts_title()}</Link></Button></EmptyState>}
     </section>
     <SocialPager base="/me/favorites" nextCursor={loaderData.page.nextCursor} />
   </main>;

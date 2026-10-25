@@ -1,3 +1,4 @@
+import { EmptyState } from "./ui-states";
 import { MotionSurface, NavigationIndicator } from "./motion-ui";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
@@ -17,7 +18,7 @@ export function groupSocialDays<T>(items: T[], date: (item: T) => string): [stri
 }
 
 export function SocialEmpty({ title, children }: { title: string; children?: ReactNode }) {
-  return <MotionSurface className="community-empty space-y-4"><p role="status">{title}</p>{children ? <div className="flex flex-wrap justify-center gap-3">{children}</div> : null}</MotionSurface>;
+  return <MotionSurface><EmptyState title={title}>{children}</EmptyState></MotionSurface>;
 }
 
 // Scope changes deliberately discard pagination; the two supported filters are independent.

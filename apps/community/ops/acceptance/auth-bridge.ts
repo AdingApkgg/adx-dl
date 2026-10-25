@@ -60,6 +60,9 @@ async function revoke() {
 const matches = (path: string) => {
   // SPA navigation discovers public route modules through this exact read-only endpoint.
   if (path === "/__manifest") return true;
+  // Explicit read-only UX destinations; no prefix access to account or auth endpoints.
+  if (/^\/(?:en\/|ja\/)?(?:privacy|help\/(?:governance|search|author|upload|publication|practice|downloads|library|community)|me\/(?:reports|discussions))(?:\.data)?$/.test(path)) return true;
+  if (path === "/api/v1/me/reports") return true;
   // The signed-in UI gate reads the public homepage; keep this exact, not a prefix.
   if (path === "/") return true;
   if (/^\/(?:en\/|ja\/)?(?:me\/governance|dash\/(?:governance|appeals|audit))(?:\.data)?$/.test(path)) return true;

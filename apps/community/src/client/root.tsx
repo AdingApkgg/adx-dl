@@ -13,6 +13,7 @@ import appCss from "./app.css?url";
 import { AppProviders } from "./components/app-providers";
 import { ErrorCard } from "./components/error-card";
 import { LoginEvent } from "./components/login-event";
+import { RouteFeedback } from "./components/route-feedback";
 import { ThemeBootScript } from "./components/theme-boot-script";
 import { getBrowserQueryClient } from "./lib/browser";
 
@@ -43,7 +44,7 @@ export function Layout({ children }: { children: ReactNode }) {
     <html lang={htmlLang(getLocale())} className="antialiased" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <ThemeBootScript />
         <Meta />
         {/* nonce 故意给空的：不传的话 React Router 会把这次请求的 nonce 抄到样式表的 <link> 上，浏览器里拿不到
@@ -89,6 +90,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AppProviders>
         <LoginEvent />
+        <RouteFeedback />
         <Outlet />
       </AppProviders>
     </QueryClientProvider>

@@ -1,3 +1,4 @@
+import { ConfirmationDialog } from "@astrodx/ui/components/confirmation-dialog";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { toast } from "@astrodx/ui/components/sonner";
@@ -16,7 +17,8 @@ function fields(chart: ChartDto, versionId: string) {
   return { title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits,
     aliases: (chart.aliases??[]).join("\n"), tags: chart.tags.map(tag => tag.label).join("\n"), releaseNote: chart.versions.find(version => version.id === versionId)?.releaseNote ?? "" };
 }
-export function ChartMetadataEditor({ chart, busy, setBusy, refresh, onDirty }: {
+export function ChartMetadataEditor({ chart, busy, setBusy, refresh, onDirty, isCurrent = () => true }: {
+  isCurrent?: () => boolean;
   chart: ChartDto; busy: boolean; setBusy: (value: boolean) => void;
   refresh: (chart: ChartDto) => Promise<void>; onDirty: (value: boolean) => void;
 }) {
@@ -47,27 +49,31 @@ export function ChartMetadataEditor({ chart, busy, setBusy, refresh, onDirty }: 
       description: draft.description, credits: draft.credits, aliases, tags: tags.map(tag => tag.label), releaseNote: { versionId, text: draft.releaseNote } };
     const api = chartsApi(getBrowserApi()); setBusy(true);
     const accept = async (actual: ChartDto) => {
+      if (!isCurrent()) return;
       const values = fields(actual, versionId); setDraft(values); setBase({ revision: actual.revision, values }); setConflict(null);
-      await refresh(actual); toast.success(m.chart_saved());
+      await refresh(actual); if (isCurrent()) toast.success(m.chart_saved());
     };
     try { await accept(await api.patch(chart.id, body)); }
     catch (failure) {
+      if (!isCurrent()) return;
       try {
         const actual = await api.get(chart.id), note = actual.versions.find(version => version.id === versionId)?.releaseNote;
+        if (!isCurrent()) return;
         const matched = actual.title === body.title && actual.artist === body.artist && actual.description === body.description &&
           actual.credits === body.credits && JSON.stringify(actual.tags) === JSON.stringify(tags) && JSON.stringify(actual.aliases??[])===JSON.stringify(aliases) && note === body.releaseNote.text;
         if (matched && !(failure instanceof ApiError && failure.status < 500)) { await accept(actual); return; }
         // Keep the captured base revision until the user explicitly reviews this difference.
         setConflict(actual); await refresh(actual);
       } catch {}
+      if (!isCurrent()) return;
       setError(failure);
       const redirect = accountErrorRedirect(failure, `${location.pathname}${location.search}`);
       if (redirect) window.location.assign(redirect);
-    } finally { setBusy(false); }
+    } finally { if (isCurrent()) setBusy(false); }
   }
   function input(key: keyof typeof draft) { return (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setDraft(value => ({ ...value, [key]: event.target.value })); }
-  return <form onSubmit={save} className="space-y-3 rounded-lg border p-4">
-    <h2 className="font-semibold">{m.chart_metadata_heading()}</h2><p className="text-sm text-muted-foreground">{m.chart_metadata_private_hint()}</p>
+  return <form onSubmit={save} className="community-panel space-y-4">
+    <h2 className="community-section-title">{m.chart_metadata_heading()}</h2><p className="text-sm text-muted-foreground">{m.chart_metadata_private_hint()}</p>
     <label className="block">{m.chart_title_label()}<input value={draft.title} maxLength={240} disabled={busy} onChange={input("title")} required className="mt-1 block w-full rounded border p-2" /></label>
     <label className="block">{m.chart_artist_label()}<input value={draft.artist} maxLength={240} disabled={busy} onChange={input("artist")} className="mt-1 block w-full rounded border p-2" /></label>
     <label className="block">{m.chart_metadata_description()}<textarea value={draft.description} maxLength={4000} disabled={busy} onChange={input("description")} rows={5} className="mt-1 block w-full rounded border p-2" /><span className="text-xs">{[...draft.description].length}/2000</span></label>
@@ -84,6 +90,6 @@ export function ChartMetadataEditor({ chart, busy, setBusy, refresh, onDirty }: 
     <div className="flex flex-wrap gap-2"><Button type="submit" disabled={busy || !dirty || !!conflict}>{busy ? m.chart_metadata_saving() : m.chart_metadata_save()}</Button>
       {dirty ? <Button type="button" variant="outline" disabled={busy} onClick={() => { const target = chart.versions.some(version => version.id === versionId) ? versionId : chart.currentVersionId; const values = fields(chart, target); setVersionId(target); setDraft(values); setBase({ revision: chart.revision, values }); setConflict(null); setError(undefined); }}>{m.chart_metadata_discard()}</Button> : null}</div>
     {error ? <Alert variant="destructive">{error instanceof ApiError && error.code === "CHART_METADATA_INVALID" ? m.chart_metadata_validation() : chartErrorMessage(error)}</Alert> : null}
-    {blocker.state === "blocked" ? <div role="alertdialog" aria-label={m.chart_metadata_unsaved()} className="space-y-2 rounded border p-3"><p>{m.chart_metadata_unsaved()}</p><Button type="button" onClick={() => blocker.proceed()}>{m.chart_metadata_leave()}</Button>{" "}<Button type="button" variant="outline" onClick={() => blocker.reset()}>{m.avatar_cancel()}</Button></div> : null}
+    <ConfirmationDialog open={blocker.state === "blocked"} onOpenChange={open => { if (!open && blocker.state === "blocked") blocker.reset(); }} title={m.chart_metadata_unsaved()} description={m.chart_metadata_unsaved()} confirmLabel={m.chart_metadata_leave()} cancelLabel={m.dash_cancel()} pending={busy} onConfirm={() => { if (blocker.state === "blocked") blocker.proceed(); }} />
   </form>;
 }

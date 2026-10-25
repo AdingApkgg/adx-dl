@@ -72,6 +72,26 @@ export async function exerciseAuthor({owner,other,anonymous,origin,step,zip,evid
   for(const prefix of ["","/en","/ja"])for(const path of ["/me/workbench","/me/imports",`/me/charts/${firstChart.id}/review`,`/me/charts/${firstChart.id}/compare`]){await page.goto(url(prefix+path));await page.locator("main h1").waitFor();await page.waitForLoadState("networkidle");for(const width of [320,390,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`${prefix}${path} at ${width}px`);}}
   assert.equal(errors.length,0,"author journey runtime errors");
  });
+ await step("author_confirmation_recovery_focus_and_sidebar",async()=>{
+  await page.goto(url(`/me/charts/${firstChart.id}`));
+  const publication=page.getByRole("region",{name:"公开发布",exact:true}),selector=publication.getByRole("combobox",{name:/公开版本/});await enabled(selector);await selector.selectOption(updated.currentVersionId);
+  for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,"PUBLISHED_SELECTED_SIDEBAR_NO_OVERFLOW");}
+  if(evidenceDirectory)await page.screenshot({path:join(evidenceDirectory,"author-sidebar-snapshots.png"),fullPage:true});
+  const pattern=`**/api/v1/me/charts/${firstChart.id}/publication`;let withdrawals=0;
+  const reject=async route=>{if(route.request().method()==="DELETE"){withdrawals++;await route.fulfill({status:409,contentType:"application/json",body:JSON.stringify({error:{code:"CHART_CHANGED",message:"Synthetic conflict"}})});}else await route.fallback();};
+  await page.route(pattern,reject);
+  try{
+   const trigger=publication.getByRole("button",{name:"撤回公开",exact:true});await trigger.click();const modal=page.getByRole("alertdialog",{name:"撤回公开",exact:true});
+   await modal.getByRole("button",{name:"确认撤回",exact:true}).click();await modal.getByRole("alert").waitFor();assert.equal(await modal.getByRole("alert").isVisible(),true,"MODAL_FAILURE_IS_ACCESSIBLE");
+   await modal.getByRole("button",{name:"取消",exact:true}).click();await modal.waitFor({state:"hidden"});assert.equal(withdrawals,1,"WITHDRAWAL_NOT_REPLAYED");assert.equal(await trigger.evaluate(el=>el===document.activeElement),true,"CANCEL_RESTORES_TRIGGER_FOCUS");
+  }finally{await page.unroute(pattern,reject);}
+  await page.reload();const versions=page.getByRole("region",{name:"历史版本",exact:true});await versions.waitFor();const oldVersion=versions.getByRole("button",{name:"删除版本",exact:true}).first();await oldVersion.click();
+  const modal=page.getByRole("alertdialog");await modal.getByRole("button",{name:"删除草稿",exact:true}).click();await modal.waitFor({state:"hidden"});await page.waitForFunction(()=>document.activeElement?.id==="author-versions");
+  assert.equal((await get(other,`/api/v1/me/charts/${firstChart.id}`)).versions.length,1,"EXPLICIT_VERSION_DELETION_SUCCEEDED");
+  await publication.getByRole("button",{name:"撤回公开",exact:true}).click();await page.getByRole("alertdialog").getByRole("button",{name:"确认撤回",exact:true}).click();await page.getByRole("alertdialog").waitFor({state:"hidden"});await page.waitForFunction(()=>document.activeElement?.id==="publication");assert.equal((await get(other,`/api/v1/me/charts/${firstChart.id}`)).publication,null,"EXPLICIT_WITHDRAWAL_SUCCEEDED");
+  // Discovery continues with this chart; restore the public fixture through the same explicit UI.
+  await selector.selectOption(updated.currentVersionId);await publication.getByLabel("我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。",{exact:true}).check();const restored=page.waitForResponse(r=>new URL(r.url()).pathname===`/api/v1/me/charts/${firstChart.id}/publication`&&r.request().method()==="PUT");await publication.getByRole("button",{name:"确认发布",exact:true}).click();const restoredResponse=await restored;assert.equal(restoredResponse.status(),200);updated=await restoredResponse.json();assert.equal(updated.publication.versionId,updated.currentVersionId);await enabled(publication.getByRole("button",{name:"撤回公开",exact:true}));assert.equal(errors.length,0,"author confirmation runtime errors");
+ });
  }catch(error){if(evidenceDirectory)await page.screenshot({path:join(evidenceDirectory,"author-failure.png"),fullPage:true,timeout:5000}).catch(()=>{});throw error;}
  finally{await page.close();await extraContext?.close();}
 }
