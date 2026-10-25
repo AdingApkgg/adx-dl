@@ -24,7 +24,8 @@ function matches(chart: ChartDto, intent: Intent) {
   return intent === null ? chart.publication === null : chart.publication?.versionId === intent.versionId &&
     chart.publication.title === intent.title && chart.publication.artist === intent.artist && chart.publication.description === intent.description && chart.publication.credits === intent.credits && JSON.stringify(chart.publication.tags) === JSON.stringify(intent.tags) && JSON.stringify(chart.publication.aliases??[])===JSON.stringify(intent.aliases??[]) && chart.publication.releaseNote === intent.releaseNote;
 }
-export function ChartPublication({ chart, busy, setBusy, refresh }: {
+export function ChartPublication({ chart, busy, setBusy, refresh, isCurrent = () => true }: {
+  isCurrent?: () => boolean;
   chart: ChartDto; busy: boolean; setBusy: (busy: boolean) => void;
   refresh: (chart: ChartDto) => Promise<void>;
 }) {
@@ -32,6 +33,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
   const [interactive,setInteractive]=useState(false);
   useEffect(()=>setInteractive(true),[]);
   const fail = (error: unknown) => {
+    if (!isCurrent()) return;
     const target = accountErrorRedirect(error, `${location.pathname}${location.search}`);
     if (target) window.location.assign(target);
   };
@@ -56,7 +58,9 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
   const selected = chart.versions.find((version) => version.id === versionId);
   const api = chartsApi(getRenderApi());
   const accept = async (actual: ChartDto, target: Intent, allowSuccess: boolean) => {
+    if (!isCurrent()) return false;
     await refresh(actual);
+    if (!isCurrent()) return false;
     if (allowSuccess && matches(actual, target)) {
       setReconcile(false); setWithdrawing(false); setConfirmed(false);
       setStatus(target ? m.chart_publication_saved() : m.chart_publication_withdrawn());
@@ -72,6 +76,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
       const actual = target ? await api.publish(chart.id, chart.revision, target.versionId) : await api.withdraw(chart.id, chart.revision);
       if (!await accept(actual, target, true)) setError(new ApiError(409, "CHART_CHANGED", "Publication changed"));
     } catch (failure) {
+      if (!isCurrent()) return;
       // A lost response can follow a committed mutation. Read before offering an explicit retry.
       setReconcile(true);
       try {
@@ -80,13 +85,13 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
         if (await accept(actual, target, !conflict)) return;
       } catch { setStatus(m.chart_publication_pending()); }
       setError(failure); fail(failure);
-    } finally { setBusy(false); }
+    } finally { if (isCurrent()) setBusy(false); }
   }
   async function check() {
     setBusy(true); setError(undefined);
     try { await accept(await api.get(chart.id), intent, true); }
     catch (failure) { setError(failure); fail(failure); }
-    finally { setBusy(false); }
+    finally { if (isCurrent()) setBusy(false); }
   }
   return <section id="publication" aria-label={m.chart_publication()} className="community-panel space-y-4">
     <div className="flex flex-wrap items-center gap-2">
@@ -112,7 +117,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
     </label>
     {selected ? <nav className="flex flex-wrap gap-3"><Link className="underline" to={localizeHref(`/me/charts/${chart.id}/review?version=${selected.id}`)}>{m.author_review()}</Link><Link className="underline" to={localizeHref(`/me/charts/${chart.id}/compare?right=${selected.id}${chart.publication?`&left=${chart.publication.versionId}`:""}`)}>{m.author_compare()}</Link></nav>:null}
     {selected&&fingerprints.key===fingerprintKey?<div className="space-y-2 rounded border p-3"><h3>{m.author_package()}</h3>{fingerprints.error?<p role="status">{m.author_analysis_failed()}</p>:!fingerprints.items.length?<p>{m.author_analysis_loading()}</p>:<>{fingerprints.items.map(f=><p key={f.versionId} className="break-all font-mono text-xs">SHA256 {f.source.sha256} · {f.source.size} B</p>)}{fingerprints.items.length===2?<p>{compareFingerprints(fingerprints.items[0],fingerprints.items[1]).archiveSame?m.author_unchanged():compareFingerprints(fingerprints.items[0],fingerprints.items[1]).previewSame?m.author_archive_changed():m.author_different()}</p>:null}</>}</div>:null}
-    {selected ? <div className="grid gap-3 md:grid-cols-2">
+    {selected ? <div className="grid gap-3">
       {chart.publication ? <div className="space-y-2 rounded border p-3"><h3 className="font-semibold">{m.chart_metadata_current_snapshot()}</h3><p>{chart.publication.title} · {chart.publication.artist || "—"}</p>
         {publishedVersion ? <><p>{m.chart_version({ number: String(publishedVersion.ordinal) })} · {(publishedVersion.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p><ChartSummary summary={publishedVersion.summary} /></> : <p>{m.chart_metadata_unknown()}</p>}
         <SnapshotMetadata value={chart.publication} /></div> : null}
@@ -128,11 +133,15 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
     <div className="flex flex-wrap gap-2">
       <Button disabled={!interactive || busy || !selected || !confirmed || reconcile || uncertain} onClick={() => void mutate({ versionId, title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits, tags: chart.tags, aliases:chart.aliases??[], releaseNote: selected?.releaseNote ?? "" })}>{chart.publication ? m.chart_publication_update() : m.chart_publication_confirm()}</Button>
       {chart.publication ? <Button variant="outline" disabled={!interactive || busy || reconcile || uncertain} onClick={() => setWithdrawing(true)}>{m.chart_publication_withdraw()}</Button> : null}
-      {reconcile || uncertain ? <Button variant="outline" disabled={!interactive || busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
+      {!withdrawing && (reconcile || uncertain) ? <Button variant="outline" disabled={!interactive || busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
     </div>
-    <ConfirmationDialog open={withdrawing} onOpenChange={setWithdrawing} title={m.chart_publication_withdraw()} description={m.chart_publication_withdraw_hint()} confirmLabel={m.chart_publication_withdraw_confirm()} cancelLabel={m.avatar_cancel()} pending={!interactive || busy} confirmDisabled={reconcile || uncertain} onConfirm={() => void mutate(null)} />
-    {status ? <p role="status">{status}</p> : null}
-    {error ? <Alert role="alert" variant="destructive">{chartErrorMessage(error)}</Alert> : null}
+    <ConfirmationDialog open={withdrawing} onOpenChange={setWithdrawing} title={m.chart_publication_withdraw()} description={m.chart_publication_withdraw_hint()} confirmLabel={m.chart_publication_withdraw_confirm()} cancelLabel={m.avatar_cancel()} pending={!interactive || busy} confirmDisabled={reconcile || uncertain} onConfirm={() => void mutate(null)}>
+      {status ? <p role="status">{status}</p> : null}
+      {error ? <Alert role="alert" variant="destructive">{chartErrorMessage(error)}</Alert> : null}
+      {reconcile || uncertain ? <Button variant="outline" disabled={!interactive || busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
+    </ConfirmationDialog>
+    {!withdrawing && status ? <p role="status">{status}</p> : null}
+    {!withdrawing && error ? <Alert role="alert" variant="destructive">{chartErrorMessage(error)}</Alert> : null}
   </section>;
 }
 

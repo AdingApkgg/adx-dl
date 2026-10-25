@@ -41,3 +41,12 @@ test("an unavailable action can stay disabled without preventing cancellation", 
   expect((screen.getByRole("button", { name: "Apply" }) as HTMLButtonElement).disabled).toBe(true);
   await user.click(screen.getByRole("button", { name: "Cancel" })); expect(onOpenChange).toHaveBeenCalledWith(false); expect(confirm).not.toHaveBeenCalled();
 });
+
+test("UX regression: recovery feedback remains accessible inside an open modal", () => {
+ render(<ConfirmationDialog open onOpenChange={()=>{}} title="Removal failed" description="Confirm the target." confirmLabel="Remove" cancelLabel="Cancel" onConfirm={()=>{}}><p role="alert">The server rejected this revision.</p><button type="button">Read latest state</button></ConfirmationDialog>);
+ const dialog=screen.getByRole("alertdialog");expect(dialog.querySelector('[role="alert"]')?.textContent).toBe("The server rejected this revision.");expect(dialog.textContent).toContain("Read latest state");
+});
+test("UX regression: removing the trigger restores focus to a stable fallback", async () => {
+ function RemovedTrigger(){const [open,setOpen]=useState(false),[removed,setRemoved]=useState(false);return <><h2 id="stable-version-region" tabIndex={-1}>Versions</h2>{!removed?<button type="button" onClick={()=>setOpen(true)}>Remove this version</button>:null}<ConfirmationDialog open={open} onOpenChange={setOpen} title="Remove version" description="Remove just this version." confirmLabel="Remove" cancelLabel="Keep" fallbackFocus={()=>document.getElementById("stable-version-region")} onConfirm={()=>{setRemoved(true);setOpen(false);}}/></>;}
+ const user=userEvent.setup();render(<RemovedTrigger/>);await user.click(screen.getByRole("button",{name:"Remove this version"}));await user.click(screen.getByRole("button",{name:"Remove"}));await waitFor(()=>expect(document.activeElement).toBe(document.getElementById("stable-version-region")));
+});

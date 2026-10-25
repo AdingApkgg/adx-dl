@@ -17,7 +17,8 @@ function fields(chart: ChartDto, versionId: string) {
   return { title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits,
     aliases: (chart.aliases??[]).join("\n"), tags: chart.tags.map(tag => tag.label).join("\n"), releaseNote: chart.versions.find(version => version.id === versionId)?.releaseNote ?? "" };
 }
-export function ChartMetadataEditor({ chart, busy, setBusy, refresh, onDirty }: {
+export function ChartMetadataEditor({ chart, busy, setBusy, refresh, onDirty, isCurrent = () => true }: {
+  isCurrent?: () => boolean;
   chart: ChartDto; busy: boolean; setBusy: (value: boolean) => void;
   refresh: (chart: ChartDto) => Promise<void>; onDirty: (value: boolean) => void;
 }) {
@@ -48,23 +49,27 @@ export function ChartMetadataEditor({ chart, busy, setBusy, refresh, onDirty }: 
       description: draft.description, credits: draft.credits, aliases, tags: tags.map(tag => tag.label), releaseNote: { versionId, text: draft.releaseNote } };
     const api = chartsApi(getBrowserApi()); setBusy(true);
     const accept = async (actual: ChartDto) => {
+      if (!isCurrent()) return;
       const values = fields(actual, versionId); setDraft(values); setBase({ revision: actual.revision, values }); setConflict(null);
-      await refresh(actual); toast.success(m.chart_saved());
+      await refresh(actual); if (isCurrent()) toast.success(m.chart_saved());
     };
     try { await accept(await api.patch(chart.id, body)); }
     catch (failure) {
+      if (!isCurrent()) return;
       try {
         const actual = await api.get(chart.id), note = actual.versions.find(version => version.id === versionId)?.releaseNote;
+        if (!isCurrent()) return;
         const matched = actual.title === body.title && actual.artist === body.artist && actual.description === body.description &&
           actual.credits === body.credits && JSON.stringify(actual.tags) === JSON.stringify(tags) && JSON.stringify(actual.aliases??[])===JSON.stringify(aliases) && note === body.releaseNote.text;
         if (matched && !(failure instanceof ApiError && failure.status < 500)) { await accept(actual); return; }
         // Keep the captured base revision until the user explicitly reviews this difference.
         setConflict(actual); await refresh(actual);
       } catch {}
+      if (!isCurrent()) return;
       setError(failure);
       const redirect = accountErrorRedirect(failure, `${location.pathname}${location.search}`);
       if (redirect) window.location.assign(redirect);
-    } finally { setBusy(false); }
+    } finally { if (isCurrent()) setBusy(false); }
   }
   function input(key: keyof typeof draft) { return (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setDraft(value => ({ ...value, [key]: event.target.value })); }
   return <form onSubmit={save} className="community-panel space-y-4">

@@ -1,5 +1,5 @@
 import { QueryClientProvider, dehydrate } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentType } from "react";
 import {renderToString} from "react-dom/server";
 import {ChartPublication} from "@/client/components/chart-publication";
@@ -7,13 +7,13 @@ import { MemoryRouter, createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { m } from "@/paraglide/messages.js";
 import ChartDetail from "@/client/routes/chart-detail";
-import { chartQuery } from "@/client/queries/charts";
+import { authorChartQuery } from "@/client/queries/charts";
 import { createApiClient } from "@/shared/api-client";
 import type { ChartDto } from "@/shared/charts";
 import { makeQueryClient } from "@/shared/query-client";
 const api = createApiClient("https://community.test");
 vi.mock("@/client/lib/browser", () => ({ getBrowserApi: () => api, getRenderApi: () => api }));
-const Page = ChartDetail as unknown as ComponentType<{ params: { id: string }; loaderData: { dehydratedState: ReturnType<typeof dehydrate> } }>;
+const Page = ChartDetail as unknown as ComponentType<{ params: { id: string }; loaderData: { actor: string; dehydratedState: ReturnType<typeof dehydrate> } }>;
 const summary = { title: "Original", artist: "Artist", maidataMd5Base64: "md5", difficulties: [{ difficulty: 4 as const, level: "12", noteCount: 3, durationMs: 5000, previewSupported: true }], warnings: [], audio: null, hasCover: false };
 const initial: ChartDto = { description: "", credits: "", tags: [], publication: null, publicationPending: false, id: "chart", title: "Original", artist: "Artist", revision: 2, currentVersionId: "v2", createdAt: "2026-10-10T00:00:00.000Z", updatedAt: "2026-10-11T00:00:00.000Z",
   versions: [2, 1].map((ordinal) => ({ id: `v${ordinal}`, ordinal, sourceFileId: `f${ordinal}`, releaseNote: "", sourceSize: 3, summary, createdAt: "2026-10-11T00:00:00.000Z" })) };
@@ -23,7 +23,7 @@ class HashWorker {
   terminate() {}
 }
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
-function setup(handler: (path: string, method: string, body: Record<string, unknown>) => Promise<Response> | Response, start = initial) {
+function setup(handler: (path: string, method: string, body: Record<string, unknown>) => Promise<Response> | Response, start = initial, onClient?: (client: ReturnType<typeof makeQueryClient>) => void) {
   const requests: { path: string; method: string; body: Record<string, unknown> }[] = [];
   vi.stubGlobal("Worker", HashWorker);
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -31,8 +31,9 @@ function setup(handler: (path: string, method: string, body: Record<string, unkn
     if(request.path.endsWith("/fingerprint"))return Response.json({versionId:request.path.split("/").at(-2),source:{sha256:"a".repeat(64),size:3},assets:{maidata:{sha256:"b".repeat(64),size:3,mime:"text/plain"}}});
     requests.push(request); return handler(request.path, request.method, request.body);
   }));
-  const client = makeQueryClient(); client.setQueryData(["me"], { id: "alice", status: "active" }); client.setQueryData(chartQuery(api, "chart").queryKey, start);
-  const router = createMemoryRouter([{ path: "/me/charts/:id", element: <QueryClientProvider client={client}><Page params={{ id: "chart" }} loaderData={{ dehydratedState: dehydrate(client) }} /></QueryClientProvider> }], { initialEntries: ["/me/charts/chart"] });
+  const client = makeQueryClient(); client.setQueryData(["me"], { id: "alice", status: "active" }); client.setQueryData(authorChartQuery(api, "alice", "chart").queryKey, start);
+  onClient?.(client);
+  const router = createMemoryRouter([{ path: "/me/charts/:id", element: <QueryClientProvider client={client}><Page params={{ id: "chart" }} loaderData={{ actor: "alice", dehydratedState: dehydrate(client) }} /></QueryClientProvider> }], { initialEntries: ["/me/charts/chart"] });
   render(<RouterProvider router={router} />);
   return requests;
 }
@@ -177,7 +178,7 @@ test("later concurrent publication returned from mutation is never mistaken for 
 });
 test("published historical version cannot be deleted and withdrawal uses revision plus confirmation", async () => {
   const requests = setup((_path, method) => Response.json(method === "DELETE" ? { ...initial, revision: 4, publication: null, publicationPending: false } : { ...initial, revision: 3, publication, publicationPending: false }), { ...initial, revision: 3, publication, publicationPending: false });
-  expect((within(screen.getByText(/^版本 1 ·/).closest("li")!).getByRole("button", { name: "删除版本" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((within(within(screen.getByRole("region", { name: "历史版本" })).getByText(/^版本 1/).closest("li")!).getByRole("button", { name: "删除版本" }) as HTMLButtonElement).disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "撤回公开" }));
   expect(requests.filter(row => row.method === "DELETE")).toHaveLength(0);
   fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "确认撤回" }));
@@ -276,13 +277,14 @@ test.each(["publish", "withdraw"])("%s response and follow-up read both lost: pu
     fireEvent.click(within(screen.getByRole("alertdialog", { name: m.chart_publication_withdraw() })).getByRole("button", { name: "确认撤回" }));
   }
   await within(section).findByText("公开状态待确认", { exact: true });
-  await waitFor(() => expect((within(section).getByRole("button", { name: "检查发布状态" }) as HTMLButtonElement).disabled).toBe(false));
+  await waitFor(() => expect((within(action === "withdraw" ? screen.getByRole("alertdialog") : section).getByRole("button", { name: "检查发布状态" }) as HTMLButtonElement).disabled).toBe(false));
   expect(within(section).queryByText("已公开", { exact: true })).toBeNull();
   expect(within(section).queryByText("私有草稿", { exact: true })).toBeNull();
   expect(within(section).queryByText("当前公开：版本 1")).toBeNull();
   expect(within(section).queryByText("公开快照已保存。")).toBeNull();
   expect(within(section).queryByText("已撤回公开。")).toBeNull();
-  expect((within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }) as HTMLButtonElement).disabled).toBe(true);
+  if (action === "publish") expect((within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }) as HTMLButtonElement).disabled).toBe(true);
+  else expect((within(screen.getByRole("alertdialog")).getByRole("button", { name: "确认撤回" }) as HTMLButtonElement).disabled).toBe(true);
   expect(requests.filter(row => row.method === (action === "publish" ? "PUT" : "DELETE"))).toHaveLength(1);
   expect(requests.filter(row => row.method === "GET")).toHaveLength(1);
 });
@@ -357,10 +359,47 @@ test("server-rendered publication controls wait for hydration before accepting a
 test("cancelling the modal delete confirmation keeps unsaved metadata and performs no DELETE", async () => {
   const requests = setup(() => Response.json(initial));
   fireEvent.change(screen.getByRole("textbox", { name: m.chart_title_label() }), { target: { value: "Keep my local draft" } });
-  fireEvent.click(screen.getByRole("button", { name: m.chart_delete(), exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: m.chart_delete() }));
   const dialog = await screen.findByRole("alertdialog", { name: m.chart_delete_confirm() });
   fireEvent.click(within(dialog).getByRole("button", { name: m.avatar_cancel() }));
   await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   expect((screen.getByRole("textbox", { name: m.chart_title_label() }) as HTMLInputElement).value).toBe("Keep my local draft");
   expect(requests.some(request => request.method === "DELETE")).toBe(false);
+});
+
+test.each([{id:"bob",status:"active"},{id:"alice",status:"pending_deletion"}])("UX regression: identity or status change immediately removes cached private detail (%s)", async next => {
+  let client!: ReturnType<typeof makeQueryClient>;
+  setup(() => Response.json(initial), initial, value => { client=value; });
+  fireEvent.change(screen.getByRole("textbox", {name:m.chart_title_label()}), {target:{value:"Private unsaved title"}});
+  act(() => { client.setQueryData(["me"],next); });
+  await waitFor(() => expect(screen.queryByRole("textbox",{name:m.chart_title_label()})).toBeNull());
+  expect(document.body.textContent).not.toContain("Original");
+  await waitFor(() => expect(client.getQueryCache().getAll().filter(q=>(q.state.data as {id?:string}|undefined)?.id===initial.id).length).toBe(0));
+});
+test("UX regression: an explicit private-read permission failure removes stale metadata", async () => {
+  let client!: ReturnType<typeof makeQueryClient>, deny=false;
+  setup(() => deny ? Response.json({error:{code:"FORBIDDEN",message:"Forbidden"}},{status:403}) : Response.json(initial), initial, value=>{client=value;client.setQueryDefaults(["me"],{retry:false});});
+  fireEvent.change(screen.getByRole("textbox",{name:m.chart_title_label()}),{target:{value:"Old private metadata"}});
+  deny=true;await act(async()=>{await client.invalidateQueries({predicate:q=>(q.state.data as {id?:string}|undefined)?.id===initial.id});});
+  await waitFor(()=>expect(screen.queryByRole("textbox",{name:m.chart_title_label()})).toBeNull());
+  expect(document.body.textContent).not.toContain("Original");
+});
+test("UX regression: a temporary read failure keeps an authorized unsaved draft", async () => {
+  let client!: ReturnType<typeof makeQueryClient>, fail=false;
+  setup(() => fail ? Response.json({error:{code:"INTERNAL_ERROR",message:"Temporary"}},{status:500}) : Response.json(initial), initial, value=>{client=value;client.setQueryDefaults(["me"],{retry:false});});
+  const input=screen.getByRole("textbox",{name:m.chart_title_label()}) as HTMLInputElement;fireEvent.change(input,{target:{value:"Keep this draft"}});
+  fail=true;await act(async()=>{await client.invalidateQueries({predicate:q=>(q.state.data as {id?:string}|undefined)?.id===initial.id});});
+  await waitFor(()=>expect(screen.getAllByRole("alert").length).toBeGreaterThan(0));expect(screen.getByRole("textbox",{name:m.chart_title_label()})).toBe(input);expect(input.value).toBe("Keep this draft");
+});
+test("UX regression: failed withdrawal exposes the recovery action inside the active modal", async () => {
+  const start={...initial,publication,publicationPending:false};const requests=setup(()=>{throw new TypeError("Response lost");},start);
+  fireEvent.click(screen.getByRole("button",{name:m.chart_publication_withdraw()}));
+  const dialog=await screen.findByRole("alertdialog",{name:m.chart_publication_withdraw()});fireEvent.click(within(dialog).getByRole("button",{name:m.chart_publication_withdraw_confirm()}));
+  await within(dialog).findByRole("button",{name:m.chart_publication_check()});expect(within(dialog).getByRole("alert")).toBeTruthy();
+  expect(requests.filter(r=>r.method==="DELETE")).toHaveLength(1);
+});
+test("UX regression: a failed deletion explains the error inside its modal", async () => {
+  setup((_path,method)=>method==="DELETE"?Response.json({error:{code:"CHART_CHANGED",message:"Changed"}},{status:409}):Response.json(initial));
+  fireEvent.click(screen.getByRole("button",{name:m.chart_delete()}));const dialog=await screen.findByRole("alertdialog",{name:m.chart_delete_confirm()});fireEvent.click(within(dialog).getByRole("button",{name:m.chart_delete()}));
+  await within(dialog).findByRole("alert");expect(screen.getByRole("alertdialog")).toBe(dialog);
 });
