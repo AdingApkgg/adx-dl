@@ -11,6 +11,9 @@ import { authorChartQuery } from "@/client/queries/charts";
 import { createApiClient } from "@/shared/api-client";
 import type { ChartDto } from "@/shared/charts";
 import { makeQueryClient } from "@/shared/query-client";
+import { ImportStore, type ImportSnapshot } from "@/client/imports/store";
+const scopeFixture = vi.hoisted(() => ({ value: null as {actor: string | null; store: ImportStore; snapshot: ImportSnapshot} | null }));
+vi.mock("@/client/imports/provider", () => ({ useImports: () => scopeFixture.value }));
 const api = createApiClient("https://community.test");
 vi.mock("@/client/lib/browser", () => ({ getBrowserApi: () => api, getRenderApi: () => api }));
 const Page = ChartDetail as unknown as ComponentType<{ params: { id: string }; loaderData: { actor: string; dehydratedState: ReturnType<typeof dehydrate> } }>;
@@ -22,7 +25,7 @@ class HashWorker {
   postMessage() { queueMicrotask(() => this.onmessage?.({ data: { hash: "a".repeat(64) } })); }
   terminate() {}
 }
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { scopeFixture.value = null; vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 function setup(handler: (path: string, method: string, body: Record<string, unknown>) => Promise<Response> | Response, start = initial, onClient?: (client: ReturnType<typeof makeQueryClient>) => void) {
   const requests: { path: string; method: string; body: Record<string, unknown> }[] = [];
   vi.stubGlobal("Worker", HashWorker);
@@ -402,4 +405,17 @@ test("UX regression: a failed deletion explains the error inside its modal", asy
   setup((_path,method)=>method==="DELETE"?Response.json({error:{code:"CHART_CHANGED",message:"Changed"}},{status:409}):Response.json(initial));
   fireEvent.click(screen.getByRole("button",{name:m.chart_delete()}));const dialog=await screen.findByRole("alertdialog",{name:m.chart_delete_confirm()});fireEvent.click(within(dialog).getByRole("button",{name:m.chart_delete()}));
   await within(dialog).findByRole("alert");expect(screen.getByRole("alertdialog")).toBe(dialog);
+});
+
+test("UX hydration: validated identity retains the editor and input node while the import queue initializes", async () => {
+  const store=new ImportStore();scopeFixture.value={actor:"alice",store,snapshot:store.getServerSnapshot()};let client!:ReturnType<typeof makeQueryClient>;
+  setup(()=>Response.json(initial),initial,value=>{client=value;});
+  const title=screen.getByRole("textbox",{name:m.chart_title_label()}),picker=screen.getByLabelText(m.chart_choose_zip());
+  fireEvent.change(title,{target:{value:"Keep hydration draft"}});expect((picker as HTMLInputElement).disabled).toBe(true);
+  scopeFixture.value={...scopeFixture.value,snapshot:{...store.getServerSnapshot(),scope:"alice"}};
+  act(()=>{client.setQueryData(["me"],{id:"alice",status:"active",name:"Fresh identity"});});
+  await waitFor(()=>expect((picker as HTMLInputElement).disabled).toBe(false));expect(picker.isConnected).toBe(true);expect(screen.getByLabelText(m.chart_choose_zip())).toBe(picker);expect(screen.getByRole("textbox",{name:m.chart_title_label()})).toBe(title);expect((title as HTMLInputElement).value).toBe("Keep hydration draft");
+  scopeFixture.value={...scopeFixture.value,actor:null,snapshot:store.getServerSnapshot()};
+  act(()=>{client.setQueryData(["me"],{id:"alice",status:"active",name:"Suspended identity"});});
+  await waitFor(()=>expect(screen.queryByRole("textbox",{name:m.chart_title_label()})).toBeNull());expect(picker.isConnected).toBe(false);
 });

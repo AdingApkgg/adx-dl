@@ -24,7 +24,6 @@ import { chartErrorMessage } from "../lib/chart-errors";
 import { requireUser } from "../lib/require-user";
 import { authorChartQuery, chartsApi, type ChartPatch } from "../queries/charts";
 import { useImports } from "../imports/provider";
-import { useHydrated } from "../lib/use-hydrated";
 import { meQuery } from "../queries/me";
 import type { Route } from "./+types/chart-detail";
 export async function loader({ context, url, params }: Route.LoaderArgs) {
@@ -39,9 +38,9 @@ export default function ChartDetail({ loaderData, params }: Route.ComponentProps
   return <HydrationBoundary state={loaderData.dehydratedState}><OwnerDetail key={`${loaderData.actor}/${params.id}`} actor={loaderData.actor} id={params.id} /></HydrationBoundary>;
 }
 function OwnerDetail({ actor, id }: { actor: string; id: string }) {
-  const client = useQueryClient(), imports = useImports(), hydrated = useHydrated();
+  const client = useQueryClient(), imports = useImports();
   const { data: me } = useQuery(meQuery(getRenderApi()));
-  const allowed = me?.id === actor && me.status === "active" && (!hydrated || !imports || imports.snapshot.scope === actor);
+  const allowed = me?.id === actor && me.status === "active" && (!imports || imports.actor === actor);
   const [denied, setDenied] = useState<ApiError | null>(null);
   const query = useQuery({ ...authorChartQuery(getRenderApi(), actor, id), enabled: allowed && !denied });
   const denial = query.error instanceof ApiError && [401, 403, 404].includes(query.error.status) ? query.error : denied;

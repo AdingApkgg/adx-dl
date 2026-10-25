@@ -6,7 +6,7 @@ import {localizeHref} from "@/paraglide/runtime.js";
 import {meQuery,refreshMe} from "../queries/me";
 import {getRenderApi} from "../lib/browser";
 import {ImportStore,type ImportSnapshot} from "./store";
-const Context=createContext<{store:ImportStore;snapshot:ImportSnapshot}|null>(null);
+const Context=createContext<{store:ImportStore;snapshot:ImportSnapshot;actor:string|null}|null>(null);
 let current:ImportStore|null=null;
 export async function clearDeviceImports(){await current?.clear();}
 export function ImportProvider({children}:{children:ReactNode}){
@@ -17,6 +17,6 @@ export function ImportProvider({children}:{children:ReactNode}){
  useEffect(()=>{const disconnect=store.connect(()=>{const attempt=++identityAttempt.current;setSuspended(true);void refreshMe(client,getRenderApi()).then(()=>{if(attempt===identityAttempt.current)setSuspended(false);}).catch(()=>{});});return()=>{++identityAttempt.current;disconnect();};},[store,client]);
  useEffect(()=>{void store.activate(scope);},[store,scope,snapshot.scope]);
  const safe=scope&&scope===snapshot.scope?snapshot:store.getServerSnapshot();
- return <Context.Provider value={{store,snapshot:safe}}>{children}{safe.scope&&(safe.rows.some(r=>!["saved","cancelled"].includes(r.phase))||safe.single)?<aside aria-label={m.author_dock()} className="fixed bottom-20 right-3 z-40 max-w-[calc(100vw-1.5rem)] rounded-lg border bg-background p-3 shadow-lg"><Link className="underline" to={safe.single?.origin??localizeHref("/me/imports")}>{m.author_dock()} · {safe.single?1:safe.rows.filter(r=>!["saved","cancelled"].includes(r.phase)).length}</Link>{safe.busy?<button type="button" className="ml-3 underline" onClick={()=>store.pause()}>{m.author_pause()}</button>:null}</aside>:null}</Context.Provider>;
+ return <Context.Provider value={{store,snapshot:safe,actor:scope}}>{children}{safe.scope&&(safe.rows.some(r=>!["saved","cancelled"].includes(r.phase))||safe.single)?<aside aria-label={m.author_dock()} className="fixed bottom-20 right-3 z-40 max-w-[calc(100vw-1.5rem)] rounded-lg border bg-background p-3 shadow-lg"><Link className="underline" to={safe.single?.origin??localizeHref("/me/imports")}>{m.author_dock()} · {safe.single?1:safe.rows.filter(r=>!["saved","cancelled"].includes(r.phase)).length}</Link>{safe.busy?<button type="button" className="ml-3 underline" onClick={()=>store.pause()}>{m.author_pause()}</button>:null}</aside>:null}</Context.Provider>;
 }
 export const useImports=()=>useContext(Context);
