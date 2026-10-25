@@ -1224,5 +1224,21 @@
   "ui_admin_details": "账号与存储概况",
   "ui_admin_services": "依赖、角色与任务",
   "ui_admin_content_services": "内容服务",
-  "ui_route_loading": "正在打开页面…"
+  "ui_route_loading": "正在打开页面…",
+  "ui_author_navigation": "创作流程导航",
+  "ui_author_steps_title": "从文件到公开作品",
+  "ui_author_step_import": "1. 选择文件",
+  "ui_author_step_save": "2. 保存私有草稿",
+  "ui_author_step_publish": "3. 选择版本公开",
+  "ui_author_steps_hint": "上传、保存和公开是独立操作。可以先校对与预览，再确认要公开的版本。",
+  "ui_author_add_version": "追加版本",
+  "ui_author_danger": "删除与存储回收",
+  "ui_author_version_actions": "版本 {version} 的操作",
+  "ui_author_delete_version": "确认删除版本 {version}。删除后无法恢复，这份版本会从私有草稿中移除。",
+  "ui_analysis_timing": "{count} 组 BPM · 起始位置 {time} ms",
+  "ui_analysis_clear": "此难度没有额外校对提示。",
+  "ui_source_results": "找到 {count} 处匹配",
+  "ui_source_no_match": "未找到匹配文本，可更换关键词。",
+  "ui_source_range": "显示 {from}–{to} / {total}",
+  "ui_package_details": "查看文件摘要"
 }

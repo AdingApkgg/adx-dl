@@ -1,3 +1,4 @@
+import { ConfirmationDialog } from "@astrodx/ui/components/confirmation-dialog";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { toast } from "@astrodx/ui/components/sonner";
@@ -66,8 +67,8 @@ export function ChartMetadataEditor({ chart, busy, setBusy, refresh, onDirty }: 
     } finally { setBusy(false); }
   }
   function input(key: keyof typeof draft) { return (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setDraft(value => ({ ...value, [key]: event.target.value })); }
-  return <form onSubmit={save} className="space-y-3 rounded-lg border p-4">
-    <h2 className="font-semibold">{m.chart_metadata_heading()}</h2><p className="text-sm text-muted-foreground">{m.chart_metadata_private_hint()}</p>
+  return <form onSubmit={save} className="community-panel space-y-4">
+    <h2 className="community-section-title">{m.chart_metadata_heading()}</h2><p className="text-sm text-muted-foreground">{m.chart_metadata_private_hint()}</p>
     <label className="block">{m.chart_title_label()}<input value={draft.title} maxLength={240} disabled={busy} onChange={input("title")} required className="mt-1 block w-full rounded border p-2" /></label>
     <label className="block">{m.chart_artist_label()}<input value={draft.artist} maxLength={240} disabled={busy} onChange={input("artist")} className="mt-1 block w-full rounded border p-2" /></label>
     <label className="block">{m.chart_metadata_description()}<textarea value={draft.description} maxLength={4000} disabled={busy} onChange={input("description")} rows={5} className="mt-1 block w-full rounded border p-2" /><span className="text-xs">{[...draft.description].length}/2000</span></label>
@@ -84,6 +85,6 @@ export function ChartMetadataEditor({ chart, busy, setBusy, refresh, onDirty }: 
     <div className="flex flex-wrap gap-2"><Button type="submit" disabled={busy || !dirty || !!conflict}>{busy ? m.chart_metadata_saving() : m.chart_metadata_save()}</Button>
       {dirty ? <Button type="button" variant="outline" disabled={busy} onClick={() => { const target = chart.versions.some(version => version.id === versionId) ? versionId : chart.currentVersionId; const values = fields(chart, target); setVersionId(target); setDraft(values); setBase({ revision: chart.revision, values }); setConflict(null); setError(undefined); }}>{m.chart_metadata_discard()}</Button> : null}</div>
     {error ? <Alert variant="destructive">{error instanceof ApiError && error.code === "CHART_METADATA_INVALID" ? m.chart_metadata_validation() : chartErrorMessage(error)}</Alert> : null}
-    {blocker.state === "blocked" ? <div role="alertdialog" aria-label={m.chart_metadata_unsaved()} className="space-y-2 rounded border p-3"><p>{m.chart_metadata_unsaved()}</p><Button type="button" onClick={() => blocker.proceed()}>{m.chart_metadata_leave()}</Button>{" "}<Button type="button" variant="outline" onClick={() => blocker.reset()}>{m.avatar_cancel()}</Button></div> : null}
+    <ConfirmationDialog open={blocker.state === "blocked"} onOpenChange={open => { if (!open && blocker.state === "blocked") blocker.reset(); }} title={m.chart_metadata_unsaved()} description={m.chart_metadata_unsaved()} confirmLabel={m.chart_metadata_leave()} cancelLabel={m.avatar_cancel()} pending={busy} onConfirm={() => { if (blocker.state === "blocked") blocker.proceed(); }} />
   </form>;
 }

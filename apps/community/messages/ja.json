@@ -1224,5 +1224,21 @@
   "ui_admin_details": "アカウントとストレージの概要",
   "ui_admin_services": "依存サービス・ロール・処理",
   "ui_admin_content_services": "コンテンツサービス",
-  "ui_route_loading": "ページを開いています…"
+  "ui_route_loading": "ページを開いています…",
+  "ui_author_navigation": "制作フロー",
+  "ui_author_steps_title": "ファイルから公開譜面まで",
+  "ui_author_step_import": "1. ファイルを選ぶ",
+  "ui_author_step_save": "2. 非公開下書きを保存",
+  "ui_author_step_publish": "3. 公開する版を選ぶ",
+  "ui_author_steps_hint": "アップロード、保存、公開は別の操作です。校正とプレビューを行ってから、公開する版を確認できます。",
+  "ui_author_add_version": "版を追加",
+  "ui_author_danger": "削除と保存領域の解放",
+  "ui_author_version_actions": "版 {version} の操作",
+  "ui_author_delete_version": "版 {version} を削除します。この版は非公開下書きから削除され、ここでは元に戻せません。",
+  "ui_analysis_timing": "BPM {count} 件・開始位置 {time} ms",
+  "ui_analysis_clear": "この難易度には追加の校正メモはありません。",
+  "ui_source_results": "{count} 件の一致",
+  "ui_source_no_match": "一致するテキストがありません。検索語を変えてください。",
+  "ui_source_range": "{total} 件中 {from}–{to} を表示",
+  "ui_package_details": "ファイルの要約を表示"
 }

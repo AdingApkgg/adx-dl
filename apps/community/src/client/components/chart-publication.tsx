@@ -1,3 +1,4 @@
+import { ConfirmationDialog } from "@astrodx/ui/components/confirmation-dialog";
 import { Badge } from "@astrodx/ui/components/badge";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
@@ -87,7 +88,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
     catch (failure) { setError(failure); fail(failure); }
     finally { setBusy(false); }
   }
-  return <section id="publication" aria-label={m.chart_publication()} className="space-y-3 rounded-lg border p-4">
+  return <section id="publication" aria-label={m.chart_publication()} className="community-panel space-y-4">
     <div className="flex flex-wrap items-center gap-2">
       <h2 className="font-semibold">{m.chart_publication()}</h2>
     <a href={localizeHref("/help/publication")} className="inline-flex min-h-11 items-center text-sm underline">{m.site_help_publication_title()}</a>
@@ -129,11 +130,7 @@ export function ChartPublication({ chart, busy, setBusy, refresh }: {
       {chart.publication ? <Button variant="outline" disabled={!interactive || busy || reconcile || uncertain} onClick={() => setWithdrawing(true)}>{m.chart_publication_withdraw()}</Button> : null}
       {reconcile || uncertain ? <Button variant="outline" disabled={!interactive || busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
     </div>
-    {withdrawing ? <div role="alertdialog" aria-label={m.chart_publication_withdraw()} className="space-y-2 rounded border p-3">
-      <p>{m.chart_publication_withdraw_hint()}</p>
-      <Button disabled={!interactive || busy || reconcile || uncertain} onClick={() => void mutate(null)}>{m.chart_publication_withdraw_confirm()}</Button>{" "}
-      <Button variant="outline" disabled={!interactive || busy} onClick={() => setWithdrawing(false)}>{m.avatar_cancel()}</Button>
-    </div> : null}
+    <ConfirmationDialog open={withdrawing} onOpenChange={setWithdrawing} title={m.chart_publication_withdraw()} description={m.chart_publication_withdraw_hint()} confirmLabel={m.chart_publication_withdraw_confirm()} cancelLabel={m.avatar_cancel()} pending={!interactive || busy} confirmDisabled={reconcile || uncertain} onConfirm={() => void mutate(null)} />
     {status ? <p role="status">{status}</p> : null}
     {error ? <Alert role="alert" variant="destructive">{chartErrorMessage(error)}</Alert> : null}
   </section>;

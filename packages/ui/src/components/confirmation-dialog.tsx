@@ -5,7 +5,7 @@ import { AlertDialog as AlertDialogPrimitive } from "radix-ui";
 import { Button } from "./button";
 
 /** Labels and operation ownership stay with the caller; confirmation never closes optimistically. */
-export function ConfirmationDialog({ open, onOpenChange, title, description, confirmLabel, cancelLabel, pending = false, destructive = true, onConfirm }: {
+export function ConfirmationDialog({ open, onOpenChange, title, description, confirmLabel, cancelLabel, pending = false, confirmDisabled = false, destructive = true, onConfirm }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -13,6 +13,7 @@ export function ConfirmationDialog({ open, onOpenChange, title, description, con
   confirmLabel: string;
   cancelLabel: string;
   pending?: boolean;
+  confirmDisabled?: boolean;
   destructive?: boolean;
   onConfirm: () => void;
 }) {
@@ -28,7 +29,7 @@ export function ConfirmationDialog({ open, onOpenChange, title, description, con
         <AlertDialogPrimitive.Description asChild><div className="mt-3 space-y-2 break-words text-sm leading-7 text-muted-foreground">{description}</div></AlertDialogPrimitive.Description>
         <div className="mt-6 flex flex-wrap justify-end gap-3">
           <AlertDialogPrimitive.Cancel asChild><Button type="button" variant="outline" className="min-h-11" disabled={pending}>{cancelLabel}</Button></AlertDialogPrimitive.Cancel>
-          <AlertDialogPrimitive.Action asChild><Button type="button" variant={destructive ? "destructive" : "default"} className="min-h-11 whitespace-normal" disabled={pending} onClick={event => { event.preventDefault(); if (!pending) onConfirm(); }}>{confirmLabel}</Button></AlertDialogPrimitive.Action>
+          <AlertDialogPrimitive.Action asChild><Button type="button" variant={destructive ? "destructive" : "default"} className="min-h-11 whitespace-normal" disabled={pending || confirmDisabled} onClick={event => { event.preventDefault(); if (!pending && !confirmDisabled) onConfirm(); }}>{confirmLabel}</Button></AlertDialogPrimitive.Action>
         </div>
       </AlertDialogPrimitive.Content>
     </AlertDialogPrimitive.Portal>

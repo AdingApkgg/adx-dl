@@ -1224,5 +1224,21 @@
   "ui_admin_details": "Accounts and storage",
   "ui_admin_services": "Dependencies, roles and tasks",
   "ui_admin_content_services": "Content services",
-  "ui_route_loading": "Opening page…"
+  "ui_route_loading": "Opening page…",
+  "ui_author_navigation": "Creation workflow",
+  "ui_author_steps_title": "From files to a published chart",
+  "ui_author_step_import": "1. Choose files",
+  "ui_author_step_save": "2. Save a private draft",
+  "ui_author_step_publish": "3. Choose a version to publish",
+  "ui_author_steps_hint": "Uploading, saving and publishing are separate steps. Review and preview your draft before confirming a version to publish.",
+  "ui_author_add_version": "Add a version",
+  "ui_author_danger": "Deletion and storage recovery",
+  "ui_author_version_actions": "Actions for version {version}",
+  "ui_author_delete_version": "Delete version {version}? It will be removed from this private draft and cannot be restored here.",
+  "ui_analysis_timing": "{count} BPM entries · first position {time} ms",
+  "ui_analysis_clear": "No additional review notes for this difficulty.",
+  "ui_source_results": "{count} matches",
+  "ui_source_no_match": "No matching text. Try another search term.",
+  "ui_source_range": "Showing {from}–{to} of {total}",
+  "ui_package_details": "File fingerprints"
 }

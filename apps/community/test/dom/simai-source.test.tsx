@@ -1,3 +1,4 @@
+import {m} from "@/paraglide/messages.js";
 import {expect,test,vi} from "vitest";
 import {fireEvent,render,screen} from "@testing-library/react";
 import {SimaiSource} from "../../src/client/components/simai-source";
@@ -18,4 +19,19 @@ test("diagnostics locate original source lines and seeks beyond preview duration
  expect(screen.getByRole("button",{name:/2:1.*2.500/}).hasAttribute("disabled")).toBe(true);
  rerender(<SimaiSource source={source} analysis={analysis} position={0} onSeek={seek} seekLimit={2} focusLine={{line:30,token:1}}/>);
  expect(screen.getByText("source line 30")).toBeTruthy();expect(screen.getByText("手动滚动已暂停跟随")).toBeTruthy();
+});
+
+test("empty original source reports zero rows and disables both page controls",()=>{
+ render(<SimaiSource source="" analysis={{...analysis,following:false,statements:[]}} position={0}/>);
+ expect(screen.getByText(m.ui_source_range({from:"0",to:"0",total:"0"}))).toBeTruthy();
+ expect((screen.getByRole("button",{name:m.chart_previous()}) as HTMLButtonElement).disabled).toBe(true);
+ expect((screen.getByRole("button",{name:m.chart_next()}) as HTMLButtonElement).disabled).toBe(true);
+ expect(screen.getByTestId("source-viewport").querySelectorAll("pre").length).toBe(0);
+});
+test("source search explains a miss and large original files still mount no more than twelve rows",()=>{
+ render(<SimaiSource source={Array.from({length:1000},(_,i)=>`line ${i+1}`).join("\n")} analysis={{...analysis,following:false,statements:[]}} position={0}/>);
+ expect(screen.getByTestId("source-viewport").querySelectorAll("pre").length).toBeLessThanOrEqual(12);
+ fireEvent.change(screen.getByRole("searchbox",{name:m.author_search()}),{target:{value:"not in this source"}});
+ expect(screen.getByText(m.ui_source_no_match())).toBeTruthy();
+ expect(screen.getByTestId("source-viewport").querySelectorAll("pre").length).toBeLessThanOrEqual(12);
 });

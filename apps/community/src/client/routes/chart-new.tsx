@@ -1,3 +1,5 @@
+import { AuthorNavigation } from "../components/author-navigation";
+import { LoadingState } from "../components/ui-states";
 import { dehydrate, HydrationBoundary, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router";
 import { m } from "@/paraglide/messages.js";
@@ -20,9 +22,11 @@ export default function ChartNew({ loaderData }: Route.ComponentProps) {
 function NewChart() {
   const { data: me } = useQuery(meQuery(getRenderApi()));
   const navigate = useNavigate();
-  if (!me) return null;
-  return <main className="space-y-6">
+  if (!me) return me === undefined ? <LoadingState label={m.ui_route_loading()} /> : null;
+  return <main className="community-author-page space-y-6">
+    <AuthorNavigation view="new" />
     <PageTitle description={m.charts_private_hint()}>{m.chart_new()}</PageTitle>
+    <section className="community-panel space-y-3" aria-label={m.ui_author_steps_title()}><h2 className="community-section-title">{m.ui_author_steps_title()}</h2><ol className="community-author-steps"><li>{m.ui_author_step_import()}</li><li>{m.ui_author_step_save()}</li><li>{m.ui_author_step_publish()}</li></ol><p className="text-sm leading-7 text-muted-foreground">{m.ui_author_steps_hint()}</p></section>
     <ChartUpload userId={me.id} onSaved={async (chart, operation) => {
       await operation.assertActive();
       await navigate(localizeHref(`/me/charts/${chart.id}`));

@@ -1,3 +1,6 @@
+import { ConfirmationDialog } from "@astrodx/ui/components/confirmation-dialog";
+import { AuthorNavigation } from "../components/author-navigation";
+import { LoadingState } from "../components/ui-states";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { toast } from "@astrodx/ui/components/sonner";
@@ -53,7 +56,8 @@ function Detail({ id }: { id: string }) {
     const target = accountErrorRedirect(failure, `${location.pathname}${location.search}`);
     if (target) window.location.assign(target); else setError(failure);
   };
-  if (!chart || !me) return null;
+  if (!me) return me === undefined ? <LoadingState label={m.ui_route_loading()} /> : null;
+  if (!chart) return queryError ? <Alert role="alert" variant="destructive">{chartErrorMessage(queryError)}</Alert> : <LoadingState label={m.ui_route_loading()} />;
   const current = chart.versions.find((version) => version.id === chart.currentVersionId);
   async function patch(body: ChartPatch) {
     setPending(true); setError(undefined);
@@ -85,32 +89,28 @@ function Detail({ id }: { id: string }) {
     } catch (failure) { await refresh(); fail(failure); }
     finally { setPending(false); }
   }
-  return <main className="space-y-6">
-    <nav className="flex flex-wrap gap-3"><Link className={textLinkClass} to={localizeHref(`/me/charts/${id}/review`)}>{m.author_review()}</Link><Link className={textLinkClass} to={localizeHref(`/me/charts/${id}/compare`)}>{m.author_compare()}</Link><Link className={textLinkClass} to={localizeHref("/me/workbench")}>{m.author_workbench()}</Link></nav>
+  return <main className="community-author-page space-y-6">
+    <AuthorNavigation id={id} view="edit" />
     <PageTitle description={m.charts_private_hint()}>{chart.title}</PageTitle>
-    <Link to={localizeHref("/me/charts")} className={textLinkClass}>{m.charts_title()}</Link>
-    <ChartMetadataEditor chart={chart} busy={pending} setBusy={setPending} refresh={refresh} onDirty={setMetadataUnsaved} />
-    <ChartPublication chart={chart} busy={pending || metadataUnsaved} setBusy={setPending} refresh={refresh} />
-    {current ? <><ChartSummary summary={current.summary} /><PrivateChartPreview key={current.id} id={id} versionId={current.id} summary={current.summary} /></> : null}
-    <section aria-label={m.chart_versions()} className="space-y-3"><h2 className="font-semibold">{m.chart_versions()}</h2>
-      <ul className="space-y-2">{chart.versions.map((version) => <li key={version.id} className="flex flex-wrap items-center gap-3 rounded border p-3">
-        <span>{m.chart_version({ number: String(version.ordinal) })} · {(version.sourceSize / (1024 * 1024)).toFixed(2)} MiB</span>
-        <time dateTime={version.createdAt} className="text-sm">{version.createdAt.slice(0, 10)}</time>
-        {version.id === chart.currentVersionId ? <span className="text-sm">{m.chart_current()}</span> : <>
-          <Button variant="outline" disabled={pending} onClick={() => void patch({ expectedRevision: chart.revision, currentVersionId: version.id })}>{m.chart_activate()}</Button>
-          <Button variant="outline" disabled={pending || chart.publication?.versionId === version.id || chart.publicationPending === true} title={chart.publication?.versionId === version.id ? m.chart_error_published() : undefined} onClick={() => setDeleting(version.id)}>{m.chart_delete_version()}</Button>
-        </>}
+    <nav aria-label={m.ui_content_navigation()} className="community-content-nav"><a href="#author-metadata">{m.chart_metadata_heading()}</a><a href="#author-publication">{m.chart_publication()}</a><a href="#author-versions">{m.chart_versions()}</a><a href="#author-upload">{m.ui_author_add_version()}</a></nav>
+    {current ? <div id="author-preview"><PrivateChartPreview key={current.id} id={id} versionId={current.id} summary={current.summary} /></div> : null}
+    <div className="community-author-layout"><div id="author-metadata" className="min-w-0"><ChartMetadataEditor chart={chart} busy={pending} setBusy={setPending} refresh={refresh} onDirty={setMetadataUnsaved} /></div>
+      <aside id="author-publication" className="min-w-0" aria-label={m.chart_publication()}><ChartPublication chart={chart} busy={pending || metadataUnsaved} setBusy={setPending} refresh={refresh} /></aside></div>
+    <section id="author-versions" aria-label={m.chart_versions()} className="community-panel space-y-5"><div className="community-section-heading"><h2 className="community-section-title">{m.chart_versions()}</h2><Link to={localizeHref("/me/charts")} className="community-inline-action">{m.charts_title()}</Link></div>
+      {current ? <ChartSummary summary={current.summary} /> : null}
+      <ul className="community-version-list">{chart.versions.map(version => <li key={version.id}>
+        <div className="min-w-0 space-y-2"><p className="font-medium">{m.chart_version({ number: String(version.ordinal) })}{version.id === chart.currentVersionId ? <span className="community-status ml-2">{m.chart_current()}</span> : null}</p><p className="text-xs text-muted-foreground">{(version.sourceSize / (1024 * 1024)).toFixed(2)} MiB · <time dateTime={version.createdAt}>{version.createdAt.slice(0, 10)}</time></p></div>
+        <div role="group" aria-label={m.ui_author_version_actions({ version: String(version.ordinal) })} className="community-toolbar"><Link className="community-inline-action" to={localizeHref(`/me/charts/${id}/review?${new URLSearchParams({version:version.id})}`)}>{m.author_review()}</Link>{version.id !== chart.currentVersionId ? <>
+          <Button type="button" variant="outline" disabled={pending} onClick={() => void patch({ expectedRevision: chart.revision, currentVersionId: version.id })}>{m.chart_activate()}</Button>
+          <Button type="button" variant="outline" disabled={pending || chart.publication?.versionId === version.id || chart.publicationPending === true} title={chart.publication?.versionId === version.id ? m.chart_error_published() : undefined} onClick={() => setDeleting(version.id)}>{m.chart_delete_version()}</Button>
+        </> : null}</div>
       </li>)}</ul>
     </section>
-    <ChartUpload userId={me.id} target={{kind:"append",id,expectedRevision:chart.revision}} onSaved={async (updated,operation) => {
+    <div id="author-upload"><ChartUpload userId={me.id} target={{kind:"append",id,expectedRevision:chart.revision}} onSaved={async (updated,operation) => {
       await operation.assertActive();await refresh(updated);await operation.assertActive();toast.success(m.chart_saved());
-    }} />
-    <Button variant="outline" disabled={pending} onClick={() => setDeleting("chart")}>{m.chart_delete()}</Button>
-    {deleting ? <section role="alertdialog" aria-label={m.chart_delete_confirm()} className="space-y-3 rounded border p-4">
-      <p>{m.chart_delete_confirm()}</p><p className="text-sm text-muted-foreground">{m.chart_delete_hint()}</p>
-      <div className="flex gap-2"><Button disabled={pending} onClick={() => void remove(deleting === "chart" ? undefined : deleting)}>{m.chart_delete()}</Button>
-        <Button variant="outline" disabled={pending} onClick={() => setDeleting(null)}>{m.avatar_cancel()}</Button></div>
-    </section> : null}
+    }} /></div>
+    <section className="community-danger-panel space-y-3" aria-label={m.ui_author_danger()}><h2 className="community-section-title">{m.ui_author_danger()}</h2><p className="text-sm leading-7 text-muted-foreground">{m.chart_delete_hint()}</p><Button type="button" variant="destructive" disabled={pending} onClick={() => setDeleting("chart")}>{m.chart_delete()}</Button></section>
+    <ConfirmationDialog open={deleting !== null} onOpenChange={open => { if (!open) setDeleting(null); }} title={m.chart_delete_confirm()} description={deleting === "chart" ? m.chart_delete_hint() : m.ui_author_delete_version({ version: String(chart.versions.find(v => v.id === deleting)?.ordinal ?? "—") })} confirmLabel={m.chart_delete()} cancelLabel={m.avatar_cancel()} pending={pending} onConfirm={() => void remove(deleting === "chart" ? undefined : deleting ?? undefined)} />
     {error || queryError ? <Alert role="alert" variant="destructive">{chartErrorMessage(error ?? queryError)}</Alert> : null}
   </main>;
 }

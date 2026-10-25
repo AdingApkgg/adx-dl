@@ -34,3 +34,10 @@ test("the caller can close only after its operation succeeds", async () => {
   await user.click(screen.getByRole("button", { name: "Open confirmation" })); await user.click(screen.getByRole("button", { name: "Confirm deletion" }));
   expect(confirm).toHaveBeenCalledTimes(1); await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
 });
+
+test("an unavailable action can stay disabled without preventing cancellation", async () => {
+  const user = userEvent.setup(), onOpenChange = vi.fn(), confirm = vi.fn();
+  render(<ConfirmationDialog open onOpenChange={onOpenChange} title="Awaiting reconciliation" description="Read the latest state first." confirmLabel="Apply" cancelLabel="Cancel" confirmDisabled onConfirm={confirm} />);
+  expect((screen.getByRole("button", { name: "Apply" }) as HTMLButtonElement).disabled).toBe(true);
+  await user.click(screen.getByRole("button", { name: "Cancel" })); expect(onOpenChange).toHaveBeenCalledWith(false); expect(confirm).not.toHaveBeenCalled();
+});

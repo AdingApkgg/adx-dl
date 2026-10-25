@@ -273,7 +273,7 @@ test.each(["publish", "withdraw"])("%s response and follow-up read both lost: pu
   if (action === "publish") choosePublication();
   else {
     fireEvent.click(within(section).getByRole("button", { name: "撤回公开" }));
-    fireEvent.click(within(within(section).getByRole("alertdialog")).getByRole("button", { name: "确认撤回" }));
+    fireEvent.click(within(screen.getByRole("alertdialog", { name: m.chart_publication_withdraw() })).getByRole("button", { name: "确认撤回" }));
   }
   await within(section).findByText("公开状态待确认", { exact: true });
   await waitFor(() => expect((within(section).getByRole("button", { name: "检查发布状态" }) as HTMLButtonElement).disabled).toBe(false));
@@ -352,4 +352,15 @@ test("publication comparison reads public metadata from its snapshot and checks 
 test("server-rendered publication controls wait for hydration before accepting a version choice",()=>{
  const markup=renderToString(<MemoryRouter><ChartPublication chart={initial} busy={false} setBusy={()=>{}} refresh={async()=>{}}/></MemoryRouter>),host=document.createElement("div");host.innerHTML=markup;
  expect((host.querySelector("select") as HTMLSelectElement).disabled).toBe(true);
+});
+
+test("cancelling the modal delete confirmation keeps unsaved metadata and performs no DELETE", async () => {
+  const requests = setup(() => Response.json(initial));
+  fireEvent.change(screen.getByRole("textbox", { name: m.chart_title_label() }), { target: { value: "Keep my local draft" } });
+  fireEvent.click(screen.getByRole("button", { name: m.chart_delete(), exact: true }));
+  const dialog = await screen.findByRole("alertdialog", { name: m.chart_delete_confirm() });
+  fireEvent.click(within(dialog).getByRole("button", { name: m.avatar_cancel() }));
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  expect((screen.getByRole("textbox", { name: m.chart_title_label() }) as HTMLInputElement).value).toBe("Keep my local draft");
+  expect(requests.some(request => request.method === "DELETE")).toBe(false);
 });
