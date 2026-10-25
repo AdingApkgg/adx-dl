@@ -71,12 +71,22 @@ export function parseMotionMode(value: string | null | undefined): MotionMode {
 }
 
 export function motionConfigPreference(
-  mode: MotionMode
+  mode: MotionMode,
+  systemReduced?: boolean
 ): "user" | "never" | "always" {
   if (mode === "on") {
     return "never";
   }
-  return mode === "off" ? "always" : "user";
+  if (mode === "off") {
+    return "always";
+  }
+  // "system" follows the live OS signal when the caller knows it. Framer's own
+  // hook samples the OS only once, so we resolve the value here and hand
+  // MotionConfig a settled "always"/"never" instead of a stale "user".
+  if (systemReduced === undefined) {
+    return "user";
+  }
+  return systemReduced ? "always" : "never";
 }
 
 /** The header toggle's read/write handle for the site-level preference. */
@@ -111,12 +121,17 @@ export function useReducedMotion(): boolean {
 
 /**
  * Opts every descendant animation into the "reduce motion" preference, so we
- * don't have to gate each component by hand. With `reducedMotion="user"`,
- * framer-motion drops transform/layout animations (keeping only opacity) when
- * the OS asks for reduced motion — mirroring the `@view-transition` guard in
- * the app's CSS (web: globals.css). The in-site toggle escalates that to
- * `"always"` and stamps `data-reduced-motion` on <html> so the CSS guards fire
- * too.
+ * don't have to gate each component by hand. Framer-motion drops
+ * transform/layout animations (keeping only opacity) when MotionConfig says
+ * `"always"` — mirroring the `@view-transition` guard in the app's CSS (web:
+ * globals.css). The in-site toggle forces that to `"always"` and stamps
+ * `data-reduced-motion` on <html> so the CSS guards fire too.
+ *
+ * Framer's own `useReducedMotion` samples the OS only once at mount, so a page
+ * that loads while the OS already asks for reduced motion keeps dropping
+ * transforms even after the user turns that OS preference back off. We
+ * therefore subscribe to the live OS signal here and resolve `"system"` to a
+ * settled `"always"`/`"never"` ourselves; explicit on/off still win.
  *
  * The stored preference is read after mount (not during hydration), so the
  * first paint of a full page load may briefly animate — the trade for
@@ -125,6 +140,13 @@ export function useReducedMotion(): boolean {
 export function MotionProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = React.useState<MotionMode>("system");
   const [preferenceReady, setPreferenceReady] = React.useState(false);
+  // Live OS signal (same store as `useReducedMotion`), so `"system"` tracks the
+  // OS instead of Framer's one-shot sample. The server snapshot is `false`.
+  const systemReduced = React.useSyncExternalStore(
+    subscribeSystemReducedMotion,
+    systemReducedMotionSnapshot,
+    serverReducedMotionSnapshot
+  );
 
   React.useEffect(() => {
     try {
@@ -174,7 +196,7 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <MotionPreferenceContext.Provider value={preference}>
-      <MotionConfig reducedMotion={motionConfigPreference(mode)}>
+      <MotionConfig reducedMotion={motionConfigPreference(mode, systemReduced)}>
         {children}
       </MotionConfig>
     </MotionPreferenceContext.Provider>

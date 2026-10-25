@@ -32,3 +32,12 @@
 2. 浏览器验证动画 on/off/system 即时切换、初始 off 不闪动、后台/离屏暂停、鼠标/触摸/键盘。
 3. 320/390/768/1280 布局、搜索建议层级、快速路由切换、未提交表单、谱面1第6槽播放/暂停/拖动。
 4. 原有19组正式发布门禁、版本回执、健康与备份。全部通过后才能推送部署并标记发布完成。
+
+## 2026-10-26 动效缺陷根因与修复（阶段1）
+
+- 根因：`packages/ui/src/motion/index.tsx` 的 `MotionProvider` 把站点偏好 `system` 直接映射为 framer-motion 的 `reducedMotion="user"`，而 framer-motion 13.4.4 的 `useReducedMotion` 用 `useState(prefersReducedMotion.current)` 只在挂载时采样一次 OS 信号。页面在 OS 已开启“减少动画”时加载，之后即使 OS 关闭，`useAnimate` 仍按旧值跳过 transform，transform 被跳过，路由没有实际位移（opacity 保持 1）。
+- 修复：`motionConfigPreference(mode, systemReduced?)` 保持单参兼容（`system` 无第二参仍返回 `user`）；`MotionProvider` 复用已有 `useSyncExternalStore` OS 订阅取实时布尔值，`system` 解析为 `always`/`never`，显式 `on` 恒 `never`、`off` 恒 `always`。SSR 快照仍为 `false`，hydration 与 ready 结构不变。
+- 契约：`motion-preference.test.ts` 新增实时 system 与显式覆盖两组用例。
+- 真实组件浏览器夹具（非 mock，实际 `MotionProvider`/`RouteMotion`/`BrowserRouter`，同一输入框 sentinel）8 场景：初始 reduce→no-preference/system 由 0px 变为 13.61px（原红转绿）；初始 no-preference 13.61px；manual on 13.61px；system reduce 与 off 均 0px；动画途中切 reduce/off 后帧不再变化且终态 m42=0、opacity=1；全部场景输入节点与值保留。证据 `evidence/20261026-034527-wt-2630b19f/motion-route-repro-20261026-052106/repro.log` 与 `after-live-policy.log`。
+- 定向回归：shared UI 类型 + 39 测试、community 类型、web 类型 + 603 测试、community DOM 285、两改动文件 Biome lint 均通过（退出码 0）。community 后台单测因该次容器缺 `TEST_REDIS_URL`/`TEST_DATABASE_URL` 与 Redis/Postgres 服务在 Redis 处超时，属环境原因，不计通过。
+- 边界：以上证明的是共享 UI 策略与真实组件行为，**尚未证明**原 CI `MOTION_WAIT_TIMEOUT ROUTE_ENTRY_OBSERVED` 与本次为同一根因；需下一次 exact-head 完整 CI（含 Chromium 与 fresh-volume restore）全绿才能确认。生产发布与 19 组正式门禁仍待验收。
