@@ -15,7 +15,7 @@ const ENTER = {
   content: { distance: 18, duration: 0.48 },
   title: { distance: 24, duration: 0.58 },
   feature: { distance: 32, duration: 0.7 },
-  dock: { distance: 20, duration: 0.46 },
+  dock: { distance: 0, duration: 0.46 },
   route: { distance: 16, duration: 0.44 },
 };
 
@@ -38,7 +38,12 @@ function useEnterMotion(tone: MotionTone | "route" = "content") {
     settle();
     if (!scope.current || motionBlocked(reduced)) return;
     const { distance, duration } = ENTER[tone];
-    active.current = animate(scope.current, { opacity: [tone === "route" ? 1 : 0.9, 1], y: [distance, 0] }, {
+    // Anchored surfaces (dock) sit inside a fixed safe gap: a positive y offset
+    // would push them under the bottom nav, so they scale in place instead.
+    const target = tone === "dock"
+      ? { opacity: [0.9, 1], scale: [0.96, 1] }
+      : { opacity: [tone === "route" ? 1 : 0.9, 1], y: [distance, 0] };
+    active.current = animate(scope.current, target, {
       duration, ease: EASE_OUT, delay,
     });
   }, [animate, reduced, scope, settle, tone]);
