@@ -334,7 +334,7 @@ test("unsaved editor text blocks navigation and cancel preserves it without loca
   fireEvent.change(screen.getByRole("textbox", { name: /作品介绍/ }), { target: { value: "Unsaved private text" } });
   fireEvent.click(document.querySelector('a[href="/me/charts"]')!);
   const dialog = await screen.findByRole("alertdialog", { name: m.chart_metadata_unsaved() });
-  fireEvent.click(within(dialog).getByRole("button", { name: m.avatar_cancel() }));
+  fireEvent.click(within(dialog).getByRole("button", { name: m.dash_cancel() }));
   expect((screen.getByRole("textbox", { name: /作品介绍/ }) as HTMLTextAreaElement).value).toBe("Unsaved private text");
   expect(storage).not.toHaveBeenCalled();
 });
@@ -364,7 +364,7 @@ test("cancelling the modal delete confirmation keeps unsaved metadata and perfor
   fireEvent.change(screen.getByRole("textbox", { name: m.chart_title_label() }), { target: { value: "Keep my local draft" } });
   fireEvent.click(screen.getByRole("button", { name: m.chart_delete() }));
   const dialog = await screen.findByRole("alertdialog", { name: m.chart_delete_confirm() });
-  fireEvent.click(within(dialog).getByRole("button", { name: m.avatar_cancel() }));
+  fireEvent.click(within(dialog).getByRole("button", { name: m.dash_cancel() }));
   await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   expect((screen.getByRole("textbox", { name: m.chart_title_label() }) as HTMLInputElement).value).toBe("Keep my local draft");
   expect(requests.some(request => request.method === "DELETE")).toBe(false);
