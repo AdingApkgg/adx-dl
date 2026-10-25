@@ -10,7 +10,7 @@
 ## Global Constraints
 
 - 复用当前已附加隔离worktree，从683d546b创建codex/community-ux-completion；不触碰主工作区，不跑开发期基线测试或安装。
-- 不改API、数据库、权限、数字链接、导入/下载/发布状态机或源码虚拟列表几何；确认组件无硬编码文字/路由。
+- 不改API、数据库、服务端权限、数字链接、导入/下载/发布状态机或源码虚拟列表几何；确认组件无硬编码文字/路由。
 - 全部新增文案zh/en/ja；保留system/on/off、SSR/no-JS、原组件key、身份清理和草稿保护。
 - 测试先写但统一留到发布窗口执行；没有执行的步骤只记实现，不声称通过。
 
@@ -50,7 +50,7 @@
 
 **Files:** DOM测试、test/acceptance/ui-layout-browser.mjs及自包含production-smoke.mjs；集中验收记录。
 **Interfaces:** 生产既有19组门禁不减少，新增受控慢导航、焦点、遗漏页面布局只读断言纳入原UI组；bridge保留精确/__manifest协议。
-- [ ] 整批一次新上下文复核；重要问题统一修正，静态记录仍为未执行。
+- [x] 整批一次新上下文复核；四项问题已在集中窗口复现并统一修正，实际验证状态见交付记录。
 - [ ] 明确进入发布窗口后，用scripts/remote/verify.sh在构建机集中验证sharedUI/web/community；修复真实失败后完成既有隔离上传/有界备份恢复。
 - [ ] 推送并等待候选CI；通过后合并pre，核对受测树与实际合并树；正式部署及全19组登录态无头验收。
 - [ ] 核对serving/accepted/complete、healthz/readyz、备份和临时会话/密钥/容器清理，只有实际通过后交付发布完成。
