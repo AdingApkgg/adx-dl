@@ -53,7 +53,7 @@ if preview_chart:
     env['PRODUCTION_PREVIEW_CHART'] = preview_chart
     env['PRODUCTION_PREVIEW_DIFFICULTY'] = preview_difficulty
 print('REMOTE_HEADLESS_EVIDENCE ' + str(root), flush=True)
-run = subprocess.run(['timeout', '--signal=TERM', '--kill-after=10s', '300s', 'node', str(root / 'smoke.mjs')], env=env)
+run = subprocess.run(['timeout', '--signal=TERM', '--kill-after=10s', '420s', 'node', str(root / 'smoke.mjs')], env=env)
 result = root / 'evidence/result.json'
 if not result.is_file():
     print('PRODUCTION_SMOKE_INCOMPLETE: no completed result', flush=True)

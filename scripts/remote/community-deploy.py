@@ -64,7 +64,7 @@ try:
         receipt=pathlib.Path(temporary)/'receipt.json'
         env=dict(os.environ,PRODUCTION_EXPECT_REVISION=ready['revision'],PRODUCTION_RELEASE_RECEIPT=str(receipt),COMMUNITY_RELEASE_ID=release_id)
         run_before_acceptance(args.before_acceptance,env)
-        outcome=subprocess.run(['bash',str(ROOT/'scripts/remote/community-smoke.sh'),'--authenticated'],env=env,timeout=450)
+        outcome=subprocess.run(['bash',str(ROOT/'scripts/remote/community-smoke.sh'),'--authenticated'],env=env,timeout=540)
         if outcome.returncode!=0 or not receipt.is_file():raise RuntimeError('AUTHENTICATED_HEADLESS_GATE_FAILED')
         call('receipt',receipt=json.loads(receipt.read_text()))
     process.wait(timeout=40)

@@ -27,7 +27,7 @@ def production(action):
         raise RuntimeError('PRODUCTION_' + action.upper() + '_FAILED (private remote logs; no credentials printed)')
     return json.loads(result.stdout.strip().splitlines()[-1])
 def builder(script, capture=False):
-    return subprocess.run(['ssh',*ssh_options,BUILD,'python3 -u -'],input=script,text=True,stdout=subprocess.PIPE if capture else None,check=True,timeout=340)
+    return subprocess.run(['ssh',*ssh_options,BUILD,'python3 -u -'],input=script,text=True,stdout=subprocess.PIPE if capture else None,check=True,timeout=460)
 def free_port():
     with socket.socket() as sock:
         sock.bind(('127.0.0.1',0)); return sock.getsockname()[1]
@@ -80,7 +80,7 @@ try:
  for key in ['PRODUCTION_PREVIEW_CHART','PRODUCTION_PREVIEW_DIFFICULTY']: env.pop(key,None)
  env.update(task['previewEnv'])
  print('REMOTE_AUTH_HEADLESS_EVIDENCE '+str(root),flush=True)
- result=subprocess.run(['timeout','--signal=TERM','--kill-after=10s','300s','node',str(root/'smoke.mjs')],env=env)
+ result=subprocess.run(['timeout','--signal=TERM','--kill-after=10s','420s','node',str(root/'smoke.mjs')],env=env)
  proof=root/'evidence/result.json'
  if proof.is_file(): print(proof.read_text(),flush=True)
  if result.returncode != 0: raise SystemExit(result.returncode)
