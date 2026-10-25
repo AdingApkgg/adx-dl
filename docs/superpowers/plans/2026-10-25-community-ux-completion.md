@@ -26,25 +26,25 @@
 
 **Files:** 新增packages/ui/src/components/confirmation-dialog.tsx及对应测试；新增community route-feedback.tsx、ui-states.tsx与DOM回归；修改root.tsx、error-card.tsx、app.css、三语言messages。
 **Interfaces:** ConfirmationDialog({open,onOpenChange,title,description,confirmLabel,cancelLabel,pending,onConfirm,destructive?})；EmptyState({title,description?,children?})；LoadingState({label})；RouteFeedback()位于框架Data Router根部。
-- [ ] 编写确认、焦点与慢导航/取消导航回归，开发时不执行。
-- [ ] 实现上述原语与错误恢复、手机基础可用性；保留SSR可读及正文实例。
-- [ ] 静态核对并原子提交，ledger标记验证pending。
+- [x] 编写确认、焦点与慢导航/取消导航回归，开发时不执行。
+- [x] 实现上述原语与错误恢复、手机基础可用性；保留SSR可读及正文实例。
+- [x] 静态核对并原子提交，ledger标记验证pending。
 
 ### Task 2: 作者编辑与校对完整流程
 
 **Files:** chart-new/detail/review/compare.tsx；chart-upload.tsx、chart-metadata-editor.tsx、chart-publication.tsx、simai-source.tsx、author-report.tsx；新增author-navigation.tsx及必要DOM回归。
 **Interfaces:** AuthorNavigation({id,view,version?})保留原版本查询和回工作台；其余组件业务props不变；使用Task1状态与确认。
-- [ ] 写取消/失败/重复确认、草稿与播放状态相关必要回归源，暂不执行。
-- [ ] 统一页面导航和任务区域，预览前置，技术明细折叠，校对选项/源码控件语义与0行计数。
-- [ ] 保留所有guard、key、PATCH读回对账和发布明确确认，静态核对后原子提交。
+- [x] 写取消/失败/重复确认、草稿与播放状态相关必要回归源，暂不执行。
+- [x] 统一页面导航和任务区域，预览前置，技术明细折叠，校对选项/源码控件语义与0行计数。
+- [x] 保留所有guard、key、PATCH读回对账和发布明确确认，静态核对后原子提交。
 
 ### Task 3: 其余页面与全站一致性
 
 **Files:** my-governance/reports/discussions、help/privacy/account-deletion；governance-ui/social-ui/dash-ui/public-chart-browser/discovery-ui、library相关空态与分页；CSS/messages及DOM回归。
 **Interfaces:** 使用Task1状态原语；处理中心分组导航按现有view/kind与URL表达，不改变cursor或查询语义。
-- [ ] 迁移遗漏阅读/记录页面、空态/不可用反馈；补明确去向、当前导航与筛选移除名称。
-- [ ] 手机长文本/触控、筛选和分页收尾；必要交互回归先写不执行。
-- [ ] 静态核对、原子提交，并更新交付记录。
+- [x] 迁移遗漏阅读/记录页面、空态/不可用反馈；补明确去向、当前导航与筛选移除名称。
+- [x] 手机长文本/触控、筛选和分页收尾；必要交互回归先写不执行。
+- [x] 静态核对、原子提交，并更新交付记录。
 
 ### Task 4: 整批复核、集中验证与正式发布
 
