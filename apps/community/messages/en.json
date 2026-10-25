@@ -1223,5 +1223,6 @@
   "ui_admin_status_hint": "Review dependencies, runtime roles, task journals and backup records.",
   "ui_admin_details": "Accounts and storage",
   "ui_admin_services": "Dependencies, roles and tasks",
-  "ui_admin_content_services": "Content services"
+  "ui_admin_content_services": "Content services",
+  "ui_route_loading": "Opening page…"
 }

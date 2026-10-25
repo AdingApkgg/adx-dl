@@ -268,3 +268,21 @@ html[data-motion=off] .community-list-card { transition:none; }
  html:not([data-motion=on]) .community-motion-hover { translate:none; transition:none; }
 }
 html[data-motion=off] .community-motion-hover { translate:none; transition:none; }
+
+/* UX completion: retain real content while navigation and recovery are visible. */
+.community-route-progress { position:fixed; inset:0 0 auto; height:3px; z-index:80; overflow:hidden; pointer-events:none; background:color-mix(in srgb,var(--primary) 12%,transparent); }
+.community-route-progress > span { display:block; height:100%; width:40%; background:var(--primary); animation:community-route-progress 1.2s ease-in-out infinite; }
+@keyframes community-route-progress { from { transform:translateX(-110%); } to { transform:translateX(360%); } }
+@media (prefers-reduced-motion:reduce) { html:not([data-motion=on]) .community-route-progress > span { animation:none; width:100%; } }
+html[data-motion=off] .community-route-progress > span { animation:none; width:100%; }
+.community-empty-state { display:flex; align-items:center; flex-direction:column; gap:.9rem; }
+.community-state-icon { display:grid; place-items:center; width:3rem; height:3rem; border:1px solid var(--border); border-radius:1rem; background:var(--card); color:var(--muted-foreground); }
+.community-state-icon svg { width:1.35rem; height:1.35rem; }
+.community-recovery { max-width:38rem; margin:clamp(1rem,7vw,5rem) auto; padding:clamp(1.25rem,4vw,2.5rem); border:1px solid var(--border); border-radius:1.25rem; background:var(--card); }
+.community-recovery :where(h1,p,code) { overflow-wrap:anywhere; }
+.community-content :where(h1,h2,h3) { overflow-wrap:anywhere; }
+.community-content :where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=hidden]),select,textarea) { min-width:0; }
+.community-content :where(button,[role=button]) { touch-action:manipulation; }
+@media (max-width:767px) { .community-content :where(input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea) { font-size:1rem; } }
+html { scroll-padding-top:6rem; scroll-padding-bottom:calc(6rem + env(safe-area-inset-bottom,0px)); }
+@media (max-width:767px) { .community-content :where(button:not([data-source-seek]),[role=button]) { min-height:2.75rem; max-width:100%; height:auto; white-space:normal; } }

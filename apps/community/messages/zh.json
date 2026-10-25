@@ -1223,5 +1223,6 @@
   "ui_admin_status_hint": "检查依赖、角色、任务日志与备份记录。",
   "ui_admin_details": "账号与存储概况",
   "ui_admin_services": "依赖、角色与任务",
-  "ui_admin_content_services": "内容服务"
+  "ui_admin_content_services": "内容服务",
+  "ui_route_loading": "正在打开页面…"
 }

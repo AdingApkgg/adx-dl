@@ -1223,5 +1223,6 @@
   "ui_admin_status_hint": "依存サービス・実行ロール・処理ログ・バックアップ記録を確認します。",
   "ui_admin_details": "アカウントとストレージの概要",
   "ui_admin_services": "依存サービス・ロール・処理",
-  "ui_admin_content_services": "コンテンツサービス"
+  "ui_admin_content_services": "コンテンツサービス",
+  "ui_route_loading": "ページを開いています…"
 }
