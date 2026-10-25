@@ -16,4 +16,17 @@ describe("motion preference", () => {
     expect(motionConfigPreference("on")).toBe("never");
     expect(motionConfigPreference("off")).toBe("always");
   });
+
+  test("resolves system mode against the live OS signal", () => {
+    expect(motionConfigPreference("system", true)).toBe("always");
+    expect(motionConfigPreference("system", false)).toBe("never");
+    expect(motionConfigPreference("system", undefined)).toBe("user");
+  });
+
+  test("explicit on/off override the OS signal", () => {
+    expect(motionConfigPreference("on", true)).toBe("never");
+    expect(motionConfigPreference("on", false)).toBe("never");
+    expect(motionConfigPreference("off", true)).toBe("always");
+    expect(motionConfigPreference("off", false)).toBe("always");
+  });
 });

@@ -255,14 +255,13 @@ html[data-motion=off] .community-list-card { transition:none; }
 .community-dash-content :where(form) :where(label) { min-width:0; }
 @media (min-width:1024px) { .community-auth-layout { grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr); gap:2.5rem; } .community-auth-intro { position:sticky; top:6rem; } }
 
-/* Shared Motion easing; native hover uses translate so it composes with the
-   one-time reveal's transform without taking focus or measuring large grids. */
+/* Native translate composes with the reveal transform without grid measurements. */
 .community-motion-nav { position:relative; isolation:isolate; }
 .community-nav-indicator { position:absolute; inset:0; z-index:-1; border-radius:inherit; background:color-mix(in srgb,var(--primary) 10%,transparent); pointer-events:none; }
 .community-motion-nav.is-active,.community-motion-nav[aria-current=page] { background:transparent; }
-.community-motion-hover { transition:translate .2s cubic-bezier(.22,1,.36,1),border-color .18s,box-shadow .18s; }
+.community-motion-hover { transition:translate .4s cubic-bezier(.22,1,.36,1),border-color .25s,box-shadow .25s; }
 @media (hover:hover) and (pointer:fine) {
- .community-motion-hover:hover { translate:0 -2px; }
+ .community-motion-hover:hover { translate:0 -6px; }
 }
 @media (prefers-reduced-motion:reduce) {
  html:not([data-motion=on]) .community-motion-hover { translate:none; transition:none; }
@@ -331,3 +330,62 @@ html { scroll-padding-top:6rem; scroll-padding-bottom:calc(6rem + env(safe-area-
 .community-content [id] { scroll-margin-top:calc(6rem + env(safe-area-inset-top,0px)); }
 html { scroll-padding-top:calc(6rem + env(safe-area-inset-top,0px)); }
 @media (min-width:640px) { .community-header-inner { padding-left:max(1.5rem,env(safe-area-inset-left,0px)); padding-right:max(1.5rem,env(safe-area-inset-right,0px)); } .community-layout { padding-left:max(1.5rem,env(safe-area-inset-left,0px)); padding-right:max(1.5rem,env(safe-area-inset-right,0px)); } }
+
+
+/* Expressive community motion: a music scene, tactile covers and clear hierarchy. */
+.community-hero { isolation:isolate; }
+.community-hero-copy { z-index:2; }
+.community-hero-media { position:relative; z-index:1; }
+.community-hero-scene { position:absolute; inset:0; z-index:0; overflow:hidden; border-radius:inherit; pointer-events:none; contain:paint; }
+.community-hero-glow { position:absolute; display:block; width:clamp(22rem,50vw,46rem); aspect-ratio:1; border-radius:50%; }
+.community-hero-glow.is-first { top:-48%; left:-18%; background:radial-gradient(circle,color-mix(in srgb,var(--primary) 26%,transparent),transparent 67%); }
+.community-hero-glow.is-second { right:-15%; bottom:-50%; background:radial-gradient(circle,color-mix(in srgb,var(--primary) 19%,transparent),color-mix(in srgb,#d946ef 12%,transparent) 33%,transparent 68%); }
+.community-orbit-plane { position:absolute; right:-9rem; top:50%; width:43rem; aspect-ratio:1; transform:translateY(-50%) rotate(-24deg) scaleY(.7); }
+.community-hero-orbit { position:absolute; display:block; border:1px solid color-mix(in srgb,var(--primary) 22%,transparent); border-radius:50%; }
+.community-hero-orbit.is-outer { inset:0; }
+.community-hero-orbit.is-inner { inset:5rem; border-style:dashed; border-color:color-mix(in srgb,var(--primary) 16%,transparent); }
+.community-hero-orbit i { position:absolute; width:.55rem; height:.55rem; top:50%; left:-.275rem; border-radius:50%; background:var(--primary); box-shadow:0 0 24px 5px color-mix(in srgb,var(--primary) 35%,transparent); }
+.community-hero-orbit i + i { top:12%; left:auto; right:16%; width:.35rem; height:.35rem; opacity:.5; }
+.community-hero-grain { position:absolute; inset:0; opacity:.2; background-image:radial-gradient(color-mix(in srgb,var(--primary) 50%,transparent) .7px,transparent .7px); background-size:18px 18px; mask-image:linear-gradient(120deg,transparent 25%,#000); }
+.community-hero-eyebrow { display:flex; align-items:center; gap:.75rem; }
+.community-hero-beat { display:flex; align-items:center; gap:3px; height:1.25rem; color:var(--primary); }
+.community-hero-beat i { display:block; width:3px; height:.55rem; border-radius:3px; background:currentColor; }
+.community-hero-beat i:nth-child(2) { height:1.1rem; }
+.community-hero-beat i:nth-child(3) { height:.8rem; }
+.community-hero-beat i:nth-child(4) { height:.4rem; }
+.community-hero-title { background:linear-gradient(115deg,var(--foreground) 25%,var(--primary) 70%,color-mix(in srgb,var(--primary) 65%,var(--foreground))); background-clip:text; -webkit-text-fill-color:transparent; }
+.community-hero-media::before { content:""; position:absolute; inset:15% -10% -8%; z-index:-1; border-radius:50%; background:radial-gradient(ellipse,color-mix(in srgb,var(--primary) 22%,transparent),transparent 70%); pointer-events:none; }
+.community-artwork-motion { position:relative; aspect-ratio:1; overflow:hidden; isolation:isolate; background:var(--muted); }
+.community-artwork-motion::after { content:""; position:absolute; inset:0; pointer-events:none; opacity:0; background:linear-gradient(135deg,#ffffff30,transparent 65%); }
+.community-chart-card:has(a:focus-visible) .community-artwork-motion::after { opacity:1; }
+.community-artwork-plate { width:100%; height:100%; transform-origin:center; }
+.community-artwork-sheen { position:absolute; display:block; inset:-25%; pointer-events:none; background:radial-gradient(ellipse at center,#ffffff5c,transparent 58%); mix-blend-mode:soft-light; }
+.community-chart-detail-hero { position:relative; background:radial-gradient(ellipse at top left,color-mix(in srgb,var(--primary) 9%,var(--card)),var(--card) 65%); }
+.community-chart-cover-frame { box-shadow:0 22px 48px -30px color-mix(in srgb,var(--primary) 50%,#000); }
+.community-nav-spark { position:absolute; inset:auto 24% 2px; height:2px; border-radius:2px; background:var(--primary); box-shadow:0 0 10px color-mix(in srgb,var(--primary) 40%,transparent); }
+.community-primary-link svg,.community-bottom-link svg,.community-side-link svg,.community-motion-list-icon { transition:transform .4s cubic-bezier(.22,1,.36,1); }
+.community-primary-link[aria-current=page] svg,.community-bottom-link[aria-current=page] svg { transform:translateY(-1px) rotate(-6deg); }
+.community-motion-success { position:relative; isolation:isolate; }
+.community-success-ripple { position:absolute; inset:-3px; z-index:-1; border:1px solid currentColor; border-radius:50%; pointer-events:none; }
+@media (hover:hover) and (pointer:fine) {
+ .community-chart-card.community-motion-hover:hover { border-color:color-mix(in srgb,var(--primary) 50%,var(--border)); box-shadow:0 20px 45px -22px color-mix(in srgb,var(--primary) 32%,#00000035); }
+ .community-list-card.community-motion-hover:hover { box-shadow:0 16px 36px -24px color-mix(in srgb,var(--primary) 40%,#00000035); }
+ .community-primary-link:hover svg,.community-side-link:hover svg { transform:translateY(-2px) rotate(-9deg); }
+ .community-list-card:hover .community-motion-list-icon { transform:rotate(-12deg) scale(1.12); }
+}
+@media (max-width:639px) {
+ .community-orbit-plane { width:29rem; right:-17rem; }
+ .community-hero-orbit.is-inner { display:none; }
+ .community-hero-glow.is-second { width:28rem; }
+}
+@media (prefers-reduced-motion:reduce) {
+ html:not([data-motion=on]) :is(.community-hero-glow,.community-hero-orbit,.community-artwork-plate) { transform:none!important; }
+ html:not([data-motion=on]) :is(.community-primary-link svg,.community-bottom-link svg,.community-side-link svg,.community-motion-list-icon) { transform:none; transition:none; }
+ html:not([data-motion=on]) .community-artwork-sheen { opacity:0!important; }
+ html:not([data-motion=on]) .community-success-ripple { display:none; }
+}
+html[data-motion=off] :is(.community-hero-glow,.community-hero-orbit,.community-artwork-plate) { transform:none!important; }
+html[data-motion=off] :is(.community-primary-link svg,.community-bottom-link svg,.community-side-link svg,.community-motion-list-icon) { transform:none; transition:none; }
+html[data-motion=off] .community-artwork-sheen { opacity:0!important; }
+html[data-motion=off] .community-success-ripple { display:none; }
+@media (forced-colors:active) { .community-hero-title { background:none; -webkit-text-fill-color:currentColor; } .community-hero-scene { display:none; } }

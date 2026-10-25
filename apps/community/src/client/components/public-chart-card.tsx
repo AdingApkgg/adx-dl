@@ -1,4 +1,5 @@
 import { MotionSurface } from "./motion-ui";
+import { MotionArtwork } from "./motion-artwork";
 import {Music2Icon} from "lucide-react";
 import {SearchText} from "./search-text";
 import {ChartSelection} from "./library-selection";
@@ -38,12 +39,12 @@ export function PublicDifficultyPill({ row }: { row: ChartDifficultySummary }) {
 
 export function PublicCover({ chart }: { chart: PublicChartDto }) {
   const [failed, setFailed] = useState(false);
-  return <div className="relative aspect-square overflow-hidden border-b border-border/60 bg-muted">
+  return <MotionArtwork><div className="relative aspect-square overflow-hidden border-b border-border/60 bg-muted">
     {chart.summary.hasCover && !failed ? <img src={publicChartAssetUrl(chart.publicId, chart.versionId, "cover")} alt="" loading="lazy" decoding="async" width={512} height={512} className="h-full w-full object-cover" onError={() => setFailed(true)} /> :
       <div className="community-chart-cover-placeholder"><Music2Icon aria-hidden="true" className="size-10 opacity-40"/><span>{m.chart_cover()} · {m.chart_missing()}</span></div>}
-  </div>;
+  </div></MotionArtwork>;
 }
-export function PublicChartCard({ chart, headingLevel = 2, query="",selectable=true }: { chart: PublicChartDto; headingLevel?: 2 | 3; query?:string;selectable?:boolean }) {
+export function PublicChartCard({ chart, headingLevel = 2, query="",selectable=true, motionTone="content" }: { chart: PublicChartDto; headingLevel?: 2 | 3; query?:string;selectable?:boolean;motionTone?:"content"|"feature" }) {
   const Heading = headingLevel === 3 ? "h3" : "h2";
   const location = useLocation();
   const href = `${location.pathname}${location.search}`;
@@ -52,7 +53,7 @@ export function PublicChartCard({ chart, headingLevel = 2, query="",selectable=t
   const privateHistory = privateCursors.filter((cursor): cursor is string => typeof cursor === "string" && (cursor === "" || /^[A-Za-z0-9_-]{1,512}$/.test(cursor)))
     .map(cursor => location.pathname + (cursor ? `?cursor=${cursor}` : ""));
   const history = publicListCursors(favorites ? privateHistory : location.state?.publicChartCursors, href);
-  return <MotionSurface as="article" hover className="community-chart-card"><Link to={localizeHref(`/charts/${chart.publicId}`)} state={{ publicListHref: href, publicListCursors: history }} className="group flex min-w-0 flex-1 flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+  return <MotionSurface as="article" tone={motionTone} hover className="community-chart-card"><Link to={localizeHref(`/charts/${chart.publicId}`)} state={{ publicListHref: href, publicListCursors: history }} className="group flex min-w-0 flex-1 flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
     <PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} />
     <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3 sm:p-4">
       <Heading className="line-clamp-2 font-semibold leading-snug" title={chart.title}><SearchText text={chart.title} query={query}/></Heading>
