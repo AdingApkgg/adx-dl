@@ -1,3 +1,4 @@
+import {exerciseUxCompletion} from "./ux-completion-browser.mjs";
 import {exerciseMotion} from "./motion-browser.mjs";
 import assert from "node:assert/strict";
 import {join} from "node:path";
@@ -17,6 +18,7 @@ export async function exerciseUiLayout({owner,anonymous,origin,step,evidenceDire
   for(const path of ["/","/charts","/forum"]){await visit(visitor,path);for(const width of [320,390,768,1024,1280]){await visitor.setViewportSize({width,height:900});await geometry(visitor,width);}}
   for(const prefix of ["/en","/ja"]){await visit(visitor,prefix+"/");for(const width of [320,1280]){await visitor.setViewportSize({width,height:900});await geometry(visitor,width);}}
   await exerciseMotion({page:visitor,origin});await exerciseMotion({page:member,origin,authenticated:true});
+  await exerciseUxCompletion({page:visitor,origin});await exerciseUxCompletion({page:member,origin,authenticated:true});
   await visit(visitor,"/");assert.equal(await visitor.getByRole("search").count(),1,"homepage has one search");assert.equal(await visitor.locator("main h1").count(),1);
   if(evidenceDirectory)await visitor.screenshot({path:join(evidenceDirectory,"ui-home-desktop.png"),fullPage:true});
  });
