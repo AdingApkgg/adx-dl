@@ -30,17 +30,18 @@ export default function Privacy({ loaderData }: Route.ComponentProps) {
   ];
 
   return (
-    <main className="space-y-6">
+    <main className="community-reading community-policy-page space-y-6">
       <PageTitle description={m.privacy_updated()}>{m.privacy_title()}</PageTitle>
-      <p>{m.privacy_intro()}</p>
+      <p className="community-context-note">{m.privacy_intro()}</p>
+      <nav aria-label={m.ui_content_navigation()} className="community-content-nav">{sections.map(section=><a key={section.id} href={`#${section.id}`}>{section.title}</a>)}<a href="#governance">{m.governance_my_title()}</a><a href="#contact">{m.privacy_contact_heading()}</a><a href="#search">{m.discovery_search_label()}</a><a href="#community">{m.site_help_community_title()}</a></nav>
       {sections.map((section) => (
-        <section key={section.id} id={section.id} className="space-y-3">
+        <section key={section.id} id={section.id} className="community-policy-section space-y-3">
           <h2 className="text-lg font-semibold">{section.title}</h2>
           {section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
         </section>
       ))}
-      <section className="space-y-3"><h2 className="text-lg font-semibold">{m.governance_my_title()}</h2><p>{m.governance_privacy()}</p></section>
-      <section id="contact" className="space-y-3">
+      <section id="governance" className="community-policy-section space-y-3"><h2 className="text-lg font-semibold">{m.governance_my_title()}</h2><p>{m.governance_privacy()}</p></section>
+      <section id="contact" className="community-policy-section space-y-3">
         <h2 className="text-lg font-semibold">{m.privacy_contact_heading()}</h2>
         <p>
           {loaderData.contactEmail ? (
@@ -51,7 +52,7 @@ export default function Privacy({ loaderData }: Route.ComponentProps) {
           ) : m.privacy_contact_unavailable()}
         </p>
       </section>
-    <section className="space-y-2"><h2 className="font-semibold">{m.discovery_search_label()}</h2><p className="whitespace-pre-line">{m.discovery_privacy()}</p></section>
-    <section className="space-y-2"><h2 className="font-semibold">{m.site_help_community_title()}</h2><p className="whitespace-pre-line">{m.site_help_community_body()}</p></section></main>
+    <section id="search" className="community-policy-section space-y-3"><h2 className="font-semibold">{m.discovery_search_label()}</h2><p className="whitespace-pre-line">{m.discovery_privacy()}</p></section>
+    <section id="community" className="community-policy-section space-y-3"><h2 className="font-semibold">{m.site_help_community_title()}</h2><p className="whitespace-pre-line">{m.site_help_community_body()}</p></section></main>
   );
 }

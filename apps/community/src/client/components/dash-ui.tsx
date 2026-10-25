@@ -1,3 +1,4 @@
+import { EmptyState } from "./ui-states";
 import { MotionSurface } from "./motion-ui";
 import type { ReactNode } from "react";
 import { Button } from "@astrodx/ui/components/button";
@@ -11,7 +12,7 @@ import { ErrorCard } from "./error-card";
 export function DashViewHeading({ title, description, count, id }: { title: string; description?: string; count?: number; id?: string }) {
   return <MotionSurface className="community-admin-view-heading"><div className="min-w-0 space-y-2"><h2 id={id} className="text-xl font-semibold tracking-tight">{title}</h2>{description ? <p className="max-w-3xl text-sm leading-7 text-muted-foreground">{description}</p> : null}</div>{count !== undefined ? <span className="community-status">{m.ui_admin_page_count({ count: String(count) })}</span> : null}</MotionSurface>;
 }
-export function DashEmpty({ children }: { children?: ReactNode }) { return <p role="status" className="community-empty">{children ?? m.dash_empty()}</p>; }
+export function DashEmpty({ children }: { children?: ReactNode }) { return <EmptyState title={typeof children === "string" ? children : m.dash_empty()}>{typeof children === "string" ? null : children}</EmptyState>; }
 export function DashSection({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
   return <MotionSurface as="card" id={id} role="region" aria-label={title}><CardHeader><CardTitle asChild><h3>{title}</h3></CardTitle></CardHeader><CardContent>{children}</CardContent></MotionSurface>;
 }

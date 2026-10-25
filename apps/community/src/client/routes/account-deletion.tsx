@@ -97,14 +97,14 @@ function DeletionContent() {
   const date = new Intl.DateTimeFormat(htmlLang(getLocale()), { dateStyle: "medium", timeStyle: "short" }).format(purgeAt);
   // "撤销注销"是主按钮，"退出登录"是次要按钮（spec 第 7.5 节）。
   return (
-    <main>
+    <main className="community-reading space-y-6 py-4">
       <Card className="mx-auto max-w-lg">
         <CardHeader>
           <CardTitle asChild>
-            <h1 className="text-xl font-semibold">{m.account_deletion_title()}</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{m.account_deletion_title()}</h1>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm">
+        <CardContent className="space-y-4 break-words text-sm leading-7">
           {hydrated ? (
             due ? (
               <p>{m.account_deletion_due()}</p>
@@ -116,13 +116,13 @@ function DeletionContent() {
               </>
             )
           ) : null}
-          {failure ? <Alert variant="destructive">{failure}</Alert> : null}
+          {failure ? <Alert role="alert" variant="destructive">{failure}</Alert> : null}
         </CardContent>
-        <CardFooter className="gap-2">
-          <Button type="button" disabled={pending || due} onClick={cancel}>
+        <CardFooter className="flex-wrap gap-3">
+          <Button type="button" className="min-h-11" aria-busy={pending} disabled={pending || due} onClick={cancel}>
             {m.account_deletion_cancel()}
           </Button>
-          <Button type="button" variant="outline" disabled={pending} onClick={signOut}>
+          <Button type="button" variant="outline" className="min-h-11" disabled={pending} onClick={signOut}>
             {m.settings_sign_out()}
           </Button>
         </CardFooter>

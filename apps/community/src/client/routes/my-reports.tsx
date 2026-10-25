@@ -1,3 +1,5 @@
+import { EmptyState } from "../components/ui-states";
+import { GovernanceNavigation } from "../components/governance-ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { m } from "@/paraglide/messages.js";
@@ -16,14 +18,14 @@ export function meta() { return [{ title: `${m.my_reports()} - ${m.site_name()}`
 export default function MyReports({ loaderData }: Route.ComponentProps) {
   const { data: me } = useQuery(meQuery(getRenderApi()));
   if (me === null || me && (me.id !== loaderData.userId || me.status !== "active")) return null;
-  return <main className="space-y-6"><PageTitle description={m.reports_private()}>{m.my_reports()}</PageTitle>
-    {loaderData.page.items.length ? <ul className="list-none space-y-4 p-0">{loaderData.page.items.map(report => <li key={report.id} className="space-y-2 rounded-xl border p-4">
+  return <main className="community-record-page space-y-6"><PageTitle description={m.ui_chart_reports_hint()}>{m.my_reports()}</PageTitle><GovernanceNavigation view="reports"/><p className="community-context-note">{m.reports_private()} <Link className={textLinkClass} to={localizeHref("/me/discussions?kind=reports")}>{m.ui_discussion_reports()}</Link></p>
+    {loaderData.page.items.length ? <ul className="community-record-list">{loaderData.page.items.map(report => <li key={report.id} className="community-panel space-y-3">
       <h2 className="break-words font-semibold">{report.chart ? <Link to={localizeHref(`/charts/${report.publicId}`)} className={textLinkClass}>{report.chart.title}</Link> : m.social_chart_number({ id: report.publicId })}</h2>
       {!report.chart ? <p className="text-sm text-muted-foreground">{m.social_chart_unavailable()}</p> : null}
       <p className="text-sm">{reportCategory(report.category)} · {reportStatus(report.status)}</p>
       <p className="whitespace-pre-wrap break-words text-sm">{report.details}</p><time className="text-xs text-muted-foreground" dateTime={report.createdAt}>{dashDate(report.createdAt)}</time>
       {report.resolutionNote ? <div className="space-y-1 rounded-lg bg-muted p-3 text-sm"><p>{m.report_resolution_note()}</p><p className="whitespace-pre-wrap break-words">{report.resolutionNote}</p><p className="text-xs">{dashDate(report.resolvedAt)}</p></div> : null}
-    </li>)}</ul> : <p>{m.reports_empty()}</p>}
+    </li>)}</ul> : <EmptyState title={m.reports_empty()} description={m.ui_reports_empty_hint()}><Link className="community-inline-action" to={localizeHref("/charts")}>{m.public_charts_title()}</Link></EmptyState>}
     <SocialPager base="/me/reports" nextCursor={loaderData.page.nextCursor} />
   </main>;
 }

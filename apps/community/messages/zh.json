@@ -1240,5 +1240,21 @@
   "ui_source_results": "找到 {count} 处匹配",
   "ui_source_no_match": "未找到匹配文本，可更换关键词。",
   "ui_source_range": "显示 {from}–{to} / {total}",
-  "ui_package_details": "查看文件摘要"
+  "ui_package_details": "查看文件摘要",
+  "ui_case_navigation": "处理记录导航",
+  "ui_chart_reports": "谱面举报",
+  "ui_discussion_reports": "评论与论坛举报",
+  "ui_chart_reports_hint": "查看你对谱面提交的举报及处理结果。评论与论坛举报可在“我的讨论”查看。",
+  "ui_case_empty_hint": "与你有关的处理记录或申诉进度会显示在这里。",
+  "ui_reports_empty_hint": "提交举报后，可在这里查看对应的处理进度与结果。",
+  "ui_discussions_empty_hint": "参与讨论后，你的主题、回复和订阅会在对应分类中显示。",
+  "ui_help_intro": "按任务查找操作说明，并直接进入对应页面。",
+  "ui_help_navigation": "帮助主题",
+  "ui_help_all": "全部帮助",
+  "ui_help_continue": "前往：{topic}",
+  "ui_search_empty_hint": "尝试更换关键词或减少筛选条件。",
+  "ui_public_empty_hint": "作者公开谱面后，会在这里显示。",
+  "ui_remove_filter": "移除筛选：{filter}",
+  "ui_random_loading": "正在寻找谱面…",
+  "ui_view_mode": "谱面显示方式"
 }

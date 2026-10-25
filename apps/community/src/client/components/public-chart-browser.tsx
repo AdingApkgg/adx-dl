@@ -1,3 +1,4 @@
+import { EmptyState } from "./ui-states";
 import { MotionGroup, MotionSurface } from "./motion-ui";
 import {SearchText} from "./search-text";
 import { Button } from "@astrodx/ui/components/button";
@@ -24,7 +25,7 @@ export function PublicChartSearchForm({ filters, base, facets, lockedAuthor = fa
   const [tagLines,setTagLines]=useState(initialTags),[levelLines,setLevelLines]=useState(initialLevels);
   useEffect(()=>{setTagLines(initialTags);setLevelLines(initialLevels);},[initialTags,initialLevels]);
   const append=(old:string,value:string,max:number)=>{const rows=old.split("\n").map(v=>v.trim()).filter(Boolean);return rows.includes(value)||rows.length>=max?old:[...rows,value].join("\n");};
-  const chip=(label:string,next:PublicChartFilters)=><Link key={label} className="min-h-11 rounded-full border px-3 py-2 text-sm underline-offset-4 hover:underline" to={href(next)}>{label} ×</Link>;
+  const chip=(label:string,next:PublicChartFilters)=><Link key={label} className="min-h-11 max-w-full break-words rounded-full border px-3 py-2 text-sm underline-offset-4 hover:underline" aria-label={m.ui_remove_filter({filter:label})} title={m.ui_remove_filter({filter:label})} to={href(next)}>{label} ×</Link>;
   return <form key={query} method="get" action={base} onSubmit={submit} role="search" aria-label={m.public_charts_search()} className="community-filter space-y-4">
     {search?<input type="hidden" name="type" value="charts"/>:null}
     <div className="flex gap-2"><Input name="q" type="search" defaultValue={filters.q} maxLength={240} aria-label={m.public_charts_search()} placeholder={m.discovery_search_hint()} className="min-h-11 min-w-0 flex-1"/><Button type="submit" className="min-h-11">{m.public_charts_search()}</Button></div>
@@ -64,13 +65,14 @@ export function PublicChartBrowser({ page, filters, base, headingLevel = 2 }: {
   const nextParams = new URLSearchParams(params);
   if (page.nextCursor) nextParams.set("cursor", page.nextCursor);
   const hasCursor = new URLSearchParams(location.search).has("cursor");
+  const filtered = Boolean(filters.q || filters.author || filters.tag || filters.tags?.length || filters.levels?.length || filters.difficulty || filters.designer || filters.minSeconds !== undefined || filters.maxSeconds !== undefined || filters.preview || filters.sort !== "updated");
   return <div className="space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-3">{page.total!==undefined&&page.total!==null?<p className="text-sm text-muted-foreground">{m.discovery_count({count:String(page.total)})}</p>:null}<div className="flex gap-2"><Button variant={view==="grid"?"default":"outline"} aria-pressed={view==="grid"} onClick={()=>changeView("grid")}>{m.discovery_view_grid()}</Button><Button variant={view==="list"?"default":"outline"} aria-pressed={view==="list"} onClick={()=>changeView("list")}>{m.discovery_view_list()}</Button></div></div>
+    <div className="flex flex-wrap items-center justify-between gap-3">{page.total!==undefined&&page.total!==null?<p className="text-sm text-muted-foreground">{m.discovery_count({count:String(page.total)})}</p>:null}<div role="group" aria-label={m.ui_view_mode()} className="community-toolbar"><Button variant={view==="grid"?"default":"outline"} aria-pressed={view==="grid"} onClick={()=>changeView("grid")}>{m.discovery_view_grid()}</Button><Button variant={view==="list"?"default":"outline"} aria-pressed={view==="list"} onClick={()=>changeView("list")}>{m.discovery_view_list()}</Button></div></div>
     {page.items.length ? <MotionGroup as="ul" className={view==="list"?"space-y-3":PUBLIC_CHART_GRID_CLASS}>{page.items.map(chart => <li key={chart.id}>{view==="list"?<MotionSurface as="article" hover className="flex flex-wrap items-start gap-3 rounded-xl border bg-card p-3"><div className="w-20 shrink-0 overflow-hidden rounded"><PublicCover chart={chart}/></div><div className="min-w-0 flex-1 space-y-2"><Link to={localizeHref(`/charts/${chart.publicId}`)} state={{publicListHref:current,publicListCursors:cursors}} className="break-words font-semibold underline"><SearchText text={chart.title} query={filters.q}/></Link><p className="break-words text-sm text-muted-foreground">{chart.artist}</p><ul className="flex flex-wrap gap-1">{chart.summary.difficulties.map(d=><li key={d.difficulty}><PublicDifficultyPill row={d}/></li>)}</ul></div><ChartSelection publicId={chart.publicId}/></MotionSurface>:<PublicChartCard chart={chart} headingLevel={headingLevel} query={filters.q}/>}</li>)}</MotionGroup>
-      : <p role="status" className="rounded-xl border border-dashed p-6 text-center text-muted-foreground">{filters.q || filters.tag || filters.difficulty || filters.sort !== "updated" ? m.public_charts_no_results() : m.public_charts_empty()}</p>}
-    <nav aria-label={m.public_charts_pagination()} className="flex flex-wrap gap-3">
+      : <EmptyState title={filtered ? m.public_charts_no_results() : m.public_charts_empty()} description={filtered ? m.ui_search_empty_hint() : m.ui_public_empty_hint()}><Link className="community-inline-action" to={filtered ? base+(/\/search$/.test(base)?"?type=charts":"") : localizeHref("/discover")}>{filtered ? m.public_charts_clear() : m.discovery_title()}</Link></EmptyState>}
+    {hasCursor || page.nextCursor ? <nav aria-label={m.public_charts_pagination()} className="flex flex-wrap gap-3">
       {hasCursor ? <Button asChild variant="outline" className="min-h-11"><Link to={cursors.at(-1) ?? first} state={{ ...origin, publicChartCursors: cursors.slice(0, -1) }}>{m.chart_previous()}</Link></Button> : null}
       {page.nextCursor ? <Button asChild variant="outline" className="min-h-11"><Link to={`${base}?${nextParams}`} state={{ ...origin, publicChartCursors: [...cursors, current] }}>{m.chart_next()}</Link></Button> : null}
-    </nav>
+    </nav> : null}
   </div>;
 }

@@ -8,6 +8,7 @@ export function SocialPager({ base, nextCursor, status }: { base: string; nextCu
   const scope = `${base}:${status ?? ""}`;
   const history: string[] = location.state?.socialPageScope === scope && Array.isArray(location.state?.socialCursors) ? location.state.socialCursors.slice(-100).filter(valid) : [];
   function href(cursor?: string) { const p = new URLSearchParams(); if (status) p.set("status", status); if (cursor) p.set("cursor", cursor); return localizeHref(base) + (p.size ? `?${p}` : ""); }
+  if (!current && !nextCursor) return null;
   return <nav aria-label={m.social_pagination()} className="flex flex-wrap gap-3">
     {current ? <Button asChild variant="outline"><Link to={href(history.at(-1))} state={{ socialPageScope: scope, socialCursors: history.slice(0, -1) }}>{m.chart_previous()}</Link></Button> : null}
     {nextCursor ? <Button asChild variant="outline"><Link to={href(nextCursor)} state={{ socialPageScope: scope, socialCursors: [...history, current] }}>{m.chart_next()}</Link></Button> : null}

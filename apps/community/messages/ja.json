@@ -1240,5 +1240,21 @@
   "ui_source_results": "{count} 件の一致",
   "ui_source_no_match": "一致するテキストがありません。検索語を変えてください。",
   "ui_source_range": "{total} 件中 {from}–{to} を表示",
-  "ui_package_details": "ファイルの要約を表示"
+  "ui_package_details": "ファイルの要約を表示",
+  "ui_case_navigation": "対応記録ナビゲーション",
+  "ui_chart_reports": "譜面の通報",
+  "ui_discussion_reports": "コメント・フォーラムの通報",
+  "ui_chart_reports_hint": "譜面への通報と対応結果を確認できます。コメントやフォーラムの通報は「自分の投稿」で確認できます。",
+  "ui_case_empty_hint": "あなたに関する対応記録や申し立ての進捗がここに表示されます。",
+  "ui_reports_empty_hint": "通報を送信すると、ここで進捗や対応結果を確認できます。",
+  "ui_discussions_empty_hint": "参加したトピック、返信、購読がそれぞれの分類に表示されます。",
+  "ui_help_intro": "作業ごとに使い方を確認し、対応するページへ進めます。",
+  "ui_help_navigation": "ヘルプの項目",
+  "ui_help_all": "すべてのヘルプ",
+  "ui_help_continue": "{topic} へ進む",
+  "ui_search_empty_hint": "検索語を変えるか、絞り込み条件を減らしてください。",
+  "ui_public_empty_hint": "作者が公開した譜面がここに表示されます。",
+  "ui_remove_filter": "絞り込みを解除: {filter}",
+  "ui_random_loading": "譜面を探しています…",
+  "ui_view_mode": "譜面の表示方法"
 }
