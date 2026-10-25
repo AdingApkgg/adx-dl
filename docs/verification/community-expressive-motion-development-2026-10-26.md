@@ -14,7 +14,8 @@
 ## 静态复核与修复
 
 - 独立审查发现 render 读取 effect 才更新的 data-motion，会导致 off→on 的装饰动效无法即时恢复。已改为 Provider ready + 当前 React reduced 状态；待集中验证。
-- 独立审查进一步确认库内 transform 策略可能保留挂载时系统偏好。首页循环只在 React active 门控为真时显式设置 `transition.reduceMotion=false`，避免手动 on 后依然静止；静止分支时长0。已补 OS reduce→手动 on→system→OS恢复的真实轨道帧断言，待集中执行。
+- 独立审查进一步确认库内 transform 策略可能保留挂载时系统偏好。首页循环只在 React active 门控为真时运行，静止分支时长0；已补 OS reduce→手动 on→system→OS恢复的真实轨道帧断言。
+- 集中 types 发现 React 公开 `Transition` 类型不含底层 motion-dom 的 `reduceMotion`（4×TS2353）。改为共享包导出已导入的 `MotionConfig`，仅在 `MotionHeroBackdrop` 用局部 `<MotionConfig reducedMotion="never">` 包纯装饰节点，移除4处 transition 参数；active 门控与 duration0 不变，无依赖或主站行为修改。
 - 封面滚动/窗口失焦/窗口缩放监听仅在鼠标实际交互时注册，离开/中断/卸载解绑；页面可见性订阅共用一个全局监听。
 - 已补 DOM 契约：SSR、初始偏好、前台/后台与可视门控、开关恢复、系统减少动画与手动覆盖、输入实例和未提交内容。
 - 已扩展现有无头动效组：实际3D倾斜、高光、归位、触摸静止、关闭时静止、首页轨道实际运动与中断。

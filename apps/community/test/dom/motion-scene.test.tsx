@@ -18,7 +18,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 function Controls() {
   const { setMode } = useMotionPreference();
-  return <><button onClick={() => setMode("on")}>Enable</button><button onClick={() => setMode("off")}>Disable</button><button onClick={() => setMode("system")}>System</button></>;
+  return <><button type="button" onClick={() => setMode("on")}>Enable</button><button type="button" onClick={() => setMode("off")}>Disable</button><button type="button" onClick={() => setMode("system")}>System</button></>;
 }
 function Activity() {
   const ref = useRef<HTMLDivElement>(null);

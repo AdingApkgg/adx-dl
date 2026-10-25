@@ -1,4 +1,4 @@
-import { motion } from "@astrodx/ui/motion";
+import { MotionConfig, motion } from "@astrodx/ui/motion";
 import { useRef } from "react";
 import { useMotionActivity } from "./motion-preference";
 
@@ -14,16 +14,18 @@ export function MotionHeroBackdrop() {
   // Motion's transform policy can retain its mount-time OS snapshot. The live
   // React gate owns this scene; only an active scene explicitly permits loops.
   return <div ref={ref} aria-hidden="true" className="community-hero-scene" data-community-motion="ambient" data-motion-active={String(active)}>
+    <MotionConfig reducedMotion="never">
     <motion.span className="community-hero-glow is-first" initial={false} animate={active ? ORB_A : REST}
-      transition={active ? { reduceMotion: false, duration: 16, repeat: Infinity, ease: "easeInOut" } : STILL} />
+      transition={active ? { duration: 16, repeat: Infinity, ease: "easeInOut" } : STILL} />
     <motion.span className="community-hero-glow is-second" initial={false} animate={active ? ORB_B : REST}
-      transition={active ? { reduceMotion: false, duration: 21, repeat: Infinity, ease: "easeInOut" } : STILL} />
+      transition={active ? { duration: 21, repeat: Infinity, ease: "easeInOut" } : STILL} />
     <div className="community-orbit-plane">
       <motion.span className="community-hero-orbit is-outer" initial={false} animate={{ rotate: active ? 360 : 0 }}
-        transition={active ? { reduceMotion: false, duration: 48, repeat: Infinity, ease: "linear" } : STILL}><i /><i /></motion.span>
+        transition={active ? { duration: 48, repeat: Infinity, ease: "linear" } : STILL}><i /><i /></motion.span>
       <motion.span className="community-hero-orbit is-inner" initial={false} animate={{ rotate: active ? -360 : 0 }}
-        transition={active ? { reduceMotion: false, duration: 36, repeat: Infinity, ease: "linear" } : STILL}><i /></motion.span>
+        transition={active ? { duration: 36, repeat: Infinity, ease: "linear" } : STILL}><i /></motion.span>
     </div>
     <span className="community-hero-grain" />
+    </MotionConfig>
   </div>;
 }

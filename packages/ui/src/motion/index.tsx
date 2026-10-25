@@ -16,7 +16,7 @@ import {
 
 import { MOTION_MODES, MOTION_STORAGE_KEY, type MotionMode } from "./constants";
 
-export { AnimatePresence, motion, useAnimate };
+export { AnimatePresence, MotionConfig, motion, useAnimate };
 // Consumers share the installed Motion runtime; existing defaults stay intact.
 export { useInView, useSpring } from "framer-motion";
 
