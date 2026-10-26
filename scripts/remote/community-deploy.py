@@ -4,7 +4,10 @@ import argparse, base64, hashlib, json, os, pathlib, re, secrets, subprocess, sy
 ROOT=pathlib.Path(__file__).resolve().parents[2]
 BUILD=os.environ.get('ASTRODX_BUILD_HOST','i@localhost-1.tailac9c6f.ts.net')
 PROD=os.environ.get('ASTRODX_PRODUCTION_HOST','i@arch.tailac9c6f.ts.net')
-OPTIONS=['-o','BatchMode=yes','-o','ConnectTimeout=15','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=2','-J',BUILD,PROD,'python3 -u -']
+PROD_JUMP=os.environ.get('ASTRODX_PRODUCTION_JUMP_HOST',BUILD)
+if not re.fullmatch('[A-Za-z0-9.@_-]+',PROD_JUMP):
+    raise SystemExit('INVALID_PRODUCTION_JUMP_HOST')
+OPTIONS=['-o','BatchMode=yes','-o','ConnectTimeout=15','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=2','-J',PROD_JUMP,PROD,'python3 -u -']
 def run_before_acceptance(path, env):
     if path is not None:
         subprocess.run([sys.executable,str(path)],env=env,timeout=300,check=True)

@@ -236,7 +236,7 @@ class SmokeDeadlineTests(unittest.TestCase):
  def test_nested_deadlines_leave_shutdown_and_cleanup_inside_the_existing_lease(self):
   root=pathlib.Path(__file__).resolve().parents[4]
   auth=(root/'scripts/remote/community-auth-smoke.py').read_text();anonymous=(root/'scripts/remote/community-smoke.sh').read_text()
-  browser=int(re.search(r"'(\d+)s',\s*'node'",auth).group(1));anonymous_browser=int(re.search(r"'(\d+)s',\s*'node'",anonymous).group(1))
+  browser=int(re.search(r"'(\d+)s',\s*(?:'node'|task\['node'\])",auth).group(1));anonymous_browser=int(re.search(r"'(\d+)s',\s*(?:'node'|task\['node'\])",anonymous).group(1))
   builder=next(n for n in ast.parse(auth).body if isinstance(n,ast.FunctionDef) and n.name=='builder')
   ssh=next(k.value.value for n in ast.walk(builder) if isinstance(n,ast.Call) for k in n.keywords if k.arg=='timeout')
   controller=ast.parse((root/'scripts/remote/community-deploy.py').read_text())
@@ -245,5 +245,20 @@ class SmokeDeadlineTests(unittest.TestCase):
   bridge=(root/'apps/community/ops/acceptance/auth-bridge.ts').read_text();lease=re.search(r"\}, (\d+) \* ([\d_]+)\)\.unref",bridge);lease_seconds=int(lease.group(1))*int(lease.group(2).replace('_',''))//1000
   self.assertEqual(browser,anonymous_browser);self.assertLess(browser+10,ssh);self.assertLess(ssh,outer)
   self.assertLessEqual(outer+30,gate_seconds);self.assertLessEqual(gate_seconds,lease_seconds);self.assertLessEqual(lease_seconds,600)
+
+class BuildHostParameterTests(unittest.TestCase):
+ def test_invalid_hostname_jump_and_node_path_fail_before_any_ssh(self):
+  repository=pathlib.Path(__file__).resolve().parents[4]
+  with tempfile.TemporaryDirectory() as directory:
+   root=pathlib.Path(directory);marker=root/'ssh-called'
+   ssh=root/'ssh';ssh.write_text(chr(10).join([ '#!'+sys.executable, 'import os,pathlib', 'pathlib.Path(os.environ["SSH_MARKER"]).write_text("1")', 'raise SystemExit(1)' ])+chr(10));ssh.chmod(0o700)
+   base=dict(os.environ,PATH=str(root)+os.pathsep+os.environ['PATH'],SSH_MARKER=str(marker))
+   cases=[({'ASTRODX_BUILD_HOSTNAME':'bad host'},'INVALID_BUILD_HOSTNAME'),({'ASTRODX_BUILD_HOSTNAME':''},'INVALID_BUILD_HOSTNAME'),({'ACCEPTANCE_NODE_PATH':'node --x'},'INVALID_ACCEPTANCE_NODE_PATH'),({'ACCEPTANCE_NODE_PATH':'rel/node'},'INVALID_ACCEPTANCE_NODE_PATH'),({'ASTRODX_PRODUCTION_JUMP_HOST':'a b'},'INVALID_PRODUCTION_JUMP_HOST')]
+   for overrides,code in cases:
+    with self.subTest(code=code,overrides=overrides):
+     marker.unlink(missing_ok=True)
+     env=dict(base);env.update(overrides)
+     result=subprocess.run([sys.executable,str(repository/'scripts/remote/community-auth-smoke.py')],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+     self.assertNotEqual(result.returncode,0);self.assertIn(code,result.stderr);self.assertFalse(marker.exists())
 
 if __name__=='__main__':unittest.main()

@@ -80,3 +80,13 @@ scripts/remote/community-smoke.sh --anonymous
 隔离 Chromium 增加私人建单/明确发布/复制、私人编辑不改变公开版本、真实原始 ZIP 与集合包字节/清单、完整文件刷新恢复、账号切换清理及管理下架/恢复、谱面撤回阻断本地保存。真实 fresh-volume 恢复增加私人最新顺序/说明、删除与撤回、独立下架、注销取消不复活公开内容及已删除账号的数字号保留。
 
 正式生产收据新增 `production_library_and_public_lists`、`production_download_center_and_list_admin`，共十二组；缺少任何新组都拒绝完成发布。生产仅验证页面/当前授权/状态与空态，实际原包字节、复制和写入验证在隔离环境完成。计划 POST 不在生产只读桥接白名单中；新增 GET/HEAD 页面/API 精确限定范围。最终发布后的运行证明另记本轮验收报告，不能把这里的开发覆盖说明当作通过证据。
+
+## 备用执行机与主机名参数
+
+默认行为不变：浏览器执行机为构建机 `localhost`，生产跳板为构建机。
+
+- `ASTRODX_BUILD_HOSTNAME`：浏览器执行机主机名，默认 `localhost`，须匹配 `^[A-Za-z0-9.-]+$`；用于 auth 选择脚本与 builder payload 两处真实 `uname` 断言。
+- `ACCEPTANCE_NODE_PATH`：验收子进程使用的 node，默认 `node`，或安全绝对路径（`^/[A-Za-z0-9._/-]+$`），不接受 shell 字符串。
+- `ASTRODX_PRODUCTION_JUMP_HOST`：生产 SSH 跳板，默认等于构建机，可为 `user@host` 或 ssh alias；仅当跳板与浏览器执行机不同才设置。
+
+登录态入口在首次 SSH 前校验这三个参数；生产协调器单独校验跳板参数。非法值以固定错误码失败。实际主机名仍以 `uname -n` 核对，断言不删除。
