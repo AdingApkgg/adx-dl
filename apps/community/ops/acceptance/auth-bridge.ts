@@ -64,7 +64,8 @@ const matches = (path: string) => {
   if (/^\/(?:en\/|ja\/)?(?:privacy|help\/(?:governance|search|author|upload|publication|practice|downloads|library|community)|me\/(?:reports|discussions))(?:\.data)?$/.test(path)) return true;
   if (path === "/api/v1/me/reports") return true;
   // The signed-in UI gate reads the public homepage; keep this exact, not a prefix.
-  if (path === "/") return true;
+  // Public localized home pages are visited by the motion acceptance helper.
+  if (path === "/" || path === "/en" || path === "/en/" || path === "/ja" || path === "/ja/") return true;
   if (/^\/(?:en\/|ja\/)?(?:me\/governance|dash\/(?:governance|appeals|audit))(?:\.data)?$/.test(path)) return true;
   if (/^\/api\/v1\/governance\/(?:me\/(?:decisions|appeals)|dash\/(?:overview|tickets|appeals|audit))$/.test(path)) return true;
   if (/^\/(?:en\/|ja\/)?(?:search|discover|authors|tags(?:\/[^/]{1,240})?)(?:\.data)?$/.test(path)) return true;
