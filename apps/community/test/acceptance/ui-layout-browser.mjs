@@ -36,13 +36,22 @@ export async function exerciseUiLayout({owner,anonymous,origin,step,evidenceDire
   const bar=member.locator(".community-selection-bar");await bar.waitFor();await member.evaluate(()=>scrollTo(0,500));await settle(member);
   const toolbar=await bar.boundingBox(),header=await member.locator(".community-header").boundingBox();assert.ok(toolbar.y>=header.y+header.height,"batch toolbar below header");await bar.getByRole("button",{name:"加入下载队列",exact:true}).click({trial:true});await bar.getByRole("button",{name:"清空选择",exact:true}).click();
   const response=await owner.request.get(url("/api/v1/charts")),charts=await response.json();assert.ok(charts.items.length,"synthetic published chart for UI queue");
-  await visit(member,`/charts/${charts.items[0].publicId}`);await member.getByRole("button",{name:"加入下载队列",exact:true}).click();await member.getByRole("button",{name:"确认加入并开始",exact:true}).click();
+  await visit(member,`/charts/${charts.items[0].publicId}`);await member.getByRole("button",{name:"加入下载队列",exact:true}).click();
+  // Sample the real dock every frame from before the queue starts. The window opens on
+  // the first real dock/nav sample and runs past the 0.46s entrance, so the animation
+  // and the resize are covered instead of only the settled frame.
+  await member.evaluate(()=>{const st={done:false,frameID:0,samples:[],start:null,end:null};window.__dockGeom=st;const t0=performance.now();const tick=()=>{const dock=document.querySelector(".community-download-dock"),nav=document.querySelector(".community-bottom-nav");if(dock&&nav&&getComputedStyle(nav).display!=="none"){const d=dock.getBoundingClientRect(),n=nav.getBoundingClientRect();if(n.height>0){const now=performance.now();if(st.start===null)st.start=now;st.samples.push({t:now-st.start,gap:n.top-d.bottom});st.end=now;if(now-st.start>=600){st.done=true;return;}}}if(performance.now()-t0>=3000){st.done=true;return;}st.frameID=requestAnimationFrame(tick);};st.frameID=requestAnimationFrame(tick);});
+  await member.getByRole("button",{name:"确认加入并开始",exact:true}).click();
   await member.setViewportSize({width:390,height:900});const dock=member.locator(".community-download-dock");await dock.waitFor();await settle(member);
-  const d=await dock.boundingBox(),n=await member.locator(".community-bottom-nav").boundingBox();assert.ok(d.y+d.height<=n.y,"queue stays above mobile navigation");await geometry(member,390);
+  const d=await dock.boundingBox(),n=await member.locator(".community-bottom-nav").boundingBox();assert.ok(d.y+d.height<=n.y,"queue stays above mobile navigation");
+  await member.waitForFunction(()=>window.__dockGeom?.done===true);const geom=await member.evaluate(()=>{const s=window.__dockGeom;return {samples:s.samples,elapsed:(s.end??0)-(s.start??0)};});
+  assert.ok(geom.samples.length>0,"dock geometry sampled every frame");assert.ok(geom.elapsed>=600,`dock sampled ${geom.elapsed}ms of the entrance`);
+  const worst=Math.min(...geom.samples.map(x=>x.gap));assert.ok(worst>=0,`dock stays above navigation on every frame (worst ${worst})`);
+  await geometry(member,390);
   if(evidenceDirectory)await member.screenshot({path:join(evidenceDirectory,"ui-download-dock-mobile.png"),fullPage:true});
   await visit(member,"/downloads");await member.getByRole("button",{name:"清空本机任务与历史",exact:true}).click();
  });
  assert.deepEqual(errors,[]);
  }catch(e){if(evidenceDirectory)await Promise.allSettled([visitor.screenshot({path:join(evidenceDirectory,"ui-visitor-failure.png"),fullPage:true}),member.screenshot({path:join(evidenceDirectory,"ui-member-failure.png"),fullPage:true})]);throw e;}
- finally{await Promise.allSettled([visitor.close(),member.close()]);}
+ finally{await Promise.allSettled([visitor.evaluate(()=>{if(window.__dockGeom){cancelAnimationFrame(window.__dockGeom.frameID);delete window.__dockGeom;}}),member.evaluate(()=>{if(window.__dockGeom){cancelAnimationFrame(window.__dockGeom.frameID);delete window.__dockGeom;}})]);await Promise.allSettled([visitor.close(),member.close()]);}
 }
