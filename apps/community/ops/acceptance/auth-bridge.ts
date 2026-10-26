@@ -102,8 +102,24 @@ const server = Bun.serve({ hostname: "0.0.0.0", port: 41910, idleTimeout: 30, as
     const value = request.headers.get(name); if (value) headers.set(name, value);
   }
   headers.set("cache-control", "no-cache");
+  const ae = request.headers.get("accept-encoding");
+  let upstreamEncoding = "identity";
+  if (ae) {
+    for (const part of ae.split(",")) {
+      const [encRaw, ...params] = part.split(";");
+      if (encRaw.trim().toLowerCase() !== "gzip") continue;
+      let q = 1;
+      for (const prm of params) {
+        const [k, v] = prm.split("=");
+        if (k.trim().toLowerCase() === "q") q = Number(v);
+      }
+      if (q > 0 && q <= 1) upstreamEncoding = "gzip";
+      break;
+    }
+  }
+  headers.set("accept-encoding", upstreamEncoding);
   try {
-    const upstream = await fetch(origin + url.pathname + url.search, { method: request.method, headers, redirect: "manual", proxy, signal: AbortSignal.timeout(25_000) });
+    const upstream = await fetch(origin + url.pathname + url.search, { method: request.method, headers, redirect: "manual", proxy, decompress: false, signal: AbortSignal.timeout(25_000) });
     reads++;
     const clean = new Headers(upstream.headers);
     for (const name of ["set-cookie", "set-auth-token", "access-control-expose-headers"]) clean.delete(name);
