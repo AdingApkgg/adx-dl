@@ -4,6 +4,15 @@ import base64, json, os, pathlib, re, secrets, socket, subprocess, sys, tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 BUILD = os.environ.get('ASTRODX_BUILD_HOST', 'i@localhost-1.tailac9c6f.ts.net')
 PROD = os.environ.get('ASTRODX_PRODUCTION_HOST', 'i@arch.tailac9c6f.ts.net')
+BUILD_HOSTNAME = os.environ.get('ASTRODX_BUILD_HOSTNAME', 'localhost')
+if not re.fullmatch('[A-Za-z0-9.-]+', BUILD_HOSTNAME):
+    raise SystemExit('INVALID_BUILD_HOSTNAME')
+PROD_JUMP = os.environ.get('ASTRODX_PRODUCTION_JUMP_HOST', BUILD)
+if not re.fullmatch('[A-Za-z0-9.@_-]+', PROD_JUMP):
+    raise SystemExit('INVALID_PRODUCTION_JUMP_HOST')
+NODE = os.environ.get('ACCEPTANCE_NODE_PATH', 'node')
+if NODE != 'node' and not re.fullmatch('/[A-Za-z0-9._/-]+', NODE):
+    raise SystemExit('INVALID_ACCEPTANCE_NODE_PATH')
 preview_chart = os.environ.get('PRODUCTION_PREVIEW_CHART', '')
 preview_difficulty = os.environ.get('PRODUCTION_PREVIEW_DIFFICULTY', '')
 if (preview_chart or preview_difficulty) and (not re.fullmatch('[1-9][0-9]{0,19}', preview_chart) or not re.fullmatch('[1-7]', preview_difficulty)):
@@ -22,7 +31,7 @@ def production(action):
     task = dict(action=action, runId=run_id, key=capability)
     if action == 'prepare': task['source'] = base64.b64encode(source.read_bytes()).decode()
     script = 'import json\ntask=json.loads(' + repr(json.dumps(task)) + ')\n' + remote
-    result = subprocess.run(['ssh',*ssh_options,'-J',BUILD,PROD,'python3 -u -'],input=script,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=100)
+    result = subprocess.run(['ssh',*ssh_options,'-J',PROD_JUMP,PROD,'python3 -u -'],input=script,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=100)
     if result.returncode:
         raise RuntimeError('PRODUCTION_' + action.upper() + '_FAILED (private remote logs; no credentials printed)')
     return json.loads(result.stdout.strip().splitlines()[-1])
@@ -43,7 +52,7 @@ with tempfile.TemporaryDirectory(prefix='adxc-smoke-ssh-') as scratch:
         print('PRODUCTION_AUTH_BRIDGE_READY revision=' + ready['productionRevision'], flush=True)
         local_port = free_port()
         with open(pathlib.Path(scratch)/'tunnels.log','w') as errors:
-            forward = tunnel(['-J',BUILD,'-L',f'127.0.0.1:{local_port}:127.0.0.1:{ready["port"]}',PROD], errors)
+            forward = tunnel(['-J',PROD_JUMP,'-L',f'127.0.0.1:{local_port}:127.0.0.1:{ready["port"]}',PROD], errors)
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
             for attempt in range(80):
                 if forward.poll() is not None: raise RuntimeError('PRODUCTION_FORWARD_FAILED')
@@ -53,13 +62,13 @@ with tempfile.TemporaryDirectory(prefix='adxc-smoke-ssh-') as scratch:
                         assert json.loads(response.read())['active']; break
                 except OSError: time.sleep(.2)
             else: raise RuntimeError('PRODUCTION_FORWARD_NOT_READY')
-            choose = "import socket,os\nassert os.uname().nodename=='localhost'\nwith socket.socket() as s:\n s.bind(('127.0.0.1',0));print(s.getsockname()[1])\n"
+            choose = f"import socket,os\nassert os.uname().nodename=={BUILD_HOSTNAME!r}\nwith socket.socket() as s:\n s.bind(('127.0.0.1',0));print(s.getsockname()[1])\n"
             remote_port = int(builder(choose,capture=True).stdout.strip())
             reverse = tunnel(['-R',f'127.0.0.1:{remote_port}:127.0.0.1:{local_port}',BUILD],errors)
-            payload = dict(previewEnv=preview_env,runId=run_id,key=capability,port=remote_port,source=base64.b64encode(tools.read_bytes()).decode(),tree=base_tree,revision=ready['productionRevision'],module=os.environ.get('ACCEPTANCE_PLAYWRIGHT_PATH','/home/i/astrodx-verify/public-browser-20261016/node_modules/playwright/index.mjs'))
+            payload = dict(previewEnv=preview_env,runId=run_id,key=capability,port=remote_port,hostname=BUILD_HOSTNAME,node=NODE,source=base64.b64encode(tools.read_bytes()).decode(),tree=base_tree,revision=ready['productionRevision'],module=os.environ.get('ACCEPTANCE_PLAYWRIGHT_PATH','/home/i/astrodx-verify/public-browser-20261016/node_modules/playwright/index.mjs'))
             script = 'import json\ntask=json.loads(' + repr(json.dumps(payload)) + ')\n' + r'''
 import base64, hashlib, os, pathlib, subprocess, time, urllib.request
-assert os.uname().nodename == 'localhost'
+assert os.uname().nodename == task['hostname']
 os.umask(0o077)
 root = pathlib.Path('/home/i/astrodx-verify/production-smoke') / ('auth-' + task['runId'])
 root.mkdir(mode=0o700, parents=True)
@@ -80,7 +89,7 @@ try:
  for key in ['PRODUCTION_PREVIEW_CHART','PRODUCTION_PREVIEW_DIFFICULTY']: env.pop(key,None)
  env.update(task['previewEnv'])
  print('REMOTE_AUTH_HEADLESS_EVIDENCE '+str(root),flush=True)
- result=subprocess.run(['timeout','--signal=TERM','--kill-after=10s','420s','node',str(root/'smoke.mjs')],env=env)
+ result=subprocess.run(['timeout','--signal=TERM','--kill-after=10s','420s',task['node'],str(root/'smoke.mjs')],env=env)
  proof=root/'evidence/result.json'
  if proof.is_file(): print(proof.read_text(),flush=True)
  if result.returncode != 0: raise SystemExit(result.returncode)
