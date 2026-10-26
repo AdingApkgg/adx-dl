@@ -90,3 +90,11 @@ scripts/remote/community-smoke.sh --anonymous
 - `ASTRODX_PRODUCTION_JUMP_HOST`：生产 SSH 跳板，默认等于构建机，可为 `user@host` 或 ssh alias；仅当跳板与浏览器执行机不同才设置。
 
 登录态入口在首次 SSH 前校验这三个参数；生产协调器单独校验跳板参数。非法值以固定错误码失败。实际主机名仍以 `uname -n` 核对，断言不删除。
+
+## 验收执行两路隔离（2 lane）
+
+- `production_ui_navigation_layout` 原字节整体移入自包含 `runUiChecks()`，使用独立 browser context/page（同受限只读 route 工厂，localStorage/viewport 隔离），在 `explicit_session_and_role` 通过后启动，与主 17 组并行，最多 2 lane。
+- UI 任务内部 catch 成 outcome 防 unhandled；主流程在原 `production_bridge_write_denial_and_session_revocation` 之前 join，两路都成功才撤销 capability。
+- 不在 UI 完成时提前 close context（避免取消在途请求扰动 routeFailures）；由共同 `finally` 先 `browser.close()` 取消等待再 `await uiTask`，保证无孤儿。
+- 预算不变：默认 15s/25s、browser 420s、SSH 460s、outer 540s、lease 600s；所有原断言与 19 组保留。
+- `routeFailureSamples`（≤12 条）只记录相对开始的毫秒、resourceType 与固定 kind（TIMEOUT/ABORTED/CLOSED/HANDLED/OTHER），不含正文/URL/头/令牌；仅诊断，不改变 `routeFailures` 计数与门禁。

@@ -17,9 +17,11 @@ assert.ok(proxy, 'CONFIGURED_PROXY_REQUIRED');
 // A new private directory prevents overwriting another run or following output symlinks.
 await mkdir(output, { mode: 0o700 });
 const steps = [], pageErrors = [], blockedWrites = [];
+const routeFailureSamples = [];
 const staticCache = new Map();
 let staticBytes = 0, cacheHits = 0, routeFailures = 0, targetPath = null;
 let phase = 'setup', browser, page;
+let uiTask = null;
 const authorCoverage={workbench:false,imports:false,review:"not-run",compare:"not-run"};
 let previewCoverage = null;
 let authenticated = 'not-configured';
@@ -47,7 +49,7 @@ async function result(status) {
     authorCoverage, previewCoverage, authenticated, role: hasAuth ? role : null, authTransport: bridgeUrl ? 'ssh-readonly-bridge-to-public-production' : statePath ? 'explicit-state' : null,
     productionRevision: env.PRODUCTION_EXPECT_REVISION || null, sessionRevoked, steps,
     failedStage: status === 'failed' ? phase : null, failedPath: status === 'failed' ? targetPath : null,
-    staticCacheHits: cacheHits, routeFailures,
+    routeFailureSamples, staticCacheHits: cacheHits, routeFailures,
     pageErrors: pageErrors.length, blockedBusinessWrites: blockedWrites.length,
     businessWrites: false,
   }, null, 2) + '\n', { mode: 0o600 });
@@ -139,8 +141,17 @@ try {
           return route.fulfill({ response });
         }
         return route.continue();
-      } catch {
+      } catch (error) {
         routeFailures++;
+        if (routeFailureSamples.length < 12) {
+          const msg = error?.message ?? '';
+          const kind = error?.name === 'TimeoutError' ? 'TIMEOUT'
+            : msg.includes('net::ERR_ABORTED') ? 'ABORTED'
+            : msg.includes('has been closed') || msg.includes('Target closed') ? 'CLOSED'
+            : msg.includes('already handled') ? 'HANDLED'
+            : 'OTHER';
+          routeFailureSamples.push({ atMs: Date.now() - started, type: route.request().resourceType(), kind });
+        }
         return route.abort('failed').catch(() => {});
       }
     });
@@ -165,6 +176,98 @@ try {
     });
     await page.close();
   }
+  async function runUiChecks(){
+    let targetPath = null;
+    try {
+      const uiContext = await context(storageState, Boolean(bridgeUrl));
+      const page = await uiContext.newPage();
+  async function visit(path) {
+    targetPath = path;
+    const r = await page.goto(origin + path, { waitUntil: 'domcontentloaded' });
+    await page.locator('main').waitFor();
+    assert.equal(r.status(), 200, 'PAGE_HTTP_STATUS');
+    assert.equal(new URL(page.url()).pathname, new URL(path, origin).pathname, 'UNEXPECTED_PAGE_REDIRECT');
+    assert.ok((await page.locator('main').innerText()).trim().length > 0, 'EMPTY_PAGE');
+  }
+  async function json(path, status = 200) {
+    const r = await page.evaluate(async path => {
+      const response = await fetch(path, { credentials: 'same-origin', cache: 'no-store' });
+      return { status: response.status, cache: response.headers.get('cache-control'), body: await response.json() };
+    }, path);
+    assert.equal(r.status, status, 'API_HTTP_STATUS');
+    if (status === 401 || status === 403 || path.startsWith('/api/v1/dash/')) assert.match(r.cache, /private.*no-store/);
+    return r.body;
+  }
+    await step('production_ui_navigation_layout',async()=>{
+      await exerciseMotion({page,origin,authenticated:true});
+      await exerciseUxCompletion({page,origin,authenticated:true,onVisit:path=>{targetPath=path;}});
+      for(const width of [320,390,768,1024,1280]){
+        await page.setViewportSize({width,height:900});await visit('/');
+        assert.equal(await page.getByRole('search').count(),1,'ONE_HOMEPAGE_SEARCH');
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'UI_HORIZONTAL_OVERFLOW');
+        const nav=page.locator('.community-bottom-nav');assert.equal(await nav.isVisible(),width<1024);
+        if(width<1024)assert.equal(await nav.getByRole('link').count(),4);
+      }
+      await page.setViewportSize({width:390,height:900});await visit('/en/charts?sort=title');
+      const more=page.getByRole('button',{name:'More navigation',exact:true});await more.click();
+      const sheet=page.getByRole('dialog',{name:'AstroDX Community',exact:true});await sheet.waitFor();
+      assert.equal(await sheet.getByRole('link',{name:'日本語',exact:true}).getAttribute('href'),'/ja/charts?sort=title');
+      await sheet.getByRole('button',{name:'Open settings',exact:true}).click();
+      const settings=page.getByRole('dialog',{name:'Settings',exact:true});await settings.waitFor();await settings.getByRole('button',{name:'Close settings',exact:true}).click();await settings.waitFor({state:'hidden'});
+      await page.keyboard.press('Escape');await sheet.waitFor({state:'hidden'});assert.equal(await more.evaluate(e=>e===document.activeElement),true,'MORE_FOCUS_RESTORED');
+      for(const path of ['/me/workbench','/me/library',...(role==='admin'?['/dash']:[])]){await visit(path);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'PRIVATE_UI_HORIZONTAL_OVERFLOW');}
+      await page.setViewportSize({width:1280,height:900});await visit('/search?type=charts&q=1');await page.getByRole('checkbox',{name:'选择谱面 #1',exact:true}).check();
+      const bar=page.locator('.community-selection-bar');await bar.waitFor();await page.evaluate(()=>scrollTo(0,400));
+      const box=await bar.boundingBox(),header=await page.locator('.community-header').boundingBox();assert.ok(box.y>=header.y+header.height,'SELECTION_BAR_BELOW_HEADER');await bar.getByRole('button',{name:'加入下载队列',exact:true}).click({trial:true});await bar.getByRole('button',{name:'清空选择',exact:true}).click();
+      // Read-only content UX acceptance stays inside the required UI group.
+      await visit('/charts/1');
+      assert.equal(await page.getByRole('navigation',{name:'本页导航',exact:true}).getByRole('link').count(),5);
+      const summary=await json('/api/v1/charts/1'),slot=summary.summary.difficulties.find(d=>d.difficulty===6&&d.previewSupported);assert.ok(slot,'REQUIRED_DIFFICULTY_CARD');
+      const card=page.locator('#chart-difficulties li').nth(summary.summary.difficulties.indexOf(slot));
+      const preview=page.locator('#chart-preview');
+      for(let cycle=0;cycle<2;cycle++){
+        const audioPath=`/api/v1/charts/1/versions/${summary.versionId}/assets/audio`;
+        const [audio]=await Promise.all([
+          summary.summary.audio?page.waitForResponse(r=>new URL(r.url()).pathname===audioPath,{timeout:30000}):Promise.resolve(null),
+          card.getByRole('button').click(),
+        ]);
+        if(audio){assert.equal(audio.status(),200,'REOPEN_AUDIO_HTTP_STATUS');assert.ok((await audio.body()).length>0,'REOPEN_AUDIO_BODY_REQUIRED');}
+        await preview.locator('canvas').waitFor();assert.equal(await preview.getByRole('combobox',{name:'难度',exact:true}).inputValue(),'6');
+        await preview.getByRole('button',{name:'播放',exact:true}).click({trial:true,timeout:30000});
+        await preview.getByRole('button',{name:'关闭预览',exact:true}).click();await preview.locator('canvas').waitFor({state:'hidden'});
+      }
+      await page.setViewportSize({width:320,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'DETAIL_UI_HORIZONTAL_OVERFLOW');
+      await visit('/forum?q=Browser&sort=published&unanswered=true&chart=1');const board=page.getByRole('navigation',{name:'浏览板块',exact:true}).getByRole('link').last(),href=new URL(await board.getAttribute('href'),origin);
+      for(const [key,value] of [['q','Browser'],['sort','published'],['unanswered','true'],['chart','1']])assert.equal(href.searchParams.get(key),value);assert.equal(href.searchParams.has('cursor'),false);await board.click();await page.waitForURL(u=>u.searchParams.has('board'));
+      await page.getByRole('link',{name:'清除筛选',exact:true}).first().click();await page.waitForURL(u=>u.pathname==='/forum'&&!u.search);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'FORUM_UI_HORIZONTAL_OVERFLOW');
+      await visit('/forum/new');await page.locator('.community-topic-editor').waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'EDITOR_UI_HORIZONTAL_OVERFLOW');
+      await visit('/me/workbench');const workbench=await json('/api/v1/me/charts/workbench'),meter=page.getByRole('meter',{name:'存储用量',exact:true});await meter.waitFor();assert.equal(Number(await meter.getAttribute('max')),Math.max(1,workbench.usage.quotaBytes));assert.equal(await meter.evaluate(el=>el.max),Math.max(1,workbench.usage.quotaBytes));assert.equal(await page.getByRole('region',{name:'需要关注',exact:true}).getByRole('link').count(),3);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'WORKBENCH_UI_HORIZONTAL_OVERFLOW');
+      // Library and downloads use the same mandatory, read-only UI gate.
+      await visit('/me/library');assert.equal(await page.getByRole('navigation',{name:'谱库导航',exact:true}).locator('[aria-current="page"]').count(),1);
+      await visit('/me/favorites');assert.equal(await page.getByRole('navigation',{name:'谱库导航',exact:true}).getByRole('link',{name:'我的收藏',exact:true}).getAttribute('aria-current'),'page');
+      await visit('/lists?q=UI-no-match&author=1');assert.equal(await page.getByRole('searchbox',{name:'搜索谱单',exact:true}).inputValue(),'UI-no-match');assert.equal(await page.getByRole('textbox',{name:'作者编号',exact:true}).inputValue(),'1');
+      await page.getByRole('link',{name:'清除筛选',exact:true}).first().click();await page.waitForURL(u=>u.pathname==='/lists'&&!u.search);
+      await visit('/me/lists/new');await page.getByRole('region',{name:'基本信息',exact:true}).waitFor();await page.getByRole('complementary',{name:'保存与发布',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'保存私人草稿',exact:true}).isEnabled(),false);
+      for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'LIBRARY_EDITOR_UI_HORIZONTAL_OVERFLOW');await visit('/downloads');await page.getByRole('region',{name:'当前队列',exact:true}).waitFor();await page.getByRole('region',{name:'最近下载',exact:true}).waitFor();assert.equal(await page.locator('.community-download-dock').count(),0);assert.equal(await page.locator('.community-selection-bar').count(),0,'DOWNLOAD_PAGE_NO_SELECTION_BAR');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'DOWNLOAD_UI_HORIZONTAL_OVERFLOW');await visit('/me/lists/new');}
+      await visit('/downloads');await page.locator('#download-help > summary').click();await page.getByText('ZIP 集合包包含各首的原始 ZIP 和清单。请先解压外层，再逐个导入；它不是一份可直接导入的 ADX 谱包。',{exact:true}).waitFor();
+      // Account/admin UI adds exact read-only routes; never authorize, unlink, revoke or delete production data.
+      for(const path of ['/settings/profile','/settings/account']){await visit(path);const nav=page.getByRole('navigation',{name:'账号设置导航',exact:true});assert.equal(await nav.locator('[aria-current="page"]').count(),1);assert.equal(await nav.locator('[aria-current="page"]').getAttribute('href'),path);for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'SETTINGS_UI_HORIZONTAL_OVERFLOW');}}
+      const accountLogins=await json('/api/v1/me/logins'),accountSessions=await json('/api/v1/me/sessions');assert.ok(Array.isArray(accountLogins.accounts)&&Array.isArray(accountLogins.passkeys)&&Array.isArray(accountSessions.sessions));
+      assert.equal(await page.locator('#account-danger input[name="deleteContent"]').isChecked(),false);assert.equal(await page.locator('#account-danger button[type="submit"]').isEnabled(),false);
+      for(const path of ['/dash','/dash/status','/dash/lists']){await visit(path);for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'ADMIN_UI_HORIZONTAL_OVERFLOW');}assert.equal(await page.locator('.community-dash-nav > div a[aria-current="page"]').getAttribute('href'),path);}
+      // Profile, following and notification UX remains strictly read-only in production.
+      await visit('/u/1');await page.getByRole('region',{name:'作者资料',exact:true}).waitFor();assert.equal(await page.locator('form[role="search"] [name="author"]').count(),0);assert.equal(await page.getByRole('button',{name:'分享主页',exact:true}).count(),1);
+      for(const path of ['/me/feed','/me/following','/me/notifications']){await visit(path);const nav=page.getByRole('navigation',{name:'关注与通知导航',exact:true});assert.equal(await nav.locator('[aria-current="page"]').count(),1);assert.equal(await nav.locator('[aria-current="page"]').getAttribute('href'),path);}
+      await visit('/me/notifications?kind=author_update&unread=true');const noticeFilters=page.getByRole('region',{name:'筛选通知',exact:true});assert.equal(await noticeFilters.getByRole('combobox',{name:'通知内容',exact:true}).inputValue(),'author_update');assert.equal(await noticeFilters.getByRole('link',{name:'全部',exact:true}).getAttribute('href'),'/me/notifications?kind=author_update');await noticeFilters.getByRole('combobox',{name:'通知内容',exact:true}).selectOption('');await noticeFilters.getByRole('button',{name:'应用',exact:true}).click();await page.waitForURL(u=>u.searchParams.get('unread')==='true'&&!u.searchParams.get('kind'));
+      for(const path of ['/u/1','/me/feed','/me/following','/me/notifications?unread=true&kind=author_update']){await visit(path);for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'SOCIAL_UI_HORIZONTAL_OVERFLOW');}}
+
+    });
+      return { status: 'fulfilled' };
+    } catch (reason) {
+      return { status: 'rejected', reason, path: targetPath };
+    }
+  }
+  if (bridgeUrl) uiTask = runUiChecks();
   const anonymous = await context();
   page = await anonymous.newPage();
   async function visit(path) {
@@ -419,70 +522,13 @@ try {
         for(const path of ['overview','tickets','appeals','audit'])await json('/api/v1/governance/dash/'+path);
       }else{await json('/api/v1/governance/dash/overview',403);}
     });
-    await step('production_ui_navigation_layout',async()=>{
-      await exerciseMotion({page,origin,authenticated:true});
-      await exerciseUxCompletion({page,origin,authenticated:true,onVisit:path=>{targetPath=path;}});
-      for(const width of [320,390,768,1024,1280]){
-        await page.setViewportSize({width,height:900});await visit('/');
-        assert.equal(await page.getByRole('search').count(),1,'ONE_HOMEPAGE_SEARCH');
-        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'UI_HORIZONTAL_OVERFLOW');
-        const nav=page.locator('.community-bottom-nav');assert.equal(await nav.isVisible(),width<1024);
-        if(width<1024)assert.equal(await nav.getByRole('link').count(),4);
-      }
-      await page.setViewportSize({width:390,height:900});await visit('/en/charts?sort=title');
-      const more=page.getByRole('button',{name:'More navigation',exact:true});await more.click();
-      const sheet=page.getByRole('dialog',{name:'AstroDX Community',exact:true});await sheet.waitFor();
-      assert.equal(await sheet.getByRole('link',{name:'日本語',exact:true}).getAttribute('href'),'/ja/charts?sort=title');
-      await sheet.getByRole('button',{name:'Open settings',exact:true}).click();
-      const settings=page.getByRole('dialog',{name:'Settings',exact:true});await settings.waitFor();await settings.getByRole('button',{name:'Close settings',exact:true}).click();await settings.waitFor({state:'hidden'});
-      await page.keyboard.press('Escape');await sheet.waitFor({state:'hidden'});assert.equal(await more.evaluate(e=>e===document.activeElement),true,'MORE_FOCUS_RESTORED');
-      for(const path of ['/me/workbench','/me/library',...(role==='admin'?['/dash']:[])]){await visit(path);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'PRIVATE_UI_HORIZONTAL_OVERFLOW');}
-      await page.setViewportSize({width:1280,height:900});await visit('/search?type=charts&q=1');await page.getByRole('checkbox',{name:'选择谱面 #1',exact:true}).check();
-      const bar=page.locator('.community-selection-bar');await bar.waitFor();await page.evaluate(()=>scrollTo(0,400));
-      const box=await bar.boundingBox(),header=await page.locator('.community-header').boundingBox();assert.ok(box.y>=header.y+header.height,'SELECTION_BAR_BELOW_HEADER');await bar.getByRole('button',{name:'加入下载队列',exact:true}).click({trial:true});await bar.getByRole('button',{name:'清空选择',exact:true}).click();
-      // Read-only content UX acceptance stays inside the required UI group.
-      await visit('/charts/1');
-      assert.equal(await page.getByRole('navigation',{name:'本页导航',exact:true}).getByRole('link').count(),5);
-      const summary=await json('/api/v1/charts/1'),slot=summary.summary.difficulties.find(d=>d.difficulty===6&&d.previewSupported);assert.ok(slot,'REQUIRED_DIFFICULTY_CARD');
-      const card=page.locator('#chart-difficulties li').nth(summary.summary.difficulties.indexOf(slot));
-      const preview=page.locator('#chart-preview');
-      for(let cycle=0;cycle<2;cycle++){
-        const audioPath=`/api/v1/charts/1/versions/${summary.versionId}/assets/audio`;
-        const [audio]=await Promise.all([
-          summary.summary.audio?page.waitForResponse(r=>new URL(r.url()).pathname===audioPath,{timeout:30000}):Promise.resolve(null),
-          card.getByRole('button').click(),
-        ]);
-        if(audio){assert.equal(audio.status(),200,'REOPEN_AUDIO_HTTP_STATUS');assert.ok((await audio.body()).length>0,'REOPEN_AUDIO_BODY_REQUIRED');}
-        await preview.locator('canvas').waitFor();assert.equal(await preview.getByRole('combobox',{name:'难度',exact:true}).inputValue(),'6');
-        await preview.getByRole('button',{name:'播放',exact:true}).click({trial:true,timeout:30000});
-        await preview.getByRole('button',{name:'关闭预览',exact:true}).click();await preview.locator('canvas').waitFor({state:'hidden'});
-      }
-      await page.setViewportSize({width:320,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'DETAIL_UI_HORIZONTAL_OVERFLOW');
-      await visit('/forum?q=Browser&sort=published&unanswered=true&chart=1');const board=page.getByRole('navigation',{name:'浏览板块',exact:true}).getByRole('link').last(),href=new URL(await board.getAttribute('href'),origin);
-      for(const [key,value] of [['q','Browser'],['sort','published'],['unanswered','true'],['chart','1']])assert.equal(href.searchParams.get(key),value);assert.equal(href.searchParams.has('cursor'),false);await board.click();await page.waitForURL(u=>u.searchParams.has('board'));
-      await page.getByRole('link',{name:'清除筛选',exact:true}).first().click();await page.waitForURL(u=>u.pathname==='/forum'&&!u.search);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'FORUM_UI_HORIZONTAL_OVERFLOW');
-      await visit('/forum/new');await page.locator('.community-topic-editor').waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'EDITOR_UI_HORIZONTAL_OVERFLOW');
-      await visit('/me/workbench');const workbench=await json('/api/v1/me/charts/workbench'),meter=page.getByRole('meter',{name:'存储用量',exact:true});await meter.waitFor();assert.equal(Number(await meter.getAttribute('max')),Math.max(1,workbench.usage.quotaBytes));assert.equal(await meter.evaluate(el=>el.max),Math.max(1,workbench.usage.quotaBytes));assert.equal(await page.getByRole('region',{name:'需要关注',exact:true}).getByRole('link').count(),3);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'WORKBENCH_UI_HORIZONTAL_OVERFLOW');
-      // Library and downloads use the same mandatory, read-only UI gate.
-      await visit('/me/library');assert.equal(await page.getByRole('navigation',{name:'谱库导航',exact:true}).locator('[aria-current="page"]').count(),1);
-      await visit('/me/favorites');assert.equal(await page.getByRole('navigation',{name:'谱库导航',exact:true}).getByRole('link',{name:'我的收藏',exact:true}).getAttribute('aria-current'),'page');
-      await visit('/lists?q=UI-no-match&author=1');assert.equal(await page.getByRole('searchbox',{name:'搜索谱单',exact:true}).inputValue(),'UI-no-match');assert.equal(await page.getByRole('textbox',{name:'作者编号',exact:true}).inputValue(),'1');
-      await page.getByRole('link',{name:'清除筛选',exact:true}).first().click();await page.waitForURL(u=>u.pathname==='/lists'&&!u.search);
-      await visit('/me/lists/new');await page.getByRole('region',{name:'基本信息',exact:true}).waitFor();await page.getByRole('complementary',{name:'保存与发布',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'保存私人草稿',exact:true}).isEnabled(),false);
-      for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'LIBRARY_EDITOR_UI_HORIZONTAL_OVERFLOW');await visit('/downloads');await page.getByRole('region',{name:'当前队列',exact:true}).waitFor();await page.getByRole('region',{name:'最近下载',exact:true}).waitFor();assert.equal(await page.locator('.community-download-dock').count(),0);assert.equal(await page.locator('.community-selection-bar').count(),0,'DOWNLOAD_PAGE_NO_SELECTION_BAR');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'DOWNLOAD_UI_HORIZONTAL_OVERFLOW');await visit('/me/lists/new');}
-      await visit('/downloads');await page.locator('#download-help > summary').click();await page.getByText('ZIP 集合包包含各首的原始 ZIP 和清单。请先解压外层，再逐个导入；它不是一份可直接导入的 ADX 谱包。',{exact:true}).waitFor();
-      // Account/admin UI adds exact read-only routes; never authorize, unlink, revoke or delete production data.
-      for(const path of ['/settings/profile','/settings/account']){await visit(path);const nav=page.getByRole('navigation',{name:'账号设置导航',exact:true});assert.equal(await nav.locator('[aria-current="page"]').count(),1);assert.equal(await nav.locator('[aria-current="page"]').getAttribute('href'),path);for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'SETTINGS_UI_HORIZONTAL_OVERFLOW');}}
-      const accountLogins=await json('/api/v1/me/logins'),accountSessions=await json('/api/v1/me/sessions');assert.ok(Array.isArray(accountLogins.accounts)&&Array.isArray(accountLogins.passkeys)&&Array.isArray(accountSessions.sessions));
-      assert.equal(await page.locator('#account-danger input[name="deleteContent"]').isChecked(),false);assert.equal(await page.locator('#account-danger button[type="submit"]').isEnabled(),false);
-      for(const path of ['/dash','/dash/status','/dash/lists']){await visit(path);for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'ADMIN_UI_HORIZONTAL_OVERFLOW');}assert.equal(await page.locator('.community-dash-nav > div a[aria-current="page"]').getAttribute('href'),path);}
-      // Profile, following and notification UX remains strictly read-only in production.
-      await visit('/u/1');await page.getByRole('region',{name:'作者资料',exact:true}).waitFor();assert.equal(await page.locator('form[role="search"] [name="author"]').count(),0);assert.equal(await page.getByRole('button',{name:'分享主页',exact:true}).count(),1);
-      for(const path of ['/me/feed','/me/following','/me/notifications']){await visit(path);const nav=page.getByRole('navigation',{name:'关注与通知导航',exact:true});assert.equal(await nav.locator('[aria-current="page"]').count(),1);assert.equal(await nav.locator('[aria-current="page"]').getAttribute('href'),path);}
-      await visit('/me/notifications?kind=author_update&unread=true');const noticeFilters=page.getByRole('region',{name:'筛选通知',exact:true});assert.equal(await noticeFilters.getByRole('combobox',{name:'通知内容',exact:true}).inputValue(),'author_update');assert.equal(await noticeFilters.getByRole('link',{name:'全部',exact:true}).getAttribute('href'),'/me/notifications?kind=author_update');await noticeFilters.getByRole('combobox',{name:'通知内容',exact:true}).selectOption('');await noticeFilters.getByRole('button',{name:'应用',exact:true}).click();await page.waitForURL(u=>u.searchParams.get('unread')==='true'&&!u.searchParams.get('kind'));
-      for(const path of ['/u/1','/me/feed','/me/following','/me/notifications?unread=true&kind=author_update']){await visit(path);for(const width of [320,390,768,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'SOCIAL_UI_HORIZONTAL_OVERFLOW');}}
-
-    });
+    phase = 'production_ui_navigation_layout';
+    assert.ok(uiTask, 'INDEPENDENT_UI_TASK_REQUIRED');
+    const uiOutcome = await uiTask;
+    if (uiOutcome.status === 'rejected') {
+      targetPath = uiOutcome.path;
+      throw uiOutcome.reason;
+    }
     await step('production_bridge_write_denial_and_session_revocation', async () => {
       const headers = { authorization: `Bearer ${bridgeKey}` };
       assert.equal((await fetch(bridgeUrl + '/api/v1/me')).status, 401);
@@ -521,7 +567,7 @@ try {
   }
   console.error(`PRODUCTION_SMOKE_FAILED stage=${phase}; inspect private result.json`);
   process.exitCode = 1;
-} finally { await browser?.close(); }
+} finally { try { await browser?.close(); } finally { await uiTask; } }
 
 // 正式验收由 SSH 按摘要传送单文件，故此入口保留自包含断言，不引入相邻模块。
 // Kept in sync with apps/community/test/acceptance/motion-browser.mjs (standalone helper).
