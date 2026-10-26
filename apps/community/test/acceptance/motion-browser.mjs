@@ -59,6 +59,7 @@ export async function exerciseMotion({page,origin,authenticated=false}){
   const identity=[1,0,0,1,0,0];
   assert.ok(frames.every(value=>value.every((v,i)=>Math.abs(v-identity[i])<.00001)),`${label}: ${JSON.stringify(frames)}`);
  }
+ let primaryFailed=false,primary;
  try{
   await page.emulateMedia({reducedMotion:"reduce"});await choose("system");
   const card=page.locator(".community-chart-card").first();await card.waitFor();await card.hover();
@@ -122,12 +123,15 @@ export async function exerciseMotion({page,origin,authenticated=false}){
     assert.equal(await field.evaluate(el=>el===document.activeElement),true,"HASH_PRESERVES_INPUT_FOCUS");
    }finally{await field.fill(previous);}
   }
- }finally{
-  // 先经真实控件恢复 Provider，再恢复本地原值，避免污染后续验收步骤。
-  await choose(originalMode);
-  await page.evaluate(value=>{if(value===null)localStorage.removeItem("adx-reduce-motion");else localStorage.setItem("adx-reduce-motion",value);window.__motionObserver?.disconnect();delete window.__motionObserver;delete window.__motionObserved;delete window.__motionRoute;delete window.__motionField;},stored);
-  await page.emulateMedia({reducedMotion:"no-preference"});
- }
+ }catch(error){primary=error;primaryFailed=true;}
+ // 清理逐项独立尝试：保留首次错误，其余步骤仍继续，避免掩盖主流程失败。
+ let cleanupFailed=false,cleanupError;
+ const attemptCleanup=async action=>{try{await action();}catch(error){if(!cleanupFailed){cleanupFailed=true;cleanupError=error;}}};
+ await attemptCleanup(()=>choose(originalMode));
+ await attemptCleanup(()=>page.evaluate(value=>{if(value===null)localStorage.removeItem("adx-reduce-motion");else localStorage.setItem("adx-reduce-motion",value);window.__motionObserver?.disconnect();delete window.__motionObserver;delete window.__motionObserved;delete window.__motionRoute;delete window.__motionField;},stored));
+ await attemptCleanup(()=>page.emulateMedia({reducedMotion:"no-preference"}));
+ if(primaryFailed)throw primary;
+ if(cleanupFailed)throw cleanupError;
 }
 
 // 在已加载的中文谱面预览上操作外观偏好；不重新加载预览或更改难度。
