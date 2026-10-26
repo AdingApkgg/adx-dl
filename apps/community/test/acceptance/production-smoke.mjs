@@ -114,7 +114,7 @@ try {
         if (viaBridge) {
           const headers = { ...r.headers(), authorization: `Bearer ${bridgeKey}` };
           delete headers.cookie;
-          Object.assign(fetchOptions, { url: bridgeUrl + url.pathname + url.search, headers });
+          Object.assign(fetchOptions, { url: bridgeUrl + url.pathname + url.search, headers, maxRetries: ['GET', 'HEAD'].includes(r.method()) ? 2 : 0 });
         }
         // Routing disables Chromium's HTTP cache. Reuse only immutable public
         // hashed build assets within this single run; never cache HTML/API data.

@@ -98,3 +98,11 @@ scripts/remote/community-smoke.sh --anonymous
 - 不在 UI 完成时提前 close context（避免取消在途请求扰动 routeFailures）；由共同 `finally` 先 `browser.close()` 取消等待再 `await uiTask`，保证无孤儿。
 - 预算不变：默认 15s/25s、browser 420s、SSH 460s、outer 540s、lease 600s；所有原断言与 19 组保留。
 - `routeFailureSamples`（≤12 条）只记录相对开始的毫秒、resourceType 与固定 kind（TIMEOUT/ABORTED/CLOSED/HANDLED/OTHER），不含正文/URL/头/令牌；仅诊断，不改变 `routeFailures` 计数与门禁。
+
+## 只读桥 GET/HEAD 的 ECONNRESET 有界重试（内部）
+
+`viaBridge` 的 `route.fetch` 现对 `GET`/`HEAD` 设置 `maxRetries: 2`，其余方法（含 `OPTIONS`）保持 `0`。仅对 `ECONNRESET` 重试，HTTP 状态码（如 503/403）不重试；30 秒总 fetch 预算不变，重试退避计入同一预算；写入仍由前置写阻拦拒绝；重试耗尽后照常计入 `routeFailures` 并失败。
+
+依据：构建机纯 loopback 故障注入 fixture（7 例全通过，私有证据 `transport-reset-fixture-result.json`）——旧 `maxRetries:0` 单次 reset 即 `socket hang up` 失败；`maxRetries:2` 的 GET/HEAD 各 2 次请求后 200；持续 reset 3 次请求后仍失败；503/403 各 1 次不重试；100ms 总预算跨退避仍生效。
+
+此为验收工具修复，尚非正式发布完成。
