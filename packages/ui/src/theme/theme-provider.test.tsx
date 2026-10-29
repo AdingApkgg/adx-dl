@@ -4,6 +4,15 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { parseAccentColor, ThemeProvider, useTheme } from "./theme-provider";
 
+function ChooseLight() {
+  const { setTheme } = useTheme();
+  return (
+    <button type="button" onClick={() => setTheme("light")}>
+      T-choose
+    </button>
+  );
+}
+
 describe("ThemeProvider", () => {
   test("does not render script tags in the React tree", async () => {
     const { ThemeProvider } = await import("./theme-provider");
@@ -49,14 +58,6 @@ describe("ThemeProvider in the browser", () => {
   });
 
   test("a choice made in this tab gives way to a later choice made in another tab", () => {
-    function ChooseLight() {
-      const { setTheme } = useTheme();
-      return (
-        <button type="button" onClick={() => setTheme("light")}>
-          T-choose
-        </button>
-      );
-    }
     render(
       <ThemeProvider>
         <ChooseLight />
