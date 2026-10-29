@@ -7,7 +7,7 @@ import { DownloadDock } from "@/components/site/downloads/download-dock";
 import { MascotWidget } from "@/components/site/live2d/mascot-widget";
 import { MusicPlayer } from "@/components/site/music-player/music-player";
 import { PageViewsProvider } from "@/components/site/page-view-counter";
-import { ServiceWorkerRegistrar } from "@/components/site/service-worker-registrar";
+import { ServiceWorkerRetirement } from "@/components/site/service-worker-retirement";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
 import { SWRProvider } from "@/components/site/swr-provider";
@@ -113,7 +113,7 @@ export async function RootLayoutShell({
           name="copyright"
           content={`${dictionary.siteName} — https://adxdls.saop.cc`}
         />
-        <ServiceWorkerRegistrar />
+        <ServiceWorkerRetirement />
         <noscript>
           <div data-no-script-notice className="mx-auto max-w-5xl border border-border bg-background p-4 text-sm leading-relaxed">
             <p>{getBrowserCompatibilityCopy(locale).noScript}</p>

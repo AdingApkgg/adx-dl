@@ -6,8 +6,7 @@ import * as React from "react";
 
 import { motion, springSoft, useReducedMotion } from "@astrodx/ui/motion";
 
-// The offline page's JS chunks are precached with the app shell (see
-// serwist.config.mjs), so this hydrates and works without a network.
+// The retired worker no longer precaches it; retry requires a connection.
 export function RetryButton({ label }: { label: string }) {
   const reducedMotion = useReducedMotion();
   const [reloading, setReloading] = React.useState(false);

@@ -5,9 +5,9 @@ import { OfflineVisual } from "./offline-visual";
 import { RetryButton } from "./retry-button";
 import { getDictionary } from "@/lib/i18n";
 
-// Static fallback served by the service worker when a navigation fails offline
-// (precached as /offline.html — see serwist.config.js + src/sw.ts `fallbacks`).
-// It is ONE page served for every locale, so the zh/en/ja strings are stacked.
+// Retained at its existing URL for old links after service-worker retirement.
+// This is a connection-help page, not an automatically served offline fallback.
+// It is ONE page for every locale, so the zh/en/ja strings are stacked.
 // Excluded from indexing: it is infrastructure, not content.
 export const metadata: Metadata = {
   title: "离线 · ADX 谱面资源",
