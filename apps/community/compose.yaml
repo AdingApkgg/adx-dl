@@ -171,7 +171,7 @@ services:
         condition: service_completed_successfully
 
   umami:
-    image: ghcr.io/umami-software/umami:3.4.0
+    image: ghcr.io/umami-software/umami:3.4.1
     restart: unless-stopped
     logging: *logging
     init: true
