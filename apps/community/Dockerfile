@@ -4,7 +4,7 @@
 # 两个工作区包（@astrodx/ui、@astrodx/tsconfig）的清单：少一个就报 "listed in bun.lock but not on disk"，
 # 只装生产依赖的运行阶段也一样。
 
-FROM oven/bun:1.4.2 AS builder
+FROM oven/bun:1.4.4 AS builder
 WORKDIR /repo
 COPY package.json bun.lock ./
 COPY apps/community/package.json apps/community/
@@ -29,7 +29,7 @@ RUN bun run build
 # 其余的都打进了产物：react-router-hono-server、共享界面包和它用到的库。所以运行阶段要自己装生产依赖，
 # 不能照搬 dash 的单文件做法；devDependencies 不装。@astrodx/ui 是社区站的 devDependency，它整棵依赖树
 # （包括它依赖的 shadcn CLI）都不装。
-FROM oven/bun:1.4.2-slim AS runner
+FROM oven/bun:1.4.4-slim AS runner
 WORKDIR /repo
 COPY package.json bun.lock ./
 COPY apps/community/package.json apps/community/
