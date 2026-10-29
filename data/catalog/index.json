@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-10-10T06:46:08.097090+00:00",
+  "generated_at": "2026-10-29T18:51:20.213515+00:00",
   "source": "https://adxdls.saop.cc",
   "license": "CC-BY-4.0",
   "license_url": "https://adxdls.saop.cc/license",
   "attribution": "Catalog data from ADX 谱面资源 (https://adxdls.saop.cc), licensed CC BY 4.0. Reuse freely with attribution and a link back to the source.",
-  "total_entries": 1933,
+  "total_entries": 1934,
   "categories": {
     "Remote": [
       "maimai",
@@ -156276,6 +156276,132 @@
         "pv": 17464118,
         "audio": 4677064
       }
+    },
+    {
+      "id": "12025",
+      "remote_dir_name": "魔法仕掛けのファンタジア",
+      "title": "魔法仕掛けのファンタジア",
+      "title_en": "",
+      "artist": "igel",
+      "artist_en": "",
+      "category": "Remote",
+      "subcategory": "maimai DX CiRCLE PLUS",
+      "source_archive": "",
+      "source_folder": "26/12025",
+      "version": "maimai DX CiRCLE PLUS",
+      "versionid": 26,
+      "genre": "maimai",
+      "genreid": 105,
+      "cabinet": "DX",
+      "short_id": "12025",
+      "aliases": [],
+      "offset": 0,
+      "bpm": 280,
+      "difficulties": [
+        {
+          "slot": 2,
+          "name": "Basic",
+          "level": "5.0",
+          "designer": "",
+          "notes": {
+            "tap": 156,
+            "hold": 14,
+            "slide": 8,
+            "touch": 15,
+            "touch_hold": 1,
+            "break": 4,
+            "total": 198
+          },
+          "duration_ms": 144313
+        },
+        {
+          "slot": 3,
+          "name": "Advanced",
+          "level": "8.0",
+          "designer": "",
+          "notes": {
+            "tap": 230,
+            "hold": 8,
+            "slide": 18,
+            "touch": 15,
+            "touch_hold": 0,
+            "break": 2,
+            "total": 273
+          },
+          "duration_ms": 147527
+        },
+        {
+          "slot": 4,
+          "name": "Expert",
+          "level": "12.2",
+          "designer": "アマリリス",
+          "notes": {
+            "tap": 436,
+            "hold": 46,
+            "slide": 52,
+            "touch": 4,
+            "touch_hold": 6,
+            "break": 21,
+            "total": 565
+          },
+          "duration_ms": 147527
+        },
+        {
+          "slot": 5,
+          "name": "Master",
+          "level": "14.8",
+          "designer": "lynx magical symphony",
+          "notes": {
+            "tap": 554,
+            "hold": 83,
+            "slide": 93,
+            "touch": 105,
+            "touch_hold": 27,
+            "break": 101,
+            "total": 963
+          },
+          "duration_ms": 147527
+        }
+      ],
+      "download_mode": "onsite",
+      "download_url": "",
+      "source_url": "https://astrodx-charts.saop.cc/26/12025/",
+      "page_url": "https://adxdls.saop.cc/charts/12025",
+      "license_note": "Catalog metadata: CC BY 4.0, credit https://adxdls.saop.cc. Chart files, cover art, audio and PV remain with their original rights holders.",
+      "files": {
+        "maidata": "https://astrodx-charts-alice.saop.cc/26/12025/maidata.txt",
+        "maidata_dx": "",
+        "audio": "https://astrodx-charts.saop.cc/26/12025/track.mp3",
+        "background": "https://astrodx-charts.saop.cc/26/12025/bg.png",
+        "pv": "https://astrodx-charts.saop.cc/26/12025/pv.mp4"
+      },
+      "assets": {
+        "has_audio": true,
+        "has_background": true,
+        "has_pv": true,
+        "has_dx_chart": true
+      },
+      "media": {
+        "entry_base_url": "https://astrodx-charts.saop.cc/26/12025/",
+        "cover_url": "https://astrodx-charts.saop.cc/26/12025/bg.png",
+        "cover_avif": "https://astrodx-charts.saop.cc/26/12025/bg.avif",
+        "cover_webp": "https://astrodx-charts.saop.cc/26/12025/bg.webp",
+        "audio_url": "https://astrodx-charts.saop.cc/26/12025/track.mp3",
+        "pv_url": "https://astrodx-charts.saop.cc/26/12025/pv.mp4"
+      },
+      "imported_at": "2026-10-29T18:51:20.213515+00:00",
+      "added_at": "2026-10-29T18:51:20.213515+00:00",
+      "slug": "12025",
+      "file_bytes": {
+        "maidata": 11020,
+        "audio": 5213824,
+        "background": 332987,
+        "pv": 56019853
+      },
+      "duration_ms": 147527,
+      "bpm_min": 240,
+      "bpm_max": 280,
+      "title_romaji": "魔法仕掛kenofantajia"
     },
     {
       "id": "12040-impact",

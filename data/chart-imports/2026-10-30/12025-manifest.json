@@ -1,0 +1,26 @@
+{
+  "bg.avif": {
+    "bytes": 44630,
+    "sha256": "a29b5186647e56809841e4892deefcfb2548c7f3cd8dc4c337bc5793746340eb"
+  },
+  "bg.png": {
+    "bytes": 332987,
+    "sha256": "76e0fd02b3aa1cf7c38eab825385af0106b960b9c79c21f8bf6c1849ac6b650e"
+  },
+  "bg.webp": {
+    "bytes": 39242,
+    "sha256": "68fff47f5eee86b1d44a636d42b9399226c52fe6cff12a39c8bb8ffb9750e924"
+  },
+  "maidata.txt": {
+    "bytes": 11020,
+    "sha256": "993329a6601d5d2b9e5fc5b16114d542669e2d0e22f78b846197a8edc7008e9a"
+  },
+  "pv.mp4": {
+    "bytes": 56019853,
+    "sha256": "43ccea40a5050162981e549c24d4c053161112aca063dc098deb316738344408"
+  },
+  "track.mp3": {
+    "bytes": 5213824,
+    "sha256": "22649f109dd136c62534413d55892fbc7422faef41e179b55012ea0976fc3fcc"
+  }
+}
