@@ -176,7 +176,7 @@ describe("至少一种登录方式：数据库的兜底", () => {
     expect(results.map((res) => res.status).sort()).toEqual([200, 500]);
     expect(await loginMethodsOf(userId)).toBe(1);
     // better-call 对非 APIError 还会把原始错误 console.error 出来（# SERVER_ERROR），DrizzleQueryError 带着 SQL 参数
-    // （会话令牌、QQ 号）。onAPIError.onError 把它换成 APIError 之后就不再打印：响应是 { code, message }，
+    // （会话令牌、QQ 号）。onAPIError.throw 交给外层 HTTP 边界之后就不再打印：响应是 { code, message }，
     // 日志里只有一条 better_auth_error，带 SQLSTATE 和 SQL 本身，不带参数。
     expect(printed.filter((line) => line.includes("SERVER_ERROR"))).toEqual([]);
     expect(results.find((res) => res.status === 500)?.json).toEqual({ code: "INTERNAL", message: "Internal server error" });
