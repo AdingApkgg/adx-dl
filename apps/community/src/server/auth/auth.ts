@@ -1,6 +1,6 @@
 import { betterAuth, type BetterAuthRateLimitStorage } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, isAPIError } from "better-auth/api";
+import { APIError } from "better-auth/api";
 import { bearer } from "better-auth/plugins";
 
 import { describeError } from "@/shared/describe-error";
@@ -20,6 +20,7 @@ import type { QqCodeStore } from "./qq/codes";
 import type { QqHasher } from "./qq/hasher";
 import { qqLogin } from "./qq/plugin";
 import type { QqSender } from "./qq/sender";
+import { withSafeAuthErrors } from "./safe-handler";
 import { shortId } from "./short-id";
 import type { TurnstileVerifier } from "./turnstile";
 
@@ -81,7 +82,7 @@ function emailFromIdToken(idToken: string): string | null {
 
 export function createAuth(deps: AuthDeps) {
   const { db, log } = deps;
-  return betterAuth({
+  const auth = betterAuth({
     appName: "AstroDX Community",
     baseURL: deps.publicOrigin,
     basePath: "/api/auth",
@@ -149,17 +150,9 @@ export function createAuth(deps: AuthDeps) {
     onAPIError: {
       // OAuth 回调在读到 state 之前出错时跳到这里（带 ?error=…），不用 Better Auth 自带的错误页。
       errorURL: `${deps.publicOrigin}/login`,
-      // 不接管的话，钩子里抛出的错误会被 Better Auth 用它自己的格式打到控制台。
-      onError: (error) => {
-        if (isAPIError(error) && error.statusCode < 500) {
-          return;
-        }
-        log.error("better_auth_error", describeError(error));
-        // 非 APIError 时 better-call 还会 console.error 原始错误（含 SQL 参数：令牌、QQ 号），改抛 APIError 就不打；已对照 Better Auth 1.7.6 的 better-call router 核实。
-        if (!isAPIError(error)) {
-          throw new APIError("INTERNAL_SERVER_ERROR", { code: "INTERNAL", message: "Internal server error" });
-        }
-      },
+      // 1.7.14 会吞掉 onError 回调抛出的异常。让未知错误向外抛，由下面的 HTTP 边界安全处理；
+      // APIError 仍由 better-call 转成原有响应，普通认证失败和跳转的语义不变。
+      throw: true,
     },
     // 只挡 HTTP 入口（返回 404），服务端的 auth.api.* 照样能调。只支持精确路径。
     disabledPaths: [
@@ -315,6 +308,9 @@ export function createAuth(deps: AuthDeps) {
       qqLogin({ ...deps.qq, verifyTurnstile: deps.verifyTurnstile, log }),
     ],
   });
+  auth.handler = withSafeAuthErrors(auth.handler, log);
+  auth.fetch = auth.handler;
+  return auth;
 }
 
 export type Auth = ReturnType<typeof createAuth>;
