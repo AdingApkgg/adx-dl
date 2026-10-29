@@ -1,5 +1,5 @@
 FROM docker:29.8.2-cli AS docker-cli
-FROM ghcr.io/actions/actions-runner:2.338.0
+FROM ghcr.io/actions/actions-runner:2.338.2
 
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
