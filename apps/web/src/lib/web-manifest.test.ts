@@ -1,9 +1,26 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import { locales } from "@/lib/i18n";
 import { buildWebManifest, webManifestPath } from "@/lib/web-manifest";
 
 describe("web manifest", () => {
+  test("keeps Chrome's manifest install requirements without a service worker", () => {
+    for (const locale of locales) {
+      const manifest = buildWebManifest(locale);
+      expect(manifest.name || manifest.short_name).toBeTruthy();
+      expect(manifest.display).toBe("standalone");
+      expect(new URL(manifest.start_url, "https://archive.example").pathname.startsWith(manifest.scope)).toBe(true);
+      for (const size of [192, 512]) {
+        const icon = manifest.icons.find((entry) => entry.sizes === `${size}x${size}` && entry.purpose === "any");
+        expect(icon).toBeDefined();
+        const png = readFileSync(new URL(`../../public${icon!.src}`, import.meta.url));
+        expect(png.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+        expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([size, size]);
+      }
+    }
+  });
+
   test("each locale installs as its own app, launching into its own tree", () => {
     expect(buildWebManifest("zh")).toMatchObject({
       id: "/",

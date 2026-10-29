@@ -516,8 +516,8 @@ type ReleaseOrderable = Pick<CatalogEntry, "versionid" | "cabinet" | "short_id">
 
 export function isUtageEntry(entry: Pick<CatalogEntry, "cabinet">): boolean {
   const cabinet = entry.cabinet?.trim();
-  // "ST" is the pre-2026-08 spelling of the standard cabinet; data cached by the
-  // service worker (RSC payloads live up to 30 days) can still carry it.
+  // "ST" is the pre-2026-08 spelling of the standard cabinet; older data and
+  // long-lived tabs can still carry it.
   return Boolean(cabinet) && cabinet !== "DX" && cabinet !== "SD" && cabinet !== "ST";
 }
 

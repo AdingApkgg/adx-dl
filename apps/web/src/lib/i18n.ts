@@ -1589,7 +1589,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     },
     offline: {
       title: "当前处于离线状态",
-      description: "无法连接到网络。已缓存的页面和封面仍可浏览；恢复网络后请重试。",
+      description: "无法连接到网络。请恢复网络后重试；下载记录和用户设置会保留在此浏览器中。",
       retry: "重试",
       backHome: "返回首页",
     },
@@ -2425,7 +2425,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     offline: {
       title: "You're offline",
       description:
-        "You appear to be offline. Cached pages and covers are still available — reconnect and try again.",
+        "You appear to be offline. Reconnect and try again; your download history and settings remain in this browser.",
       retry: "Retry",
       backHome: "Back to home",
     },
@@ -3243,7 +3243,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
     offline: {
       title: "オフラインです",
       description:
-        "ネットワークに接続できません。キャッシュ済みのページやジャケットは引き続き閲覧できます。接続が回復したら再試行してください。",
+        "ネットワークに接続できません。接続を回復してから再試行してください。ダウンロード履歴と設定はこのブラウザーに保持されます。",
       retry: "再試行",
       backHome: "ホームへ戻る",
     },

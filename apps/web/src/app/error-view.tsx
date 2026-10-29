@@ -14,9 +14,9 @@ import {
 
 /**
  * A chunk that 404s after a deploy is the single most likely runtime error on a
- * static export: the service worker activates a new build, the old hashed
- * `_next/static` chunks are swept, and a long-lived tab that lazy-loads anything
- * afterwards throws. That failure is fully self-healing with one reload, so the
+ * static export: a deployment replaces old hashed `_next/static` chunks, and a
+ * long-lived tab that lazy-loads an old URL afterwards throws. That failure is
+ * fully self-healing with one reload, so the
  * boundary does it automatically instead of showing the user a dead end. The
  * sessionStorage flag makes it strictly one attempt per tab — a genuinely broken
  * deploy must surface the error screen rather than reload-loop.
