@@ -16,7 +16,7 @@
     "@astrodx/content-schema": "workspace:*",
     "@astrodx/ui": "workspace:*",
     "@lxns-network/maimai-chart-engine": "workspace:*",
-    "@zip.js/zip.js": "2.23.0",
+    "@zip.js/zip.js": "2.24.0",
     "fflate": "^0.8.3",
     "framer-motion": "^13.4.4",
     "fuse.js": "^7.5.0",
