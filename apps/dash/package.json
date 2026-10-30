@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@astrodx/content-schema": "workspace:*",
-    "@react-router/node": "8.4.0",
+    "@react-router/node": "8.5.1",
     "hono": "^4.13.9",
     "isbot": "^5.2.2",
     "jose": "^6.2.12",
