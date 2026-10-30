@@ -38,7 +38,7 @@
   "devDependencies": {
     "@astrodx/ui": "workspace:*",
     "@inlang/paraglide-js": "2.25.4",
-    "@inlang/plugin-message-format": "4.4.4",
+    "@inlang/plugin-message-format": "4.5.6",
     "@react-router/dev": "8.4.0",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.2",
