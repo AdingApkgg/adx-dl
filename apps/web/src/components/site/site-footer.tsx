@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { HeartHandshakeIcon } from "lucide-react";
 
 import { usePathLocale } from "@/app/use-path-locale";
 import { NoticesUnreadBadge, useUnreadNoticeCount } from "@/components/site/notices-unread-dot";
@@ -45,6 +46,13 @@ export function SiteFooter({
         <p className="max-w-2xl text-sm text-muted-foreground">
           {dictionary.footer.description}
         </p>
+        <Link
+          href={buildLocalePath("/donate", locale)}
+          className="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          <HeartHandshakeIcon className="size-4 shrink-0" aria-hidden="true" />
+          {dictionary.donate.downloadThanks}
+        </Link>
         <nav
           aria-label={dictionary.footer.navLabel}
           className="flex flex-wrap gap-x-5 gap-y-2 text-sm"
@@ -119,9 +127,6 @@ export function SiteFooter({
           </Link>
           <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/links", locale)}>
             {dictionary.links.navLabel}
-          </Link>
-          <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/donate", locale)}>
-            {dictionary.donate.navLabel}
           </Link>
           <Link className="text-muted-foreground hover:text-foreground" href={buildLocalePath("/about", locale)}>
             {dictionary.about.navLabel}

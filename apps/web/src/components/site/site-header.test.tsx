@@ -49,7 +49,28 @@ describe("SiteHeader", () => {
     expect(html).toContain('href="/charts?focus=search"');
     expect(html).toContain('aria-label="搜索"');
     expect(html).toContain('aria-label="打开设置"');
+    const tabBar = html.slice(html.indexOf("data-mobile-tabbar-root"));
+    expect(tabBar).toContain("搜谱");
+    expect(tabBar).toContain("社群");
+    expect(tabBar).toContain("公告");
+    expect(tabBar).toContain('href="/charts?focus=search"');
+    expect(tabBar).toContain('href="/community"');
+    expect(tabBar).not.toContain('href="/charts"');
+    expect(tabBar).not.toContain(">曲库<");
     expect(html).not.toContain('aria-label="切换主题"');
+  });
+
+  test("marks the community tab active without activating More", async () => {
+    mock.module("next/navigation", () => ({
+      usePathname: () => "/community",
+      useRouter: () => ({ push() {} }),
+    }));
+    const { SiteHeader } = await import("./site-header");
+    const html = renderToStaticMarkup(<SiteHeader totalEntries={7} />);
+    const tabBar = html.slice(html.indexOf("data-mobile-tabbar-root"));
+    expect(tabBar.match(/<a\b[^>]*href="\/community"[^>]*>/)?.[0]).toContain('aria-current="page"');
+    expect(tabBar.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(tabBar).not.toContain('w-full text-primary');
   });
 
   test("static HTML is pinned for view transitions and starts expanded", async () => {

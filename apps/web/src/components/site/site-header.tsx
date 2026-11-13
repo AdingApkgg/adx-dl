@@ -130,6 +130,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
   const unread = useUnreadNoticeCount();
 
   const noticesHref = switchLocale("/notices", locale);
+  const communityHref = switchLocale("/community", locale);
 
   const primaryNav: NavItem[] = [
     {
@@ -147,6 +148,11 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
       href: switchLocale("/versions", locale),
       label: dictionary.versions.navLabel,
       icon: <LayersIcon data-icon="inline-start" />,
+    },
+    {
+      href: communityHref,
+      label: dictionary.community.navLabel,
+      icon: <UsersIcon data-icon="inline-start" />,
     },
   ];
   // Search has no page of its own: it deep-links to the browse catalog with
@@ -211,11 +217,6 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
       },
     ],
     [
-      {
-        href: switchLocale("/community", locale),
-        label: dictionary.community.navLabel,
-        icon: <UsersIcon />,
-      },
       {
         href: switchLocale("/comments", locale),
         label: dictionary.guestbook.navLabel,
@@ -503,7 +504,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               </motion.span>
             </div>
           </Link>
-          <Badge variant="secondary" className="hidden xl:inline-flex">
+          <Badge variant="secondary" className="hidden 2xl:inline-flex">
             {dictionary.home.entriesBadge(totalEntries)}
           </Badge>
         </div>
@@ -585,6 +586,17 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             Measured in en, the widest locale: labels need ~1165px, so they
             can't come back any earlier than xl. */}
         <div className="flex shrink-0 items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            className="gap-1 px-2 text-primary"
+          >
+            <Link href={switchLocale("/donate", locale)} aria-current={pathname === switchLocale("/donate", locale) ? "page" : undefined}>
+              <HeartHandshakeIcon aria-hidden="true" />
+              {dictionary.donate.supportLabel}
+            </Link>
+          </Button>
           {/* Search and random sit with the trailing controls rather than in
               the nav, so neither is repeated in the menu (on phones the tab
               bar takes over both). */}
@@ -670,19 +682,17 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
           active: isActive(primaryNav[0]),
         },
         {
-          href: chartsHref,
-          label: dictionary.nav.browse,
-          // Same glyph as the header's browse link, so a phone visitor who
-          // later sees the desktop header recognizes it.
-          icon: <DownloadIcon />,
-          active: isActive({ href: chartsHref, label: dictionary.nav.browse }),
+          href: searchItem.href,
+          label: dictionary.nav.findChartsLabel,
+          icon: <SearchIcon />,
+          active: isActive({ href: chartsHref, label: dictionary.nav.findChartsLabel }),
+          onClick: onSearchClick,
         },
         {
-          href: searchItem.href,
-          label: dictionary.nav.searchLabel,
-          icon: <SearchIcon />,
-          active: false,
-          onClick: onSearchClick,
+          href: communityHref,
+          label: dictionary.community.tabLabel,
+          icon: <UsersIcon />,
+          active: isActive({ href: communityHref, label: dictionary.community.tabLabel }),
         },
         {
           href: noticesHref,
@@ -695,7 +705,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
       ]}
       menuLabel={dictionary.nav.moreLabel}
       menuActive={[...primaryNav.slice(2), ...secondaryNav].some(
-        (item) => item.href !== noticesHref && isActive(item)
+        (item) => item.href !== noticesHref && item.href !== communityHref && isActive(item)
       )}
       menu={renderNavMenu("top")}
     />

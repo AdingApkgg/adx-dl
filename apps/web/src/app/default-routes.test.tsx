@@ -196,7 +196,7 @@ describe("default zh routes", () => {
 
     const html = renderToStaticMarkup(<DonatePage />);
 
-    expect(html).toContain("捐赠支持");
+    expect(html).toContain("请站长喝杯咖啡");
     expect(html).toContain("爱发电");
     expect(html).toContain("Patreon");
     expect(html).toContain("https://afdian.com/a/scale");

@@ -7,6 +7,7 @@ import {
   ExternalLinkIcon,
   LifeBuoyIcon,
   PlayCircleIcon,
+  UsersIcon,
 } from "lucide-react";
 
 import { Reveal, RevealGroup, RevealItem } from "@astrodx/ui/motion";
@@ -302,6 +303,10 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
                 {home.getAppCta}
                 <ExternalLinkIcon className="size-3.5" aria-hidden="true" />
               </a>
+              <Link className={styles.heroAction} href={buildLocalePath("/community", locale)}>
+                {dictionary.community.homeCta}
+                <UsersIcon className="size-3.5" aria-hidden="true" />
+              </Link>
               <Link className={styles.heroAction} href={guideHref}>
                 {home.guideCta}
                 <LifeBuoyIcon className="size-3.5" aria-hidden="true" />
