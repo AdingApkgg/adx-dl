@@ -22,7 +22,7 @@ export default async function ChartsPage() {
   const cardEntries = entries.map(toCatalogCardEntry);
 
   return (
-    <PageShell className="adx-expressive adx-catalog-page">
+    <PageShell className="adx-material adx-catalog-page">
       <SeoJsonLd data={buildListingStructuredData(locale, entries)} />
       <PageHeader
         title={dictionary.charts.title}

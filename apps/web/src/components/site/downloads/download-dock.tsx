@@ -368,7 +368,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
       className={cn(
         // Safe-area aware, and lifted above the batch bar when one is on screen
         // so the fixed bottom surfaces never overlap on phones.
-        "adx-expressive adx-download-dock pointer-events-none fixed right-4 z-50 flex w-[calc(100vw-2rem)] max-w-xs flex-col items-end gap-2"
+        "adx-material adx-download-dock pointer-events-none fixed right-4 z-50 flex w-[calc(100vw-2rem)] max-w-xs flex-col items-end gap-2"
       )}
       style={{
         bottom: bottomOffset,
@@ -393,7 +393,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
               exit={{ opacity: 0 }}
               transition={{ ...springSoft, opacity: { duration: 0.18, ease: EASE_OUT } }}
               // borderRadius lives in style so the pill↔panel morph animates it.
-              style={{ borderRadius: 20, scale: trayScale }}
+              style={{ borderRadius: 4, scale: trayScale }}
               whileTap={{ scale: 0.92 }}
               onClick={() => {
                 transferFocus.current = true;
@@ -434,7 +434,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
               transition={{ ...springSoft, opacity: { duration: 0.18, ease: EASE_OUT } }}
               style={{
                 // Numeric radius enables Motion corner correction during the morph.
-                borderRadius: 32, scale: trayScale, maxHeight: `min(36rem, calc(100dvh - ${bottomOffset} - 6rem))` }}
+                borderRadius: 4, scale: trayScale, maxHeight: `min(36rem, calc(100dvh - ${bottomOffset} - 6rem))` }}
               className="pointer-events-auto relative isolate flex w-full flex-col overflow-hidden border border-border/70 bg-popover p-0 shadow-lg ring-1 ring-foreground/5"
             >
               <div data-download-manager-header className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2 text-sm font-semibold">

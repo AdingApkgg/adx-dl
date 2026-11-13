@@ -1,4 +1,6 @@
-# Material 3 Expressive 落地计划
+# Material 3 Expressive 落地记录（历史）
+
+后续方向已由用户改选为 4px Material，当前规范见 README.md，实施记录见 material2-adoption.md。下文保留当时的验证事实。
 
 2026-11-14。用户已选择 Material 3 Expressive，并明确封面尽量不裁切、保持微圆角；先落地搜谱页、谱面详情、下载管理器，不发布。
 

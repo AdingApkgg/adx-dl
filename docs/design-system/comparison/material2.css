@@ -1,7 +1,7 @@
 /* Development-only M2-inspired comparison, not an official component port. */
 html[data-design-concept^="material2"] { --m2-corner: 4px; }
 html[data-design-concept="material2-sharp"] { --m2-corner: 0px; }
-html[data-design-concept^="material2"] :where(.adx-expressive, body:has(main.adx-expressive)) {
+html[data-design-concept^="material2"] :where(.adx-material, body:has(main.adx-material)) {
   --md-background: #fafafa;
   --md-surface: #fff;
   --md-surface-high: #fff;
@@ -13,29 +13,29 @@ html[data-design-concept^="material2"] :where(.adx-expressive, body:has(main.adx
   --md-on-action: #fff;
   --md-artwork-radius: var(--m2-corner);
 }
-html[data-design-concept^="material2"] .adx-expressive.ui-page { --type-page-title: 32px; --type-section-title: 20px; gap: 24px; }
-html[data-design-concept^="material2"] .adx-expressive .ui-page-title { font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
+html[data-design-concept^="material2"] .adx-material.ui-page { --type-page-title: 32px; --type-section-title: 20px; gap: 24px; }
+html[data-design-concept^="material2"] .adx-material .ui-page-title { font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
 html[data-design-concept^="material2"] .adx-detail-page [data-detail-identity] .ui-page-title { font-size: 34px; }
-html[data-design-concept^="material2"] .adx-expressive button,
-html[data-design-concept^="material2"] .adx-expressive :is(.ui-surface,[data-slot="card"],[data-chart-card],[data-detail-hero],[data-download-panel],[data-download-task],[data-slot="button"],[data-slot="select-trigger"],[data-download-inline] label),
+html[data-design-concept^="material2"] .adx-material button,
+html[data-design-concept^="material2"] .adx-material :is(.ui-surface,[data-slot="card"],[data-chart-card],[data-detail-hero],[data-download-panel],[data-download-task],[data-slot="button"],[data-slot="select-trigger"],[data-download-inline] label),
 html[data-design-concept^="material2"] .adx-catalog-page :is([data-catalog-search],button[aria-pressed],[role="search"] + button),
 html[data-design-concept^="material2"] .adx-download-dock :is([data-download-manager],.adx-download-entry),
 html[data-design-concept^="material2"] [data-slot="dropdown-menu-content"],
 html[data-design-concept^="material2"] [data-slot="select-content"] { border-radius: var(--m2-corner) !important; }
-html[data-design-concept^="material2"] .adx-expressive :is(.ui-surface,[data-chart-card],[data-detail-hero]) { border: 1px solid #e0e2e7; box-shadow: 0 1px 3px #20284014; }
+html[data-design-concept^="material2"] .adx-material :is(.ui-surface,[data-chart-card],[data-detail-hero]) { border: 1px solid #e0e2e7; box-shadow: 0 1px 3px #20284014; }
 html[data-design-concept^="material2"] .adx-catalog-page [data-catalog-controls] { padding: 20px; }
 html[data-design-concept^="material2"] .adx-catalog-page [data-catalog-search] { min-height: 48px; border-bottom: 1px solid #6f7480; }
 html[data-design-concept^="material2"] .adx-catalog-page [role="search"] + button { width: 48px; height: 48px; }
 html[data-design-concept^="material2"] .adx-catalog-page [data-chart-cover-frame] { margin: 12px 12px 0; }
-html[data-design-concept^="material2"] .adx-expressive [data-slot="button"] { font-weight: 500; }
-html[data-design-concept^="material2"] .adx-expressive :is([data-download-inline],[data-download-task]) [data-slot="button"][data-variant="default"] { min-height: 48px; padding: 10px 18px; font-size: 14px; border-radius: var(--m2-corner); box-shadow: 0 2px 4px #0003; }
-html[data-design-concept^="material2"] .adx-expressive [data-download-panel] { background: #f5f6fa; border: 1px solid #e0e2e7; }
-html[data-design-concept^="material2"] .adx-expressive [data-download-panel] h2 { font-size: 20px; font-weight: 600; }
+html[data-design-concept^="material2"] .adx-material [data-slot="button"] { font-weight: 500; }
+html[data-design-concept^="material2"] .adx-material :is([data-download-inline],[data-download-task]) [data-slot="button"][data-variant="default"] { min-height: 48px; padding: 10px 18px; font-size: 14px; border-radius: var(--m2-corner); box-shadow: 0 2px 4px #0003; }
+html[data-design-concept^="material2"] .adx-material [data-download-panel] { background: #f5f6fa; border: 1px solid #e0e2e7; }
+html[data-design-concept^="material2"] .adx-material [data-download-panel] h2 { font-size: 20px; font-weight: 600; }
 html[data-design-concept^="material2"] .adx-download-dock [data-download-task] { background: #fff; border: 1px solid #e0e2e7; }
 html[data-design-concept^="material2"] .adx-download-dock [data-download-manager] { box-shadow: 0 8px 24px #0003; border: 1px solid #e0e2e7; }
 html[data-design-concept^="material2"] .adx-download-dock [data-download-manager-header] { border-bottom: 1px solid #e0e2e7; }
 html[data-design-concept^="material2"] [data-site-header] { border-bottom: 1px solid #e0e2e7; }
 @media(max-width:767px) {
- html[data-design-concept^="material2"] .adx-expressive.ui-page { --type-page-title: 30px; }
+ html[data-design-concept^="material2"] .adx-material.ui-page { --type-page-title: 30px; }
  html[data-design-concept^="material2"] .adx-detail-page [data-detail-identity] .ui-page-title { font-size: 30px; }
 }

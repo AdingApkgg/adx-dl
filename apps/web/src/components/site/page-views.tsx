@@ -655,7 +655,7 @@ export function ChartDetailPageView({
   const sourceHost = hostnameOf(entry.source_url);
 
   return (
-    <PageShell className="adx-expressive adx-detail-page">
+    <PageShell className="adx-material adx-detail-page">
       <SeoJsonLd data={buildChartDetailStructuredData(locale, entry)} />
       <nav
         aria-label={detail.breadcrumbLabel}
@@ -1114,7 +1114,7 @@ function CatalogPageView({
   intro,
 }: CatalogPageViewProps) {
   return (
-    <PageShell className="adx-expressive adx-catalog-page">
+    <PageShell className="adx-material adx-catalog-page">
       <SeoJsonLd data={buildListingStructuredData(locale, entries)} />
       <PageHeader title={title} description={description} meta={intro} />
       <CatalogBrowser

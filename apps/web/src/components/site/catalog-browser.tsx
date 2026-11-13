@@ -1740,6 +1740,7 @@ export function CatalogBrowser({
         <motion.div
           aria-hidden="true"
           initial={false}
+          data-catalog-toolbar-backdrop
           animate={{ opacity: toolbarStuck ? 1 : 0 }}
           transition={{ duration: 0.2, ease: EASE_OUT }}
           className="pointer-events-none absolute -inset-x-3 -inset-y-2 -z-10 rounded-xl border border-border/60 bg-background/95 shadow-md"
