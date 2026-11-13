@@ -120,9 +120,11 @@ function CopyButton({ value, copyLabel, copiedLabel }: {
 export function DownloadJobNotes({
   job,
   locale,
+  showSaveConfirmation = true,
 }: {
   job: DownloadJob;
   locale: Locale;
+  showSaveConfirmation?: boolean;
 }) {
   const dictionary: Dictionary = getDictionary(locale);
   const tray = dictionary.downloads;
@@ -175,7 +177,7 @@ export function DownloadJobNotes({
       ) : null}
       {hasArchives ? (
         <>
-          <ul className="flex max-h-40 flex-col gap-1 overflow-y-auto overscroll-contain">
+          <ul className="flex flex-col gap-1">
             {job.archives!.map((archive, index) => (
               <li key={archive.fileName} className="flex flex-col gap-1">
                 <button
@@ -196,13 +198,13 @@ export function DownloadJobNotes({
           {job.mobileBatch && job.status === "success" ? (
             <div className="flex flex-col gap-1.5">
               <p className="text-muted-foreground">{tray.confirmSavedBatchHint}</p>
-              <button
+              {showSaveConfirmation ? <button
                 type="button"
                 onClick={() => confirmSavedBatch(job.id)}
                 className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 {hasNextJob ? tray.confirmSavedBatch : tray.releaseSavedBatch}
-              </button>
+              </button> : null}
             </div>
           ) : null}
         </>

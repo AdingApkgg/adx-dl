@@ -83,6 +83,19 @@ function buildCatalog(entries: CatalogEntry[], categories: Catalog["categories"]
 }
 
 describe("page views locale-driven content", () => {
+  test("detail separates the main download task from secondary actions in every locale", () => {
+    for (const locale of ["zh", "en", "ja"] as const) {
+      const html = renderToStaticMarkup(<ChartDetailPageView entry={buildEntry()} locale={locale} />);
+      expect(html.match(/<h1\b/g)).toHaveLength(1);
+      const download = html.indexOf('data-download-panel');
+      const secondary = html.indexOf('data-detail-secondary-actions');
+      expect(download).toBeGreaterThan(0);
+      expect(secondary).toBeGreaterThan(download);
+      expect(html).toContain('data-chart-description');
+      expect(html).toContain(getDictionary(locale).detail.downloadSection);
+    }
+  });
+
   test("detail dictionary exposes localized download status copy", () => {
     const enDetail = getDictionary("en").detail;
     const jaDetail = getDictionary("ja").detail;

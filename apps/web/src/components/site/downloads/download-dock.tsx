@@ -31,10 +31,12 @@ import {
 } from "@astrodx/ui/components/dropdown-menu";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { cn } from "@astrodx/ui/lib/utils";
+import { downloadManagerSummary } from "./download-manager-summary";
 import { DownloadSourceMenu, DownloadSourceSummary } from "./download-source-selector";
 import { useWakeLock } from "@/components/chart-preview/hooks/use-wake-lock";
 import { jobPercent, useDownloadsStore } from "./downloads-store";
 import { DownloadJobNotes, DownloadJobStatusLine, DownloadStorageNotice } from "./download-job-notes";
+import { DownloadSaveAction } from "./download-save-action";
 import { DownloadSupportPrompt } from "./download-support-prompt";
 import { DownloadHistoryList } from "./download-history";
 
@@ -54,7 +56,7 @@ const SOURCE_PROBE_REFRESH_MS = 5 * 60_000;
  * invisible for keyboard users. This is the same ring the primitives use.
  */
 const DOCK_ICON_BUTTON_CLASS =
-  "-m-0.5 rounded-md p-1.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  "inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 /** True while the tab is visible — stops infinite sweep loops in hidden tabs. */
 function usePageVisible(): boolean {
@@ -108,13 +110,20 @@ export function DownloadProgressBar({
       aria-label={label}
       className="relative h-1.5 w-full max-w-full overflow-hidden rounded-full bg-muted"
     >
-      <motion.div
-        className={cn("h-full w-full origin-left rounded-full", fillClassName ?? "bg-primary")}
-        // Style-bound motion values bypass MotionConfig's reducedMotion, so
-        // reduced motion binds the raw target (instant) instead of the spring.
-        style={{ scaleX: reduced ? target : spring }}
-      />
-      {active && !reduced && pageVisible ? (
+      {percent === null ? (
+        <motion.div
+          className={cn("h-full w-1/3 rounded-full", fillClassName ?? "bg-primary/50")}
+          animate={active && !reduced && pageVisible ? { x: ["-100%", "300%"] } : undefined}
+          transition={{ duration: 1.4, repeat: Infinity, ease: "linear" }}
+        />
+      ) : (
+        <motion.div
+          className={cn("h-full w-full origin-left rounded-full", fillClassName ?? "bg-primary")}
+          // Style-bound values need the raw target when reduced motion is enabled.
+          style={{ scaleX: reduced ? target : spring }}
+        />
+      )}
+      {percent !== null && active && !reduced && pageVisible ? (
         <motion.div
           aria-hidden="true"
           className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent dark:via-white/25"
@@ -217,7 +226,6 @@ export function DownloadDock({ locale }: { locale: Locale }) {
   const tray = dictionary.downloads;
 
   const jobs = useDownloadsStore((state) => state.jobs);
-  const presented = useDownloadsStore((state) => state.presented);
   const bottomBars = useDownloadsStore((state) => state.bottomBars);
   const dismiss = useDownloadsStore((state) => state.dismiss);
   const resume = useDownloadsStore((state) => state.resume);
@@ -227,8 +235,9 @@ export function DownloadDock({ locale }: { locale: Locale }) {
   const refreshSourceProbes = useDownloadsStore((state) => state.refreshSourceProbes);
   const resumeInterrupted = useDownloadsStore((state) => state.resumeInterrupted);
   const history = useDownloadsStore((state) => state.history);
-  const [collapsed, setCollapsed] = React.useState(false);
+  const [collapsed, setCollapsed] = React.useState(true);
   const [historyOpen, setHistoryOpen] = React.useState(false);
+  const panelId = React.useId();
 
   const reducedMotion = useReducedMotion();
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -317,7 +326,8 @@ export function DownloadDock({ locale }: { locale: Locale }) {
     return () => window.removeEventListener(DOWNLOAD_STARTED_EVENT, onStarted);
   }, [reducedMotion]);
 
-  const visible = jobs.filter((job) => !((presented[job.id] ?? 0) > 0));
+  const visible = jobs;
+  const summaryText = downloadManagerSummary(visible, tray);
   const activeCount = visible.filter(
     (job) =>
       job.status === "packing" ||
@@ -343,7 +353,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
       className={cn(
         // Safe-area aware, and lifted above the batch bar when one is on screen
         // so the fixed bottom surfaces never overlap on phones.
-        "pointer-events-none fixed right-4 z-50 flex w-full max-w-xs flex-col items-end gap-2"
+        "pointer-events-none fixed right-4 z-50 flex w-[calc(100vw-2rem)] max-w-xs flex-col items-end gap-2"
       )}
       style={{
         bottom: bottomOffset,
@@ -373,8 +383,10 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                 setCollapsed(false);
                 if (visible.length === 0) setHistoryOpen(true);
               }}
-              aria-label={visible.length > 0 ? tray.expand : tray.historyTitle}
-              className="pointer-events-auto relative isolate flex min-h-11 items-center gap-2 border border-border/70 bg-popover/95 px-3 py-2 text-xs font-medium shadow-lg ring-1 ring-foreground/5"
+              aria-label={visible.length > 0 ? `${tray.expand} · ${summaryText}` : tray.historyTitle}
+              aria-expanded={false}
+              aria-controls={panelId}
+              className="pointer-events-auto relative isolate flex min-h-11 max-w-full flex-wrap justify-end items-center gap-2 border border-border/70 bg-popover/95 px-3 py-2 text-xs font-medium shadow-lg ring-1 ring-foreground/5"
             >
               {/* Blur on a child, not the morphing element, so it doesn't smear mid-morph. */}
               <span aria-hidden="true" className="absolute inset-0 -z-10 rounded-[inherit] backdrop-blur" />
@@ -383,30 +395,36 @@ export function DownloadDock({ locale }: { locale: Locale }) {
               ) : (
                 <><HistoryIcon className="size-3.5" />{tray.historyTitle}</>
               )}
-              {activeCount > 0 ? (
+              {activeCount > 0 && !visible.some((job) => job.status === "archiving") ? (
                 <RollingNumber
                   value={aggregatePercent}
                   format={(n) => `${n}%`}
                   className="tabular-nums text-muted-foreground"
                 />
               ) : null}
+              {visible.length > 0 ? <span className={cn("min-w-0 text-xs", visible.some((job) => job.status === "error") ? "text-destructive" : "text-muted-foreground")}>{summaryText}</span> : null}
               <ChevronUpIcon className="size-3.5 text-muted-foreground" />
             </motion.button>
           ) : (
             <motion.div
               key="tray"
+              id={panelId}
+              role="region"
+              aria-label={tray.trayTitle}
+              data-download-manager
               layoutId="download-tray"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ ...springSoft, opacity: { duration: 0.18, ease: EASE_OUT } }}
               style={{ borderRadius: 16, scale: trayScale, maxHeight: `calc(100dvh - ${bottomOffset} - 1rem)` }}
-              className="pointer-events-auto relative isolate flex w-full flex-col gap-2 overflow-y-auto overscroll-contain border border-border/70 bg-popover/95 p-3 shadow-lg ring-1 ring-foreground/5"
+              className="pointer-events-auto relative isolate flex w-full flex-col overflow-hidden border border-border/70 bg-popover p-0 shadow-lg ring-1 ring-foreground/5"
             >
               <span aria-hidden="true" className="absolute inset-0 -z-10 rounded-[inherit] backdrop-blur" />
-              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <DownloadIcon className="size-3.5" />
-                {tray.trayTitle}
+              <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2 text-sm font-semibold">
+                <DownloadIcon className="size-4" />
+                <h2>{tray.trayTitle}</h2>
+                <span className="text-xs font-normal text-muted-foreground">{tray.jobsCount(visible.length)}</span>
                 <span className="flex-1" />
                 <motion.button
                   type="button"
@@ -419,6 +437,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                   <ChevronDownIcon className="size-3.5" />
                 </motion.button>
               </div>
+              <div className="flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain p-4">
               {/* Tray-wide notices. The auto-resume line is in its own live
                   region because it reports something the app did on its own,
                   which no per-job status line would ever announce. */}
@@ -433,7 +452,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
               <DownloadStorageNotice locale={locale} />
               {/* overscroll-contain keeps a flick at either end inside the tray
                   instead of scrolling the page underneath it. */}
-              <ul className="relative flex max-h-[50vh] touch-pan-y flex-col gap-2 overflow-y-auto overscroll-contain">
+              <ul className="relative flex shrink-0 flex-col gap-3">
                 <AnimatePresence initial={false} mode="popLayout">
                   {visible.map((job) => {
                     const percent = jobPercent(job);
@@ -470,7 +489,8 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                         // would otherwise compress to fit max-h instead of
                         // overflowing, so a long queue squeezed every row into
                         // a clipped sliver and the list never became scrollable.
-                        className="relative flex shrink-0 flex-col gap-1.5 overflow-hidden rounded-lg"
+                        data-download-task
+                        className="ui-surface relative flex shrink-0 flex-col gap-3 overflow-hidden p-3"
                       >
                         {job.status === "success" ? (
                           // One-shot emerald wash as the row lands on success.
@@ -514,10 +534,10 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                                     type="button"
                                     whileTap={{ scale: 0.92 }}
                                     onClick={() => resume(job.id)}
-                                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                                    className="inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                                   >
                                     <RotateCwIcon className="size-3" />
-                                    {tray.resume}
+                                    {job.status === "error" ? tray.retry : tray.resume}
                                   </motion.button>
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -590,12 +610,13 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                           className="w-fit"
                         />
                         <DownloadJobStatusLine job={job} locale={locale} />
-                        <DownloadJobNotes job={job} locale={locale} />
+                        <DownloadSaveAction jobs={[job]} locale={locale} />
+                        <DownloadJobNotes job={job} locale={locale} showSaveConfirmation={false} />
                         {job.status === "packing" ||
                         job.status === "paused" ||
                         job.status === "archiving" ? (
                           <DownloadProgressBar
-                            percent={percent}
+                            percent={job.status === "archiving" ? null : percent}
                             active={job.status === "packing" || job.status === "archiving"}
                             label={job.title}
                             fillClassName={job.status === "paused" ? "bg-primary/40" : undefined}
@@ -630,6 +651,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                   ) : null}
                 </div>
               ) : null}
+              </div>
             </motion.div>
           )
         ) : null}

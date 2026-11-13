@@ -75,13 +75,10 @@ export function downloadJobMetricsText(
   if (job.status !== "packing" && job.status !== "archiving") {
     return job.status === "paused" ? `${jobPercent(job)}%` : "";
   }
-  const parts: string[] = [];
   if (job.status === "archiving") {
-    parts.push(`${jobPercent(job)}%`);
-    if (job.total > 0) {
-      parts.push(`${job.completed}/${job.total}`);
-    }
+    return job.archiveCurrentFile ?? "";
   }
+  const parts: string[] = [];
   if (job.receivedBytes > 0 || job.totalBytes > 0) {
     const prefix = job.totalBytesEstimated ? "~" : "";
     parts.push(
@@ -95,9 +92,6 @@ export function downloadJobMetricsText(
   }
   if (job.etaMs !== null) {
     parts.push(tray.etaRemaining(formatEtaClock(job.etaMs)));
-  }
-  if (job.status === "archiving" && job.archiveCurrentFile) {
-    parts.push(job.archiveCurrentFile);
   }
   return parts.join(" · ");
 }

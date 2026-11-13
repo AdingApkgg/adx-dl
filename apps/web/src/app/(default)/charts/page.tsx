@@ -1,4 +1,4 @@
-import { Reveal } from "@astrodx/ui/motion";
+import { PageShell, PageHeader } from "@astrodx/ui/components/page-layout";
 import { CatalogBrowser } from "@/components/site/catalog-browser";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { readCatalogEntries } from "@/lib/catalog";
@@ -22,23 +22,18 @@ export default async function ChartsPage() {
   const cardEntries = entries.map(toCatalogCardEntry);
 
   return (
-    <main
-      id="main-content"
-      className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
-    >
+    <PageShell>
       <SeoJsonLd data={buildListingStructuredData(locale, entries)} />
-      <Reveal className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold">{dictionary.charts.title}</h1>
-        <p className="text-muted-foreground">{dictionary.charts.description}</p>
-        <p className="text-sm text-muted-foreground">
-          {dictionary.charts.intro(entries.length, versionCount)}
-        </p>
-      </Reveal>
+      <PageHeader
+        title={dictionary.charts.title}
+        description={dictionary.charts.description}
+        meta={dictionary.charts.intro(entries.length, versionCount)}
+      />
       <CatalogBrowser
         entries={cardEntries}
         locale={locale}
         detailPathPrefix={buildLocalePath("/charts", locale)}
       />
-    </main>
+    </PageShell>
   );
 }

@@ -1,3 +1,4 @@
+import { PageShell, PageHeader, Surface } from "@astrodx/ui/components/page-layout";
 import Link from "next/link";
 import { preload } from "react-dom";
 import {
@@ -662,10 +663,7 @@ export function ChartDetailPageView({
   const sourceHost = hostnameOf(entry.source_url);
 
   return (
-    <main
-      id="main-content"
-      className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
-    >
+    <PageShell>
       <SeoJsonLd data={buildChartDetailStructuredData(locale, entry)} />
       <nav
         aria-label={detail.breadcrumbLabel}
@@ -681,7 +679,7 @@ export function ChartDetailPageView({
       </nav>
       {/* The whole chart page is one self-contained article about the chart. */}
       <article className="flex flex-col gap-6">
-      <section className="relative isolate overflow-hidden rounded-3xl border border-border/60">
+      <section className="relative isolate overflow-hidden rounded-2xl border border-border/60" aria-label={title}>
         <DetailHeroBackdrop>
           {heroCoverSources ? (
             <>
@@ -699,20 +697,20 @@ export function ChartDetailPageView({
           )}
         </DetailHeroBackdrop>
 
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 p-6 md:p-8 lg:grid-cols-[260px_minmax(0,1fr)]">
-          <div className="mx-auto w-full max-w-[260px] lg:mx-0">
+        <div className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-4 p-4 md:gap-6 md:p-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+          <div className="w-full self-start lg:row-span-3">
             <DetailHeroCover>
               <EntryCover
                 entry={entry}
                 locale={locale}
                 priority
-                sizes="(max-width: 1024px) 260px, 260px"
+                sizes="(max-width: 1024px) 88px, 220px"
                 className="h-full w-full"
               />
             </DetailHeroCover>
           </div>
 
-          <div className="flex flex-col gap-4">
+          <div data-detail-identity className="flex min-w-0 flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <VersionBadge version={entry.version} label={branchLabel} />
               <CabinetBadge cabinet={entry.cabinet} className="h-7" />
@@ -721,11 +719,11 @@ export function ChartDetailPageView({
             <div className="flex flex-col gap-2">
               <h1
                 lang={japaneseTextLang(title)}
-                className="text-3xl font-bold md:text-5xl"
+                className="ui-page-title"
               >
                 {title}
               </h1>
-              <p lang={japaneseTextLang(artistName)} className="text-lg text-muted-foreground">
+              <p lang={japaneseTextLang(artistName)} className="text-sm text-muted-foreground [overflow-wrap:anywhere] md:text-base">
                 {artistHref ? (
                   <Link
                     href={artistHref}
@@ -760,51 +758,36 @@ export function ChartDetailPageView({
                 )}
               </div>
             ) : null}
-            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
-              {description}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <EntryAssetBadges entry={entry} locale={locale} />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {entry.download_mode === "onsite" || entry.download_mode === "mixed" ? (
-                <AdxDownloadButton spec={downloadSpec} locale={locale} />
-              ) : (
-                <Button disabled>
-                  <DownloadIcon data-icon="inline-start" aria-hidden="true" />
-                  {detail.onsitePending}
-                </Button>
-              )}
-              <ChartDetailActions entry={entry} locale={locale} />
-              {(entry.download_mode === "external" || entry.download_mode === "mixed") &&
-              entry.source_url ? (
-                <Button variant="outline" asChild>
-                  <a href={entry.source_url} target="_blank" rel="noreferrer">
-                    <ExternalLinkIcon data-icon="inline-start" aria-hidden="true" />
-                    {detail.sourceLink}
-                  </a>
-                </Button>
-              ) : null}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {detail.installHint}{" "}
-              <a
-                href={CHART_IMPORT_VIDEO_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-primary underline-offset-4 hover:underline"
-              >
-                {detail.installVideo}
-              </a>
-              {" · "}
-              <Link
-                href={`${buildLocalePath("/guide", locale)}#import`}
-                className="font-medium text-primary underline-offset-4 hover:underline"
-              >
-                {detail.installGuide}
-              </Link>
-            </p>
           </div>
+          <Surface data-download-panel aria-label={detail.downloadSection} className="col-span-2 space-y-4 bg-card/95 lg:col-span-1 lg:col-start-2">
+            <h2 className="ui-section-title">{detail.downloadSection}</h2>
+            {entry.download_mode === "onsite" || entry.download_mode === "mixed" ? (
+              <AdxDownloadButton spec={downloadSpec} locale={locale} />
+            ) : (
+              <Button size="touch" disabled><DownloadIcon data-icon="inline-start" aria-hidden="true" />{detail.onsitePending}</Button>
+            )}
+            <details className="text-sm text-muted-foreground">
+              <summary className="min-h-11 cursor-pointer py-3 font-medium">{detail.installGuide}</summary>
+              <p className="leading-relaxed">{detail.installHint}</p>
+              <div className="flex flex-wrap gap-x-4">
+                <a href={CHART_IMPORT_VIDEO_URL} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-primary hover:underline">{detail.installVideo}</a>
+                <Link href={`${buildLocalePath("/guide", locale)}#import`} className="inline-flex min-h-11 items-center text-primary hover:underline">{detail.installGuide}</Link>
+              </div>
+            </details>
+          </Surface>
+          <div data-detail-secondary-actions className="col-span-2 min-w-0 border-t border-border/60 pt-4 lg:col-span-1 lg:col-start-2">
+            <ChartDetailActions entry={entry} locale={locale} />
+            {(entry.download_mode === "external" || entry.download_mode === "mixed") && entry.source_url ? (
+              <Button size="touch" variant="ghost" asChild>
+                <a href={entry.source_url} target="_blank" rel="noreferrer"><ExternalLinkIcon data-icon="inline-start" aria-hidden="true" />{detail.sourceLink}</a>
+              </Button>
+            ) : null}
+          </div>
+          <details data-chart-description className="col-span-2 border-t border-border/60 pt-2 text-sm text-muted-foreground">
+            <summary className="min-h-11 cursor-pointer py-3 font-medium">{detail.aboutChart}</summary>
+            <p className="max-w-2xl leading-relaxed">{description}</p>
+            <div className="mt-3 flex flex-wrap gap-2"><EntryAssetBadges entry={entry} locale={locale} /></div>
+          </details>
         </div>
       </section>
 
@@ -1142,7 +1125,7 @@ export function ChartDetailPageView({
         </section>
       ) : null}
       </article>
-    </main>
+    </PageShell>
   );
 }
 
@@ -1154,22 +1137,15 @@ function CatalogPageView({
   intro,
 }: CatalogPageViewProps) {
   return (
-    <main
-      id="main-content"
-      className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
-    >
+    <PageShell>
       <SeoJsonLd data={buildListingStructuredData(locale, entries)} />
-      <Reveal ssrVisible className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold">{title}</h1>
-        <p className="text-muted-foreground">{description}</p>
-        <p className="text-sm text-muted-foreground">{intro}</p>
-      </Reveal>
+      <PageHeader title={title} description={description} meta={intro} />
       <CatalogBrowser
         entries={entries}
         locale={locale}
         detailPathPrefix={buildLocalePath("/charts", locale)}
       />
-    </main>
+    </PageShell>
   );
 }
 

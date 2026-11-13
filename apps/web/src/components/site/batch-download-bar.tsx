@@ -17,7 +17,6 @@ import { Button } from "@astrodx/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -47,7 +46,9 @@ import {
   downloadJobStateText,
 } from "./downloads/download-status-text";
 import { DownloadJobNotes, DownloadStorageNotice } from "./downloads/download-job-notes";
+import { DownloadProgressBar } from "./downloads/download-dock";
 import { DownloadVideoOption } from "./downloads/download-video-option";
+import { DownloadSaveAction, getDownloadSaveAction } from "./downloads/download-save-action";
 import { DownloadSupportPrompt } from "./downloads/download-support-prompt";
 import {
   chartGroupingDir,
@@ -110,6 +111,7 @@ export function BatchDownloadBar({
   const selectedSourceId = useDownloadsStore((state) => state.selectedSourceId);
   const setSelectedSourceId = useDownloadsStore((state) => state.setSelectedSourceId);
   const preferredFormat = useDownloadsStore((state) => state.preferredFormat);
+  const setPreferredFormat = useDownloadsStore((state) => state.setPreferredFormat);
   const grouping = useDownloadsStore((state) => state.preferredBatchGrouping);
   const setGrouping = useDownloadsStore((state) => state.setPreferredBatchGrouping);
 
@@ -132,8 +134,6 @@ export function BatchDownloadBar({
   const restartWithSource = useDownloadsStore((state) => state.restartWithSource);
   const pause = useDownloadsStore((state) => state.pause);
   const dismiss = useDownloadsStore((state) => state.dismiss);
-  const presentInline = useDownloadsStore((state) => state.presentInline);
-  const unpresentInline = useDownloadsStore((state) => state.unpresentInline);
   const presentBottomBar = useDownloadsStore((state) => state.presentBottomBar);
   const unpresentBottomBar = useDownloadsStore((state) => state.unpresentBottomBar);
 
@@ -196,6 +196,7 @@ export function BatchDownloadBar({
   const summary = React.useMemo(() => summarizeDownloadJobs(jobs), [jobs]);
   const status = summary.status;
   const isBusy = planning || status === "packing" || status === "archiving" || status === "queued";
+  const canPause = status === "packing" || status === "queued";
   const isResumable = status === "paused" || status === "error";
   const progress = React.useMemo(
     () =>
@@ -220,11 +221,13 @@ export function BatchDownloadBar({
           ? tray.completed
           : status === "ready"
             ? tray.readyToSave
+          : status === "archiving"
+            ? tray.archiving
           : tray.queueSummary(summary.done, summary.total);
   const metricsText =
     jobs.length === 1
       ? downloadJobMetricsText(jobs[0], tray)
-      : jobs.length > 1 && status !== "success"
+      : jobs.length > 1 && (status === "packing" || status === "paused")
         ? `${summary.percent}%`
         : "";
   const statusText = metricsText ? `${stateText} · ${metricsText}` : stateText;
@@ -235,25 +238,8 @@ export function BatchDownloadBar({
   const noteJobs = jobs.filter((entry) => entry.archives?.length || entry.id === failedJob?.id ||
     (entry === releasedGuideJob && !hasCurrentSavedArchive) ||
     (entry.mobileMemoryWarning && entry.status !== "queued" && !entry.savedArchiveInfo));
+  const saveAction = getDownloadSaveAction(jobs);
   const canDownload = count > 0 && !isBusy && !isResumable && status !== "ready" && !hasRetainedMobileArchives;
-
-  // Hide these jobs from the floating tray while the bar itself is on screen.
-  // Keyed by a joined string so the effect doesn't re-run on array identity.
-  const presentedKey = jobs.map((entry) => entry.id).join("\u0000");
-  React.useEffect(() => {
-    if (presentedKey === "") {
-      return;
-    }
-    const ids = presentedKey.split("\u0000");
-    for (const id of ids) {
-      presentInline(id);
-    }
-    return () => {
-      for (const id of ids) {
-        unpresentInline(id);
-      }
-    };
-  }, [presentedKey, presentInline, unpresentInline]);
 
   // Tell the floating tray a full-width bottom bar is on screen so it lifts
   // itself above instead of overlapping on phones.
@@ -383,11 +369,13 @@ export function BatchDownloadBar({
             <XIcon data-icon="inline-start" />
             {browser.clearSelection}
           </Button>
-          {isResumable ? (
+          {saveAction ? (
+            <DownloadSaveAction jobs={jobs} locale={locale} />
+          ) : isResumable ? (
             <>
               <Button type="button" size="sm" onClick={resumeAll}>
                 <RotateCwIcon data-icon="inline-start" />
-                {tray.resume}
+                {status === "error" ? tray.retry : tray.resume}
                 {percent > 0 ? ` · ${percent}%` : null}
               </Button>
               <DropdownMenu>
@@ -436,22 +424,22 @@ export function BatchDownloadBar({
             </>
           ) : (
             <>
-              <div data-slot="button-group" className="inline-flex">
+              <div data-slot="button-group" className="inline-flex min-w-0 max-w-full flex-wrap gap-2">
                 <Button
                   type="button"
                   size="sm"
-                  disabled={!canDownload || isBusy}
-                  onClick={() => handleSelect(preferredFormat)}
-                  className="rounded-r-none"
+                  disabled={!canPause && (!canDownload || isBusy)}
+                  onClick={() => canPause ? pauseAll() : handleSelect(preferredFormat)}
+                  className="h-auto min-h-11 whitespace-normal py-2"
                 >
-                  <DownloadIcon data-icon="inline-start" />
-                  {status === "archiving"
-                    ? `${tray.archiving} · ${percent}%`
+                  {canPause ? <PauseIcon data-icon="inline-start" /> : <DownloadIcon data-icon="inline-start" />}
+                  {canPause ? tray.pause : status === "archiving"
+                    ? tray.archiving
                     : isBusy
                       ? detail.downloadPacking(progress.completed, progress.total)
                       : status === "ready"
                         ? tray.readyToSave
-                        : individual ? tray.downloadIndividualAction : browser.batchDownload}
+                        : status === "success" ? tray.historyRerun : individual ? tray.downloadIndividualAction : browser.batchDownload}
                   {canDownload ? (
                     <span className="font-mono text-[11px] opacity-75">
                       .{preferredFormat}
@@ -462,12 +450,13 @@ export function BatchDownloadBar({
                   <DropdownMenuTrigger asChild>
                     <Button
                       type="button"
-                      size="icon-sm"
+                      variant="outline"
                       disabled={!canDownload || isBusy}
-                      aria-label={detail.downloadFormatLabel}
-                      title={detail.downloadFormatLabel}
-                      className="-ml-px rounded-l-none border-l border-primary-foreground/25 px-0"
+                      aria-label={tray.optionsLabel}
+                      title={tray.optionsLabel}
+                      className="min-h-11"
                     >
+                      {tray.optionsLabel}
                       <ChevronDownIcon className="opacity-80" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -483,20 +472,22 @@ export function BatchDownloadBar({
                     />
                     <DropdownMenuSeparator />
                     <DropdownMenuLabel>{detail.downloadFormatLabel}</DropdownMenuLabel>
-                    {BATCH_FORMATS.map((format) => (
-                      <DropdownMenuItem
-                        key={format}
-                        onSelect={() => handleSelect(format)}
-                        className="justify-between gap-4"
-                      >
-                        <span className="font-mono">.{format}</span>
-                        {format === "adx" ? (
-                          <span className="text-xs text-muted-foreground">
-                            {detail.formatHintAdx}
-                          </span>
-                        ) : null}
-                      </DropdownMenuItem>
-                    ))}
+                    <DropdownMenuRadioGroup value={preferredFormat} onValueChange={(value) => setPreferredFormat(value as BatchArchiveFormat)}>
+                      {BATCH_FORMATS.map((format) => (
+                        <DropdownMenuRadioItem
+                          key={format}
+                          value={format}
+                          className="justify-between gap-4"
+                        >
+                          <span className="font-mono">.{format}</span>
+                          {format === "adx" ? (
+                            <span className="text-xs text-muted-foreground">
+                              {detail.formatHintAdx}
+                            </span>
+                          ) : null}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
                     <DropdownMenuSeparator />
                     <DropdownMenuLabel>{tray.groupingLabel}</DropdownMenuLabel>
                     <DropdownMenuRadioGroup
@@ -525,18 +516,7 @@ export function BatchDownloadBar({
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              {status === "packing" || status === "queued" ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={tray.pause}
-                  title={tray.pause}
-                  onClick={pauseAll}
-                >
-                  <PauseIcon />
-                </Button>
-              ) : null}
+
             </>
           )}
         </div>
@@ -653,16 +633,7 @@ export function BatchDownloadBar({
               transition={{ duration: 0.2, ease: EASE_OUT }}
               className="overflow-hidden"
             >
-              <div
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={percent}
-                aria-label={collectionName}
-                className="h-1.5 overflow-hidden rounded-full bg-muted"
-              >
-                <ProgressFill percent={percent} className="bg-primary" />
-              </div>
+              <DownloadProgressBar percent={null} active label={tray.archiving} />
               <p aria-hidden="true" className="mt-1.5 text-xs text-muted-foreground">
                 {statusText}
               </p>
@@ -733,7 +704,7 @@ export function BatchDownloadBar({
         </p>
         <div className="flex max-h-60 flex-col gap-2 overflow-y-auto overscroll-contain">
           {noteJobs.map((entry) => (
-            <DownloadJobNotes key={entry.id} job={entry} locale={locale} />
+            <DownloadJobNotes key={entry.id} job={entry} locale={locale} showSaveConfirmation={false} />
           ))}
         </div>
       </div>

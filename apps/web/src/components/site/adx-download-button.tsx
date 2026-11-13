@@ -10,12 +10,13 @@ import {
   XIcon,
 } from "lucide-react";
 
-import { AnimatePresence, DrawnCheck, EASE_OUT, motion } from "@astrodx/ui/motion";
+import { AnimatePresence, EASE_OUT, motion } from "@astrodx/ui/motion";
 import { Button } from "@astrodx/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -41,6 +42,7 @@ import {
   DownloadJobStatusLine,
   DownloadStorageNotice,
 } from "./downloads/download-job-notes";
+import { DownloadSaveAction, getDownloadSaveAction } from "./downloads/download-save-action";
 import { DownloadSupportPrompt } from "./downloads/download-support-prompt";
 import { formatBytes } from "./downloads/format-bytes";
 import { DownloadVideoOption } from "./downloads/download-video-option";
@@ -64,6 +66,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
   const selectedSourceId = useDownloadsStore((state) => state.selectedSourceId);
   const setSelectedSourceId = useDownloadsStore((state) => state.setSelectedSourceId);
   const preferredFormat = useDownloadsStore((state) => state.preferredFormat);
+  const setPreferredFormat = useDownloadsStore((state) => state.setPreferredFormat);
   const files = spec?.files ?? [];
   const normalizedFileName = typeof spec?.dir === "string" ? spec.dir.trim() : "";
   const canDownload = files.length > 0 && normalizedFileName.length > 0;
@@ -83,6 +86,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
   const isBusy = status === "packing" || status === "archiving" || status === "queued";
   // After a full reload an interrupted job comes back as `paused`; an in-session
   // failure is `error`. Both keep completed loose files and retry unfinished ones.
+  const canPause = status === "packing" || status === "queued";
   const isResumable = status === "paused" || status === "error";
   const progress = { completed: job?.completed ?? 0, total: job?.total ?? 0 };
   const fileProgress = job?.fileProgress ?? [];
@@ -108,19 +112,6 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
           )
         : detailDictionary.sizeEstimate(formatBytes(quotedBytes))
       : null;
-
-  // While this job is shown inline, claim it so the floating tray doesn't also
-  // render it; once we unmount (navigation) the tray takes over its progress.
-  const hasJob = job != null;
-  const presentInline = useDownloadsStore((state) => state.presentInline);
-  const unpresentInline = useDownloadsStore((state) => state.unpresentInline);
-  React.useEffect(() => {
-    if (!hasJob) {
-      return;
-    }
-    presentInline(jobId);
-    return () => unpresentInline(jobId);
-  }, [hasJob, jobId, presentInline, unpresentInline]);
 
   React.useEffect(() => {
     if (!confirmDiscard) {
@@ -157,6 +148,8 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
     });
   }
 
+  const saveAction = getDownloadSaveAction(job ? [job] : []);
+
   const label =
     status === "queued"
       ? downloadsDictionary.queued
@@ -167,16 +160,18 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
         : status === "ready"
           ? downloadsDictionary.readyToSave
           : canDownload
-            ? detailDictionary.onsiteDownload
+            ? status === "success" ? downloadsDictionary.historyRerun : detailDictionary.onsiteDownload
             : detailDictionary.onsitePending;
 
   return (
     <div data-download-inline className="flex min-w-0 max-w-full flex-col gap-2">
-      {isResumable ? (
+      {saveAction ? (
+        <DownloadSaveAction jobs={job ? [job] : []} locale={locale} />
+      ) : isResumable ? (
         <div className="flex flex-wrap items-center gap-2">
-          <MotionButton type="button" whileTap={{ scale: 0.97 }} onClick={() => resume(jobId)}>
+          <MotionButton type="button" size="touch" whileTap={{ scale: 0.97 }} onClick={() => resume(jobId)}>
             <RotateCwIcon data-icon="inline-start" />
-            {downloadsDictionary.resume}
+            {status === "error" ? downloadsDictionary.retry : downloadsDictionary.resume}
             {percent > 0 ? ` · ${percent}%` : null}
           </MotionButton>
           <DropdownMenu>
@@ -257,13 +252,13 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <div data-slot="button-group" className="inline-flex min-w-0 max-w-full">
+          <div data-slot="button-group" className="inline-flex min-w-0 max-w-full flex-wrap gap-2">
             <Button
               ref={triggerRef}
               type="button"
-              disabled={!canDownload || isBusy || status === "ready"}
-              onClick={() => handleSelect(preferredFormat)}
-              className="h-auto min-h-11 min-w-0 shrink whitespace-normal rounded-r-none py-2"
+              disabled={!canPause && (!canDownload || isBusy || status === "ready")}
+              onClick={() => canPause ? pause(jobId) : handleSelect(preferredFormat)}
+              className="h-auto min-h-11 min-w-0 shrink whitespace-normal py-2"
             >
               <motion.span
                 className="inline-flex"
@@ -274,9 +269,9 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
                     : { duration: 0.2 }
                 }
               >
-                <DownloadIcon data-icon="inline-start" />
+                {canPause ? <PauseIcon data-icon="inline-start" /> : <DownloadIcon data-icon="inline-start" />}
               </motion.span>
-              {label}
+              {canPause ? downloadsDictionary.pause : label}
               {canDownload && !isBusy ? (
                 <span className="font-mono text-xs opacity-75">
                   .{preferredFormat}
@@ -287,12 +282,13 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
               <DropdownMenuTrigger asChild>
                 <Button
                   type="button"
-                  size="icon"
+                  variant="outline"
                   disabled={!canDownload || isBusy || status === "ready"}
-                  aria-label={detailDictionary.downloadFormatLabel}
-                  title={detailDictionary.downloadFormatLabel}
-                  className="-ml-px h-auto min-h-11 w-11 self-stretch rounded-l-none border-l border-primary-foreground/25 px-0"
+                  aria-label={downloadsDictionary.optionsLabel}
+                  title={downloadsDictionary.optionsLabel}
+                  className="h-auto min-h-11 self-stretch"
                 >
+                  {downloadsDictionary.optionsLabel}
                   <ChevronDownIcon className="opacity-80" />
                 </Button>
               </DropdownMenuTrigger>
@@ -307,46 +303,29 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
                 />
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>{detailDictionary.downloadFormatLabel}</DropdownMenuLabel>
-                {ARCHIVE_FORMATS.map((format) => (
-                  <DropdownMenuItem
-                    key={format}
-                    onSelect={() => handleSelect(format)}
-                    className="justify-between gap-4"
-                  >
-                    <span className="font-mono">.{format}</span>
-                    {format === "adx" ? (
-                      <span className="text-xs text-muted-foreground">
-                        {detailDictionary.formatHintAdx}
-                      </span>
-                    ) : null}
-                  </DropdownMenuItem>
-                ))}
+                <DropdownMenuRadioGroup value={preferredFormat} onValueChange={(value) => setPreferredFormat(value as ArchiveFormat)}>
+                  {ARCHIVE_FORMATS.map((format) => (
+                    <DropdownMenuRadioItem
+                      key={format}
+                      value={format}
+                      className="justify-between gap-4"
+                    >
+                      <span className="font-mono">.{format}</span>
+                      {format === "adx" ? (
+                        <span className="text-xs text-muted-foreground">
+                          {detailDictionary.formatHintAdx}
+                        </span>
+                      ) : null}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
           {sizeHint && !isBusy ? (
             <span className="text-xs tabular-nums text-muted-foreground">{sizeHint}</span>
           ) : null}
-          <AnimatePresence initial={false} mode="wait">
-            {status === "packing" || status === "queued" ? (
-              <MotionButton
-                key="pause"
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={downloadsDictionary.pause}
-                title={downloadsDictionary.pause}
-                onClick={() => pause(jobId)}
-                whileTap={{ scale: 0.92 }}
-                initial={{ opacity: 0, scale: 0.6, rotate: -45 }}
-                animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                exit={{ opacity: 0, scale: 0.6, rotate: -45 }}
-                transition={{ duration: 0.15, ease: EASE_OUT }}
-              >
-                <PauseIcon />
-              </MotionButton>
-            ) : null}
-          </AnimatePresence>
+
         </div>
       )}
       {hasVideo && !isResumable && status !== "ready" && status !== "success" ? (
@@ -374,7 +353,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
       {job ? (
         <>
           <DownloadJobStatusLine job={job} locale={locale} />
-          <DownloadJobNotes job={job} locale={locale} />
+          <DownloadJobNotes job={job} locale={locale} showSaveConfirmation={false} />
           <DownloadSupportPrompt locale={locale} statuses={[job.status]} />
         </>
       ) : null}
@@ -388,7 +367,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
             transition={{ duration: 0.2, ease: EASE_OUT }}
             className="overflow-hidden"
           >
-            <DownloadProgressBar percent={percent} active label={normalizedFileName} />
+            <DownloadProgressBar percent={null} active label={downloadsDictionary.archiving} />
           </motion.div>
         ) : (status === "packing" || status === "paused") && fileProgress.length > 0 ? (
           <motion.ul
@@ -446,27 +425,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
           </motion.ul>
         ) : null}
       </AnimatePresence>
-      <AnimatePresence mode="wait">
-        {status === "success" || status === "ready" ? (
-          <motion.div
-            key="success"
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.2, ease: EASE_OUT }}
-            className="flex flex-col gap-1 text-sm text-muted-foreground"
-          >
-            {/* The status line above already announces completion; this row is
-                the visual celebration, so it must not say it a second time. */}
-            <p aria-hidden="true" className="flex items-center gap-1.5">
-              <span className="shrink-0 text-emerald-500">
-                <DrawnCheck size={16} />
-              </span>
-              {status === "ready" ? downloadsDictionary.readyToSave : downloadsDictionary.completed}
-            </p>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+
     </div>
   );
 }

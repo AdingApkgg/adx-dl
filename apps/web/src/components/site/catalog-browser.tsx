@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Surface } from "@astrodx/ui/components/page-layout";
 import useSWR from "swr";
 import {
   ArrowDownUpIcon,
@@ -1164,6 +1165,7 @@ export function CatalogBrowser({
         showBatchBar && "pb-[calc(var(--batch-download-bar-height,6rem)+2rem)]"
       )}
     >
+      <Surface aria-label={dictionary.searchLabel} className="flex flex-col gap-4">
       {categories.length > 2 ? (
         // Tab-styled filter buttons; not ARIA tabs because there are no panels —
         // they narrow the one grid below.
@@ -1217,7 +1219,7 @@ export function CatalogBrowser({
           data-catalog-search=""
           // Solid card fill + shadow so the box reads clearly against the page's
           // tinted gradient (a transparent input blends into it).
-          className={cn("h-10 border-border bg-card pl-9 shadow-sm", inputValue && "pr-9")}
+          className={cn("h-11 border-border bg-background pl-9", inputValue && "pr-9")}
           placeholder={dictionary.searchPlaceholder}
           value={inputValue}
           onChange={(event) => {
@@ -1254,6 +1256,7 @@ export function CatalogBrowser({
         locale={locale}
         label={dictionary.randomChart}
         iconOnly
+        className="size-11 shadow-none"
         pool={randomPool}
       />
       </div>
@@ -1264,7 +1267,7 @@ export function CatalogBrowser({
         type="button"
         onClick={() => setFiltersOpen((open) => !open)}
         aria-expanded={filtersOpen}
-        className="flex w-fit items-center gap-1.5 rounded-lg py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        className="flex min-h-11 w-fit items-center gap-2 rounded-lg px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
         <ListFilterIcon className="size-4" />
         {dictionary.advancedFilters}
@@ -1718,6 +1721,8 @@ export function CatalogBrowser({
         </div>
       ) : null}
 
+      </Surface>
+
       {/* 1px pin sentinel for the toolbar below; the negative margin swallows
           its own height plus the column gap so layout is unchanged. */}
       <div
@@ -1752,7 +1757,7 @@ export function CatalogBrowser({
               setCurrentPage(1);
             }}
           >
-            <SelectTrigger aria-labelledby={sortLabelId} className="h-8 bg-card">
+            <SelectTrigger aria-labelledby={sortLabelId} className="min-h-11 bg-card">
               <ArrowDownUpIcon
                 aria-hidden="true"
                 className="size-3.5 text-muted-foreground"
@@ -1774,20 +1779,20 @@ export function CatalogBrowser({
           <Button
             type="button"
             variant={selectMode ? "default" : "outline"}
-            size="sm"
+            size="touch"
             onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
           >
             {selectMode ? dictionary.exitSelectMode : dictionary.selectMode}
           </Button>
           {selectMode ? (
             <>
-              <Button type="button" variant="outline" size="sm" onClick={selectAllFiltered}>
+              <Button type="button" variant="outline" size="touch" onClick={selectAllFiltered}>
                 {dictionary.selectAllFiltered(orderedEntries.length)}
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
+                size="touch"
                 disabled={orderedEntries.length === 0}
                 onClick={invertFilteredSelection}
               >
@@ -1797,7 +1802,7 @@ export function CatalogBrowser({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="sm"
+                  size="touch"
                   onClick={() => {
                     setSelectedIds(selectionUndo.previous);
                     setSelectionUndo(null);

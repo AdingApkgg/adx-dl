@@ -32,7 +32,7 @@ import {
 import { formatEntryTitle, type CatalogEntry } from "@/lib/catalog-shared";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { entrySlug } from "@/lib/route-slug";
-import { cn, TAP_TARGET_44 } from "@astrodx/ui/lib/utils";
+import { cn } from "@astrodx/ui/lib/utils";
 
 type DetailPanel = "media" | "comments" | null;
 
@@ -46,7 +46,7 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
 
   const dictionary = getDictionary(locale);
   const detail = dictionary.detail;
-  const closeLabel = dictionary.downloads.dismiss;
+  const closeLabel = detail.closePanel;
   const title = formatEntryTitle(entry, locale);
   const mediaLabel = entry.assets.has_pv ? detail.pvLabel : detail.audioLabel;
   const router = useRouter();
@@ -141,17 +141,17 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
     <>
       <TooltipProvider>
         <div className="flex flex-col gap-1.5">
-          <div className="flex flex-wrap items-center gap-3" role="group" aria-label={detail.actionsLabel}>
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label={detail.actionsLabel}>
             {/* Visible labels keep preview and gameplay search discoverable on touch screens. */}
             {hasChartPreview ? (
-              <Button variant="secondary" className="min-h-11" asChild>
+              <Button variant="outline" size="touch" asChild>
                 <Link href={buildPreviewHref(entry, locale)}>
                   <PlayCircleIcon data-icon="inline-start" aria-hidden="true" />
                   {detail.chartPreview}
                 </Link>
               </Button>
             ) : null}
-            <Button variant="outline" className="min-h-11" asChild>
+            <Button variant="ghost" size="touch" asChild>
               <a href={`https://search.bilibili.com/video?keyword=${encodeURIComponent(`${entry.title} maimai 手元`)}`} target="_blank" rel="noopener noreferrer" title={detail.chartConfirmHint}>
                 <SearchIcon data-icon="inline-start" aria-hidden="true" />
                 {detail.chartConfirm}
@@ -192,14 +192,7 @@ export function ChartDetailActions({ entry, locale }: ChartDetailActionsProps) {
   );
 }
 
-/**
- * Icon action that stops being icon-only where a tooltip can never appear.
- *
- * Radix Tooltip returns early on touch pointers by design, so on a phone these
- * were four unlabelled squares. Rather than bolt a tap-to-reveal popover on
- * top, the label itself becomes visible under `(hover: none)` — no JS, no
- * hydration branch, and it survives a device that reports both input types.
- */
+/** Secondary actions keep their labels visible with a full touch target. */
 function ActionIconButton({
   label,
   onClick,
@@ -214,17 +207,13 @@ function ActionIconButton({
       <TooltipTrigger asChild>
         <Button
           type="button"
-          variant="outline"
-          size="icon"
-          className={cn(
-            TAP_TARGET_44,
-            "[@media(hover:none)]:size-auto [@media(hover:none)]:h-8 [@media(hover:none)]:gap-1.5 [@media(hover:none)]:px-2.5"
-          )}
+          variant="ghost"
+          size="touch"
           aria-label={label}
           onClick={onClick}
         >
           {children}
-          <span className="sr-only [@media(hover:none)]:not-sr-only" aria-hidden="true">
+          <span aria-hidden="true">
             {label}
           </span>
         </Button>
