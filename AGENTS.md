@@ -27,5 +27,5 @@
 
 ## CI
 
-- PR 上的 `web-check` 跑在 GitHub 托管的 `ubuntu-latest`；只有推到 main / dev / pre 才用 localhost-1 上的自托管 runner（标签 `astrodx-ci`）。推上去的 PR 交给 CI 验证即可，`verify.sh` 用在推送之前。
+- 主站 `web-check`（PR、main / dev / pre 推送及手动检查）与发布工作流的构建、打包任务统一跑在 GitHub 托管的 `ubuntu-latest`，使用 GitHub Actions 缓存。推送本身不发布；推上去的 PR 交给 CI 验证即可，`verify.sh` 用在推送之前。
 - 静态站构建（`next build`）需要从媒体服务器拉的目录数据，那是 CI 的事，`verify.sh` 默认不做。
