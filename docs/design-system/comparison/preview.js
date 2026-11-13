@@ -1,5 +1,5 @@
 /* Development-only same-origin preview. No app imports, new routes or dependencies. */
-const variants = new Set(["fluent", "expressive"]);
+const variants = new Set(["fluent", "expressive", "material2", "material2-sharp"]);
 const paths = { search: "/charts", detail: "/charts/12061", downloads: "/charts/12061" };
 const params = new URLSearchParams(location.search);
 let variant = variants.has(params.get("style")) ? params.get("style") : "fluent";
@@ -14,7 +14,7 @@ let applyVersion = 0;
 
 async function apply() {
   const version = ++applyVersion;
-  if (!sheets.has(variant)) sheets.set(variant, fetch(`${variant}.css`).then((response) => response.text()));
+  if (!sheets.has(variant)) sheets.set(variant, fetch(`${variant.startsWith("material2") ? "material2" : variant}.css`).then((response) => response.text()));
   const css = `${await common}\n${await sheets.get(variant)}`;
   if (version !== applyVersion) return;
   const doc = frame.contentDocument;
