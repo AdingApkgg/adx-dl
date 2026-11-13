@@ -29,6 +29,7 @@ export type SiteDictionary = {
     moreLabel: string;
     randomLabel: string;
     searchLabel: string;
+    findChartsLabel: string;
   };
   language: {
     zh: string;
@@ -653,6 +654,8 @@ export type SiteDictionary = {
     visitLink: (name: string) => string;
   };
   community: {
+    tabLabel: string;
+    homeCta: string;
     navLabel: string;
     title: string;
     description: string;
@@ -662,6 +665,8 @@ export type SiteDictionary = {
     join: (name: string) => string;
   };
   donate: {
+    supportLabel: string;
+    downloadThanks: string;
     navLabel: string;
     title: string;
     description: string;
@@ -848,6 +853,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       moreLabel: "更多",
       randomLabel: "随机",
       searchLabel: "搜索",
+      findChartsLabel: "搜谱",
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "切换主题", light: "浅色", dark: "深色", system: "跟随系统" },
@@ -1462,16 +1468,20 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       visitLink: (name) => `访问${name}`,
     },
     community: {
-      navLabel: "社区",
+      tabLabel: "社群",
+      homeCta: "找群友，一起打歌",
+      navLabel: "玩家社群",
       title: "社区",
       description: "加入玩家社区，交流谱面与游戏心得。",
       intro: "以下是本站相关的玩家交流群组，点击卡片即可加入。",
       join: (name) => `加入 ${name}`,
     },
     donate: {
+      supportLabel: "支持站长",
+      downloadThanks: "本站好用嘛？请我喝杯咖啡呗～",
       navLabel: "捐赠",
-      title: "捐赠支持",
-      description: "如果本站对你有帮助，欢迎请我们喝杯咖啡。",
+      title: "请站长喝杯咖啡",
+      description: "本站好用嘛？请我喝杯咖啡呗～",
       intro: "本站的服务器与流量成本均为个人承担，你的支持能帮助本站持续运营。",
       open: (name) => `前往 ${name}`,
       viewOnExplorer: "在 Tronscan 查看",
@@ -1638,6 +1648,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       moreLabel: "More",
       randomLabel: "Random",
       searchLabel: "Search",
+      findChartsLabel: "Find charts",
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "Toggle theme", light: "Light", dark: "Dark", system: "System" },
@@ -2291,6 +2302,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       visitLink: (name) => `Visit ${name}`,
     },
     community: {
+      tabLabel: "Community",
+      homeCta: "Find friends to play with",
       navLabel: "Community",
       title: "Community",
       description: "Join the player community to chat about charts and the game.",
@@ -2298,9 +2311,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       join: (name) => `Join ${name}`,
     },
     donate: {
+      supportLabel: "Support me",
+      downloadThanks: "Enjoying the site? Buy me a coffee?",
       navLabel: "Donate",
-      title: "Support Us",
-      description: "If this archive helps you, consider buying us a coffee.",
+      title: "Buy me a coffee",
+      description: "Enjoying the site? Buy me a coffee?",
       intro:
         "Servers and bandwidth are paid out of pocket — your support keeps this archive running.",
       open: (name) => `Open ${name}`,
@@ -2477,6 +2492,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       moreLabel: "その他",
       randomLabel: "ランダム",
       searchLabel: "検索",
+      findChartsLabel: "譜面検索",
     },
     language: { zh: "中文", en: "English", ja: "日本語" },
     theme: { toggleLabel: "テーマ切り替え", light: "ライト", dark: "ダーク", system: "システム" },
@@ -3109,6 +3125,8 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       visitLink: (name) => `${name} にアクセス`,
     },
     community: {
+      tabLabel: "交流",
+      homeCta: "仲間と一緒に遊ぼう",
       navLabel: "コミュニティ",
       title: "コミュニティ",
       description: "プレイヤーコミュニティに参加して、譜面やゲームについて交流しましょう。",
@@ -3116,9 +3134,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       join: (name) => `${name}に参加`,
     },
     donate: {
+      supportLabel: "管理人を応援",
+      downloadThanks: "このサイト、気に入った？コーヒーを一杯おごってくれるとうれしいな～",
       navLabel: "寄付",
-      title: "寄付・サポート",
-      description: "本サイトがお役に立ちましたら、コーヒー一杯分の応援をお願いします。",
+      title: "管理人にコーヒーを一杯",
+      description: "このサイト、気に入った？コーヒーを一杯おごってくれるとうれしいな～",
       intro:
         "サーバーと帯域のコストは個人で負担しています。皆さまのサポートが継続運営の支えになります。",
       open: (name) => `${name}を開く`,

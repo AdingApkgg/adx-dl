@@ -35,6 +35,7 @@ import { DownloadSourceMenu, DownloadSourceSummary } from "./download-source-sel
 import { useWakeLock } from "@/components/chart-preview/hooks/use-wake-lock";
 import { jobPercent, useDownloadsStore } from "./downloads-store";
 import { DownloadJobNotes, DownloadJobStatusLine, DownloadStorageNotice } from "./download-job-notes";
+import { DownloadSupportPrompt } from "./download-support-prompt";
 import { DownloadHistoryList } from "./download-history";
 
 /**
@@ -605,6 +606,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                   })}
                 </AnimatePresence>
               </ul>
+              <DownloadSupportPrompt locale={locale} statuses={visible.map((job) => job.status)} />
               {history.length > 0 ? (
                 <div className="border-t border-border/60 pt-2">
                   <button

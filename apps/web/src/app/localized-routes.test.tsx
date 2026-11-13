@@ -211,10 +211,10 @@ describe("localized routes", () => {
       await LocalizedDonatePage({ params: Promise.resolve({ locale: "ja" }) })
     );
 
-    expect(enDonateHtml).toContain("Support Us");
+    expect(enDonateHtml).toContain("Buy me a coffee");
     expect(enDonateHtml).toContain("Afdian");
     expect(enDonateHtml).toContain("TGXpGgXBrFGjQLX8WuS3QAswCGzFyrnp1r");
-    expect(jaDonateHtml).toContain("寄付・サポート");
+    expect(jaDonateHtml).toContain("管理人にコーヒーを一杯");
     expect(jaDonateHtml).toContain("アドレスをコピー");
   });
 
