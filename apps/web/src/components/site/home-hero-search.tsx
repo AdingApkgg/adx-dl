@@ -298,6 +298,7 @@ export function HomeHeroSearch({
         <motion.div
           aria-hidden="true"
           initial={false}
+          data-home-search-glow
           animate={{ opacity: focused ? 1 : 0 }}
           transition={{ duration: 0.3, ease: EASE_OUT }}
           className={cn(
@@ -353,7 +354,7 @@ export function HomeHeroSearch({
             className={cn(
               "h-12 rounded-xl border-border/70 bg-background/70 pl-11 text-base shadow-sm backdrop-blur",
               tone === "brand" &&
-                "border-white/15 bg-white text-slate-950 shadow-[0_14px_38px_rgba(0,0,0,0.22)] focus-visible:border-sky-400 focus-visible:ring-sky-400/30",
+                "border-border bg-[var(--md-field)] text-foreground shadow-none",
               // The real placeholder attribute stays in the HTML for no-JS;
               // hide it via CSS only while the cycling overlay stands in.
               cyclingPlaceholder && "placeholder:text-transparent"
@@ -488,7 +489,7 @@ export function HomeHeroSearch({
             <span
               className={cn(
                 "mr-1 text-xs",
-                tone === "brand" ? "text-white/55" : "text-muted-foreground"
+                "text-muted-foreground"
               )}
             >
               {quickLabel}

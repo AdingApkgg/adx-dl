@@ -83,7 +83,7 @@ export async function RootLayoutShell({
 
   return (
     <html lang={lang} className="h-full antialiased" suppressHydrationWarning>
-      <body className="min-h-full bg-background text-foreground">
+      <body className="adx-site adx-material min-h-full bg-background text-foreground">
         {/* Runs synchronously during HTML parse — first in <body>, before any
             visible content — so the persisted color mode, accent, motion and
             music-player preferences apply without a flash. Must stay inside

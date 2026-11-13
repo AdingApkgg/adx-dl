@@ -324,7 +324,7 @@ function ReactiveAudioPlayer({
             alt=""
             loading="lazy"
             pictureClassName="relative block"
-            className="aspect-square w-full rounded-xl border border-border/60 object-cover"
+            className="aspect-square w-full rounded border border-border/60 object-contain"
           />
         </div>
       ) : null}

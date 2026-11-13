@@ -75,7 +75,7 @@ export function EntryCover({
   entry,
   locale,
   className,
-  fit = "cover",
+  fit = "contain",
   priority = false,
   sizes = "(max-width: 768px) 100vw, 512px",
 }: EntryCoverProps) {

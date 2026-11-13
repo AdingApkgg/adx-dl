@@ -1,7 +1,6 @@
-/* Material 2-inspired 4px direction, opt-in to the catalog, detail and global download
-   component. Keep the user's light/dark theme and accent as the color source.
+/* Material 2-inspired 4px direction for the public site. Keep the user's light/dark theme and accent as the color source.
    Artwork is a separate role: contain + 4px with inset artwork. */
-:where(.adx-material, body:has(main.adx-material), body:has(.adx-download-dock [data-download-manager])) {
+:where(.adx-material, body.adx-site, body:has(.adx-download-dock [data-download-manager])) {
   --md-seed: var(--primary);
   --md-on-action: var(--primary-foreground);
   --md-background: var(--background);
@@ -15,7 +14,7 @@
   --md-artwork-radius: var(--md-radius);
   --md-surface-shadow: 0 1px 3px rgb(32 40 64 / 8%);
 }
-html:not(.dark) :where(.adx-material, body:has(main.adx-material), body:has(.adx-download-dock [data-download-manager])) {
+html:not(.dark) :where(.adx-material, body.adx-site, body:has(.adx-download-dock [data-download-manager])) {
   --md-background: #fafafa;
   --md-surface: #fff;
   --md-surface-high: #fff;
@@ -26,33 +25,33 @@ html:not(.dark) :where(.adx-material, body:has(main.adx-material), body:has(.adx
 }
 /* Indigo is the approved default blue direction; custom accents keep their own
    shared palette. Dark mode uses a light seed and its corresponding on-color. */
-html:not(.dark):is(:not([data-accent]), [data-accent="blue"]) :where(.adx-material, body:has(main.adx-material), body:has(.adx-download-dock [data-download-manager])) {
+html:not(.dark):is(:not([data-accent]), [data-accent="blue"]) :where(.adx-material, body.adx-site, body:has(.adx-download-dock [data-download-manager])) {
   --md-seed: #4255ae;
   --md-on-action: #fff;
 }
-html.dark:is(:not([data-accent]), [data-accent="blue"]) :where(.adx-material, body:has(main.adx-material), body:has(.adx-download-dock [data-download-manager])) {
+html.dark:is(:not([data-accent]), [data-accent="blue"]) :where(.adx-material, body.adx-site, body:has(.adx-download-dock [data-download-manager])) {
   --md-seed: #b8c4ff;
   --md-on-action: #18265f;
 }
 /* These light accents need a deeper action tone for small white labels. */
-html:not(.dark):is([data-accent="orange"], [data-accent="teal"]) :where(.adx-material, body:has(main.adx-material), body:has(.adx-download-dock [data-download-manager])) {
+html:not(.dark):is([data-accent="orange"], [data-accent="teal"]) :where(.adx-material, body.adx-site, body:has(.adx-download-dock [data-download-manager])) {
   --md-seed: color-mix(in oklch, var(--primary) 88%, black);
 }
-body:has(main.adx-material) .site-shell-background { background: var(--md-background); }
-body:has(main.adx-material) [data-site-header] {
+body.adx-site .site-shell-background { background: var(--md-background); }
+body.adx-site [data-site-header] {
   background: var(--md-background);
   border-color: var(--md-outline);
   box-shadow: none;
   backdrop-filter: none;
 }
-body:has(main.adx-material) [data-mobile-tabbar-root] {
+body.adx-site [data-mobile-tabbar-root] {
   background: var(--md-surface);
   border-color: transparent;
   backdrop-filter: none;
 }
-body:has(main.adx-material) [data-site-header] [data-slot="button"] { border-radius: var(--md-radius); }
+body.adx-site [data-site-header] [data-slot="button"] { border-radius: var(--md-radius); }
 .adx-material .text-primary,
-body:has(main.adx-material) [data-site-header] .text-primary { color: var(--md-seed); }
+body.adx-site [data-site-header] .text-primary { color: var(--md-seed); }
 .adx-material.ui-page {
   max-width: 1200px;
   gap: 24px;
@@ -188,15 +187,15 @@ body:has(main.adx-material) [data-site-header] .text-primary { color: var(--md-s
 .adx-download-dock .adx-download-entry { background: var(--md-surface); color: var(--foreground); border-color: var(--md-outline); }
 /* Menus are portaled outside the main/component. Scope them by an active
    migrated page or the manager’s own menu, retaining shared keyboard behavior. */
-body:has(main.adx-material) [data-slot="dropdown-menu-content"],
+body.adx-site [data-slot="dropdown-menu-content"],
 [data-material-download-menu],
-body:has(main.adx-material) [data-slot="select-content"] {
+body.adx-site [data-slot="select-content"] {
   background: var(--md-surface);
   color: var(--foreground);
   border-color: var(--md-outline);
   border-radius: var(--md-radius);
 }
-body:has(main.adx-material) [data-slot="dropdown-menu-radio-item"],
+body.adx-site [data-slot="dropdown-menu-radio-item"],
 [data-material-download-menu] [data-slot="dropdown-menu-radio-item"] { min-height: 44px; border-radius: var(--md-radius); }
 @media (max-width: 767px) {
   .adx-material.ui-page { --type-page-title: 30px; }
@@ -211,3 +210,29 @@ body:has(main.adx-material) [data-slot="dropdown-menu-radio-item"],
 }
 
 .adx-material [data-download-job-notes] { font-size: 12px; }
+
+/* Public-site migration. Keep circular avatars, badges, playback controls and
+   progress rings; ordinary containers and fields share the 4px shape role. */
+.adx-site :is(.rounded-sm,.rounded-md,.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl),
+.adx-site :is([data-slot="input"],[data-slot="textarea"],[data-slot="dialog-content"],[data-slot="sheet-content"],[data-slot="popover-content"],[data-slot="alert-dialog-content"]) {
+  border-radius: var(--md-radius);
+}
+.adx-site :is([data-slot="dialog-content"],[data-slot="sheet-content"],[data-slot="popover-content"],[data-slot="alert-dialog-content"]) {
+  background: var(--md-surface);
+  border-color: var(--md-outline);
+}
+.adx-site { --type-page-title: 32px; }
+.adx-site .max-w-7xl { max-width: 1200px; }
+.adx-site main h1 { color: var(--md-title); font-size: 32px; font-weight: 600; line-height: 1.2; letter-spacing: -.02em; }
+.adx-site [data-chart-card] { background: var(--md-surface); border: 1px solid var(--md-outline); border-radius: var(--md-radius); box-shadow: var(--md-surface-shadow); }
+.adx-site [data-chart-cover-frame] { margin: 12px 12px 0; border-radius: var(--md-artwork-radius); border: 0; background: var(--md-surface); }
+.adx-site [data-cover-artwork] { border-radius: var(--md-artwork-radius); }
+.adx-site button[data-music-player-surface="collapsed"],
+.adx-site :is([data-music-player-surface],[data-music-player-panel]) button.rounded-full:is(.size-11,.size-12) { border-radius: 50%; }
+@media(max-width:767px) {
+  .adx-site { --type-page-title: 30px; }
+  .adx-site main h1 { font-size: 30px; }
+}
+@media(min-width:768px) { .adx-site .adx-detail-page [data-detail-identity] h1 { font-size: 34px; } }
+
+.adx-site [data-home-search-glow] { display: none; }

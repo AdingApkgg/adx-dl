@@ -247,7 +247,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
     <main
       id="main-content"
       className={cn(
-        "mx-auto flex w-full max-w-[82rem] flex-col gap-12 px-4 py-6 md:gap-16 md:px-6 md:py-10",
+        "mx-auto flex w-full max-w-7xl flex-col gap-12 px-4 py-6 md:gap-16 md:px-6 md:py-10",
         styles.page
       )}
     >

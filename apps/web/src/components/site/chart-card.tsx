@@ -93,7 +93,7 @@ type ChartCardProps = {
 export function ChartCard({
   entry,
   locale,
-  coverFit = "cover",
+  coverFit = "contain",
   priority = false,
   sizes,
   aliasHit = null,

@@ -162,7 +162,7 @@ function PlayerArtwork({
       width={160}
       height={160}
       loading="lazy"
-      className={cn("object-cover", className)}
+      className={cn("object-contain", className)}
     />
   );
 }
@@ -1226,7 +1226,7 @@ function MusicPlayerSurface({
                 track={currentTrack}
                 versionId={versionId}
                 alt=""
-                className="size-full"
+                className="size-full p-2"
               />
             </motion.span>
             {currentTrack && duration > 0 ? (
@@ -1340,6 +1340,7 @@ function MusicPlayerSurface({
 
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
+          data-music-player-panel
           side="top"
           align="end"
           sideOffset={10}
