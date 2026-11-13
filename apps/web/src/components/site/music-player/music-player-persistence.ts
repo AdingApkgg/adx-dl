@@ -49,6 +49,7 @@ export function parseMusicPlayerSnapshot(
   const currentTimeValue = finiteNumber(candidate.currentTime);
 
   return {
+    ...(candidate.customQueue === true ? { customQueue: true } : {}),
     ...(versionId ? { versionId } : {}),
     ...(trackId ? { trackId } : {}),
     ...(queue ? { queue } : {}),

@@ -6,6 +6,7 @@ import { CommentsSkeleton } from "@/components/site/comments-skeleton";
 import { useTheme } from "@astrodx/ui/theme";
 import { Button } from "@astrodx/ui/components/button";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { probeCommentServer, watchCommentLoading } from "@/lib/comment-loading";
 
 // Self-hosted Artalk comment backend. The UMD bundle served from `/dist` exposes
 // a `window.Artalk` global and is version-matched to this backend.
@@ -33,8 +34,8 @@ type ArtalkConf = Record<string, unknown>;
 type ArtalkInstance = {
   destroy: () => void;
   setDarkMode: (value: boolean) => void;
-  reload: () => void;
   on: (event: string, handler: () => void) => void;
+  off: (event: string, handler: () => void) => void;
 };
 type ArtalkGlobal = {
   init: (conf: ArtalkConf) => ArtalkInstance;
@@ -62,11 +63,20 @@ function loadScriptOnce(src: string): Promise<void> {
     const script = document.createElement("script");
     script.src = src;
     script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => {
+    const fail = () => {
+      clearTimeout(timer);
+      script.onload = null;
+      script.onerror = null;
+      script.remove();
       scriptPromises.delete(src);
       reject(new Error(`Failed to load ${src}`));
     };
+    const timer = setTimeout(fail, 20_000);
+    script.onload = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    script.onerror = fail;
     document.head.appendChild(script);
   });
   scriptPromises.set(src, promise);
@@ -111,7 +121,7 @@ export function ChartComments({
   // a more reliable dark-mode source than a DOM class read that can race.
   const isDarkRef = React.useRef(isDark);
   // Drives the loading skeleton and the failure card: "loading" keeps the
-  // skeleton up until Artalk's own UI is mounted, "error" swaps in a retry
+  // skeleton up until Artalk has loaded the first comment list, "error" swaps in a retry
   // card so the section never sits blank after a failed third-party fetch.
   const [status, setStatus] = React.useState<"loading" | "ready" | "error">("loading");
   // Bumped by the retry button to re-run the load effect (loadScriptOnce
@@ -121,6 +131,23 @@ export function ChartComments({
 
   React.useEffect(() => {
     let cancelled = false;
+    let stopWatching: (() => void) | undefined;
+    const controller = new AbortController();
+    const deadline = setTimeout(() => fail(), 20_000);
+    const fail = () => {
+      if (cancelled || controller.signal.aborted) return;
+      clearTimeout(deadline);
+      controller.abort();
+      stopWatching?.();
+      try {
+        instanceRef.current?.destroy();
+      } catch {
+        // Clear partial UI even if an incomplete instance cannot destroy itself.
+      }
+      instanceRef.current = null;
+      containerRef.current?.replaceChildren();
+      setStatus("error");
+    };
     // Re-show the skeleton when the thread is re-initialized (e.g. client-side
     // navigation between chart pages tears down and rebuilds the instance).
     // Intentional reset: the prior instance was just destroyed, so without this
@@ -132,9 +159,13 @@ export function ChartComments({
     // `ja` (and any non-bundled locale) self-registers into window.ArtalkI18n
     // once its file loads, so pull it in alongside the main bundle before init.
     const localeSrc = ARTALK_EXTRA_LOCALE_SRC[locale];
-    Promise.all([loadArtalk(), localeSrc ? loadScriptOnce(localeSrc) : null])
+    Promise.all([
+      loadArtalk(),
+      localeSrc ? loadScriptOnce(localeSrc) : null,
+      probeCommentServer(ARTALK_SERVER, controller.signal),
+    ])
       .then(([Artalk]) => {
-        if (cancelled || !containerRef.current) {
+        if (cancelled || controller.signal.aborted || !containerRef.current) {
           return;
         }
         // init/reload can throw synchronously (e.g. a version-mismatched
@@ -148,64 +179,33 @@ export function ChartComments({
             site: ARTALK_SITE,
             locale: artalkLocale,
             darkMode: isDarkRef.current,
-            // The backend ships `darkMode: "inherit"` + `locale: "zh-CN"` with
-            // `useBackendConf`; re-assert our values so the widget tracks the site
-            // theme and page locale, not the backend/system defaults.
-            remoteConfModifier: (conf: ArtalkConf) => {
-              conf.darkMode = isDarkRef.current;
-              conf.locale = artalkLocale;
-            },
+            // Artalk >= 2.10 keeps explicit local theme/locale overrides.
+            // remoteConfModifier was removed; the client loads comments itself.
+            preferRemoteConf: false,
           });
           instanceRef.current = instance;
-          // Load the comment list only after the backend conf is merged, not
-          // synchronously. Artalk fetches the backend conf asynchronously and,
-          // when `remoteConfModifier` is set, skips its own post-conf auto-load
-          // (see `remoteConfModifier || fetch()` in the bundle) — so we must
-          // fetch the list ourselves. Doing it here, before the conf lands,
-          // races a cold (uncached) conf fetch: the first load would render the
-          // list against the pre-merge conf (default Gravatar host + stale dark
-          // mode) and only self-correct on a later refresh once the conf
-          // response is cached. The `mounted` event fires right after
-          // `updateConf()` applies the merged conf (avatar mirror, locale, dark
-          // mode), so the list renders correctly on the very first load.
-          instance.on("mounted", () => {
-            if (cancelled) {
-              return;
+          stopWatching = watchCommentLoading(instance, (nextStatus) => {
+            if (cancelled) return;
+            if (nextStatus === "error") fail();
+            else {
+              clearTimeout(deadline);
+              setStatus("ready");
             }
-            // Re-assert the theme onto the now-ready instance before loading the
-            // list: the standalone setDarkMode effect below runs once at mount
-            // while `instanceRef` is still null (Artalk loads async), so it never
-            // reaches the live instance, which would otherwise keep whatever dark
-            // mode the init/backend conf produced.
-            instance.setDarkMode(isDarkRef.current);
-            instance.reload();
           });
-          // Artalk's editor + list shell is mounted now; drop the skeleton.
-          setStatus("ready");
+          instance.on("mounted", () => {
+            if (!cancelled) instance.setDarkMode(isDarkRef.current);
+          });
         } catch {
-          // A half-initialized widget may have painted; tear it down so a
-          // retry starts from an empty mount point.
-          try {
-            instanceRef.current?.destroy();
-          } catch {
-            // A broken instance may also fail to destroy; the container reset
-            // below still leaves a clean mount point.
-          }
-          instanceRef.current = null;
-          containerRef.current.replaceChildren();
-          setStatus("error");
+          fail();
         }
       })
-      .catch(() => {
-        // Network/load failure: swap the skeleton for the retry card instead of
-        // leaving a blank section under the comments heading.
-        if (!cancelled) {
-          setStatus("error");
-        }
-      });
+      .catch(fail);
 
     return () => {
       cancelled = true;
+      clearTimeout(deadline);
+      controller.abort();
+      stopWatching?.();
       instanceRef.current?.destroy();
       instanceRef.current = null;
     };
@@ -221,8 +221,8 @@ export function ChartComments({
   return (
     <div className="relative">
       {/* Always mounted so the ref exists when Artalk.init runs; stays empty
-          (zero height) until the widget paints into it. */}
-      <div ref={containerRef} />
+          until the first comment request completes. */}
+      <div ref={containerRef} hidden={status !== "ready"} />
       {status === "loading" ? (
         <div role="status" aria-busy="true">
           <span className="sr-only">{labels.commentsLoading}</span>

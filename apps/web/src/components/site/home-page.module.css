@@ -741,7 +741,8 @@
   line-height: 1.72;
 }
 
-@media (max-width: 1100px) {
+/* The 224px sidebar reduces the content width before this grid stacks. */
+@media (max-width: 1324px) {
   .heroGrid {
     grid-template-areas:
       "content"
