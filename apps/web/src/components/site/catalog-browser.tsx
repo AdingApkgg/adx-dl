@@ -1219,7 +1219,7 @@ export function CatalogBrowser({
           data-catalog-search=""
           // Solid card fill + shadow so the box reads clearly against the page's
           // tinted gradient (a transparent input blends into it).
-          className={cn("h-11 border-border bg-background pl-9", inputValue && "pr-9")}
+          className={cn("h-11 border-border bg-background pl-9", inputValue && "pr-12")}
           placeholder={dictionary.searchPlaceholder}
           value={inputValue}
           onChange={(event) => {
@@ -1243,7 +1243,7 @@ export function CatalogBrowser({
             type="button"
             aria-label={dictionary.clearSearch}
             onClick={clearSearch}
-            className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="absolute top-1/2 right-0 inline-flex size-11 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <XIcon className="size-4" />
           </button>
@@ -1713,7 +1713,7 @@ export function CatalogBrowser({
           ) : null}
           {/* Layout-animated so the clear button slides along with the chips. */}
           <motion.div key="clear-all" layout transition={springSoft}>
-            <Button type="button" variant="ghost" size="sm" onClick={clearAllFilters}>
+            <Button type="button" variant="ghost" size="touch" onClick={clearAllFilters}>
               {dictionary.clearFilters}
             </Button>
           </motion.div>
@@ -1870,7 +1870,7 @@ export function CatalogBrowser({
                 </div>
               ) : null}
               {hasActiveFilters ? (
-                <Button type="button" variant="ghost" size="sm" onClick={clearAllFilters}>
+                <Button type="button" variant="ghost" size="touch" onClick={clearAllFilters}>
                   {dictionary.clearFilters}
                 </Button>
               ) : null}
@@ -2071,7 +2071,7 @@ function AllChip({
       onClick={onClick}
       className={cn(
         CHIP_FOCUS_CLASS,
-        "min-h-8 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+        "min-h-11 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
         active
           ? "border-primary bg-primary/15 text-primary"
           : "border-border text-muted-foreground hover:bg-muted/60"
@@ -2124,7 +2124,7 @@ function ToggleChip({
       onClick={onClick}
       className={cn(
         CHIP_FOCUS_CLASS,
-        "flex min-h-8 shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-[color,background-color,border-color,opacity,filter]",
+        "flex min-h-11 shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-[color,background-color,border-color,opacity,filter]",
         // Greyed out: desaturated and faded, whatever tone it would otherwise
         // carry, so an incompatible option reads as unavailable rather than
         // merely unselected.

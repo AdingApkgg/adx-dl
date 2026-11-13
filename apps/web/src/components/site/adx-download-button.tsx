@@ -179,7 +179,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
+                size="touch"
                 aria-label={downloadsDictionary.sourcePicker.switchAndRestart}
                 title={downloadsDictionary.sourcePicker.restartHint}
               >
@@ -204,7 +204,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
             type="button"
             whileTap={{ scale: 0.92 }}
             variant={confirmDiscard ? "destructive" : "ghost"}
-            size="icon"
+            size="icon-touch"
             aria-label={
               confirmDiscard ? downloadsDictionary.confirmDiscard : downloadsDictionary.cancel
             }
@@ -353,7 +353,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
       {job ? (
         <>
           <DownloadJobStatusLine job={job} locale={locale} />
-          <DownloadJobNotes job={job} locale={locale} showSaveConfirmation={false} />
+          <DownloadJobNotes job={job} locale={locale} />
           <DownloadSupportPrompt locale={locale} statuses={[job.status]} />
         </>
       ) : null}

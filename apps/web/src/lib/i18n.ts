@@ -2112,9 +2112,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         troubleshootingLink: "Troubleshooting",
       },
       confirmDiscard: "Click again to discard the downloaded data",
-      errorOffline: "You're offline — completed files are kept; Resume downloads the rest",
-      errorNetwork: "Download failed — completed files are kept; Resume retries the rest",
-      errorGeneric: "Download error — completed files are kept; Resume retries the rest",
+      errorOffline: "You're offline — completed files are kept; choose Retry download when back online",
+      errorNetwork: "Download failed — completed files are kept; choose Retry download for the remaining files",
+      errorGeneric: "Download error — completed files are kept; choose Retry download for the remaining files",
       batchSummary: (charts, files) =>
         charts === 1
           ? `Packing 1 chart, ${files} files total`
@@ -2903,7 +2903,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       managerFailed: "ダウンロード失敗",
       managerDownloading: "ダウンロード中",
       trayTitle: "ダウンロード",
-      dismiss: "閉じる",
+      dismiss: "記録を削除",
       resume: "再開",
       retry: "再試行",
       optionsLabel: "ダウンロード設定",

@@ -25,3 +25,10 @@ test("keeps mobile save confirmation distinct from a pending file save", () => {
   const mobile = { ...job("success"), mobileBatch: true, archives: [{ fileName: "chart.adx", bytes: 1, requested: true, error: false }] };
   expect(downloadManagerSummary([mobile], getDictionary("zh").downloads)).toBe(getDictionary("zh").downloads.managerConfirmSave);
 });
+
+test("removing task data is named differently from closing a panel in every locale", () => {
+  for (const locale of ["zh", "en", "ja"] as const) {
+    const copy = getDictionary(locale);
+    expect(copy.downloads.dismiss).not.toBe(copy.detail.closePanel);
+  }
+});

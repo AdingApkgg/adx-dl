@@ -142,15 +142,15 @@ export async function RootLayoutShell({
               {/* Live2D 看板娘 (bottom-right, wide screens only). Before the
                   dock so its pinned view-transition group paints under it. */}
               <MascotWidget locale={locale} />
-              {/* Lives above the page subtree so an in-flight download keeps
-                  rendering progress after a client-side navigation. */}
-              <DownloadDock locale={locale} />
               <MusicPlayer
                 locale={locale}
                 versions={musicVersions}
                 initialVersionId={initialMusicVersionId}
                 initialTracks={initialMusicTracks}
               />
+              {/* Task controls paint above the same-layer player when space is
+                  tight; menus and modal portals continue to paint above both. */}
+              <DownloadDock locale={locale} />
               {/* Global maimai-style tap feedback rings (decorative). */}
               <TapRipple />
             </PageViewsProvider>

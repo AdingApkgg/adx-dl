@@ -226,15 +226,15 @@ html[data-reduced-motion] [data-marquee="on"] {
     linear-gradient(180deg, color-mix(in oklch, var(--primary) 8%, transparent), transparent 30%);
 }
 
-/* The fixed download dock shares the lower edge with the global player on
-   phones; only the expanded bar needs the reserve (the default collapsed
-   bubble and a disabled player leave the edge free). Desktop has enough
-   horizontal room for one surface on each side. */
+/* Both player surfaces occupy the phone's lower edge. Task panels reserve
+   their actual size; a collapsed bubble must not cover save/history controls. */
 :root {
   --music-player-mobile-reserve: 0rem;
 }
-
 @media (max-width: 47.9375rem) {
+  :root[data-music-player="collapsed"] {
+    --music-player-mobile-reserve: 3.75rem;
+  }
   :root[data-music-player="expanded"] {
     --music-player-mobile-reserve: 4.75rem;
   }

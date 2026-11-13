@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckIcon, DownloadIcon } from "lucide-react";
+import { DownloadIcon } from "lucide-react";
 import { Button } from "@astrodx/ui/components/button";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { useDownloadsStore, type DownloadJob } from "./downloads-store";
@@ -21,18 +21,20 @@ export function getDownloadSaveAction(jobs: readonly DownloadJob[]) {
 export function DownloadSaveAction({ jobs, locale }: { jobs: readonly DownloadJob[]; locale: Locale }) {
   const copy = getDictionary(locale).downloads;
   const saveArchive = useDownloadsStore((state) => state.saveArchive);
-  const confirmSavedBatch = useDownloadsStore((state) => state.confirmSavedBatch);
-  const hasNextJob = useDownloadsStore((state) => state.jobs.some((job) => job.status === "queued"));
   const action = getDownloadSaveAction(jobs);
   if (!action) return null;
+  // Keep the just-clicked save position non-interactive. The separate
+  // confirmation below the file list is deliberate, not the next double tap.
+  if (action.kind === "confirm") {
+    return <p className="flex min-h-11 items-center text-sm text-muted-foreground">{copy.managerConfirmSave}</p>;
+  }
   return (
     <Button type="button" className="h-auto min-h-11 whitespace-normal py-2" onClick={() => {
-      if (action.kind === "save") saveArchive(action.job.id, action.index);
-      else confirmSavedBatch(action.job.id);
+      saveArchive(action.job.id, action.index);
     }}>
-      {action.kind === "save" ? <DownloadIcon data-icon="inline-start" /> : <CheckIcon data-icon="inline-start" />}
-      {action.kind === "save" ? copy.saveArchive : hasNextJob ? copy.confirmSavedBatch : copy.releaseSavedBatch}
-      {action.kind === "save" && action.job.archives!.length > 1 ? (
+      <DownloadIcon data-icon="inline-start" />
+      {copy.saveArchive}
+      {action.job.archives!.length > 1 ? (
         <span className="tabular-nums">{action.index + 1}/{action.job.archives!.length}</span>
       ) : null}
     </Button>

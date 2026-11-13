@@ -111,6 +111,11 @@ export function BatchDownloadBar({
   const selectedSourceId = useDownloadsStore((state) => state.selectedSourceId);
   const setSelectedSourceId = useDownloadsStore((state) => state.setSelectedSourceId);
   const preferredFormat = useDownloadsStore((state) => state.preferredFormat);
+  React.useEffect(() => {
+    // A format change invalidates the earlier confirmation, including changes
+    // coming from the global settings rather than this menu.
+    setPendingFormat(null);
+  }, [preferredFormat]);
   const setPreferredFormat = useDownloadsStore((state) => state.setPreferredFormat);
   const grouping = useDownloadsStore((state) => state.preferredBatchGrouping);
   const setGrouping = useDownloadsStore((state) => state.setPreferredBatchGrouping);
@@ -313,7 +318,8 @@ export function BatchDownloadBar({
   }
 
   function confirmPending() {
-    if (pendingFormat === null) {
+    if (pendingFormat === null || pendingFormat !== useDownloadsStore.getState().preferredFormat) {
+      setPendingFormat(null);
       return;
     }
     beginBatch(pendingFormat);
@@ -358,14 +364,15 @@ export function BatchDownloadBar({
     >
       <div
         ref={barRef}
-        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col gap-2 overflow-y-auto overscroll-contain rounded-2xl border border-border/70 bg-popover/95 p-3 shadow-lg ring-1 ring-foreground/5 backdrop-blur"
+        style={{ maxHeight: "min(50dvh, calc(100dvh - var(--floating-bottom) - 6rem))" }}
+        className="flex w-full max-w-xl flex-col gap-2 overflow-y-auto overscroll-contain rounded-2xl border border-border/70 bg-popover/95 p-3 shadow-lg ring-1 ring-foreground/5 backdrop-blur"
       >
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium tabular-nums">
             {browser.selectedCount(count)}
           </span>
           <span className="flex-1" />
-          <Button type="button" variant="ghost" size="sm" onClick={onClear} disabled={isBusy}>
+          <Button type="button" variant="ghost" size="touch" onClick={onClear} disabled={isBusy}>
             <XIcon data-icon="inline-start" />
             {browser.clearSelection}
           </Button>
@@ -373,7 +380,7 @@ export function BatchDownloadBar({
             <DownloadSaveAction jobs={jobs} locale={locale} />
           ) : isResumable ? (
             <>
-              <Button type="button" size="sm" onClick={resumeAll}>
+              <Button type="button" size="touch" onClick={resumeAll}>
                 <RotateCwIcon data-icon="inline-start" />
                 {status === "error" ? tray.retry : tray.resume}
                 {percent > 0 ? ` · ${percent}%` : null}
@@ -383,7 +390,7 @@ export function BatchDownloadBar({
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
+                    size="touch"
                     aria-label={tray.sourcePicker.switchAndRestart}
                     title={tray.sourcePicker.restartHint}
                   >
@@ -408,7 +415,7 @@ export function BatchDownloadBar({
               <Button
                 type="button"
                 variant={confirmDiscard ? "destructive" : "ghost"}
-                size="icon"
+                size="icon-touch"
                 aria-label={confirmDiscard ? tray.confirmDiscard : tray.cancel}
                 title={confirmDiscard ? tray.confirmDiscard : tray.cancel}
                 onClick={() => {
@@ -427,7 +434,7 @@ export function BatchDownloadBar({
               <div data-slot="button-group" className="inline-flex min-w-0 max-w-full flex-wrap gap-2">
                 <Button
                   type="button"
-                  size="sm"
+                  size="touch"
                   disabled={!canPause && (!canDownload || isBusy)}
                   onClick={() => canPause ? pauseAll() : handleSelect(preferredFormat)}
                   className="h-auto min-h-11 whitespace-normal py-2"
@@ -472,7 +479,7 @@ export function BatchDownloadBar({
                     />
                     <DropdownMenuSeparator />
                     <DropdownMenuLabel>{detail.downloadFormatLabel}</DropdownMenuLabel>
-                    <DropdownMenuRadioGroup value={preferredFormat} onValueChange={(value) => setPreferredFormat(value as BatchArchiveFormat)}>
+                    <DropdownMenuRadioGroup value={preferredFormat} onValueChange={(value) => { setPendingFormat(null); setPreferredFormat(value as BatchArchiveFormat); }}>
                       {BATCH_FORMATS.map((format) => (
                         <DropdownMenuRadioItem
                           key={format}
@@ -577,7 +584,7 @@ export function BatchDownloadBar({
         ) : null}
 
         <AnimatePresence mode="wait">
-          {pendingFormat !== null && !isBusy ? (
+          {pendingFormat !== null && pendingFormat === preferredFormat && !isBusy ? (
             <motion.div
               key="confirm"
               initial={{ opacity: 0, y: -4 }}
@@ -614,12 +621,12 @@ export function BatchDownloadBar({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="sm"
+                  size="touch"
                   onClick={() => setPendingFormat(null)}
                 >
                   {tray.cancel}
                 </Button>
-                <Button type="button" size="sm" onClick={confirmPending}>
+                <Button type="button" size="touch" onClick={confirmPending}>
                   {tray.batchConfirmStart}
                 </Button>
               </div>
@@ -704,7 +711,7 @@ export function BatchDownloadBar({
         </p>
         <div className="flex max-h-60 flex-col gap-2 overflow-y-auto overscroll-contain">
           {noteJobs.map((entry) => (
-            <DownloadJobNotes key={entry.id} job={entry} locale={locale} showSaveConfirmation={false} />
+            <DownloadJobNotes key={entry.id} job={entry} locale={locale} />
           ))}
         </div>
       </div>

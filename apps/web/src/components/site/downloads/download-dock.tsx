@@ -238,6 +238,15 @@ export function DownloadDock({ locale }: { locale: Locale }) {
   const [collapsed, setCollapsed] = React.useState(true);
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const panelId = React.useId();
+  const entryRef = React.useRef<HTMLButtonElement>(null);
+  const collapseRef = React.useRef<HTMLButtonElement>(null);
+  const transferFocus = React.useRef(false);
+  React.useEffect(() => {
+    if (!transferFocus.current) return;
+    const target = collapsed ? entryRef.current : collapseRef.current;
+    target?.focus({ preventScroll: true });
+    transferFocus.current = false;
+  }, [collapsed]);
 
   const reducedMotion = useReducedMotion();
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -343,9 +352,15 @@ export function DownloadDock({ locale }: { locale: Locale }) {
     visible.length > 0
       ? Math.round(visible.reduce((sum, job) => sum + jobPercent(job), 0) / visible.length)
       : 0;
-  const bottomOffset = bottomBars > 0
+  const baseOffset = "calc(var(--floating-bottom) + var(--music-player-mobile-reserve, 0rem))";
+  const stackedOffset = bottomBars > 0
     ? "calc(var(--batch-download-bar-height, 5rem) + var(--floating-bottom) + var(--music-player-mobile-reserve, 0rem) + 0.75rem)"
-    : "calc(var(--floating-bottom) + var(--music-player-mobile-reserve, 0rem))";
+    : baseOffset;
+  // Expanded tasks may cover the batch bar instead of losing their scroll area.
+  // Keep the collapsed entry reachable even when a bottom surface is very tall.
+  const bottomOffset = collapsed
+    ? `min(${stackedOffset}, calc(100dvh - 12rem))`
+    : baseOffset;
 
   return (
     <div
@@ -370,6 +385,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
           collapsed || (visible.length === 0 && !historyOpen) ? (
             <motion.button
               key="tray-collapsed"
+              ref={entryRef}
               layoutId="download-tray"
               type="button"
               initial={{ opacity: 0, y: 12 }}
@@ -380,6 +396,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
               style={{ borderRadius: 20, scale: trayScale }}
               whileTap={{ scale: 0.92 }}
               onClick={() => {
+                transferFocus.current = true;
                 setCollapsed(false);
                 if (visible.length === 0) setHistoryOpen(true);
               }}
@@ -417,7 +434,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ ...springSoft, opacity: { duration: 0.18, ease: EASE_OUT } }}
-              style={{ borderRadius: 16, scale: trayScale, maxHeight: `calc(100dvh - ${bottomOffset} - 1rem)` }}
+              style={{ borderRadius: 16, scale: trayScale, maxHeight: `min(36rem, calc(100dvh - ${bottomOffset} - 6rem))` }}
               className="pointer-events-auto relative isolate flex w-full flex-col overflow-hidden border border-border/70 bg-popover p-0 shadow-lg ring-1 ring-foreground/5"
             >
               <span aria-hidden="true" className="absolute inset-0 -z-10 rounded-[inherit] backdrop-blur" />
@@ -429,7 +446,8 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                 <motion.button
                   type="button"
                   whileTap={{ scale: 0.92 }}
-                  onClick={() => setCollapsed(true)}
+                  ref={collapseRef}
+                  onClick={() => { transferFocus.current = true; setCollapsed(true); }}
                   aria-label={tray.collapse}
                   title={tray.collapse}
                   className={DOCK_ICON_BUTTON_CLASS}
@@ -611,7 +629,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                         />
                         <DownloadJobStatusLine job={job} locale={locale} />
                         <DownloadSaveAction jobs={[job]} locale={locale} />
-                        <DownloadJobNotes job={job} locale={locale} showSaveConfirmation={false} />
+                        <DownloadJobNotes job={job} locale={locale} />
                         {job.status === "packing" ||
                         job.status === "paused" ||
                         job.status === "archiving" ? (

@@ -50,3 +50,9 @@ describe("next download action", () => {
     expect(getDownloadSaveAction([job({ status: "success", archives: undefined })])).toBeNull();
   });
 });
+
+test("saving cannot turn the same primary control into mobile cache release", () => {
+  const saved = job({ status: "success", archives: [{ fileName: "1.adx", bytes: 5, requested: true, error: false }] });
+  const html = renderToStaticMarkup(<DownloadSaveAction jobs={[saved]} locale="zh" />);
+  expect(html).not.toContain("<button");
+});
