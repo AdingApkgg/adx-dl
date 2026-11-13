@@ -1,0 +1,20 @@
+/* Only preview documents opt in; all business behavior belongs to the existing page. */
+html[data-design-concept] { color-scheme: light; }
+html[data-design-concept] nextjs-portal { display: none !important; }
+html[data-design-concept] .ui-page { padding-block: 32px; }
+html[data-design-concept] main article > section:first-of-type > [aria-hidden="true"] { display: none; }
+html[data-design-concept] main article > section:first-of-type { isolation: isolate; }
+html[data-design-concept] [data-detail-identity] { min-width: 0; }
+html[data-design-concept] [data-detail-identity] h1 { overflow-wrap: anywhere; }
+html[data-design-concept] [data-detail-secondary-actions] { padding-top: 16px; }
+html[data-design-concept] [data-download-panel] summary { font-size: 13px; }
+html[data-design-concept] [data-download-task] { font-size: 13px; }
+html[data-design-concept] [data-download-task] > div:not(:first-child) { font-size: 12px; }
+html[data-design-concept] [data-download-manager] { max-width: calc(100vw - 32px); }
+html[data-design-concept] [data-slot="input"] { font-size: 15px; }
+@media (min-width:1024px) {
+ html[data-design-concept] main article > section:first-of-type > .grid { grid-template-columns: 180px minmax(0,1fr); }
+}
+@media (max-width:767px) {
+ html[data-design-concept] .ui-page { padding: 22px 16px; }
+}
