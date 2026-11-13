@@ -450,6 +450,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
     // (globals.css animates only the root snapshot around it).
     <>
     <header
+      data-site-header
       style={{ viewTransitionName: "site-header" }}
       className={cn(
         "sticky top-0 z-20 border-b backdrop-blur transition-colors duration-300",

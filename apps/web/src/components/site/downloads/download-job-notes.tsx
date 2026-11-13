@@ -155,7 +155,7 @@ export function DownloadJobNotes({
         tray.sourcePicker.options[getDownloadSource(job.autoSwitchedTo).copyKey].name;
 
   return (
-    <div className="flex min-w-0 max-w-full flex-col gap-1.5 text-[11px] leading-snug">
+    <div data-download-job-notes className="flex min-w-0 max-w-full flex-col gap-1.5 text-[11px] leading-snug">
       {showMemoryWarning ? (
         <p className="rounded-md bg-amber-500/10 px-2 py-1.5 text-amber-800 dark:text-amber-300">
           {job.mobileMemoryWarning === "unknown-size" ? tray.mobileUnknownSizeHint : tray.mobileLargeChartHint}

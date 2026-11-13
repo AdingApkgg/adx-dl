@@ -136,7 +136,7 @@ export function ChartCard({
   );
 
   const cover = (
-    <div className="relative aspect-square overflow-hidden border-b border-border/60">
+    <div data-chart-cover-frame className="relative aspect-square overflow-hidden border-b border-border/60">
       <EntryCover
         entry={fullEntry}
         locale={locale}
@@ -247,6 +247,7 @@ export function ChartCard({
             onToggleSelect?.();
           }
         }}
+        data-chart-card
         className={cardClassName}
       >
         {body}
@@ -255,7 +256,8 @@ export function ChartCard({
   }
 
   return (
-    <Link href={href} className={cardClassName}>
+    <Link href={href} data-chart-card
+        className={cardClassName}>
       {body}
     </Link>
   );

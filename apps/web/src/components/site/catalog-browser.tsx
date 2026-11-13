@@ -1165,7 +1165,7 @@ export function CatalogBrowser({
         showBatchBar && "pb-[calc(var(--batch-download-bar-height,6rem)+2rem)]"
       )}
     >
-      <Surface aria-label={dictionary.searchLabel} className="flex flex-col gap-4">
+      <Surface data-catalog-controls aria-label={dictionary.searchLabel} className="flex flex-col gap-4">
       {categories.length > 2 ? (
         // Tab-styled filter buttons; not ARIA tabs because there are no panels —
         // they narrow the one grid below.
@@ -1903,6 +1903,7 @@ export function CatalogBrowser({
                 className="h-full"
               >
                 <ChartCard
+                  coverFit="contain"
                   entry={entry}
                   locale={locale}
                   priority={safeCurrentPage === 1 && index < 6}

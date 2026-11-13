@@ -63,10 +63,11 @@ export function DetailHeroCover({ children }: { children: React.ReactNode }) {
         aria-hidden="true"
         variants={coverShadowVariants}
         transition={{ duration: 0.3, ease: EASE_OUT }}
-        className="absolute inset-0 rounded-2xl shadow-2xl shadow-primary/30"
+        className="absolute inset-0 rounded-md shadow-2xl shadow-primary/30"
       />
       <div
-        className="relative aspect-square overflow-hidden rounded-2xl border border-border/60 shadow-xl"
+        data-cover-artwork
+        className="relative aspect-square overflow-hidden rounded-md border border-border/60 shadow-xl"
         style={{ viewTransitionName: "chart-cover" }}
       >
         {children}

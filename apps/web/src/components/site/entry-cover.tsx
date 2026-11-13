@@ -133,6 +133,7 @@ export function EntryCover({
     return (
       <div
         ref={rootRef}
+        data-cover-fit={fit}
         className={cn(
           "relative overflow-hidden rounded-xl",
           fit === "contain" && "bg-muted/45",
@@ -177,6 +178,7 @@ export function EntryCover({
   return (
     <div
       ref={rootRef}
+      data-cover-fit={fit}
       role="img"
       aria-label={cover.placeholder}
       className={cn(

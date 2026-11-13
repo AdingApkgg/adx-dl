@@ -368,7 +368,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
       className={cn(
         // Safe-area aware, and lifted above the batch bar when one is on screen
         // so the fixed bottom surfaces never overlap on phones.
-        "pointer-events-none fixed right-4 z-50 flex w-[calc(100vw-2rem)] max-w-xs flex-col items-end gap-2"
+        "adx-expressive adx-download-dock pointer-events-none fixed right-4 z-50 flex w-[calc(100vw-2rem)] max-w-xs flex-col items-end gap-2"
       )}
       style={{
         bottom: bottomOffset,
@@ -403,10 +403,8 @@ export function DownloadDock({ locale }: { locale: Locale }) {
               aria-label={visible.length > 0 ? `${tray.expand} · ${summaryText}` : tray.historyTitle}
               aria-expanded={false}
               aria-controls={panelId}
-              className="pointer-events-auto relative isolate flex min-h-11 max-w-full flex-wrap justify-end items-center gap-2 border border-border/70 bg-popover/95 px-3 py-2 text-xs font-medium shadow-lg ring-1 ring-foreground/5"
+              className="adx-download-entry pointer-events-auto relative isolate flex min-h-11 max-w-full flex-wrap justify-end items-center gap-2 border border-border/70 bg-popover/95 px-3 py-2 text-xs font-medium shadow-lg ring-1 ring-foreground/5"
             >
-              {/* Blur on a child, not the morphing element, so it doesn't smear mid-morph. */}
-              <span aria-hidden="true" className="absolute inset-0 -z-10 rounded-[inherit] backdrop-blur" />
               {visible.length > 0 ? (
                 <><DownloadIcon className="size-3.5" /><RollingNumber value={visible.length} format={tray.jobsCount} /></>
               ) : (
@@ -434,11 +432,12 @@ export function DownloadDock({ locale }: { locale: Locale }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ ...springSoft, opacity: { duration: 0.18, ease: EASE_OUT } }}
-              style={{ borderRadius: 16, scale: trayScale, maxHeight: `min(36rem, calc(100dvh - ${bottomOffset} - 6rem))` }}
+              style={{
+                // Numeric radius enables Motion corner correction during the morph.
+                borderRadius: 32, scale: trayScale, maxHeight: `min(36rem, calc(100dvh - ${bottomOffset} - 6rem))` }}
               className="pointer-events-auto relative isolate flex w-full flex-col overflow-hidden border border-border/70 bg-popover p-0 shadow-lg ring-1 ring-foreground/5"
             >
-              <span aria-hidden="true" className="absolute inset-0 -z-10 rounded-[inherit] backdrop-blur" />
-              <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2 text-sm font-semibold">
+              <div data-download-manager-header className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2 text-sm font-semibold">
                 <DownloadIcon className="size-4" />
                 <h2>{tray.trayTitle}</h2>
                 <span className="text-xs font-normal text-muted-foreground">{tray.jobsCount(visible.length)}</span>
@@ -455,7 +454,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                   <ChevronDownIcon className="size-3.5" />
                 </motion.button>
               </div>
-              <div className="flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain p-4">
+              <div data-download-manager-body className="flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain p-4">
               {/* Tray-wide notices. The auto-resume line is in its own live
                   region because it reports something the app did on its own,
                   which no per-job status line would ever announce. */}
@@ -570,6 +569,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                                       </motion.button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent
+                                      data-material-download-menu
                                       align="end"
                                       collisionPadding={8}
                                       className="max-h-[min(28rem,calc(100dvh-5rem))] w-[min(20rem,calc(100vw-2rem))] overscroll-contain"

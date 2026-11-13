@@ -31,7 +31,6 @@ import {
   compatibleSourcesFromPng,
 } from "@/components/site/compatible-image";
 import {
-  DetailHeroBackdrop,
   DetailHeroCover,
   RelatedChartRow,
 } from "@/components/site/detail-hero-parallax";
@@ -620,13 +619,6 @@ export function ChartDetailPageView({
   const description = buildChartDescription(entry, locale);
   const title = formatEntryTitle(entry, locale);
   const chartsHref = buildLocalePath("/charts", locale);
-  const heroCoverSources = entry.media.cover_url
-    ? {
-        avif: entry.media.cover_avif,
-        webp: entry.media.cover_webp,
-        png: entry.media.cover_url,
-      }
-    : null;
 
   // Metadata links reuse the catalog's stable version-id filter instead of
   // opening a separate per-version page. Older entries fall back to resolving
@@ -663,7 +655,7 @@ export function ChartDetailPageView({
   const sourceHost = hostnameOf(entry.source_url);
 
   return (
-    <PageShell>
+    <PageShell className="adx-expressive adx-detail-page">
       <SeoJsonLd data={buildChartDetailStructuredData(locale, entry)} />
       <nav
         aria-label={detail.breadcrumbLabel}
@@ -679,32 +671,16 @@ export function ChartDetailPageView({
       </nav>
       {/* The whole chart page is one self-contained article about the chart. */}
       <article className="flex flex-col gap-6">
-      <section className="relative isolate overflow-hidden rounded-2xl border border-border/60" aria-label={title}>
-        <DetailHeroBackdrop>
-          {heroCoverSources ? (
-            <>
-              <CompatibleImage
-                sources={heroCoverSources}
-                alt=""
-                sizes="100vw"
-                pictureClassName="absolute inset-0 block"
-                className="h-full w-full scale-110 object-cover opacity-30 blur-2xl"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/85 to-background/55" />
-            </>
-          ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-card/40 to-fuchsia-500/10" />
-          )}
-        </DetailHeroBackdrop>
-
+      <section data-detail-hero className="relative isolate overflow-hidden rounded-2xl border border-border/60" aria-label={title}>
         <div className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-4 p-4 md:gap-6 md:p-6 lg:grid-cols-[220px_minmax(0,1fr)]">
           <div className="w-full self-start lg:row-span-3">
             <DetailHeroCover>
               <EntryCover
                 entry={entry}
                 locale={locale}
+                fit="contain"
                 priority
-                sizes="(max-width: 1024px) 88px, 220px"
+                sizes="(max-width: 767px) 80px, (max-width: 1023px) 88px, 220px"
                 className="h-full w-full"
               />
             </DetailHeroCover>
@@ -1084,10 +1060,11 @@ export function ChartDetailPageView({
                     href={buildLocalePath(`/charts/${entrySlug(item)}`, locale)}
                     className="group flex h-full items-center gap-3 rounded-xl border border-border/60 bg-card/60 p-2.5 transition-[border-color,background-color,box-shadow] hover:border-primary/40 hover:bg-card hover:shadow-lg hover:shadow-primary/10"
                   >
-                    <div className="relative size-16 shrink-0 overflow-hidden rounded-lg border border-border/60 sm:size-18">
+                    <div data-cover-artwork className="relative size-16 shrink-0 overflow-hidden rounded-md border border-border/60 sm:size-18">
                       <EntryCover
                         entry={toRelatedCoverEntry(item)}
                         locale={locale}
+                        fit="contain"
                         sizes="72px"
                         className="h-full w-full rounded-lg"
                       />
@@ -1137,7 +1114,7 @@ function CatalogPageView({
   intro,
 }: CatalogPageViewProps) {
   return (
-    <PageShell>
+    <PageShell className="adx-expressive adx-catalog-page">
       <SeoJsonLd data={buildListingStructuredData(locale, entries)} />
       <PageHeader title={title} description={description} meta={intro} />
       <CatalogBrowser

@@ -162,6 +162,14 @@ describe("CatalogBrowser", () => {
     });
   });
 
+  test("catalog artwork uses the full image even for a non-square original", () => {
+    const html = renderToStaticMarkup(<CatalogBrowser entries={[buildEntry({})]} locale="en" detailPathPrefix="/en/charts" />);
+    const artwork = [...html.matchAll(/<img\b[^>]*>/g)].map((match) => match[0]).find((tag) => tag.includes('/covers/official-alpha/bg.jpg'));
+    expect(artwork).toBeDefined();
+    expect(artwork).toContain("object-contain");
+    expect(artwork).not.toContain("group-hover:scale-");
+  });
+
   test("renders localized search controls with all-category scope", () => {
     const html = renderToStaticMarkup(
       <CatalogBrowser

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@astrodx/ui/styles/theme.css";
+@import "./material-expressive.css";
 
 /* Design tokens, fonts, the skeleton shimmer and the shared reduced-motion
    guards come from @astrodx/ui/styles/theme.css. Everything below is web-only. */
