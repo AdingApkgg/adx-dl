@@ -7,6 +7,8 @@ import {
 } from "@/lib/download-sources";
 import { getDictionary } from "@/lib/i18n";
 import { AdxDownloadButton } from "./adx-download-button";
+import { DownloadDock } from "./downloads/download-dock";
+import { singleJobId, useDownloadsStore, type DownloadJob } from "./downloads/downloads-store";
 import {
   DownloadSourceSummary,
   downloadSourceStatusClass,
@@ -26,6 +28,44 @@ describe("AdxDownloadButton", () => {
     expect(html).toContain("R2");
     expect(html).toContain("Recommended");
     expect(html).toContain("-- ms");
+  });
+
+  test("shows support inline after success even when the job is hidden from the floating dock", () => {
+    const initial = useDownloadsStore.getInitialState();
+    const previousJobs = initial.jobs;
+    const previousPresented = initial.presented;
+    const job: DownloadJob = {
+      id: singleJobId("39"), kind: "single", title: "39", sourceId: "r2", format: "adx",
+      status: "success", completed: 1, total: 1, receivedBytes: 10, totalBytes: 10,
+      totalBytesEstimated: false, speedBps: 0, etaMs: null, fileProgress: [],
+      archiveCurrentFile: null, error: null, errorKind: null, errorDetail: null,
+      skippedFiles: [], autoSwitchedTo: null, startedAt: 0,
+    };
+    try {
+      // SSR reads the initial snapshot. Mirror the inline presenter claim that
+      // the mounted detail page makes, so the dock must not duplicate this job.
+      initial.jobs = [job];
+      initial.presented = { [job.id]: 1 };
+      for (const locale of ["zh", "en", "ja"] as const) {
+        const html = renderToStaticMarkup(
+          <AdxDownloadButton spec={{ dir: "39", files, groupDir: "00 maimai" }} locale={locale} />
+        );
+        const hint = getDictionary(locale).donate.downloadThanks;
+        expect(html).toContain(hint);
+        expect(html).toContain(`href="${locale === "zh" ? "/donate" : `/${locale}/donate`}"`);
+        expect(renderToStaticMarkup(<DownloadDock locale={locale} />)).not.toContain(hint);
+      }
+      for (const status of ["queued", "packing", "archiving", "ready", "paused", "error"] as const) {
+        initial.jobs = [{ ...job, status }];
+        const html = renderToStaticMarkup(
+          <AdxDownloadButton spec={{ dir: "39", files, groupDir: "00 maimai" }} locale="zh" />
+        );
+        expect(html).not.toContain(getDictionary("zh").donate.downloadThanks);
+      }
+    } finally {
+      initial.jobs = previousJobs;
+      initial.presented = previousPresented;
+    }
   });
 
   test("renders pending copy when there are no files", () => {

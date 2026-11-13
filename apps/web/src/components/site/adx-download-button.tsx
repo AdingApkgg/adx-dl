@@ -41,6 +41,7 @@ import {
   DownloadJobStatusLine,
   DownloadStorageNotice,
 } from "./downloads/download-job-notes";
+import { DownloadSupportPrompt } from "./downloads/download-support-prompt";
 import { formatBytes } from "./downloads/format-bytes";
 import { DownloadVideoOption } from "./downloads/download-video-option";
 import { jobPercent, singleJobId, useDownloadsStore } from "./downloads/downloads-store";
@@ -374,6 +375,7 @@ export function AdxDownloadButton({ spec, locale }: AdxDownloadButtonProps) {
         <>
           <DownloadJobStatusLine job={job} locale={locale} />
           <DownloadJobNotes job={job} locale={locale} />
+          <DownloadSupportPrompt locale={locale} statuses={[job.status]} />
         </>
       ) : null}
       <AnimatePresence>

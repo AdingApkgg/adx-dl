@@ -48,6 +48,7 @@ import {
 } from "./downloads/download-status-text";
 import { DownloadJobNotes, DownloadStorageNotice } from "./downloads/download-job-notes";
 import { DownloadVideoOption } from "./downloads/download-video-option";
+import { DownloadSupportPrompt } from "./downloads/download-support-prompt";
 import {
   chartGroupingDir,
   newBatchJobId,
@@ -723,6 +724,7 @@ export function BatchDownloadBar({
             </motion.p>
           ) : null}
         </AnimatePresence>
+        <DownloadSupportPrompt locale={locale} statuses={status === "success" ? ["success"] : []} />
         {/* Always mounted: a live region that appears together with its text is
             what most screen readers fail to announce, which is exactly how the
             terminal states used to go unreported. */}
