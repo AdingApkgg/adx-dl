@@ -1,0 +1,167 @@
+name: Hosted build and archive benchmark
+
+# Isolated benchmark branch only. No Pages environment, deployment, or write token.
+on:
+  push:
+    branches: [codex/hosted-build-benchmark-20261113]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: node:24.21.0-bookworm
+      options: --cpus=4 --memory=6g --memory-swap=6g --pids-limit=4096
+    defaults:
+      run:
+        shell: bash
+        working-directory: source
+    steps:
+      - name: Checkout the exact published source
+        uses: actions/checkout@v7
+        with:
+          ref: 597ad2b095aa99f52e04b281a683d867140ee50e
+          path: source
+
+      - name: Setup the matching Node runtime
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+
+      - name: Setup the matching Bun runtime
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Download the original enriched catalog
+        uses: actions/download-artifact@v8
+        with:
+          name: indexnow-catalog
+          run-id: 43351083923
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/benchmark-catalog
+
+      - name: Verify source, data, and runner
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 597ad2b095aa99f52e04b281a683d867140ee50e
+          test "$(git rev-parse HEAD^{tree})" = cf23202f5d2dca6ab63bb0ec8c7e1664f03a5aeb
+          cp "$RUNNER_TEMP/benchmark-catalog/index.json" data/catalog/index.json
+          echo '0fdea6a72a584c5b1ce2aa3a89ffe8aeb9a1894612891eb30882bb09e22934f2  data/catalog/index.json' | sha256sum -c -
+          node --version
+          bun --version
+          uname -a
+          lscpu || true
+          df -h . "$RUNNER_TEMP"
+          cat /sys/fs/cgroup/cpu.max /sys/fs/cgroup/memory.max
+          test "$(cat /sys/fs/cgroup/memory.max)" = 6442450944
+          test ! -d apps/web/.next/cache
+          mkdir -p "$RUNNER_TEMP/hosted-benchmark"
+          {
+            printf 'source_commit=597ad2b095aa99f52e04b281a683d867140ee50e\n'
+            printf 'source_tree=cf23202f5d2dca6ab63bb0ec8c7e1664f03a5aeb\n'
+            printf 'catalog_sha256=0fdea6a72a584c5b1ce2aa3a89ffe8aeb9a1894612891eb30882bb09e22934f2\n'
+            printf 'runner=%s\nimage=%s\n' "$RUNNER_NAME" "${ImageOS:-unknown}"
+            cat /sys/fs/cgroup/cpu.max /sys/fs/cgroup/memory.max
+            df -h .
+          } > "$RUNNER_TEMP/hosted-benchmark/inputs.txt"
+
+      - name: Measure cold and cached builds and matching tar archives
+        env:
+          CI: '1'
+          NEXT_TELEMETRY_DISABLED: '1'
+          CIRCLE_NODE_TOTAL: '5'
+          ASTRODX_CI_EXPORT_LINKS: '1'
+        run: |
+          set -euo pipefail
+          bench="$RUNNER_TEMP/hosted-benchmark"
+          export BENCH_DIR="$bench"
+          export BUN_INSTALL_CACHE_DIR="$RUNNER_TEMP/benchmark-bun-cache"
+          export NODE_OPTIONS="--require $GITHUB_WORKSPACE/source/scripts/ci/runner/next-export-links.cjs"
+          NODE_OPTIONS= node <<'NODE' &
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const dir = process.env.BENCH_DIR;
+          const read = (p) => { try { return fs.readFileSync(p, 'utf8').trim(); } catch { return null; } };
+          const timer = setInterval(() => {
+            const sample = { time: Date.now() / 1000 };
+            for (const name of ['memory.current', 'memory.peak', 'memory.events', 'cpu.stat', 'io.pressure']) {
+              sample[name] = read('/sys/fs/cgroup/' + name);
+            }
+            for (const name of ['cpu', 'memory', 'io']) sample['host_' + name] = read('/proc/pressure/' + name);
+            fs.appendFileSync(path.join(dir, 'samples.jsonl'), JSON.stringify(sample) + '\n');
+            if (fs.existsSync(path.join(dir, 'finished'))) clearInterval(timer);
+          }, 2000);
+          NODE
+          monitor=$!
+          trap 'code=$?; touch "$bench/finished"; wait "$monitor" || true; printf "%s\n" "$code" > "$bench/exit-code"; exit "$code"' EXIT
+          phase() {
+            name="$1"; shift
+            start=$(date +%s%N)
+            printf '\nPHASE %s START %s\n' "$name" "$(date -Iseconds)"
+            set +e
+            "$@" 2>&1 | tee "$bench/$name.log"
+            code=$?
+            set -e
+            end=$(date +%s%N)
+            printf '%s\t%s\t%s\t%s\n' "$name" "$start" "$end" "$code" >> "$bench/timings.tsv"
+            for metric in memory.peak memory.events io.pressure cpu.stat; do
+              printf '\nMETRIC %s %s\n' "$name" "$metric"
+              cat "/sys/fs/cgroup/$metric"
+              cp "/sys/fs/cgroup/$metric" "$bench/$name.$metric"
+            done
+            printf 'PHASE %s END exit=%s\n' "$name" "$code"
+            test "$code" -eq 0 || exit "$code"
+          }
+          # Fail early rather than fill the hosted VM. No system cache dropping.
+          free_bytes() { df -PB1 . | awk 'NR==2 {print $4}'; }
+          test "$(free_bytes)" -ge 11811160064
+          phase install timeout 900 bun install --frozen-lockfile
+          phase build-cold timeout 900 bash -c 'cd apps/web && bun run build'
+          test -f apps/web/out/index.html
+          cp apps/web/.next/trace "$bench/trace-cold.jsonl"
+          phase trim-cold rm -rf -- apps/web/.next/server
+          test "$(free_bytes)" -ge 6030915584
+          phase pack-cold timeout 900 tar --dereference --hard-dereference --directory apps/web/out -cf "$RUNNER_TEMP/benchmark-pages.tar" --exclude=.git --exclude=.github --exclude='.[^/]*' .
+          stat -c '%s' "$RUNNER_TEMP/benchmark-pages.tar" > "$bench/archive-cold-bytes"
+          rm -- "$RUNNER_TEMP/benchmark-pages.tar"
+          phase build-warm timeout 900 bash -c 'cd apps/web && bun run build'
+          cp apps/web/.next/trace "$bench/trace-warm.jsonl"
+          phase trim-warm rm -rf -- apps/web/.next/server
+          test "$(free_bytes)" -ge 6030915584
+          phase pack-warm timeout 900 tar --dereference --hard-dereference --directory apps/web/out -cf "$RUNNER_TEMP/benchmark-pages.tar" --exclude=.git --exclude=.github --exclude='.[^/]*' .
+          stat -c '%s' "$RUNNER_TEMP/benchmark-pages.tar" > "$bench/archive-warm-bytes"
+          echo '0fdea6a72a584c5b1ce2aa3a89ffe8aeb9a1894612891eb30882bb09e22934f2  data/catalog/index.json' | sha256sum -c -
+          NODE_OPTIONS= node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const dir = process.env.BENCH_DIR;
+          const phases = fs.readFileSync(path.join(dir, 'timings.tsv'), 'utf8').trim().split('\n').map(line => {
+            const [name, start, end, code] = line.split('\t');
+            return { name, seconds: Number(BigInt(end) - BigInt(start)) / 1e9, exit: Number(code) };
+          });
+          const archives = Object.fromEntries(['cold', 'warm'].map(name => [name, Number(fs.readFileSync(path.join(dir, `archive-${name}-bytes`), 'utf8').trim())]));
+          const result = { source: '597ad2b095aa99f52e04b281a683d867140ee50e', catalogSha256: '0fdea6a72a584c5b1ce2aa3a89ffe8aeb9a1894612891eb30882bb09e22934f2', phases, archives, expectedArchiveBytes: 4957173760 };
+          fs.writeFileSync(path.join(dir, 'result.json'), JSON.stringify(result, null, 2) + '\n');
+          const rows = phases.map(p => `| ${p.name} | ${p.seconds.toFixed(3)} | ${p.exit} |`).join('\n');
+          const summary = `## GitHub 托管 runner 构建对比\n\n固定上次发布代码与目录快照，Node 24.21.0、Bun 1.4.4，4 CPU / 6 GiB / 4 workers。仅构建和打包，没有发布。\n\n| 阶段 | 秒 | 退出码 |\n|---|---:|---:|\n${rows}\n\n归档字节数：${JSON.stringify(archives)}；上次基线：4,957,173,760。\n`;
+          fs.writeFileSync(path.join(dir, '说明.md'), summary);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+          if (Object.values(archives).some(size => size !== result.expectedArchiveBytes)) {
+            console.log('::warning::Archive size differs from the original benchmark; compare file contents before treating timings as equivalent.');
+          }
+          NODE
+
+      - name: Upload measurements only
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hosted-build-benchmark-results
+          path: ${{ runner.temp }}/hosted-benchmark/
+          retention-days: 1
+          if-no-files-found: warn
