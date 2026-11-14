@@ -562,7 +562,7 @@ export function BatchDownloadBar({
           <p className="text-xs text-muted-foreground">{tray.batchSizeSplitHint}</p>
         ) : null}
 
-        <AnimatePresence mode="wait">
+        {/* Invalidated confirmations leave immediately, including their focusable controls. */}
           {pendingFormat !== null && pendingFormat === preferredFormat && !isBusy ? (
             <MotionSurface as="div" pattern="popup"
               key="confirm"
@@ -607,7 +607,9 @@ export function BatchDownloadBar({
                 </Button>
               </div>
             </MotionSurface>
-          ) : status === "archiving" ? (
+          ) : null}
+        <AnimatePresence mode="wait">
+          {status === "archiving" ? (
             <MotionSurface as="div" pattern="disclosure"
               key="archiving"
 

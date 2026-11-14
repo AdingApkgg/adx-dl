@@ -1,0 +1,19 @@
+{
+  "layouts": [],
+  "checks": {
+    "browseKeepsPlayback": true,
+    "addAcrossVersions": true,
+    "playNext": true,
+    "saveQueueAsPlaylist": true,
+    "removeFromPlaylist": true,
+    "localPlaylistPersistence": true,
+    "realAudioFixturePlayback": true,
+    "clearQueue": true,
+    "reAddAfterClear": true,
+    "removeCurrent": true,
+    "reorder": true,
+    "refreshRestoresQueue": true,
+    "deletePlaylist": true
+  },
+  "exceptions": []
+}

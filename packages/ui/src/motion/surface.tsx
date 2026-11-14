@@ -47,6 +47,8 @@ export function MotionSurface<T extends SurfaceTag = "div">({ as, pattern, initi
     initial: reduced || !ready ? false : initial ?? preset.initial,
     animate: controls,
     transition: reduced ? { duration: 0, delay: 0 } : transition ?? preset.transition,
+    inert: !isPresent || props.inert,
+    "aria-hidden": !isPresent ? true : props["aria-hidden"],
     style: { ...style, ...(!isPresent ? { pointerEvents: "none" } : {}) },
   } as unknown as HTMLMotionProps<T>;
   return React.createElement(Tag, motionProps);
