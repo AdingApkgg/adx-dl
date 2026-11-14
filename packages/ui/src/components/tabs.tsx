@@ -4,7 +4,7 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Tabs as TabsPrimitive } from "radix-ui"
 
-import { motion, springSoft } from "../motion"
+import { motion, motionPresets, getMotionTransition, useReducedMotion } from "../motion"
 import { cn } from "../lib/utils"
 
 // Mirrors Radix's active value so each trigger knows whether to host the
@@ -104,6 +104,7 @@ function TabsTrigger({
 }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
   const indicator = React.useContext(TabsIndicatorContext)
   const activeValue = React.useContext(TabsValueContext)
+  const reduced = useReducedMotion()
   const isActive = indicator !== null && activeValue === value
   return (
     <TabsPrimitive.Trigger
@@ -123,9 +124,9 @@ function TabsTrigger({
       {isActive ? (
         <motion.span
           aria-hidden="true"
-          layoutId={indicator.layoutId}
+          layoutId={reduced ? undefined : indicator.layoutId}
           initial={false}
-          transition={springSoft}
+          transition={getMotionTransition(motionPresets.selection.move.scheme, motionPresets.selection.move.tempo, reduced)}
           className={
             indicator.variant === "line"
               ? "absolute bg-foreground group-data-horizontal/tabs:inset-x-0 group-data-horizontal/tabs:bottom-[-5px] group-data-horizontal/tabs:h-0.5 group-data-vertical/tabs:inset-y-0 group-data-vertical/tabs:-right-1 group-data-vertical/tabs:w-0.5"

@@ -7,6 +7,7 @@
 @import "@fontsource-variable/noto-sans";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "./motion.css";
 
 /* Tailwind only scans the app's own directory, so the package points it at
    its own source. The path is relative to this file: apps need not know where
@@ -26,30 +27,6 @@
 }
 .shimmer-sweep {
   animation: skeleton-shimmer 1.8s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html:not([data-motion="on"]) .shimmer-sweep {
-    animation: none !important;
-  }
-  html:not([data-motion="on"]) [data-motion-sensitive] {
-    animation: none !important;
-    transition: none !important;
-  }
-}
-
-/* The in-site "reduce motion" setting mirrors the OS media query above:
-   MotionProvider (../motion) stamps `data-reduced-motion` on <html> when it's on. */
-html[data-reduced-motion] .shimmer-sweep {
-  animation: none !important;
-}
-html[data-motion="off"] *,
-html[data-motion="off"] *::before,
-html[data-motion="off"] *::after {
-  scroll-behavior: auto !important;
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
 }
 
 @custom-variant dark (&:is(.dark *));

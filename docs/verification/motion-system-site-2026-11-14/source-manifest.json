@@ -1,0 +1,38 @@
+{
+  "sourceHashes": {
+    "packages/ui/src/motion/adapters/motion.ts": "988dcfeb6e776c264f8f6ef9fffc0da4be769bfcca0a6735143de01d4e167285",
+    "packages/ui/src/motion/index.tsx": "01e6b766797382974f9dd8cd4068ecb49ab6df6d6dbe6e62c056c99e6f4f2969",
+    "packages/ui/src/motion/presets.ts": "d88c40346734817a93f41d3986cca7adb7f9d257152c66d74b644193fe41ad6d",
+    "packages/ui/src/motion/surface.tsx": "1d9ca8c23fbeac673c9c1c0191142e68d5e9b612dcc334e7b4947f4282849692",
+    "packages/ui/src/motion/progress.ts": "4c01d80a65bda5f0ca821f46139d6c5f1e61dae2d8bb9480253bab4c9ca70083",
+    "packages/ui/src/motion/primitives.tsx": "8036f53efb5886723f66e933829bb1d3ae86ca115e1c8cfa5f45f18c2d523413",
+    "packages/ui/src/motion/provider.tsx": "437b0a16c1bf86f7028913f89a229f0c31533ce556bcce9b79e06ad5050f1380",
+    "packages/ui/src/styles/motion-tokens.css": "bada1e0229afda2a3e84f80c272a9556a9154854a4dc849cef13839eac1cdcea",
+    "packages/ui/src/styles/motion.css": "1a1bb5f2df157149778c0396ebd6cf817746f8f5ab7e009554e1c73d605dfe02",
+    "apps/web/src/components/site/home-hero-search.tsx": "babc737ae15902649ee303176aea3ea39521e1bfed682e4f7707078a9ff00667",
+    "apps/web/src/components/site/home-hero-search.module.css": "e19f6a8b6687b1d29422616f7ee531878f3a2e0474b855328c82ce5e081e36bf",
+    "apps/web/src/components/site/catalog-browser.tsx": "5d54223f4067387a6e9a9b53e42c9baa145003c76f6a22a0c96be31d0b77de04",
+    "apps/web/src/components/site/batch-download-bar.tsx": "337684bad9c8056f504c14ebf9521ccfacfea649c4e1c92e05950a64eaa11ada",
+    "apps/web/src/components/site/downloads/download-dock.tsx": "924f405f64286617d84b0a42245498fdfc1cde56ceafaa550f5d051faf81823c",
+    "apps/web/src/components/site/music-player/music-player.tsx": "37a67ee94861e8a4005ca82a7b24d61b65f804e9815b942195ea532935bdcdd3",
+    "apps/web/src/components/site/scrolling-label.tsx": "d7e4446f6ae06d14835c976ee848ff4dfd74731adc86350e58b8658e2a4f61ae",
+    "apps/web/src/app/globals.css": "0280a644f325a099dbc632d5be13decfcb917375e81c7199374adc890e16cf8a",
+    "apps/web/src/app/page-transition.tsx": "c1cd8ec1c2821dbdd7ed1ce5285325296439d958365a4c9b1047d3802a42269b",
+    "scripts/remote/dev.sh": "e65f455024a7eed05d5a118b9283f799188dd6efc7717e09c7388fed2cd20257",
+    "scripts/generate-motion-css.ts": "22f06b017b115d40a7975d93dc398c09c3e6042fb1414b20a158f3d35a825262",
+    "apps/web/src/app/root-layout-shell.tsx": "267610a11fd63d4c76def8ec95fe8b25a70863e40cb6165550a77699aa39cd2e"
+  },
+  "verificationScriptHashes": {
+    "scripts/remote/check-motion-native.mjs": "d78e970db3a0c9cacfe74b882926f5c6ef5eaad30e7ff3bb6f3ff7d7dbe6e71a",
+    "scripts/remote/check-motion-site.mjs": "49d7682292cede02bbe1d0a0fc13e09adfd00d7a767c368dca9123f386f2b292",
+    "scripts/remote/check-motion.mjs": "bfce5b57c701f08245f2ae4df322a7731ba6eea191c784347f4f4a9dc6817c1b"
+  },
+  "previewBefore": true,
+  "previewAfter": true,
+  "previewDirectory": "/home/i/astrodx-verify/dev-motion-site-20261114",
+  "siteJob": "motion-site-20261114-native-final",
+  "nativeJob": "motion-native-20261114-accepted",
+  "foundationJob": "motion-foundation-20261114-native-final",
+  "nativeAccepted": true,
+  "browser": "145.0.7632.6"
+}

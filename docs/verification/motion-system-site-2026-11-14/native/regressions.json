@@ -1,0 +1,105 @@
+[
+  {
+    "change": "root-selector",
+    "job": "motion-native-20261114-r1",
+    "status": "failed",
+    "error": "AssertionError [ERR_ASSERTION]: {\"types\":[\"adx-document\"],\"animations\":[{\"name\":\"-ua-view-transition-group-anim-root\",\"pseudo\":\"::view-transition-group(root)\",\"duration\":250,\"state\":\"running\"}],\"header\":{\"name\":\"site-header\",\"top\":0,\"oldDisplay\":\"none\",\"newAnimation\":\"none\",\"groupAnimation\":\"none\"},\"reduced\":false,\"mode\":\"system\"}",
+    "groups": []
+  },
+  {
+    "change": "early-opt-in",
+    "job": "motion-native-20261114-r6",
+    "status": "failed",
+    "error": "AssertionError [ERR_ASSERTION]: all native acceptance groups must pass\n\nfalse !== true\n",
+    "groups": [
+      {
+        "name": "real native link, lifecycle and pinned chrome",
+        "passed": true,
+        "error": null
+      },
+      {
+        "name": "native guide to catalog",
+        "passed": false,
+        "error": "AssertionError [ERR_ASSERTION]: expected native animation, but incoming viewTransition is absent: {\"active\":false,\"time\":262.7000000476837,\"rules\":[\"@view-transition { navigation: auto; }\"],\"links\":[{\"href\":\"/_next/static/chunks/apps_web_src_app_globals_1wvyn-h.css\",\"ready\":true,\"parent\":\"HEAD\"}]}\n\ntrue !== false\n"
+      },
+      {
+        "name": "OS reduced motion disables native snapshots",
+        "passed": true,
+        "error": null
+      },
+      {
+        "name": "site off overrides OS full motion",
+        "passed": true,
+        "error": null
+      },
+      {
+        "name": "site on overrides OS reduced motion",
+        "passed": true,
+        "error": null
+      },
+      {
+        "name": "reducing during native entrance cancels motion",
+        "passed": true,
+        "error": null
+      },
+      {
+        "name": "390px native navigation and interaction after finish",
+        "passed": true,
+        "error": null
+      },
+      {
+        "name": "native history back and forward",
+        "passed": false,
+        "error": "AssertionError [ERR_ASSERTION]: expected native animation, but incoming viewTransition is absent: {\"active\":false,\"time\":525,\"rules\":[\"@view-transition { navigation: auto; }\"],\"links\":[{\"href\":\"/_next/static/chunks/apps_web_src_app_globals_1wvyn-h.css\",\"ready\":true,\"parent\":\"HEAD\"},{\"href\":\"/_next/static/chunks/apps_web_src_components_site_0kq_ldd._.css\",\"ready\":true,\"parent\":\"HEAD\"}]}\n\ntrue !== false\n"
+      }
+    ]
+  },
+  {
+    "change": "parsed-content",
+    "job": "motion-native-20261114-r7",
+    "status": "failed",
+    "error": "AssertionError [ERR_ASSERTION]: all native acceptance groups must pass\n\nfalse !== true\n",
+    "groups": [
+      {
+        "name": "real native link, lifecycle and pinned chrome",
+        "passed": true,
+        "error": null
+      },
+      {
+        "name": "native guide to catalog",
+        "passed": true,
+        "error": null
+      },
+      {
+        "name": "OS reduced motion disables native snapshots",
+        "passed": true,
+        "error": null
+      },
+      {
+        "name": "site off overrides OS full motion",
+        "passed": true,
+        "error": null
+      },
+      {
+        "name": "site on overrides OS reduced motion",
+        "passed": true,
+        "error": null
+      },
+      {
+        "name": "reducing during native entrance cancels motion",
+        "passed": true,
+        "error": null
+      },
+      {
+        "name": "390px native navigation and interaction after finish",
+        "passed": true,
+        "error": null
+      },
+      {
+        "name": "native history back and forward",
+        "passed": false,
+        "error": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ null\n- 'site-header'\n"
+      }
+    ]
+  }
+]

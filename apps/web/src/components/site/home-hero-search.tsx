@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { SearchIcon } from "lucide-react";
-import { useMotionValue, useSpring, type Variants } from "framer-motion";
+import { useMotionValue, useSpring } from "framer-motion";
 
-import { AnimatePresence, EASE_OUT, motion, springSoft, useReducedMotion } from "@astrodx/ui/motion";
+import { AnimatePresence, motion, motionTokens, motionPresets, MotionSurface, getSemanticTransition, toMotionSpring, useMotionActivity, useReducedMotion } from "@astrodx/ui/motion";
 import styles from "@/components/site/home-hero-search.module.css";
 import { Button } from "@astrodx/ui/components/button";
 import { Input } from "@astrodx/ui/components/input";
@@ -49,13 +49,11 @@ const SUGGESTION_LIMIT = 6;
 // Short debounce: suggestions should feel immediate but not churn per keystroke.
 const SUGGEST_DEBOUNCE_MS = 150;
 
-const MotionLink = motion.create(Link);
-
 // Rotating example queries live in the dictionary: the alias example only
 // means anything to a reader of that language, so 「潘多拉」 was advertising a
 // Chinese query to English visitors. The search index only loads on first
 // focus, so the examples stay copy rather than data.
-const PLACEHOLDER_CYCLE_MS = 3200;
+const PLACEHOLDER_CYCLE_MS = motionPresets.ambient.loop.placeholderCycleMs;
 
 // Hydration + hover-capability detection without setState-in-effect: both are
 // external facts (client vs static HTML, pointer hardware) read via
@@ -64,20 +62,14 @@ function subscribeToNothing() {
   return () => {};
 }
 
-const HOVER_QUERY = "(hover: hover)";
+const HOVER_QUERY = "(hover: hover) and (pointer: fine)";
 
 function subscribeToHoverCapable(onChange: () => void) {
+  if (typeof window.matchMedia !== "function") return () => {};
   const media = window.matchMedia(HOVER_QUERY);
   media.addEventListener("change", onChange);
   return () => media.removeEventListener("change", onChange);
 }
-
-// Transform-only mount cascade: chips must stay fully visible in the static
-// HTML, so the hidden state offsets y but never touches opacity.
-const chipVariants: Variants = {
-  hidden: { y: 6 },
-  visible: { y: 0 },
-};
 
 // The page only hands us the locale-prefixed search path; recover the locale
 // from it so suggestion labels and detail links localize without a prop change.
@@ -105,6 +97,8 @@ export function HomeHeroSearch({
   const locale = localeFromHref(searchHref);
   const dictionary = getDictionary(locale);
   const reduced = useReducedMotion();
+  const sceneRef = React.useRef<HTMLDivElement>(null);
+  const motionActive = useMotionActivity(sceneRef);
   const [query, setQuery] = React.useState(initialQuery);
   // The committed suggestion query: debounced, never set mid-IME-composition.
   const [suggestQuery, setSuggestQuery] = React.useState("");
@@ -144,7 +138,7 @@ export function HomeHeroSearch({
   // fresh array per render costs nothing — and React Compiler refuses to
   // preserve a useMemo whose dependency is a shared dictionary array.
   const placeholderPhrases = [placeholder, ...dictionary.home.searchExamples];
-  const cyclingPlaceholder = mounted && !reduced && !focused && query === "";
+  const cyclingPlaceholder = mounted && motionActive && !focused && query === "";
 
   React.useEffect(() => {
     if (!cyclingPlaceholder) return;
@@ -180,29 +174,31 @@ export function HomeHeroSearch({
   // does not gate style-bound motion values, so this is gated by hand.
   const hoverCapable = React.useSyncExternalStore(
     subscribeToHoverCapable,
-    () => window.matchMedia(HOVER_QUERY).matches,
+    () => typeof window.matchMedia === "function" && window.matchMedia(HOVER_QUERY).matches,
     () => false
   );
-  const magnetic = hoverCapable && !reduced;
+  const magnetic = hoverCapable && motionActive;
 
   const magnetX = useMotionValue(0);
   const magnetY = useMotionValue(0);
-  const submitX = useSpring(magnetX, { stiffness: 320, damping: 26, mass: 0.5 });
-  const submitY = useSpring(magnetY, { stiffness: 320, damping: 26, mass: 0.5 });
+  const submitX = useSpring(magnetX, toMotionSpring(motionTokens.schemes.standard.spatial.fast));
+  const submitY = useSpring(magnetY, toMotionSpring(motionTokens.schemes.standard.spatial.fast));
 
   React.useEffect(() => {
     if (!magnetic) {
       magnetX.set(0);
       magnetY.set(0);
+      submitX.jump(0);
+      submitY.jump(0);
     }
-  }, [magnetic, magnetX, magnetY]);
+  }, [magnetic, magnetX, magnetY, submitX, submitY]);
 
   const onSubmitPointerMove = (event: React.PointerEvent<HTMLSpanElement>) => {
     if (!magnetic) return;
     const rect = event.currentTarget.getBoundingClientRect();
     // -0.5..0.5 across the padded hitbox → a lean of up to ±8px.
-    magnetX.set(((event.clientX - rect.left) / rect.width - 0.5) * 16);
-    magnetY.set(((event.clientY - rect.top) / rect.height - 0.5) * 16);
+    magnetX.set(((event.clientX - rect.left) / rect.width - 0.5) * motionTokens.distance.sm * 2);
+    magnetY.set(((event.clientY - rect.top) / rect.height - 0.5) * motionTokens.distance.sm * 2);
   };
   const onSubmitPointerLeave = () => {
     magnetX.set(0);
@@ -276,8 +272,8 @@ export function HomeHeroSearch({
   };
 
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-3">
-      <motion.form
+    <div ref={sceneRef} className="flex w-full max-w-2xl flex-col gap-3">
+      <form
         onSubmit={submit}
         action={searchHref}
         method="get"
@@ -288,19 +284,15 @@ export function HomeHeroSearch({
         // z-50 no longer competes globally — the chips' own transforms would
         // otherwise paint over it in DOM order.
         className="relative isolate z-30 flex gap-2"
-        initial={false}
-        animate={{ scale: focused ? 1.005 : 1 }}
-        transition={springSoft}
+        style={{ transform: !reduced && focused ? "scale(1.005)" : "none", transitionProperty: "transform", transitionDuration: "var(--adx-motion-duration-fast)", transitionTimingFunction: "var(--adx-motion-easing-standard)" }}
       >
         {/* Focus glow echoing the h1 gradient: pre-blurred, crossfaded via
             opacity only (never animate filter). Decorative, so opacity:0 in
             the static HTML is fine. */}
-        <motion.div
+        <div
           aria-hidden="true"
-          initial={false}
           data-home-search-glow
-          animate={{ opacity: focused ? 1 : 0 }}
-          transition={{ duration: 0.3, ease: EASE_OUT }}
+          style={{ opacity: focused ? 1 : 0, transition: "opacity var(--adx-motion-duration-fast) var(--adx-motion-easing-enter)" }}
           className={cn(
             "pointer-events-none absolute -inset-2 -z-10 rounded-2xl blur-lg",
             tone === "brand"
@@ -369,29 +361,23 @@ export function HomeHeroSearch({
               )}
             >
               <AnimatePresence mode="wait" initial={false}>
-                <motion.span
+                <MotionSurface as="span" pattern="popup"
                   key={exampleIndex}
-                  initial={{ y: 10, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -10, opacity: 0 }}
-                  transition={{ duration: 0.25, ease: EASE_OUT }}
+
                   className="truncate"
                 >
                   {placeholderPhrases[exampleIndex]}
-                </motion.span>
+                </MotionSurface>
               </AnimatePresence>
             </span>
           ) : null}
           <AnimatePresence>
             {showList ? (
-              <motion.ul
+              <MotionSurface as="ul" pattern="popup"
                 id={listboxId}
                 role="listbox"
                 aria-label={dictionary.home.searchSuggestionsLabel}
-                initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, transition: { duration: 0.12, ease: EASE_OUT } }}
-                transition={{ duration: 0.18, ease: EASE_OUT }}
+
                 className="absolute top-full right-0 left-0 z-50 mt-2 origin-top overflow-hidden rounded-xl border border-border/70 bg-popover py-1 text-popover-foreground shadow-lg"
               >
                 {suggestions.map((result, suggestionIndex) => {
@@ -423,8 +409,9 @@ export function HomeHeroSearch({
                           // One shared layoutId so the highlight glides between
                           // rows on keyboard/mouse moves instead of jumping.
                           <motion.span
-                            layoutId="hero-suggestion-highlight"
-                            transition={springSoft}
+                            layoutId={reduced ? undefined : `${listboxId}-highlight`}
+                            initial={false}
+                            transition={getSemanticTransition("selection", reduced)}
                             aria-hidden="true"
                             className="absolute inset-x-1 inset-y-0.5 rounded-lg bg-accent"
                           />
@@ -442,7 +429,7 @@ export function HomeHeroSearch({
                     </li>
                   );
                 })}
-              </motion.ul>
+              </MotionSurface>
             ) : null}
           </AnimatePresence>
         </div>
@@ -453,7 +440,7 @@ export function HomeHeroSearch({
           onPointerMove={onSubmitPointerMove}
           onPointerLeave={onSubmitPointerLeave}
         >
-          <motion.span className="block" style={{ x: submitX, y: submitY }}>
+          <motion.span className="block" style={{ x: magnetic ? submitX : 0, y: magnetic ? submitY : 0 }}>
             <Button
               type="submit"
               size="lg"
@@ -474,16 +461,12 @@ export function HomeHeroSearch({
             </Button>
           </motion.span>
         </span>
-      </motion.form>
+      </form>
 
       {genres.length > 0 ? (
         <motion.div
           className="flex flex-wrap items-center gap-1.5"
-          initial="hidden"
-          animate="visible"
-          // Stagger lives on the parent so each chip's own transition stays
-          // delay-free for hover/tap and hover-exit.
-          variants={{ visible: { transition: { staggerChildren: 0.04 } } }}
+          initial={false}
         >
           {quickLabel ? (
             <span
@@ -496,20 +479,17 @@ export function HomeHeroSearch({
             </span>
           ) : null}
           {genres.map((genre) => (
-            <MotionLink
+            <Link
               key={genre.id}
               href={`${searchHref}?genre=${genre.id}`}
-              variants={chipVariants}
-              whileHover={{ scale: 1.06, y: -1 }}
-              whileTap={{ scale: 0.94 }}
-              transition={springSoft}
+              data-motion-press="css"
               className={cn(
                 "rounded-full border px-3 py-1 text-xs font-medium opacity-80 transition-opacity hover:opacity-100",
                 genre.badge
               )}
             >
               {genre.label}
-            </MotionLink>
+            </Link>
           ))}
         </motion.div>
       ) : null}

@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { animate, useMotionValue, useSpring } from "framer-motion";
 import {
   AlertCircleIcon,
   ArrowLeftRightIcon,
@@ -18,10 +17,15 @@ import {
 import {
   AnimatePresence,
   DrawnCheck,
-  EASE_OUT,
+  MotionSurface,
+  getSemanticTransition,
+  getPressTarget,
+  motionPresets,
+  motionTokens,
+  useMotionProgress,
+  useMotionActivity,
   RollingNumber,
   motion,
-  springSoft,
   useReducedMotion,
 } from "@astrodx/ui/motion";
 import {
@@ -58,18 +62,6 @@ const SOURCE_PROBE_REFRESH_MS = 5 * 60_000;
 const DOCK_ICON_BUTTON_CLASS =
   "inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-/** True while the tab is visible — stops infinite sweep loops in hidden tabs. */
-function usePageVisible(): boolean {
-  const [visible, setVisible] = React.useState(true);
-  React.useEffect(() => {
-    const update = () => setVisible(!document.hidden);
-    update();
-    document.addEventListener("visibilitychange", update);
-    return () => document.removeEventListener("visibilitychange", update);
-  }, []);
-  return visible;
-}
-
 type DownloadProgressBarProps = {
   /** Raw store percent (0–100), or null when the total is unknown (indeterminate). */
   percent: number | null;
@@ -82,8 +74,7 @@ type DownloadProgressBarProps = {
 
 /**
  * Progress track shared by the dock rows and the inline chart-page button. The
- * fill is a spring-driven scaleX (transform-only, replacing the old width
- * transition); aria values stay bound to the raw store numbers.
+ * fill uses bounded interpolation; aria values stay bound to the raw store numbers.
  */
 export function DownloadProgressBar({
   percent,
@@ -91,47 +82,31 @@ export function DownloadProgressBar({
   label,
   fillClassName,
 }: DownloadProgressBarProps) {
-  const reduced = useReducedMotion();
-  const pageVisible = usePageVisible();
-  const fraction = percent === null ? 1 : Math.min(100, Math.max(0, percent)) / 100;
-  const target = useMotionValue(fraction);
-  const spring = useSpring(target, { stiffness: 240, damping: 34, mass: 0.8 });
-
-  React.useEffect(() => {
-    target.set(fraction);
-  }, [fraction, target]);
+  const ref = React.useRef<HTMLDivElement>(null);
+  const motionActive = useMotionActivity(ref);
+  const fraction = percent === null ? 1 : Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) / 100 : 0;
+  const scaleX = useMotionProgress(fraction);
 
   return (
     <div
+      ref={ref}
       role="progressbar"
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-valuenow={percent ?? undefined}
+      aria-valuenow={percent === null ? undefined : fraction * 100}
       aria-label={label}
       className="relative h-1.5 w-full max-w-full overflow-hidden rounded-full bg-muted"
     >
-      {percent === null ? (
-        <motion.div
-          className={cn("h-full w-1/3 rounded-full", fillClassName ?? "bg-primary/50")}
-          animate={active && !reduced && pageVisible ? { x: ["-100%", "300%"] } : undefined}
-          transition={{ duration: 1.4, repeat: Infinity, ease: "linear" }}
-        />
-      ) : (
-        <motion.div
-          className={cn("h-full w-full origin-left rounded-full", fillClassName ?? "bg-primary")}
-          // Style-bound values need the raw target when reduced motion is enabled.
-          style={{ scaleX: reduced ? target : spring }}
-        />
-      )}
-      {percent !== null && active && !reduced && pageVisible ? (
-        <motion.div
-          aria-hidden="true"
-          className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent dark:via-white/25"
-          initial={{ x: "-110%" }}
-          animate={{ x: "320%" }}
-          transition={{ duration: 1.4, repeat: Infinity, ease: "linear", repeatDelay: 0.4 }}
-        />
-      ) : null}
+      <motion.div
+        className={cn("h-full w-full origin-left rounded-full", fillClassName ?? "bg-primary")}
+        style={{ scaleX }}
+      />
+      <div
+        aria-hidden="true"
+        data-motion-loop="download-sweep"
+        className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent dark:via-white/25"
+        style={{ animationPlayState: active && motionActive ? "running" : "paused", opacity: active && motionActive ? 1 : 0 }}
+      />
     </div>
   );
 }
@@ -151,6 +126,10 @@ function ConfirmDismissButton({
   confirmHint: string;
 }) {
   const [armed, setArmed] = React.useState(false);
+  const reducedMotion = useReducedMotion();
+  const armedAt = React.useRef(0);
+  const attentionAllowed = React.useRef(false);
+  React.useEffect(() => { if (reducedMotion) attentionAllowed.current = false; }, [reducedMotion]);
 
   React.useEffect(() => {
     if (!armed) {
@@ -163,11 +142,13 @@ function ConfirmDismissButton({
   return (
     <motion.button
       type="button"
-      whileTap={{ scale: 0.92 }}
+      whileTap={getPressTarget(reducedMotion)}
       onClick={() => {
         if (armed) {
           onConfirm();
         } else {
+          attentionAllowed.current = !reducedMotion;
+          armedAt.current = Date.now();
           setArmed(true);
         }
       }}
@@ -191,21 +172,27 @@ function ConfirmDismissButton({
             stroke="currentColor"
             strokeWidth={1.5}
             strokeLinecap="round"
-            initial={{ pathLength: 1 }}
-            animate={{ pathLength: 0 }}
-            transition={{ duration: 3, ease: "linear" }}
+            initial={reducedMotion ? false : { pathLength: 1 }}
+            animate={{ pathLength: reducedMotion ? 1 : 0 }}
+            transition={{ duration: reducedMotion ? 0 : Math.max(0, 3000 - (Date.now() - armedAt.current)) / 1000, ease: "linear" }}
           />
         </svg>
       ) : null}
       <motion.span
         className="flex"
-        animate={armed ? { x: [0, -2.5, 2.5, -1.5, 1.5, 0] } : { x: 0 }}
-        transition={armed ? { duration: 0.35, ease: "easeInOut" } : { duration: 0.15 }}
+        animate={{ x: armed && attentionAllowed.current && !reducedMotion ? [...motionPresets.feedback.attention.x] : 0 }}
+        transition={{ duration: reducedMotion ? 0 : motionPresets.feedback.attention.durationMs / 1000, ease: motionTokens.easing.standard }}
       >
         <XIcon className="size-3.5" />
       </motion.span>
     </motion.button>
   );
+}
+
+/** Capture the first presentation; parent updates must not interrupt its draw. */
+function DownloadSuccessMark({ animate }: { animate: boolean }) {
+  const [animateOnMount] = React.useState(animate);
+  return <DrawnCheck size={14} animateOnMount={animateOnMount} />;
 }
 
 type GhostFlight = {
@@ -251,9 +238,17 @@ export function DownloadDock({ locale }: { locale: Locale }) {
   const reducedMotion = useReducedMotion();
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const [ghost, setGhost] = React.useState<GhostFlight | null>(null);
-  // The pill/tray "catch" pulse. Driven imperatively when the ghost lands, so
-  // it inherits the ghost's reduced-motion gate.
-  const trayScale = useMotionValue(1);
+  const layoutId = React.useId();
+  const seenSuccess = React.useRef(new Set<string>());
+  React.useEffect(() => {
+    for (const job of jobs) {
+      if (job.status === "success") seenSuccess.current.add(`${job.id}:${job.startedAt}`);
+    }
+  }, [jobs]);
+  const motionActive = useMotionActivity(containerRef);
+  React.useEffect(() => {
+    if (!motionActive) setGhost(null);
+  }, [motionActive]);
 
   // Rehydrate interrupted downloads once, after mount (IndexedDB is client-only).
   React.useEffect(() => {
@@ -322,7 +317,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
   React.useEffect(() => {
     const onStarted = (event: Event) => {
       const startDetail = (event as CustomEvent<DownloadStartedDetail>).detail;
-      if (!startDetail || reducedMotion) {
+      if (!startDetail || !motionActive) {
         return;
       }
       const corner = containerRef.current?.getBoundingClientRect();
@@ -333,7 +328,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
     };
     window.addEventListener(DOWNLOAD_STARTED_EVENT, onStarted);
     return () => window.removeEventListener(DOWNLOAD_STARTED_EVENT, onStarted);
-  }, [reducedMotion]);
+  }, [motionActive]);
 
   const visible = jobs;
   const summaryText = downloadManagerSummary(visible, tray);
@@ -364,6 +359,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
 
   return (
     <div
+      data-slot="download-dock"
       ref={containerRef}
       className={cn(
         // Safe-area aware, and lifted above the batch bar when one is on screen
@@ -383,18 +379,16 @@ export function DownloadDock({ locale }: { locale: Locale }) {
       <AnimatePresence initial={false} mode="popLayout">
         {visible.length > 0 || history.length > 0 ? (
           collapsed || (visible.length === 0 && !historyOpen) ? (
-            <motion.button
+            <MotionSurface as="button" pattern="reveal"
               key="tray-collapsed"
               ref={entryRef}
-              layoutId="download-tray"
+              layoutId={reducedMotion ? undefined : layoutId}
               type="button"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ ...springSoft, opacity: { duration: 0.18, ease: EASE_OUT } }}
+
+              transition={getSemanticTransition("layout", reducedMotion)}
               // borderRadius lives in style so the pill↔panel morph animates it.
-              style={{ borderRadius: 4, scale: trayScale }}
-              whileTap={{ scale: 0.92 }}
+              style={{ borderRadius: 4 }}
+              whileTap={getPressTarget(reducedMotion)}
               onClick={() => {
                 transferFocus.current = true;
                 setCollapsed(false);
@@ -419,22 +413,17 @@ export function DownloadDock({ locale }: { locale: Locale }) {
               ) : null}
               {visible.length > 0 ? <span className={cn("min-w-0 text-xs", visible.some((job) => job.status === "error") ? "text-destructive" : "text-muted-foreground")}>{summaryText}</span> : null}
               <ChevronUpIcon className="size-3.5 text-muted-foreground" />
-            </motion.button>
+            </MotionSurface>
           ) : (
-            <motion.div
+            <MotionSurface as="div" pattern="reveal"
               key="tray"
               id={panelId}
               role="region"
               aria-label={tray.trayTitle}
               data-download-manager
-              layoutId="download-tray"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ ...springSoft, opacity: { duration: 0.18, ease: EASE_OUT } }}
-              style={{
-                // Numeric radius enables Motion corner correction during the morph.
-                borderRadius: 4, scale: trayScale, maxHeight: `min(36rem, calc(100dvh - ${bottomOffset} - 6rem))` }}
+              layoutId={reducedMotion ? undefined : layoutId}
+              transition={getSemanticTransition("layout", reducedMotion)}
+              style={{ borderRadius: 4, maxHeight: `min(36rem, calc(100dvh - ${bottomOffset} - 6rem))` }}
               className="pointer-events-auto relative isolate flex w-full flex-col overflow-hidden border border-border/70 bg-popover p-0 shadow-lg ring-1 ring-foreground/5"
             >
               <div data-download-manager-header className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2 text-sm font-semibold">
@@ -444,7 +433,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                 <span className="flex-1" />
                 <motion.button
                   type="button"
-                  whileTap={{ scale: 0.92 }}
+                  whileTap={getPressTarget(reducedMotion)}
                   ref={collapseRef}
                   onClick={() => { transferFocus.current = true; setCollapsed(true); }}
                   aria-label={tray.collapse}
@@ -481,13 +470,11 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                       !(job.mobileBatch && job.archives?.length);
 
                     return (
-                      <motion.li
+                      <MotionSurface as="li" pattern="popup"
                         key={job.id}
-                        layout
-                        initial={{ opacity: 0, y: 12, scale: 0.96 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, x: 56, transition: { duration: 0.18, ease: EASE_OUT } }}
-                        transition={{ ...springSoft, opacity: { duration: 0.2, ease: EASE_OUT } }}
+
+                        layout={!reducedMotion && visible.length <= 12}
+                        transition={getSemanticTransition("layout", reducedMotion)}
                         // Completed rows can also be swiped away; the X button
                         // stays as the accessible path.
                         drag={canDismissImmediately ? "x" : false}
@@ -509,47 +496,26 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                         data-download-task
                         className="ui-surface relative flex shrink-0 flex-col gap-3 overflow-hidden p-3"
                       >
-                        {job.status === "success" ? (
-                          // One-shot emerald wash as the row lands on success.
-                          <motion.span
-                            aria-hidden="true"
-                            className="pointer-events-none absolute inset-0 rounded-[inherit] bg-emerald-500/15"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: [0, 1, 0] }}
-                            transition={{ duration: 1.2, times: [0, 0.2, 1], ease: "easeInOut" }}
-                          />
-                        ) : null}
                         <div className="flex items-center gap-1.5">
                           {job.status === "success" ? (
                             <span className="relative flex size-3.5 shrink-0 items-center justify-center text-emerald-500">
-                              <DrawnCheck size={14} />
-                              <motion.span
-                                aria-hidden="true"
-                                className="absolute inset-0 rounded-full border border-emerald-500/70"
-                                initial={{ scale: 0.5, opacity: 1 }}
-                                animate={{ scale: 1.8, opacity: 0 }}
-                                transition={{ duration: 0.7, ease: EASE_OUT }}
-                              />
+                              <DownloadSuccessMark key={`${job.id}:${job.startedAt}`} animate={!seenSuccess.current.has(`${job.id}:${job.startedAt}`)} />
                             </span>
                           ) : job.status === "error" ? (
                             <AlertCircleIcon className="size-3.5 shrink-0 text-destructive" />
                           ) : null}
                           <span className="truncate text-sm font-medium">{job.title}</span>
                           <span className="flex-1" />
-                          <AnimatePresence initial={false} mode="wait">
-                            <motion.span
+                            <MotionSurface as="span" pattern="popup"
                               key={job.status}
                               className="flex items-center gap-1"
-                              initial={{ opacity: 0, scale: 0.6, rotate: -45 }}
-                              animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                              exit={{ opacity: 0, scale: 0.6, rotate: -45 }}
-                              transition={{ duration: 0.15, ease: EASE_OUT }}
+
                             >
                               {resumable ? (
                                 <>
                                   <motion.button
                                     type="button"
-                                    whileTap={{ scale: 0.92 }}
+                                    whileTap={getPressTarget(reducedMotion)}
                                     onClick={() => resume(job.id)}
                                     className="inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                                   >
@@ -560,7 +526,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                                     <DropdownMenuTrigger asChild>
                                       <motion.button
                                         type="button"
-                                        whileTap={{ scale: 0.92 }}
+                                        whileTap={getPressTarget(reducedMotion)}
                                         aria-label={tray.sourcePicker.switchAndRestart}
                                         title={tray.sourcePicker.restartHint}
                                         className={DOCK_ICON_BUTTON_CLASS}
@@ -590,7 +556,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                               {active ? (
                                 <motion.button
                                   type="button"
-                                  whileTap={{ scale: 0.92 }}
+                                  whileTap={getPressTarget(reducedMotion)}
                                   onClick={() => pause(job.id)}
                                   aria-label={tray.pause}
                                   title={tray.pause}
@@ -602,7 +568,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                               {canDismissImmediately ? (
                                 <motion.button
                                   type="button"
-                                  whileTap={{ scale: 0.92 }}
+                                  whileTap={getPressTarget(reducedMotion)}
                                   onClick={() => dismiss(job.id)}
                                   aria-label={tray.dismiss}
                                   title={tray.dismiss}
@@ -617,8 +583,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                                   confirmHint={tray.confirmDiscard}
                                 />
                               ) : null}
-                            </motion.span>
-                          </AnimatePresence>
+                            </MotionSurface>
                         </div>
                         <DownloadSourceSummary
                           sourceId={job.sourceId}
@@ -640,7 +605,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                             fillClassName={job.status === "paused" ? "bg-primary/40" : undefined}
                           />
                         ) : null}
-                      </motion.li>
+                      </MotionSurface>
                     );
                   })}
                 </AnimatePresence>
@@ -670,22 +635,22 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                 </div>
               ) : null}
               </div>
-            </motion.div>
+            </MotionSurface>
           )
         ) : null}
       </AnimatePresence>
-      {ghost
+      {ghost && motionActive
         ? createPortal(
             <motion.span
+              data-motion-feedback="download-flight"
               key={ghost.key}
               aria-hidden="true"
               className="pointer-events-none fixed left-0 top-0 z-[60] text-primary"
               initial={{ x: ghost.from.x - 12, y: ghost.from.y - 12, scale: 1.15, opacity: 1 }}
               animate={{ x: ghost.to.x - 12, y: ghost.to.y - 12, scale: 0.45, opacity: 0.85 }}
-              transition={{ ...springSoft, opacity: { duration: 0.4, ease: EASE_OUT } }}
+              transition={getSemanticTransition("layout", reducedMotion)}
               onAnimationComplete={() => {
                 setGhost(null);
-                void animate(trayScale, [1, 1.12, 1], { duration: 0.45, ease: "easeInOut" });
               }}
             >
               <DownloadIcon className="size-6" />

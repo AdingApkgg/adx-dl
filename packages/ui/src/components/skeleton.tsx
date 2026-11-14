@@ -1,11 +1,19 @@
-import type * as React from "react"
+"use client"
+
+import * as React from "react"
+import { useMotionActivity } from "../motion/provider"
 
 import { cn } from "../lib/utils"
 
-function Skeleton({ className, children, ...props }: React.ComponentProps<"div">) {
+function Skeleton({ className, children, ref: forwardedRef, ...props }: React.ComponentProps<"div">) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  React.useImperativeHandle(forwardedRef, () => ref.current as HTMLDivElement)
+  const active = useMotionActivity(ref)
   return (
     <div
       data-slot="skeleton"
+      data-motion-active={active}
+      ref={ref}
       aria-hidden="true"
       className={cn("relative overflow-hidden rounded-md bg-muted", className)}
       {...props}

@@ -22,7 +22,7 @@ IMAGE="oven/bun:1.4.2@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232a
 REMOTE_ROOT="/home/i/astrodx-verify"
 # Mirrors web-check.yml's verification steps (minus the catalog rebuild and the
 # static build, which need the media server and are CI's job).
-DEFAULT_CMD='bun install --frozen-lockfile && bun run lint && (cd packages/ui && bun run check) && (cd apps/web && bun run check)'
+DEFAULT_CMD='bun install --frozen-lockfile && bun scripts/generate-motion-css.ts --check && bun run lint && (cd packages/ui && bun run check) && (cd apps/web && bun run check)'
 
 ref=""
 keep=0
@@ -55,7 +55,7 @@ else
   label="wt-$(git rev-parse --short HEAD)"
 fi
 
-run="$(date +%Y%m%d-%H%M%S)-$label"
+run="$(date +%Y%m%d-%H%M%S)-$label-$$"
 echo "verify.sh: $HOST run $run (tree ${tree:0:12})" >&2
 
 # Step 1: ship the snapshot into a fresh run directory.
@@ -66,23 +66,40 @@ git archive --format=tar "$tree" | ssh -o BatchMode=yes -o ConnectTimeout=15 "$H
    mkdir -p \"\$dir\"
    printf '%s\n' astrodx-verify > \"\$dir/.owner\"
    printf '%s\n' '$tree' > \"\$dir/.source-tree\"
-   tar -x -C \"\$dir\""
+   tar --warning=no-timestamp -x -C \"\$dir\""
 
-# Step 2: run the command in the pinned image. The command travels base64
-# encoded so no quoting survives two shells.
+# Step 2: persist the runner before waiting on it. SSH disconnection never
+# loses the log or exit status; reconnect using the printed job directory.
 cmd_b64="$(printf '%s' "$cmd" | base64 | tr -d '\n')"
 set +e
 ssh -o BatchMode=yes -o ConnectTimeout=15 "$HOST" 'bash -s' -- "$run" "$cmd_b64" "$keep" <<REMOTE
+set -euo pipefail
+run="\$1"; keep="\$3"
+[ "\$(uname -n)" = '$EXPECT_HOSTNAME' ] || { echo 'verify.sh: unexpected remote host' >&2; exit 90; }
+job='$REMOTE_ROOT/jobs/'"\$run"
+mkdir -p "\$job"
+chmod 700 "\$job"
+printf '%s' "\$2" > "\$job/command.b64"
+printf '%s' "\$keep" > "\$job/keep"
+printf '%s\n' "\$(uname -n)" > "\$job/host"
+cat > "\$job/run.sh" <<'JOB'
+#!/usr/bin/env bash
 set -uo pipefail
-run="\$1"; cmd="\$(printf '%s' "\$2" | base64 -d)"; keep="\$3"
-[ "\$(uname -n)" = '$EXPECT_HOSTNAME' ] || { echo "verify.sh: unexpected remote host \$(uname -n)" >&2; exit 90; }
+job="\$(cd -- "\$(dirname -- "\$0")" && pwd)"
 root='$REMOTE_ROOT'
+run="\$(basename -- "\$job")"
 dir="\$root/runs/\$run"
+exec >"\$job/output.log" 2>&1
+printf '%s\n' "\$(date -Is)" > "\$job/started"
+echo "\$\$" > "\$job/pid"
+# tmux servers may predate this SSH session's proxy environment.
+set -a
+[ ! -f /etc/environment ] || . /etc/environment
+set +a
+export PATH="/usr/local/bin:/usr/bin:/bin:\$PATH"
+trap 'status=\$?; printf "%s\n" "\$status" > "\$job/exit-code"; date -Is > "\$job/finished"' EXIT
 mkdir -p "\$root/bun-cache"
-# Old runs left by --keep or an interrupted session.
-find "\$root/runs" -mindepth 1 -maxdepth 1 -type d -mtime +2 -exec rm -rf {} + 2>/dev/null
-# Host network so the image reaches the proxy on 127.0.0.1:11090 that
-# /etc/environment sets; the ssh session already carries those variables.
+cmd="\$(base64 -d < "\$job/command.b64")"
 docker run --rm --pull=never --network host \
   --user "\$(id -u):\$(id -g)" \
   --cpus 16 --memory 16g --pids-limit 4096 \
@@ -91,12 +108,22 @@ docker run --rm --pull=never --network host \
   -v "\$dir:/repo" -v "\$root/bun-cache:/cache" -w /repo \
   --entrypoint sh '$IMAGE' -c "\$cmd"
 status=\$?
-if [ "\$keep" = 1 ]; then
-  echo "verify.sh: kept \$dir" >&2
+if [ "\$(cat "\$job/keep")" = 1 ]; then
+  echo "verify.sh: kept \$dir"
 else
   rm -rf "\$dir"
 fi
-exit \$status
+exit "\$status"
+JOB
+session="astrodx-verify-\$run"
+printf '%s\n' "\$session" > "\$job/session"
+tmux new-session -d -s "\$session" bash "\$job/run.sh"
+echo "verify.sh: runner \$session; records \$job" >&2
+while [ ! -f "\$job/exit-code" ]; do
+  sleep 2
+done
+cat "\$job/output.log"
+exit "\$(cat "\$job/exit-code")"
 REMOTE
 status=$?
 set -e

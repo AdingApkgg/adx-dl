@@ -12,7 +12,7 @@
     "./styles/theme.css": "./src/styles/theme.css"
   },
   "scripts": {
-    "check": "tsc --noEmit && vitest run",
+    "check": "bun ../../scripts/generate-motion-css.ts --check && tsc --noEmit && vitest run",
     "test": "vitest"
   },
   "peerDependencies": {

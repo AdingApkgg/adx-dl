@@ -9,9 +9,8 @@ import {
   RotateCwIcon,
   XIcon,
 } from "lucide-react";
-import { useSpring } from "framer-motion";
 
-import { AnimatePresence, DrawnCheck, EASE_OUT, motion, useReducedMotion } from "@astrodx/ui/motion";
+import { AnimatePresence, DrawnCheck, MotionSurface, motion, useMotionProgress } from "@astrodx/ui/motion";
 import { cn } from "@astrodx/ui/lib/utils";
 import { Button } from "@astrodx/ui/components/button";
 import {
@@ -60,27 +59,10 @@ import {
 /** Above this many charts, one click could start a multi-GB transfer — confirm first. */
 const CONFIRM_THRESHOLD = 50;
 
-// Spring-driven progress fill rendered as scaleX (GPU) instead of an animated
-// width, so the bar glides between store updates. The parent track keeps
-// role=progressbar / aria-valuenow bound to the raw store percent.
+// Interpolate bounded visual progress without changing the store's status.
 function ProgressFill({ percent, className }: { percent: number; className?: string }) {
-  // MotionConfig's reducedMotion doesn't gate style-bound motion values — jump
-  // the spring manually so reduced-motion users get instant updates.
-  const reduced = useReducedMotion();
-  const scaleX = useSpring(percent / 100, { stiffness: 180, damping: 28 });
-  React.useEffect(() => {
-    if (reduced) {
-      scaleX.jump(percent / 100);
-    } else {
-      scaleX.set(percent / 100);
-    }
-  }, [percent, reduced, scaleX]);
-  return (
-    <motion.div
-      className={cn("h-full w-full origin-left", className)}
-      style={{ scaleX }}
-    />
-  );
+  const scaleX = useMotionProgress(percent / 100);
+  return <motion.div className={cn("h-full w-full origin-left", className)} style={{ scaleX }} />;
 }
 
 type BatchDownloadBarProps = {
@@ -355,11 +337,8 @@ export function BatchDownloadBar({
   };
 
   return (
-    <motion.div
-      initial={{ y: 80, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      exit={{ y: 80, opacity: 0 }}
-      transition={{ duration: 0.25, ease: EASE_OUT }}
+    <MotionSurface as="div" pattern="sheet"
+
       className="fixed inset-x-0 bottom-(--floating-bottom) z-40 flex justify-center px-4"
     >
       <div
@@ -585,12 +564,9 @@ export function BatchDownloadBar({
 
         <AnimatePresence mode="wait">
           {pendingFormat !== null && pendingFormat === preferredFormat && !isBusy ? (
-            <motion.div
+            <MotionSurface as="div" pattern="popup"
               key="confirm"
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2, ease: EASE_OUT }}
+
               className="flex flex-wrap items-center justify-between gap-2"
             >
               <div className="min-w-0 flex-1 text-xs text-muted-foreground">
@@ -630,28 +606,22 @@ export function BatchDownloadBar({
                   {tray.batchConfirmStart}
                 </Button>
               </div>
-            </motion.div>
+            </MotionSurface>
           ) : status === "archiving" ? (
-            <motion.div
+            <MotionSurface as="div" pattern="disclosure"
               key="archiving"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2, ease: EASE_OUT }}
+
               className="overflow-hidden"
             >
               <DownloadProgressBar percent={null} active label={tray.archiving} />
               <p aria-hidden="true" className="mt-1.5 text-xs text-muted-foreground">
                 {statusText}
               </p>
-            </motion.div>
+            </MotionSurface>
           ) : status === "packing" || status === "paused" || status === "queued" ? (
-            <motion.div
+            <MotionSurface as="div" pattern="disclosure"
               key="progress"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2, ease: EASE_OUT }}
+
               className="overflow-hidden"
             >
               <div
@@ -673,33 +643,27 @@ export function BatchDownloadBar({
               <p aria-hidden="true" className="mt-1.5 text-xs text-muted-foreground">
                 {statusText}
               </p>
-            </motion.div>
+            </MotionSurface>
           ) : status === "success" || status === "ready" ? (
-            <motion.div
+            <MotionSurface as="div" pattern="popup"
               key="success"
               aria-hidden="true"
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2, ease: EASE_OUT }}
+
               className="flex items-center gap-1.5 text-xs text-muted-foreground"
             >
               {/* Self-drawing check — the payoff moment for a finished batch. */}
               <DrawnCheck size={14} className="shrink-0 text-primary" />
               <span>{stateText}</span>
-            </motion.div>
+            </MotionSurface>
           ) : status === "error" ? (
-            <motion.p
+            <MotionSurface as="p" pattern="popup"
               key="error"
               aria-hidden="true"
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2, ease: EASE_OUT }}
+
               className="text-xs text-destructive"
             >
               {statusText}
-            </motion.p>
+            </MotionSurface>
           ) : null}
         </AnimatePresence>
         <DownloadSupportPrompt locale={locale} statuses={status === "success" ? ["success"] : []} />
@@ -715,6 +679,6 @@ export function BatchDownloadBar({
           ))}
         </div>
       </div>
-    </motion.div>
+    </MotionSurface>
   );
 }

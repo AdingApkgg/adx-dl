@@ -5,11 +5,11 @@ import { cva, type VariantProps } from "class-variance-authority"
 import type { HTMLMotionProps } from "framer-motion"
 import { Slot } from "radix-ui"
 
-import { motion, springSoft } from "../motion"
+import { motion, motionPresets, getMotionTransition, useReducedMotion } from "../motion"
 import { cn } from "../lib/utils"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -57,6 +57,7 @@ function Button({
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
   }) {
+  const reduced = useReducedMotion()
   const sharedProps = {
     "data-slot": "button",
     "data-variant": variant,
@@ -65,16 +66,16 @@ function Button({
   }
 
   // Slot merges onto an arbitrary child (links etc.), so that branch keeps the
-  // pure-CSS press (active:translate-y-px) instead of a motion wrapper.
+  // CSS scale press instead of a Motion wrapper, with the same policy.
   if (asChild) {
-    return <Slot.Root {...sharedProps} {...props} />
+    return <Slot.Root {...sharedProps} data-motion-press="css" {...props} />
   }
 
   return (
     <motion.button
       {...sharedProps}
-      whileTap={{ scale: 0.97 }}
-      transition={springSoft}
+      whileTap={props.disabled || reduced ? undefined : { scale: motionPresets.press.start.scale }}
+      transition={getMotionTransition(motionPresets.press.scheme, motionPresets.press.tempo, reduced)}
       // React and framer type the drag/animation DOM handlers differently
       // (onDrag etc.); the runtime props are compatible, so cast the spread.
       {...(props as HTMLMotionProps<"button">)}

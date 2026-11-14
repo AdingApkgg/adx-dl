@@ -22,7 +22,7 @@ import { Popover as PopoverPrimitive, Slider as SliderPrimitive } from "radix-ui
 import useSWR from "swr";
 import { useShallow } from "zustand/react/shallow";
 
-import { motion, useReducedMotion } from "@astrodx/ui/motion";
+import { AnimatePresence, MotionSurface, getSemanticTransition, getPressTarget, useMotionActivity, useReducedMotion } from "@astrodx/ui/motion";
 import { CompatibleImage } from "@/components/site/compatible-image";
 import { ScrollingLabel } from "@/components/site/scrolling-label";
 import { useDownloadsStore } from "@/components/site/downloads/downloads-store";
@@ -70,11 +70,6 @@ import {
 
 const PLAYLIST_MANIFEST_PATH = "/music/playlists.json";
 
-// The player survives client-side route transitions as a session-level
-// surface; its entrance animation belongs to the FIRST appearance only. A
-// module flag (not state) survives the remounts that happen when navigation
-// crosses the (default) ↔ [locale] route groups.
-let playerEnteredOnce = false;
 const CHECKPOINT_INTERVAL_MS = 5_000;
 const MODE_ORDER: MusicPlayerMode[] = [
   "sequence",
@@ -196,7 +191,7 @@ function ProgressRing({
           strokeDasharray={circumference}
           strokeDashoffset={circumference * (1 - progress)}
           data-motion-sensitive
-          className="transition-[stroke-dashoffset] duration-300 ease-linear"
+          className="transition-[stroke-dashoffset] duration-(--adx-motion-duration-fast) ease-linear"
         />
       ) : null}
     </svg>
@@ -245,7 +240,7 @@ function PlayerSlider({
     >
       <SliderPrimitive.Track
         data-motion-sensitive
-        className="relative h-1 grow overflow-hidden rounded-full bg-foreground/12 transition-[height] duration-150 group-hover/slider:h-1.5"
+        className="relative h-1 grow overflow-hidden rounded-full bg-foreground/12 transition-[height] duration-(--adx-motion-duration-fast) group-hover/slider:h-1.5"
       >
         <SliderPrimitive.Range className="absolute h-full rounded-full bg-primary" />
       </SliderPrimitive.Track>
@@ -253,7 +248,7 @@ function PlayerSlider({
         aria-label={label}
         aria-valuetext={valueText}
         data-motion-sensitive
-        className="block size-3 rounded-full border-2 border-primary bg-background shadow-sm transition-transform duration-150 outline-none group-hover/slider:scale-125 focus-visible:scale-125 focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="block size-3 rounded-full border-2 border-primary bg-background shadow-sm transition-transform duration-(--adx-motion-duration-fast) outline-none group-hover/slider:scale-125 focus-visible:scale-125 focus-visible:ring-3 focus-visible:ring-ring/50"
       />
     </SliderPrimitive.Root>
   );
@@ -313,15 +308,14 @@ function MusicPlayerSurface({
   initialTracks,
 }: MusicPlayerProps) {
   const copy = getMusicPlayerCopy(locale);
-  const [skipEntrance] = React.useState(() => playerEnteredOnce);
-  React.useEffect(() => {
-    playerEnteredOnce = true;
-  }, []);
   const collapsed = useMusicPlayerPreferences((state) => state.collapsed);
   const setCollapsed = useMusicPlayerPreferences(
     (state) => state.setCollapsed
   );
   const reducedMotion = useReducedMotion();
+  const surfaceRef = React.useRef<HTMLDivElement>(null);
+  const motionActive = useMotionActivity(surfaceRef);
+  const layoutId = React.useId();
   const bottomBars = useDownloadsStore((state) => state.bottomBars);
   const audioRef = React.useRef<HTMLAudioElement>(null);
   const currentTimeRef = React.useRef(0);
@@ -1145,6 +1139,7 @@ function MusicPlayerSurface({
       }}
     >
       <div
+        ref={surfaceRef}
         role="region"
         aria-label={copy.playerLabel}
         inert={open || undefined}
@@ -1158,12 +1153,17 @@ function MusicPlayerSurface({
         // globals.css) instead of blinking with the root snapshot.
         style={{ bottom: playerBottom, viewTransitionName: "music-player", opacity: open ? 0 : 1 }}
       >
+        <AnimatePresence initial={false} mode="popLayout">
         {collapsed ? (
-          <motion.button
+          <MotionSurface as="button" pattern="reveal"
+            key="collapsed"
+            layoutId={reducedMotion ? undefined : layoutId}
+            whileTap={getPressTarget(reducedMotion)}
             type="button"
             data-music-player-surface="collapsed"
-            initial={reducedMotion || skipEntrance ? false : { scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
+
+            initial={false}
+            transition={getSemanticTransition("layout", reducedMotion)}
             onClick={() => setCollapsed(false)}
             aria-label={copy.expand}
             title={copy.expand}
@@ -1171,17 +1171,11 @@ function MusicPlayerSurface({
           >
             {/* Vinyl-style disc: the artwork spins while playing so the
                 bubble reads as a music player at a glance. */}
-            <motion.span
+            <span
               aria-hidden="true"
+              data-motion-loop="disc"
               className="absolute inset-0 overflow-hidden rounded-full"
-              animate={
-                isPlaying && !reducedMotion ? { rotate: 360 } : { rotate: 0 }
-              }
-              transition={
-                isPlaying && !reducedMotion
-                  ? { duration: 10, ease: "linear", repeat: Infinity }
-                  : { duration: 0.3 }
-              }
+              style={{ animation: "adx-ambient-disc var(--adx-motion-ambient-disc-duration) linear infinite", animationPlayState: isPlaying && motionActive ? "running" : "paused" }}
             >
               <PlayerArtwork
                 track={currentTrack}
@@ -1189,7 +1183,7 @@ function MusicPlayerSurface({
                 alt=""
                 className="size-full p-2"
               />
-            </motion.span>
+            </span>
             {currentTrack && duration > 0 ? (
               <ProgressRing progress={progress} className="text-primary" />
             ) : null}
@@ -1200,12 +1194,15 @@ function MusicPlayerSurface({
             >
               <Music2Icon className="size-3" />
             </span>
-          </motion.button>
+          </MotionSurface>
         ) : (
-        <motion.div
+        <MotionSurface as="div" pattern="reveal"
+          key="expanded"
+          layoutId={reducedMotion ? undefined : layoutId}
           data-music-player-surface="expanded"
-          initial={reducedMotion || skipEntrance ? false : { y: 16, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
+
+          initial={false}
+          transition={getSemanticTransition("layout", reducedMotion)}
           className="pointer-events-auto relative isolate overflow-hidden rounded-2xl border border-border/70 bg-popover/95 shadow-xl ring-1 ring-foreground/5 backdrop-blur-xl"
         >
           <div className="flex min-h-16 items-center gap-1 p-2">
@@ -1296,8 +1293,9 @@ function MusicPlayerSurface({
               <ChevronDownIcon />
             </Button>
           </div>
-        </motion.div>
+        </MotionSurface>
         )}
+        </AnimatePresence>
       </div>
 
       <PopoverPrimitive.Portal>
@@ -1317,7 +1315,8 @@ function MusicPlayerSurface({
           collisionPadding={12}
           aria-label={copy.panelTitle}
           data-motion-sensitive
-          className="relative z-[55] flex max-h-[min(80dvh,46rem)] w-[min(30rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-2xl border border-border/70 bg-popover/98 shadow-2xl ring-1 ring-foreground/5 backdrop-blur-xl outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+          data-motion-surface="popup"
+          className="relative z-[55] flex max-h-[min(80dvh,46rem)] w-[min(30rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-2xl border border-border/70 bg-popover/98 shadow-2xl ring-1 ring-foreground/5 backdrop-blur-xl outline-none"
         >
           <Button type="button" variant="ghost" size="icon-touch" className="absolute top-2 right-2 z-10" aria-label={copy.closePanel} onClick={() => { returnPanelFocus.current = true; setOpen(false); }}><XIcon /></Button>
           <div className="border-b border-border/60 p-4">

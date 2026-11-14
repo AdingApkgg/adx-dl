@@ -86,6 +86,7 @@ describe("motion preferences during hydration", () => {
     expect(screen.getByLabelText("motion").textContent).toBe("full");
     act(() => setOsReduced(true));
     expect(screen.getByLabelText("motion").textContent).toBe("reduced");
+    expect(document.documentElement.hasAttribute("data-reduced-motion")).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Always animate" }));
     expect(screen.getByLabelText("motion").textContent).toBe("full");
     act(() => setOsReduced(false));

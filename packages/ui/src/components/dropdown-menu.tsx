@@ -1,10 +1,9 @@
 "use client"
 
-import * as React from "react"
+import type * as React from "react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 import { CheckIcon } from "lucide-react"
 
-import { EASE_OUT, motion } from "../motion"
 import { cn } from "../lib/utils"
 
 function DropdownMenu({
@@ -37,37 +36,22 @@ function DropdownMenuContent({
    *  feel instantaneous (the stagger reads as lag next to a running canvas). */
   instant?: boolean;
 }) {
-  // Radix remounts the content on every open, so a plain initial/animate pair
-  // replays the cascade each time. ~18ms per row, capped so long menus still
-  // settle within ~150ms of stagger; the panel keeps its tw-animate-css
-  // enter/exit while items drop in behind it.
-  let itemIndex = 0
-  const cascadedChildren = instant ? children : React.Children.map(children, (child) => {
-    if (!React.isValidElement(child)) return child
-    const delay = Math.min(itemIndex++ * 0.018, 0.126)
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: -4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.12, ease: EASE_OUT, delay }}
-      >
-        {child}
-      </motion.div>
-    )
-  })
+  // High-frequency menus animate the surface once, never queue their rows.
   return (
     <DropdownMenuPrimitive.Portal container={container ?? undefined}>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
+        data-motion-surface="popup"
+        data-motion-instant={instant || undefined}
         sideOffset={sideOffset}
         align={align}
         className={cn(
-          "relative z-50 min-w-36 origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "relative z-50 min-w-36 origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10",
           className
         )}
         {...props}
       >
-        {cascadedChildren}
+        {children}
       </DropdownMenuPrimitive.Content>
     </DropdownMenuPrimitive.Portal>
   )

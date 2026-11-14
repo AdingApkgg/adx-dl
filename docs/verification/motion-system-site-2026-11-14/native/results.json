@@ -1,0 +1,554 @@
+{
+  "status": "passed",
+  "browser": "145.0.7632.6",
+  "results": [
+    {
+      "name": "real native link, lifecycle and pinned chrome",
+      "passed": true,
+      "types": [
+        "adx-document"
+      ],
+      "animations": [
+        {
+          "name": "-ua-view-transition-group-anim-root",
+          "pseudo": "::view-transition-group(root)",
+          "duration": 250,
+          "state": "running"
+        },
+        {
+          "name": "adx-page-enter",
+          "pseudo": "::view-transition-new(root)",
+          "duration": 320,
+          "state": "running"
+        },
+        {
+          "name": "adx-page-exit",
+          "pseudo": "::view-transition-old(root)",
+          "duration": 180,
+          "state": "running"
+        }
+      ],
+      "main": true,
+      "chrome": [
+        {
+          "name": "music-player",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        {
+          "name": "download-dock",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        {
+          "name": "mobile-tabbar",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        }
+      ],
+      "header": {
+        "name": "site-header",
+        "top": 0,
+        "oldDisplay": "none",
+        "newAnimation": "none",
+        "groupAnimation": "none"
+      },
+      "reduced": false,
+      "mode": "system"
+    },
+    {
+      "name": "native guide to catalog",
+      "passed": true,
+      "types": [
+        "adx-document"
+      ],
+      "animations": [
+        {
+          "name": "-ua-view-transition-group-anim-root",
+          "pseudo": "::view-transition-group(root)",
+          "duration": 250,
+          "state": "running"
+        },
+        {
+          "name": "adx-page-enter",
+          "pseudo": "::view-transition-new(root)",
+          "duration": 320,
+          "state": "running"
+        },
+        {
+          "name": "adx-page-exit",
+          "pseudo": "::view-transition-old(root)",
+          "duration": 180,
+          "state": "running"
+        }
+      ],
+      "main": true,
+      "chrome": [
+        {
+          "name": "music-player",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        {
+          "name": "download-dock",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        {
+          "name": "mobile-tabbar",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        }
+      ],
+      "header": {
+        "name": "site-header",
+        "top": 0,
+        "oldDisplay": "none",
+        "newAnimation": "none",
+        "groupAnimation": "none"
+      },
+      "reduced": false,
+      "mode": "system"
+    },
+    {
+      "name": "OS reduced motion disables native snapshots",
+      "passed": true,
+      "types": [
+        "adx-document"
+      ],
+      "animations": [],
+      "main": true,
+      "chrome": [
+        {
+          "name": "music-player",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        {
+          "name": "download-dock",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        {
+          "name": "mobile-tabbar",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        }
+      ],
+      "header": {
+        "name": "site-header",
+        "top": 0,
+        "oldDisplay": "none",
+        "newAnimation": "none",
+        "groupAnimation": "none"
+      },
+      "reduced": true,
+      "mode": "system"
+    },
+    {
+      "name": "site off overrides OS full motion",
+      "passed": true,
+      "types": [
+        "adx-document"
+      ],
+      "animations": [],
+      "main": true,
+      "chrome": [
+        {
+          "name": "music-player",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        {
+          "name": "download-dock",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        {
+          "name": "mobile-tabbar",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        }
+      ],
+      "header": {
+        "name": "site-header",
+        "top": 0,
+        "oldDisplay": "none",
+        "newAnimation": "none",
+        "groupAnimation": "none"
+      },
+      "reduced": true,
+      "mode": "off"
+    },
+    {
+      "name": "site on overrides OS reduced motion",
+      "passed": true,
+      "types": [
+        "adx-document"
+      ],
+      "animations": [
+        {
+          "name": "-ua-view-transition-group-anim-root",
+          "pseudo": "::view-transition-group(root)",
+          "duration": 250,
+          "state": "running"
+        },
+        {
+          "name": "adx-page-enter",
+          "pseudo": "::view-transition-new(root)",
+          "duration": 320,
+          "state": "running"
+        },
+        {
+          "name": "adx-page-exit",
+          "pseudo": "::view-transition-old(root)",
+          "duration": 180,
+          "state": "running"
+        }
+      ],
+      "main": true,
+      "chrome": [
+        {
+          "name": "music-player",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        {
+          "name": "download-dock",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        {
+          "name": "mobile-tabbar",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        }
+      ],
+      "header": {
+        "name": "site-header",
+        "top": 0,
+        "oldDisplay": "none",
+        "newAnimation": "none",
+        "groupAnimation": "none"
+      },
+      "reduced": false,
+      "mode": "on"
+    },
+    {
+      "name": "compatibility mode overrides explicit motion on",
+      "passed": true,
+      "types": [
+        "adx-document"
+      ],
+      "animations": [],
+      "main": true,
+      "chrome": [
+        {
+          "name": "music-player",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        {
+          "name": "download-dock",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        {
+          "name": "mobile-tabbar",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        }
+      ],
+      "header": {
+        "name": "site-header",
+        "top": 0,
+        "oldDisplay": "none",
+        "newAnimation": "none",
+        "groupAnimation": "none"
+      },
+      "reduced": false,
+      "mode": "on"
+    },
+    {
+      "name": "reducing during native entrance cancels motion",
+      "passed": true,
+      "before": {
+        "types": [
+          "adx-document"
+        ],
+        "animations": [
+          {
+            "name": "-ua-view-transition-group-anim-root",
+            "pseudo": "::view-transition-group(root)",
+            "duration": 250,
+            "state": "running"
+          },
+          {
+            "name": "adx-page-enter",
+            "pseudo": "::view-transition-new(root)",
+            "duration": 320,
+            "state": "running"
+          },
+          {
+            "name": "adx-page-exit",
+            "pseudo": "::view-transition-old(root)",
+            "duration": 180,
+            "state": "running"
+          }
+        ],
+        "main": true,
+        "chrome": [
+          {
+            "name": "music-player",
+            "exists": true,
+            "oldDisplay": "none",
+            "newAnimation": "none",
+            "groupAnimation": "none"
+          },
+          {
+            "name": "download-dock",
+            "exists": true,
+            "oldDisplay": "none",
+            "newAnimation": "none",
+            "groupAnimation": "none"
+          },
+          {
+            "name": "mobile-tabbar",
+            "exists": true,
+            "oldDisplay": "none",
+            "newAnimation": "none",
+            "groupAnimation": "none"
+          }
+        ],
+        "header": {
+          "name": "site-header",
+          "top": 0,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        "reduced": false,
+        "mode": "system"
+      },
+      "cancelled": true
+    },
+    {
+      "name": "390px native navigation and interaction after finish",
+      "passed": true,
+      "types": [
+        "adx-document"
+      ],
+      "animations": [
+        {
+          "name": "-ua-view-transition-group-anim-root",
+          "pseudo": "::view-transition-group(root)",
+          "duration": 250,
+          "state": "running"
+        },
+        {
+          "name": "adx-page-enter",
+          "pseudo": "::view-transition-new(root)",
+          "duration": 320,
+          "state": "running"
+        },
+        {
+          "name": "adx-page-exit",
+          "pseudo": "::view-transition-old(root)",
+          "duration": 180,
+          "state": "running"
+        }
+      ],
+      "main": true,
+      "chrome": [
+        {
+          "name": "music-player",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        {
+          "name": "download-dock",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        {
+          "name": "mobile-tabbar",
+          "exists": true,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        }
+      ],
+      "header": {
+        "name": "site-header",
+        "top": 0,
+        "oldDisplay": "none",
+        "newAnimation": "none",
+        "groupAnimation": "none"
+      },
+      "reduced": false,
+      "mode": "system"
+    },
+    {
+      "name": "native history back and forward",
+      "passed": true,
+      "back": {
+        "types": [
+          "adx-document"
+        ],
+        "animations": [
+          {
+            "name": "-ua-view-transition-group-anim-root",
+            "pseudo": "::view-transition-group(root)",
+            "duration": 250,
+            "state": "running"
+          },
+          {
+            "name": "adx-page-enter",
+            "pseudo": "::view-transition-new(root)",
+            "duration": 320,
+            "state": "running"
+          },
+          {
+            "name": "adx-page-exit",
+            "pseudo": "::view-transition-old(root)",
+            "duration": 180,
+            "state": "running"
+          }
+        ],
+        "main": true,
+        "chrome": [
+          {
+            "name": "music-player",
+            "exists": true,
+            "oldDisplay": "none",
+            "newAnimation": "none",
+            "groupAnimation": "none"
+          },
+          {
+            "name": "download-dock",
+            "exists": true,
+            "oldDisplay": "none",
+            "newAnimation": "none",
+            "groupAnimation": "none"
+          },
+          {
+            "name": "mobile-tabbar",
+            "exists": true,
+            "oldDisplay": "none",
+            "newAnimation": "none",
+            "groupAnimation": "none"
+          }
+        ],
+        "header": {
+          "name": "site-header",
+          "top": 0,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        "reduced": false,
+        "mode": "system"
+      },
+      "forward": {
+        "types": [
+          "adx-document"
+        ],
+        "animations": [
+          {
+            "name": "-ua-view-transition-group-anim-root",
+            "pseudo": "::view-transition-group(root)",
+            "duration": 250,
+            "state": "running"
+          },
+          {
+            "name": "adx-page-enter",
+            "pseudo": "::view-transition-new(root)",
+            "duration": 320,
+            "state": "running"
+          },
+          {
+            "name": "adx-page-exit",
+            "pseudo": "::view-transition-old(root)",
+            "duration": 180,
+            "state": "running"
+          }
+        ],
+        "main": true,
+        "chrome": [
+          {
+            "name": "music-player",
+            "exists": true,
+            "oldDisplay": "none",
+            "newAnimation": "none",
+            "groupAnimation": "none"
+          },
+          {
+            "name": "download-dock",
+            "exists": true,
+            "oldDisplay": "none",
+            "newAnimation": "none",
+            "groupAnimation": "none"
+          },
+          {
+            "name": "mobile-tabbar",
+            "exists": true,
+            "oldDisplay": "none",
+            "newAnimation": "none",
+            "groupAnimation": "none"
+          }
+        ],
+        "header": {
+          "name": "site-header",
+          "top": 0,
+          "oldDisplay": "none",
+          "newAnimation": "none",
+          "groupAnimation": "none"
+        },
+        "reduced": false,
+        "mode": "system"
+      },
+      "bfcache": false
+    }
+  ],
+  "errors": []
+}

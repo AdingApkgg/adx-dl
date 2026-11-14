@@ -83,6 +83,14 @@ export async function RootLayoutShell({
 
   return (
     <html lang={lang} className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        {/* Native navigation decides opt-in before streamed page content and
+            external styles finish loading. Keep this tiny rule in the shell. */}
+        <style>{"@view-transition{navigation:auto;types:adx-document;}"}</style>
+        {/* Hold the native snapshot until the page and preceding header have
+            been parsed; this does not wait for images or client hydration. */}
+        <link rel="expect" href="#main-content" blocking="render" />
+      </head>
       <body className="adx-site adx-material min-h-full bg-background text-foreground">
         {/* Runs synchronously during HTML parse — first in <body>, before any
             visible content — so the persisted color mode, accent, motion and

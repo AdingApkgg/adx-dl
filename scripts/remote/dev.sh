@@ -15,6 +15,7 @@
 # browser trusts it without a per-site prompt, Next's dev-origin check passes
 # with no allowedDevOrigins, and hot reload's WebSocket goes through the tunnel.
 # Nothing is exposed on the tailnet or the build machine's LAN.
+# Set ASTRODX_DEV_SLOT and a separate ASTRODX_DEV_PORT for isolated previews.
 set -euo pipefail
 
 HOST="${ASTRODX_BUILD_HOST:-i@localhost-1.tailac9c6f.ts.net}"
@@ -22,8 +23,14 @@ EXPECT_HOSTNAME="${ASTRODX_BUILD_HOSTNAME:-localhost}"
 PORT="${ASTRODX_DEV_PORT:-3310}"
 IMAGE="oven/bun:1.4.2@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895"
 REMOTE_ROOT="/home/i/astrodx-verify"
-REMOTE_DIR="$REMOTE_ROOT/dev"
-CONTAINER="astrodx-dev-preview"
+# Optional isolated slot: concurrent tasks must not overwrite one shared tree.
+SLOT="${ASTRODX_DEV_SLOT:-}"
+if [[ -n "$SLOT" && ! "$SLOT" =~ ^[a-z0-9-]+$ ]]; then
+  echo "dev.sh: ASTRODX_DEV_SLOT must contain only lowercase letters, digits and hyphens" >&2
+  exit 2
+fi
+REMOTE_DIR="$REMOTE_ROOT/dev${SLOT:+-$SLOT}"
+CONTAINER="astrodx-dev-${SLOT:-preview}"
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=15)
 SSH=(ssh "${SSH_OPTS[@]}" "$HOST")
 # Control socket of the background tunnel, so status/stop can find it.

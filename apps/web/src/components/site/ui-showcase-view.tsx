@@ -1,5 +1,7 @@
 import { DownloadIcon, SearchIcon, StarIcon } from "lucide-react";
 
+import { MotionShowcase } from "./motion-showcase";
+
 import { Reveal } from "@astrodx/ui/motion";
 import { CabinetBadge } from "@/components/site/cabinet-badge";
 import { ChartCard, CHART_CARD_SIZES, CHART_GRID_CLASS } from "@/components/site/chart-card";
@@ -118,6 +120,10 @@ export function UiShowcaseView({
         <p className="text-muted-foreground">{ui.description}</p>
         <p className="text-sm text-muted-foreground">{ui.intro}</p>
       </Reveal>
+
+      <Separator />
+
+      <MotionShowcase locale={locale} />
 
       <Separator />
 
