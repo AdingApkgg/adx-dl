@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { MusicLibraryPanel } from "./music-library-panel";
 import {
-  AlertCircleIcon,
   ChevronDownIcon,
   ListMusicIcon,
   LoaderCircleIcon,
@@ -16,23 +16,18 @@ import {
   SkipForwardIcon,
   Volume2Icon,
   VolumeXIcon,
+  XIcon,
 } from "lucide-react";
 import { Popover as PopoverPrimitive, Slider as SliderPrimitive } from "radix-ui";
 import useSWR from "swr";
 import { useShallow } from "zustand/react/shallow";
 
-import { motion, useReducedMotion } from "@astrodx/ui/motion";
+import { AnimatePresence, MotionSurface, getSemanticTransition, getPressTarget, useMotionActivity, useReducedMotion } from "@astrodx/ui/motion";
 import { CompatibleImage } from "@/components/site/compatible-image";
 import { ScrollingLabel } from "@/components/site/scrolling-label";
 import { useDownloadsStore } from "@/components/site/downloads/downloads-store";
 import { Button } from "@astrodx/ui/components/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@astrodx/ui/components/select";
+
 import type { VersionGroup } from "@/lib/catalog-shared";
 import type { Locale } from "@/lib/i18n";
 import {
@@ -75,11 +70,6 @@ import {
 
 const PLAYLIST_MANIFEST_PATH = "/music/playlists.json";
 
-// The player survives client-side route transitions as a session-level
-// surface; its entrance animation belongs to the FIRST appearance only. A
-// module flag (not state) survives the remounts that happen when navigation
-// crosses the (default) ↔ [locale] route groups.
-let playerEnteredOnce = false;
 const CHECKPOINT_INTERVAL_MS = 5_000;
 const MODE_ORDER: MusicPlayerMode[] = [
   "sequence",
@@ -162,7 +152,7 @@ function PlayerArtwork({
       width={160}
       height={160}
       loading="lazy"
-      className={cn("object-cover", className)}
+      className={cn("object-contain", className)}
     />
   );
 }
@@ -201,7 +191,7 @@ function ProgressRing({
           strokeDasharray={circumference}
           strokeDashoffset={circumference * (1 - progress)}
           data-motion-sensitive
-          className="transition-[stroke-dashoffset] duration-300 ease-linear"
+          className="transition-[stroke-dashoffset] duration-(--adx-motion-duration-fast) ease-linear"
         />
       ) : null}
     </svg>
@@ -250,7 +240,7 @@ function PlayerSlider({
     >
       <SliderPrimitive.Track
         data-motion-sensitive
-        className="relative h-1 grow overflow-hidden rounded-full bg-foreground/12 transition-[height] duration-150 group-hover/slider:h-1.5"
+        className="relative h-1 grow overflow-hidden rounded-full bg-foreground/12 transition-[height] duration-(--adx-motion-duration-fast) group-hover/slider:h-1.5"
       >
         <SliderPrimitive.Range className="absolute h-full rounded-full bg-primary" />
       </SliderPrimitive.Track>
@@ -258,7 +248,7 @@ function PlayerSlider({
         aria-label={label}
         aria-valuetext={valueText}
         data-motion-sensitive
-        className="block size-3 rounded-full border-2 border-primary bg-background shadow-sm transition-transform duration-150 outline-none group-hover/slider:scale-125 focus-visible:scale-125 focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="block size-3 rounded-full border-2 border-primary bg-background shadow-sm transition-transform duration-(--adx-motion-duration-fast) outline-none group-hover/slider:scale-125 focus-visible:scale-125 focus-visible:ring-3 focus-visible:ring-ring/50"
       />
     </SliderPrimitive.Root>
   );
@@ -268,25 +258,6 @@ function PlayerSlider({
  * The playing track's marker in the list: bars that bounce while it plays and
  * hold still while paused, so the list says which of the two it is.
  */
-function NowPlayingBars({ playing }: { playing: boolean }) {
-  return (
-    <span aria-hidden="true" className="flex h-3.5 items-end gap-[3px]">
-      {[0, 0.25, 0.5].map((delay, index) => (
-        <span
-          key={delay}
-          data-motion-sensitive
-          className="h-full w-[3px] origin-bottom rounded-full bg-current"
-          style={
-            playing
-              ? { animation: `music-eq 0.9s ease-in-out ${delay}s infinite` }
-              : { transform: `scaleY(${[0.45, 0.8, 0.6][index]})` }
-          }
-        />
-      ))}
-    </span>
-  );
-}
-
 function PlaybackModeIcon({ mode }: { mode: MusicPlayerMode }) {
   if (mode === "shuffle") {
     return <ShuffleIcon />;
@@ -337,15 +308,14 @@ function MusicPlayerSurface({
   initialTracks,
 }: MusicPlayerProps) {
   const copy = getMusicPlayerCopy(locale);
-  const [skipEntrance] = React.useState(() => playerEnteredOnce);
-  React.useEffect(() => {
-    playerEnteredOnce = true;
-  }, []);
   const collapsed = useMusicPlayerPreferences((state) => state.collapsed);
   const setCollapsed = useMusicPlayerPreferences(
     (state) => state.setCollapsed
   );
   const reducedMotion = useReducedMotion();
+  const surfaceRef = React.useRef<HTMLDivElement>(null);
+  const motionActive = useMotionActivity(surfaceRef);
+  const layoutId = React.useId();
   const bottomBars = useDownloadsStore((state) => state.bottomBars);
   const audioRef = React.useRef<HTMLAudioElement>(null);
   const currentTimeRef = React.useRef(0);
@@ -361,6 +331,8 @@ function MusicPlayerSurface({
     seek: () => {},
   });
   const [open, setOpen] = React.useState(false);
+  const playlistTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const returnPanelFocus = React.useRef(false);
   const [manifestRequested, setManifestRequested] = React.useState(false);
   const [currentTime, setCurrentTime] = React.useState(0);
   const [duration, setDuration] = React.useState(0);
@@ -435,8 +407,8 @@ function MusicPlayerSurface({
   });
 
   const activeTracks = React.useMemo(
-    () => (versionId ? (tracksByVersion[versionId] ?? []) : []),
-    [tracksByVersion, versionId]
+    () => Object.values(tracksByVersion).flat(),
+    [tracksByVersion]
   );
   const currentTrack = React.useMemo(
     () =>
@@ -482,6 +454,7 @@ function MusicPlayerSurface({
         versionId: state.versionId,
         trackId: state.trackId,
         queue: state.queue,
+        customQueue: state.customQueue,
         mode: state.mode,
         volume: state.volume,
         muted: state.muted,
@@ -572,7 +545,11 @@ function MusicPlayerSurface({
 
   React.useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !currentTrack) {
+    if (!audio) return;
+    if (!currentTrack) {
+      audio.pause(); audio.removeAttribute("src"); delete audio.dataset.trackId; pendingSeekRef.current = null; audio.load();
+      currentTimeRef.current = 0; setCurrentTime(0); setDuration(0);
+      playIntentRef.current = false; setPlayIntent(false);
       return;
     }
 
@@ -713,6 +690,7 @@ function MusicPlayerSurface({
   const playTrack = React.useCallback(
     (track: MusicTrack, position = 0, shouldPlay = true) => {
       selectTrack(track.id);
+      if (useMusicPlayerStore.getState().trackId !== track.id) return;
       failedTrackIdsRef.current.delete(track.id);
       const audio = prepareTrack(track, position);
       if (!audio) {
@@ -839,23 +817,6 @@ function MusicPlayerSurface({
       persistSnapshot(target);
     },
     [duration, persistSnapshot]
-  );
-
-  const changeVersion = React.useCallback(
-    (nextVersionId: string) => {
-      const shouldContinue = playIntentRef.current;
-      selectVersion(nextVersionId);
-      const state = useMusicPlayerStore.getState();
-      const nextTrack = state.trackId
-        ? state.tracksByVersion[nextVersionId]?.find(
-            (track) => track.id === state.trackId
-          )
-        : null;
-      if (nextTrack) {
-        playTrack(nextTrack, 0, shouldContinue);
-      }
-    },
-    [playTrack, selectVersion]
   );
 
   // A "play this version" ask posted by /music. It carries only a version id,
@@ -1167,13 +1128,6 @@ function MusicPlayerSurface({
     updateMediaPosition,
   ]);
 
-  const selectedVersionId =
-    versionId && versions.some(
-      (version) => String(version.imageIndex) === versionId
-    )
-      ? versionId
-      : String(initialVersionId);
-
   return (
     <PopoverPrimitive.Root
       open={open}
@@ -1185,8 +1139,10 @@ function MusicPlayerSurface({
       }}
     >
       <div
+        ref={surfaceRef}
         role="region"
         aria-label={copy.playerLabel}
+        inert={open || undefined}
         className={cn(
           "pointer-events-none fixed z-50",
           collapsed
@@ -1195,14 +1151,19 @@ function MusicPlayerSurface({
         )}
         // Own view-transition-name = pinned during page transitions (see
         // globals.css) instead of blinking with the root snapshot.
-        style={{ bottom: playerBottom, viewTransitionName: "music-player" }}
+        style={{ bottom: playerBottom, viewTransitionName: "music-player", opacity: open ? 0 : 1 }}
       >
+        <AnimatePresence initial={false} mode="popLayout">
         {collapsed ? (
-          <motion.button
+          <MotionSurface as="button" pattern="reveal"
+            key="collapsed"
+            layoutId={reducedMotion ? undefined : layoutId}
+            whileTap={getPressTarget(reducedMotion)}
             type="button"
             data-music-player-surface="collapsed"
-            initial={reducedMotion || skipEntrance ? false : { scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
+
+            initial={false}
+            transition={getSemanticTransition("layout", reducedMotion)}
             onClick={() => setCollapsed(false)}
             aria-label={copy.expand}
             title={copy.expand}
@@ -1210,25 +1171,19 @@ function MusicPlayerSurface({
           >
             {/* Vinyl-style disc: the artwork spins while playing so the
                 bubble reads as a music player at a glance. */}
-            <motion.span
+            <span
               aria-hidden="true"
+              data-motion-loop="disc"
               className="absolute inset-0 overflow-hidden rounded-full"
-              animate={
-                isPlaying && !reducedMotion ? { rotate: 360 } : { rotate: 0 }
-              }
-              transition={
-                isPlaying && !reducedMotion
-                  ? { duration: 10, ease: "linear", repeat: Infinity }
-                  : { duration: 0.3 }
-              }
+              style={{ animation: "adx-ambient-disc var(--adx-motion-ambient-disc-duration) linear infinite", animationPlayState: isPlaying && motionActive ? "running" : "paused" }}
             >
               <PlayerArtwork
                 track={currentTrack}
                 versionId={versionId}
                 alt=""
-                className="size-full"
+                className="size-full p-2"
               />
-            </motion.span>
+            </span>
             {currentTrack && duration > 0 ? (
               <ProgressRing progress={progress} className="text-primary" />
             ) : null}
@@ -1239,12 +1194,15 @@ function MusicPlayerSurface({
             >
               <Music2Icon className="size-3" />
             </span>
-          </motion.button>
+          </MotionSurface>
         ) : (
-        <motion.div
+        <MotionSurface as="div" pattern="reveal"
+          key="expanded"
+          layoutId={reducedMotion ? undefined : layoutId}
           data-music-player-surface="expanded"
-          initial={reducedMotion || skipEntrance ? false : { y: 16, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
+
+          initial={false}
+          transition={getSemanticTransition("layout", reducedMotion)}
           className="pointer-events-auto relative isolate overflow-hidden rounded-2xl border border-border/70 bg-popover/95 shadow-xl ring-1 ring-foreground/5 backdrop-blur-xl"
         >
           <div className="flex min-h-16 items-center gap-1 p-2">
@@ -1313,6 +1271,7 @@ function MusicPlayerSurface({
                 variant="ghost"
                 size="icon-lg"
                 aria-label={copy.openPlaylist}
+                ref={playlistTriggerRef}
                 title={copy.openPlaylist}
                 className="size-10"
               >
@@ -1334,20 +1293,32 @@ function MusicPlayerSurface({
               <ChevronDownIcon />
             </Button>
           </div>
-        </motion.div>
+        </MotionSurface>
         )}
+        </AnimatePresence>
       </div>
 
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
+          data-music-player-panel
+          onEscapeKeyDown={() => { returnPanelFocus.current = true; }}
+          onCloseAutoFocus={(event) => {
+            if (returnPanelFocus.current) {
+              event.preventDefault();
+              returnPanelFocus.current = false;
+              requestAnimationFrame(() => playlistTriggerRef.current?.focus());
+            }
+          }}
           side="top"
           align="end"
           sideOffset={10}
           collisionPadding={12}
           aria-label={copy.panelTitle}
           data-motion-sensitive
-          className="z-[55] flex max-h-[min(72dvh,36rem)] w-[min(24rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-2xl border border-border/70 bg-popover/98 shadow-2xl ring-1 ring-foreground/5 backdrop-blur-xl outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+          data-motion-surface="popup"
+          className="relative z-[55] flex max-h-[min(80dvh,46rem)] w-[min(30rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-2xl border border-border/70 bg-popover/98 shadow-2xl ring-1 ring-foreground/5 backdrop-blur-xl outline-none"
         >
+          <Button type="button" variant="ghost" size="icon-touch" className="absolute top-2 right-2 z-10" aria-label={copy.closePanel} onClick={() => { returnPanelFocus.current = true; setOpen(false); }}><XIcon /></Button>
           <div className="border-b border-border/60 p-4">
             <div className="flex items-start gap-3 pr-8">
               <div className="size-16 shrink-0 overflow-hidden rounded-xl bg-muted shadow-md ring-1 ring-border/60">
@@ -1370,53 +1341,13 @@ function MusicPlayerSurface({
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {activeVersion?.name ?? copy.panelTitle}
-                  {activeTracks.length > 0
-                    ? ` · ${copy.trackCount(activeTracks.length)}`
+                  {queue.length > 0
+                    ? ` · ${copy.trackCount(queue.length)}`
                     : null}
                 </p>
               </div>
             </div>
 
-            <div className="mt-4 flex items-center gap-2">
-              <label
-                htmlFor="music-version-select"
-                className="shrink-0 text-xs font-medium text-muted-foreground"
-              >
-                {copy.versionLabel}
-              </label>
-              <Select
-                value={selectedVersionId}
-                onValueChange={changeVersion}
-                disabled={!manifest}
-              >
-                <SelectTrigger
-                  id="music-version-select"
-                  size="sm"
-                  className="min-w-0 flex-1"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent
-                  position="popper"
-                  align="end"
-                  className="z-[56] max-h-72"
-                >
-                  {versions.map((version) =>
-                    version.imageIndex !== null ? (
-                      <SelectItem
-                        key={version.slug}
-                        value={String(version.imageIndex)}
-                      >
-                        <span className="truncate">{version.name}</span>
-                        <span className="ml-auto text-xs tabular-nums text-muted-foreground">
-                          {copy.trackCount(version.count)}
-                        </span>
-                      </SelectItem>
-                    ) : null
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <div className="border-b border-border/60 px-4 py-3">
@@ -1477,89 +1408,7 @@ function MusicPlayerSurface({
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
-            {manifestLoading && !manifest ? (
-              <div
-                role="status"
-                className="flex min-h-36 items-center justify-center gap-2 text-sm text-muted-foreground"
-              >
-                <LoaderCircleIcon
-                  data-motion-sensitive
-                  className="size-4 animate-spin"
-                />
-                {copy.loading}
-              </div>
-            ) : manifestError && !manifest ? (
-              <div
-                role="alert"
-                className="flex min-h-36 flex-col items-center justify-center gap-3 px-6 text-center text-sm"
-              >
-                <AlertCircleIcon className="size-5 text-destructive" />
-                <span>{copy.loadError}</span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void retryManifest()}
-                >
-                  {copy.retry}
-                </Button>
-              </div>
-            ) : activeTracks.length === 0 ? (
-              <p className="px-4 py-10 text-center text-sm text-muted-foreground">
-                {copy.noTracks}
-              </p>
-            ) : (
-              <ol aria-label={copy.panelTitle} className="flex flex-col gap-0.5">
-                {activeTracks.map((track, index) => {
-                  const selected = track.id === trackId;
-                  const title = musicTrackTitle(track, locale);
-                  const artist =
-                    musicTrackArtist(track, locale) || copy.unknownArtist;
-                  return (
-                    <li key={track.id}>
-                      <button
-                        type="button"
-                        onClick={() => playTrack(track)}
-                        aria-current={selected ? "true" : undefined}
-                        className={cn(
-                          "group/track flex min-h-11 w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-                          selected && "bg-primary/10 text-primary"
-                        )}
-                      >
-                        <span className="w-5 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                          {index + 1}
-                        </span>
-                        {/* Covers make a long version list scannable; the
-                            current track wears the now-playing bars. */}
-                        <span className="relative size-10 shrink-0 overflow-hidden rounded-md bg-muted ring-1 ring-border/60">
-                          <PlayerArtwork
-                            track={track}
-                            versionId={versionId}
-                            alt=""
-                            className="size-full"
-                          />
-                          {selected ? (
-                            <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white">
-                              <NowPlayingBars playing={isPlaying} />
-                            </span>
-                          ) : null}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">
-                            {title}
-                          </span>
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {artist}
-                          </span>
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-          </div>
+          {manifestLoading && !manifest ? <p role="status" className="p-4 text-sm">{copy.loading}</p> : manifestError ? <div className="p-4 text-sm"><p>{copy.loadError}</p><Button variant="outline" size="touch" onClick={() => void retryManifest()}>{copy.retry}</Button></div> : <MusicLibraryPanel locale={locale} onPlay={playTrack} />}
 
           <div className="flex items-center gap-2 border-t border-border/60 px-3 py-2.5">
             <Button

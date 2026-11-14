@@ -93,7 +93,7 @@ describe("i18n helpers", () => {
       customSaveAndTest: "保存并测速",
       customReset: "恢复 R2",
       manageInSettings: "可在右上角设置中添加和管理自定义线路。",
-      switchAndRestart: "换线路继续",
+      switchAndRestart: "换线路重试",
       restartHint: "切换线路后，已完成文件会保留；未完成文件将通过新线路从头下载。",
     });
     expect(Object.values(en?.options ?? {}).map((option) => option.name)).toEqual([
@@ -171,14 +171,14 @@ describe("i18n helpers", () => {
     });
     expect(enPages.charts).toEqual({
       pathname: "/charts",
-      title: "Browse Charts",
+      title: "Find charts",
       description:
         "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download.",
       keywords: ["AstroDX", "ADX Chart Archive", "browse charts", "category filter", "display language"],
     });
     expect(jaPages.charts).toEqual({
       pathname: "/charts",
-      title: "譜面一覧",
+      title: "譜面を探す",
       description:
         "収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。",
       keywords: ["AstroDX", "ADX 譜面アーカイブ", "譜面一覧", "分類フィルタ", "表示言語"],

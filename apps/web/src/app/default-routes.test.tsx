@@ -146,8 +146,8 @@ describe("default zh routes", () => {
 
     const html = renderToStaticMarkup(await ChartsPage());
 
-    expect(html).toContain("浏览曲目");
-    expect(html).toContain("按分类、分支与显示语言浏览 AstroDX 目录条目。");
+    expect(html).toContain("搜谱");
+    expect(html).toContain("搜歌名、别名、曲师或版本，找到想玩的谱面。");
     expect(html).toContain('data-layout="card-grid"');
     expect(html).toContain('href="/charts/song-1"');
     expect(html).toContain("曲目 1");

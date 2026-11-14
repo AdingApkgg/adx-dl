@@ -9,15 +9,13 @@ import {
   RotateCwIcon,
   XIcon,
 } from "lucide-react";
-import { useSpring } from "framer-motion";
 
-import { AnimatePresence, DrawnCheck, EASE_OUT, motion, useReducedMotion } from "@astrodx/ui/motion";
+import { AnimatePresence, DrawnCheck, MotionSurface, motion, useMotionProgress } from "@astrodx/ui/motion";
 import { cn } from "@astrodx/ui/lib/utils";
 import { Button } from "@astrodx/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -47,7 +45,9 @@ import {
   downloadJobStateText,
 } from "./downloads/download-status-text";
 import { DownloadJobNotes, DownloadStorageNotice } from "./downloads/download-job-notes";
+import { DownloadProgressBar } from "./downloads/download-dock";
 import { DownloadVideoOption } from "./downloads/download-video-option";
+import { DownloadSaveAction, getDownloadSaveAction } from "./downloads/download-save-action";
 import { DownloadSupportPrompt } from "./downloads/download-support-prompt";
 import {
   chartGroupingDir,
@@ -59,27 +59,10 @@ import {
 /** Above this many charts, one click could start a multi-GB transfer — confirm first. */
 const CONFIRM_THRESHOLD = 50;
 
-// Spring-driven progress fill rendered as scaleX (GPU) instead of an animated
-// width, so the bar glides between store updates. The parent track keeps
-// role=progressbar / aria-valuenow bound to the raw store percent.
+// Interpolate bounded visual progress without changing the store's status.
 function ProgressFill({ percent, className }: { percent: number; className?: string }) {
-  // MotionConfig's reducedMotion doesn't gate style-bound motion values — jump
-  // the spring manually so reduced-motion users get instant updates.
-  const reduced = useReducedMotion();
-  const scaleX = useSpring(percent / 100, { stiffness: 180, damping: 28 });
-  React.useEffect(() => {
-    if (reduced) {
-      scaleX.jump(percent / 100);
-    } else {
-      scaleX.set(percent / 100);
-    }
-  }, [percent, reduced, scaleX]);
-  return (
-    <motion.div
-      className={cn("h-full w-full origin-left", className)}
-      style={{ scaleX }}
-    />
-  );
+  const scaleX = useMotionProgress(percent / 100);
+  return <motion.div className={cn("h-full w-full origin-left", className)} style={{ scaleX }} />;
 }
 
 type BatchDownloadBarProps = {
@@ -110,6 +93,12 @@ export function BatchDownloadBar({
   const selectedSourceId = useDownloadsStore((state) => state.selectedSourceId);
   const setSelectedSourceId = useDownloadsStore((state) => state.setSelectedSourceId);
   const preferredFormat = useDownloadsStore((state) => state.preferredFormat);
+  React.useEffect(() => {
+    // A format change invalidates the earlier confirmation, including changes
+    // coming from the global settings rather than this menu.
+    setPendingFormat(null);
+  }, [preferredFormat]);
+  const setPreferredFormat = useDownloadsStore((state) => state.setPreferredFormat);
   const grouping = useDownloadsStore((state) => state.preferredBatchGrouping);
   const setGrouping = useDownloadsStore((state) => state.setPreferredBatchGrouping);
 
@@ -132,8 +121,6 @@ export function BatchDownloadBar({
   const restartWithSource = useDownloadsStore((state) => state.restartWithSource);
   const pause = useDownloadsStore((state) => state.pause);
   const dismiss = useDownloadsStore((state) => state.dismiss);
-  const presentInline = useDownloadsStore((state) => state.presentInline);
-  const unpresentInline = useDownloadsStore((state) => state.unpresentInline);
   const presentBottomBar = useDownloadsStore((state) => state.presentBottomBar);
   const unpresentBottomBar = useDownloadsStore((state) => state.unpresentBottomBar);
 
@@ -196,6 +183,7 @@ export function BatchDownloadBar({
   const summary = React.useMemo(() => summarizeDownloadJobs(jobs), [jobs]);
   const status = summary.status;
   const isBusy = planning || status === "packing" || status === "archiving" || status === "queued";
+  const canPause = status === "packing" || status === "queued";
   const isResumable = status === "paused" || status === "error";
   const progress = React.useMemo(
     () =>
@@ -220,11 +208,13 @@ export function BatchDownloadBar({
           ? tray.completed
           : status === "ready"
             ? tray.readyToSave
+          : status === "archiving"
+            ? tray.archiving
           : tray.queueSummary(summary.done, summary.total);
   const metricsText =
     jobs.length === 1
       ? downloadJobMetricsText(jobs[0], tray)
-      : jobs.length > 1 && status !== "success"
+      : jobs.length > 1 && (status === "packing" || status === "paused")
         ? `${summary.percent}%`
         : "";
   const statusText = metricsText ? `${stateText} · ${metricsText}` : stateText;
@@ -235,25 +225,8 @@ export function BatchDownloadBar({
   const noteJobs = jobs.filter((entry) => entry.archives?.length || entry.id === failedJob?.id ||
     (entry === releasedGuideJob && !hasCurrentSavedArchive) ||
     (entry.mobileMemoryWarning && entry.status !== "queued" && !entry.savedArchiveInfo));
+  const saveAction = getDownloadSaveAction(jobs);
   const canDownload = count > 0 && !isBusy && !isResumable && status !== "ready" && !hasRetainedMobileArchives;
-
-  // Hide these jobs from the floating tray while the bar itself is on screen.
-  // Keyed by a joined string so the effect doesn't re-run on array identity.
-  const presentedKey = jobs.map((entry) => entry.id).join("\u0000");
-  React.useEffect(() => {
-    if (presentedKey === "") {
-      return;
-    }
-    const ids = presentedKey.split("\u0000");
-    for (const id of ids) {
-      presentInline(id);
-    }
-    return () => {
-      for (const id of ids) {
-        unpresentInline(id);
-      }
-    };
-  }, [presentedKey, presentInline, unpresentInline]);
 
   // Tell the floating tray a full-width bottom bar is on screen so it lifts
   // itself above instead of overlapping on phones.
@@ -327,7 +300,8 @@ export function BatchDownloadBar({
   }
 
   function confirmPending() {
-    if (pendingFormat === null) {
+    if (pendingFormat === null || pendingFormat !== useDownloadsStore.getState().preferredFormat) {
+      setPendingFormat(null);
       return;
     }
     beginBatch(pendingFormat);
@@ -363,31 +337,31 @@ export function BatchDownloadBar({
   };
 
   return (
-    <motion.div
-      initial={{ y: 80, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      exit={{ y: 80, opacity: 0 }}
-      transition={{ duration: 0.25, ease: EASE_OUT }}
+    <MotionSurface as="div" pattern="sheet"
+
       className="fixed inset-x-0 bottom-(--floating-bottom) z-40 flex justify-center px-4"
     >
       <div
         ref={barRef}
-        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col gap-2 overflow-y-auto overscroll-contain rounded-2xl border border-border/70 bg-popover/95 p-3 shadow-lg ring-1 ring-foreground/5 backdrop-blur"
+        style={{ maxHeight: "min(50dvh, calc(100dvh - var(--floating-bottom) - 6rem))" }}
+        className="flex w-full max-w-xl flex-col gap-2 overflow-y-auto overscroll-contain rounded-2xl border border-border/70 bg-popover/95 p-3 shadow-lg ring-1 ring-foreground/5 backdrop-blur"
       >
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium tabular-nums">
             {browser.selectedCount(count)}
           </span>
           <span className="flex-1" />
-          <Button type="button" variant="ghost" size="sm" onClick={onClear} disabled={isBusy}>
+          <Button type="button" variant="ghost" size="touch" onClick={onClear} disabled={isBusy}>
             <XIcon data-icon="inline-start" />
             {browser.clearSelection}
           </Button>
-          {isResumable ? (
+          {saveAction ? (
+            <DownloadSaveAction jobs={jobs} locale={locale} />
+          ) : isResumable ? (
             <>
-              <Button type="button" size="sm" onClick={resumeAll}>
+              <Button type="button" size="touch" onClick={resumeAll}>
                 <RotateCwIcon data-icon="inline-start" />
-                {tray.resume}
+                {status === "error" ? tray.retry : tray.resume}
                 {percent > 0 ? ` · ${percent}%` : null}
               </Button>
               <DropdownMenu>
@@ -395,7 +369,7 @@ export function BatchDownloadBar({
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
+                    size="touch"
                     aria-label={tray.sourcePicker.switchAndRestart}
                     title={tray.sourcePicker.restartHint}
                   >
@@ -420,7 +394,7 @@ export function BatchDownloadBar({
               <Button
                 type="button"
                 variant={confirmDiscard ? "destructive" : "ghost"}
-                size="icon"
+                size="icon-touch"
                 aria-label={confirmDiscard ? tray.confirmDiscard : tray.cancel}
                 title={confirmDiscard ? tray.confirmDiscard : tray.cancel}
                 onClick={() => {
@@ -436,22 +410,22 @@ export function BatchDownloadBar({
             </>
           ) : (
             <>
-              <div data-slot="button-group" className="inline-flex">
+              <div data-slot="button-group" className="inline-flex min-w-0 max-w-full flex-wrap gap-2">
                 <Button
                   type="button"
-                  size="sm"
-                  disabled={!canDownload || isBusy}
-                  onClick={() => handleSelect(preferredFormat)}
-                  className="rounded-r-none"
+                  size="touch"
+                  disabled={!canPause && (!canDownload || isBusy)}
+                  onClick={() => canPause ? pauseAll() : handleSelect(preferredFormat)}
+                  className="h-auto min-h-11 whitespace-normal py-2"
                 >
-                  <DownloadIcon data-icon="inline-start" />
-                  {status === "archiving"
-                    ? `${tray.archiving} · ${percent}%`
+                  {canPause ? <PauseIcon data-icon="inline-start" /> : <DownloadIcon data-icon="inline-start" />}
+                  {canPause ? tray.pause : status === "archiving"
+                    ? tray.archiving
                     : isBusy
                       ? detail.downloadPacking(progress.completed, progress.total)
                       : status === "ready"
                         ? tray.readyToSave
-                        : individual ? tray.downloadIndividualAction : browser.batchDownload}
+                        : status === "success" ? tray.historyRerun : individual ? tray.downloadIndividualAction : browser.batchDownload}
                   {canDownload ? (
                     <span className="font-mono text-[11px] opacity-75">
                       .{preferredFormat}
@@ -462,12 +436,13 @@ export function BatchDownloadBar({
                   <DropdownMenuTrigger asChild>
                     <Button
                       type="button"
-                      size="icon-sm"
+                      variant="outline"
                       disabled={!canDownload || isBusy}
-                      aria-label={detail.downloadFormatLabel}
-                      title={detail.downloadFormatLabel}
-                      className="-ml-px rounded-l-none border-l border-primary-foreground/25 px-0"
+                      aria-label={tray.optionsLabel}
+                      title={tray.optionsLabel}
+                      className="min-h-11"
                     >
+                      {tray.optionsLabel}
                       <ChevronDownIcon className="opacity-80" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -483,20 +458,22 @@ export function BatchDownloadBar({
                     />
                     <DropdownMenuSeparator />
                     <DropdownMenuLabel>{detail.downloadFormatLabel}</DropdownMenuLabel>
-                    {BATCH_FORMATS.map((format) => (
-                      <DropdownMenuItem
-                        key={format}
-                        onSelect={() => handleSelect(format)}
-                        className="justify-between gap-4"
-                      >
-                        <span className="font-mono">.{format}</span>
-                        {format === "adx" ? (
-                          <span className="text-xs text-muted-foreground">
-                            {detail.formatHintAdx}
-                          </span>
-                        ) : null}
-                      </DropdownMenuItem>
-                    ))}
+                    <DropdownMenuRadioGroup value={preferredFormat} onValueChange={(value) => { setPendingFormat(null); setPreferredFormat(value as BatchArchiveFormat); }}>
+                      {BATCH_FORMATS.map((format) => (
+                        <DropdownMenuRadioItem
+                          key={format}
+                          value={format}
+                          className="justify-between gap-4"
+                        >
+                          <span className="font-mono">.{format}</span>
+                          {format === "adx" ? (
+                            <span className="text-xs text-muted-foreground">
+                              {detail.formatHintAdx}
+                            </span>
+                          ) : null}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
                     <DropdownMenuSeparator />
                     <DropdownMenuLabel>{tray.groupingLabel}</DropdownMenuLabel>
                     <DropdownMenuRadioGroup
@@ -525,18 +502,7 @@ export function BatchDownloadBar({
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              {status === "packing" || status === "queued" ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={tray.pause}
-                  title={tray.pause}
-                  onClick={pauseAll}
-                >
-                  <PauseIcon />
-                </Button>
-              ) : null}
+
             </>
           )}
         </div>
@@ -596,14 +562,11 @@ export function BatchDownloadBar({
           <p className="text-xs text-muted-foreground">{tray.batchSizeSplitHint}</p>
         ) : null}
 
-        <AnimatePresence mode="wait">
-          {pendingFormat !== null && !isBusy ? (
-            <motion.div
+        {/* Invalidated confirmations leave immediately, including their focusable controls. */}
+          {pendingFormat !== null && pendingFormat === preferredFormat && !isBusy ? (
+            <MotionSurface as="div" pattern="popup"
               key="confirm"
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2, ease: EASE_OUT }}
+
               className="flex flex-wrap items-center justify-between gap-2"
             >
               <div className="min-w-0 flex-1 text-xs text-muted-foreground">
@@ -634,46 +597,33 @@ export function BatchDownloadBar({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="sm"
+                  size="touch"
                   onClick={() => setPendingFormat(null)}
                 >
                   {tray.cancel}
                 </Button>
-                <Button type="button" size="sm" onClick={confirmPending}>
+                <Button type="button" size="touch" onClick={confirmPending}>
                   {tray.batchConfirmStart}
                 </Button>
               </div>
-            </motion.div>
-          ) : status === "archiving" ? (
-            <motion.div
+            </MotionSurface>
+          ) : null}
+        <AnimatePresence mode="wait">
+          {status === "archiving" ? (
+            <MotionSurface as="div" pattern="disclosure"
               key="archiving"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2, ease: EASE_OUT }}
+
               className="overflow-hidden"
             >
-              <div
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={percent}
-                aria-label={collectionName}
-                className="h-1.5 overflow-hidden rounded-full bg-muted"
-              >
-                <ProgressFill percent={percent} className="bg-primary" />
-              </div>
+              <DownloadProgressBar percent={null} active label={tray.archiving} />
               <p aria-hidden="true" className="mt-1.5 text-xs text-muted-foreground">
                 {statusText}
               </p>
-            </motion.div>
+            </MotionSurface>
           ) : status === "packing" || status === "paused" || status === "queued" ? (
-            <motion.div
+            <MotionSurface as="div" pattern="disclosure"
               key="progress"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2, ease: EASE_OUT }}
+
               className="overflow-hidden"
             >
               <div
@@ -695,33 +645,27 @@ export function BatchDownloadBar({
               <p aria-hidden="true" className="mt-1.5 text-xs text-muted-foreground">
                 {statusText}
               </p>
-            </motion.div>
+            </MotionSurface>
           ) : status === "success" || status === "ready" ? (
-            <motion.div
+            <MotionSurface as="div" pattern="popup"
               key="success"
               aria-hidden="true"
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2, ease: EASE_OUT }}
+
               className="flex items-center gap-1.5 text-xs text-muted-foreground"
             >
               {/* Self-drawing check — the payoff moment for a finished batch. */}
               <DrawnCheck size={14} className="shrink-0 text-primary" />
               <span>{stateText}</span>
-            </motion.div>
+            </MotionSurface>
           ) : status === "error" ? (
-            <motion.p
+            <MotionSurface as="p" pattern="popup"
               key="error"
               aria-hidden="true"
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2, ease: EASE_OUT }}
+
               className="text-xs text-destructive"
             >
               {statusText}
-            </motion.p>
+            </MotionSurface>
           ) : null}
         </AnimatePresence>
         <DownloadSupportPrompt locale={locale} statuses={status === "success" ? ["success"] : []} />
@@ -737,6 +681,6 @@ export function BatchDownloadBar({
           ))}
         </div>
       </div>
-    </motion.div>
+    </MotionSurface>
   );
 }

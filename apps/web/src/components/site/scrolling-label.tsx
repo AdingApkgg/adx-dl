@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { motionPresets, useMotionActivity } from "@astrodx/ui/motion";
 import { cn } from "@astrodx/ui/lib/utils";
 
 /**
@@ -25,6 +26,7 @@ export function ScrollingLabel({
   containerClassName?: string;
 }) {
   const containerRef = React.useRef<HTMLSpanElement>(null);
+  const motionActive = useMotionActivity(containerRef);
   const [shift, setShift] = React.useState(0);
 
   React.useEffect(() => {
@@ -46,7 +48,7 @@ export function ScrollingLabel({
   const scrolling = active && shift > 1;
   // Scale the cycle to the travel distance (~28px/s over the ~60% of the cycle
   // spent moving) with a floor so short overflows don't whip past.
-  const duration = Math.max(6, Math.round((shift / 28) * 3 + 3));
+  const duration = Math.max(motionPresets.ambient.loop.marqueeMinDurationMs / 1000, Math.round((shift / motionPresets.ambient.loop.marqueeSpeedPxPerSecond) * 3 + 3));
 
   // A block-level span rather than a div, so it can sit inside a heading.
   return (
@@ -62,7 +64,8 @@ export function ScrollingLabel({
         style={
           scrolling
             ? ({
-                animation: `marquee-reveal ${duration}s ease-in-out infinite`,
+                animation: `adx-ambient-marquee ${duration}s ease-in-out infinite`,
+                animationPlayState: motionActive ? "running" : "paused",
                 "--marquee-shift": `-${shift}px`,
               } as React.CSSProperties)
             : undefined

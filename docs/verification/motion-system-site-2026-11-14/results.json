@@ -1,0 +1,87 @@
+{
+  "status": "passed",
+  "results": [
+    {
+      "name": "hero suggestions, keyboard and IME",
+      "suggestions": "real local index",
+      "submitted": true
+    },
+    {
+      "name": "catalog batches replace immediately and disclosure cancels",
+      "cards": 24,
+      "perCardAnimations": 0,
+      "disclosure": {
+        "opacity": "1",
+        "height": "auto"
+      }
+    },
+    {
+      "name": "player audio survives collapse, expansion and route navigation",
+      "sameAudioNode": true,
+      "timeAdvanced": true,
+      "externalAudio": "30s silent WAV fixture"
+    },
+    {
+      "name": "dock restores a checkpoint and remains live while collapsing",
+      "checkpoint": true,
+      "percentBeforeCompletion": 50,
+      "ghostCancelled": true
+    },
+    {
+      "name": "real archive completion and no replay after reopening",
+      "archiveIntegrity": {
+        "bad": null,
+        "entries": 2
+      },
+      "fixtureGETs": 1,
+      "successNotReplayed": true
+    },
+    {
+      "name": "same-document navigation tokens and reduced initial load",
+      "sameDocumentEvents": [
+        {
+          "kind": "same-document",
+          "ready": true,
+          "finished": true,
+          "animations": [
+            {
+              "name": "adx-page-exit",
+              "pseudo": "::view-transition-old(_t_0_)",
+              "duration": 180
+            },
+            {
+              "name": "adx-page-enter",
+              "pseudo": "::view-transition-new(_t_1_)",
+              "duration": 320
+            }
+          ]
+        },
+        {
+          "kind": "same-document",
+          "ready": true,
+          "finished": true,
+          "animations": [
+            {
+              "name": "adx-page-exit",
+              "pseudo": "::view-transition-old(_t_1_)",
+              "duration": 180
+            },
+            {
+              "name": "adx-page-enter",
+              "pseudo": "::view-transition-new(_t_2_)",
+              "duration": 320
+            }
+          ]
+        }
+      ],
+      "reducedRunning": [],
+      "nativeNavigation": "covered by check-motion-native.mjs"
+    },
+    {
+      "name": "390px reduced catalog and player",
+      "x": 12,
+      "right": 378
+    }
+  ],
+  "pageErrors": []
+}

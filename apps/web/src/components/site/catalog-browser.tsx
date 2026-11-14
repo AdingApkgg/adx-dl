@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Surface } from "@astrodx/ui/components/page-layout";
 import useSWR from "swr";
 import {
   ArrowDownUpIcon,
@@ -10,14 +11,15 @@ import {
   SearchIcon,
   XIcon,
 } from "lucide-react";
-import type { Variants } from "framer-motion";
 
 import {
   AnimatePresence,
-  EASE_OUT,
+  MotionSurface,
+  getSemanticTransition,
+  getEffectsTransition,
+  motionPresets,
   motion,
   RollingNumber,
-  springSoft,
   useReducedMotion,
 } from "@astrodx/ui/motion";
 import { BatchDownloadBar } from "@/components/site/batch-download-bar";
@@ -213,26 +215,6 @@ export function isCabinetLockedOut(
   return selected.has(UTAGE_CABINET) ? value !== UTAGE_CABINET : value === UTAGE_CABINET;
 }
 
-// Advanced-filter panel: opening staggers the rows in one by one; collapse
-// runs fast and un-staggered so closing feels immediate.
-const filterPanelVariants: Variants = {
-  collapsed: {
-    height: 0,
-    opacity: 0,
-    transition: { duration: 0.2, ease: EASE_OUT },
-  },
-  open: {
-    height: "auto",
-    opacity: 1,
-    transition: { duration: 0.25, ease: EASE_OUT, staggerChildren: 0.04 },
-  },
-};
-
-const filterRowVariants: Variants = {
-  collapsed: { opacity: 0, x: -8, transition: { duration: 0.15, ease: EASE_OUT } },
-  open: { opacity: 1, x: 0, transition: { duration: 0.3, ease: EASE_OUT } },
-};
-
 export function buildSelectedCatalogCharts(
   entries: readonly CatalogCardEntry[],
   specs: Record<string, ChartDownloadSpec> | undefined,
@@ -284,6 +266,7 @@ export function CatalogBrowser({
   // panel, closed by default (opened automatically when a deep link arrives
   // with filters already applied).
   const [filtersOpen, setFiltersOpen] = React.useState(false);
+  const filtersPanelId = React.useId();
   const [hasUserSelectedCategory, setHasUserSelectedCategory] = React.useState(false);
   const [sort, setSort] = React.useState<CatalogSortId>(DEFAULT_CATALOG_SORT);
   const [currentPage, setCurrentPage] = React.useState(1);
@@ -1164,6 +1147,7 @@ export function CatalogBrowser({
         showBatchBar && "pb-[calc(var(--batch-download-bar-height,6rem)+2rem)]"
       )}
     >
+      <Surface data-catalog-controls aria-label={dictionary.searchLabel} className="flex flex-col gap-4">
       {categories.length > 2 ? (
         // Tab-styled filter buttons; not ARIA tabs because there are no panels —
         // they narrow the one grid below.
@@ -1217,7 +1201,7 @@ export function CatalogBrowser({
           data-catalog-search=""
           // Solid card fill + shadow so the box reads clearly against the page's
           // tinted gradient (a transparent input blends into it).
-          className={cn("h-10 border-border bg-card pl-9 shadow-sm", inputValue && "pr-9")}
+          className={cn("h-11 border-border bg-background pl-9", inputValue && "pr-12")}
           placeholder={dictionary.searchPlaceholder}
           value={inputValue}
           onChange={(event) => {
@@ -1241,7 +1225,7 @@ export function CatalogBrowser({
             type="button"
             aria-label={dictionary.clearSearch}
             onClick={clearSearch}
-            className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="absolute top-1/2 right-0 inline-flex size-11 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <XIcon className="size-4" />
           </button>
@@ -1254,6 +1238,7 @@ export function CatalogBrowser({
         locale={locale}
         label={dictionary.randomChart}
         iconOnly
+        className="size-11 shadow-none"
         pool={randomPool}
       />
       </div>
@@ -1264,7 +1249,8 @@ export function CatalogBrowser({
         type="button"
         onClick={() => setFiltersOpen((open) => !open)}
         aria-expanded={filtersOpen}
-        className="flex w-fit items-center gap-1.5 rounded-lg py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        aria-controls={filtersPanelId}
+        className="flex min-h-11 w-fit items-center gap-2 rounded-lg px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
         <ListFilterIcon className="size-4" />
         {dictionary.advancedFilters}
@@ -1281,12 +1267,10 @@ export function CatalogBrowser({
 
       <AnimatePresence initial={false}>
         {filtersOpen ? (
-          <motion.div
+          <MotionSurface as="div" pattern="disclosure"
+            id={filtersPanelId}
             key="filter-rows"
-            initial="collapsed"
-            animate="open"
-            exit="collapsed"
-            variants={filterPanelVariants}
+
             className="overflow-hidden"
           >
             {/* One chip row per dimension — pick directly, combine across rows.
@@ -1537,7 +1521,7 @@ export function CatalogBrowser({
           </ChipFilterRow>
         ) : null}
             </div>
-          </motion.div>
+          </MotionSurface>
         ) : null}
       </AnimatePresence>
 
@@ -1559,7 +1543,7 @@ export function CatalogBrowser({
           aria-label={dictionary.activeFiltersLabel}
         >
           {/* popLayout pops a removed chip out of flow so its neighbors (all
-              layout chips) spring over on springSoft while it collapses. */}
+              layout chips) follow the selection preset while it collapses. */}
           <AnimatePresence mode="popLayout" initial={false}>
           {hasQuery ? (
             <FilterChip
@@ -1709,14 +1693,16 @@ export function CatalogBrowser({
             </FilterChip>
           ) : null}
           {/* Layout-animated so the clear button slides along with the chips. */}
-          <motion.div key="clear-all" layout transition={springSoft}>
-            <Button type="button" variant="ghost" size="sm" onClick={clearAllFilters}>
+          <motion.div key="clear-all" layout={!reduceMotion} transition={getSemanticTransition("selection", reduceMotion)}>
+            <Button type="button" variant="ghost" size="touch" onClick={clearAllFilters}>
               {dictionary.clearFilters}
             </Button>
           </motion.div>
           </AnimatePresence>
         </div>
       ) : null}
+
+      </Surface>
 
       {/* 1px pin sentinel for the toolbar below; the negative margin swallows
           its own height plus the column gap so layout is unchanged. */}
@@ -1735,8 +1721,9 @@ export function CatalogBrowser({
         <motion.div
           aria-hidden="true"
           initial={false}
+          data-catalog-toolbar-backdrop
           animate={{ opacity: toolbarStuck ? 1 : 0 }}
-          transition={{ duration: 0.2, ease: EASE_OUT }}
+          transition={getEffectsTransition("fast", reduceMotion)}
           className="pointer-events-none absolute -inset-x-3 -inset-y-2 -z-10 rounded-xl border border-border/60 bg-background/95 shadow-md"
         />
         <div className="flex flex-wrap items-center gap-2">
@@ -1752,7 +1739,7 @@ export function CatalogBrowser({
               setCurrentPage(1);
             }}
           >
-            <SelectTrigger aria-labelledby={sortLabelId} className="h-8 bg-card">
+            <SelectTrigger aria-labelledby={sortLabelId} className="min-h-11 bg-card">
               <ArrowDownUpIcon
                 aria-hidden="true"
                 className="size-3.5 text-muted-foreground"
@@ -1774,20 +1761,20 @@ export function CatalogBrowser({
           <Button
             type="button"
             variant={selectMode ? "default" : "outline"}
-            size="sm"
+            size="touch"
             onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
           >
             {selectMode ? dictionary.exitSelectMode : dictionary.selectMode}
           </Button>
           {selectMode ? (
             <>
-              <Button type="button" variant="outline" size="sm" onClick={selectAllFiltered}>
+              <Button type="button" variant="outline" size="touch" onClick={selectAllFiltered}>
                 {dictionary.selectAllFiltered(orderedEntries.length)}
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
+                size="touch"
                 disabled={orderedEntries.length === 0}
                 onClick={invertFilteredSelection}
               >
@@ -1797,7 +1784,7 @@ export function CatalogBrowser({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="sm"
+                  size="touch"
                   onClick={() => {
                     setSelectedIds(selectionUndo.previous);
                     setSelectionUndo(null);
@@ -1835,9 +1822,7 @@ export function CatalogBrowser({
 
       {visibleEntries.length === 0 ? (
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: EASE_OUT }}
+          initial={false}
         >
           <Card size="sm">
             <CardContent className="flex flex-col items-center gap-4 py-10 text-center text-sm text-muted-foreground">
@@ -1865,7 +1850,7 @@ export function CatalogBrowser({
                 </div>
               ) : null}
               {hasActiveFilters ? (
-                <Button type="button" variant="ghost" size="sm" onClick={clearAllFilters}>
+                <Button type="button" variant="ghost" size="touch" onClick={clearAllFilters}>
                   {dictionary.clearFilters}
                 </Button>
               ) : null}
@@ -1873,31 +1858,21 @@ export function CatalogBrowser({
           </Card>
         </motion.div>
       ) : (
-        /* No `layout` on the grid or its cards. Layout animation is measured
-           per element on every commit, and it was the single most expensive
-           thing in a keystroke — while buying nothing here, because a page turn
-           or a filter change replaces the whole batch rather than moving cards
-           around. popLayout still lifts the outgoing cards out of flow so the
-           incoming ones don't wait for them. */
-        <motion.ul
+        /* Result batches replace immediately. No per-card presence, layout
+           measurements or stagger on search, filters and pagination. */
+        <ul
+          // biome-ignore lint/a11y/noRedundantRoles: Safari needs an explicit role for lists with list-style:none.
           role="list"
           data-layout="card-grid"
           className={CHART_GRID_CLASS}
         >
-          <AnimatePresence mode="popLayout" initial={false}>
             {paginatedEntries.map((entry, index) => (
-              <motion.li
+              <li
                 key={entry.id}
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.96 }}
-                // In select mode the whole card is a toggle — give the press
-                // tactile feedback on its owned click surface.
-                whileTap={selectMode ? { scale: 0.97 } : undefined}
-                transition={{ duration: 0.25, ease: EASE_OUT }}
                 className="h-full"
               >
                 <ChartCard
+                  coverFit="contain"
                   entry={entry}
                   locale={locale}
                   priority={safeCurrentPage === 1 && index < 6}
@@ -1909,9 +1884,8 @@ export function CatalogBrowser({
                   selected={selectedIds.has(entry.id)}
                   onToggleSelect={() => toggleSelection(entry.id)}
                 />
-              </motion.li>
+              </li>
             ))}
-          </AnimatePresence>
           {totalPages > 1 ? (
             // Presentational so it isn't announced as a list item, but stays a
             // valid <ul> child while spanning the full grid row.
@@ -1973,7 +1947,7 @@ export function CatalogBrowser({
             </Card>
             </li>
           ) : null}
-        </motion.ul>
+        </ul>
       )}
 
       <AnimatePresence>
@@ -1993,8 +1967,7 @@ export function CatalogBrowser({
 // A labeled row of filter chips (one dimension). Chips never wrap — the group
 // scrolls horizontally (swipe on touch, left drag/trackpad on desktop) so a
 // long dimension like version stays a single compact line. Scrollbar hidden.
-// A motion row so the advanced panel's open stagger cascades through it (the
-// variants are inherited from the panel — no own animate prop).
+// The panel owns disclosure motion; rows remain immediately interactive.
 function ChipFilterRow({ label, children, controls, hint }: {
   label: string;
   children: React.ReactNode;
@@ -2011,8 +1984,7 @@ function ChipFilterRow({ label, children, controls, hint }: {
     if (element) return attachMouseDragScroll(element);
   }, []);
   return (
-    <motion.div
-      variants={filterRowVariants}
+    <div
       role="group"
       aria-labelledby={labelId}
       className="flex flex-col gap-1"
@@ -2035,7 +2007,7 @@ function ChipFilterRow({ label, children, controls, hint }: {
           {children}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -2058,15 +2030,17 @@ function AllChip({
   onClick: () => void;
   children: React.ReactNode;
 }) {
+  const reduced = useReducedMotion();
   return (
     <motion.button
       type="button"
-      whileTap={{ scale: 0.93 }}
+      whileTap={reduced ? motionPresets.press.end : motionPresets.press.start}
+      transition={getSemanticTransition("press", reduced)}
       aria-pressed={active}
       onClick={onClick}
       className={cn(
         CHIP_FOCUS_CLASS,
-        "min-h-8 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+        "min-h-11 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
         active
           ? "border-primary bg-primary/15 text-primary"
           : "border-border text-muted-foreground hover:bg-muted/60"
@@ -2108,10 +2082,12 @@ function ToggleChip({
   /** No result would survive picking this — greyed out and inert. */
   disabled?: boolean;
 }) {
+  const reduced = useReducedMotion();
   return (
     <motion.button
       type="button"
-      whileTap={disabled ? undefined : { scale: 0.93 }}
+      whileTap={disabled || reduced ? motionPresets.press.end : motionPresets.press.start}
+      transition={getSemanticTransition("press", reduced)}
       aria-pressed={active}
       aria-label={ariaLabel}
       title={title}
@@ -2119,7 +2095,7 @@ function ToggleChip({
       onClick={onClick}
       className={cn(
         CHIP_FOCUS_CLASS,
-        "flex min-h-8 shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-[color,background-color,border-color,opacity,filter]",
+        "flex min-h-11 shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-[color,background-color,border-color,opacity,filter]",
         // Greyed out: desaturated and faded, whatever tone it would otherwise
         // carry, so an incompatible option reads as unavailable rather than
         // merely unselected.
@@ -2161,8 +2137,7 @@ function RangeFilterRow({
 }) {
   const labelId = React.useId();
   return (
-    <motion.div
-      variants={filterRowVariants}
+    <div
       role="group"
       aria-labelledby={labelId}
       className="flex items-center gap-x-2"
@@ -2181,7 +2156,7 @@ function RangeFilterRow({
         </AllChip>
         <div className="min-w-0 flex-1">{children}</div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -2277,8 +2252,7 @@ function DesignerFilterRow({
   };
 
   return (
-    <motion.div
-      variants={filterRowVariants}
+    <div
       role="group"
       aria-labelledby={labelId}
       className="flex items-start gap-x-2"
@@ -2391,7 +2365,7 @@ function DesignerFilterRow({
           </ul>
         ) : null}
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -2437,14 +2411,13 @@ function FilterChip({
   // popLayout's exit measurement needs a DOM ref through the component.
   ref?: React.Ref<HTMLSpanElement>;
 }) {
+  const reduced = useReducedMotion();
   return (
-    <motion.span
+    <MotionSurface as="span" pattern="popup"
       ref={ref}
-      layout
-      initial={{ scale: 0.8, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0.8, opacity: 0 }}
-      transition={springSoft}
+
+      layout={!reduced}
+      transition={getSemanticTransition("selection", reduced)}
       className={cn(
         "inline-flex min-h-8 items-center gap-1.5 rounded-full border py-1 pr-1 pl-2.5 text-xs font-medium",
         className ?? "border-border bg-muted/50"
@@ -2460,7 +2433,7 @@ function FilterChip({
       >
         <XIcon className="size-3.5" />
       </button>
-    </motion.span>
+    </MotionSurface>
   );
 }
 

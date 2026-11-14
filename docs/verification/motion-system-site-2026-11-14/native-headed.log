@@ -1,0 +1,12 @@
+home {
+  records: [ [ 'reveal', false, 335.2000000476837 ] ],
+  ready: 'complete'
+}
+guide {
+  records: [],
+  frames: [],
+  ready: 'complete',
+  marker: undefined,
+  swap: '[true,3087.7999999523163]',
+  html: false
+}

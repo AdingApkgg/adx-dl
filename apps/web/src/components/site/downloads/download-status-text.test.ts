@@ -51,7 +51,7 @@ describe("formatEtaClock", () => {
 });
 
 describe("downloadJobStatusText", () => {
-  test("includes archive progress details while locally packing", () => {
+  test("shows the archive phase without reusing transfer percent or speed", () => {
     expect(
       downloadJobStatusText(
         job({
@@ -63,7 +63,7 @@ describe("downloadJobStatusText", () => {
         dictionary.detail,
         dictionary.downloads
       )
-    ).toBe("正在打包归档… · 25% · 3/12 · 2.0 KB / 8.0 KB · 25 CiRCLE/Same Song/maidata.txt");
+    ).toBe("正在打包归档… · 25 CiRCLE/Same Song/maidata.txt");
   });
 
   test("marks an extrapolated total with a tilde and appends the ETA", () => {

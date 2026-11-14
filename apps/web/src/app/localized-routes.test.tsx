@@ -138,7 +138,7 @@ describe("localized routes", () => {
       })
     );
 
-    expect(chartsHtml).toContain("Browse Charts");
+    expect(chartsHtml).toContain("Find charts");
     expect(chartsHtml).toContain('data-layout="card-grid"');
     expect(chartsHtml).toContain('href="/en/charts/song-1"');
     expect(chartsHtml).toContain("Song 1");

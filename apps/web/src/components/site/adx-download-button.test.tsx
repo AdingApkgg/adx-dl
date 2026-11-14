@@ -30,7 +30,7 @@ describe("AdxDownloadButton", () => {
     expect(html).toContain("-- ms");
   });
 
-  test("shows support inline after success even when the job is hidden from the floating dock", () => {
+  test("keeps support inline and the manager reachable for inline jobs", () => {
     const initial = useDownloadsStore.getInitialState();
     const previousJobs = initial.jobs;
     const previousPresented = initial.presented;
@@ -42,8 +42,7 @@ describe("AdxDownloadButton", () => {
       skippedFiles: [], autoSwitchedTo: null, startedAt: 0,
     };
     try {
-      // SSR reads the initial snapshot. Mirror the inline presenter claim that
-      // the mounted detail page makes, so the dock must not duplicate this job.
+      // The manager must include jobs even if an older inline presenter claims them.
       initial.jobs = [job];
       initial.presented = { [job.id]: 1 };
       for (const locale of ["zh", "en", "ja"] as const) {
@@ -53,8 +52,17 @@ describe("AdxDownloadButton", () => {
         const hint = getDictionary(locale).donate.downloadThanks;
         expect(html).toContain(hint);
         expect(html).toContain(`href="${locale === "zh" ? "/donate" : `/${locale}/donate`}"`);
-        expect(renderToStaticMarkup(<DownloadDock locale={locale} />)).not.toContain(hint);
+        const dock = renderToStaticMarkup(<DownloadDock locale={locale} />);
+        expect(dock).toContain(getDictionary(locale).downloads.jobsCount(1));
       }
+      initial.jobs = [{ ...job, status: "ready", archives: [{ fileName: "39.adx", bytes: 10, requested: false, error: false }] }];
+      const ready = renderToStaticMarkup(<AdxDownloadButton spec={{ dir: "39", files }} locale="zh" />);
+      const primary = ready.match(/<button\b[^>]*>[\s\S]*?<\/button>/)?.[0];
+      expect(primary).toContain(getDictionary("zh").downloads.saveArchive);
+      expect(primary).not.toMatch(/\sdisabled(?:=|\s|>)/);
+      initial.jobs = [{ ...job, status: "packing" }];
+      const packing = renderToStaticMarkup(<AdxDownloadButton spec={{ dir: "39", files }} locale="zh" />);
+      expect(packing.match(/<button\b[^>]*>[\s\S]*?<\/button>/)?.[0]).toContain(getDictionary("zh").downloads.pause);
       for (const status of ["queued", "packing", "archiving", "ready", "paused", "error"] as const) {
         initial.jobs = [{ ...job, status }];
         const html = renderToStaticMarkup(

@@ -296,6 +296,9 @@ export type SiteDictionary = {
     specsError: string;
   };
   detail: {
+    closePanel: string;
+    downloadSection: string;
+    aboutChart: string;
     onsiteDownload: string;
     onsitePending: string;
     downloadFormatLabel: string;
@@ -420,9 +423,14 @@ export type SiteDictionary = {
       switchAndRestart: string;
       restartHint: string;
     };
+    managerConfirmSave: string;
+    managerFailed: string;
+    managerDownloading: string;
     trayTitle: string;
     dismiss: string;
     resume: string;
+    retry: string;
+    optionsLabel: string;
     cancel: string;
     paused: string;
     pause: string;
@@ -1014,10 +1022,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       faqEntryId: "what-is-astrodx",
     },
     charts: {
-      title: "浏览曲目",
-      description: "按分类、分支与显示语言浏览 AstroDX 目录条目。",
+      title: "搜谱",
+      description: "搜歌名、别名、曲师或版本，找到想玩的谱面。",
       intro: (count, versions) =>
-        `本目录共收录 ${count} 首谱面，覆盖 ${versions} 个 maimai DX 版本分支，可按分类、分支与显示语言浏览。`,
+        `${count} 首谱面 · ${versions} 个版本分支`,
     },
     statusPage: {
       title: "服务器状态",
@@ -1112,6 +1120,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       specsError: "下载清单加载失败，请稍后重试。",
     },
     detail: {
+      closePanel: "关闭",
+      downloadSection: "下载谱面",
+      aboutChart: "关于这首谱面",
       onsiteDownload: "站内下载",
       onsitePending: "站内下载待接入",
       downloadFormatLabel: "选择格式",
@@ -1220,13 +1231,18 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         customHint: "仅保存在本机；镜像需保持相同目录结构并允许跨域下载。",
         customInvalid: "请输入有效的 HTTPS 地址（本机开发可用 HTTP），且不要包含账号、查询参数或锚点。",
         manageInSettings: "可在右上角设置中添加和管理自定义线路。",
-        switchAndRestart: "换线路继续",
+        switchAndRestart: "换线路重试",
         restartHint: "切换线路后，已完成文件会保留；未完成文件将通过新线路从头下载。",
       },
-      trayTitle: "下载",
-      dismiss: "关闭",
-      resume: "继续",
-      cancel: "取消",
+      managerConfirmSave: "等待确认保存",
+      managerFailed: "有下载失败",
+      managerDownloading: "下载中",
+      trayTitle: "下载管理器",
+      dismiss: "移除记录",
+      resume: "继续下载",
+      retry: "重试下载",
+      optionsLabel: "下载选项",
+      cancel: "取消下载",
       paused: "已暂停",
       pause: "暂停",
       queued: "排队中，等待前面的任务",
@@ -1239,15 +1255,15 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       readyToSave: "打包完成，等待保存文件",
       saveArchive: "保存文件",
       saveAgain: "再次保存",
-      saveHint: "逐个点击保存。尚未释放缓存或移除任务时，可再次保存；刷新后可用保留的已下载数据重新打包。释放后需重新下载：整组完成后可从「最近下载」开始，未完成时先继续剩余批次，或重新选曲。",
+      saveHint: "逐个保存文件；找不到时可点「再次保存」。刷新或移除任务前，请先检查浏览器下载记录。",
       saveError: "保存未能发起，请重试或更换浏览器。",
       importHint: "将文件导入 AstroDX 即可游玩（.adx 可直接导入）。",
       videoOptionHint: "只影响背景动画，不影响谱面游玩。",
       videoOffSavings: (size) => `不含 BGA 可减少约 ${size}`,
-      confirmSavedBatch: "已确认保存，继续下载",
-      releaseSavedBatch: "确认保存并释放缓存",
-      confirmSavedBatchHint: "先在浏览器下载记录中确认本批每个文件已下载完成，再确认释放并继续。释放后不能再次保存，导入引导仍会保留；仍需重试保存时请勿确认。",
-      mobileBatchHint: "浏览器支持写盘且空间充足时，按版本保存大包；不支持或空间不足时自动分包。先确认文件已保存，再释放缓存继续下一包。下载期间保持页面打开。",
+      confirmSavedBatch: "文件已保存，继续下一批",
+      releaseSavedBatch: "文件已保存，完成",
+      confirmSavedBatchHint: "先确认浏览器中本批文件已下载完成。确认后将继续，当前文件将无法再次保存。",
+      mobileBatchHint: "大批量下载会自动分包。每批保存完成后确认继续，下载期间请保持页面打开。",
       mobileLegacyBatchHint: "继续旧任务会保留已下载进度。重新规划会替换旧任务、清除其缓存，并根据浏览器能力和可用空间重新下载。",
       mobileRestartBatch: "重新规划并下载",
       mobileLargeChartHint: "这首谱面资源较大，建议关闭 BGA 视频减少体积；仍然过大时请改用电脑下载。",
@@ -1273,9 +1289,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         troubleshootingLink: "查看排障说明",
       },
       confirmDiscard: "再点一次将放弃已下载的数据",
-      errorOffline: "网络已断开；已完成文件会保留，联网后点「继续」下载剩余文件",
-      errorNetwork: "下载失败；已完成文件会保留，可点「继续」重试剩余文件",
-      errorGeneric: "下载出错；已完成文件会保留，可点「继续」重试剩余文件",
+      errorOffline: "网络已断开；已完成文件会保留，联网后点「重试下载」下载剩余文件",
+      errorNetwork: "下载失败；已完成文件会保留，可点「重试下载」重试剩余文件",
+      errorGeneric: "下载出错；已完成文件会保留，可点「重试下载」重试剩余文件",
       batchSummary: (charts, files) => `将打包 ${charts} 首谱面，共 ${files} 个文件`,
       batchSplitSummary: (archives) =>
         `跨版本选择，将拆成 ${archives} 个下载任务加入队列，按版本分别打包`,
@@ -1819,11 +1835,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       faqEntryId: "what-is-astrodx",
     },
     charts: {
-      title: "Browse Charts",
+      title: "Find charts",
       description:
-        "Explore AstroDX directory entries by category, branch, and display language.",
+        "Search titles, aliases, artists or versions to find your next chart.",
       intro: (count, versions) =>
-        `This catalog lists ${count} charts across ${versions} maimai DX version branches. Browse by category, branch, and display language.`,
+        `${count} charts · ${versions} version branches`,
     },
     statusPage: {
       title: "Server Status",
@@ -1927,6 +1943,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       specsError: "Couldn't load the download manifest. Please try again later.",
     },
     detail: {
+      closePanel: "Close",
+      downloadSection: "Download chart",
+      aboutChart: "About this chart",
       onsiteDownload: "Onsite Download",
       onsitePending: "Onsite Download Pending",
       downloadFormatLabel: "Choose format",
@@ -2038,9 +2057,14 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         switchAndRestart: "Switch and continue",
         restartHint: "Completed files are kept; unfinished files restart on the new route.",
       },
+      managerConfirmSave: "Confirm files saved",
+      managerFailed: "Download failed",
+      managerDownloading: "Downloading",
       trayTitle: "Downloads",
       dismiss: "Dismiss",
       resume: "Resume",
+      retry: "Retry download",
+      optionsLabel: "Download options",
       cancel: "Cancel",
       paused: "Paused",
       pause: "Pause",
@@ -2054,15 +2078,15 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       readyToSave: "Archive ready — save the files below",
       saveArchive: "Save file",
       saveAgain: "Save again",
-      saveHint: "Save each file separately. Before removing the job or releasing its cache, you can save again or repack retained downloads after a reload. After release, download again: use Recent downloads once the whole selection is complete, or finish the remaining batches or select the charts again.",
+      saveHint: "Save each file. Use “Save again” if needed, and check browser downloads before refreshing or removing the task.",
       saveError: "Could not start saving. Try again or use another browser.",
       importHint: "Import the file into AstroDX to play (.adx imports directly).",
       videoOptionHint: "Changes the background animation only, not the chart gameplay.",
       videoOffSavings: (size) => `About ${size} less without BGA`,
-      confirmSavedBatch: "Files saved — continue downloading",
-      releaseSavedBatch: "Confirm saved and release cache",
-      confirmSavedBatchHint: "Check your browser's downloads to confirm every file in this batch has finished, then release its cache and continue. Save again will be unavailable after release, but import instructions remain. Do not confirm if you still need to retry saving.",
-      mobileBatchHint: "Browsers with disk writing and enough space save whole version packages; otherwise downloads split into smaller parts. Confirm each file is saved, then release its cache to continue. Keep this page open while downloading.",
+      confirmSavedBatch: "Files saved, continue to next batch",
+      releaseSavedBatch: "Files saved, finish",
+      confirmSavedBatchHint: "Check that every file in this batch has finished downloading in your browser. Confirming continues the queue and removes the option to save these files again.",
+      mobileBatchHint: "Large downloads may be split into batches. Confirm each batch is saved to continue, and keep this page open.",
       mobileLegacyBatchHint: "Continuing keeps this older job's downloaded progress. Replanning replaces the old job, clears its cache, and downloads again based on browser capabilities and available storage.",
       mobileRestartBatch: "Replan and download",
       mobileLargeChartHint: "This chart has large assets. Turn off BGA video to reduce the size; if it is still too large, download on a computer.",
@@ -2088,9 +2112,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         troubleshootingLink: "Troubleshooting",
       },
       confirmDiscard: "Click again to discard the downloaded data",
-      errorOffline: "You're offline — completed files are kept; Resume downloads the rest",
-      errorNetwork: "Download failed — completed files are kept; Resume retries the rest",
-      errorGeneric: "Download error — completed files are kept; Resume retries the rest",
+      errorOffline: "You're offline — completed files are kept; choose Retry download when back online",
+      errorNetwork: "Download failed — completed files are kept; choose Retry download for the remaining files",
+      errorGeneric: "Download error — completed files are kept; choose Retry download for the remaining files",
       batchSummary: (charts, files) =>
         charts === 1
           ? `Packing 1 chart, ${files} files total`
@@ -2662,10 +2686,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       faqEntryId: "what-is-astrodx",
     },
     charts: {
-      title: "譜面一覧",
-      description: "分類、バージョン、表示言語で AstroDX エントリを閲覧します。",
+      title: "譜面を探す",
+      description: "曲名・別名・アーティスト・バージョンから譜面を探せます。",
       intro: (count, versions) =>
-        `本カタログは ${count} 曲の譜面を ${versions} 個の maimai DX バージョン分類で収録しています。分類・バージョン・表示言語で閲覧できます。`,
+        `${count} 曲の譜面 · ${versions} バージョン`,
     },
     statusPage: {
       title: "サーバー状態",
@@ -2761,6 +2785,9 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       specsError: "ダウンロードリストの読み込みに失敗しました。しばらくしてからもう一度お試しください。",
     },
     detail: {
+      closePanel: "閉じる",
+      downloadSection: "譜面をダウンロード",
+      aboutChart: "この譜面について",
       onsiteDownload: "サイト内ダウンロード",
       onsitePending: "サイト内ダウンロード準備中",
       downloadFormatLabel: "形式を選択",
@@ -2872,9 +2899,14 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         switchAndRestart: "回線を切り替えて続行",
         restartHint: "完了済みファイルは保持され、未完了ファイルは新しい回線で最初からダウンロードされます。",
       },
+      managerConfirmSave: "保存の確認待ち",
+      managerFailed: "ダウンロード失敗",
+      managerDownloading: "ダウンロード中",
       trayTitle: "ダウンロード",
-      dismiss: "閉じる",
+      dismiss: "記録を削除",
       resume: "再開",
+      retry: "再試行",
+      optionsLabel: "ダウンロード設定",
       cancel: "キャンセル",
       paused: "一時停止中",
       pause: "一時停止",
@@ -2888,15 +2920,15 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       readyToSave: "アーカイブ作成完了 — ファイルを保存してください",
       saveArchive: "ファイルを保存",
       saveAgain: "もう一度保存",
-      saveHint: "各ファイルを保存してください。タスク削除・キャッシュ解放前は再保存でき、ページ再読み込み後も保持された取得済みデータから再作成できます。解放後は再取得が必要です。選択した全曲の完了後は「最近のダウンロード」を使い、未完了の場合は残りのバッチを完了するか曲を選び直してください。",
+      saveHint: "各ファイルを保存してください。見つからない場合は「再保存」を選び、更新やタスク削除の前にダウンロード履歴を確認してください。",
       saveError: "保存を開始できませんでした。再試行するか別のブラウザをお試しください。",
       importHint: "ファイルを AstroDX にインポートするとプレイできます（.adx はそのままインポート可）。",
       videoOptionHint: "背景動画のみが変わり、譜面のプレイには影響しません。",
       videoOffSavings: (size) => `BGA なしで約 ${size} 削減`,
-      confirmSavedBatch: "保存を確認してダウンロードを続行",
-      releaseSavedBatch: "保存を確認してキャッシュを解放",
-      confirmSavedBatchHint: "ブラウザーのダウンロード履歴で今回の全ファイルの保存完了を確認し、キャッシュを解放して続行します。解放後は再保存できませんが、インポート手順は表示されます。再保存が必要な場合はまだ確認しないでください。",
-      mobileBatchHint: "ディスク書き込みに対応し空き容量が十分なブラウザーでは、バージョン単位でまとめて保存します。非対応や容量不足の場合は小分けにします。保存完了を確認してからキャッシュを解放し、次へ進みます。ダウンロード中はページを開いたままにしてください。",
+      confirmSavedBatch: "保存を確認して次へ",
+      releaseSavedBatch: "保存を確認して完了",
+      confirmSavedBatchHint: "今回の全ファイルがブラウザーで保存済みか確認してください。確認後は次へ進み、今回のファイルは再保存できなくなります。",
+      mobileBatchHint: "大量のダウンロードは分割されます。各回の保存を確認して次へ進み、ページを開いたままにしてください。",
       mobileLegacyBatchHint: "旧タスクの続行では取得済みデータを保持します。再計画では旧タスクとキャッシュを削除し、ブラウザーの対応状況と空き容量に応じて再取得します。",
       mobileRestartBatch: "再計画してダウンロード",
       mobileLargeChartHint: "この譜面のリソースは大きいため、BGA 動画をオフにして容量を減らしてください。それでも大きい場合はパソコンでのダウンロードをお勧めします。",

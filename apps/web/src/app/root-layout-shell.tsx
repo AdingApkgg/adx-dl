@@ -83,7 +83,15 @@ export async function RootLayoutShell({
 
   return (
     <html lang={lang} className="h-full antialiased" suppressHydrationWarning>
-      <body className="min-h-full bg-background text-foreground">
+      <head>
+        {/* Native navigation decides opt-in before streamed page content and
+            external styles finish loading. Keep this tiny rule in the shell. */}
+        <style>{"@view-transition{navigation:auto;types:adx-document;}"}</style>
+        {/* Hold the native snapshot until the page and preceding header have
+            been parsed; this does not wait for images or client hydration. */}
+        <link rel="expect" href="#main-content" blocking="render" />
+      </head>
+      <body className="adx-site adx-material min-h-full bg-background text-foreground">
         {/* Runs synchronously during HTML parse — first in <body>, before any
             visible content — so the persisted color mode, accent, motion and
             music-player preferences apply without a flash. Must stay inside
@@ -142,15 +150,15 @@ export async function RootLayoutShell({
               {/* Live2D 看板娘 (bottom-right, wide screens only). Before the
                   dock so its pinned view-transition group paints under it. */}
               <MascotWidget locale={locale} />
-              {/* Lives above the page subtree so an in-flight download keeps
-                  rendering progress after a client-side navigation. */}
-              <DownloadDock locale={locale} />
               <MusicPlayer
                 locale={locale}
                 versions={musicVersions}
                 initialVersionId={initialMusicVersionId}
                 initialTracks={initialMusicTracks}
               />
+              {/* Task controls paint above the same-layer player when space is
+                  tight; menus and modal portals continue to paint above both. */}
+              <DownloadDock locale={locale} />
               {/* Global maimai-style tap feedback rings (decorative). */}
               <TapRipple />
             </PageViewsProvider>

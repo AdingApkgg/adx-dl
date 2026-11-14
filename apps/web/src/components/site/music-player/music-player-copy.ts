@@ -5,6 +5,7 @@ export type MusicPlayerCopy = {
   panelTitle: string;
   panelDescription: string;
   openPlaylist: string;
+  closePanel: string;
   play: string;
   pause: string;
   previous: string;
@@ -44,9 +45,10 @@ export type MusicPlayerCopy = {
 const copies: Record<Locale, MusicPlayerCopy> = {
   zh: {
     playerLabel: "音乐播放器",
-    panelTitle: "版本歌单",
+    closePanel: "关闭播放器面板",
+    panelTitle: "播放器与队列",
     panelDescription: "选择一个 maimai 版本并连续播放其中的曲目。",
-    openPlaylist: "打开版本歌单",
+    openPlaylist: "打开队列与歌单",
     play: "播放",
     pause: "暂停",
     previous: "上一首",
@@ -84,9 +86,10 @@ const copies: Record<Locale, MusicPlayerCopy> = {
   },
   en: {
     playerLabel: "Music player",
-    panelTitle: "Version playlists",
+    closePanel: "Close player panel",
+    panelTitle: "Player and queue",
     panelDescription: "Choose a maimai version and play its tracks continuously.",
-    openPlaylist: "Open version playlists",
+    openPlaylist: "Open queue and playlists",
     play: "Play",
     pause: "Pause",
     previous: "Previous track",
@@ -125,9 +128,10 @@ const copies: Record<Locale, MusicPlayerCopy> = {
   },
   ja: {
     playerLabel: "音楽プレイヤー",
-    panelTitle: "バージョン別プレイリスト",
+    closePanel: "パネルを閉じる",
+    panelTitle: "プレイヤーとキュー",
     panelDescription: "maimai のバージョンを選び、収録曲を続けて再生します。",
-    openPlaylist: "バージョン別プレイリストを開く",
+    openPlaylist: "キューとマイリストを開く",
     play: "再生",
     pause: "一時停止",
     previous: "前の曲",

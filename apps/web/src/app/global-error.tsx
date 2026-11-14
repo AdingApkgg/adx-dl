@@ -35,7 +35,7 @@ export default function GlobalError({
 
   return (
     <html lang={lang} className="h-full antialiased" suppressHydrationWarning>
-      <body className="min-h-full bg-background text-foreground">
+      <body className="adx-site adx-material min-h-full bg-background text-foreground">
         <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-center gap-4 px-4 py-24 text-center">
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{copy.title}</h1>
           <p className="max-w-md text-sm text-muted-foreground">{copy.description}</p>

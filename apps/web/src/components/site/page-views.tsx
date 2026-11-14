@@ -1,3 +1,4 @@
+import { PageShell, PageHeader, Surface } from "@astrodx/ui/components/page-layout";
 import Link from "next/link";
 import { preload } from "react-dom";
 import {
@@ -30,7 +31,6 @@ import {
   compatibleSourcesFromPng,
 } from "@/components/site/compatible-image";
 import {
-  DetailHeroBackdrop,
   DetailHeroCover,
   RelatedChartRow,
 } from "@/components/site/detail-hero-parallax";
@@ -247,7 +247,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
     <main
       id="main-content"
       className={cn(
-        "mx-auto flex w-full max-w-[82rem] flex-col gap-12 px-4 py-6 md:gap-16 md:px-6 md:py-10",
+        "mx-auto flex w-full max-w-7xl flex-col gap-12 px-4 py-6 md:gap-16 md:px-6 md:py-10",
         styles.page
       )}
     >
@@ -619,13 +619,6 @@ export function ChartDetailPageView({
   const description = buildChartDescription(entry, locale);
   const title = formatEntryTitle(entry, locale);
   const chartsHref = buildLocalePath("/charts", locale);
-  const heroCoverSources = entry.media.cover_url
-    ? {
-        avif: entry.media.cover_avif,
-        webp: entry.media.cover_webp,
-        png: entry.media.cover_url,
-      }
-    : null;
 
   // Metadata links reuse the catalog's stable version-id filter instead of
   // opening a separate per-version page. Older entries fall back to resolving
@@ -662,10 +655,7 @@ export function ChartDetailPageView({
   const sourceHost = hostnameOf(entry.source_url);
 
   return (
-    <main
-      id="main-content"
-      className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
-    >
+    <PageShell className="adx-material adx-detail-page">
       <SeoJsonLd data={buildChartDetailStructuredData(locale, entry)} />
       <nav
         aria-label={detail.breadcrumbLabel}
@@ -681,38 +671,22 @@ export function ChartDetailPageView({
       </nav>
       {/* The whole chart page is one self-contained article about the chart. */}
       <article className="flex flex-col gap-6">
-      <section className="relative isolate overflow-hidden rounded-3xl border border-border/60">
-        <DetailHeroBackdrop>
-          {heroCoverSources ? (
-            <>
-              <CompatibleImage
-                sources={heroCoverSources}
-                alt=""
-                sizes="100vw"
-                pictureClassName="absolute inset-0 block"
-                className="h-full w-full scale-110 object-cover opacity-30 blur-2xl"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/85 to-background/55" />
-            </>
-          ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-card/40 to-fuchsia-500/10" />
-          )}
-        </DetailHeroBackdrop>
-
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 p-6 md:p-8 lg:grid-cols-[260px_minmax(0,1fr)]">
-          <div className="mx-auto w-full max-w-[260px] lg:mx-0">
+      <section data-detail-hero className="relative isolate overflow-hidden rounded-2xl border border-border/60" aria-label={title}>
+        <div className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-4 p-4 md:gap-6 md:p-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+          <div className="w-full self-start lg:row-span-3">
             <DetailHeroCover>
               <EntryCover
                 entry={entry}
                 locale={locale}
+                fit="contain"
                 priority
-                sizes="(max-width: 1024px) 260px, 260px"
+                sizes="(max-width: 767px) 80px, (max-width: 1023px) 88px, 220px"
                 className="h-full w-full"
               />
             </DetailHeroCover>
           </div>
 
-          <div className="flex flex-col gap-4">
+          <div data-detail-identity className="flex min-w-0 flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <VersionBadge version={entry.version} label={branchLabel} />
               <CabinetBadge cabinet={entry.cabinet} className="h-7" />
@@ -721,11 +695,11 @@ export function ChartDetailPageView({
             <div className="flex flex-col gap-2">
               <h1
                 lang={japaneseTextLang(title)}
-                className="text-3xl font-bold md:text-5xl"
+                className="ui-page-title"
               >
                 {title}
               </h1>
-              <p lang={japaneseTextLang(artistName)} className="text-lg text-muted-foreground">
+              <p lang={japaneseTextLang(artistName)} className="text-sm text-muted-foreground [overflow-wrap:anywhere] md:text-base">
                 {artistHref ? (
                   <Link
                     href={artistHref}
@@ -760,51 +734,36 @@ export function ChartDetailPageView({
                 )}
               </div>
             ) : null}
-            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
-              {description}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <EntryAssetBadges entry={entry} locale={locale} />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {entry.download_mode === "onsite" || entry.download_mode === "mixed" ? (
-                <AdxDownloadButton spec={downloadSpec} locale={locale} />
-              ) : (
-                <Button disabled>
-                  <DownloadIcon data-icon="inline-start" aria-hidden="true" />
-                  {detail.onsitePending}
-                </Button>
-              )}
-              <ChartDetailActions entry={entry} locale={locale} />
-              {(entry.download_mode === "external" || entry.download_mode === "mixed") &&
-              entry.source_url ? (
-                <Button variant="outline" asChild>
-                  <a href={entry.source_url} target="_blank" rel="noreferrer">
-                    <ExternalLinkIcon data-icon="inline-start" aria-hidden="true" />
-                    {detail.sourceLink}
-                  </a>
-                </Button>
-              ) : null}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {detail.installHint}{" "}
-              <a
-                href={CHART_IMPORT_VIDEO_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-primary underline-offset-4 hover:underline"
-              >
-                {detail.installVideo}
-              </a>
-              {" · "}
-              <Link
-                href={`${buildLocalePath("/guide", locale)}#import`}
-                className="font-medium text-primary underline-offset-4 hover:underline"
-              >
-                {detail.installGuide}
-              </Link>
-            </p>
           </div>
+          <Surface data-download-panel aria-label={detail.downloadSection} className="col-span-2 space-y-4 bg-card/95 lg:col-span-1 lg:col-start-2">
+            <h2 className="ui-section-title">{detail.downloadSection}</h2>
+            {entry.download_mode === "onsite" || entry.download_mode === "mixed" ? (
+              <AdxDownloadButton spec={downloadSpec} locale={locale} />
+            ) : (
+              <Button size="touch" disabled><DownloadIcon data-icon="inline-start" aria-hidden="true" />{detail.onsitePending}</Button>
+            )}
+            <details className="text-sm text-muted-foreground">
+              <summary className="min-h-11 cursor-pointer py-3 font-medium">{detail.installGuide}</summary>
+              <p className="leading-relaxed">{detail.installHint}</p>
+              <div className="flex flex-wrap gap-x-4">
+                <a href={CHART_IMPORT_VIDEO_URL} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-primary hover:underline">{detail.installVideo}</a>
+                <Link href={`${buildLocalePath("/guide", locale)}#import`} className="inline-flex min-h-11 items-center text-primary hover:underline">{detail.installGuide}</Link>
+              </div>
+            </details>
+          </Surface>
+          <div data-detail-secondary-actions className="col-span-2 min-w-0 border-t border-border/60 pt-4 lg:col-span-1 lg:col-start-2">
+            <ChartDetailActions entry={entry} locale={locale} />
+            {(entry.download_mode === "external" || entry.download_mode === "mixed") && entry.source_url ? (
+              <Button size="touch" variant="ghost" asChild>
+                <a href={entry.source_url} target="_blank" rel="noreferrer"><ExternalLinkIcon data-icon="inline-start" aria-hidden="true" />{detail.sourceLink}</a>
+              </Button>
+            ) : null}
+          </div>
+          <details data-chart-description className="col-span-2 border-t border-border/60 pt-2 text-sm text-muted-foreground">
+            <summary className="min-h-11 cursor-pointer py-3 font-medium">{detail.aboutChart}</summary>
+            <p className="max-w-2xl leading-relaxed">{description}</p>
+            <div className="mt-3 flex flex-wrap gap-2"><EntryAssetBadges entry={entry} locale={locale} /></div>
+          </details>
         </div>
       </section>
 
@@ -1101,10 +1060,11 @@ export function ChartDetailPageView({
                     href={buildLocalePath(`/charts/${entrySlug(item)}`, locale)}
                     className="group flex h-full items-center gap-3 rounded-xl border border-border/60 bg-card/60 p-2.5 transition-[border-color,background-color,box-shadow] hover:border-primary/40 hover:bg-card hover:shadow-lg hover:shadow-primary/10"
                   >
-                    <div className="relative size-16 shrink-0 overflow-hidden rounded-lg border border-border/60 sm:size-18">
+                    <div data-cover-artwork className="relative size-16 shrink-0 overflow-hidden rounded-md border border-border/60 sm:size-18">
                       <EntryCover
                         entry={toRelatedCoverEntry(item)}
                         locale={locale}
+                        fit="contain"
                         sizes="72px"
                         className="h-full w-full rounded-lg"
                       />
@@ -1142,7 +1102,7 @@ export function ChartDetailPageView({
         </section>
       ) : null}
       </article>
-    </main>
+    </PageShell>
   );
 }
 
@@ -1154,22 +1114,15 @@ function CatalogPageView({
   intro,
 }: CatalogPageViewProps) {
   return (
-    <main
-      id="main-content"
-      className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10"
-    >
+    <PageShell className="adx-material adx-catalog-page">
       <SeoJsonLd data={buildListingStructuredData(locale, entries)} />
-      <Reveal ssrVisible className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold">{title}</h1>
-        <p className="text-muted-foreground">{description}</p>
-        <p className="text-sm text-muted-foreground">{intro}</p>
-      </Reveal>
+      <PageHeader title={title} description={description} meta={intro} />
       <CatalogBrowser
         entries={entries}
         locale={locale}
         detailPathPrefix={buildLocalePath("/charts", locale)}
       />
-    </main>
+    </PageShell>
   );
 }
 

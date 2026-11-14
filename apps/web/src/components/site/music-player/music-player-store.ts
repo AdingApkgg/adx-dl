@@ -14,6 +14,7 @@ export type MusicPlayerStatus =
 export type MusicTracksByVersion = Record<string, MusicTrack[]>;
 
 export type MusicPlayerPersistedSnapshot = {
+  customQueue?: boolean;
   versionId?: string | null;
   trackId?: string | null;
   queue?: readonly string[];
@@ -41,6 +42,7 @@ export type MusicPlayRequest = {
 };
 
 export type MusicPlayerState = {
+  customQueue: boolean;
   tracksByVersion: MusicTracksByVersion;
   versionId: string | null;
   trackId: string | null;
@@ -56,6 +58,10 @@ export type MusicPlayerState = {
 };
 
 export type MusicPlayerActions = {
+  enqueue: (ids: readonly string[], next?: boolean) => void;
+  removeFromQueue: (id: string) => void;
+  moveInQueue: (id: string, direction: -1 | 1) => void;
+  clearQueue: () => void;
   bootstrap: (
     initialVersionId: string | number,
     initialTracks: readonly MusicTrack[],
@@ -85,6 +91,7 @@ export type MusicPlayerRandom = () => number;
 const DEFAULT_VOLUME = 0.72;
 
 const INITIAL_STATE: MusicPlayerState = {
+  customQueue: false,
   tracksByVersion: {},
   versionId: null,
   trackId: null,
@@ -377,12 +384,13 @@ export function createMusicPlayerStore(
       const persistedTrackIsAvailable =
         !persisted?.trackId || trackId === persisted.trackId;
       pendingBootstrapSnapshot =
-        persistedVersionId &&
-        (persistedVersionId !== versionId || !persistedTrackIsAvailable)
+        (persisted?.customQueue === true || (persistedVersionId &&
+        (persistedVersionId !== versionId || !persistedTrackIsAvailable)))
           ? persisted ?? null
           : null;
 
       set({
+        customQueue: persisted?.customQueue === true,
         tracksByVersion,
         versionId,
         trackId,
@@ -430,6 +438,17 @@ export function createMusicPlayerStore(
             )
           : null;
 
+      const manual = pendingBootstrapSnapshot?.customQueue ?? prior.customQueue;
+      if (manual) {
+        const all = Object.values(tracksByVersion).flat();
+        const ids = new Set(all.map((track) => track.id));
+        const queue = [...new Set(pendingBootstrapSnapshot?.queue ?? prior.queue)].filter((id) => ids.has(id)).slice(0, 500);
+        const selected = preferredTrackId && queue.includes(preferredTrackId) ? preferredTrackId : queue[0] ?? null;
+        const current = all.find((track) => track.id === selected);
+        pendingBootstrapSnapshot = null;
+        set({ tracksByVersion, customQueue: true, queue, trackId: selected, versionId: current ? String(current.versionId) : versionId, restorePending: false, status: playbackStatusAfterSelection(prior, current ? String(current.versionId) : versionId, selected) });
+        return;
+      }
       pendingBootstrapSnapshot = null;
       set({
         tracksByVersion,
@@ -454,7 +473,7 @@ export function createMusicPlayerStore(
 
       if (
         !hasVersion(prior.tracksByVersion, versionId) ||
-        versionId === prior.versionId
+        (versionId === prior.versionId && !prior.customQueue)
       ) {
         return;
       }
@@ -465,6 +484,7 @@ export function createMusicPlayerStore(
         versionId,
         trackId,
         queue: buildMusicPlayerQueue(tracks, prior.mode, trackId, random),
+        customQueue: false,
         status: trackId ? "loading" : "idle",
         error: null,
         restorePending: false,
@@ -474,18 +494,12 @@ export function createMusicPlayerStore(
     selectTrack: (trackId) => {
       pendingBootstrapSnapshot = null;
       const prior = get();
-      const tracks = prior.versionId
-        ? (prior.tracksByVersion[prior.versionId] ?? [])
-        : [];
-
-      if (
-        trackId === prior.trackId ||
-        !tracks.some((track) => track.id === trackId)
-      ) {
-        return;
-      }
+      const tracks = Object.values(prior.tracksByVersion).flat();
+      const track = tracks.find((item) => item.id === trackId);
+      if (trackId === prior.trackId || !track || !prior.queue.includes(trackId)) return;
 
       set({
+        versionId: String(track.versionId),
         trackId,
         status: "loading",
         error: null,
@@ -498,14 +512,41 @@ export function createMusicPlayerStore(
       if (mode === prior.mode) {
         return;
       }
-      const tracks = prior.versionId
-        ? (prior.tracksByVersion[prior.versionId] ?? [])
-        : [];
-      set({
-        mode,
-        queue: buildMusicPlayerQueue(tracks, mode, prior.trackId, random),
-      });
+      const all = Object.values(prior.tracksByVersion).flat();
+      const tracks = prior.customQueue ? prior.queue.map((id) => all.find((track) => track.id === id)).filter((track): track is MusicTrack => !!track) : prior.versionId ? prior.tracksByVersion[prior.versionId] ?? [] : [];
+      set({ mode, queue: prior.customQueue && mode !== "shuffle" ? prior.queue : buildMusicPlayerQueue(tracks, mode, prior.trackId, random) });
     },
+
+    enqueue: (ids, next = false) => {
+      pendingBootstrapSnapshot = null;
+      const prior = get();
+      const available = new Set(Object.values(prior.tracksByVersion).flat().map((track) => track.id));
+      const added = [...new Set(ids)].filter((id) => available.has(id) && (!next || id !== prior.trackId));
+      if (!added.length) return;
+      const queue = next ? prior.queue.filter((id) => !added.includes(id)) : [...prior.queue];
+      if (next) queue.splice(Math.max(0, queue.indexOf(prior.trackId ?? "") + 1), 0, ...added.filter((id) => id !== prior.trackId));
+      else queue.push(...added.filter((id) => !queue.includes(id)));
+      const bounded = queue.slice(0, 500);
+      const trackId = prior.trackId ?? bounded[0] ?? null;
+      const track = Object.values(prior.tracksByVersion).flat().find((item) => item.id === trackId);
+      set({ customQueue: true, queue: bounded, trackId, versionId: track ? String(track.versionId) : prior.versionId, restorePending: false });
+    },
+    removeFromQueue: (id) => {
+      const prior = get();
+      const index = prior.queue.indexOf(id);
+      if (index < 0) return;
+      const queue = prior.queue.filter((item) => item !== id);
+      const trackId = prior.trackId === id ? queue[Math.min(index, queue.length - 1)] ?? null : prior.trackId;
+      const track = Object.values(prior.tracksByVersion).flat().find((item) => item.id === trackId);
+      set({ customQueue: true, queue, trackId, versionId: track ? String(track.versionId) : prior.versionId, status: trackId === prior.trackId ? prior.status : trackId ? "loading" : "idle", error: null });
+    },
+    moveInQueue: (id, direction) => {
+      const queue = [...get().queue]; const index = queue.indexOf(id); const target = index + direction;
+      if (index < 0 || target < 0 || target >= queue.length) return;
+      [queue[index], queue[target]] = [queue[target], queue[index]];
+      set({ queue, customQueue: true });
+    },
+    clearQueue: () => { pendingBootstrapSnapshot = null; set({ queue: [], trackId: null, customQueue: true, status: "idle", error: null, restorePending: false }); },
 
     nextTrackId: () => {
       const { queue, trackId, mode } = get();

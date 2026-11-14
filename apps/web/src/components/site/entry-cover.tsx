@@ -75,7 +75,7 @@ export function EntryCover({
   entry,
   locale,
   className,
-  fit = "cover",
+  fit = "contain",
   priority = false,
   sizes = "(max-width: 768px) 100vw, 512px",
 }: EntryCoverProps) {
@@ -133,6 +133,7 @@ export function EntryCover({
     return (
       <div
         ref={rootRef}
+        data-cover-fit={fit}
         className={cn(
           "relative overflow-hidden rounded-xl",
           fit === "contain" && "bg-muted/45",
@@ -177,6 +178,7 @@ export function EntryCover({
   return (
     <div
       ref={rootRef}
+      data-cover-fit={fit}
       role="img"
       aria-label={cover.placeholder}
       className={cn(

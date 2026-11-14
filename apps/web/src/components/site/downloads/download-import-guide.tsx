@@ -15,7 +15,6 @@ export function DownloadImportGuide({ locale, format, split, cacheReleased = fal
 }) {
   const copy = getDictionary(locale).downloads.importGuide;
   const [platform, setPlatform] = React.useState<DownloadPlatform>("desktop");
-  const titleId = React.useId();
   const radioName = React.useId();
 
   React.useEffect(() => {
@@ -23,8 +22,8 @@ export function DownloadImportGuide({ locale, format, split, cacheReleased = fal
   }, []);
 
   return (
-    <section aria-labelledby={titleId} className="rounded-lg border border-primary/20 bg-primary/5 p-2.5 text-xs leading-relaxed">
-      <h3 id={titleId} className="font-medium text-foreground">{copy.title}</h3>
+    <details className="rounded-lg border border-primary/20 bg-primary/5 p-2.5 text-xs leading-relaxed">
+      <summary className="min-h-11 cursor-pointer py-3 font-medium text-foreground">{copy.title}</summary>
       {split ? <p className="mt-1 text-muted-foreground">{copy.splitHint}</p> : null}
       {format === "zip" ? <p className="mt-1 text-muted-foreground">{copy.zipHint}</p> : null}
       {format === "tar.gz" ? <p className="mt-1 text-muted-foreground">{copy.tarHint}</p> : (
@@ -53,6 +52,6 @@ export function DownloadImportGuide({ locale, format, split, cacheReleased = fal
         <summary className="min-h-11 cursor-pointer rounded-sm py-3 focus-visible:outline-2 focus-visible:outline-ring">{copy.helpLabel}</summary>
         <p className="mt-1">{cacheReleased ? copy.helpBodyReleased : copy.helpBody}</p>
       </details>
-    </section>
+    </details>
   );
 }

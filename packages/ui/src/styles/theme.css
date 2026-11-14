@@ -7,6 +7,7 @@
 @import "@fontsource-variable/noto-sans";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "./motion.css";
 
 /* Tailwind only scans the app's own directory, so the package points it at
    its own source. The path is relative to this file: apps need not know where
@@ -26,30 +27,6 @@
 }
 .shimmer-sweep {
   animation: skeleton-shimmer 1.8s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html:not([data-motion="on"]) .shimmer-sweep {
-    animation: none !important;
-  }
-  html:not([data-motion="on"]) [data-motion-sensitive] {
-    animation: none !important;
-    transition: none !important;
-  }
-}
-
-/* The in-site "reduce motion" setting mirrors the OS media query above:
-   MotionProvider (../motion) stamps `data-reduced-motion` on <html> when it's on. */
-html[data-reduced-motion] .shimmer-sweep {
-  animation: none !important;
-}
-html[data-motion="off"] *,
-html[data-motion="off"] *::before,
-html[data-motion="off"] *::after {
-  scroll-behavior: auto !important;
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -272,5 +249,58 @@ html[data-motion="off"] *::after {
   a:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
+  }
+}
+
+/* Layout foundation v0.1. Opt-in classes keep existing app density unchanged.
+   See docs/design-system/README.md for the pilot's component and layout rules. */
+:root {
+  --layout-page-max: 80rem;
+  --layout-reading-max: 48rem;
+  --layout-gutter: clamp(1rem, 3vw, 1.5rem);
+  --layout-page-padding: clamp(1.5rem, 4vw, 2.5rem);
+  --layout-section-gap: clamp(1.5rem, 3vw, 2rem);
+  --surface-radius: calc(var(--radius) * 1.8);
+  --surface-padding: clamp(1rem, 2vw, 1.5rem);
+  --type-page-title: clamp(1.75rem, 3vw, 2.25rem);
+  --type-section-title: 1.125rem;
+}
+
+@layer components {
+  .ui-page {
+    display: flex;
+    min-width: 0;
+    width: 100%;
+    max-width: var(--layout-page-max);
+    margin-inline: auto;
+    flex-direction: column;
+    gap: var(--layout-section-gap);
+    padding: var(--layout-page-padding) var(--layout-gutter);
+  }
+  .ui-page-header {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .ui-page-title {
+    overflow-wrap: anywhere;
+    font-size: var(--type-page-title);
+    font-weight: 650;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+  .ui-section-title {
+    font-size: var(--type-section-title);
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .ui-surface {
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--surface-radius);
+    background: var(--card);
+    color: var(--card-foreground);
+    padding: var(--surface-padding);
   }
 }

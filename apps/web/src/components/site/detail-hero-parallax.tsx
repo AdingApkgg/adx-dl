@@ -32,46 +32,18 @@ export function DetailHeroBackdrop({ children }: { children: React.ReactNode }) 
   );
 }
 
-const coverVariants = {
-  rest: { scale: 1, rotate: 0 },
-  hover: { scale: 1.03, rotate: -1.2 },
-};
-
-const coverShadowVariants = {
-  rest: { opacity: 0 },
-  hover: { opacity: 1 },
-};
-
-/**
- * The detail hero's square cover card: springs to a slight scale + tilt on
- * hover while a pre-rendered stronger shadow layer crossfades in (shadows are
- * too expensive to animate directly). Also carries the "chart-cover"
- * view-transition name — the catalog card names its cover the same way, so
- * navigation morphs the cover between pages.
- */
+/** Full artwork with a stable frame and shared navigation transition. */
 export function DetailHeroCover({ children }: { children: React.ReactNode }) {
-  const reduced = useReducedMotion();
   return (
-    <motion.div
-      initial="rest"
-      whileHover={reduced ? undefined : "hover"}
-      variants={coverVariants}
-      transition={springSoft}
-      className="relative"
-    >
-      <motion.div
-        aria-hidden="true"
-        variants={coverShadowVariants}
-        transition={{ duration: 0.3, ease: EASE_OUT }}
-        className="absolute inset-0 rounded-2xl shadow-2xl shadow-primary/30"
-      />
+    <div className="relative">
       <div
-        className="relative aspect-square overflow-hidden rounded-2xl border border-border/60 shadow-xl"
+        data-cover-artwork
+        className="relative aspect-square overflow-hidden rounded border border-border/60"
         style={{ viewTransitionName: "chart-cover" }}
       >
         {children}
       </div>
-    </motion.div>
+    </div>
   );
 }
 

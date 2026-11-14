@@ -6,14 +6,7 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 import { cn } from "@astrodx/ui/lib/utils";
 import { useDownloadsStore } from "./downloads-store";
 
-/**
- * The last few completed downloads, replayable in one click.
- *
- * A finished job deletes itself (its checkpoints were the only reason to keep
- * it) and the tray row auto-dismisses after 30 s, so "download that whole
- * version again" used to mean rebuilding the selection by hand. Only the spec
- * is stored — never the bytes.
- */
+/** Recent specifications can start a fresh download; file bytes are not history. */
 export function DownloadHistoryList({
   locale,
   className,
@@ -49,7 +42,7 @@ export function DownloadHistoryList({
                 <button
                   type="button"
                   onClick={() => rerunHistoryEntry(entry.key)}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border/70 px-2 py-1 text-xs font-medium transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-md border border-border/70 px-2 py-1 text-xs font-medium transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   <RotateCwIcon className="size-3" aria-hidden="true" />
                   {copy.historyRerun}

@@ -1,0 +1,125 @@
+{
+  "layouts": [
+    {
+      "label": "long-title",
+      "viewport": 320,
+      "width": 320,
+      "main": {
+        "x": 0,
+        "y": 65,
+        "width": 320,
+        "height": 5289,
+        "top": 65,
+        "right": 320,
+        "bottom": 5354,
+        "left": 0
+      },
+      "title": "ExtremelyLongChartTitleWithoutSpacesExtremelyLongChartTitleWithoutSpacesExtremelyLongChartTitleWithoutSpacesExtremelyLongChartTitleWithoutSpacesExtremelyLongChartTitleWithoutSpacesExtremelyLongChartTitleWithoutSpacesExtremelyLongChartTitleWithoutSpacesExtremelyLongChartTitleWithoutSpacesExtremelyLongChartTitleWithoutSpacesExtremelyLongChartTitleWithoutSpaces",
+      "mainCount": 1
+    }
+  ],
+  "checks": {
+    "clearSearchTouch": {
+      "pass": true,
+      "detail": 44
+    },
+    "filterTouch": {
+      "pass": true,
+      "detail": []
+    },
+    "batchConfirmTouch": {
+      "pass": true,
+      "detail": 44
+    },
+    "changedFormatInvalidatesConfirmation": {
+      "pass": true,
+      "detail": false
+    },
+    "pausedDetailTouch": {
+      "pass": true,
+      "detail": [
+        {
+          "text": "继续下载",
+          "height": 48
+        },
+        {
+          "text": "换线路重试",
+          "height": 44
+        },
+        {
+          "text": "取消下载",
+          "height": 44
+        }
+      ]
+    },
+    "focusIntoManager": {
+      "pass": true,
+      "detail": "<button type=\"button\" aria-label=\"收起下载列表\" title=\"收起下载列表\" class=\"inline-flex size-11 shrink-0 items-center justify-center"
+    },
+    "collapsedPlayerDoesNotCoverManager": {
+      "pass": true,
+      "detail": {
+        "clear": true
+      }
+    },
+    "focusBackToEntry": {
+      "pass": true,
+      "detail": "BUTTON"
+    },
+    "tallBatchLeavesUsableManager": {
+      "pass": true,
+      "detail": {
+        "rect": {
+          "x": 16,
+          "y": 483,
+          "width": 288,
+          "height": 289,
+          "top": 483,
+          "right": 304,
+          "bottom": 772,
+          "left": 16
+        },
+        "bodyHeight": 218
+      }
+    },
+    "expandedPlayerAndTallBatch": {
+      "pass": true,
+      "detail": {
+        "rect": {
+          "x": 16,
+          "y": 467,
+          "width": 288,
+          "height": 289,
+          "top": 467,
+          "right": 304,
+          "bottom": 756,
+          "left": 16
+        },
+        "bodyHeight": 218,
+        "hit": true
+      }
+    },
+    "doubleSaveDoesNotConfirm": {
+      "pass": true,
+      "detail": {
+        "confirm": true,
+        "retained": true,
+        "zip": true
+      }
+    },
+    "actualArchiveUsesChosenFormat": {
+      "pass": true,
+      "detail": {
+        "confirm": true,
+        "retained": true,
+        "zip": true
+      }
+    },
+    "explicitConfirmationReleases": {
+      "pass": true,
+      "detail": true
+    }
+  },
+  "exceptions": [],
+  "failures": []
+}

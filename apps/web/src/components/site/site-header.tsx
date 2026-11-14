@@ -1,5 +1,7 @@
 "use client";
 
+import "./site-navigation.css";
+
 import * as React from "react";
 import Link from "next/link";
 import {
@@ -10,7 +12,6 @@ import {
   CloudIcon,
   DicesIcon,
   DownloadIcon,
-  EllipsisIcon,
   Gamepad2Icon,
   HardDriveIcon,
   HeartHandshakeIcon,
@@ -177,7 +178,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
     input.focus();
   };
   // The "more" menu, grouped: resources / community / site. Rendered with a
-  // separator between groups in both the desktop dropdown and the mobile menu.
+  // separator between groups in the desktop sidebar and the mobile menu.
   const secondaryNavGroups: NavItem[][] = [
     [
       {
@@ -450,24 +451,24 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
     // (globals.css animates only the root snapshot around it).
     <>
     <header
+      data-site-header
       style={{ viewTransitionName: "site-header" }}
       className={cn(
-        "sticky top-0 z-20 border-b backdrop-blur transition-colors duration-300",
+        "site-navigation sticky top-0 z-20 border-b backdrop-blur transition-colors duration-300",
         compact ? "border-border bg-background/95" : "border-border/60 bg-background/90"
       )}
     >
       <div
         data-motion-sensitive=""
         className={cn(
-          // One row at every width: each breakpoint sheds content to keep it
-          // that way (see the comment on the trailing controls). On phones
-          // the navigation lives in the bottom tab bar instead.
-          "mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 md:px-6",
+          // Mobile keeps a single compact row; the desktop stylesheet turns
+          // this same shell into a fixed sidebar without a hydration switch.
+          "site-navigation-layout mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 md:px-6",
           "transition-[padding] duration-300",
           compact ? "py-1.5" : "py-3"
         )}
       >
-        <div className="flex min-w-0 shrink items-center gap-3">
+        <div className="site-navigation-brand flex min-w-0 shrink items-center gap-3">
           <Link href={primaryNav[0].href} className="group flex min-w-0 items-center gap-3">
             <motion.div
               animate={{ scale: compact ? 0.85 : 1 }}
@@ -508,7 +509,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             {dictionary.home.entriesBadge(totalEntries)}
           </Badge>
         </div>
-        <nav aria-label={dictionary.nav.primaryLabel} className="hidden shrink-0 items-center gap-2 lg:flex">
+        <nav aria-label={dictionary.nav.primaryLabel} className="site-navigation-links hidden shrink-0 items-center gap-2 lg:flex">
           {primaryNav.map((item) => {
             const active = isActive(item);
             return (
@@ -526,71 +527,49 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               </Button>
             );
           })}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  secondaryNav.some(isActive) && "bg-secondary text-secondary-foreground"
-                )}
-              >
-                <EllipsisIcon data-icon="inline-start" />
-                {dictionary.nav.moreLabel}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              collisionPadding={8}
-              className="w-[min(34rem,calc(100vw-2rem))] p-2"
+          {secondaryNavGroups.map((group, index) => (
+            <div
+              key={group[0].href}
+              className="site-navigation-group"
+              role="group"
+              aria-label={[
+                dictionary.nav.moreLabel,
+                dictionary.community.navLabel,
+                dictionary.footer.navLabel,
+              ][index]}
             >
-              <div className="grid grid-cols-3 gap-2">
-                {secondaryNavGroups.map((group) => (
-                  <div
-                    key={group[0].href}
-                    className="grid min-w-0 content-start gap-0.5 border-l border-border/70 pl-2 first:border-l-0 first:pl-0"
+              {group.filter((item) => item.href !== switchLocale("/donate", locale)).map((item) => {
+                const className = cn(
+                  "site-navigation-link",
+                  isActive(item) && "bg-secondary text-secondary-foreground"
+                );
+                return item.external ? (
+                  <a key={item.href} href={item.href} target="_blank" rel="noreferrer" className={className}>
+                    <NavItemContent item={item} showExternal />
+                  </a>
+                ) : (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={className}
+                    aria-current={isActive(item) ? "page" : undefined}
+                    aria-label={item.ariaLabel}
                   >
-                    {group.map((item) => (
-                      <DropdownMenuItem
-                        key={item.href}
-                        asChild
-                        className="min-w-0 whitespace-normal py-2 leading-snug"
-                      >
-                        {item.external ? (
-                          <a href={item.href} target="_blank" rel="noreferrer">
-                            <NavItemContent item={item} showExternal />
-                          </a>
-                        ) : (
-                          <Link
-                            href={item.href}
-                            aria-current={isActive(item) ? "page" : undefined}
-                            aria-label={item.ariaLabel}
-                          >
-                            <NavItemContent item={item} />
-                          </Link>
-                        )}
-                      </DropdownMenuItem>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    <NavItemContent item={item} />
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
-        {/* How the header is laid out, narrowest first:
-              - below sm: language and settings only — search, random,
-                notices and the menu move to the bottom tab bar;
-              - sm–lg: icons only, the primary nav lives in the menu;
-              - lg–xl: primary nav shown, these controls still icons only;
-              - xl up: these controls get their labels, the entry count shows.
-            Measured in en, the widest locale: labels need ~1165px, so they
-            can't come back any earlier than xl. */}
-        <div className="flex shrink-0 items-center gap-2">
+        {/* On desktop these controls stay below the scrollable navigation;
+            phones keep the compact top bar and bottom navigation. */}
+        <div className="site-navigation-actions flex shrink-0 items-center gap-2">
           <Button
             variant="ghost"
             size="sm"
             asChild
-            className="gap-1 px-2 text-primary"
+            className="site-navigation-support gap-1 px-2 text-primary"
           >
             <Link href={switchLocale("/donate", locale)} aria-current={pathname === switchLocale("/donate", locale) ? "page" : undefined}>
               <HeartHandshakeIcon aria-hidden="true" />
@@ -630,12 +609,14 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               labelled 设置 in Chinese — unreadable to exactly the visitors who
               needed it. The switcher shows the current locale's short label so
               the control announces what it does before it is opened. */}
-          <NoticesHeaderButton
-            href={noticesHref}
-            label={dictionary.notices.navLabel}
-            unreadLabel={dictionary.notices.unreadLabel}
-            active={isActive({ href: noticesHref, label: dictionary.notices.navLabel })}
-          />
+          <div className="site-navigation-notices contents">
+            <NoticesHeaderButton
+              href={noticesHref}
+              label={dictionary.notices.navLabel}
+              unreadLabel={dictionary.notices.unreadLabel}
+              active={isActive({ href: noticesHref, label: dictionary.notices.navLabel })}
+            />
+          </div>
           <LanguageSwitcher locale={locale} pathname={pathname} />
           <SiteSettingsPanel
             locale={locale}
@@ -666,7 +647,7 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
         <motion.div
           aria-hidden="true"
           style={{ scaleX: progressScale }}
-          className="absolute inset-x-0 bottom-0 h-0.5 origin-left bg-primary"
+          className="absolute inset-x-0 bottom-0 h-0.5 origin-left bg-primary lg:hidden"
         />
       )}
     </header>

@@ -1,51 +1,55 @@
 @import "tailwindcss";
 @import "@astrodx/ui/styles/theme.css";
+@import "./material.css";
 
 /* Design tokens, fonts, the skeleton shimmer and the shared reduced-motion
    guards come from @astrodx/ui/styles/theme.css. Everything below is web-only. */
 
 /* Smooth cross-document (MPA) navigations via the native View Transitions API.
    We ship a pure static export (RSC nav payloads are pruned for the CF Pages
-   20k-file cap), so links are full-page loads — this animates them with zero JS.
+   20k-file cap), so links are full-page loads — a native transition type scopes the root animation to navigation.
    Progressive enhancement: unsupported browsers just navigate normally. */
 @view-transition {
   navigation: auto;
+  types: adx-document;
 }
 
 /* Branded page transition on the site's shared ease-out: outgoing content
    drifts up and fades, incoming rises into place. The site header carries its
    own view-transition-name ("site-header", set in site-header.tsx) so the
    chrome reads as pinned while only page content travels. */
-@keyframes vt-page-out {
+@keyframes adx-page-exit {
   to {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(var(--adx-motion-page-exit-distance));
   }
 }
-@keyframes vt-page-in {
+@keyframes adx-page-enter {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(var(--adx-motion-page-enter-distance));
   }
 }
-::view-transition-old(root) {
-  animation: vt-page-out 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
+/* These pseudo-elements originate on html itself, not its descendants. */
+::view-transition-old(root),
 ::view-transition-new(root) {
-  animation: vt-page-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: none;
+}
+html:active-view-transition-type(adx-document)::view-transition-old(root) {
+  animation: adx-page-exit var(--adx-motion-page-exit-duration) var(--adx-motion-easing-enter) both;
+}
+html:active-view-transition-type(adx-document)::view-transition-new(root) {
+  animation: adx-page-enter var(--adx-motion-page-enter-duration) var(--adx-motion-easing-enter) both;
 }
 
-/* Same-document (client-side) navigations: the static export ships full RSC
-   payloads, so in-app links normally do NOT reload the document and the rules
-   above never fire. React's <ViewTransition update="vt-page"> around the page
-   content (src/app/page-transition.tsx, enabled by experimental.viewTransition)
-   runs the browser transition instead — map its class onto the same keyframes
-   so soft and hard navigations share one motion. */
+/* Same-document navigations use React's vt-page transition class when the
+   route payload is available. Hard navigations use root above. Both paths
+   consume the same semantic tokens; Next 16.3 needs no experimental flag. */
 ::view-transition-old(.vt-page) {
-  animation: vt-page-out 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: adx-page-exit var(--adx-motion-page-exit-duration) var(--adx-motion-easing-enter) both;
 }
 ::view-transition-new(.vt-page) {
-  animation: vt-page-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: adx-page-enter var(--adx-motion-page-enter-duration) var(--adx-motion-easing-enter) both;
 }
 
 /* Keep the chrome pinned while content travels: no animation, rendered above
@@ -79,8 +83,8 @@
    boxes are the same and the morph moves nothing. Timed like the page motion;
    the reduced-motion and simple-mode rules below still turn it off. */
 ::view-transition-group(live2d-mascot) {
-  animation-duration: 0.45s;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-duration: var(--adx-motion-shared-move-duration);
+  animation-timing-function: var(--adx-motion-easing-enter);
   z-index: 50;
 }
 ::view-transition-old(music-player),
@@ -128,10 +132,10 @@
    from the button. The initial clip lives inside the keyframe (not on the
    element) so the reduced-motion `animation: none` guard below leaves the new
    snapshot fully visible instead of clipped to a point. */
-html[data-theme-wipe] ::view-transition-old(root) {
+html[data-theme-wipe]::view-transition-old(root) {
   animation: none;
 }
-html[data-theme-wipe] ::view-transition-new(root) {
+html[data-theme-wipe]::view-transition-new(root) {
   animation: theme-wipe 0.45s ease-in-out both;
   z-index: 1;
 }
@@ -151,7 +155,12 @@ html[data-theme-wipe] ::view-transition-new(root) {
 /* The music player's now-playing bars (music-player.tsx): each bar bounces
    from its foot, staggered per bar. data-motion-sensitive on the bars hands
    them to the shared reduced-motion guards. */
-@keyframes music-eq {
+[data-motion-loop="download-sweep"] {
+  animation: adx-ambient-download-sweep var(--adx-motion-ambient-sweep-duration) linear infinite;
+}
+@keyframes adx-ambient-disc { to { transform: rotate(360deg); } }
+
+@keyframes adx-ambient-equalizer {
   0%,
   100% {
     transform: scaleY(0.35);
@@ -161,7 +170,7 @@ html[data-theme-wipe] ::view-transition-new(root) {
   }
 }
 
-@keyframes marquee-reveal {
+@keyframes adx-ambient-marquee {
   0%,
   12% {
     transform: translateX(0);
@@ -177,9 +186,9 @@ html[data-theme-wipe] ::view-transition-new(root) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html:not([data-motion="on"]) ::view-transition-group(*),
-  html:not([data-motion="on"]) ::view-transition-old(*),
-  html:not([data-motion="on"]) ::view-transition-new(*) {
+  html:not([data-motion="on"])::view-transition-group(*),
+  html:not([data-motion="on"])::view-transition-old(*),
+  html:not([data-motion="on"])::view-transition-new(*) {
     animation: none !important;
   }
   /* No auto-scroll for reduced-motion users; the full name stays in the title. */
@@ -191,9 +200,9 @@ html[data-theme-wipe] ::view-transition-new(root) {
 /* The in-site "reduce motion" setting mirrors the OS media query above:
    MotionProvider (@astrodx/ui/motion) stamps `data-reduced-motion` on <html>
    when it's on. */
-html[data-reduced-motion] ::view-transition-group(*),
-html[data-reduced-motion] ::view-transition-old(*),
-html[data-reduced-motion] ::view-transition-new(*) {
+html[data-reduced-motion]::view-transition-group(*),
+html[data-reduced-motion]::view-transition-old(*),
+html[data-reduced-motion]::view-transition-new(*) {
   animation: none !important;
 }
 html[data-reduced-motion] [data-marquee="on"] {
@@ -226,15 +235,15 @@ html[data-reduced-motion] [data-marquee="on"] {
     linear-gradient(180deg, color-mix(in oklch, var(--primary) 8%, transparent), transparent 30%);
 }
 
-/* The fixed download dock shares the lower edge with the global player on
-   phones; only the expanded bar needs the reserve (the default collapsed
-   bubble and a disabled player leave the edge free). Desktop has enough
-   horizontal room for one surface on each side. */
+/* Both player surfaces occupy the phone's lower edge. Task panels reserve
+   their actual size; a collapsed bubble must not cover save/history controls. */
 :root {
   --music-player-mobile-reserve: 0rem;
 }
-
 @media (max-width: 47.9375rem) {
+  :root[data-music-player="collapsed"] {
+    --music-player-mobile-reserve: 3.75rem;
+  }
   :root[data-music-player="expanded"] {
     --music-player-mobile-reserve: 4.75rem;
   }
@@ -288,9 +297,9 @@ html[data-compatibility="simple"] *::after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
-html[data-compatibility="simple"] ::view-transition-group(*),
-html[data-compatibility="simple"] ::view-transition-old(*),
-html[data-compatibility="simple"] ::view-transition-new(*) {
+html[data-compatibility="simple"]::view-transition-group(*),
+html[data-compatibility="simple"]::view-transition-old(*),
+html[data-compatibility="simple"]::view-transition-new(*) {
   animation: none !important;
 }
 html[data-compatibility="simple"] .site-shell-background {

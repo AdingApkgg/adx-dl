@@ -343,3 +343,57 @@ describe("music-player store", () => {
     expect(store.getState().playRequest).toBeNull();
   });
 });
+
+describe("editable playback queue", () => {
+  function ready() {
+    const store = createMusicPlayerStore(() => 0.5);
+    store.getState().bootstrap(1, [track("a", 1), track("b", 1)]);
+    store.getState().loadManifest({ 1: [track("a", 1), track("b", 1)], 2: [track("c", 2)] });
+    return store;
+  }
+  test("adds across versions without replacing current playback", () => {
+    const store = ready();
+    store.getState().enqueue(["c"]);
+    expect(store.getState().queue).toEqual(["a", "b", "c"]);
+    expect(store.getState().trackId).toBe("a");
+    store.getState().enqueue(["c"], true);
+    expect(store.getState().queue).toEqual(["a", "c", "b"]);
+  });
+  test("removing the current track chooses its next neighbor; clearing survives refresh", () => {
+    const store = ready();
+    store.getState().enqueue(["c"]);
+    store.getState().removeFromQueue("a");
+    expect(store.getState().trackId).toBe("b");
+    store.getState().clearQueue();
+    store.getState().loadManifest({ 1: [track("a", 1), track("b", 1)], 2: [track("c", 2)] });
+    expect(store.getState().queue).toEqual([]);
+    expect(store.getState().trackId).toBeNull();
+  });
+  test("manual order and membership survive mode changes and manifest reload", () => {
+    const store = ready();
+    store.getState().enqueue(["c"]);
+    store.getState().moveInQueue("c", -1);
+    store.getState().setMode("repeat-one");
+    store.getState().loadManifest({ 1: [track("a", 1), track("b", 1)], 2: [track("c", 2)] });
+    expect(store.getState().queue).toEqual(["a", "c", "b"]);
+    store.getState().selectTrack("c");
+    expect(store.getState().versionId).toBe("2");
+    expect(store.getState().queue).toEqual(["a", "c", "b"]);
+  });
+  test("restores a custom cross-version queue after the full manifest arrives", () => {
+    const store = createMusicPlayerStore();
+    store.getState().bootstrap(1, [track("a", 1)], { versionId:"2", trackId:"c", queue:["c","a"], customQueue:true });
+    store.getState().loadManifest({ 1:[track("a",1),track("b",1)],2:[track("c",2)] });
+    expect(store.getState().queue).toEqual(["c","a"]);
+    expect(store.getState().trackId).toBe("c");
+    expect(store.getState().status).toBe("loading");
+  });
+});
+
+
+test("play-next on the current song never removes it from the queue", () => {
+  const store = createMusicPlayerStore();
+  store.getState().bootstrap(1,[track("a",1),track("b",1)]);
+  store.getState().enqueue(["a"],true);
+  expect(store.getState().queue).toEqual(["a","b"]);
+});

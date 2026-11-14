@@ -1,0 +1,133 @@
+/* Desktop navigation shares the same links and controls as the mobile header.
+   Keep this scoped to the public shell: community pages own their own chrome. */
+@media (min-width: 64rem) {
+  body.adx-site {
+    --site-sidebar-width: 14rem;
+  }
+
+  body.adx-site .site-shell-background {
+    margin-left: var(--site-sidebar-width);
+  }
+
+  body.adx-site .site-navigation {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: var(--site-sidebar-width);
+    height: 100dvh;
+    border-right: 1px solid var(--border);
+    border-bottom: 0;
+    background: var(--background);
+    backdrop-filter: none;
+  }
+
+  body.adx-site .site-navigation-layout {
+    height: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 1.25rem;
+    padding: 1.25rem 0.75rem;
+  }
+
+  body.adx-site .site-navigation-brand {
+    flex-shrink: 0;
+  }
+
+  body.adx-site .site-navigation-brand > a {
+    gap: 0.625rem;
+  }
+
+  body.adx-site .site-navigation-brand > a > div > span {
+    white-space: normal;
+    font-size: 0.8125rem;
+  }
+
+  body.adx-site .site-navigation-brand > a > div > span + span,
+  body.adx-site .site-navigation-brand > [data-slot="badge"] {
+    display: none;
+  }
+
+  body.adx-site .site-navigation-links {
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding: 2px;
+    margin: -2px;
+  }
+
+  body.adx-site .site-navigation-links > a,
+  body.adx-site .site-navigation-link {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.625rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.625rem;
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.35;
+    white-space: normal;
+  }
+
+  body.adx-site .site-navigation-link:hover {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  body.adx-site .site-navigation-link:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+  }
+
+  body.adx-site .site-navigation-link[aria-current="page"] {
+    background: var(--secondary);
+    color: var(--secondary-foreground);
+  }
+
+  body.adx-site .site-navigation-group {
+    display: grid;
+    gap: 0.125rem;
+    margin-top: 0.625rem;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--border);
+  }
+
+  body.adx-site .site-navigation-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    flex-shrink: 0;
+    gap: 0.375rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.75rem;
+  }
+
+  body.adx-site .site-navigation-actions > a,
+  body.adx-site .site-navigation-actions > button {
+    width: 100%;
+    min-width: 0;
+    height: 2.75rem;
+    padding-inline: 0.25rem;
+  }
+
+  body.adx-site .site-navigation-actions .xl\:inline,
+  body.adx-site .site-navigation-notices {
+    display: none;
+  }
+
+  body.adx-site .site-navigation-actions > .site-navigation-support {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    padding-inline: 0.625rem;
+  }
+
+  body.adx-site [role="region"][style*="music-player"] {
+    left: calc(var(--site-sidebar-width) + 1rem);
+  }
+}

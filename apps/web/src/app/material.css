@@ -1,0 +1,238 @@
+/* Material 2-inspired 4px direction for the public site. Keep the user's light/dark theme and accent as the color source.
+   Artwork is a separate role: contain + 4px with inset artwork. */
+:where(.adx-material, body.adx-site, body:has(.adx-download-dock [data-download-manager])) {
+  --md-seed: var(--primary);
+  --md-on-action: var(--primary-foreground);
+  --md-background: var(--background);
+  --md-surface: var(--card);
+  --md-surface-high: var(--card);
+  --md-container: var(--muted);
+  --md-field: var(--muted);
+  --md-title: var(--foreground);
+  --md-outline: var(--border);
+  --md-radius: 4px;
+  --md-artwork-radius: var(--md-radius);
+  --md-surface-shadow: 0 1px 3px rgb(32 40 64 / 8%);
+}
+html:not(.dark) :where(.adx-material, body.adx-site, body:has(.adx-download-dock [data-download-manager])) {
+  --md-background: #fafafa;
+  --md-surface: #fff;
+  --md-surface-high: #fff;
+  --md-container: #f1f3f8;
+  --md-field: #f5f5f5;
+  --md-title: #252a34;
+  --md-outline: #d9dce3;
+}
+/* Indigo is the approved default blue direction; custom accents keep their own
+   shared palette. Dark mode uses a light seed and its corresponding on-color. */
+html:not(.dark):is(:not([data-accent]), [data-accent="blue"]) :where(.adx-material, body.adx-site, body:has(.adx-download-dock [data-download-manager])) {
+  --md-seed: #4255ae;
+  --md-on-action: #fff;
+}
+html.dark:is(:not([data-accent]), [data-accent="blue"]) :where(.adx-material, body.adx-site, body:has(.adx-download-dock [data-download-manager])) {
+  --md-seed: #b8c4ff;
+  --md-on-action: #18265f;
+}
+/* These light accents need a deeper action tone for small white labels. */
+html:not(.dark):is([data-accent="orange"], [data-accent="teal"]) :where(.adx-material, body.adx-site, body:has(.adx-download-dock [data-download-manager])) {
+  --md-seed: color-mix(in oklch, var(--primary) 88%, black);
+}
+body.adx-site .site-shell-background { background: var(--md-background); }
+body.adx-site [data-site-header] {
+  background: var(--md-background);
+  border-color: var(--md-outline);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+body.adx-site [data-mobile-tabbar-root] {
+  background: var(--md-surface);
+  border-color: transparent;
+  backdrop-filter: none;
+}
+body.adx-site [data-site-header] [data-slot="button"] { border-radius: var(--md-radius); }
+.adx-material .text-primary,
+body.adx-site [data-site-header] .text-primary { color: var(--md-seed); }
+.adx-material.ui-page {
+  max-width: 1200px;
+  gap: 24px;
+  --type-page-title: 32px;
+  --type-section-title: 20px;
+}
+.adx-material .ui-page-title {
+  color: var(--md-title);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.adx-material .ui-page-header { gap: 12px; }
+.adx-material .ui-surface,
+.adx-material [data-slot="card"] {
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-radius);
+  box-shadow: var(--md-surface-shadow);
+}
+.adx-material button,
+.adx-material [data-slot="button"] {
+  border-radius: var(--md-radius);
+  font-weight: 500;
+}
+.adx-material [data-slot="button"][data-variant="outline"] {
+  background: var(--md-surface-high);
+  color: var(--md-title);
+  border-color: transparent;
+}
+.adx-material [data-slot="button"][data-variant="secondary"] {
+  background: var(--md-container);
+  color: var(--md-title);
+}
+.adx-material [data-slot="button"][data-variant="ghost"] { color: var(--md-title); }
+.adx-material [data-slot="button"][data-variant="default"] {
+  background: var(--md-seed);
+  color: var(--md-on-action);
+}
+.adx-material [data-slot="button"]:hover:not(:disabled):not([data-variant="destructive"]) {
+  filter: brightness(0.96);
+}
+.adx-material [data-slot="button"]:disabled { filter: none; }
+.adx-material [data-slot="select-trigger"] {
+  background: var(--md-container);
+  color: var(--md-title);
+  border-color: transparent;
+  border-radius: var(--md-radius);
+}
+.adx-catalog-page [data-catalog-controls] { padding: 20px; }
+.adx-catalog-page [data-catalog-search] {
+  min-height: 48px;
+  background: var(--md-field);
+  border-color: transparent;
+  border-radius: var(--md-radius);
+  border-bottom: 1px solid var(--muted-foreground);
+  padding-left: 42px;
+  font-size: 16px;
+  box-shadow: none;
+}
+.adx-catalog-page [role="search"] + button {
+  width: 48px;
+  height: 48px;
+  background: var(--md-container);
+  color: var(--md-title);
+  border-radius: var(--md-radius);
+  border: 0;
+}
+.adx-catalog-page button[aria-pressed] { border-radius: var(--md-radius); }
+.adx-catalog-page button[aria-pressed="true"] {
+  background: var(--md-container);
+  color: var(--md-title);
+  border-color: transparent;
+}
+.adx-catalog-page [data-catalog-toolbar-backdrop] { border-radius: var(--md-radius); }
+.adx-catalog-page [data-layout="card-grid"] { gap: 18px; }
+.adx-catalog-page [data-chart-card] {
+  background: var(--md-surface-high);
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-radius);
+  box-shadow: var(--md-surface-shadow);
+}
+/* Insets keep the outer card clip away from the full artwork. */
+.adx-catalog-page [data-chart-cover-frame] {
+  margin: 12px 12px 0;
+  border: 0;
+  border-radius: var(--md-artwork-radius);
+  background: var(--md-surface);
+}
+.adx-material [data-cover-fit],
+.adx-material [data-cover-artwork] { border-radius: var(--md-artwork-radius); }
+.adx-material [data-cover-fit="contain"] { background: var(--md-surface); }
+.adx-catalog-page [data-chart-card] h3 { font-size: 18px; font-weight: 700; }
+.adx-detail-page [data-detail-hero] {
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-radius);
+  background: var(--md-surface);
+  box-shadow: var(--md-surface-shadow);
+}
+.adx-detail-page [data-detail-hero] > .grid { gap: 24px; padding: 28px; }
+.adx-detail-page [data-cover-artwork] { box-shadow: none; }
+.adx-detail-page [data-detail-identity] .ui-page-title { font-size: 34px; }
+.adx-material [data-download-panel] { background: var(--md-container); border: 1px solid var(--md-outline); padding: 24px; }
+.adx-material [data-download-panel] h2 {
+  color: var(--md-title);
+  font-size: 20px;
+  font-weight: 700;
+}
+.adx-material [data-download-inline] [data-slot="button"][data-variant="default"],
+.adx-material [data-download-task] [data-slot="button"][data-variant="default"] {
+  min-height: 48px;
+  padding: 10px 18px;
+  border-radius: var(--md-radius);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 20%);
+  transition: background-color 160ms ease-out;
+}
+.adx-material [data-download-inline] [data-slot="button"][data-variant="outline"] { min-height: 48px; background: var(--md-surface); }
+.adx-material [data-download-inline] label { background: var(--md-surface); border: 0; border-radius: var(--md-radius); padding: 12px; }
+.adx-material [data-detail-secondary-actions],
+.adx-material [data-chart-description] { border-color: var(--md-outline); }
+.adx-download-dock [data-download-manager] {
+  background: var(--md-surface);
+  border: 1px solid var(--md-outline);
+  border-radius: var(--md-radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 20%);
+}
+.adx-download-dock [data-download-manager-header] { padding-block: 12px; border-color: var(--md-outline); }
+.adx-download-dock [data-download-manager] h2 { color: var(--md-title); font-size: 17px; font-weight: 700; }
+.adx-download-dock [data-download-task] { background: var(--md-surface); border: 1px solid var(--md-outline); padding: 16px; gap: 14px; border-radius: var(--md-radius); }
+.adx-download-dock [data-download-task] button:not([data-slot]) { border-radius: var(--md-radius); }
+.adx-download-dock .adx-download-entry { background: var(--md-surface); color: var(--foreground); border-color: var(--md-outline); }
+/* Menus are portaled outside the main/component. Scope them by an active
+   migrated page or the manager’s own menu, retaining shared keyboard behavior. */
+body.adx-site [data-slot="dropdown-menu-content"],
+[data-material-download-menu],
+body.adx-site [data-slot="select-content"] {
+  background: var(--md-surface);
+  color: var(--foreground);
+  border-color: var(--md-outline);
+  border-radius: var(--md-radius);
+}
+body.adx-site [data-slot="dropdown-menu-radio-item"],
+[data-material-download-menu] [data-slot="dropdown-menu-radio-item"] { min-height: 44px; border-radius: var(--md-radius); }
+@media (max-width: 767px) {
+  .adx-material.ui-page { --type-page-title: 30px; }
+  .adx-catalog-page [data-catalog-controls] { padding: 20px; }
+  .adx-detail-page [data-detail-hero] { border-radius: var(--md-radius); }
+  .adx-detail-page [data-detail-hero] > .grid { grid-template-columns: 80px minmax(0,1fr); gap: 16px; padding: 18px; }
+  .adx-detail-page [data-detail-identity] .ui-page-title { font-size: 30px; }
+  .adx-material [data-download-panel] { padding: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion="on"]) .adx-material [data-slot="button"] { transition: none; }
+}
+
+.adx-material [data-download-job-notes] { font-size: 12px; }
+
+/* Public-site migration. Keep circular avatars, badges, playback controls and
+   progress rings; ordinary containers and fields share the 4px shape role. */
+.adx-site :is(.rounded-sm,.rounded-md,.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl),
+.adx-site :is([data-slot="input"],[data-slot="textarea"],[data-slot="dialog-content"],[data-slot="sheet-content"],[data-slot="popover-content"],[data-slot="alert-dialog-content"]) {
+  border-radius: var(--md-radius);
+}
+.adx-site :is([data-slot="dialog-content"],[data-slot="sheet-content"],[data-slot="popover-content"],[data-slot="alert-dialog-content"]) {
+  background: var(--md-surface);
+  border-color: var(--md-outline);
+}
+.adx-site { --type-page-title: 32px; }
+.adx-site .max-w-7xl { max-width: 1200px; }
+.adx-site main h1 { color: var(--md-title); font-size: 32px; font-weight: 600; line-height: 1.2; letter-spacing: -.02em; }
+.adx-site [data-chart-card] { background: var(--md-surface); border: 1px solid var(--md-outline); border-radius: var(--md-radius); box-shadow: var(--md-surface-shadow); }
+.adx-site [data-chart-cover-frame] { margin: 12px 12px 0; border-radius: var(--md-artwork-radius); border: 0; background: var(--md-surface); }
+.adx-site [data-cover-artwork] { border-radius: var(--md-artwork-radius); }
+.adx-site button[data-music-player-surface="collapsed"],
+.adx-site :is([data-music-player-surface],[data-music-player-panel]) button.rounded-full:is(.size-11,.size-12) { border-radius: 50%; }
+@media(max-width:767px) {
+  .adx-site { --type-page-title: 30px; }
+  .adx-site main h1 { font-size: 30px; }
+}
+@media(min-width:768px) { .adx-site .adx-detail-page [data-detail-identity] h1 { font-size: 34px; } }
+
+.adx-site [data-home-search-glow] { display: none; }

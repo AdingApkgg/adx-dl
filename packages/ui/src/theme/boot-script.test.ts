@@ -19,7 +19,7 @@ type Html = {
 // remove them, not just avoid adding them.
 function run(
   stored: Record<string, string>,
-  { prefersDark = false, storageThrows = false, stale = false, missingMedia = false } = {}
+  { prefersDark = false, storageThrows = false, stale = false, missingMedia = false, prefersReduced = false } = {}
 ): Html {
   const html: Html = {
     classes: new Set(stale ? ["dark"] : []),
@@ -43,7 +43,7 @@ function run(
       return stored[key] ?? null;
     },
   };
-  const window = { matchMedia: missingMedia ? undefined : () => ({ matches: prefersDark }) };
+  const window = { matchMedia: missingMedia ? undefined : (query: string) => ({ matches: query.includes("reduced-motion") ? prefersReduced : prefersDark }) };
   new Function("document", "localStorage", "window", themeBootScript())({ documentElement }, localStorage, window);
   return html;
 }
@@ -105,6 +105,12 @@ describe("themeBootScript", () => {
     expect(html.dataset.accent).toBe("blue");
     expect(html.dataset.motion).toBe("system");
     expect(html.attributes.has("data-reduced-motion")).toBe(false);
+  });
+
+  test("sets effective reduced motion before paint, including when storage is denied", () => {
+    expect(run({}, { prefersReduced: true }).attributes.has("data-reduced-motion")).toBe(true);
+    expect(run({ [MOTION_STORAGE_KEY]: "on" }, { prefersReduced: true }).attributes.has("data-reduced-motion")).toBe(false);
+    expect(run({}, { prefersReduced: true, storageThrows: true }).attributes.has("data-reduced-motion")).toBe(true);
   });
 
   test("is safe to inline in a script tag", () => {

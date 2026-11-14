@@ -1,4 +1,5 @@
 import { MOTION_MODES, MOTION_STORAGE_KEY } from "../motion/constants";
+import { resolveReducedMotion } from "../motion/policy";
 import { ACCENT_COLORS, ACCENT_STORAGE_KEY, THEME_STORAGE_KEY } from "./constants";
 
 /**
@@ -24,11 +25,12 @@ export function themeBootScript(): string {
   const accents = JSON.stringify(ACCENT_COLORS);
   const motionKey = JSON.stringify(MOTION_STORAGE_KEY);
   const motionModes = JSON.stringify(MOTION_MODES);
+  const resolveMotion = resolveReducedMotion.toString();
   return [
     "(function(){var e=document.documentElement;",
     `try{var t=localStorage.getItem(${themeKey});var m=typeof window.matchMedia==='function'?window.matchMedia('(prefers-color-scheme: dark)').matches:true;var d=t==='light'?false:(t==='dark'?true:m);e.classList.toggle('dark',d);e.style.colorScheme=t==='light'?'only light':(d?'dark':'light');}catch(x){e.classList.add('dark');e.style.colorScheme='dark';}`,
     `try{var a=localStorage.getItem(${accentKey});var c=${accents};e.dataset.accent=c.indexOf(a)>=0?a:'blue';}catch(x){e.dataset.accent='blue';}`,
-    `try{var p=localStorage.getItem(${motionKey});p=p==='1'?'off':(p==='0'?'system':p);p=${motionModes}.indexOf(p)>=0?p:'system';e.dataset.motion=p;e.toggleAttribute('data-reduced-motion',p==='off');}catch(x){e.dataset.motion='system';}`,
+    `var p='system';try{p=localStorage.getItem(${motionKey});p=p==='1'?'off':(p==='0'?'system':p);p=${motionModes}.indexOf(p)>=0?p:'system';}catch(x){}e.dataset.motion=p;var r=false;try{r=typeof window.matchMedia==='function'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(x){}e.toggleAttribute('data-reduced-motion',(${resolveMotion})(p,r));`,
     "})();",
   ].join("");
 }

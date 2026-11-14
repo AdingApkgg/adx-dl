@@ -1,0 +1,102 @@
+@import "./motion-tokens.css";
+
+/* CSS adapters approximate the spatial springs for finite Radix surfaces.
+   Motion owns interactive springs; no element has two transform owners. */
+[data-motion-surface] {
+  --adx-surface-x: 0px;
+  --adx-surface-y: var(--adx-motion-distance-xs);
+  --adx-surface-scale: 1;
+  --adx-surface-duration: var(--adx-motion-popup-enter-duration);
+}
+[data-motion-surface="backdrop"] {
+  --adx-surface-y: 0px;
+  --adx-surface-duration: var(--adx-motion-backdrop-enter-duration);
+}
+[data-motion-surface="dialog"] {
+  --adx-surface-duration: var(--adx-motion-dialog-enter-duration);
+  --adx-surface-y: 12px;
+  --adx-surface-scale: var(--adx-motion-scale-dialog-start);
+}
+[data-motion-surface="sheet"] {
+  --adx-surface-duration: var(--adx-motion-sheet-enter-duration);
+  --adx-surface-y: var(--adx-motion-distance-lg);
+}
+[data-motion-surface="sheet"][data-motion-side="right"] {
+  --adx-surface-x: var(--adx-motion-distance-lg);
+  --adx-surface-y: 0px;
+}
+/* Transitions preserve the current presentation when opening is reversed.
+   The invisible presence animation only lets Radix retain a closing node. */
+[data-motion-surface] {
+  opacity: 0;
+  transform: translate(0, 0) scale(1);
+  transition-property: opacity, transform;
+  transition-duration: var(--adx-surface-duration);
+  transition-timing-function: var(--adx-motion-easing-enter);
+}
+[data-motion-surface][data-state="open"],
+[data-motion-surface][data-state="delayed-open"],
+[data-motion-surface][data-state="instant-open"] {
+  opacity: 1;
+  animation: adx-presence-enter 1ms;
+}
+@starting-style {
+  [data-motion-surface][data-state="open"],
+  [data-motion-surface][data-state="delayed-open"],
+  [data-motion-surface][data-state="instant-open"] {
+    opacity: 0;
+    transform: translate(var(--adx-surface-x), var(--adx-surface-y)) scale(var(--adx-surface-scale));
+  }
+}
+[data-motion-surface][data-state="closed"] {
+  opacity: 0;
+  transition-duration: var(--adx-motion-duration-fast);
+  transition-timing-function: var(--adx-motion-easing-exit);
+  animation: adx-presence-exit var(--adx-motion-duration-fast);
+}
+@keyframes adx-presence-enter { from { --adx-motion-presence: 0; } to { --adx-motion-presence: 1; } }
+@keyframes adx-presence-exit { from { --adx-motion-presence: 1; } to { --adx-motion-presence: 0; } }
+
+[data-slot="button"], [data-slot="tabs-trigger"] {
+  transition-duration: var(--adx-motion-duration-fast);
+  transition-timing-function: var(--adx-motion-easing-standard);
+}
+[data-motion-press="css"] {
+  transition-property: color, background-color, border-color, box-shadow, scale;
+}
+[data-motion-press="css"]:active:not([aria-disabled="true"]):not(:disabled) { scale: var(--adx-motion-scale-press); }
+
+/* Animate only when in view and foreground; the static base remains readable. */
+[data-slot="skeleton"][data-motion-active="false"] .shimmer-sweep { animation-play-state: paused; }
+
+/* Pre-hydration fallback follows the OS; explicit 'on' is the only OS override. */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion="on"]) *,
+  html:not([data-motion="on"]) *::before,
+  html:not([data-motion="on"]) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+  html:not([data-motion="on"]) [data-motion-press="css"]:active { scale: none; }
+  html:not([data-motion="on"]) .shimmer-sweep { animation: none !important; }
+}
+/* The effective attribute also covers the temporary compatibility override. */
+html[data-reduced-motion] *,
+html[data-reduced-motion] *::before,
+html[data-reduced-motion] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+html[data-reduced-motion] [data-motion-press="css"]:active { scale: none; }
+html[data-reduced-motion] .shimmer-sweep { animation: none !important; }
+
+/* Radix item-aligned selects position the selected row under the trigger. */
+[data-motion-surface][data-align-trigger="true"] { animation: none; transition: none; }

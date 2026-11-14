@@ -34,13 +34,11 @@ type SheetVariant = "side" | "centered" | "fullscreen";
 
 const sheetVariantClass: Record<SheetVariant, string> = {
   side: cn(
-    "inset-y-0 right-0 h-dvh w-full max-w-2xl border-l border-border",
-    "data-closed:slide-out-to-right-8 data-open:slide-in-from-right-8"
+    "inset-y-0 right-0 h-dvh w-full max-w-2xl border-l border-border"
   ),
   // `inset-0 + m-auto` centers without a transform. A translate-based centering
-  // would be overwritten mid-animation: tw-animate-css's enter/exit keyframes
-  // set `transform` wholesale, so the panel would snap to the top-left corner
-  // for the duration of the fade.
+  // would conflict with the surface transition, which owns transform during
+  // entrance and interruption. Centering stays independent of animation.
   //
   // `h-fit` means the panel is only as tall as its content, so whatever this
   // wraps must contribute an intrinsic height — a `flex: 1 1 0%` child does not,
@@ -48,12 +46,10 @@ const sheetVariantClass: Record<SheetVariant, string> = {
   // is in `dvh` so a mobile browser's retractable chrome shrinks the panel
   // instead of pushing its bottom off-screen.
   centered: cn(
-    "inset-0 m-auto h-fit max-h-[min(88dvh,760px)] w-[calc(100vw-2rem)] max-w-4xl rounded-xl border border-border/70",
-    "data-closed:zoom-out-95 data-open:zoom-in-95"
+    "inset-0 m-auto h-fit max-h-[min(88dvh,760px)] w-[calc(100vw-2rem)] max-w-4xl rounded-xl border border-border/70"
   ),
   fullscreen: cn(
-    "inset-0 h-dvh w-full",
-    "data-closed:slide-out-to-bottom-4 data-open:slide-in-from-bottom-4"
+    "inset-0 h-dvh w-full"
   ),
 };
 
@@ -71,15 +67,17 @@ function SheetContent({
     <SheetPrimitive.Portal>
       <SheetPrimitive.Overlay
         data-slot="sheet-overlay"
+        data-motion-surface="backdrop"
         data-motion-sensitive=""
-        className="fixed inset-0 z-[90] bg-black/45 backdrop-blur-[2px] data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0"
+        className="fixed inset-0 z-[90] bg-black/45 backdrop-blur-[2px]"
       />
       <SheetPrimitive.Content
         data-slot="sheet-content"
+        data-motion-surface={variant === "centered" ? "dialog" : "sheet"}
+        data-motion-side={variant === "side" ? "right" : "bottom"}
         data-motion-sensitive=""
         className={cn(
           "fixed z-[91] flex flex-col bg-background shadow-2xl outline-none",
-          "data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0",
           sheetVariantClass[variant],
           className
         )}
