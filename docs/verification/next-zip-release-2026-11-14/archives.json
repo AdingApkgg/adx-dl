@@ -1,0 +1,40 @@
+[
+  {
+    "format": ".adx",
+    "name": "012061 XODUS.adx",
+    "archive": {
+      "entries": [
+        "27 MAGiCAL/012061 XODUS/maidata.txt",
+        "27 MAGiCAL/012061 XODUS/track.mp3",
+        "27 MAGiCAL/012061 XODUS/bg.png",
+        "27 MAGiCAL/012061 XODUS/pv.mp4"
+      ],
+      "sizes": {
+        "27 MAGiCAL/012061 XODUS/maidata.txt": 6740,
+        "27 MAGiCAL/012061 XODUS/track.mp3": 4419185,
+        "27 MAGiCAL/012061 XODUS/bg.png": 164269,
+        "27 MAGiCAL/012061 XODUS/pv.mp4": 48717
+      }
+    },
+    "errors": []
+  },
+  {
+    "format": ".zip",
+    "name": "012061 XODUS.zip",
+    "archive": {
+      "entries": [
+        "27 MAGiCAL/012061 XODUS/maidata.txt",
+        "27 MAGiCAL/012061 XODUS/track.mp3",
+        "27 MAGiCAL/012061 XODUS/bg.png",
+        "27 MAGiCAL/012061 XODUS/pv.mp4"
+      ],
+      "sizes": {
+        "27 MAGiCAL/012061 XODUS/maidata.txt": 6740,
+        "27 MAGiCAL/012061 XODUS/track.mp3": 4419185,
+        "27 MAGiCAL/012061 XODUS/bg.png": 164269,
+        "27 MAGiCAL/012061 XODUS/pv.mp4": 48717
+      }
+    },
+    "errors": []
+  }
+]
