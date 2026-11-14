@@ -296,3 +296,12 @@ body.adx-site [data-slot="dropdown-menu-radio-item"],
   .music-player-track, .music-player-transport { width: min(100%, 36dvh, 240px); }
   .music-player-track { gap: 8px; }
 }
+
+/* Wide detail headers put the download action beside the chart identity. The
+   artwork occupies only this header row, never a column beside later content. */
+@media(min-width:80rem) {
+  .adx-detail-page [data-detail-hero] > .grid { grid-template-columns: 128px minmax(0, 1fr) minmax(320px, 1fr); align-items: start; }
+  .adx-detail-page [data-detail-identity] { grid-column: 2; grid-row: 1; }
+  .adx-detail-page [data-download-panel] { grid-column: 3; grid-row: 1; min-width: 0; }
+  .adx-detail-page :is([data-detail-secondary-actions], [data-chart-description]) { grid-column: 1 / -1; }
+}
