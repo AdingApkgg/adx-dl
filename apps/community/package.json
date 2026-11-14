@@ -39,7 +39,7 @@
     "@astrodx/ui": "workspace:*",
     "@inlang/paraglide-js": "2.25.4",
     "@inlang/plugin-message-format": "4.4.4",
-    "@react-router/dev": "8.4.0",
+    "@react-router/dev": "8.5.1",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
