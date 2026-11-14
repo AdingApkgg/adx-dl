@@ -18,7 +18,7 @@ import {
   VolumeXIcon,
   XIcon,
 } from "lucide-react";
-import { Popover as PopoverPrimitive, Slider as SliderPrimitive } from "radix-ui";
+import { Dialog as DialogPrimitive, Slider as SliderPrimitive } from "radix-ui";
 import useSWR from "swr";
 import { useShallow } from "zustand/react/shallow";
 
@@ -331,8 +331,19 @@ function MusicPlayerSurface({
     seek: () => {},
   });
   const [open, setOpen] = React.useState(false);
+  const expandTriggerRef = React.useRef<HTMLButtonElement>(null);
   const playlistTriggerRef = React.useRef<HTMLButtonElement>(null);
   const returnPanelFocus = React.useRef(false);
+  // Keep the page inert even when nested menus update Radix's aria-hidden
+  // bookkeeping. The player portal remains outside this public-page shell.
+  React.useEffect(() => {
+    if (!open) return;
+    const shell = document.querySelector<HTMLElement>(".site-shell-background");
+    if (!shell) return;
+    const wasInert = shell.inert;
+    shell.inert = true;
+    return () => { shell.inert = wasInert; };
+  }, [open]);
   const [manifestRequested, setManifestRequested] = React.useState(false);
   const [currentTime, setCurrentTime] = React.useState(0);
   const [duration, setDuration] = React.useState(0);
@@ -1129,7 +1140,7 @@ function MusicPlayerSurface({
   ]);
 
   return (
-    <PopoverPrimitive.Root
+    <DialogPrimitive.Root
       open={open}
       onOpenChange={(nextOpen) => {
         setOpen(nextOpen);
@@ -1140,6 +1151,7 @@ function MusicPlayerSurface({
     >
       <div
         ref={surfaceRef}
+        data-music-player-root
         role="region"
         aria-label={copy.playerLabel}
         inert={open || undefined}
@@ -1164,7 +1176,8 @@ function MusicPlayerSurface({
 
             initial={false}
             transition={getSemanticTransition("layout", reducedMotion)}
-            onClick={() => setCollapsed(false)}
+            ref={expandTriggerRef}
+            onClick={() => { setOpen(true); setManifestRequested(true); }}
             aria-label={copy.expand}
             title={copy.expand}
             className="pointer-events-auto relative block size-12 rounded-full border border-border/70 bg-popover/95 shadow-xl ring-1 ring-foreground/5 backdrop-blur-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -1265,7 +1278,7 @@ function MusicPlayerSurface({
             >
               <SkipForwardIcon className="fill-current" />
             </Button>
-            <PopoverPrimitive.Trigger asChild>
+            <DialogPrimitive.Trigger asChild>
               <Button
                 type="button"
                 variant="ghost"
@@ -1277,7 +1290,7 @@ function MusicPlayerSurface({
               >
                 <ListMusicIcon />
               </Button>
-            </PopoverPrimitive.Trigger>
+            </DialogPrimitive.Trigger>
             <Button
               type="button"
               variant="ghost"
@@ -1298,30 +1311,31 @@ function MusicPlayerSurface({
         </AnimatePresence>
       </div>
 
-      <PopoverPrimitive.Portal>
-        <PopoverPrimitive.Content
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[79] bg-background" />
+        <DialogPrimitive.Content
           data-music-player-panel
           onEscapeKeyDown={() => { returnPanelFocus.current = true; }}
           onCloseAutoFocus={(event) => {
             if (returnPanelFocus.current) {
               event.preventDefault();
               returnPanelFocus.current = false;
-              requestAnimationFrame(() => playlistTriggerRef.current?.focus());
+              requestAnimationFrame(() => (collapsed ? expandTriggerRef.current : playlistTriggerRef.current)?.focus());
             }
           }}
-          side="top"
-          align="end"
-          sideOffset={10}
-          collisionPadding={12}
           aria-label={copy.panelTitle}
           data-motion-sensitive
-          data-motion-surface="popup"
-          className="relative z-[55] flex max-h-[min(80dvh,46rem)] w-[min(30rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-2xl border border-border/70 bg-popover/98 shadow-2xl ring-1 ring-foreground/5 backdrop-blur-xl outline-none"
+          data-motion-surface="dialog"
+          aria-describedby={undefined}
+          className="music-player-immersive adx-material fixed inset-0 z-[80] grid h-dvh w-full overflow-hidden bg-background outline-none"
         >
-          <Button type="button" variant="ghost" size="icon-touch" className="absolute top-2 right-2 z-10" aria-label={copy.closePanel} onClick={() => { returnPanelFocus.current = true; setOpen(false); }}><XIcon /></Button>
-          <div className="border-b border-border/60 p-4">
-            <div className="flex items-start gap-3 pr-8">
-              <div className="size-16 shrink-0 overflow-hidden rounded-xl bg-muted shadow-md ring-1 ring-border/60">
+          <div className="music-player-heading"><DialogPrimitive.Title className="text-sm font-medium text-muted-foreground">{copy.panelTitle}</DialogPrimitive.Title>
+          <Button type="button" variant="ghost" size="icon-touch" aria-label={copy.closePanel} onClick={() => { returnPanelFocus.current = true; setOpen(false); }}><XIcon /></Button></div>
+          <div className="music-player-stage">
+          <div className="music-player-now">
+          <div className="music-player-identity">
+            <div className="music-player-track">
+              <div className="music-player-artwork overflow-hidden rounded bg-muted shadow-lg ring-1 ring-border/60">
                 <PlayerArtwork
                   track={currentTrack}
                   versionId={versionId}
@@ -1330,7 +1344,7 @@ function MusicPlayerSurface({
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="font-semibold">
+                <h2 className="music-player-title font-semibold">
                   <ScrollingLabel text={displayTitle} active={isPlaying} />
                 </h2>
                 <p
@@ -1350,7 +1364,7 @@ function MusicPlayerSurface({
 
           </div>
 
-          <div className="border-b border-border/60 px-4 py-3">
+          <div className="music-player-transport">
             <PlayerSlider
               value={currentTime}
               // Radix needs max > min; a zero duration means nothing to seek.
@@ -1369,7 +1383,7 @@ function MusicPlayerSurface({
               <Button
                 type="button"
                 variant="ghost"
-                size="icon-lg"
+                size="icon-touch"
                 onClick={playPrevious}
                 disabled={!currentTrack}
                 aria-label={copy.previous}
@@ -1379,7 +1393,7 @@ function MusicPlayerSurface({
               </Button>
               <Button
                 type="button"
-                size="icon-lg"
+                size="icon-touch"
                 onClick={togglePlayback}
                 disabled={!currentTrack || restorePending}
                 aria-label={showPause ? copy.pause : copy.play}
@@ -1397,7 +1411,7 @@ function MusicPlayerSurface({
               <Button
                 type="button"
                 variant="ghost"
-                size="icon-lg"
+                size="icon-touch"
                 onClick={playNext}
                 disabled={!currentTrack}
                 aria-label={copy.next}
@@ -1408,13 +1422,17 @@ function MusicPlayerSurface({
             </div>
           </div>
 
+          </div>
+          <div className="music-player-library">
           {manifestLoading && !manifest ? <p role="status" className="p-4 text-sm">{copy.loading}</p> : manifestError ? <div className="p-4 text-sm"><p>{copy.loadError}</p><Button variant="outline" size="touch" onClick={() => void retryManifest()}>{copy.retry}</Button></div> : <MusicLibraryPanel locale={locale} onPlay={playTrack} />}
 
-          <div className="flex items-center gap-2 border-t border-border/60 px-3 py-2.5">
+          </div>
+          </div>
+          <div className="music-player-footer flex items-center gap-2 border-t border-border/60">
             <Button
               type="button"
               variant="ghost"
-              size="icon-sm"
+              size="icon-touch"
               onClick={() => setMuted(!muted)}
               aria-label={muted ? copy.unmute : copy.mute}
               title={muted ? copy.unmute : copy.mute}
@@ -1442,7 +1460,7 @@ function MusicPlayerSurface({
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="touch"
               onClick={cycleMode}
               aria-label={copy.modeHint[mode]}
               title={copy.modeHint[mode]}
@@ -1458,9 +1476,8 @@ function MusicPlayerSurface({
             </Button>
           </div>
 
-          <PopoverPrimitive.Arrow className="fill-border" />
-        </PopoverPrimitive.Content>
-      </PopoverPrimitive.Portal>
-    </PopoverPrimitive.Root>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

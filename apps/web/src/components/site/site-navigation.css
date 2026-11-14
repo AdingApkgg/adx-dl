@@ -127,7 +127,7 @@
     padding-inline: 0.625rem;
   }
 
-  body.adx-site [role="region"][style*="music-player"] {
+  body.adx-site [data-music-player-root] {
     left: calc(var(--site-sidebar-width) + 1rem);
   }
 }
