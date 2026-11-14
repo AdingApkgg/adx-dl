@@ -681,7 +681,7 @@ export function ChartDetailPageView({
                 locale={locale}
                 fit="contain"
                 priority
-                sizes="(max-width: 767px) 80px, 128px"
+                sizes="(min-width: 1280px) 260px, (min-width: 768px) 128px, 80px"
                 className="h-full w-full"
               />
             </DetailHeroCover>
