@@ -1,3 +1,4 @@
+import { cachedPaletteForEntry, type CoverPaletteCache } from "./cover-palette-cache";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { cache } from "react";
@@ -27,7 +28,17 @@ const catalogPath = path.resolve(process.cwd(), "..", "..", "data", "catalog", "
 
 const loadCatalog = createSnapshotReader(async (): Promise<Catalog> => {
   const raw = await fs.readFile(catalogPath, "utf-8");
-  return JSON.parse(raw) as Catalog;
+  const catalog = JSON.parse(raw) as Catalog;
+  try {
+    const palettes: CoverPaletteCache = JSON.parse(await fs.readFile(path.join(path.dirname(catalogPath), "cover-palettes.json"), "utf8"));
+    for (const entry of catalog.entries) {
+      const palette = cachedPaletteForEntry(entry, palettes);
+      if (palette) entry.media.palette = palette;
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  return catalog;
 }, process.env.NODE_ENV === "production");
 
 // React cache deduplicates one render; the snapshot also shares immutable input

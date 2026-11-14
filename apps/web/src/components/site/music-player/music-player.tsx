@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { coverPaletteStyle } from "@/lib/cover-palette";
+import { CoverPaletteBackdrop } from "./cover-palette-backdrop";
 import { MusicLibraryPanel } from "./music-library-panel";
 import {
   ChevronDownIcon,
@@ -1319,6 +1321,7 @@ function MusicPlayerSurface({
         <DialogPrimitive.Content
           data-music-player-panel
           data-library-open={libraryOpen}
+          style={coverPaletteStyle(currentTrack?.palette)}
           onEscapeKeyDown={() => { returnPanelFocus.current = true; }}
           onCloseAutoFocus={(event) => {
             if (returnPanelFocus.current) {
@@ -1333,7 +1336,7 @@ function MusicPlayerSurface({
           aria-describedby={undefined}
           className="music-player-immersive adx-material fixed inset-0 z-[80] grid h-dvh w-full overflow-hidden bg-background outline-none"
         >
-          <div className="music-player-ambience" aria-hidden="true"><PlayerArtwork track={currentTrack} versionId={versionId} alt="" className="size-full" /></div>
+          <CoverPaletteBackdrop palette={currentTrack?.palette} />
           <div className="music-player-heading"><DialogPrimitive.Title className="text-sm font-medium text-muted-foreground">{copy.panelTitle}</DialogPrimitive.Title>
           <Button type="button" variant="ghost" size="icon-touch" aria-label={copy.closePanel} onClick={() => { returnPanelFocus.current = true; setOpen(false); }}><XIcon /></Button></div>
           <div className="music-player-stage">

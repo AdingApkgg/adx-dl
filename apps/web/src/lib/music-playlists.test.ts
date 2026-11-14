@@ -191,3 +191,12 @@ describe("music version summaries", () => {
     expect(musicVersionSummaries(buildCatalog([silent]))).toEqual([]);
   });
 });
+
+test("projects cached cover colours into tracks without cache metadata", () => {
+  const entry = buildEntry();
+  const palette = {accent:"#225533",highlight:"#aaffcc",surface:"#f1fff5",background:"#112218",backgroundEnd:"#050905"};
+  entry.media.palette = palette;
+  const track = projectMusicTrack(entry);
+  expect(track?.palette).toEqual(palette);
+  expect(track).not.toHaveProperty("checkedAt");
+});

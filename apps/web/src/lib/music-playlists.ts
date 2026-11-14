@@ -1,3 +1,4 @@
+import type { CoverPalette } from "./cover-palette";
 import { readCatalog } from "@/lib/catalog";
 import {
   resolveVersionIndex,
@@ -8,6 +9,7 @@ import { entrySlug } from "@/lib/route-slug";
 import { MAIMAI_VERSIONS } from "@/lib/version-image";
 
 export type MusicTrack = {
+  palette?: CoverPalette;
   id: string;
   slug: string;
   title: string;
@@ -51,6 +53,7 @@ export function projectMusicTrack(entry: CatalogEntry): MusicTrack | null {
     coverUrl: entry.media.cover_url,
     ...(entry.media.cover_avif ? { coverAvif: entry.media.cover_avif } : {}),
     ...(entry.media.cover_webp ? { coverWebp: entry.media.cover_webp } : {}),
+    ...(entry.media.palette ? { palette: entry.media.palette } : {}),
     audioUrl,
   };
 }

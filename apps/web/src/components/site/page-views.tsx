@@ -1,3 +1,4 @@
+import { coverPaletteStyle } from "@/lib/cover-palette";
 import { PageShell, PageHeader, Surface } from "@astrodx/ui/components/page-layout";
 import Link from "next/link";
 import { preload } from "react-dom";
@@ -671,7 +672,7 @@ export function ChartDetailPageView({
       </nav>
       {/* The whole chart page is one self-contained article about the chart. */}
       <article className="flex flex-col gap-6">
-      <section data-detail-hero className="relative isolate overflow-hidden rounded-2xl border border-border/60" aria-label={title}>
+      <section data-detail-hero style={coverPaletteStyle(entry.media.palette)} className="relative isolate overflow-hidden rounded-2xl border border-border/60" aria-label={title}>
         <div className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-4 p-4 md:grid-cols-[128px_minmax(0,1fr)] md:gap-6 md:p-6">
           <div className="w-full self-start">
             <DetailHeroCover>
