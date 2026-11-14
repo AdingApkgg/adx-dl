@@ -300,8 +300,10 @@ body.adx-site [data-slot="dropdown-menu-radio-item"],
 /* Wide detail headers put the download action beside the chart identity. The
    artwork occupies only this header row, never a column beside later content. */
 @media(min-width:80rem) {
-  .adx-detail-page [data-detail-hero] > .grid { grid-template-columns: 128px minmax(0, 1fr) minmax(320px, 1fr); align-items: start; }
+  .adx-detail-page [data-detail-hero] > .grid { grid-template-columns: 176px minmax(0, 1fr) minmax(320px, .85fr); align-items: center; }
+  .adx-detail-page [data-detail-hero] > .grid > :first-child { align-self: center; }
   .adx-detail-page [data-detail-identity] { grid-column: 2; grid-row: 1; }
-  .adx-detail-page [data-download-panel] { grid-column: 3; grid-row: 1; min-width: 0; }
+  .adx-detail-page [data-download-panel] { grid-column: 3; grid-row: 1; min-width: 0; padding: 18px; background: var(--md-surface); }
+  .adx-detail-page [data-download-panel] > :not(:last-child) { margin-block: 0 12px; }
   .adx-detail-page :is([data-detail-secondary-actions], [data-chart-description]) { grid-column: 1 / -1; }
 }
