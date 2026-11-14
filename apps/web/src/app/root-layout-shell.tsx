@@ -20,6 +20,7 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 import { musicTracksForVersion } from "@/lib/music-playlists";
 import { compatibilityBootScript } from "@/lib/browser-compatibility-preference";
 import { getBrowserCompatibilityCopy } from "@/lib/browser-compatibility-copy";
+import { navigationMotionBootScript } from "@/lib/navigation-motion";
 import { buildLocalePath } from "@/lib/i18n";
 
 type RootLayoutShellProps = Readonly<{
@@ -38,7 +39,7 @@ type RootLayoutShellProps = Readonly<{
 // storage keys and presets as its ThemeProvider and MotionProvider. The
 // music-player attribute is web's own and mirrors music-player-preferences.ts.
 const MUSIC_PLAYER_BOOT_SCRIPT = `(function(){var e=document.documentElement;try{var s=JSON.parse(localStorage.getItem('astrodx-music-player-prefs-v1')||'{}');e.dataset.musicPlayer=s.enabled===false?'off':(s.collapsed===false?'expanded':'collapsed');}catch(x){e.dataset.musicPlayer='collapsed';}})();`;
-const NO_FLASH_BOOT_SCRIPT = themeBootScript() + MUSIC_PLAYER_BOOT_SCRIPT + compatibilityBootScript();
+const NO_FLASH_BOOT_SCRIPT = themeBootScript() + MUSIC_PLAYER_BOOT_SCRIPT + compatibilityBootScript() + navigationMotionBootScript();
 
 /**
  * Shared by both html-owning layouts. The color-scheme meta lands early in
@@ -87,9 +88,9 @@ export async function RootLayoutShell({
         {/* Native navigation decides opt-in before streamed page content and
             external styles finish loading. Keep this tiny rule in the shell. */}
         <style>{"@view-transition{navigation:auto;types:adx-document;}"}</style>
-        {/* Hold the native snapshot until the page and preceding header have
-            been parsed; this does not wait for images or client hydration. */}
-        <link rel="expect" href="#main-content" blocking="render" />
+        {/* Include the floating chrome in the first snapshot too. The page's
+            main can be a streamed loading boundary that is later replaced. */}
+        <link rel="expect" href="#adx-shell-ready" blocking="render" />
       </head>
       <body className="adx-site adx-material min-h-full bg-background text-foreground">
         {/* Runs synchronously during HTML parse — first in <body>, before any
@@ -166,6 +167,7 @@ export async function RootLayoutShell({
           </TooltipProvider>
           </BrowserCompatibilityProvider>
         </ThemeProvider>
+        <span id="adx-shell-ready" hidden />
       </body>
     </html>
   );

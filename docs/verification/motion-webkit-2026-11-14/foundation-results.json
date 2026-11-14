@@ -1,0 +1,337 @@
+{
+  "status": "passed",
+  "results": [
+    {
+      "name": "button press",
+      "frames": [
+        {
+          "time": 5184,
+          "transform": "matrix(0.970438, 0, 0, 0.970438, 0, 0)"
+        },
+        {
+          "time": 5208,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5232,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5237,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5253,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5269,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5285,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5301,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5317,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5333,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5349,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5365,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5381,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5397,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5413,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5429,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5446,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        },
+        {
+          "time": 5462,
+          "transform": "matrix(0.97, 0, 0, 0.97, 0, 0)"
+        }
+      ]
+    },
+    {
+      "name": "asChild press",
+      "scale": "0.97"
+    },
+    {
+      "name": "offscreen decoration pauses",
+      "passed": true
+    },
+    {
+      "name": "侧边面板",
+      "rect": {
+        "x": 608,
+        "y": 0,
+        "width": 672,
+        "height": 1000,
+        "top": 0,
+        "right": 1280,
+        "bottom": 1000,
+        "left": 608
+      },
+      "animation": "adx-presence-enter",
+      "focused": true
+    },
+    {
+      "name": "居中弹窗",
+      "rect": {
+        "x": 192,
+        "y": 397.625,
+        "width": 896,
+        "height": 204.75,
+        "top": 397.625,
+        "right": 1088,
+        "bottom": 602.375,
+        "left": 192
+      },
+      "animation": "adx-presence-enter",
+      "focused": true
+    },
+    {
+      "name": "全屏面板",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 1000,
+        "top": 0,
+        "right": 1280,
+        "bottom": 1000,
+        "left": 0
+      },
+      "animation": "adx-presence-enter",
+      "focused": true
+    },
+    {
+      "name": "interrupt dialog entrance",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "name": "rapid tabs and keyboard menu",
+      "passed": true
+    },
+    {
+      "name": "expressive reveal trajectory",
+      "frames": [
+        {
+          "time": 32,
+          "y": 13.676997,
+          "opacity": 0.408192
+        },
+        {
+          "time": 92,
+          "y": 6.303345,
+          "opacity": 0.904358
+        },
+        {
+          "time": 126,
+          "y": 3.226505,
+          "opacity": 0.97183
+        },
+        {
+          "time": 204,
+          "y": 0.240559,
+          "opacity": 0.998441
+        },
+        {
+          "time": 241,
+          "y": -0.097598,
+          "opacity": 0.999608
+        },
+        {
+          "time": 292,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 329,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 389,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 423,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 505,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 536,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 540,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 556,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 573,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 589,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 605,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 621,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 637,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 653,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 669,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 685,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 701,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 717,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 739,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 749,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 765,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 782,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 798,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 814,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 830,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 846,
+          "y": 0,
+          "opacity": 1
+        },
+        {
+          "time": 862,
+          "y": 0,
+          "opacity": 1
+        }
+      ]
+    },
+    {
+      "name": "reduced diagnostics",
+      "hidden": 0,
+      "incomplete": 0,
+      "running": 0,
+      "skeletons": [
+        "false"
+      ]
+    },
+    {
+      "name": "reduced final state",
+      "hidden": 0,
+      "incomplete": 0,
+      "running": 0,
+      "skeletons": [
+        "false"
+      ]
+    },
+    {
+      "name": "OS and explicit override",
+      "passed": true
+    },
+    {
+      "name": "narrow screen and saved reduction",
+      "width": 358,
+      "transform": "matrix(1, 0, 0, 1, 0, 0)"
+    }
+  ],
+  "pageErrors": []
+}
