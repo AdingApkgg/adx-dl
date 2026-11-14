@@ -10,6 +10,7 @@
     "test": "bun test",
     "check": "tsc --noEmit && bun test",
     "submit:indexnow": "bun run scripts/submit-indexnow.ts",
+    "enrich:palettes": "bun run scripts/enrich-cover-palettes.ts",
     "enrich:details": "bun run scripts/enrich-chart-details.ts"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "sharp": "0.35.5",
     "@astrodx/tsconfig": "workspace:*",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24.19.0",

@@ -82,6 +82,18 @@ jobs:
         working-directory: apps/web
         run: bun run enrich:details
 
+      # Colour metadata only: no full-size cover mirror, no browser pixel work.
+      - name: Cache cover palettes
+        uses: actions/cache@v6
+        with:
+          path: data/catalog/cover-palettes.json
+          key: cover-palettes-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: cover-palettes-v1-
+
+      - name: Enrich cover palettes
+        working-directory: apps/web
+        run: bun run enrich:palettes
+
       - name: Cache Next.js build
         uses: actions/cache@v6
         with:

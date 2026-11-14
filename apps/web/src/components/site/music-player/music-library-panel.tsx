@@ -355,7 +355,7 @@ export function MusicLibraryPanel({
 								</DropdownMenuTrigger>
 								<DropdownMenuContent
 									align="end"
-									className="z-[56] max-h-72 max-w-[calc(100vw-2rem)] overflow-y-auto"
+									className="z-[90] max-h-72 max-w-[calc(100vw-2rem)] overflow-y-auto"
 								>
 									{track ? (
 										<>

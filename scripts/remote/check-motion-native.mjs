@@ -174,12 +174,15 @@ try {
     await page.locator("#astrodx-global-music-player-audio").waitFor({ state: "attached" });
     await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
     await page.getByRole("button", { name: "展开播放器", exact: true }).click();
-    await page.locator('[data-music-player-surface="expanded"]').waitFor();
-    await page.waitForFunction(() => {
-      const surface = document.querySelector('[data-music-player-surface="expanded"]');
-      return surface && getComputedStyle(surface).transform === "none";
-    });
+    const panel = page.locator("[data-music-player-panel]");
+    await panel.waitFor();
+    await panel.evaluate((element) => Promise.allSettled(element.getAnimations().map((animation) => animation.finished)));
+    assert.deepEqual(await panel.boundingBox(), { x: 0, y: 0, width: 390, height: 844 });
+    assert.equal(await page.locator("main").evaluate((element) => !!element.closest("[inert]")), true);
     await page.screenshot({ path: `${output}/native-mobile.png` });
+    await page.keyboard.press("Escape");
+    await panel.waitFor({ state: "hidden" });
+    assert.equal(await page.getByRole("button", { name: "展开播放器", exact: true }).evaluate((element) => element === document.activeElement), true);
     return ready;
   });
   await step("native history back and forward", async () => {

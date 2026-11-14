@@ -1,0 +1,275 @@
+[
+  {
+    "device": "desktop",
+    "panel": "player",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 1000
+    },
+    "fullscreen": true,
+    "dialog": "dialog",
+    "contentWithinViewport": true,
+    "scrollLocked": true
+  },
+  {
+    "device": "desktop",
+    "escapeRestoresFocus": true
+  },
+  {
+    "device": "desktop",
+    "panel": "downloads",
+    "rect": {
+      "x": 1008,
+      "y": 689,
+      "width": 416,
+      "height": 295
+    },
+    "withinViewport": true,
+    "details": {
+      "parent": {
+        "x": 1008,
+        "y": 689,
+        "width": 416,
+        "height": 295,
+        "top": 689,
+        "right": 1424,
+        "bottom": 984,
+        "left": 1008
+      },
+      "transform": "none",
+      "parentTransform": "none",
+      "ancestors": [
+        {
+          "class": "adx-material adx-download-dock pointer-events-none fixed right-4 z-50 flex w-[calc(100vw-2rem)] max-w-[26rem] flex-col items-end gap-2",
+          "rect": {
+            "x": 1008,
+            "y": 689,
+            "width": 416,
+            "height": 295,
+            "top": 689,
+            "right": 1424,
+            "bottom": 984,
+            "left": 1008
+          },
+          "transform": "none"
+        },
+        {
+          "class": "adx-site adx-material min-h-full bg-background text-foreground",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 1440,
+            "height": 2615.296875,
+            "top": 0,
+            "right": 1440,
+            "bottom": 2615.296875,
+            "left": 0
+          },
+          "transform": "none"
+        }
+      ]
+    },
+    "actions": [
+      {
+        "label": "继续下载",
+        "height": 44,
+        "width": 102
+      },
+      {
+        "label": "换线路重试",
+        "height": 44,
+        "width": 108.015625
+      },
+      {
+        "label": "取消下载",
+        "height": 44,
+        "width": 44
+      }
+    ],
+    "text": "下载管理器\n1 个下载任务\n\n012061 XODUS\n继续下载\n换线路重试\nR2\n推荐\n不可用\n\n已暂停 · 25%"
+  },
+  {
+    "device": "mobile",
+    "panel": "player",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844
+    },
+    "fullscreen": true,
+    "dialog": "dialog",
+    "contentWithinViewport": true,
+    "scrollLocked": true
+  },
+  {
+    "device": "mobile",
+    "escapeRestoresFocus": true
+  },
+  {
+    "device": "mobile",
+    "panel": "downloads",
+    "rect": {
+      "x": 16,
+      "y": 421,
+      "width": 358,
+      "height": 295
+    },
+    "withinViewport": true,
+    "details": {
+      "parent": {
+        "x": 16,
+        "y": 421,
+        "width": 358,
+        "height": 295,
+        "top": 421,
+        "right": 374,
+        "bottom": 716,
+        "left": 16
+      },
+      "transform": "none",
+      "parentTransform": "none",
+      "ancestors": [
+        {
+          "class": "adx-material adx-download-dock pointer-events-none fixed right-4 z-50 flex w-[calc(100vw-2rem)] max-w-[26rem] flex-col items-end gap-2",
+          "rect": {
+            "x": 16,
+            "y": 421,
+            "width": 358,
+            "height": 295,
+            "top": 421,
+            "right": 374,
+            "bottom": 716,
+            "left": 16
+          },
+          "transform": "none"
+        },
+        {
+          "class": "adx-site adx-material min-h-full bg-background text-foreground",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 390,
+            "height": 4321.5,
+            "top": 0,
+            "right": 390,
+            "bottom": 4321.5,
+            "left": 0
+          },
+          "transform": "none"
+        }
+      ]
+    },
+    "actions": [
+      {
+        "label": "继续下载",
+        "height": 44,
+        "width": 102
+      },
+      {
+        "label": "换线路重试",
+        "height": 44,
+        "width": 108.015625
+      },
+      {
+        "label": "取消下载",
+        "height": 44,
+        "width": 44
+      }
+    ],
+    "text": "下载管理器\n1 个下载任务\n\n012061 XODUS\n继续下载\n换线路重试\nR2\n推荐\n不可用\n\n已暂停 · 25%"
+  },
+  {
+    "device": "narrow",
+    "panel": "player",
+    "rect": {
+      "x": 0,
+      "y": 0,
+      "width": 320,
+      "height": 740
+    },
+    "fullscreen": true,
+    "dialog": "dialog",
+    "contentWithinViewport": true,
+    "scrollLocked": true
+  },
+  {
+    "device": "narrow",
+    "escapeRestoresFocus": true
+  },
+  {
+    "device": "narrow",
+    "panel": "downloads",
+    "rect": {
+      "x": 16,
+      "y": 265,
+      "width": 288,
+      "height": 347
+    },
+    "withinViewport": true,
+    "details": {
+      "parent": {
+        "x": 16,
+        "y": 265,
+        "width": 288,
+        "height": 347,
+        "top": 265,
+        "right": 304,
+        "bottom": 612,
+        "left": 16
+      },
+      "transform": "none",
+      "parentTransform": "none",
+      "ancestors": [
+        {
+          "class": "adx-material adx-download-dock pointer-events-none fixed right-4 z-50 flex w-[calc(100vw-2rem)] max-w-[26rem] flex-col items-end gap-2",
+          "rect": {
+            "x": 16,
+            "y": 265,
+            "width": 288,
+            "height": 347,
+            "top": 265,
+            "right": 304,
+            "bottom": 612,
+            "left": 16
+          },
+          "transform": "none"
+        },
+        {
+          "class": "adx-site adx-material min-h-full bg-background text-foreground",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 320,
+            "height": 4673,
+            "top": 0,
+            "right": 320,
+            "bottom": 4673,
+            "left": 0
+          },
+          "transform": "none"
+        }
+      ]
+    },
+    "actions": [
+      {
+        "label": "继续下载",
+        "height": 44,
+        "width": 102
+      },
+      {
+        "label": "换线路重试",
+        "height": 44,
+        "width": 108.015625
+      },
+      {
+        "label": "取消下载",
+        "height": 44,
+        "width": 44
+      }
+    ],
+    "text": "下载管理器\n1 个下载任务\n\n012061 XODUS\n继续下载\n换线路重试\nR2\n推荐\n不可用\n\n已暂停 · 25%"
+  }
+]

@@ -1,3 +1,4 @@
+import type { CoverPalette } from "./cover-palette";
 import { MAIMAI_VERSIONS, versionImageIndex } from "@/lib/version-image";
 
 /**
@@ -32,6 +33,7 @@ export type CatalogDifficulty = {
 };
 
 export type CatalogEntryMedia = {
+  palette?: CoverPalette;
   entry_base_url: string;
   /** Remote original cover (used for page display and OG/social images). */
   cover_url: string;

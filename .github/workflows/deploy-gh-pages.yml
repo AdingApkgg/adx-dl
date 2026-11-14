@@ -90,7 +90,8 @@ jobs:
           python-version: "3.11"
 
       # Covers (AVIF/WebP) are served from Cloudflare R2, not mirrored into the
-      # Pages build — so no libavif/cwebp install and no cover cache. build_catalog
+      # Pages build — no full-image mirror/cache or libavif/cwebp install.
+      # Small colour metadata is cached separately below. build_catalog
       # points cover_avif/webp at R2 by default (ASTRODX_COVERS=local re-enables the
       # legacy local mirror, which would also need the encoders reinstated).
       - name: Build catalog
@@ -119,6 +120,18 @@ jobs:
       - name: Enrich chart details
         working-directory: apps/web
         run: bun run enrich:details
+
+      # Colour metadata only: no full-size cover mirror, no browser pixel work.
+      - name: Cache cover palettes
+        uses: actions/cache@v6
+        with:
+          path: data/catalog/cover-palettes.json
+          key: cover-palettes-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: cover-palettes-v1-
+
+      - name: Enrich cover palettes
+        working-directory: apps/web
+        run: bun run enrich:palettes
 
       # Next.js build cache (module graph, compiled pages) across runs.
       - name: Cache Next.js build

@@ -364,7 +364,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
       className={cn(
         // Safe-area aware, and lifted above the batch bar when one is on screen
         // so the fixed bottom surfaces never overlap on phones.
-        "adx-material adx-download-dock pointer-events-none fixed right-4 z-50 flex w-[calc(100vw-2rem)] max-w-xs flex-col items-end gap-2"
+        "adx-material adx-download-dock pointer-events-none fixed right-4 z-50 flex w-[calc(100vw-2rem)] max-w-[26rem] flex-col items-end gap-2"
       )}
       style={{
         bottom: bottomOffset,
@@ -496,7 +496,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                         data-download-task
                         className="ui-surface relative flex shrink-0 flex-col gap-3 overflow-hidden p-3"
                       >
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex min-w-0 items-start gap-2">
                           {job.status === "success" ? (
                             <span className="relative flex size-3.5 shrink-0 items-center justify-center text-emerald-500">
                               <DownloadSuccessMark key={`${job.id}:${job.startedAt}`} animate={!seenSuccess.current.has(`${job.id}:${job.startedAt}`)} />
@@ -504,11 +504,12 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                           ) : job.status === "error" ? (
                             <AlertCircleIcon className="size-3.5 shrink-0 text-destructive" />
                           ) : null}
-                          <span className="truncate text-sm font-medium">{job.title}</span>
-                          <span className="flex-1" />
+                          <span className="min-w-0 flex-1 break-words text-sm font-medium">{job.title}</span>
+                        </div>
                             <MotionSurface as="span" pattern="popup"
                               key={job.status}
-                              className="flex items-center gap-1"
+                              data-download-task-actions
+                              className="flex w-full flex-wrap items-center gap-2"
 
                             >
                               {resumable ? (
@@ -517,7 +518,7 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                                     type="button"
                                     whileTap={getPressTarget(reducedMotion)}
                                     onClick={() => resume(job.id)}
-                                    className="inline-flex min-h-11 items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                                    className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                                   >
                                     <RotateCwIcon className="size-3" />
                                     {job.status === "error" ? tray.retry : tray.resume}
@@ -529,9 +530,10 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                                         whileTap={getPressTarget(reducedMotion)}
                                         aria-label={tray.sourcePicker.switchAndRestart}
                                         title={tray.sourcePicker.restartHint}
-                                        className={DOCK_ICON_BUTTON_CLASS}
+                                        className={cn(DOCK_ICON_BUTTON_CLASS, "w-auto gap-2 border border-border px-3 text-xs")}
                                       >
                                         <ArrowLeftRightIcon className="size-3.5" />
+                                        {tray.sourcePicker.switchAndRestart}
                                       </motion.button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent
@@ -584,7 +586,6 @@ export function DownloadDock({ locale }: { locale: Locale }) {
                                 />
                               ) : null}
                             </MotionSurface>
-                        </div>
                         <DownloadSourceSummary
                           sourceId={job.sourceId}
                           sourceBaseUrl={job.sourceBaseUrl}
