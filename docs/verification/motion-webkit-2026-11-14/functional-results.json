@@ -1,0 +1,162 @@
+{
+  "engine": "webkit",
+  "version": "27.2",
+  "origin": "https://adxdls.saop.cc",
+  "results": [
+    {
+      "label": "desktop",
+      "errors": [],
+      "transitionMessages": [],
+      "capabilities": {
+        "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Safari/605.1.15",
+        "startViewTransition": true,
+        "transitionTypes": true,
+        "pagereveal": true,
+        "reduced": false
+      },
+      "search": "passed",
+      "navigation": [
+        {
+          "active": false,
+          "ready": false,
+          "finished": false,
+          "animations": []
+        }
+      ],
+      "outgoing": {
+        "active": true,
+        "types": [
+          "adx-document"
+        ]
+      },
+      "navigationMode": "normal-navigation-fallback",
+      "player": {
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": 1000,
+          "top": 0,
+          "right": 1440,
+          "bottom": 1000,
+          "left": 0
+        },
+        "opacity": "1",
+        "inert": true,
+        "scrollLock": "hidden",
+        "scrollBlocked": true,
+        "scrollProbe": "mouse wheel",
+        "focusRestored": true
+      },
+      "midSessionReducedMotion": "passed",
+      "download": {
+        "x": 1008,
+        "y": 630.75,
+        "width": 416,
+        "height": 353.25
+      },
+      "status": "passed"
+    },
+    {
+      "label": "mobile",
+      "errors": [],
+      "transitionMessages": [],
+      "capabilities": {
+        "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Safari/605.1.15",
+        "startViewTransition": true,
+        "transitionTypes": true,
+        "pagereveal": true,
+        "reduced": false
+      },
+      "search": "passed",
+      "navigation": [],
+      "outgoing": {
+        "active": true,
+        "types": [
+          "adx-document"
+        ]
+      },
+      "navigationMode": "normal-navigation-fallback",
+      "player": {
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844,
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "left": 0
+        },
+        "opacity": "1",
+        "inert": true,
+        "scrollLock": "hidden",
+        "scrollBlocked": true,
+        "scrollProbe": "PageDown and overflow:hidden; no native touch swipe",
+        "focusRestored": true
+      },
+      "midSessionReducedMotion": "passed",
+      "download": {
+        "x": 16,
+        "y": 362.75,
+        "width": 358,
+        "height": 353.25
+      },
+      "status": "passed"
+    },
+    {
+      "label": "mobile-reduced",
+      "errors": [],
+      "transitionMessages": [],
+      "capabilities": {
+        "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Safari/605.1.15",
+        "startViewTransition": true,
+        "transitionTypes": true,
+        "pagereveal": true,
+        "reduced": true
+      },
+      "search": "passed",
+      "navigation": [
+        {
+          "active": false,
+          "ready": false,
+          "finished": false,
+          "animations": []
+        }
+      ],
+      "outgoing": {
+        "active": true,
+        "types": [
+          "adx-document"
+        ]
+      },
+      "navigationMode": "normal-navigation-fallback",
+      "player": {
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844,
+          "top": 0,
+          "right": 390,
+          "bottom": 844,
+          "left": 0
+        },
+        "opacity": "1",
+        "inert": true,
+        "scrollLock": "hidden",
+        "scrollBlocked": true,
+        "scrollProbe": "PageDown and overflow:hidden; no native touch swipe",
+        "focusRestored": true
+      },
+      "download": {
+        "x": 16,
+        "y": 362.75,
+        "width": 358,
+        "height": 353.25
+      },
+      "status": "passed"
+    }
+  ],
+  "status": "passed"
+}

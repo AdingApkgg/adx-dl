@@ -1,0 +1,482 @@
+[
+  {
+    "engine": "webkit",
+    "label": "native-success-control",
+    "passed": true,
+    "active": true,
+    "animations": [
+      {
+        "name": "-ua-view-transition-group-anim-root",
+        "duration": 250
+      },
+      {
+        "name": "adx-page-exit",
+        "duration": 180
+      },
+      {
+        "name": "adx-page-enter",
+        "duration": 320
+      }
+    ],
+    "finished": true
+  },
+  {
+    "engine": "webkit",
+    "version": "27.2",
+    "label": "normal-desktop",
+    "errors": [],
+    "reveals": [
+      {
+        "native": false,
+        "ready": null
+      }
+    ],
+    "recoveredFrames": 6,
+    "mode": "recovered",
+    "passed": true
+  },
+  {
+    "engine": "webkit",
+    "version": "27.2",
+    "label": "normal-mobile",
+    "errors": [],
+    "reveals": [
+      {
+        "native": false,
+        "ready": null
+      }
+    ],
+    "recoveredFrames": 14,
+    "mode": "recovered",
+    "passed": true
+  },
+  {
+    "engine": "webkit",
+    "version": "27.2",
+    "label": "cancelled-desktop",
+    "errors": [],
+    "reveals": [
+      {
+        "native": false,
+        "ready": null
+      }
+    ],
+    "recoveredFrames": 8,
+    "mode": "fallback",
+    "passed": true
+  },
+  {
+    "engine": "webkit",
+    "version": "27.2",
+    "label": "cancelled-mobile",
+    "errors": [],
+    "reveals": [
+      {
+        "native": false,
+        "ready": null
+      }
+    ],
+    "recoveredFrames": 15,
+    "mode": "fallback",
+    "passed": true
+  },
+  {
+    "engine": "webkit",
+    "version": "27.2",
+    "label": "cancelled-reduced",
+    "errors": [],
+    "reveals": [
+      {
+        "native": false,
+        "ready": null
+      }
+    ],
+    "recoveredFrames": 0,
+    "mode": "reduced",
+    "passed": true
+  },
+  {
+    "engine": "chromium",
+    "label": "native-success-control",
+    "passed": true,
+    "active": true,
+    "animations": [
+      {
+        "name": "-ua-view-transition-group-anim-root",
+        "duration": 250
+      },
+      {
+        "name": "adx-page-enter",
+        "duration": 320
+      },
+      {
+        "name": "adx-page-exit",
+        "duration": 180
+      }
+    ],
+    "finished": true
+  },
+  {
+    "engine": "chromium",
+    "version": "156.0.8078.80",
+    "label": "normal-desktop",
+    "errors": [],
+    "reveals": [
+      {
+        "native": true,
+        "ready": {
+          "fallback": false,
+          "animations": [
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "adx-ambient-disc",
+              "duration": 10000,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "-ua-view-transition-group-anim-root",
+              "duration": 250,
+              "pseudo": "::view-transition-group(root)",
+              "target": "",
+              "state": "running"
+            },
+            {
+              "name": "adx-page-enter",
+              "duration": 320,
+              "pseudo": "::view-transition-new(root)",
+              "target": "",
+              "state": "running"
+            },
+            {
+              "name": "adx-page-exit",
+              "duration": 180,
+              "pseudo": "::view-transition-old(root)",
+              "target": "",
+              "state": "running"
+            }
+          ],
+          "chrome": [
+            {
+              "name": "music-player",
+              "parsed": true
+            },
+            {
+              "name": "download-dock",
+              "parsed": true
+            },
+            {
+              "name": "site-header",
+              "parsed": true
+            }
+          ]
+        }
+      }
+    ],
+    "recoveredFrames": 0,
+    "mode": "native",
+    "passed": true
+  },
+  {
+    "engine": "chromium",
+    "version": "156.0.8078.80",
+    "label": "normal-mobile",
+    "errors": [],
+    "reveals": [
+      {
+        "native": true,
+        "ready": {
+          "fallback": false,
+          "animations": [
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "skeleton-shimmer",
+              "duration": 1800,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "adx-ambient-disc",
+              "duration": 10000,
+              "pseudo": null,
+              "target": "",
+              "state": "paused"
+            },
+            {
+              "name": "-ua-view-transition-group-anim-root",
+              "duration": 250,
+              "pseudo": "::view-transition-group(root)",
+              "target": "",
+              "state": "running"
+            },
+            {
+              "name": "adx-page-enter",
+              "duration": 320,
+              "pseudo": "::view-transition-new(root)",
+              "target": "",
+              "state": "running"
+            },
+            {
+              "name": "adx-page-exit",
+              "duration": 180,
+              "pseudo": "::view-transition-old(root)",
+              "target": "",
+              "state": "running"
+            }
+          ],
+          "chrome": [
+            {
+              "name": "music-player",
+              "parsed": true
+            },
+            {
+              "name": "download-dock",
+              "parsed": true
+            },
+            {
+              "name": "site-header",
+              "parsed": true
+            }
+          ]
+        }
+      }
+    ],
+    "recoveredFrames": 0,
+    "mode": "native",
+    "passed": true
+  },
+  {
+    "engine": "chromium",
+    "version": "156.0.8078.80",
+    "label": "cancelled-desktop",
+    "errors": [],
+    "reveals": [
+      {
+        "native": false,
+        "ready": null
+      }
+    ],
+    "recoveredFrames": 21,
+    "mode": "fallback",
+    "passed": true
+  },
+  {
+    "engine": "chromium",
+    "version": "156.0.8078.80",
+    "label": "cancelled-mobile",
+    "errors": [],
+    "reveals": [
+      {
+        "native": false,
+        "ready": null
+      }
+    ],
+    "recoveredFrames": 21,
+    "mode": "fallback",
+    "passed": true
+  },
+  {
+    "engine": "chromium",
+    "version": "156.0.8078.80",
+    "label": "cancelled-reduced",
+    "errors": [],
+    "reveals": [
+      {
+        "native": false,
+        "ready": null
+      }
+    ],
+    "recoveredFrames": 0,
+    "mode": "reduced",
+    "passed": true
+  }
+]

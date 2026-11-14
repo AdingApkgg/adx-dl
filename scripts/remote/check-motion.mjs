@@ -3,13 +3,15 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 
 assert.equal(process.platform, "linux", "Browser verification belongs on the build host");
-const { chromium } = await import(process.env.ASTRODX_PLAYWRIGHT_PATH || "playwright");
+const engine = process.env.ASTRODX_BROWSER_ENGINE || "chromium";
+assert.ok(["chromium", "webkit"].includes(engine));
+const { [engine]: browserType } = await import(process.env.ASTRODX_PLAYWRIGHT_PATH || "playwright");
 const output = process.env.ASTRODX_MOTION_EVIDENCE;
 assert.ok(output, "Set ASTRODX_MOTION_EVIDENCE to this run's evidence directory");
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({
+const browser = await browserType.launch({
   headless: true,
-  ...(process.env.ASTRODX_CHROMIUM ? { executablePath: process.env.ASTRODX_CHROMIUM } : {}),
+  ...(engine === "chromium" && process.env.ASTRODX_CHROMIUM ? { executablePath: process.env.ASTRODX_CHROMIUM } : {}),
 });
 const context = await browser.newContext({ viewport: { width: 1280, height: 1000 }, reducedMotion: "no-preference" });
 const page = await context.newPage();
@@ -28,7 +30,7 @@ async function chooseMode(name) {
   await page.waitForTimeout(80);
 }
 try {
-  assert.equal((await page.goto(`${origin}/ui#motion`)).status(), 200);
+  assert.equal((await page.goto(`${origin}/ui#motion`, { waitUntil: "domcontentloaded" })).status(), 200);
   await page.locator("#motion").waitFor();
   const readable = await page.locator("[data-motion-readable]").evaluate((el) => getComputedStyle(el).opacity);
   assert.equal(readable, "1", "ssrVisible remains readable after hydration");

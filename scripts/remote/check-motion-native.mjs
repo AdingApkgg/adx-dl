@@ -4,13 +4,15 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 
 assert.equal(process.platform, "linux");
-const { chromium } = await import(process.env.ASTRODX_PLAYWRIGHT_PATH || "playwright");
+const engine = process.env.ASTRODX_BROWSER_ENGINE || "chromium";
+assert.ok(["chromium", "webkit"].includes(engine));
+const { [engine]: browserType } = await import(process.env.ASTRODX_PLAYWRIGHT_PATH || "playwright");
 const origin = process.env.ASTRODX_PREVIEW_ORIGIN || "http://127.0.0.1:3311";
 assert.ok(["127.0.0.1", "localhost"].includes(new URL(origin).hostname));
 const output = process.env.ASTRODX_MOTION_EVIDENCE;
 assert.ok(output);
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({ headless: true, ...(process.env.ASTRODX_CHROMIUM ? { executablePath: process.env.ASTRODX_CHROMIUM } : {}) });
+const browser = await browserType.launch({ headless: true, ...(engine === "chromium" && process.env.ASTRODX_CHROMIUM ? { executablePath: process.env.ASTRODX_CHROMIUM } : {}) });
 const results = [];
 const errors = [];
 const contexts = [];

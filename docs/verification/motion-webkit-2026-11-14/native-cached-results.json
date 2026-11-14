@@ -1,0 +1,73 @@
+[
+  {
+    "mode": "cached-exact",
+    "trace": [
+      {
+        "active": false
+      }
+    ],
+    "errors": [
+      "Fetch API cannot load https: /adxdls.saop.cc/en/__next._tree.txt?_rsc=5CB68i4pnAekjehf due to access control checks."
+    ]
+  },
+  {
+    "mode": "no-scripts",
+    "trace": [
+      {
+        "active": true,
+        "animations": [
+          "-ua-view-transition-group-anim-root",
+          "adx-page-exit",
+          "adx-page-enter",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "adx-ambient-disc"
+        ],
+        "finished": true
+      }
+    ],
+    "errors": []
+  },
+  {
+    "mode": "no-expect",
+    "trace": [
+      {
+        "active": true,
+        "animations": [
+          "-ua-view-transition-group-anim-root",
+          "adx-page-exit",
+          "adx-page-enter",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "skeleton-shimmer",
+          "adx-ambient-disc"
+        ],
+        "finished": true
+      }
+    ],
+    "errors": []
+  }
+]

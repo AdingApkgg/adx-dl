@@ -1,0 +1,58 @@
+[
+  {
+    "name": "live-warm",
+    "trace": [
+      {
+        "active": false
+      }
+    ],
+    "swap": "{\"active\":true}",
+    "errors": [
+      "SecurityError: The operation is insecure.",
+      "Fetch API cannot load https: /astrodx-charts-tsumugi.saop.cc/0/10/track.mp3 due to access control checks.",
+      "Fetch API cannot load https: /adxdls.saop.cc/en/__next._tree.txt?_rsc=5CB68i4pnAekjehf due to access control checks.",
+      "Fetch API cannot load https: /astrodx-charts-tsumugi.saop.cc/0/10/track.mp3 due to access control checks."
+    ],
+    "timing": {
+      "name": "https://adxdls.saop.cc/charts/12061",
+      "entryType": "navigation",
+      "startTime": 0,
+      "duration": 6314,
+      "initiatorType": "navigation",
+      "nextHopProtocol": "",
+      "workerStart": 0,
+      "redirectStart": 0,
+      "redirectEnd": 0,
+      "fetchStart": 0,
+      "domainLookupStart": 0,
+      "domainLookupEnd": 0,
+      "connectStart": 0,
+      "connectEnd": 0,
+      "secureConnectionStart": 0,
+      "requestStart": 0,
+      "finalResponseHeadersStart": 0,
+      "firstInterimResponseStart": 0,
+      "responseStart": 0,
+      "responseEnd": 1157,
+      "transferSize": 0,
+      "encodedBodySize": 0,
+      "decodedBodySize": 0,
+      "workerRouterEvaluationStart": 0,
+      "workerCacheLookupStart": 0,
+      "workerMatchedRouterSource": "",
+      "workerFinalRouterSource": "",
+      "deliveryType": "navigational-prefetch",
+      "serverTiming": [],
+      "unloadEventStart": 0,
+      "unloadEventEnd": 0,
+      "domInteractive": 1485,
+      "domContentLoadedEventStart": 1485,
+      "domContentLoadedEventEnd": 1486,
+      "domComplete": 6313,
+      "loadEventStart": 6313,
+      "loadEventEnd": 6314,
+      "type": "navigate",
+      "redirectCount": 0
+    }
+  }
+]

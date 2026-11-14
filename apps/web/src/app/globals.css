@@ -42,6 +42,13 @@ html:active-view-transition-type(adx-document)::view-transition-new(root) {
   animation: adx-page-enter var(--adx-motion-page-enter-duration) var(--adx-motion-easing-enter) both;
 }
 
+/* A real same-origin navigation can lose its incoming native snapshot while
+   streamed content initializes. Recover only the final content, once, without
+   replaying the pinned chrome or animating a loading placeholder. */
+html[data-navigation-fallback]:not([data-reduced-motion]):not([data-compatibility="simple"]) main#main-content:not([aria-busy="true"]) {
+  animation: adx-page-enter var(--adx-motion-page-enter-duration) var(--adx-motion-easing-enter) both;
+}
+
 /* Same-document navigations use React's vt-page transition class when the
    route payload is available. Hard navigations use root above. Both paths
    consume the same semantic tokens; Next 16.3 needs no experimental flag. */
