@@ -672,15 +672,15 @@ export function ChartDetailPageView({
       {/* The whole chart page is one self-contained article about the chart. */}
       <article className="flex flex-col gap-6">
       <section data-detail-hero className="relative isolate overflow-hidden rounded-2xl border border-border/60" aria-label={title}>
-        <div className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-4 p-4 md:gap-6 md:p-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <div className="w-full self-start lg:row-span-3">
+        <div className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-4 p-4 md:grid-cols-[128px_minmax(0,1fr)] md:gap-6 md:p-6">
+          <div className="w-full self-start">
             <DetailHeroCover>
               <EntryCover
                 entry={entry}
                 locale={locale}
                 fit="contain"
                 priority
-                sizes="(max-width: 767px) 80px, (max-width: 1023px) 88px, 220px"
+                sizes="(max-width: 767px) 80px, 128px"
                 className="h-full w-full"
               />
             </DetailHeroCover>
@@ -735,7 +735,7 @@ export function ChartDetailPageView({
               </div>
             ) : null}
           </div>
-          <Surface data-download-panel aria-label={detail.downloadSection} className="col-span-2 space-y-4 bg-card/95 lg:col-span-1 lg:col-start-2">
+          <Surface data-download-panel aria-label={detail.downloadSection} className="col-span-2 space-y-4 bg-card/95">
             <h2 className="ui-section-title">{detail.downloadSection}</h2>
             {entry.download_mode === "onsite" || entry.download_mode === "mixed" ? (
               <AdxDownloadButton spec={downloadSpec} locale={locale} />
@@ -751,7 +751,7 @@ export function ChartDetailPageView({
               </div>
             </details>
           </Surface>
-          <div data-detail-secondary-actions className="col-span-2 min-w-0 border-t border-border/60 pt-4 lg:col-span-1 lg:col-start-2">
+          <div data-detail-secondary-actions className="col-span-2 min-w-0 border-t border-border/60 pt-4">
             <ChartDetailActions entry={entry} locale={locale} />
             {(entry.download_mode === "external" || entry.download_mode === "mixed") && entry.source_url ? (
               <Button size="touch" variant="ghost" asChild>

@@ -5,7 +5,7 @@ try {
  await page.goto(`${process.env.ASTRODX_PREVIEW_ORIGIN ?? 'http://127.0.0.1:3313'}/charts/12061`,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>{const e=document.querySelector('[data-music-player-surface=collapsed]');return e&&Object.keys(e).some(k=>k.startsWith('__reactProps'))});
  await page.getByRole('button',{name:'展开播放器',exact:true}).click();
- const panel=page.locator('[data-music-player-panel]');await panel.waitFor();
+ const panel=page.locator('[data-music-player-panel]');await panel.waitFor();await panel.getByRole('button',{name:'打开队列与歌单',exact:true}).click();
  await panel.locator('ol li button[aria-haspopup=menu]').first().click();
  const menu=page.getByRole('menu');await menu.waitFor();
  if(!await menu.evaluate(e=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+15))}))throw Error('Queue menu obscured');

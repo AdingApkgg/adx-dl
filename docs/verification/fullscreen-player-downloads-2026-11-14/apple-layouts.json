@@ -1,0 +1,128 @@
+[
+  {
+    "device": "desktop",
+    "custom": true,
+    "detail": {
+      "panel": {
+        "x": 285,
+        "y": 314.796875,
+        "width": 1094,
+        "height": 278,
+        "top": 314.796875,
+        "right": 1379,
+        "bottom": 592.796875,
+        "left": 285
+      },
+      "hero": {
+        "x": 256,
+        "y": 84,
+        "width": 1152,
+        "height": 721.796875,
+        "top": 84,
+        "right": 1408,
+        "bottom": 805.796875,
+        "left": 256
+      },
+      "fullWidth": true
+    },
+    "player": {
+      "width": 1440,
+      "cover": {
+        "x": 500,
+        "y": 154.09375,
+        "width": 440,
+        "height": 440,
+        "top": 154.09375,
+        "right": 940,
+        "bottom": 594.09375,
+        "left": 500
+      },
+      "queueHidden": true,
+      "overflow": false
+    }
+  },
+  {
+    "device": "mobile",
+    "custom": true,
+    "detail": {
+      "panel": {
+        "x": 35,
+        "y": 367,
+        "width": 320,
+        "height": 306,
+        "top": 367,
+        "right": 355,
+        "bottom": 673,
+        "left": 35
+      },
+      "hero": {
+        "x": 16,
+        "y": 133,
+        "width": 358,
+        "height": 779,
+        "top": 133,
+        "right": 374,
+        "bottom": 912,
+        "left": 16
+      },
+      "fullWidth": true
+    },
+    "player": {
+      "width": 390,
+      "cover": {
+        "x": 34.640625,
+        "y": 142.734375,
+        "width": 320.71875,
+        "height": 320.71875,
+        "top": 142.734375,
+        "right": 355.359375,
+        "bottom": 463.453125,
+        "left": 34.640625
+      },
+      "queueHidden": true,
+      "overflow": false
+    }
+  },
+  {
+    "device": "narrow",
+    "custom": true,
+    "detail": {
+      "panel": {
+        "x": 35,
+        "y": 403,
+        "width": 250,
+        "height": 374,
+        "top": 403,
+        "right": 285,
+        "bottom": 777,
+        "left": 35
+      },
+      "hero": {
+        "x": 16,
+        "y": 133,
+        "width": 288,
+        "height": 935,
+        "top": 133,
+        "right": 304,
+        "bottom": 1068,
+        "left": 16
+      },
+      "fullWidth": true
+    },
+    "player": {
+      "width": 320,
+      "cover": {
+        "x": 28,
+        "y": 119.09375,
+        "width": 264,
+        "height": 264,
+        "top": 119.09375,
+        "right": 292,
+        "bottom": 383.09375,
+        "left": 28
+      },
+      "queueHidden": true,
+      "overflow": false
+    }
+  }
+]
