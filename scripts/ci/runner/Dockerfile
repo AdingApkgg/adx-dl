@@ -3,7 +3,7 @@ FROM ghcr.io/actions/actions-runner:2.338.0
 
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      python3 ca-certificates openssh-client tini util-linux xz-utils \
+      python3 ca-certificates openssh-client tini util-linux xz-utils libatomic1 \
     && rm -rf /var/lib/apt/lists/* \
     && gpasswd -d runner sudo \
     && mkdir -p /opt/actions-runner /opt/hostedtoolcache /etc/gha-runner \
