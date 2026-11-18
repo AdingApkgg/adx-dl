@@ -39,8 +39,8 @@ concurrency:
 
 jobs:
   check:
-    # Playwright 1.58.2 supports Ubuntu 24.04; ubuntu-latest can advance independently.
-    runs-on: ubuntu-24.04
+    # Keep the runner OS aligned with Playwright 1.65.1 support.
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
     services:
       postgres:
@@ -77,7 +77,7 @@ jobs:
       ACCEPTANCE_TEST_IMAGE: community-acceptance:ci
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
@@ -92,7 +92,7 @@ jobs:
           bash apps/community/test/acceptance/select.sh >> "$GITHUB_OUTPUT"
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@v2.2.0
         with:
           bun-version-file: package.json
 
@@ -114,9 +114,9 @@ jobs:
       # 共享界面包的测试和社区站的交互测试（test/dom）用 vitest，它跑在 Node 上（vitest 5 要求 Node ^22.12 || ^24 || >=26）。
       # 要排在下面两步之前：社区站 check 的最后一步就是 vitest run。
       - name: Setup Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: 24
+          node-version: 26
 
       # 共享界面包（@astrodx/ui）的类型检查和测试；它的 lint 由仓库根目录的 biome（web-check）负责。
       - name: Typecheck and test the shared UI package
@@ -186,7 +186,7 @@ jobs:
       - name: Install only the CI browser
         if: steps.acceptance.outputs.browser == 'true'
         run: |
-          npm install --prefix "$RUNNER_TEMP/community-browser" --no-audit --no-fund --package-lock=false playwright@1.58.2
+          npm install --prefix "$RUNNER_TEMP/community-browser" --no-audit --no-fund --package-lock=false playwright@1.65.1
           "$RUNNER_TEMP/community-browser/node_modules/.bin/playwright" install --with-deps --only-shell chromium
 
       - name: Start built web and media worker
@@ -212,7 +212,7 @@ jobs:
 
       - name: Upload controlled discovery diagnostics
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: community-discovery-performance-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -223,7 +223,7 @@ jobs:
 
       - name: Upload acceptance evidence
         if: always() && (steps.acceptance.outputs.browser == 'true' || steps.acceptance.outputs.restore == 'true')
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: community-acceptance-${{ github.run_id }}-${{ github.run_attempt }}
           # 白名单：不上传 env、会话、PG dump、restic 仓库或包含凭据的 trace。

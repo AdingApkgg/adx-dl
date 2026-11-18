@@ -375,7 +375,15 @@ async function acceptance() {
     if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-home-desktop.png"), fullPage: true });
     for (const width of [320, 390]) {
       await visitor.setViewportSize({ width, height: 844 });
-      assert.equal(await visitor.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+      const layout = await visitor.evaluate(() => ({
+        viewport: innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        overflow: [...document.querySelectorAll("body *")].map(element => {
+          const box = element.getBoundingClientRect();
+          return { tag: element.tagName, className: String(element.className), left: box.left, right: box.right };
+        }).filter(box => box.right > innerWidth + 1 || box.left < -1).slice(0, 40),
+      }));
+      assert.ok(layout.scrollWidth <= layout.viewport, `public page fits viewport: ${JSON.stringify(layout)}`);
     }
     if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-home-mobile.png"), fullPage: true });
     await visitor.setViewportSize({ width: 1440, height: 900 });
@@ -414,7 +422,15 @@ async function acceptance() {
     const [download] = await Promise.all([visitor.waitForEvent("download"), visitor.getByRole("link", { name: "下载原始 ZIP", exact: true }).click()]);
     assert.deepEqual(await readFile(await download.path()), zip);
     await visitor.setViewportSize({ width: 390, height: 844 });
-    assert.equal(await visitor.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    const layout = await visitor.evaluate(() => ({
+        viewport: innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        overflow: [...document.querySelectorAll("body *")].map(element => {
+          const box = element.getBoundingClientRect();
+          return { tag: element.tagName, className: String(element.className), left: box.left, right: box.right };
+        }).filter(box => box.right > innerWidth + 1 || box.left < -1).slice(0, 40),
+      }));
+      assert.ok(layout.scrollWidth <= layout.viewport, `public page fits viewport: ${JSON.stringify(layout)}`);
     if (evidenceDirectory) await visitor.screenshot({ path: join(evidenceDirectory, "public-mobile.png"), fullPage: true });
     for (const [path, bytes] of [[publicAssets()[0], maidata], [publicAssets()[1], audio]]) {
       const result = await anonymous.request.get(new URL(path, origin).href);
