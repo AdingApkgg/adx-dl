@@ -118,3 +118,9 @@ html:not(.dark):is([data-accent="orange"], [data-accent="teal"]) body.community-
 .community-material :is(.community-settings-panel, .community-navigation-drawer) a { border-radius: var(--md-radius); }
 .community-material .community-chart-card .community-artwork-motion { margin: 12px 12px 0; border-radius: var(--md-radius); background: var(--md-surface); }
 .community-material .community-artwork-plate > div { border-bottom: 0; background: var(--md-surface); }
+
+/* Buttons use transition-all by default. Width must switch immediately when the
+   desktop sidebar becomes a mobile header, or its controls overflow mid-resize. */
+.community-material .community-header-actions :is(a, button) {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+}
