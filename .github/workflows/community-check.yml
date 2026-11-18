@@ -39,7 +39,8 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Playwright 1.58.2 supports Ubuntu 24.04; ubuntu-latest can advance independently.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     services:
       postgres:
