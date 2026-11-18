@@ -8,6 +8,31 @@ import { createDb } from "../../src/server/db/client";
 import { user, userPublicIds, session } from "../../src/server/db/schema";
 import { createLogger } from "../../src/shared/log";
 
+type UpstreamRead = (input: string, init: RequestInit & { proxy?: string; decompress: false }) => Promise<Response>;
+
+/** Retry connection failures only; every HTTP response keeps its original meaning. */
+async function fetchReadonlyPublic(input: string, init: Omit<RequestInit, "signal"> & { proxy?: string; decompress: false }, read: UpstreamRead = fetch, deadlineMs = 6000): Promise<Response> {
+  if (!Number.isFinite(deadlineMs) || deadlineMs <= 0 || deadlineMs > 6000) throw new Error("READONLY_DEADLINE_REQUIRED");
+  const method = (init.method ?? "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") throw new Error("READONLY_METHOD_REQUIRED");
+  let failure: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const controller = new AbortController();
+    // Three connection budgets plus two short pauses fit the 25s navigation cap.
+    const deadline = setTimeout(() => controller.abort(new DOMException("Readonly upstream connection timed out", "TimeoutError")), deadlineMs);
+    try {
+      return await read(input, { ...init, method, signal: controller.signal });
+    } catch (error) {
+      failure = error;
+    } finally {
+      // Leave a successfully opened response stream to the caller's own deadline.
+      clearTimeout(deadline);
+    }
+    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  throw failure;
+}
+
 async function main() {
 const origin = "https://adxc.saop.cc";
 const runId = process.env.SMOKE_RUN_ID ?? "";
@@ -119,7 +144,7 @@ const server = Bun.serve({ hostname: "0.0.0.0", port: 41910, idleTimeout: 30, as
   }
   headers.set("accept-encoding", upstreamEncoding);
   try {
-    const upstream = await fetch(origin + url.pathname + url.search, { method: request.method, headers, redirect: "manual", proxy, decompress: false, signal: AbortSignal.timeout(25_000) });
+    const upstream = await fetchReadonlyPublic(origin + url.pathname + url.search, { method: request.method, headers, redirect: "manual", proxy, decompress: false });
     reads++;
     const clean = new Headers(upstream.headers);
     for (const name of ["set-cookie", "set-auth-token", "access-control-expose-headers"]) clean.delete(name);

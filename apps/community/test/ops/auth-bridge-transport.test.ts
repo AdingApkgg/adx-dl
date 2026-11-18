@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync, gunzipSync } from "node:zlib";
+import { fetchReadonlyPublic } from "./auth-bridge-helper";
 
 const SRC_PATH = join(import.meta.dir, "../../ops/acceptance/auth-bridge.ts");
 const START = 'const headers = new Headers({ cookie, host: "adxc.saop.cc" });';
@@ -31,7 +32,9 @@ function extractForwardBlock(): string {
 function buildForward(): Forward {
   const block = extractForwardBlock();
   const body = `return (async () => {\nlet reads = 0;\n${block}\n})();`;
-  return new Function("origin", "url", "request", "cookie", "proxy", "fetch", body) as Forward;
+  const forward = new Function("origin", "url", "request", "cookie", "proxy", "fetchReadonlyPublic", body) as (...args: unknown[]) => Promise<Response>;
+  return (origin, url, request, cookie, proxy, read) => forward(origin, url, request, cookie, proxy,
+    (input: string, init: Parameters<typeof fetchReadonlyPublic>[1]) => fetchReadonlyPublic(input, init, read));
 }
 
 let server: ReturnType<typeof Bun.serve>;
