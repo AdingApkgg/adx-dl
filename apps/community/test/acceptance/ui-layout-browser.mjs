@@ -34,7 +34,7 @@ export async function exerciseUiLayout({owner,anonymous,origin,step,evidenceDire
   for(const path of ["/me/library","/me/workbench","/dash"]){await visit(member,path);for(const width of [390,1280]){await member.setViewportSize({width,height:900});await geometry(member,width);}}
   await visit(member,"/charts");await member.getByRole("checkbox",{name:/选择谱面 #/}).first().check();
   const bar=member.locator(".community-selection-bar");await bar.waitFor();await member.evaluate(()=>scrollTo(0,500));await settle(member);
-  const toolbar=await bar.boundingBox(),header=await member.locator(".community-header").boundingBox();assert.ok(toolbar.y>=header.y+header.height,"batch toolbar below header");await bar.getByRole("button",{name:"加入下载队列",exact:true}).click({trial:true});await bar.getByRole("button",{name:"清空选择",exact:true}).click();
+  const toolbar=await bar.boundingBox(),header=await member.locator(".community-header").boundingBox();assert.ok(toolbar.x>=header.x+header.width&&toolbar.y>=0,"batch toolbar beside desktop sidebar");await bar.getByRole("button",{name:"加入下载队列",exact:true}).click({trial:true});await bar.getByRole("button",{name:"清空选择",exact:true}).click();
   const response=await owner.request.get(url("/api/v1/charts")),charts=await response.json();assert.ok(charts.items.length,"synthetic published chart for UI queue");
   await visit(member,`/charts/${charts.items[0].publicId}`);await member.getByRole("button",{name:"加入下载队列",exact:true}).click();
   // Sample the real dock every frame from before the queue starts. The window opens on

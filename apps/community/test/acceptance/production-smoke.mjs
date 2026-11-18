@@ -218,7 +218,7 @@ try {
       for(const path of ['/me/workbench','/me/library',...(role==='admin'?['/dash']:[])]){await visit(path);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'PRIVATE_UI_HORIZONTAL_OVERFLOW');}
       await page.setViewportSize({width:1280,height:900});await visit('/search?type=charts&q=1');await page.getByRole('checkbox',{name:'选择谱面 #1',exact:true}).check();
       const bar=page.locator('.community-selection-bar');await bar.waitFor();await page.evaluate(()=>scrollTo(0,400));
-      const box=await bar.boundingBox(),header=await page.locator('.community-header').boundingBox();assert.ok(box.y>=header.y+header.height,'SELECTION_BAR_BELOW_HEADER');await bar.getByRole('button',{name:'加入下载队列',exact:true}).click({trial:true});await bar.getByRole('button',{name:'清空选择',exact:true}).click();
+      const box=await bar.boundingBox(),header=await page.locator('.community-header').boundingBox();assert.ok(box.x>=header.x+header.width&&box.y>=0,'SELECTION_BAR_BESIDE_DESKTOP_SIDEBAR');await bar.getByRole('button',{name:'加入下载队列',exact:true}).click({trial:true});await bar.getByRole('button',{name:'清空选择',exact:true}).click();
       // Read-only content UX acceptance stays inside the required UI group.
       await visit('/charts/1');
       assert.equal(await page.getByRole('navigation',{name:'本页导航',exact:true}).getByRole('link').count(),5);

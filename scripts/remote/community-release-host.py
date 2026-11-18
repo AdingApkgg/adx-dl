@@ -1,5 +1,5 @@
 # This module is sent over the existing authenticated production SSH connection.
-import base64, hashlib, json, os, pathlib, re, subprocess
+import base64, hashlib, json, os, pathlib, re, shlex, subprocess, time
 assert os.uname().nodename == 'arch'
 os.umask(0o077)
 assert re.fullmatch('[a-f0-9]{32}', task['releaseId'])
@@ -45,12 +45,32 @@ else:
         if overlay.is_file():env['COMPOSE_FILE']='compose.yaml:.superpowers/napcat-reuse.compose.yaml'
         args=['bash',str(tools/'apps/community/deploy.sh')]
         if task['mode']:args.append(task['mode'])
-        with open(root/'deploy.log','w') as log:
-            # Git/Docker public source must remain readable by the non-root smoke tool.
-            # Private release files stay under this parent's 077 umask and 0700 context.
-            result=subprocess.run(args,env=env,stdout=log,stderr=subprocess.STDOUT,umask=0o022)
-        print(json.dumps({'deployExitCode':result.returncode}))
-        raise SystemExit(result.returncode)
+        # The production task survives loss of either SSH hop. Only non-secret
+        # release context enters the runner; Compose still reads its existing .env.
+        runner = root/'run.sh'
+        exit_file = root/'deploy-exit-code'
+        assert not runner.exists() and not exit_file.exists(), 'RELEASE_ALREADY_STARTED'
+        keys = []
+        for line in (deployment/'.env').read_text().splitlines():
+            if line.strip() and not line.lstrip().startswith('#'):
+                key = line.split('=',1)[0]
+                assert re.fullmatch('[A-Z][A-Z0-9_]*',key)
+                keys.append(key)
+        names = ['COMMUNITY_DEPLOY_DIR','COMMUNITY_RELEASE_ID','COMMUNITY_RELEASE_DIR','COMMUNITY_SMOKE_SHA256','COMMUNITY_RELEASE_TIMEOUT','COMMUNITY_RELEASE_SOURCE_REVISION','COMPOSE_FILE','PRODUCTION_PREVIEW_CHART','PRODUCTION_PREVIEW_DIFFICULTY']
+        overrides = '\n'.join('export '+key+'='+shlex.quote(env[key]) for key in names if key in env)
+        status_command = 'code=$?; umask 077; printf "%s\n" "$code" > '+shlex.quote(str(exit_file))+'; date -u +%Y-%m-%dT%H:%M:%SZ > '+shlex.quote(str(root/'finished'))
+        runner.write_text('#!/usr/bin/env bash\nset -uo pipefail\numask 077\nset -a\n[ ! -f /etc/environment ] || . /etc/environment\nset +a\nexport PATH=/usr/local/bin:/usr/bin:/bin:$PATH\nunset '+ ' '.join(dict.fromkeys([*keys,*names]))+'\n'+overrides+'\ntrap '+shlex.quote(status_command)+' EXIT\nprintf "%s\n" "$$" > '+shlex.quote(str(root/'pid'))+'\ndate -u +%Y-%m-%dT%H:%M:%SZ > '+shlex.quote(str(root/'started'))+'\numask 022\n'+shlex.join(args)+' > '+shlex.quote(str(root/'deploy.log'))+' 2>&1\n')
+        runner.chmod(0o700)
+        (root/'deploy.log').touch(mode=0o600)
+        session='adxc-release-'+task['releaseId']
+        (root/'session').write_text(session+'\n')
+        (root/'host').write_text(os.uname().nodename+'\n')
+        subprocess.run(['tmux','new-session','-d','-s',session,'bash',str(runner)],check=True)
+        while not exit_file.exists(): time.sleep(1)
+        code=exit_file.read_text().strip()
+        assert re.fullmatch('[0-9]{1,3}',code), 'INVALID_DEPLOYMENT_EXIT_CODE'
+        print(json.dumps({'deployExitCode':int(code)}))
+        raise SystemExit(int(code))
     elif action in ['receipt','fail']:
         name='acceptance.json' if action=='receipt' else 'failed.json'
         temp=root/(name+'.incoming')

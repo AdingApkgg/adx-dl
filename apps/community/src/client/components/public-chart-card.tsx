@@ -40,7 +40,7 @@ export function PublicDifficultyPill({ row }: { row: ChartDifficultySummary }) {
 export function PublicCover({ chart }: { chart: PublicChartDto }) {
   const [failed, setFailed] = useState(false);
   return <MotionArtwork><div className="relative aspect-square overflow-hidden border-b border-border/60 bg-muted">
-    {chart.summary.hasCover && !failed ? <img src={publicChartAssetUrl(chart.publicId, chart.versionId, "cover")} alt="" loading="lazy" decoding="async" width={512} height={512} className="h-full w-full object-cover" onError={() => setFailed(true)} /> :
+    {chart.summary.hasCover && !failed ? <img src={publicChartAssetUrl(chart.publicId, chart.versionId, "cover")} alt="" loading="lazy" decoding="async" width={512} height={512} className="h-full w-full object-contain" onError={() => setFailed(true)} /> :
       <div className="community-chart-cover-placeholder"><Music2Icon aria-hidden="true" className="size-10 opacity-40"/><span>{m.chart_cover()} · {m.chart_missing()}</span></div>}
   </div></MotionArtwork>;
 }
