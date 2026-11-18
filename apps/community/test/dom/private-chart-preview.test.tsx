@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { afterEach, expect, test, vi } from "vitest";
 import { m } from "@/paraglide/messages.js";
 import { PrivateChartPreview } from "@/client/components/private-chart-preview";
@@ -28,6 +29,27 @@ function fixture() {
   });
 }
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); fakes.parse.mockReset(); });
+test("SSR preview waits for hydration and the first enabled click loads resources", async () => {
+  fixture();
+  const fetcher = vi.fn(async () => new Response(new Uint8Array([1, 2, 3])));
+  vi.stubGlobal("fetch", fetcher);
+  const preview = <PrivateChartPreview id="chart" versionId="version" summary={summary} />;
+  const container = document.createElement("div");
+  container.innerHTML = renderToString(preview);
+  document.body.append(container);
+  expect(container.querySelector("button")?.disabled).toBe(true);
+  expect(container.querySelector("select")?.disabled).toBe(true);
+  fireEvent.click(container.querySelector("button")!);
+  expect(fetcher).not.toHaveBeenCalled();
+  const view = render(preview, { container, hydrate: true });
+  const load = view.getByRole("button", { name: "加载预览" }) as HTMLButtonElement;
+  await waitFor(() => expect(load.disabled).toBe(false));
+  expect((view.getByRole("combobox", { name: "难度" }) as HTMLSelectElement).disabled).toBe(false);
+  fireEvent.click(load);
+  await waitFor(() => expect((view.getByRole("button", { name: "播放" }) as HTMLButtonElement).disabled).toBe(false));
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
 test("unsupported difficulties cannot load preview resources", () => {
   const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
   render(<PrivateChartPreview id="chart" versionId="version" summary={{ ...summary, difficulties: [{ ...summary.difficulties[0]!, previewSupported: false }] }} />);

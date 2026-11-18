@@ -26,6 +26,9 @@ export function PrivateChartPreview(props: Props) {
 }
 function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectionId, enableShare=false, initialDifficulty, controlledDifficulty, externalSeek, initialPosition = 0, onPosition }: Props) {
   const previewTitle = assetUrl === chartAssetUrl ? m.chart_preview() : m.public_chart_preview();
+  // SSR controls must wait for their client event handlers before accepting input.
+  const [interactive, setInteractive] = useState(false);
+  useEffect(() => { setInteractive(true); }, []);
   const [difficulty, setDifficulty] = useState<ChartDifficulty | undefined>(() => controlledDifficulty ?? initialDifficulty ?? summary.difficulties.find(row => row.previewSupported)?.difficulty);
   const [opened, setOpened] = useState(false);
   const [ready, setReady] = useState(false);
@@ -223,18 +226,18 @@ function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectio
   return (
     // biome-ignore lint/a11y/noNoninteractiveTabindex: A focusable preview region scopes its documented keyboard shortcuts.
     <section ref={section} id={sectionId} tabIndex={0} onKeyDown={shortcuts} aria-label={previewTitle}
-    className={`scroll-mt-24 space-y-3 rounded-lg border bg-background p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${fullscreen ? "h-dvh overflow-y-auto" : ""}`}>
+    className={`community-chart-preview scroll-mt-24 space-y-3 rounded-lg border bg-background p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${fullscreen ? "h-dvh overflow-y-auto" : ""}`}>
     <h2 className="font-semibold">{previewTitle}</h2>
     <p className="text-sm text-muted-foreground">{m.chart_preview_hint()}</p>
     <label className="block text-sm">{m.chart_difficulties()}
-      <select value={difficulty ?? ""} disabled={exporting || controlledDifficulty !== undefined} onChange={event => {initialSeek.current=0;setDifficulty(Number(event.target.value) as ChartDifficulty);}} className="ml-2 min-h-11 rounded border bg-background px-2 py-1">
+      <select value={difficulty ?? ""} disabled={!interactive || exporting || controlledDifficulty !== undefined} onChange={event => {initialSeek.current=0;setDifficulty(Number(event.target.value) as ChartDifficulty);}} className="ml-2 min-h-11 rounded border bg-background px-2 py-1">
         {!difficulty ? <option value="">{m.chart_unsupported()}</option> : null}
         {summary.difficulties.map(row => <option key={row.difficulty} value={row.difficulty} disabled={!row.previewSupported}>
           {publicDifficultyName(row.difficulty)}{row.previewSupported ? "" : ` · ${m.chart_unsupported()}`}
         </option>)}
       </select>
     </label>
-    {!opened ? <Button className="min-h-11" disabled={!difficulty || !summary.difficulties.find(d=>d.difficulty===difficulty)?.previewSupported} onClick={() => setOpened(true)}>{m.chart_preview_load()}</Button> : <>
+    {!opened ? <Button className="min-h-11" disabled={!interactive || !difficulty || !summary.difficulties.find(d=>d.difficulty===difficulty)?.previewSupported} onClick={() => setOpened(true)}>{m.chart_preview_load()}</Button> : <>
       <div className={`mx-auto aspect-square w-full bg-black ${fullscreen ? "max-w-[min(65dvh,100%)]" : "max-w-lg"}`}><canvas ref={canvas} aria-label={previewTitle} className="h-full w-full" /></div>
       {!ready && !error ? <p role="status">{m.chart_preview_loading()}</p> : null}
       {silent ? <p role="status" className="text-sm">{m.chart_preview_silent()}</p> : null}

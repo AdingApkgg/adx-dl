@@ -92,7 +92,7 @@ html:not(.dark):is([data-accent="orange"], [data-accent="teal"]) body.community-
 
 /* Complete the page surfaces beyond the global navigation. Match main's 4px
    direction while keeping avatars, meters and decorative orbit geometry. */
-.community-material :is(.community-hero, .community-list-card, .community-list-unavailable, .community-library-entry, .community-topic-list, .community-composer, .community-storage-panel, .community-notification, .community-recovery, .community-admin-shortcut, .community-danger-panel, .community-source-details, .community-difficulty-card, .community-download-items, .community-download-dock, .community-version-grid, .community-content-nav),
+.community-material :is(.community-hero, .community-chart-preview, .community-list-card, .community-list-unavailable, .community-library-entry, .community-topic-list, .community-composer, .community-storage-panel, .community-notification, .community-recovery, .community-admin-shortcut, .community-danger-panel, .community-source-details, .community-difficulty-card, .community-download-items, .community-download-dock, .community-version-grid, .community-content-nav),
 .community-material .community-stat-grid > div,
 .community-material .community-workbench-list > li,
 .community-material .community-author-steps li,
@@ -102,7 +102,7 @@ html:not(.dark):is([data-accent="orange"], [data-accent="teal"]) body.community-
   background: var(--md-surface);
 }
 .community-material :is(.community-chart-cover-frame, .community-list-icon, .community-state-icon, .community-status, .community-reply-count, .community-board-link, .community-attention-link, .community-inline-action, .community-library-tab, .community-help-topics a, .community-content-nav a),
-.community-material .community-content :is([class*="rounded-2xl"], [class*="rounded-3xl"], a.rounded-full),
+.community-material .community-content :is([class*="rounded-sm"], [class*="rounded-md"], [class*="rounded-lg"], [class*="rounded-xl"], [class*="rounded-2xl"], [class*="rounded-3xl"], a.rounded-full),
 .community-material [data-slot="card"] > :is([data-slot="card-header"], [data-slot="card-footer"]) { border-radius: var(--md-radius); }
 .community-material .community-chart-cover-frame { box-shadow: none; }
 .community-material :is(.community-list-card, .community-chart-card).community-motion-hover:hover { box-shadow: 0 1px 3px rgb(32 40 64 / 8%); }

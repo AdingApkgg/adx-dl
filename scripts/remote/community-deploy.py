@@ -8,6 +8,16 @@ PROD_JUMP=os.environ.get('ASTRODX_PRODUCTION_JUMP_HOST',BUILD)
 if not re.fullmatch('[A-Za-z0-9.@_-]+',PROD_JUMP):
     raise SystemExit('INVALID_PRODUCTION_JUMP_HOST')
 OPTIONS=['-o','BatchMode=yes','-o','ConnectTimeout=15','-o','ServerAliveInterval=15','-o','ServerAliveCountMax=2','-J',PROD_JUMP,PROD,'python3 -u -']
+def align_acceptance_clock(ready):
+    # The builder timestamps browser results; the production host timestamps ready.
+    # Wait for that boundary instead of rewriting either clock or receipt dates.
+    delay = ready['startedAt'] + 2 - time.time()
+    if delay > 120:
+        raise RuntimeError('ACCEPTANCE_CLOCK_SKEW_TOO_LARGE')
+    if delay > 0:
+        print('ACCEPTANCE_CLOCK_ALIGNMENT_WAIT '+str(round(delay,2)),flush=True)
+        time.sleep(delay)
+
 def run_before_acceptance(path, env):
     if path is not None:
         subprocess.run([sys.executable,str(path)],env=env,timeout=300,check=True)
@@ -66,6 +76,7 @@ try:
     with tempfile.TemporaryDirectory(prefix='adxc-release-') as temporary:
         receipt=pathlib.Path(temporary)/'receipt.json'
         env=dict(os.environ,PRODUCTION_EXPECT_REVISION=ready['revision'],PRODUCTION_RELEASE_RECEIPT=str(receipt),COMMUNITY_RELEASE_ID=release_id)
+        align_acceptance_clock(ready)
         run_before_acceptance(args.before_acceptance,env)
         outcome=subprocess.run(['bash',str(ROOT/'scripts/remote/community-smoke.sh'),'--authenticated'],env=env,timeout=540)
         if outcome.returncode!=0 or not receipt.is_file():raise RuntimeError('AUTHENTICATED_HEADLESS_GATE_FAILED')

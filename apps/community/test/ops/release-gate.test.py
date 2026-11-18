@@ -135,6 +135,29 @@ class ReleaseGateTests(unittest.TestCase):
     with self.assertRaises(ValueError):self.invoke('--preflight')
     self.env[key]=old
 
+class AcceptanceClockTests(unittest.TestCase):
+ def setUp(self):
+  source=(pathlib.Path(__file__).resolve().parents[4]/'scripts/remote/community-deploy.py').read_text()
+  functions=[node for node in ast.parse(source).body if isinstance(node,ast.FunctionDef) and node.name=='align_acceptance_clock']
+  namespace=dict(time=time)
+  exec(compile(ast.Module(body=functions,type_ignores=[]),'community-deploy.py','exec'),namespace)
+  self.align=namespace['align_acceptance_clock']
+ def test_waits_for_production_boundary_without_rewriting_ready(self):
+  ready=dict(startedAt=125,revision='a'*40)
+  with patch.object(time,'time',return_value=100),patch.object(time,'sleep') as sleep:
+   self.align(ready)
+   sleep.assert_called_once_with(27)
+  self.assertEqual(ready,dict(startedAt=125,revision='a'*40))
+ def test_past_boundary_starts_without_sleep(self):
+  with patch.object(time,'time',return_value=200),patch.object(time,'sleep') as sleep:
+   self.align(dict(startedAt=100))
+   sleep.assert_not_called()
+ def test_excessive_skew_fails_before_browser_or_wait(self):
+  with patch.object(time,'time',return_value=100),patch.object(time,'sleep') as sleep:
+   with self.assertRaisesRegex(RuntimeError,'ACCEPTANCE_CLOCK_SKEW_TOO_LARGE'):
+    self.align(dict(startedAt=219))
+   sleep.assert_not_called()
+
 class BeforeAcceptanceHookTests(unittest.TestCase):
  def test_hook_gets_release_environment_and_failure_stops_acceptance(self):
   source=(pathlib.Path(__file__).resolve().parents[4]/'scripts/remote/community-deploy.py').read_text()

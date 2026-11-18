@@ -267,7 +267,6 @@ try {
       return { status: 'rejected', reason, path: targetPath };
     }
   }
-  if (bridgeUrl) uiTask = runUiChecks();
   const anonymous = await context();
   page = await anonymous.newPage();
   async function visit(path) {
@@ -522,7 +521,10 @@ try {
         for(const path of ['overview','tickets','appeals','audit'])await json('/api/v1/governance/dash/'+path);
       }else{await json('/api/v1/governance/dash/overview',403);}
     });
+    // Keep contexts isolated, but do not race two pages through the same proxy
+    // and in-flight asset cache. Every UI assertion still runs before revocation.
     phase = 'production_ui_navigation_layout';
+    if (bridgeUrl) uiTask = runUiChecks();
     assert.ok(uiTask, 'INDEPENDENT_UI_TASK_REQUIRED');
     const uiOutcome = await uiTask;
     if (uiOutcome.status === 'rejected') {

@@ -91,18 +91,10 @@ scripts/remote/community-smoke.sh --anonymous
 
 登录态入口在首次 SSH 前校验这三个参数；生产协调器单独校验跳板参数。非法值以固定错误码失败。实际主机名仍以 `uname -n` 核对，断言不删除。
 
-## 验收执行两路隔离（2 lane）
+## 验收顺序与时钟边界
 
-- `production_ui_navigation_layout` 原字节整体移入自包含 `runUiChecks()`，使用独立 browser context/page（同受限只读 route 工厂，localStorage/viewport 隔离），在 `explicit_session_and_role` 通过后启动，与主 17 组并行，最多 2 lane。
-- UI 任务内部 catch 成 outcome 防 unhandled；主流程在原 `production_bridge_write_denial_and_session_revocation` 之前 join，两路都成功才撤销 capability。
-- 不在 UI 完成时提前 close context（避免取消在途请求扰动 routeFailures）；由共同 `finally` 先 `browser.close()` 取消等待再 `await uiTask`，保证无孤儿。
-- 预算不变：默认 15s/25s、browser 420s、SSH 460s、outer 540s、lease 600s；所有原断言与 19 组保留。
-- `routeFailureSamples`（≤12 条）只记录相对开始的毫秒、resourceType 与固定 kind（TIMEOUT/ABORTED/CLOSED/HANDLED/OTHER），不含正文/URL/头/令牌；仅诊断，不改变 `routeFailures` 计数与门禁。
-
-## 只读桥 GET/HEAD 的 ECONNRESET 有界重试（内部）
-
-`viaBridge` 的 `route.fetch` 现对 `GET`/`HEAD` 设置 `maxRetries: 2`，其余方法（含 `OPTIONS`）保持 `0`。仅对 `ECONNRESET` 重试，HTTP 状态码（如 503/403）不重试；30 秒总 fetch 预算不变，重试退避计入同一预算；写入仍由前置写阻拦拒绝；重试耗尽后照常计入 `routeFailures` 并失败。
-
-依据：构建机纯 loopback 故障注入 fixture（7 例全通过，私有证据 `transport-reset-fixture-result.json`）——旧 `maxRetries:0` 单次 reset 即 `socket hang up` 失败；`maxRetries:2` 的 GET/HEAD 各 2 次请求后 200；持续 reset 3 次请求后仍失败；503/403 各 1 次不重试；100ms 总预算跨退避仍生效。
-
-此为验收工具修复，尚非正式发布完成。
+- 业务检查完成后再执行 `production_ui_navigation_layout`；两组仍使用独立 browser context/page 隔离 localStorage 和 viewport，但不同时争用代理和进行中的静态资源缓存。
+- UI 任务失败仍保留 outcome，由共同 `finally` 关闭浏览器并等待任务退出；全部原断言及 19 组检查成功后才能撤销 capability 并提交收据。
+- 生产主机写 ready 时间，构建机写浏览器 startedAt。协调器在验收前有限等待构建机时间达到 ready 后 2 秒；超过 120 秒的偏差直接失败。不改系统时钟、ready 或收据时间，门禁的新鲜度校验保留。
+- 默认 15s/25s、browser 420s、SSH 460s、outer 540s、lease 600s 预算保留。生产验收可通过 `ACCEPTANCE_PLAYWRIGHT_PATH` 选择与 CI 相同的 Playwright 1.65.1；旧工具目录与浏览器不删除。
+- `routeFailureSamples`（≤12 条）仅记录相对时间、resourceType 与固定 kind，不含正文、URL、头或令牌。任何请求失败仍阻止完成发布。
