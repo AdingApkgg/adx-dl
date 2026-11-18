@@ -28,7 +28,7 @@ jobs:
   # 运行的 github.sha，定时任务的 github.sha 永远是 main 的最新提交，和它实际
   # 检出构建的提交对不上，跑过一次记录就指向了没发布的代码。
   resolve:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       build_sha: ${{ steps.pick.outputs.build_sha }}
       live_sha: ${{ steps.pick.outputs.live_sha }}
@@ -59,7 +59,7 @@ jobs:
   deploy:
     needs: resolve
     if: needs.resolve.outputs.build_sha != ''
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       pages: write
@@ -73,23 +73,23 @@ jobs:
       # catalog against the previously deployed commit. blob:none keeps that cheap:
       # file contents are fetched on demand rather than pulling ~1.5G of history.
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ needs.resolve.outputs.build_sha }}
           fetch-depth: 0
           filter: blob:none
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@v2.2.0
         with:
           # 以根 package.json 的 packageManager 为唯一版本来源。定时重建旧提交时，
           # 用的也是那个提交当时固定的版本。
           bun-version-file: package.json
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7.1.0
         with:
-          python-version: "3.11"
+          python-version: "3.15"
 
       # Covers (AVIF/WebP) are served from Cloudflare R2, not mirrored into the
       # Pages build — so no libavif/cwebp install and no cover cache. build_catalog
@@ -124,7 +124,7 @@ jobs:
 
       # Next.js build cache (module graph, compiled pages) across runs.
       - name: Cache Next.js build
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: apps/web/.next/cache
           key: next-${{ hashFiles('bun.lock') }}-${{ needs.resolve.outputs.build_sha }}
@@ -145,16 +145,16 @@ jobs:
         run: bun run build
 
       - name: Setup Pages
-        uses: actions/configure-pages@v6
+        uses: actions/configure-pages@v6.0.0
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: ./apps/web/out
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v5.0.1
 
       - name: Submit IndexNow
         continue-on-error: true
@@ -172,7 +172,7 @@ jobs:
   mark-live:
     needs: [resolve, deploy]
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:

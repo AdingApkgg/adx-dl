@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 export function PageTitle({ children, description }: { children: ReactNode; description?: ReactNode }) {
   return (
     <MotionSurface tone="title" className="community-motion-title min-w-0 space-y-2">
-      <h1 className="text-balance break-words text-2xl font-bold tracking-tight sm:text-3xl">{children}</h1>
+      <h1 className="community-page-title text-balance break-words text-2xl font-bold tracking-tight sm:text-3xl">{children}</h1>
       {description ? <p className="max-w-2xl text-pretty text-sm leading-6 text-muted-foreground">{description}</p> : null}
     </MotionSurface>
   );

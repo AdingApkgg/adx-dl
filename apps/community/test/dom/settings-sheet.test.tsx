@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { describe, expect, test } from "vitest";
 
 import { m } from "@/paraglide/messages.js";
@@ -9,7 +10,7 @@ import { SettingsSheet } from "@/client/components/settings-sheet";
 function renderSettings() {
   render(
     <AppProviders>
-      <SettingsSheet />
+      <MemoryRouter><SettingsSheet /></MemoryRouter>
     </AppProviders>
   );
   return userEvent.setup();

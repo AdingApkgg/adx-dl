@@ -221,8 +221,20 @@ class ReleaseSourcePermissionsTests(unittest.TestCase):
    source=(pathlib.Path(__file__).resolve().parents[4]/'scripts/remote/community-release-host.py').read_text().replace('/home/i/astrodx-community-releases',str(releases)).replace('/home/i/astrodx-dash-src/apps/community',str(deployment))
    previous=os.umask(0o077)
    try:
-    with patch('os.uname',return_value=os.uname_result(('Linux','arch','','',''))),patch('subprocess.check_output',return_value=''):
+    real_run=subprocess.run
+    launched=[]
+    def run_owned_tmux(args,**kwargs):
+     self.assertEqual(args[:4],['tmux','new-session','-d','-s'])
+     self.assertEqual(args[4],'adxc-release-'+run)
+     launched.append(args)
+     return real_run(['bash',args[-1]],check=True)
+    with patch('os.uname',return_value=os.uname_result(('Linux','arch','','',''))),patch('subprocess.check_output',return_value=''),patch('subprocess.run',side_effect=run_owned_tmux):
      with self.assertRaises(SystemExit) as outcome:exec(compile(source,'community-release-host.py','exec'),{'task':dict(action='start',releaseId=run,mode='--no-pull',smokeSha256='b'*64,baseCommit='c'*40)})
+    self.assertEqual(len(launched),1)
+    self.assertEqual((context/'deploy-exit-code').read_text().strip(),'0')
+    self.assertTrue((context/'pid').is_file())
+    self.assertTrue((context/'finished').is_file())
+    self.assertNotIn('FIXTURE_ONLY=value',(context/'run.sh').read_text())
     self.assertEqual(outcome.exception.code,0)
    finally:os.umask(previous)
    self.assertEqual(stat.S_IMODE((deployment/'public.ts').stat().st_mode),0o644)

@@ -66,7 +66,7 @@ export function Layout({ children }: { children: ReactNode }) {
           />
         ) : null}
       </head>
-      <body>
+      <body className="community-material">
         {children}
         <ScrollRestoration />
         <Scripts />

@@ -162,3 +162,41 @@ describe("grouped site navigation",()=>{
   expect(screen.queryByRole("combobox")).toBeNull();
  });
 });
+
+describe("Material navigation sidebar", () => {
+  test("public navigation exposes secondary pages without opening a settings dialog", () => {
+    renderHeader("/en/help/upload", null);
+    const nav = screen.getByRole("navigation", { name: m.ui_group_site({}, { locale: "en" }) });
+    const help = within(nav).getByRole("link", { name: m.site_help({}, { locale: "en" }) });
+    expect(help.getAttribute("href")).toBe("/en/help");
+    expect(help.getAttribute("aria-current")).toBe("page");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("navigation", { name: m.ui_group_create({}, { locale: "en" }) })).toBeNull();
+  });
+
+  test("signed-in navigation retains author and account routes with nested active state", () => {
+    renderHeader("/ja/me/charts/42/edit", USER);
+    const create = screen.getByRole("navigation", { name: m.ui_group_create({}, { locale: "ja" }) });
+    const charts = within(create).getByRole("link", { name: `${m.charts_title({}, { locale: "ja" })} · ${m.ui_group_create({}, { locale: "ja" })}` });
+    expect(charts.getAttribute("aria-current")).toBe("page");
+    expect(charts.getAttribute("href")).toBe("/ja/me/charts");
+    expect(screen.getByRole("navigation", { name: m.ui_group_account({}, { locale: "ja" }) })).toBeTruthy();
+  });
+
+  test("pending deletion does not expose signed-in workspace links", () => {
+    renderHeader("/account-deletion", { ...USER, status: "pending_deletion" });
+    expect(screen.queryByRole("navigation", { name: m.ui_group_create() })).toBeNull();
+  });
+
+  test("mobile menu uses the same personal routes and closes after selection", async () => {
+    const user = renderHeader("/me/library", USER);
+    await user.click(screen.getByRole("button", { name: m.ui_more() }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: m.ui_navigation_close() })).toBeTruthy();
+    const create = within(dialog).getByRole("navigation", { name: m.ui_group_create() });
+    await user.click(within(create).getByRole("link", { name: `${m.author_workbench()} · ${m.ui_group_create()}` }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const sidebar = screen.getByRole("navigation", { name: m.ui_group_create() });
+    expect(within(sidebar).getByRole("link", { name: `${m.author_workbench()} · ${m.ui_group_create()}` }).getAttribute("aria-current")).toBe("page");
+  });
+});

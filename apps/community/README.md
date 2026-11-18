@@ -90,6 +90,9 @@ bun run test:http    # 启动构建产物，做页面和接口的 HTTP 级测试
   先引 `tailwindcss` 和包的 `theme.css`，类名只从 `src/client` 里找（原因写在文件里）。
 - 明暗模式、强调色、减少动画和 web 是同一套（localStorage 的键也一样，两个站的域名不同，各存各的）。
   防闪烁脚本带着本次请求的 nonce 内联在 `<head>` 里（`src/client/components/theme-boot-script.tsx`）。
+- 导航同步主站 `main` 的 Material 4px 小圆角、靛蓝配色和 14rem 固定左栏。桌面正文为左栏留出空间，
+  导航区独立滚动，当前项自动进入可视区域，工具区固定在下方；个人工作区链接并入全局左栏。
+  手机沿用顶部工具栏和底部导航，通过“更多导航”抽屉访问同一组入口；选中后关闭抽屉，Esc 关闭后恢复焦点。
 - 组件从 `@astrodx/ui/components/<名字>` 引入；toast 用同一个文件转出的 `toast`。包里不放文字，界面上的文字一律走 Paraglide。
 - 包里的类名也会进 web 的 CSS（`theme.css` 扫描整个包）。0b 加的 `Label`、`Alert` 只用了 web 已经有的类名；
   以后加组件，web 的 CSS 会多出它的类名。
