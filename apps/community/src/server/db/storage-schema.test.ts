@@ -1,5 +1,5 @@
-import { beforeAll, expect, test } from "bun:test";
-import { eq, sql } from "drizzle-orm";
+import { afterAll, beforeAll, expect, test } from "bun:test";
+import { eq, inArray, sql } from "drizzle-orm";
 import { shortId } from "../auth/short-id";
 import { resetTestDatabase, testDbHandle } from "../testing/test-db";
 import {
@@ -11,6 +11,7 @@ import {
   mediaPurgeRequests,
   storageBudget,
   storageMaintenance,
+  storagePolicies,
   storageTombstones,
   storageUsage,
   uploadAttempts,
@@ -21,6 +22,26 @@ import {
 } from "./schema";
 
 beforeAll(resetTestDatabase, 30_000);
+const fixtures: { userId: string; policyId: string }[] = [];
+const purgeIds: string[] = [];
+afterAll(async () => {
+  if (!fixtures.length) return;
+  const { db } = testDbHandle();
+  const policies = fixtures.map((item) => item.policyId);
+  // These are constraint-only rows: no object IO or budget charges were issued.
+  // The shared test database must not retain our synthetic writing/deleting claims.
+  await db.transaction(async (tx) => {
+    await tx.delete(user).where(inArray(user.id, fixtures.map((item) => item.userId)));
+    await tx.delete(uploadAttempts).where(inArray(uploadAttempts.policyId, policies));
+    if (purgeIds.length) await tx.delete(mediaPurgeRequests).where(inArray(mediaPurgeRequests.id, purgeIds));
+    const originals = tx.select({ id: blobs.id }).from(blobs).where(inArray(blobs.policyId, policies));
+    await tx.delete(files).where(inArray(files.blobId, originals));
+    await tx.delete(blobDerivatives).where(inArray(blobDerivatives.sourceBlobId, originals));
+    await tx.delete(derivedObjects).where(inArray(derivedObjects.policyId, policies));
+    await tx.delete(blobs).where(inArray(blobs.policyId, policies));
+    await tx.delete(storagePolicies).where(inArray(storagePolicies.id, policies));
+  });
+}, 30_000);
 const hash = () => crypto.randomUUID().replaceAll("-", "").repeat(2);
 async function fixture() {
   const { db } = testDbHandle();
@@ -30,6 +51,7 @@ async function fixture() {
     sql`insert into storage_policies(name, driver, endpoint, region, original_bucket, derived_bucket, credentials_ref) values (${crypto.randomUUID()}, 's3', 'http://seaweedfs:8333', 'us-east-1', 'blobs', 'derived', 'SEAWEED') returning id`,
   );
   const policyId = p.rows[0]!.id;
+  fixtures.push({ userId, policyId });
   const [blob] = await db
     .insert(blobs)
     .values({ sha256: hash(), policyId, key: crypto.randomUUID(), size: 1, detectedMime: "image/png" })
@@ -159,6 +181,7 @@ test("user deletion nulls file owner, cascades personal ledgers, preserves purge
     .insert(mediaPurgeRequests)
     .values({ outputSha256: hash(), generation: 0 })
     .returning();
+  purgeIds.push(outbox!.id);
   const [tombstone] = await db.insert(storageTombstones).values({ kind: "user_deleted", userId }).returning();
   await db.delete(user).where(eq(user.id, userId));
   expect((await db.select().from(files).where(eq(files.id, file!.id)))[0]?.ownerId).toBeNull();
