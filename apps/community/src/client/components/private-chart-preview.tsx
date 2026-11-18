@@ -226,7 +226,7 @@ function ChartPreview({ id, versionId, summary, assetUrl = chartAssetUrl, sectio
   return (
     // biome-ignore lint/a11y/noNoninteractiveTabindex: A focusable preview region scopes its documented keyboard shortcuts.
     <section ref={section} id={sectionId} tabIndex={0} onKeyDown={shortcuts} aria-label={previewTitle}
-    className={`scroll-mt-24 space-y-3 rounded-lg border bg-background p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${fullscreen ? "h-dvh overflow-y-auto" : ""}`}>
+    className={`community-chart-preview scroll-mt-24 space-y-3 rounded-lg border bg-background p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${fullscreen ? "h-dvh overflow-y-auto" : ""}`}>
     <h2 className="font-semibold">{previewTitle}</h2>
     <p className="text-sm text-muted-foreground">{m.chart_preview_hint()}</p>
     <label className="block text-sm">{m.chart_difficulties()}
