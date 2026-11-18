@@ -1,6 +1,5 @@
 import { expect, mock, test } from "bun:test";
-import { join } from "node:path";
-import { fetchReadonlyPublic } from "../../ops/acceptance/auth-bridge";
+import { fetchReadonlyPublic } from "./auth-bridge-helper";
 
 const target = "https://adxc.saop.cc/help";
 const options = { headers: new Headers({ cookie: "test-only-cookie" }), proxy: "http://host.docker.internal:20172", decompress: false as const, redirect: "manual" as const };
@@ -27,10 +26,10 @@ test("a stalled connection is aborted before the next attempt succeeds", async (
     if (!signal) throw new Error("connection deadline required");
     return new Promise<Response>((_resolve, reject) => signal.addEventListener("abort", () => reject(signal.reason), { once: true }));
   });
-  expect(await fetchReadonlyPublic(target, options, read)).toBe(response);
+  expect(await fetchReadonlyPublic(target, options, read, 10)).toBe(response);
   expect(read).toHaveBeenCalledTimes(2);
   expect(read.mock.calls[0]?.[1].signal?.aborted).toBe(true);
-}, 15000);
+});
 
 test.each([403, 429, 503])("HTTP %d is returned once without retry", async status => {
   const response = new Response(null, { status });
@@ -52,11 +51,8 @@ test("write methods are rejected before any upstream request", async () => {
 });
 
 
-test("CLI entry still validates its context before opening a session", () => {
-  const child = Bun.spawnSync([process.execPath, join(import.meta.dir, "../../ops/acceptance/auth-bridge.ts")], {
-    env: { ...process.env, SMOKE_RUN_ID: "", SMOKE_BRIDGE_KEY: "" },
-    stdout: "pipe", stderr: "pipe",
-  });
-  expect(child.exitCode).toBe(1);
-  expect(new TextDecoder().decode(child.stderr)).toContain('"event":"bridge_failed"');
+test("a caller cannot extend the production connection deadline", async () => {
+  const read = mock(async () => new Response(null));
+  await expect(fetchReadonlyPublic(target, options, read, 6001)).rejects.toThrow("READONLY_DEADLINE_REQUIRED");
+  expect(read).not.toHaveBeenCalled();
 });

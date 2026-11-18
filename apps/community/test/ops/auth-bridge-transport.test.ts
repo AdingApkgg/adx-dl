@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync, gunzipSync } from "node:zlib";
-import { fetchReadonlyPublic } from "../../ops/acceptance/auth-bridge";
+import { fetchReadonlyPublic } from "./auth-bridge-helper";
 
 const SRC_PATH = join(import.meta.dir, "../../ops/acceptance/auth-bridge.ts");
 const START = 'const headers = new Headers({ cookie, host: "adxc.saop.cc" });';

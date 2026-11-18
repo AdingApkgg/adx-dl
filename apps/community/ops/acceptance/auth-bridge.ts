@@ -11,14 +11,15 @@ import { createLogger } from "../../src/shared/log";
 type UpstreamRead = (input: string, init: RequestInit & { proxy?: string; decompress: false }) => Promise<Response>;
 
 /** Retry connection failures only; every HTTP response keeps its original meaning. */
-export async function fetchReadonlyPublic(input: string, init: Omit<RequestInit, "signal"> & { proxy?: string; decompress: false }, read: UpstreamRead = fetch): Promise<Response> {
+async function fetchReadonlyPublic(input: string, init: Omit<RequestInit, "signal"> & { proxy?: string; decompress: false }, read: UpstreamRead = fetch, deadlineMs = 6000): Promise<Response> {
+  if (!Number.isFinite(deadlineMs) || deadlineMs <= 0 || deadlineMs > 6000) throw new Error("READONLY_DEADLINE_REQUIRED");
   const method = (init.method ?? "GET").toUpperCase();
   if (method !== "GET" && method !== "HEAD") throw new Error("READONLY_METHOD_REQUIRED");
   let failure: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {
     const controller = new AbortController();
     // Three connection budgets plus two short pauses fit the 25s navigation cap.
-    const deadline = setTimeout(() => controller.abort(new DOMException("Readonly upstream connection timed out", "TimeoutError")), 6000);
+    const deadline = setTimeout(() => controller.abort(new DOMException("Readonly upstream connection timed out", "TimeoutError")), deadlineMs);
     try {
       return await read(input, { ...init, method, signal: controller.signal });
     } catch (error) {
@@ -160,4 +161,4 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) process.on(signal, () => { 
 setTimeout(() => { void shutdown().then(() => process.exit(0), () => process.exit(1)); }, 10 * 60_000).unref();
 
 }
-if (import.meta.main) await main().catch((error) => { console.error(JSON.stringify({ event: "bridge_failed", runId: process.env.SMOKE_RUN_ID, kind: error.name, frames: String(error.stack).split("\n").filter(x => x.trim().startsWith("at ")).slice(0, 4) })); process.exit(1); });
+await main().catch((error) => { console.error(JSON.stringify({ event: "bridge_failed", runId: process.env.SMOKE_RUN_ID, kind: error.name, frames: String(error.stack).split("\n").filter(x => x.trim().startsWith("at ")).slice(0, 4) })); process.exit(1); });
