@@ -85,17 +85,17 @@ jobs:
     runs-on: [self-hosted, linux, x64, astrodx-ci]
     timeout-minutes: 10
     container:
-      image: node:24-bookworm
+      image: node:26-bookworm
       # 与持久卷的 runner 所有者一致，避免后续 host job 无法清理 root 文件。
       options: --user 1001:123
     steps:
       - name: Checkout inside the job container
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Setup Node inside the job container
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: 24
+          node-version: 26
 
       - name: Check the job container workspace and tool cache
         shell: bash
@@ -117,7 +117,7 @@ jobs:
           fs.accessSync(toolCache, fs.constants.R_OK | fs.constants.W_OK);
           assert.ok(fs.existsSync(path.join(toolCache, "node")), "setup-node populated the tool cache");
           assert.ok(process.execPath.startsWith(path.join(toolCache, "node") + path.sep));
-          assert.equal(process.versions.node.split(".")[0], "24");
+          assert.equal(process.versions.node.split(".")[0], "26");
           console.log(`Node ${process.versions.node}: workspace ${workspace}, tool cache ${toolCache}`);
           console.log("The job container can run Node and read the checked-out repository.");
           NODE
