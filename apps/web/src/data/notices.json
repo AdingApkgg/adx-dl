@@ -1,6 +1,30 @@
 {
   "notices": [
     {
+      "id": "2026-11-19-community-launch",
+      "level": "featured",
+      "publishedAt": "2026-11-19",
+      "expiresAt": null,
+      "title": {
+        "zh": "自制谱站上线！",
+        "en": null,
+        "ja": null
+      },
+      "body": {
+        "zh": "做了个自制谱站，可以发布自己的独创谱面啦！或者玩到小谱师发布的 “神秘” 谱面~\n\n遇到问题或者有什么想法，可以在自制谱站的论坛说。",
+        "en": null,
+        "ja": null
+      },
+      "link": {
+        "href": "https://adxc.saop.cc",
+        "label": {
+          "zh": "adxc.saop.cc",
+          "en": null,
+          "ja": null
+        }
+      }
+    },
+    {
       "id": "2026-10-magical-charts",
       "level": "featured",
       "publishedAt": "2026-10-13",
