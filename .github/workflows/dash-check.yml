@@ -40,13 +40,13 @@ permissions:
 jobs:
   check:
     # 公开仓库的 PR 留在 GitHub runner；自托管 runner 另有主机侧事件白名单。
-    runs-on: ${{ fromJSON(((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && contains(fromJSON('["refs/heads/main","refs/heads/dev","refs/heads/pre"]'), github.ref)) && '["self-hosted","linux","x64","astrodx-ci"]' || '["ubuntu-latest"]') }}
+    runs-on: ${{ fromJSON(((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && contains(fromJSON('["refs/heads/main","refs/heads/dev","refs/heads/pre"]'), github.ref)) && '["self-hosted","linux","x64","astrodx-ci"]' || '["ubuntu-26.04"]') }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@v2.2.0
         with:
           # 以根 package.json 的 packageManager 为唯一版本来源。定时重建旧提交时，
           # 用的也是那个提交当时固定的版本。
@@ -54,9 +54,9 @@ jobs:
 
       # 自托管镜像不预装系统 Node；依赖安装和 CLI 的 node shebang 都需要它。
       - name: Setup Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: 24
+          node-version: 26
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -76,7 +76,7 @@ jobs:
       # for the fixes). A build that only ever runs at deploy time makes
       # deployment the place you discover build breakage, which is the most
       # expensive place to discover it. This step is NOT a substitute for a
-      # deploy rehearsal: ubuntu-latest here isn't the oven/bun container that
+      # deploy rehearsal: ubuntu-26.04 here isn't the oven/bun container that
       # ships to g510, so it will not reproduce that container's IPv6-only
       # preview-server binding or its node-shim behaviour. It only catches
       # build breakage in general (syntax errors, type errors that slip past

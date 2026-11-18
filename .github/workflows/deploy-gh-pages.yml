@@ -28,7 +28,7 @@ jobs:
   # 运行的 github.sha，定时任务的 github.sha 永远是 main 的最新提交，和它实际
   # 检出构建的提交对不上，跑过一次记录就指向了没发布的代码。
   resolve:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       build_sha: ${{ steps.pick.outputs.build_sha }}
       live_sha: ${{ steps.pick.outputs.live_sha }}
@@ -60,19 +60,19 @@ jobs:
   build:
     needs: resolve
     if: needs.resolve.outputs.build_sha != ''
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       # 定时任务必须构建 pages-live 的旧提交，不能把 main 上未发布的代码带上线。
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ needs.resolve.outputs.build_sha }}
           fetch-depth: 0
           filter: blob:none
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@v2.2.0
         with:
           # 以根 package.json 的 packageManager 为唯一版本来源。定时重建旧提交时，
           # 用的也是那个提交当时固定的版本。
@@ -80,14 +80,14 @@ jobs:
 
       # 显式选择 Node 版本，保持依赖安装和构建环境一致。
       - name: Setup Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: 24
+          node-version: 26
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7.1.0
         with:
-          python-version: "3.11"
+          python-version: "3.15"
 
       # Covers (AVIF/WebP) are served from Cloudflare R2, not mirrored into the
       # Pages build — no full-image mirror/cache or libavif/cwebp install.
@@ -123,7 +123,7 @@ jobs:
 
       # Colour metadata only: no full-size cover mirror, no browser pixel work.
       - name: Cache cover palettes
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: data/catalog/cover-palettes.json
           key: cover-palettes-v1-${{ github.run_id }}-${{ github.run_attempt }}
@@ -135,7 +135,7 @@ jobs:
 
       # Next.js build cache (module graph, compiled pages) across runs.
       - name: Cache Next.js build
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: apps/web/.next/cache
           key: next-${{ hashFiles('bun.lock') }}-${{ needs.resolve.outputs.build_sha }}
@@ -203,7 +203,7 @@ jobs:
             "$(stat -c '%s' "$RUNNER_TEMP/artifact.tar")" "$((SECONDS - started))"
 
       - name: Upload Pages artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: github-pages
           path: ${{ runner.temp }}/artifact.tar
@@ -212,7 +212,7 @@ jobs:
 
       # IndexNow 要对比的是本次实际生成并发布的目录，不能在发布 job 中重新生成。
       - name: Upload IndexNow catalog
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: indexnow-catalog
           path: data/catalog/index.json
@@ -221,7 +221,7 @@ jobs:
 
   deploy:
     needs: [resolve, build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       pages: write
@@ -232,37 +232,37 @@ jobs:
     steps:
       # IndexNow 使用同一版本的脚本，并取完整历史与发布前目录做 diff。
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ needs.resolve.outputs.build_sha }}
           fetch-depth: 0
           filter: blob:none
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@v2.2.0
         with:
           bun-version-file: package.json
 
       - name: Setup Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
-          node-version: 24
+          node-version: 26
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
       - name: Download IndexNow catalog
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.2
         with:
           name: indexnow-catalog
           path: data/catalog
 
       - name: Setup Pages
-        uses: actions/configure-pages@v6
+        uses: actions/configure-pages@v6.0.0
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v5.0.1
 
       - name: Submit IndexNow
         continue-on-error: true
@@ -280,7 +280,7 @@ jobs:
   mark-live:
     needs: [resolve, deploy]
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:
