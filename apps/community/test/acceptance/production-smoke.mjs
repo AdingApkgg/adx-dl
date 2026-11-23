@@ -210,7 +210,7 @@ try {
       }
       await page.setViewportSize({width:390,height:900});await visit('/en/charts?sort=title');
       const more=page.getByRole('button',{name:'More navigation',exact:true});await more.click();
-      const sheet=page.getByRole('dialog',{name:'AstroDX Community',exact:true});await sheet.waitFor();
+      const sheet=page.getByRole('dialog',{name:'INOTE Community',exact:true});await sheet.waitFor();
       assert.equal(await sheet.getByRole('link',{name:'日本語',exact:true}).getAttribute('href'),'/ja/charts?sort=title');
       await sheet.getByRole('button',{name:'Open settings',exact:true}).click();
       const settings=page.getByRole('dialog',{name:'Settings',exact:true});await settings.waitFor();await settings.getByRole('button',{name:'Close settings',exact:true}).click();await settings.waitFor({state:'hidden'});

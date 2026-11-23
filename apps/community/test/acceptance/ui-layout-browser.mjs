@@ -24,7 +24,7 @@ export async function exerciseUiLayout({owner,anonymous,origin,step,evidenceDire
  });
  await step("ui_mobile_languages_settings_and_focus",async()=>{
   await visitor.setViewportSize({width:320,height:900});await visit(visitor,"/en/charts?sort=title");const more=visitor.getByRole("button",{name:"More navigation",exact:true});await more.click();
-  const current=visitor.getByRole("dialog",{name:"AstroDX Community",exact:true});await current.waitFor();
+  const current=visitor.getByRole("dialog",{name:"INOTE Community",exact:true});await current.waitFor();
   const ja=current.getByRole("link",{name:"日本語",exact:true});assert.equal(await ja.getAttribute("href"),"/ja/charts?sort=title");await ja.click();await visitor.waitForURL(u=>u.pathname==="/ja/charts"&&u.searchParams.get("sort")==="title");
   await visit(visitor,"/en/charts?sort=title");await more.click();await current.getByRole("button",{name:"Open settings",exact:true}).click();
   const settings=visitor.getByRole("dialog",{name:"Settings",exact:true});await settings.waitFor();await settings.getByRole("button",{name:"Close settings",exact:true}).click();await settings.waitFor({state:"hidden"});await visitor.keyboard.press("Escape");await current.waitFor({state:"hidden"});assert.equal(await more.evaluate(e=>e===document.activeElement),true,"focus returns to More trigger");
