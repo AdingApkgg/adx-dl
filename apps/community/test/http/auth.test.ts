@@ -51,9 +51,7 @@ beforeAll(async () => {
   server = await startBuiltServer();
 }, 60_000);
 
-afterAll(() => {
-  server.stop();
-});
+afterAll(() => server.stop());
 
 describe("登录页", () => {
   test("200、不缓存、不收录，三种登录方式都在", async () => {

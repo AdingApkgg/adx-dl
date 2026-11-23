@@ -8,7 +8,7 @@ import { prepareTestQueues } from "../../src/server/testing/test-boss";
 export type RunningServer = {
   origin: string;
   url(path: string): string;
-  stop(): void;
+  stop(): Promise<void>;
 };
 
 const appRoot = fileURLToPath(new URL("../..", import.meta.url));
@@ -60,6 +60,12 @@ export async function startBuiltServer(extraEnv: Record<string, string> = {}): P
     stderr: "inherit",
   });
 
+  // 后续套件可能重用同一端口，等进程实际退出后再结束 teardown。
+  async function stop() {
+    proc.kill();
+    await proc.exited;
+  }
+
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     if (proc.exitCode !== null) {
@@ -67,13 +73,13 @@ export async function startBuiltServer(extraEnv: Record<string, string> = {}): P
     }
     try {
       if ((await fetch(`${origin}/healthz`)).ok) {
-        return { origin, url: (path) => `${origin}${path}`, stop: () => proc.kill() };
+        return { origin, url: (path) => `${origin}${path}`, stop };
       }
     } catch {
       // 还没起来。
     }
     await Bun.sleep(200);
   }
-  proc.kill();
+  await stop();
   throw new Error("server did not become healthy within 20s");
 }
