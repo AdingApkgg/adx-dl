@@ -1,4 +1,4 @@
-import { type ComponentType, useLayoutEffect } from "react";
+import { type ComponentType, type ReactNode, useLayoutEffect } from "react";
 import { dehydrate, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, MemoryRouter, RouterContextProvider, RouterProvider } from "react-router";
@@ -54,6 +54,13 @@ function view(kind: "login" | "account" | "profile", url?: string, me: typeof US
   render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>);
   return { client, router };
 }
+function FirstCommit({ first, children }: { first: string[]; children: ReactNode }) {
+  useLayoutEffect(() => {
+    first.push(document.body.textContent ?? "", ...Array.from(document.querySelectorAll("input, textarea"), input => (input as HTMLInputElement).value));
+  }, [first]);
+  return children;
+}
+
 test.each(["profile", "account"] as const)("settings navigation marks only %s current", view => {
   render(<MemoryRouter><SettingsNavigation view={view} /></MemoryRouter>);
   const nav = screen.getByRole("navigation", { name: m.ui_account_navigation() });
@@ -111,11 +118,7 @@ test.each(["profile", "account"] as const)("fresh %s loader never renders retain
     : await accountLoader(args as unknown as Parameters<typeof accountLoader>[0]);
   const Component = kind === "profile" ? Profile : Account;
   const first: string[] = [];
-  function FirstCommit() {
-    useLayoutEffect(() => { first.push(document.body.textContent ?? "", ...Array.from(document.querySelectorAll("input, textarea"), input => (input as HTMLInputElement).value)); }, []);
-    return <Component loaderData={data} />;
-  }
-  const router = createMemoryRouter([{ path: "*", element: <FirstCommit /> }], { initialEntries: [`/settings/${kind}`] });
+  const router = createMemoryRouter([{ path: "*", element: <FirstCommit first={first}><Component loaderData={data} /></FirstCommit> }], { initialEntries: [`/settings/${kind}`] });
   render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>);
   expect(first.join(" ")).not.toContain("owner@example.test"); expect(first.join(" ")).not.toContain("Private profile draft"); expect(first.join(" ")).not.toContain("Other browser");
   if (kind === "profile") {

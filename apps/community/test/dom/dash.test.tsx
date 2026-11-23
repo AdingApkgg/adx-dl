@@ -33,6 +33,10 @@ const moderated: DashChart = {
 };
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
+function ChartsTestRoute() {
+  return <ChartsPage loaderData={useLoaderData() as DashChartsPage} />;
+}
+
 async function renderCharts(reply: () => Response | Promise<Response>, start = published, path = "/dash/charts?cursor=24") {
   const requests: { path: string; method: string; body: unknown; cache: RequestCache | undefined }[] = [];
   const success = vi.spyOn(toast, "success");
@@ -43,7 +47,7 @@ async function renderCharts(reply: () => Response | Promise<Response>, start = p
   const loader = vi.fn(() => ({ items: [start], nextCursor: null }));
   const router = createMemoryRouter([{
     path: "*", loader,
-    Component: () => <ChartsPage loaderData={useLoaderData() as DashChartsPage} />,
+    Component: ChartsTestRoute,
   }], { initialEntries: [path] });
   render(<RouterProvider router={router} />);
   await screen.findByRole("button", { name: m.dash_take_down() });
