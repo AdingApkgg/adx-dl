@@ -9,7 +9,7 @@ import { RootLayoutShell } from "@/app/root-layout-shell";
 // live in the route groups), so this page renders the full document itself via
 // RootLayoutShell. Excluded from indexing: it is infrastructure, not content.
 export const metadata: Metadata = {
-  title: "404 · ADX 谱面资源",
+  title: "404 · INOTE 谱面资源",
   robots: { index: false, follow: false },
 };
 

@@ -115,10 +115,10 @@ function expectLocalizedAlternates(
   const absoluteCanonical = `https://adxdls.saop.cc${canonical === "/" ? "" : canonical}`;
   // The title suffix and og:site_name now follow the page's own locale.
   const expectedSiteName = canonical.startsWith("/en")
-    ? "ADX Chart Archive"
+    ? "INOTE Chart Archive"
     : canonical.startsWith("/ja")
-      ? "ADX 譜面アーカイブ"
-      : "ADX 谱面资源";
+      ? "INOTE 譜面アーカイブ"
+      : "INOTE 谱面资源";
   const fullTitle = `${expected.title} | ${expectedSiteName}`;
   const expectedImage = image ?? {
     url: "https://adxdls.saop.cc/opengraph-image.png",
@@ -157,32 +157,32 @@ describe("route metadata", () => {
     const homeModule = await import("./(default)/page");
     const chartsModule = await import("./(default)/charts/page");
 
-    expect(homeModule.metadata?.title).toBe("AstroDX 谱面资料站与下载入口 | ADX 谱面资源");
+    expect(homeModule.metadata?.title).toBe("INOTE 谱面资料站与下载入口 | INOTE 谱面资源");
     expect(homeModule.metadata?.description).toBe(
-      "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。"
+      "INOTE 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。"
     );
     expectLocalizedAlternates(
       homeModule.metadata ?? {},
       "/",
       {
-        title: "AstroDX 谱面资料站与下载入口",
-        description: "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
-        keywords: ["AstroDX", "ADX 谱面资源", "谱面资料站", "下载入口", "目录索引"],
+        title: "INOTE 谱面资料站与下载入口",
+        description: "INOTE 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
+        keywords: ["AstroDX", "INOTE 谱面资源", "谱面资料站", "下载入口", "目录索引"],
       },
       {
         url: "https://adxdls.saop.cc/opengraph-home-v2.png",
-        alt: "AstroDX 谱面资料站与下载入口 | ADX 谱面资源",
+        alt: "INOTE 谱面资料站与下载入口 | INOTE 谱面资源",
       }
     );
 
-    expect(chartsModule.metadata?.title).toBe("AstroDX 谱面浏览与下载目录 | ADX 谱面资源");
+    expect(chartsModule.metadata?.title).toBe("INOTE 谱面浏览与下载目录 | INOTE 谱面资源");
     expect(chartsModule.metadata?.description).toBe(
       "浏览本站收录的全部 AstroDX 谱面，可按 maimai DX 版本分支、谱面分类与显示语言筛选，每首曲目均提供封面、难度等级、谱面定数与 BPM 等信息，支持在线预览并下载导入 AstroDX 模拟器。"
     );
     expectLocalizedAlternates(chartsModule.metadata ?? {}, "/charts", {
-      title: "AstroDX 谱面浏览与下载目录",
+      title: "INOTE 谱面浏览与下载目录",
       description: "浏览本站收录的全部 AstroDX 谱面，可按 maimai DX 版本分支、谱面分类与显示语言筛选，每首曲目均提供封面、难度等级、谱面定数与 BPM 等信息，支持在线预览并下载导入 AstroDX 模拟器。",
-      keywords: ["AstroDX", "ADX 谱面资源", "浏览曲目", "分类筛选", "显示语言"],
+      keywords: ["AstroDX", "INOTE 谱面资源", "浏览曲目", "分类筛选", "显示语言"],
     });
   });
 
@@ -198,7 +198,7 @@ describe("route metadata", () => {
     });
 
     expect(enHomeMetadata?.title).toBe(
-      "AstroDX Chart Archive, Browser and Download Portal | ADX Chart Archive"
+      "INOTE Chart Archive, Browser and Download Portal | INOTE Chart Archive"
     );
     expect(enHomeMetadata?.description).toBe(
       "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download."
@@ -207,27 +207,27 @@ describe("route metadata", () => {
       enHomeMetadata ?? {},
       "/en",
       {
-        title: "AstroDX Chart Archive, Browser and Download Portal",
+        title: "INOTE Chart Archive, Browser and Download Portal",
         description:
           "An unofficial AstroDX archive of maimai-style charts — per-song metadata, cover art, difficulty constants and BPM. Browse, search, preview and download.",
-        keywords: ["AstroDX", "ADX Chart Archive", "chart archive", "downloads", "catalog index"],
+        keywords: ["AstroDX", "INOTE Chart Archive", "chart archive", "downloads", "catalog index"],
       },
       {
         url: "https://adxdls.saop.cc/opengraph-home-v2.png",
-        alt: "AstroDX Chart Archive, Browser and Download Portal | ADX Chart Archive",
+        alt: "INOTE Chart Archive, Browser and Download Portal | INOTE Chart Archive",
       }
     );
 
     expect(enChartsMetadata?.title).toBe(
-      "AstroDX Chart Browser and Download Catalog | ADX Chart Archive"
+      "INOTE Chart Browser and Download Catalog | INOTE Chart Archive"
     );
     expect(enChartsMetadata?.description).toBe(
       "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download."
     );
     expectLocalizedAlternates(enChartsMetadata ?? {}, "/en/charts", {
-      title: "AstroDX Chart Browser and Download Catalog",
+      title: "INOTE Chart Browser and Download Catalog",
       description: "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download.",
-      keywords: ["AstroDX", "ADX Chart Archive", "browse charts", "category filter", "display language"],
+      keywords: ["AstroDX", "INOTE Chart Archive", "browse charts", "category filter", "display language"],
     });
   });
 
@@ -248,30 +248,30 @@ describe("route metadata", () => {
     const zhDescription = buildChartDescription(entry3, "zh");
     const enDescription = buildChartDescription(entry3, "en");
 
-    expect(zhMetadata?.title).toBe("曲目 3 AstroDX 谱面资料与下载 | ADX 谱面资源");
+    expect(zhMetadata?.title).toBe("曲目 3 INOTE 谱面资料与下载 | INOTE 谱面资源");
     expect(zhMetadata?.description).toBe(zhDescription);
     expectLocalizedAlternates(
       zhMetadata ?? {},
       `/charts/${song3Slug}`,
       {
-        title: "曲目 3 AstroDX 谱面资料与下载",
+        title: "曲目 3 INOTE 谱面资料与下载",
         description: zhDescription,
-        keywords: ["AstroDX", "ADX 谱面资源", "曲目 3", "歌手 3", "舞萌DX 2025", "Anime", "maimai"],
+        keywords: ["AstroDX", "INOTE 谱面资源", "曲目 3", "歌手 3", "舞萌DX 2025", "Anime", "maimai"],
       },
       { url: song3Cover, alt: "曲目 3" }
     );
 
     expect(enMetadata?.title).toBe(
-      "Song 3 AstroDX Chart Details and Download | ADX Chart Archive"
+      "Song 3 INOTE Chart Details and Download | INOTE Chart Archive"
     );
     expect(enMetadata?.description).toBe(enDescription);
     expectLocalizedAlternates(
       enMetadata ?? {},
       `/en/charts/${song3Slug}`,
       {
-        title: "Song 3 AstroDX Chart Details and Download",
+        title: "Song 3 INOTE Chart Details and Download",
         description: enDescription,
-        keywords: ["AstroDX", "ADX Chart Archive", "Song 3", "Artist 3", "舞萌DX 2025", "Anime", "maimai"],
+        keywords: ["AstroDX", "INOTE Chart Archive", "Song 3", "Artist 3", "舞萌DX 2025", "Anime", "maimai"],
       },
       { url: song3Cover, alt: "Song 3" }
     );
@@ -304,21 +304,21 @@ describe("route metadata", () => {
     const enDescription = buildChartDescription(entry5, "en");
 
     // Remote branch label (version / cabinet) must appear in the synthesized prose.
-    expect(zhMetadata?.title).toBe("远端曲目 5 AstroDX 谱面资料与下载 | ADX 谱面资源");
+    expect(zhMetadata?.title).toBe("远端曲目 5 INOTE 谱面资料与下载 | INOTE 谱面资源");
     expect(zhMetadata?.description).toBe(zhDescription);
     expect(zhDescription).toContain("maimai DX PRiSM / DX");
     expect(enMetadata?.title).toBe(
-      "Remote Song 5 AstroDX Chart Details and Download | ADX Chart Archive"
+      "Remote Song 5 INOTE Chart Details and Download | INOTE Chart Archive"
     );
     expect(enMetadata?.description).toBe(enDescription);
     expect(zhMetadata?.openGraph).toMatchObject({
-      title: "远端曲目 5 AstroDX 谱面资料与下载 | ADX 谱面资源",
+      title: "远端曲目 5 INOTE 谱面资料与下载 | INOTE 谱面资源",
       description: zhDescription,
       url: `https://adxdls.saop.cc/charts/remote-song-5`,
-      siteName: "ADX 谱面资源",
+      siteName: "INOTE 谱面资源",
     });
     expect(enMetadata?.twitter).toMatchObject({
-      title: "Remote Song 5 AstroDX Chart Details and Download | ADX Chart Archive",
+      title: "Remote Song 5 INOTE Chart Details and Download | INOTE Chart Archive",
       description: enDescription,
     });
   });

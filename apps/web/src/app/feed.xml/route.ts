@@ -61,14 +61,14 @@ export async function GET() {
 
   const body = `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-  <title>ADX 谱面资源 — latest charts</title>
+  <title>INOTE 谱面资源 — latest charts</title>
   <subtitle>Newly added AstroDX charts (maimai DX-style rhythm-game charts).</subtitle>
   <link href="${siteUrl}/feed.xml" rel="self"/>
   <link href="${siteUrl}/"/>
   <id>${siteUrl}/</id>
   <updated>${updated}</updated>
   <author>
-    <name>ADX 谱面资源</name>
+    <name>INOTE 谱面资源</name>
     <uri>${siteUrl}/</uri>
   </author>
 ${recent.map(chartEntryXml).join("\n")}

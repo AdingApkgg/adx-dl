@@ -849,8 +849,8 @@ export type StaticPageMetadataEntry = {
 const dictionaries: Record<Locale, SiteDictionary> = {
   zh: {
     localeLabel: "中文",
-    siteName: "ADX 谱面资源",
-    siteNameLong: "AstroDX 谱面资源",
+    siteName: "INOTE 谱面资源",
+    siteNameLong: "INOTE 谱面资源",
     nav: {
       home: "首页",
       browse: "曲库",
@@ -939,11 +939,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       },
     },
     home: {
-      badge: "为 AstroDX 玩家打造",
-      heroTitle: "为 AstroDX 找到下一首谱面。",
+      badge: "为 Simai 玩家打造",
+      heroTitle: "为 Simai 找到下一首谱面。",
       heroTitleNoBreak: "找到下一首谱面。",
       heroDescription: "搜索、试玩并下载社区谱面，按版本与曲风浏览，再一键导入 AstroDX。",
-      title: "AstroDX 谱面资料站与下载入口。",
+      title: "INOTE 谱面资料站与下载入口。",
       description:
         "搜索、试玩并下载 maimai 谱面，一键导入 AstroDX 模拟器。可按版本与曲风浏览，也支持整包批量下载。",
       searchCta: "搜索曲库",
@@ -996,7 +996,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         {
           id: "what-is-astrodx",
           q: "AstroDX 是什么？",
-          a: "AstroDX 是一款社区开发的 maimai 风格音乐游戏模拟器。本站「ADX 谱面资源」收录 AstroDX 谱面，提供元数据、封面与下载链接，是非官方的资料站。",
+          a: "AstroDX 是一款社区开发的 maimai 风格音乐游戏模拟器。本站「INOTE 谱面资源」收录 AstroDX 谱面，提供元数据、封面与下载链接，是非官方的资料站。",
         },
         {
           id: "what-is-maimai-dx",
@@ -1108,7 +1108,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       clearSelection: "清空",
       selectedCount: (count) => `已选 ${count} 首`,
       batchDownload: "打包下载",
-      batchDefaultName: "AstroDX Charts",
+      batchDefaultName: "INOTE Charts",
       levelFilterLabel: "等级筛选",
       allLevels: "全部等级",
       levelOption: (level) => `等级 ${level}`,
@@ -1409,7 +1409,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       placeholder: "AstroDX 封面占位图",
     },
     footer: {
-      description: "ADX 谱面资源，基于远端目录构建的非官方索引。",
+      description: "INOTE 谱面资源，基于远端目录构建的非官方索引。",
       lastUpdated: (date) => `目录更新于 ${date}`,
       disclaimer: "非官方爱好者资料站。AstroDX 与 maimai 的相关权利归各自所有者所有。",
       aiNotice: "项目由 Claude 与 GPT 联合开发。所有内容均由人工智能生成。",
@@ -1624,7 +1624,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       dismiss: "关闭",
     },
     seo: {
-      home: "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
+      home: "INOTE 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
       charts:
         "浏览本站收录的全部 AstroDX 谱面，可按 maimai DX 版本分支、谱面分类与显示语言筛选，每首曲目均提供封面、难度等级、谱面定数与 BPM 等信息，支持在线预览并下载导入 AstroDX 模拟器。",
       versions:
@@ -1632,28 +1632,28 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       versionDetail: (label, count) =>
         `浏览 maimai DX「${label}」版本收录的全部 ${count} 首 AstroDX 谱面，含每首曲目的封面、难度等级、谱面定数与 BPM 等完整信息，支持在线预览谱面并一键下载导入 AstroDX 模拟器，是查找与收藏该版本 maimai 谱面资源的完整归档目录。`,
       guestbook:
-        "欢迎在 ADX 谱面资源留言板留下你的想法、建议、问题或反馈，与其他 maimai 与 AstroDX 玩家交流。评论系统由 Artalk 提供支持，可匿名发表，也可登录后留言。",
+        "欢迎在 INOTE 谱面资源留言板留下你的想法、建议、问题或反馈，与其他 maimai 与 AstroDX 玩家交流。评论系统由 Artalk 提供支持，可匿名发表，也可登录后留言。",
       links:
         "这里收集了一些与 maimai 和 AstroDX 相关的优秀站点、工具与资源，包括查分器、谱面工具、社群与教程等友情链接，方便你发现更多 maimai 玩家常用的实用资源。",
       community:
         "加入 AstroDX 玩家社区：QQ 交流群与 Telegram 群组，交流 maimai 谱面、反馈问题，并获取本站与 AstroDX 模拟器的最新动态。",
       donate:
-        "如果 ADX 谱面资源对你有帮助，欢迎通过爱发电、Patreon 或 USDT (TRC20) 捐赠支持，帮助本站持续承担服务器与流量成本。",
+        "如果 INOTE 谱面资源对你有帮助，欢迎通过爱发电、Patreon 或 USDT (TRC20) 捐赠支持，帮助本站持续承担服务器与流量成本。",
       about:
-        "了解 ADX 谱面资源：非官方 AstroDX 谱面资料站的定位与维护理念、联系方式、开源仓库与技术栈、鸣谢名单及免责声明。",
+        "了解 INOTE 谱面资源：非官方 AstroDX 谱面资料站的定位与维护理念、联系方式、开源仓库与技术栈、鸣谢名单及免责声明。",
       guide:
         "AstroDX 上手指南：Android 与 iOS 的安装方式、在本站搜索与下载谱面（.adx / .zip / .tar.gz 与 BGA 的区别）、按平台导入谱面的步骤，以及下载卡住、压缩包打不开、谱面不显示、缺音频封面等常见故障的排查方法。",
       music:
-        "ADX 谱面资源音乐库：按 maimai DX 版本连续播放曲库中的音源，跨页面播放不中断，可随时切换版本、随机播放或单曲循环。",
+        "INOTE 谱面资源音乐库：按 maimai DX 版本连续播放曲库中的音源，跨页面播放不中断，可随时切换版本、随机播放或单曲循环。",
       changelog:
-        "ADX 谱面资源更新日志：按入库日期查看每一批新收录的 AstroDX 谱面，了解各批次涉及的 maimai DX 版本与谱面数量，快速找到最近新增的曲目。",
-      notices: "ADX 谱面资源的站点公告：维护计划、镜像变更、数据迁移等通知的发布页。",
+        "INOTE 谱面资源更新日志：按入库日期查看每一批新收录的 AstroDX 谱面，了解各批次涉及的 maimai DX 版本与谱面数量，快速找到最近新增的曲目。",
+      notices: "INOTE 谱面资源的站点公告：维护计划、镜像变更、数据迁移等通知的发布页。",
     },
   },
   en: {
     localeLabel: "English",
-    siteName: "ADX Chart Archive",
-    siteNameLong: "AstroDX Chart Archive",
+    siteName: "INOTE Chart Archive",
+    siteNameLong: "INOTE Chart Archive",
     nav: {
       home: "Home",
       browse: "Browse",
@@ -1751,11 +1751,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       },
     },
     home: {
-      badge: "Built for AstroDX players",
-      heroTitle: "Find your next chart for AstroDX.",
+      badge: "Built for Simai players",
+      heroTitle: "Find your next chart for Simai.",
       heroDescription:
         "Search, preview, and download community charts. Browse by release or genre, then import them into AstroDX.",
-      title: "AstroDX chart archive for browsing, indexing, and downloads.",
+      title: "INOTE chart archive for browsing, indexing, and downloads.",
       description:
         "Search, preview, and download maimai charts, then import them into the AstroDX simulator in one click. Browse by version or genre, or grab whole sets at once.",
       searchCta: "Search Catalog",
@@ -1809,7 +1809,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         {
           id: "what-is-astrodx",
           q: "What is AstroDX?",
-          a: "AstroDX is a community-built simulator for maimai-style rhythm-game charts. This site, the ADX Chart Archive, is an unofficial index of AstroDX charts with metadata, cover art, and download links.",
+          a: "AstroDX is a community-built simulator for maimai-style rhythm-game charts. This site, the INOTE Chart Archive, is an unofficial index of AstroDX charts with metadata, cover art, and download links.",
         },
         {
           id: "what-is-maimai-dx",
@@ -1931,7 +1931,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       clearSelection: "Clear",
       selectedCount: (count) => `${count} selected`,
       batchDownload: "Download",
-      batchDefaultName: "AstroDX Charts",
+      batchDefaultName: "INOTE Charts",
       levelFilterLabel: "Filter by level",
       allLevels: "All Levels",
       levelOption: (level) => `Level ${level}`,
@@ -2245,7 +2245,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       placeholder: "AstroDX cover placeholder",
     },
     footer: {
-      description: "ADX 谱面资源 — an unofficial chart index built from the remote directory.",
+      description: "INOTE 谱面资源 — an unofficial chart index built from the remote directory.",
       lastUpdated: (date) => `Catalog updated ${date}`,
       disclaimer:
         "Unofficial fan-made archive. AstroDX and maimai are the property of their respective owners.",
@@ -2489,23 +2489,23 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       community:
         "Join the AstroDX player community — our QQ group and Telegram group — to chat about maimai charts, report issues and follow updates to this site and the AstroDX simulator.",
       donate:
-        "If the ADX chart archive helps you, consider supporting it via Afdian, Patreon or USDT (TRC20) to help cover server and bandwidth costs.",
+        "If the INOTE chart archive helps you, consider supporting it via Afdian, Patreon or USDT (TRC20) to help cover server and bandwidth costs.",
       about:
-        "About the ADX chart archive: what this unofficial AstroDX chart site is, how it is maintained, how to reach us, its open-source repository and tech stack, credits and disclaimer.",
+        "About the INOTE chart archive: what this unofficial AstroDX chart site is, how it is maintained, how to reach us, its open-source repository and tech stack, credits and disclaimer.",
       guide:
         "Getting started with AstroDX: installing it on Android and iOS, finding and downloading charts here (.adx vs .zip vs .tar.gz, and what a BGA adds), importing on each platform, and fixing stalled downloads, unopenable archives, missing charts and missing audio.",
       music:
-        "The ADX chart archive music library: play the catalog's audio continuously by maimai DX version, keep it running across pages, and switch versions, shuffle or repeat at any time.",
+        "The INOTE chart archive music library: play the catalog's audio continuously by maimai DX version, keep it running across pages, and switch versions, shuffle or repeat at any time.",
       changelog:
-        "The ADX chart archive changelog: every batch of newly added AstroDX charts by import date, which maimai DX versions each batch touched, and how many charts it brought in.",
+        "The INOTE chart archive changelog: every batch of newly added AstroDX charts by import date, which maimai DX versions each batch touched, and how many charts it brought in.",
       notices:
-        "Site notices for the ADX chart archive: maintenance windows, mirror changes, data migrations and other announcements.",
+        "Site notices for the INOTE chart archive: maintenance windows, mirror changes, data migrations and other announcements.",
     },
   },
   ja: {
     localeLabel: "日本語",
-    siteName: "ADX 譜面アーカイブ",
-    siteNameLong: "AstroDX 譜面アーカイブ",
+    siteName: "INOTE 譜面アーカイブ",
+    siteNameLong: "INOTE 譜面アーカイブ",
     nav: {
       home: "ホーム",
       browse: "曲一覧",
@@ -2603,11 +2603,11 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       },
     },
     home: {
-      badge: "AstroDX プレイヤーのために",
-      heroTitle: "AstroDX の次の譜面を見つけよう。",
+      badge: "Simai プレイヤーのために",
+      heroTitle: "Simai の次の譜面を見つけよう。",
       heroDescription:
         "コミュニティ譜面を検索・プレビュー・ダウンロード。バージョンやジャンルから探して、AstroDX へ導入できます。",
-      title: "AstroDX 譜面アーカイブとダウンロード入口。",
+      title: "INOTE 譜面アーカイブとダウンロード入口。",
       description:
         "maimai 譜面を検索・試遊してダウンロードし、ワンクリックで AstroDX シミュレーターへインポート。バージョンやジャンルから探せて、まとめてダウンロードにも対応しています。",
       searchCta: "カタログ検索",
@@ -2660,7 +2660,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
         {
           id: "what-is-astrodx",
           q: "AstroDX とは？",
-          a: "AstroDX はコミュニティ製の maimai 風リズムゲームシミュレーターです。本サイト「ADX 譜面アーカイブ」は AstroDX 譜面を収録し、メタデータ・ジャケット・ダウンロードリンクを提供する非公式アーカイブです。",
+          a: "AstroDX はコミュニティ製の maimai 風リズムゲームシミュレーターです。本サイト「INOTE 譜面アーカイブ」は AstroDX 譜面を収録し、メタデータ・ジャケット・ダウンロードリンクを提供する非公式アーカイブです。",
         },
         {
           id: "what-is-maimai-dx",
@@ -2773,7 +2773,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       clearSelection: "クリア",
       selectedCount: (count) => `${count} 曲選択中`,
       batchDownload: "まとめてダウンロード",
-      batchDefaultName: "AstroDX Charts",
+      batchDefaultName: "INOTE Charts",
       levelFilterLabel: "レベルで絞り込み",
       allLevels: "すべてのレベル",
       levelOption: (level) => `レベル ${level}`,
@@ -3080,7 +3080,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       placeholder: "AstroDX ジャケットプレースホルダー",
     },
     footer: {
-      description: "ADX 谱面资源 — リモートディレクトリから構築した非公式インデックス。",
+      description: "INOTE 谱面资源 — リモートディレクトリから構築した非公式インデックス。",
       lastUpdated: (date) => `カタログ更新: ${date}`,
       disclaimer: "非公式のファンメイドアーカイブです。AstroDX および maimai の権利は各所有者に帰属します。",
       aiNotice: "本プロジェクトは Claude と GPT の共同開発です。すべてのコンテンツは AI により生成されています。",
@@ -3312,23 +3312,23 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       versionDetail: (label, count) =>
         `maimai DX「${label}」バージョンに収録された ${count} 曲の AstroDX 譜面を一覧。各曲のジャケット、難易度レベル、譜面定数、BPM などの情報を掲載し、オンラインでの譜面プレビューと AstroDX シミュレーターへのダウンロードに対応しています。`,
       guestbook:
-        "ADX 谱面资源のゲストブックで、ご意見・ご提案・ご質問・フィードバックをお気軽にどうぞ。ほかの maimai・AstroDX プレイヤーと交流できます。コメントは Artalk によって提供され、匿名でもサインインしても投稿できます。",
+        "INOTE 谱面资源のゲストブックで、ご意見・ご提案・ご質問・フィードバックをお気軽にどうぞ。ほかの maimai・AstroDX プレイヤーと交流できます。コメントは Artalk によって提供され、匿名でもサインインしても投稿できます。",
       links:
         "maimai と AstroDX に関連するおすすめのサイト、ツール、リソースをまとめたリンク集。スコア管理ツール、譜面ツール、コミュニティ、ガイドなど、maimai プレイヤーに役立つ情報を見つけやすくまとめています。",
       community:
         "AstroDX プレイヤーコミュニティに参加しましょう。QQ グループと Telegram グループで maimai 譜面について交流し、本サイトと AstroDX シミュレーターの最新情報を入手できます。",
       donate:
-        "ADX 譜面アーカイブがお役に立ちましたら、爱发电・Patreon・USDT (TRC20) での寄付にご協力ください。サーバーと帯域のコスト維持に役立てられます。",
+        "INOTE 譜面アーカイブがお役に立ちましたら、爱发电・Patreon・USDT (TRC20) での寄付にご協力ください。サーバーと帯域のコスト維持に役立てられます。",
       about:
-        "ADX 譜面アーカイブについて：非公式 AstroDX 譜面資料サイトの位置づけと運営方針、連絡先、オープンソースリポジトリと技術構成、謝辞、免責事項を掲載しています。",
+        "INOTE 譜面アーカイブについて：非公式 AstroDX 譜面資料サイトの位置づけと運営方針、連絡先、オープンソースリポジトリと技術構成、謝辞、免責事項を掲載しています。",
       guide:
         "AstroDX の導入ガイド：Android と iOS それぞれのインストール方法、本サイトでの譜面の探し方とダウンロード（.adx / .zip / .tar.gz の違いと BGA について）、プラットフォーム別の取り込み手順、ダウンロードが止まる・書庫が開けない・譜面が表示されない・音源やジャケットが無いといったトラブルの対処法。",
       music:
-        "ADX 譜面アーカイブのミュージックライブラリ：収録楽曲を maimai DX のバージョンごとに連続再生。ページを移動しても途切れず、バージョン切り替え・シャッフル・1 曲リピートにも対応しています。",
+        "INOTE 譜面アーカイブのミュージックライブラリ：収録楽曲を maimai DX のバージョンごとに連続再生。ページを移動しても途切れず、バージョン切り替え・シャッフル・1 曲リピートにも対応しています。",
       changelog:
-        "ADX 譜面アーカイブの更新履歴：新しく追加された AstroDX 譜面を収録日ごとに一覧。各バッチが対象とした maimai DX のバージョンと収録曲数を確認できます。",
+        "INOTE 譜面アーカイブの更新履歴：新しく追加された AstroDX 譜面を収録日ごとに一覧。各バッチが対象とした maimai DX のバージョンと収録曲数を確認できます。",
       notices:
-        "ADX 譜面アーカイブのお知らせ：メンテナンス予定、ミラーの変更、データ移行などの告知ページ。",
+        "INOTE 譜面アーカイブのお知らせ：メンテナンス予定、ミラーの変更、データ移行などの告知ページ。",
     },
   },
 };

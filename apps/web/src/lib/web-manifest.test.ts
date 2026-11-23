@@ -50,7 +50,7 @@ describe("web manifest", () => {
     expect(new Set(names).size).toBe(locales.length);
 
     const english = buildWebManifest("en");
-    expect(english.name).toBe("ADX Chart Archive");
+    expect(english.name).toBe("INOTE Chart Archive");
     // A Han character here would mean the zh copy leaked into the en manifest.
     expect(english.description).not.toMatch(/[一-鿿]/);
   });

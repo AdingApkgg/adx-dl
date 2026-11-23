@@ -40,7 +40,7 @@ type LicenseCopy = {
 };
 
 const SITE_URL = "https://adxdls.saop.cc";
-const SITE_LABEL = "ADX 谱面资源";
+const SITE_LABEL = "INOTE 谱面资源";
 const CREDIT_SNIPPETS = {
   plain: `${SITE_LABEL} — ${SITE_URL}`,
   markdown: `[${SITE_LABEL}](${SITE_URL})`,
@@ -58,14 +58,14 @@ const LICENSE_DEED_URL: Record<Locale, string> = {
 const copy: Record<Locale, LicenseCopy> = {
   zh: {
     title: "许可、来源与使用说明",
-    description: "关于 ADX 谱面资源目录索引、下载文件与相关权利归属的说明。",
+    description: "关于 INOTE 谱面资源目录索引、下载文件与相关权利归属的说明。",
     intro:
-      "ADX 谱面资源是非官方 AstroDX 谱面索引与下载入口。本站整理远端目录中的公开元数据、封面、谱面文件与媒体链接，方便玩家搜索、预览和导入 AstroDX。",
+      "INOTE 谱面资源是非官方 AstroDX 谱面索引与下载入口。本站整理远端目录中的公开元数据、封面、谱面文件与媒体链接，方便玩家搜索、预览和导入 AstroDX。",
     sections: [
       {
         title: "数据许可（CC BY 4.0）",
         body:
-          "本站整理的目录数据与站点文案（曲目元数据、别名、难度、/llms.txt、/llms-full.txt、/feed.xml 等）以 CC BY 4.0 发布：可自由取用、二次分发、修改和商用，唯一条件是署名「ADX 谱面资源」并保留本站链接。自动化程序、AI 模型或下游服务在复用、摘要或据此作答时同样适用——请让署名和链接跟着数据一起走。",
+          "本站整理的目录数据与站点文案（曲目元数据、别名、难度、/llms.txt、/llms-full.txt、/feed.xml 等）以 CC BY 4.0 发布：可自由取用、二次分发、修改和商用，唯一条件是署名「INOTE 谱面资源」并保留本站链接。自动化程序、AI 模型或下游服务在复用、摘要或据此作答时同样适用——请让署名和链接跟着数据一起走。",
       },
       {
         title: "目录索引",
@@ -99,9 +99,9 @@ const copy: Record<Locale, LicenseCopy> = {
   en: {
     title: "License, Sources and Usage Notes",
     description:
-      "Notes about the ADX chart catalog index, downloadable chart files and related rights.",
+      "Notes about the INOTE chart catalog index, downloadable chart files and related rights.",
     intro:
-      "ADX 谱面资源 is an unofficial AstroDX chart index and download portal. It organizes public metadata, cover art, chart files and media links from remote directories so players can search, preview and import charts into AstroDX.",
+      "INOTE 谱面资源 is an unofficial AstroDX chart index and download portal. It organizes public metadata, cover art, chart files and media links from remote directories so players can search, preview and import charts into AstroDX.",
     sections: [
       {
         title: "Data license (CC BY 4.0)",
@@ -140,14 +140,14 @@ const copy: Record<Locale, LicenseCopy> = {
   ja: {
     title: "ライセンス、出典、利用案内",
     description:
-      "ADX 譜面カタログの索引、ダウンロード可能な譜面ファイル、関連する権利についての説明です。",
+      "INOTE 譜面カタログの索引、ダウンロード可能な譜面ファイル、関連する権利についての説明です。",
     intro:
-      "ADX 谱面资源 は非公式の AstroDX 譜面インデックス兼ダウンロード入口です。リモートディレクトリの公開メタデータ、ジャケット、譜面ファイル、メディアリンクを整理し、検索・プレビュー・AstroDX への導入をしやすくしています。",
+      "INOTE 谱面资源 は非公式の AstroDX 譜面インデックス兼ダウンロード入口です。リモートディレクトリの公開メタデータ、ジャケット、譜面ファイル、メディアリンクを整理し、検索・プレビュー・AstroDX への導入をしやすくしています。",
     sections: [
       {
         title: "データライセンス（CC BY 4.0）",
         body:
-          "本サイトが整理したカタログデータとサイト文面（曲メタデータ、別名、難易度、/llms.txt、/llms-full.txt、/feed.xml など）は CC BY 4.0 で公開しています。再利用・再配布・改変・商用利用は自由で、条件は「ADX 谱面资源」のクレジットと本サイトへのリンクを残すことだけです。自動化エージェント、AI モデル、下流サービスによる再利用・要約・回答にも同様に適用されます。",
+          "本サイトが整理したカタログデータとサイト文面（曲メタデータ、別名、難易度、/llms.txt、/llms-full.txt、/feed.xml など）は CC BY 4.0 で公開しています。再利用・再配布・改変・商用利用は自由で、条件は「INOTE 谱面资源」のクレジットと本サイトへのリンクを残すことだけです。自動化エージェント、AI モデル、下流サービスによる再利用・要約・回答にも同様に適用されます。",
       },
       {
         title: "カタログ索引",

@@ -65,34 +65,34 @@ type PageMetadataOptions = {
 
 const staticSeoTitles: Record<Locale, Record<StaticPageMetadataKey, string>> = {
   zh: {
-    home: "AstroDX 谱面资料站与下载入口",
-    charts: "AstroDX 谱面浏览与下载目录",
+    home: "INOTE 谱面资料站与下载入口",
+    charts: "INOTE 谱面浏览与下载目录",
   },
   en: {
-    home: "AstroDX Chart Archive, Browser and Download Portal",
-    charts: "AstroDX Chart Browser and Download Catalog",
+    home: "INOTE Chart Archive, Browser and Download Portal",
+    charts: "INOTE Chart Browser and Download Catalog",
   },
   ja: {
-    home: "AstroDX 譜面アーカイブとダウンロード入口",
-    charts: "AstroDX 譜面一覧とダウンロードカタログ",
+    home: "INOTE 譜面アーカイブとダウンロード入口",
+    charts: "INOTE 譜面一覧とダウンロードカタログ",
   },
 };
 
 const licensePageMetadata: Record<Locale, { title: string; description: string }> = {
   zh: {
-    title: "ADX 谱面资源许可、来源与使用说明",
+    title: "INOTE 谱面资源许可、来源与使用说明",
     description:
-      "说明 ADX 谱面资源的目录索引来源、谱面与媒体资源权利归属、站点代码与数据的使用边界，以及 AstroDX 和 maimai 相关内容的非官方性质。",
+      "说明 INOTE 谱面资源的目录索引来源、谱面与媒体资源权利归属、站点代码与数据的使用边界，以及 AstroDX 和 maimai 相关内容的非官方性质。",
   },
   en: {
-    title: "ADX Chart Catalog License, Sources and Usage Notes",
+    title: "INOTE Chart Catalog License, Sources and Usage Notes",
     description:
-      "Explains the ADX chart catalog sources, ownership of chart and media assets, usage boundaries for site data, and the archive's unofficial relationship to AstroDX and maimai.",
+      "Explains the INOTE chart catalog sources, ownership of chart and media assets, usage boundaries for site data, and the archive's unofficial relationship to AstroDX and maimai.",
   },
   ja: {
-    title: "ADX 譜面カタログのライセンス、出典、利用案内",
+    title: "INOTE 譜面カタログのライセンス、出典、利用案内",
     description:
-      "ADX 譜面カタログの出典、譜面とメディア素材の権利帰属、サイトデータの利用範囲、AstroDX と maimai に対する非公式の位置づけを説明します。",
+      "INOTE 譜面カタログの出典、譜面とメディア素材の権利帰属、サイトデータの利用範囲、AstroDX と maimai に対する非公式の位置づけを説明します。",
   },
 };
 
@@ -134,22 +134,22 @@ function buildChartDetailSeoTitle(locale: Locale, entry: CatalogEntry): string {
   const title = formatEntryTitle(entry, locale);
 
   if (locale === "zh") {
-    return `${title} AstroDX 谱面资料与下载`;
+    return `${title} INOTE 谱面资料与下载`;
   }
   if (locale === "ja") {
-    return `${title} AstroDX 譜面情報とダウンロード`;
+    return `${title} INOTE 譜面情報とダウンロード`;
   }
-  return `${title} AstroDX Chart Details and Download`;
+  return `${title} INOTE Chart Details and Download`;
 }
 
 function buildGuestbookSeoTitle(locale: Locale): string {
   if (locale === "zh") {
-    return "AstroDX 玩家留言板与反馈";
+    return "INOTE 玩家留言板与反馈";
   }
   if (locale === "ja") {
-    return "AstroDX プレイヤーのゲストブックとフィードバック";
+    return "INOTE プレイヤーのゲストブックとフィードバック";
   }
-  return "AstroDX Player Guestbook and Feedback";
+  return "INOTE Player Guestbook and Feedback";
 }
 
 function buildLinksSeoTitle(locale: Locale): string {
@@ -174,22 +174,22 @@ function buildCommunitySeoTitle(locale: Locale): string {
 
 function buildDonateSeoTitle(locale: Locale): string {
   if (locale === "zh") {
-    return "捐赠支持 ADX 谱面资源";
+    return "捐赠支持 INOTE 谱面资源";
   }
   if (locale === "ja") {
-    return "ADX 譜面アーカイブへの寄付・サポート";
+    return "INOTE 譜面アーカイブへの寄付・サポート";
   }
-  return "Support the ADX Chart Archive";
+  return "Support the INOTE Chart Archive";
 }
 
 function buildAboutSeoTitle(locale: Locale): string {
   if (locale === "zh") {
-    return "关于 ADX 谱面资源";
+    return "关于 INOTE 谱面资源";
   }
   if (locale === "ja") {
-    return "ADX 譜面アーカイブについて";
+    return "INOTE 譜面アーカイブについて";
   }
-  return "About the ADX Chart Archive";
+  return "About the INOTE Chart Archive";
 }
 
 function buildGuideSeoTitle(locale: Locale): string {
@@ -204,32 +204,32 @@ function buildGuideSeoTitle(locale: Locale): string {
 
 function buildMusicSeoTitle(locale: Locale): string {
   if (locale === "zh") {
-    return "AstroDX 谱面音乐库与版本歌单";
+    return "INOTE 谱面音乐库与版本歌单";
   }
   if (locale === "ja") {
-    return "AstroDX 譜面のミュージックライブラリとバージョン別プレイリスト";
+    return "INOTE 譜面のミュージックライブラリとバージョン別プレイリスト";
   }
-  return "AstroDX Music Library and Version Playlists";
+  return "INOTE Music Library and Version Playlists";
 }
 
 function buildChangelogSeoTitle(locale: Locale): string {
   if (locale === "zh") {
-    return "AstroDX 谱面收录更新日志";
+    return "INOTE 谱面收录更新日志";
   }
   if (locale === "ja") {
-    return "AstroDX 譜面の収録更新履歴";
+    return "INOTE 譜面の収録更新履歴";
   }
-  return "AstroDX Chart Archive Changelog";
+  return "INOTE Chart Archive Changelog";
 }
 
 function buildNoticesSeoTitle(locale: Locale): string {
   if (locale === "zh") {
-    return "ADX 谱面资源站点公告";
+    return "INOTE 谱面资源站点公告";
   }
   if (locale === "ja") {
-    return "ADX 譜面アーカイブのお知らせ";
+    return "INOTE 譜面アーカイブのお知らせ";
   }
-  return "ADX Chart Archive Site Notices";
+  return "INOTE Chart Archive Site Notices";
 }
 
 function buildVersionsSeoTitle(locale: Locale): string {
@@ -457,12 +457,12 @@ export function buildNoticesPageMetadata(locale: Locale): Metadata {
 
 function buildUiSeoTitle(locale: Locale): string {
   if (locale === "zh") {
-    return "ADX 谱面资源设计系统";
+    return "INOTE 谱面资源设计系统";
   }
   if (locale === "ja") {
-    return "ADX 譜面アーカイブのデザインシステム";
+    return "INOTE 譜面アーカイブのデザインシステム";
   }
-  return "ADX Chart Archive Design System";
+  return "INOTE Chart Archive Design System";
 }
 
 /**
@@ -473,17 +473,17 @@ function buildUiSeoTitle(locale: Locale): string {
 const live2dPageMetadata: Record<Locale, { title: string; description: string }> = {
   zh: {
     title: "Live2D 看板娘",
-    description: "ADX 谱面资源的 Live2D 看板娘：换装、换人、一言与拍照，手机和触屏设备也能使用。",
+    description: "INOTE 谱面资源的 Live2D 看板娘：换装、换人、一言与拍照，手机和触屏设备也能使用。",
   },
   en: {
     title: "Live2D Mascot",
     description:
-      "The ADX Chart Archive's Live2D mascot: outfits, characters, random quotes and photos, on phones and touch screens too.",
+      "The INOTE Chart Archive's Live2D mascot: outfits, characters, random quotes and photos, on phones and touch screens too.",
   },
   ja: {
     title: "Live2D 看板娘",
     description:
-      "ADX 譜面アーカイブの Live2D 看板娘。着替え・キャラ切替・ひとこと・撮影ができ、スマホやタッチ端末でも使えます。",
+      "INOTE 譜面アーカイブの Live2D 看板娘。着替え・キャラ切替・ひとこと・撮影ができ、スマホやタッチ端末でも使えます。",
   },
 };
 

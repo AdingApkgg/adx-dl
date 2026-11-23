@@ -48,7 +48,7 @@ import {
   NET_DISK_URL,
   wikiUrl,
 } from "@/lib/resource-links";
-import { CompatibleImage, compatibleSourcesFromPng } from "@/components/site/compatible-image";
+import { BrandMark } from "@astrodx/ui/components/brand-mark";
 import { HEADER_ACTION_CLASS } from "@/components/site/header-actions";
 import { MobileTabBar } from "@/components/site/mobile-tab-bar";
 import { LanguageSwitcher } from "@/components/site/language-switcher";
@@ -475,16 +475,9 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               whileHover={{ scale: 1.06, rotate: -3 }}
               whileTap={{ scale: 0.95 }}
               transition={springSoft}
-              className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20"
+              className="flex size-10 shrink-0 items-center justify-center"
             >
-              <CompatibleImage
-                sources={compatibleSourcesFromPng("/brand-icon.png")}
-                alt=""
-                aria-hidden="true"
-                className="size-7 rounded-md"
-                width={28}
-                height={28}
-              />
+              <BrandMark className="size-8" />
             </motion.div>
             <div className="flex min-w-0 flex-col">
               <span className="truncate text-sm font-semibold tracking-wide text-primary">

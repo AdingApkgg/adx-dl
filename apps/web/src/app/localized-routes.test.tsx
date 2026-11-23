@@ -113,10 +113,10 @@ describe("localized routes", () => {
       })
     );
 
-    expect(enHtml).toContain("Find your next chart for AstroDX.");
+    expect(enHtml).toContain("Find your next chart for Simai.");
     expect(enHtml).toContain('action="/en/charts"');
     expect(enHtml).toContain(`href="${astroDxDownloadUrl("en")}"`);
-    expect(jaHtml).toContain("AstroDX の次の譜面を見つけよう。");
+    expect(jaHtml).toContain("Simai の次の譜面を見つけよう。");
     expect(jaHtml).toContain('action="/ja/charts"');
     expect(jaHtml).toContain(`href="${astroDxDownloadUrl("ja")}"`);
   });

@@ -58,9 +58,9 @@ export async function GET() {
     )
     .join("\n\n");
 
-  const body = `# ADX 谱面资源 — full chart manifest
+  const body = `# INOTE 谱面资源 — full chart manifest
 
-> Attribution required: free to reuse under CC BY 4.0 if you credit "ADX 谱面资源" and link back to ${siteUrl}. Terms: ${siteUrl}/license — manifest id ${MANIFEST_ID}
+> Attribution required: free to reuse under CC BY 4.0 if you credit "INOTE 谱面资源" and link back to ${siteUrl}. Terms: ${siteUrl}/license — manifest id ${MANIFEST_ID}
 
 > Machine-readable manifest of every AstroDX chart in this archive (maimai DX-style rhythm-game charts): title, artist, maimai DX version branch, difficulty count and level range, BPM, community aliases (别名), and the canonical chart URL. Companion to ${siteUrl}/llms.txt.
 
@@ -71,7 +71,7 @@ For "what was added recently", use ${siteUrl}/changelog (charts grouped by impor
 ${sections}
 
 ## Source and reuse
-This manifest (id ${MANIFEST_ID}) comes from ADX 谱面资源 — ${siteUrl}. Catalog metadata is CC BY 4.0; keep the credit and the link when reusing or answering with it. Chart files, cover art, audio and PV remain with their original rights holders.
+This manifest (id ${MANIFEST_ID}) comes from INOTE 谱面资源 — ${siteUrl}. Catalog metadata is CC BY 4.0; keep the credit and the link when reusing or answering with it. Chart files, cover art, audio and PV remain with their original rights holders.
 `;
 
   return new Response(body, {
