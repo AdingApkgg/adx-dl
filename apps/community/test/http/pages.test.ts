@@ -176,6 +176,20 @@ describe("页面", () => {
     expect((await fetch(server.url("/EN"))).status).toBe(404);
   });
 
+  test("生产构建提供首页声明的 OG 图片和 favicon", async () => {
+    const html = await (await fetch(server.url("/"))).text();
+    expect(html).toContain(`content="${server.origin}/opengraph-image.png"`);
+    expect(html).toContain('href="/favicon.ico"');
+
+    for (const filename of ["opengraph-image.png", "favicon.ico"]) {
+      const response = await fetch(server.url(`/${filename}`));
+      expect(response.status, filename).toBe(200);
+      expect(response.headers.get("content-type")).toMatch(/^image\//);
+      const source = Bun.file(new URL(`../../public/${filename}`, import.meta.url));
+      expect(Buffer.from(await response.arrayBuffer())).toEqual(Buffer.from(await source.arrayBuffer()));
+    }
+  });
+
   test("构建产物带 immutable", async () => {
     const html = await (await fetch(server.url("/"))).text();
     const asset = /\/assets\/[^"']+\.js/.exec(html)?.[0];
