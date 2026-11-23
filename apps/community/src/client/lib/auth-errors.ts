@@ -5,6 +5,7 @@ import { ApiError } from "@/shared/api-client";
 const MESSAGES: Record<string, () => string> = {
   REAUTH_REQUIRED: m.error_reauth_required,
   SESSION_NOT_FRESH: m.error_reauth_required,
+  SESSION_REQUIRED: m.error_reauth_required,
   LAST_LOGIN_METHOD: m.error_last_login_method,
   QQ_CAPTCHA_FAILED: m.error_captcha_failed,
   SIGNUP_CAPTCHA_FAILED: m.error_captcha_failed,

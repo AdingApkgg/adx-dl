@@ -22,7 +22,7 @@
     "@astrodx/tsconfig": "workspace:*",
     "@better-auth/passkey": "1.7.27",
     "@tanstack/react-query": "^5.104.0",
-    "better-auth": "1.7.14",
+    "better-auth": "1.7.27",
     "bowser": "2.15.1",
     "drizzle-orm": "^0.45.3",
     "hono": "^4.13.9",
@@ -38,7 +38,7 @@
   "devDependencies": {
     "@astrodx/ui": "workspace:*",
     "@inlang/paraglide-js": "2.29.3",
-    "@inlang/plugin-message-format": "4.4.4",
+    "@inlang/plugin-message-format": "4.6.0",
     "@react-router/dev": "8.5.2",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.2",

@@ -16,6 +16,7 @@ describe("错误文案", () => {
   test("已知的错误码翻译成对应的文案", () => {
     expect(errorMessage({ code: "REAUTH_REQUIRED" })).toBe(m.error_reauth_required());
     expect(errorMessage({ code: "SESSION_NOT_FRESH" })).toBe(m.error_reauth_required());
+    expect(errorMessage({ code: "SESSION_REQUIRED" })).toBe(m.error_reauth_required());
     expect(errorMessage({ code: "SIGNUP_CAPTCHA_FAILED" })).toBe(m.error_captcha_failed());
     expect(errorMessage(new ApiError(400, "LAST_LOGIN_METHOD", "x"))).toBe(m.error_last_login_method());
     expect(errorMessage("account_already_linked_to_different_user")).toBe(m.error_google_already_linked());

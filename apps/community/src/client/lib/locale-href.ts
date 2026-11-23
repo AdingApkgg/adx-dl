@@ -5,5 +5,8 @@ import { deLocalizeHref, type Locale, localizeHref } from "@/paraglide/runtime.j
  * 页头的语言切换和语言不一致提示的"切换"都用它。//evil.com/x 这样的路径也只得到本站的路径（/x）。
  */
 export function localeHref(pathAndSearch: string, locale: Locale): string {
-  return localizeHref(deLocalizeHref(pathAndSearch), { locale });
+  const location = new URL(pathAndSearch, "https://community.invalid");
+  const pathname = location.pathname.replace(/^\/{2,}/, "/");
+  const localPath = `${pathname}${location.search}${location.hash}`;
+  return localizeHref(deLocalizeHref(localPath), { locale });
 }
