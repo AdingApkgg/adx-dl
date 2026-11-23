@@ -70,10 +70,10 @@ describe("structured data builders", () => {
       "@id": "https://adxdls.saop.cc/#organization",
       // English page → English name, with the other spellings as alternates so
       // the Chinese name still resolves to this entity.
-      name: "ADX Chart Archive",
-      alternateName: ["ADX 谱面资源", "ADX 譜面アーカイブ"],
+      name: "INOTE Chart Archive",
+      alternateName: ["INOTE 谱面资源", "INOTE 譜面アーカイブ"],
       url: "https://adxdls.saop.cc",
-      logo: "https://adxdls.saop.cc/opengraph-image.png",
+      logo: "https://adxdls.saop.cc/brand-icon.png",
       sameAs: [
         "https://github.com/AdingApkgg/adx-dl",
         "https://github.com/AdingApkgg",
@@ -88,8 +88,8 @@ describe("structured data builders", () => {
     expect(website).toMatchObject({
       "@type": "WebSite",
       "@id": "https://adxdls.saop.cc/#website",
-      name: "ADX Chart Archive",
-      alternateName: ["ADX 谱面资源", "ADX 譜面アーカイブ"],
+      name: "INOTE Chart Archive",
+      alternateName: ["INOTE 谱面资源", "INOTE 譜面アーカイブ"],
       url: "https://adxdls.saop.cc/en",
       inLanguage: "en",
       publisher: { "@id": "https://adxdls.saop.cc/#organization" },
@@ -106,7 +106,7 @@ describe("structured data builders", () => {
       "@type": "DataCatalog",
       "@id": "https://adxdls.saop.cc/#data-catalog",
       license: "https://creativecommons.org/licenses/by/4.0/",
-      creditText: "ADX 谱面资源 (https://adxdls.saop.cc)",
+      creditText: "INOTE 谱面资源 (https://adxdls.saop.cc)",
       usageInfo: "https://adxdls.saop.cc/license",
       copyrightHolder: { "@id": "https://adxdls.saop.cc/#organization" },
       dataset: { "@id": "https://adxdls.saop.cc/#chart-catalog-dataset" },
@@ -114,14 +114,14 @@ describe("structured data builders", () => {
     expect(dataset).toMatchObject({
       "@type": "Dataset",
       "@id": "https://adxdls.saop.cc/#chart-catalog-dataset",
-      name: "ADX Chart Archive — AstroDX chart catalog",
+      name: "INOTE Chart Archive — AstroDX chart catalog",
       alternateName: [
-        "ADX 谱面资源 — AstroDX chart catalog",
+        "INOTE 谱面资源 — AstroDX chart catalog",
         "AstroDX chart catalog",
-        "ADX chart catalog",
+        "INOTE chart catalog",
       ],
       license: "https://creativecommons.org/licenses/by/4.0/",
-      creditText: "ADX 谱面资源 (https://adxdls.saop.cc)",
+      creditText: "INOTE 谱面资源 (https://adxdls.saop.cc)",
       usageInfo: "https://adxdls.saop.cc/license",
       copyrightHolder: { "@id": "https://adxdls.saop.cc/#organization" },
       isPartOf: "https://adxdls.saop.cc",

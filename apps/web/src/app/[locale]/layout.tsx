@@ -12,7 +12,7 @@ export const viewport = rootViewport;
 
 const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 const siteDescription =
-  "ADX 谱面资源 is an unofficial AstroDX chart archive with maimai-style catalog indexing, song metadata, cover art, difficulty data, online previews and downloads.";
+  "INOTE 谱面资源 is an unofficial AstroDX chart archive with maimai-style catalog indexing, song metadata, cover art, difficulty data, online previews and downloads.";
 
 // Per-locale, purely so each tree links its own install manifest — the title
 // and description here are the layout-level defaults every page overrides.
@@ -25,7 +25,7 @@ export async function generateMetadata({
 
   return {
     metadataBase: new URL(siteUrl),
-    title: "ADX 谱面资源 | AstroDX Chart Archive",
+    title: "INOTE 谱面资源 | INOTE Chart Archive",
     description: siteDescription,
     manifest: webManifestPath(getPrefixedRouteLocale(locale)),
   };

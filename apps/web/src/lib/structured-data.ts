@@ -48,7 +48,7 @@ const datasetId = `${siteUrl}/#chart-catalog-dataset`;
 // Attribution terms in the fields answer engines actually surface: `license`
 // alone states there are terms, `creditText` + `usageInfo` state what they are.
 const dataLicenseUrl = "https://creativecommons.org/licenses/by/4.0/";
-const creditText = `ADX 谱面资源 (${siteUrl})`;
+const creditText = `INOTE 谱面资源 (${siteUrl})`;
 const usageInfo = `${siteUrl}/license`;
 const sourceRepository = "https://github.com/AdingApkgg/adx-dl";
 const maintainerProfile = "https://github.com/AdingApkgg";
@@ -83,7 +83,7 @@ function buildOrganization(locale: Locale): JsonLdValue {
     name: siteName(locale),
     alternateName: siteNameAlternates(locale),
     url: siteUrl,
-    logo: `${siteUrl}/opengraph-image.png`,
+    logo: `${siteUrl}/brand-icon.png`,
     // Profiles that represent this archive's operator — the source repo, the
     // maintainer's GitHub, and the Telegram community.
     sameAs: [sourceRepository, maintainerProfile, communityUrl],
@@ -166,7 +166,7 @@ function buildChartCatalogStructuredData(
       alternateName: [
         `${canonicalSiteName} — AstroDX chart catalog`,
         "AstroDX chart catalog",
-        "ADX chart catalog",
+        "INOTE chart catalog",
       ],
       description: pageMetadata.description,
       url: toAbsoluteUrl(homePath),

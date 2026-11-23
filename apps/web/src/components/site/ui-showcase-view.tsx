@@ -181,7 +181,7 @@ export function UiShowcaseView({
       <Separator />
 
       <Section title={ui.sections.typography}>
-        <h3 className="text-4xl font-bold">AstroDX 谱面资源</h3>
+        <h3 className="text-4xl font-bold">INOTE 谱面资源</h3>
         <h4 className="text-2xl font-semibold">系ぎて / Tsunagite</h4>
         <p className="max-w-prose leading-7">
           搜索、试玩并下载社区谱面，按版本与曲风浏览，再一键导入 AstroDX。Latin text sits beside

@@ -108,7 +108,7 @@ describe("default zh routes", () => {
 
     const html = renderToStaticMarkup(await HomePage());
 
-    expect(html).toContain("<h1>为 AstroDX <span>找到下一首谱面。</span></h1>");
+    expect(html).toContain("<h1>为 Simai <span>找到下一首谱面。</span></h1>");
     expect(html).toContain("搜索曲库");
     expect(html).toContain("浏览版本");
     expect(html).toContain(`href="${astroDxDownloadUrl("zh")}"`);
@@ -132,7 +132,7 @@ describe("default zh routes", () => {
     expect(html).toContain("查看更多");
     expect(html).toContain("最新谱面");
     expect(html).toContain("按曲风浏览");
-    expect(html).toContain("ADX CHARTS");
+    expect(html).toContain("INOTE CHARTS");
     expect(html).toContain('role="search"');
     expect(html).toContain('action="/charts"');
     expect(html).toContain(`/covers/${slugOf("song-9")}/bg.jpg`);

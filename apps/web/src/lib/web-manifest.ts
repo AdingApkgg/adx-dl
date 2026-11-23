@@ -24,19 +24,19 @@ export type WebManifest = {
  */
 const manifestCopy: Record<Locale, { shortName: string; description: string }> = {
   zh: {
-    shortName: "ADX 谱面",
+    shortName: "INOTE 谱面",
     description:
-      "AstroDX 谱面资源归档与下载入口：搜索、试听、预览并下载 maimai 风格谱面，一键导入 AstroDX。",
+      "INOTE 谱面资源归档与下载入口：搜索、试听、预览并下载 maimai 风格谱面，一键导入 AstroDX。",
   },
   en: {
-    shortName: "ADX Charts",
+    shortName: "INOTE Charts",
     description:
       "Chart archive and download portal for AstroDX: search, preview and download maimai-style charts, then import them in one tap.",
   },
   ja: {
-    shortName: "ADX 譜面",
+    shortName: "INOTE 譜面",
     description:
-      "AstroDX 譜面のアーカイブとダウンロード入口。maimai 系譜面の検索・試聴・プレビュー・ダウンロードに対応しています。",
+      "INOTE 譜面のアーカイブとダウンロード入口。maimai 系譜面の検索・試聴・プレビュー・ダウンロードに対応しています。",
   },
 };
 

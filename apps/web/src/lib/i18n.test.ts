@@ -164,24 +164,24 @@ describe("i18n helpers", () => {
 
     expect(zhPages.home).toEqual({
       pathname: "/",
-      title: "AstroDX 谱面资料站与下载入口。",
+      title: "INOTE 谱面资料站与下载入口。",
       description:
-        "ADX 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
-      keywords: ["AstroDX", "ADX 谱面资源", "谱面资料站", "下载入口", "目录索引"],
+        "INOTE 谱面资源是一个非官方的 AstroDX 谱面资料站，收录大量 maimai 风格谱面，提供曲目元数据、封面、难度定数与 BPM 等信息，支持按 maimai DX 版本与分类浏览、关键字搜索、在线预览谱面并一键下载导入 AstroDX 模拟器。",
+      keywords: ["AstroDX", "INOTE 谱面资源", "谱面资料站", "下载入口", "目录索引"],
     });
     expect(enPages.charts).toEqual({
       pathname: "/charts",
       title: "Find charts",
       description:
         "Browse the AstroDX chart catalog by maimai DX version, category and language, with cover art, difficulty levels, constants and BPM to preview and download.",
-      keywords: ["AstroDX", "ADX Chart Archive", "browse charts", "category filter", "display language"],
+      keywords: ["AstroDX", "INOTE Chart Archive", "browse charts", "category filter", "display language"],
     });
     expect(jaPages.charts).toEqual({
       pathname: "/charts",
       title: "譜面を探す",
       description:
         "収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。",
-      keywords: ["AstroDX", "ADX 譜面アーカイブ", "譜面一覧", "分類フィルタ", "表示言語"],
+      keywords: ["AstroDX", "INOTE 譜面アーカイブ", "譜面一覧", "分類フィルタ", "表示言語"],
     });
   });
 
@@ -199,7 +199,7 @@ describe("i18n helpers", () => {
       keywords: [],
     });
 
-    expect(metadata?.title).toBe("Search | ADX Chart Archive");
+    expect(metadata?.title).toBe("Search | INOTE Chart Archive");
     expect(metadata?.description).toBe(
       "Built from remote AstroDX directory scans, with per-song metadata, chart parsing, and a unified catalog for static deployment."
     );
@@ -246,11 +246,11 @@ describe("i18n helpers", () => {
 
     const metadata = pageMetadata.buildLocalizedPageMetadata?.("ja", "charts");
 
-    expect(metadata?.title).toBe("AstroDX 譜面一覧とダウンロードカタログ | ADX 譜面アーカイブ");
+    expect(metadata?.title).toBe("INOTE 譜面一覧とダウンロードカタログ | INOTE 譜面アーカイブ");
     expect(metadata?.description).toBe("収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。");
     expect(metadata?.keywords).toEqual([
       "AstroDX",
-      "ADX 譜面アーカイブ",
+      "INOTE 譜面アーカイブ",
       "譜面一覧",
       "分類フィルタ",
       "表示言語",
@@ -267,13 +267,13 @@ describe("i18n helpers", () => {
       ja: "/ja/charts",
     });
     expect(metadata?.openGraph).toMatchObject({
-      title: "AstroDX 譜面一覧とダウンロードカタログ | ADX 譜面アーカイブ",
+      title: "INOTE 譜面一覧とダウンロードカタログ | INOTE 譜面アーカイブ",
       description: "収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。",
       url: "https://adxdls.saop.cc/ja/charts",
-      siteName: "ADX 譜面アーカイブ",
+      siteName: "INOTE 譜面アーカイブ",
     });
     expect(metadata?.twitter).toMatchObject({
-      title: "AstroDX 譜面一覧とダウンロードカタログ | ADX 譜面アーカイブ",
+      title: "INOTE 譜面一覧とダウンロードカタログ | INOTE 譜面アーカイブ",
       description: "収録されている AstroDX 譜面をすべて閲覧。maimai DX のバージョン分類、カテゴリ、表示言語で絞り込め、各曲のジャケット、難易度レベル、譜面定数、BPM を確認しながらオンラインでプレビュー・ダウンロードできます。",
     });
   });

@@ -12,6 +12,7 @@ import {
   UsersIcon,
 } from "lucide-react";
 
+import { BrandMark } from "@astrodx/ui/components/brand-mark";
 import { Reveal, RevealGroup, RevealItem } from "@astrodx/ui/motion";
 import { buildPreviewHref } from "@/lib/chart-preview-route";
 import { AdxDownloadButton } from "@/components/site/adx-download-button";
@@ -27,10 +28,7 @@ import {
   ChartDetailActions,
   PreviewDifficultyTrigger,
 } from "@/components/site/chart-detail-actions";
-import {
-  CompatibleImage,
-  compatibleSourcesFromPng,
-} from "@/components/site/compatible-image";
+import { CompatibleImage } from "@/components/site/compatible-image";
 import {
   DetailHeroCover,
   RelatedChartRow,
@@ -264,16 +262,10 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
           {/* Copy comes first in the DOM so mobile reading and focus order match the layout. */}
           <div className={styles.heroContent}>
             <div className={styles.brandLockup}>
-              <CompatibleImage
-                sources={compatibleSourcesFromPng("/brand-icon.png")}
-                alt=""
-                width={40}
-                height={40}
-                className={styles.brandMark}
-              />
+              <BrandMark className="size-10" />
               <span className={styles.brandCopy}>
-                <span className={styles.brandName}>ADX CHARTS</span>
-                <span className={styles.brandMeta}>ASTRODX COMMUNITY LIBRARY</span>
+                <span className={styles.brandName}>INOTE CHARTS</span>
+                <span className={styles.brandMeta}>INOTE COMMUNITY LIBRARY</span>
               </span>
             </div>
             <HomeNoticeStrip locale={locale} className="-mt-4 mb-5 md:-mt-6" />
@@ -367,13 +359,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
               <HomeSpotlightCarousel entries={spotlightEntries} locale={locale} />
             ) : (
               <div className={styles.spotlightFallback} aria-hidden="true">
-                <CompatibleImage
-                  sources={compatibleSourcesFromPng("/brand-icon.png")}
-                  alt=""
-                  width={192}
-                  height={192}
-                  className="h-full w-full object-contain"
-                />
+                <BrandMark className="size-full" />
               </div>
             )}
           </div>

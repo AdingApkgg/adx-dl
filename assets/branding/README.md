@@ -4,7 +4,10 @@ This directory stores brand assets prepared for the AstroDX archive site.
 
 ## Source
 
-The original icon files in `original/` were extracted from the official AstroDX Android APK release:
+The site mark is an original `&=` symbol drawn from the `&inote_n=` chart field.
+The archive and community use the same mark without a background.
+
+The historical files in `original/` were extracted from the official AstroDX Android APK release and are retained only as source history:
 
 - Release: `v2.0.0.beta.5.patch.a`
 - APK URL:
@@ -20,11 +23,12 @@ These files were identified from the APK manifest and mipmap resources:
 ## Directory Layout
 
 - `original/`
-  - Raw extracted Android icon resources
+  - Historical Android icon resources, unused by the sites
   - Includes adaptive icon XML plus foreground/background layers
 - `web/`
   - Web-ready exports for site integration
   - Includes favicon PNGs, Apple touch icon, PWA icons, and an Open Graph image
+  - `brand-icon.svg` is the transparent mark used on the dark OG artwork
 
 ## Web Asset Map
 

@@ -10,7 +10,7 @@ import { getDictionary } from "@/lib/i18n";
 // It is ONE page for every locale, so the zh/en/ja strings are stacked.
 // Excluded from indexing: it is infrastructure, not content.
 export const metadata: Metadata = {
-  title: "离线 · ADX 谱面资源",
+  title: "离线 · INOTE 谱面资源",
   robots: { index: false, follow: false },
 };
 
