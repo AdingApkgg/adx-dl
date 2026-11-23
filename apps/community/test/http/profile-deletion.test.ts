@@ -76,7 +76,7 @@ describe("个人主页", () => {
     expect(html).toContain(`<link rel="canonical" href="${server.origin}/u/${id}"/>`);
     expect(html).toContain(`<link rel="alternate" hrefLang="en" href="${server.origin}/en/u/${id}"/>`);
     expect(html).toContain(`<link rel="alternate" hrefLang="x-default" href="${server.origin}/u/${id}"/>`);
-    expect(html).toContain("<title>主页测试 - AstroDX 自制谱社区</title>");
+    expect(html).toContain("<title>主页测试 - INOTE 自制谱社区</title>");
     expect(html).toContain('<meta name="description" content="写谱的 也打歌"/>');
     expect(html).toContain(`ID：${id}`);
     expect(html).not.toContain("noindex");

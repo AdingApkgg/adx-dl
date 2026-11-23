@@ -475,7 +475,7 @@ async function acceptance() {
       }
     }
     assert.equal((await json(anonymous, "/api/v1/charts")).items.some(c => c.id === draft.id), false);
-    await publicVisitor.getByRole("banner").getByRole("link", { name: "AstroDX 自制谱社区", exact: true }).click();
+    await publicVisitor.getByRole("banner").getByRole("link", { name: "INOTE 自制谱社区", exact: true }).click();
     await publicVisitor.waitForURL(url => url.pathname === "/");
     await publicVisitor.getByRole("heading", { level: 1, name: "发现好谱，分享创作。", exact: true }).waitFor();
     const updated = publicVisitor.getByRole("region", { name: "最近公开", exact: true });

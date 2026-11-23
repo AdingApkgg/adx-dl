@@ -66,6 +66,6 @@ describe("编译产物", () => {
     // 普通 string，运行时是恒等操作，不影响断言本身。
     expect(String(m.home_api_version({ version: 1 }, { locale: "zh" }))).toBe("接口版本 v1");
     expect(String(m.home_api_version({ version: 1 }, { locale: "en" }))).toBe("API v1");
-    expect(String(m.site_name({}, { locale: "ja" }))).toBe("AstroDX コミュニティ");
+    expect(String(m.site_name({}, { locale: "ja" }))).toBe("INOTE コミュニティ");
   });
 });

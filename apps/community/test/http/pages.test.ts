@@ -127,10 +127,10 @@ describe("页面", () => {
     const ja = await (await fetch(server.url("/ja/"))).text();
 
     expect(en).toContain('<html lang="en"');
-    expect(en).toContain("AstroDX Community");
+    expect(en).toContain("INOTE Community");
     expect(en).toContain("Find your next chart. Share your creation.");
     expect(ja).toContain('<html lang="ja"');
-    expect(ja).toContain("AstroDX コミュニティ");
+    expect(ja).toContain("INOTE コミュニティ");
   });
 
   test("/zh 前缀 301 到不带前缀的地址，不缓存", async () => {

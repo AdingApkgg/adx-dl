@@ -24,7 +24,7 @@ export const middleware: Route.MiddlewareFunction[] = [
 ];
 
 // 样式表放进 <head>（spec 第 7.1 节）。?url 拿到构建后的地址：开发服务器里也是真的 <link>，不会先无样式闪一下。
-export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: appCss }];
+export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: appCss }, { rel: "icon", href: "/favicon.ico" }];
 
 export function loader({ context }: Route.LoaderArgs) {
   const meta = context.get(requestMetaContext);
@@ -38,7 +38,8 @@ export function loader({ context }: Route.LoaderArgs) {
 
 export function Layout({ children }: { children: ReactNode }) {
   // 出错页面也用这个 Layout：那时可能拿不到根组件的 loader 数据。
-  const analytics = useRouteLoaderData<typeof loader>("root")?.analytics;
+  const root = useRouteLoaderData<typeof loader>("root");
+  const analytics = root?.analytics;
   return (
     // 防闪烁脚本在 hydrate 之前就改了 <html> 的 class 和属性，所以这一层不比对。
     <html lang={htmlLang(getLocale())} className="antialiased" suppressHydrationWarning>
@@ -47,6 +48,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <ThemeBootScript />
         <Meta />
+        {root?.origin ? <meta property="og:image" content={`${root.origin}/opengraph-image.png`} /> : null}
         {/* nonce 故意给空的：不传的话 React Router 会把这次请求的 nonce 抄到样式表的 <link> 上，浏览器里拿不到
             这个值，hydrate 时报属性对不上。CSP 的 style-src 不用 nonce，空值没有影响；脚本照样由 <Scripts> 和
             ThemeBootScript 带上真的 nonce。 */}
