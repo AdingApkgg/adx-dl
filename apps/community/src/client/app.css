@@ -18,8 +18,8 @@
 .community-brand { min-width:0; display:flex; align-items:center; gap:.5rem; margin-right:auto; }
 .community-brand > span:last-child { min-width:0; }
 .community-brand > span:last-child > span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.community-brand-mark { width:2rem; height:2rem; flex-shrink:0; border-radius:.75rem; display:grid; place-items:center; background:color-mix(in srgb,var(--primary) 10%,var(--background)); color:var(--primary); border:1px solid color-mix(in srgb,var(--primary) 16%,transparent); }
-.community-brand-mark svg { width:1.1rem; height:1.1rem; }
+.community-brand-mark { width:2rem; height:2rem; flex-shrink:0; display:grid; place-items:center; }
+.community-brand-mark svg { width:1.65rem; height:1.65rem; }
 .community-primary-link { min-height:2.75rem; display:inline-flex; align-items:center; gap:.4rem; padding:.5rem .7rem; border-radius:.7rem; font-size:.8rem; font-weight:600; color:var(--muted-foreground); white-space:nowrap; }
 .community-primary-link svg { width:1rem; height:1rem; }
 .community-primary-link:hover,.community-side-link:hover { background:var(--muted); color:var(--foreground); }

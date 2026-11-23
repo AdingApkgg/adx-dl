@@ -84,7 +84,7 @@ function emailFromIdToken(idToken: string): string | null {
 export function createAuth(deps: AuthDeps) {
   const { db, log } = deps;
   return betterAuth({
-    appName: "AstroDX Community",
+    appName: "INOTE Community",
     baseURL: deps.publicOrigin,
     basePath: "/api/auth",
     secret: deps.secret,
@@ -315,7 +315,7 @@ export function createAuth(deps: AuthDeps) {
       ...(deps.awmc ? [genericOAuth({ config: [createAwmcProvider(deps.awmc)] })] : []),
       passkeyPlugin({
         publicOrigin: deps.publicOrigin,
-        rpName: "AstroDX Community",
+        rpName: "INOTE Community",
         verifyTurnstile: deps.verifyTurnstile,
       }),
       accountRules({ db }),

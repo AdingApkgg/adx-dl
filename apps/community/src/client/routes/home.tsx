@@ -85,7 +85,7 @@ function HomeContent({ publicCharts,featured,notices,lists,discovery }: { public
     <section className="community-hero" aria-labelledby="community-home-title">
       <MotionHeroBackdrop />
       <MotionGroup className="community-hero-copy space-y-6">
-        <MotionSurface className="community-hero-eyebrow"><span className="community-hero-beat" aria-hidden="true"><i/><i/><i/><i/></span><p className="text-xs font-semibold tracking-[.18em] text-primary">ASTRODX COMMUNITY</p></MotionSurface>
+        <MotionSurface className="community-hero-eyebrow"><span className="community-hero-beat" aria-hidden="true"><i/><i/><i/><i/></span><p className="text-xs font-semibold tracking-[.18em] text-primary">INOTE COMMUNITY</p></MotionSurface>
         <MotionSurface tone="title" className="space-y-4"><h1 id="community-home-title" className="community-hero-title">{m.ui_home_title()}</h1><p className="max-w-xl text-pretty text-sm leading-7 text-muted-foreground sm:text-base">{m.ui_home_intro()}</p></MotionSurface>
         <DiscoverySearch compact/>
         <MotionSurface className="community-toolbar"><Button asChild><Link to={localizeHref("/charts")}>{m.public_charts_browse()}</Link></Button><Button asChild variant="outline"><Link to={localizeHref("/me/charts/new")}>{m.chart_new()}</Link></Button><Link to={localizeHref("/help")} className="inline-flex min-h-11 items-center px-3 text-sm font-medium text-muted-foreground hover:text-foreground">{m.site_help()}</Link></MotionSurface>

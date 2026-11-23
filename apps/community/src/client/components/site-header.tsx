@@ -1,4 +1,5 @@
-import { CompassIcon, FileMusicIcon, LibraryIcon, MenuIcon, MessageSquareIcon, Music2Icon, SearchIcon, UploadIcon, ArrowUpRightIcon } from "lucide-react";
+import { BrandMark } from "@astrodx/ui/components/brand-mark";
+import { CompassIcon, FileMusicIcon, LibraryIcon, MenuIcon, MessageSquareIcon, SearchIcon, UploadIcon, ArrowUpRightIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router";
@@ -74,7 +75,7 @@ export function SiteHeader() {
   return <header className="community-header">
     <a href="#main-content" className="community-skip-link">{m.ui_skip_content()}</a>
     <div className="community-header-inner">
-      <Link to={localizeHref("/")} className="community-brand" aria-label={m.site_name()}><span className="community-brand-mark"><Music2Icon aria-hidden="true" /></span><span><span className="block text-sm font-bold tracking-tight">AstroDX</span><span className="block text-[11px] font-medium text-muted-foreground">{m.ui_brand_subtitle()}</span></span></Link>
+      <Link to={localizeHref("/")} className="community-brand" aria-label={m.site_name()}><span className="community-brand-mark"><BrandMark /></span><span><span className="block text-sm font-bold tracking-tight">INOTE</span><span className="block text-[11px] font-medium text-muted-foreground">{m.ui_brand_subtitle()}</span></span></Link>
       <div ref={sidebar} className="community-site-navigation hidden lg:block" data-community-navigation="sidebar">
         <PrimaryNavigation />
         <SecondaryNavigation workspace={workspace} />
