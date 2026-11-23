@@ -17,6 +17,7 @@ RUN bun install --frozen-lockfile --filter community
 COPY apps/community/tsconfig.json apps/community/react-router.config.ts apps/community/vite.config.ts apps/community/
 COPY apps/community/project.inlang/settings.json apps/community/project.inlang/
 COPY apps/community/messages apps/community/messages
+COPY apps/community/public apps/community/public
 COPY apps/community/src apps/community/src
 COPY apps/community/ops/backup/*.ts apps/community/ops/backup/
 COPY apps/community/ops/seaweed/*.ts apps/community/ops/seaweed/
@@ -28,7 +29,9 @@ COPY packages/ui/src packages/ui/src
 COPY packages/maimai-chart-engine/src packages/maimai-chart-engine/src
 WORKDIR /repo/apps/community
 # 构建时 Vite 插件把文案编译进 src/paraglide/，插件从 node_modules 加载，不连 CDN。
-RUN bun run build
+RUN bun run build \
+    && test -s build/client/favicon.ico \
+    && test -s build/client/opengraph-image.png
 
 # 服务端渲染的构建产物只把生产依赖（dependencies）留给运行时 import（test/http/build-output.test.ts 检查），
 # 其余的都打进了产物：react-router-hono-server、共享界面包和它用到的库。所以运行阶段要自己装生产依赖，
