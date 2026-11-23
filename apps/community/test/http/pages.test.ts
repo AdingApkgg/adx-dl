@@ -9,9 +9,7 @@ beforeAll(async () => {
   server = await startBuiltServer();
 }, 30_000);
 
-afterAll(() => {
-  server.stop();
-});
+afterAll(() => server.stop());
 
 describe("页面", () => {
   test("隐私说明无需登录，三种语言有正文、联系邮箱与 canonical", async () => {

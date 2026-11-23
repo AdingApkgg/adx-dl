@@ -32,13 +32,13 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "react-router": "8.4.0",
-    "react-router-hono-server": "4.1.7",
+    "react-router-hono-server": "4.1.13",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@astrodx/ui": "workspace:*",
     "@inlang/paraglide-js": "2.29.3",
-    "@inlang/plugin-message-format": "4.6.0",
+    "@inlang/plugin-message-format": "4.6.1",
     "@react-router/dev": "8.5.2",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.2",

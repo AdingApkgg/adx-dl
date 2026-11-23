@@ -29,8 +29,8 @@ beforeAll(async () => {
   });
 }, 60_000);
 
-afterAll(() => {
-  server.stop();
+afterAll(async () => {
+  await server.stop();
   upstream.stop(true);
 });
 

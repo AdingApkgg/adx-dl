@@ -44,9 +44,7 @@ beforeAll(async () => {
   server = await startBuiltServer();
 }, 60_000);
 
-afterAll(() => {
-  server.stop();
-});
+afterAll(() => server.stop());
 
 describe("隐私说明的登录状态", () => {
   test("正常和待注销用户都可阅读，待注销状态不会触发重定向", async () => {
