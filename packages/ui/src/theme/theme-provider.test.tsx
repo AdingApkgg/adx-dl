@@ -24,6 +24,15 @@ describe("ThemeProvider", () => {
   });
 });
 
+function ChooseLight() {
+  const { setTheme } = useTheme();
+  return (
+    <button type="button" onClick={() => setTheme("light")}>
+      T-choose
+    </button>
+  );
+}
+
 describe("ThemeProvider in the browser", () => {
   const html = document.documentElement;
 
@@ -49,14 +58,6 @@ describe("ThemeProvider in the browser", () => {
   });
 
   test("a choice made in this tab gives way to a later choice made in another tab", () => {
-    function ChooseLight() {
-      const { setTheme } = useTheme();
-      return (
-        <button type="button" onClick={() => setTheme("light")}>
-          T-choose
-        </button>
-      );
-    }
     render(
       <ThemeProvider>
         <ChooseLight />

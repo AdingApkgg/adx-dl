@@ -12,7 +12,7 @@ const api=createApiClient("https://community.test");
 vi.mock("@/client/lib/browser",()=>({getBrowserApi:()=>api,getRenderApi:()=>api}));
 afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
 const decision={key:"decision:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",entity:"message",targetId:"private",action:"hide",publicReason:"Public reason",createdAt:"2026-10-20T00:00:00.000Z",appealId:null};
-function mount(node:ReactNode){const client=makeQueryClient();client.setQueryData(['me'],{id:'owner',name:'Owner',status:'active',isAdmin:true});const router=createMemoryRouter([{path:'*',Component:()=> <PrivateDiscussionGuard userId="owner">{node}</PrivateDiscussionGuard>}]);render(<QueryClientProvider client={client}><RouterProvider router={router}/></QueryClientProvider>);return client;}
+function mount(node:ReactNode){const client=makeQueryClient();client.setQueryData(['me'],{id:'owner',name:'Owner',status:'active',isAdmin:true});const router=createMemoryRouter([{path:'*',element: <PrivateDiscussionGuard userId="owner">{node}</PrivateDiscussionGuard>}]);render(<QueryClientProvider client={client}><RouterProvider router={router}/></QueryClientProvider>);return client;}
 test("appeal requires meaningful text and confirmation; unknown response keeps draft",async()=>{
  vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('network');}));
  mount(<AppealComposer decision={decision}/>);

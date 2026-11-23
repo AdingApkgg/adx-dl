@@ -1,6 +1,6 @@
 import { betterAuth, type BetterAuthRateLimitStorage } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, isAPIError } from "better-auth/api";
+import { APIError } from "better-auth/api";
 import { bearer, genericOAuth } from "better-auth/plugins";
 import { createAwmcProvider } from "./awmc";
 
@@ -21,6 +21,7 @@ import type { QqCodeStore } from "./qq/codes";
 import type { QqHasher } from "./qq/hasher";
 import { qqLogin } from "./qq/plugin";
 import type { QqSender } from "./qq/sender";
+import { withSafeAuthErrors } from "./safe-handler";
 import { userShortId } from "./short-id";
 import type { TurnstileVerifier } from "./turnstile";
 
@@ -83,7 +84,7 @@ function emailFromIdToken(idToken: string): string | null {
 
 export function createAuth(deps: AuthDeps) {
   const { db, log } = deps;
-  return betterAuth({
+  const auth = betterAuth({
     appName: "INOTE Community",
     baseURL: deps.publicOrigin,
     basePath: "/api/auth",
@@ -151,17 +152,8 @@ export function createAuth(deps: AuthDeps) {
     onAPIError: {
       // OAuth 回调在读到 state 之前出错时跳到这里（带 ?error=…），不用 Better Auth 自带的错误页。
       errorURL: `${deps.publicOrigin}/login`,
-      // 不接管的话，钩子里抛出的错误会被 Better Auth 用它自己的格式打到控制台。
-      onError: (error) => {
-        if (isAPIError(error) && error.statusCode < 500) {
-          return;
-        }
-        log.error("better_auth_error", describeError(error));
-        // 非 APIError 时 better-call 还会 console.error 原始错误（含 SQL 参数：令牌、QQ 号），改抛 APIError 就不打；已对照 Better Auth 1.7.6 的 better-call router 核实。
-        if (!isAPIError(error)) {
-          throw new APIError("INTERNAL_SERVER_ERROR", { code: "INTERNAL", message: "Internal server error" });
-        }
-      },
+      // 把未处理的异常交给下方 handler，避免 better-call 打印带 SQL 参数的原始错误。
+      throw: true,
     },
     // 只挡 HTTP 入口（返回 404），服务端的 auth.api.* 照样能调。只支持精确路径。
     disabledPaths: [
@@ -322,6 +314,9 @@ export function createAuth(deps: AuthDeps) {
       qqLogin({ ...deps.qq, verifyTurnstile: deps.verifyTurnstile, log }),
     ],
   });
+  auth.handler = withSafeAuthErrors(auth.handler, log);
+  auth.fetch = auth.handler;
+  return auth;
 }
 
 export type Auth = ReturnType<typeof createAuth>;

@@ -3,7 +3,7 @@ import { makeQueryClient } from "@/shared/query-client";
 import { m } from "@/paraglide/messages.js";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import {isValidElement,useState,type ComponentType,type ReactNode} from "react";
-import {createMemoryRouter,createRoutesFromElements,RouterProvider,Routes,type MemoryRouterProps,RouterContextProvider} from "react-router";
+import {createMemoryRouter,createRoutesFromElements,RouterProvider,Routes,type MemoryRouterProps,RouterContextProvider,useLocation} from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import PublicCharts, { loader as catalogLoader, headers as catalogHeaders, meta as catalogMeta } from "@/client/routes/public-charts";
 import PublicChartDetail, { loader as detailLoader, meta as detailMeta } from "@/client/routes/public-chart-detail";
@@ -129,10 +129,13 @@ test.each(["/en/charts/12345678-1234-4234-8234-123456789012/", "/en/Charts/12345
 });
 
 
-test("filter changes reset the cursor and preserve Unicode search in the URL", async () => {
-  const { useLocation } = await import("react-router");
-  function Location() { const l = useLocation(); return <output data-testid="search-location">{l.pathname + l.search}</output>; }
-  render(<MemoryRouter initialEntries={["/charts?q=old&cursor=oldpage"]}><Catalog loaderData={{ items: [], nextCursor: null }} /><Location /></MemoryRouter>);
+function SearchLocation() {
+  const { pathname, search } = useLocation();
+  return <output data-testid="search-location">{pathname + search}</output>;
+}
+
+test("filter changes reset the cursor and preserve Unicode search in the URL", () => {
+  render(<MemoryRouter initialEntries={["/charts?q=old&cursor=oldpage"]}><Catalog loaderData={{ items: [], nextCursor: null }} /><SearchLocation /></MemoryRouter>);
   fireEvent.change(screen.getByRole("searchbox"), { target: { value: "星テスト %_" } });
   fireEvent.change(screen.getByRole("combobox", { name: m.chart_difficulties() }), { target: { value: "4" } });
   fireEvent.change(screen.getByRole("combobox", { name: m.public_charts_sort() }), { target: { value: "published" } });
@@ -173,9 +176,9 @@ test("favorites page three detail roundtrip restores raw private page cursors", 
   const { Route, Routes } = await import("react-router");
   const { PublicChartCard } = await import("@/client/components/public-chart-card");
   const { SocialPager } = await import("@/client/components/social-pager");
-  function FavoritesList() { return <><PublicChartCard chart={chart} /><SocialPager base="/me/favorites" nextCursor={null} /></>; }
+  const favorites = <><PublicChartCard chart={chart} /><SocialPager base="/me/favorites" nextCursor={null} /></>;
   render(<MemoryRouter initialEntries={[{ pathname: "/me/favorites", search: "?cursor=page3", state: { socialPageScope: "/me/favorites:", socialCursors: ["", "page2"] } }]}>
-    <Routes><Route path="/me/favorites" element={<FavoritesList />} /><Route path="/charts/:id" element={<Detail loaderData={chart} />} /></Routes>
+    <Routes><Route path="/me/favorites" element={favorites} /><Route path="/charts/:id" element={<Detail loaderData={chart} />} /></Routes>
   </MemoryRouter>);
   fireEvent.click(screen.getByRole("link", { name: /Published title/ }));
   fireEvent.click(await screen.findByRole("link", { name: m.my_favorites() }));
