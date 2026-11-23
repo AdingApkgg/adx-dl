@@ -382,7 +382,7 @@ describe("通行密钥登录和管理", () => {
     // 挑战 Cookie 还在，只是这次请求已经没有会话了。
     const res = await browser.request("POST", "/api/auth/passkey/verify-registration", { body: { response } });
 
-    expect([res.status, res.json.code]).toEqual([401, "REAUTH_REQUIRED"]);
+    expect([res.status, res.json.code]).toEqual([401, "SESSION_REQUIRED"]);
     expect(await passkeysOf(userId)).toHaveLength(1);
   }, 30_000);
 

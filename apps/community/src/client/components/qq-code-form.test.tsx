@@ -29,6 +29,7 @@ describe("isReauthError", () => {
   test("REAUTH_REQUIRED 和 SESSION_NOT_FRESH 是；Better Auth 的 { code } 和我们接口的 ApiError 都认", () => {
     expect(isReauthError({ code: "REAUTH_REQUIRED", message: "Sign in again to continue", status: 403 })).toBe(true);
     expect(isReauthError({ code: "SESSION_NOT_FRESH", status: 403 })).toBe(true);
+    expect(isReauthError({ code: "SESSION_REQUIRED", status: 401 })).toBe(true);
     expect(isReauthError(new ApiError(403, "REAUTH_REQUIRED", "Sign in again to continue"))).toBe(true);
   });
 
