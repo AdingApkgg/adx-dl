@@ -18,3 +18,19 @@
 4. 现有作品逐批提取并做文件清单对账。未核对的版本保留原件路径。原件退出在线存储需要独立切换验证和明确授权。
 
 本分支已接入新上传。校验后将散文件写入现有 S3 原件桶，清单关联现有来源对象。对象复用原件预算和备份清单，回收检查仍引用该文件的所有来源。下载仍使用原包路径，线上存量和备份恢复的完整演练待做。
+
+## 生产回填
+
+社区发布验收通过后，在社区 Compose 工作目录里执行：
+
+```sh
+docker compose exec -T media-worker bun ops/charts/backfill-source-cas.ts status
+docker compose exec -T media-worker bun ops/charts/backfill-source-cas.ts enqueue
+```
+
+每次投递一个仍被谱面版本引用、尚未建立散文件清单的原包。媒体 worker 会重新校验
+原包大小和 SHA-256，再复用上传链路的解包、去重和存储预算检查。任务运行期间可用
+`status` 查看进度。上一单完成后再投递下一单，有失败时先看 worker 日志，再重试。
+收尾核对 `remaining=0`、`invalid=0` 和任务回执，并验证社区下载。
+
+回填期间保留原包，现有下载继续读取原包。散文件及清单走正常备份流程。

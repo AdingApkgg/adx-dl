@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { chartEntryStagingPath, type ChartSourceEntry } from "../server/charts/package-validation";
 import { blobs, blobBlocks, chartSourceEntries, storageBudget } from "../server/db/schema";
-import type { StorageContext, StorageJobData } from "../server/storage/contracts";
+import type { DbTransaction, StorageContext, StorageJobData } from "../server/storage/contracts";
 import { StorageError, StorageUnavailableError } from "../server/storage/errors";
 import { objectKey } from "../server/storage/keys";
 import { assertOriginalKeyAvailable, withProcessingUpload } from "../server/storage/objects";
@@ -13,6 +13,8 @@ import { originalMime } from "./ingest";
 const busy = () => new StorageError(503, "STORAGE_BUSY", "STORAGE_BUSY", 30);
 const blocked = () => new StorageError(400, "HASH_BLOCKED");
 type SourceBlob = typeof blobs.$inferSelect;
+type AdmissionState = { tx: DbTransaction; now: Date; budget: typeof storageBudget.$inferSelect };
+export type ChartCasAdmission = <T>(fn: (state: AdmissionState) => Promise<T>) => Promise<T | null>;
 type Ref = ChartSourceEntry & { contentBlobId: string | null };
 
 function inferredMime(header: Uint8Array) {
@@ -22,7 +24,7 @@ function inferredMime(header: Uint8Array) {
 }
 
 async function storeEntry(
-  ctx: StorageContext, data: StorageJobData, source: SourceBlob, entry: ChartSourceEntry,
+  ctx: StorageContext, admit: ChartCasAdmission, source: SourceBlob, entry: ChartSourceEntry,
   filePath: string, recoveryPath: string, signal: AbortSignal,
 ) {
   const body = Bun.file(filePath);
@@ -32,9 +34,8 @@ async function storeEntry(
   if (size !== entry.size || hash.digest("hex") !== entry.sha256) throw new StorageUnavailableError();
   const mime = inferredMime(new Uint8Array(await body.slice(0, 4096).arrayBuffer()));
   const key = objectKey(entry.sha256);
-  const claim = await withProcessingUpload(ctx, data, async ({ tx, session, file, accounting: { budget }, now }) => {
+  const claim = await admit(async ({ tx, budget, now }) => {
     signal.throwIfAborted();
-    if (session.expiresAt <= now || file.blobId !== source.id) throw busy();
     if ((await tx.select().from(blobBlocks).where(eq(blobBlocks.sha256, entry.sha256))).length) throw blocked();
     await assertOriginalKeyAvailable(tx, ctx, key);
     await tx.insert(blobs).values({ sha256: entry.sha256, key, size, policyId: source.policyId }).onConflictDoNothing();
@@ -74,9 +75,8 @@ async function storeEntry(
   } else throw new StorageUnavailableError();
   if (!claim.writer) return claim.object.id;
 
-  const settled = await withProcessingUpload(ctx, data, async ({ tx, session, file, accounting: { budget }, now }) => {
+  const settled = await admit(async ({ tx, budget, now }) => {
     signal.throwIfAborted();
-    if (session.expiresAt <= now || file.blobId !== source.id) throw busy();
     const [object] = await tx.select().from(blobs).where(eq(blobs.id, claim.object.id)).for("update");
     if (object?.state !== "pending" || object.generation !== claim.object.generation ||
       !object.leaseUntil || object.leaseUntil <= now) throw busy();
@@ -92,8 +92,19 @@ async function storeEntry(
   return claim.object.id;
 }
 
-export async function saveChartSourceFiles(
+export function saveChartSourceFiles(
   ctx: StorageContext, data: StorageJobData, source: SourceBlob, entries: ChartSourceEntry[],
+  directory: string, signal: AbortSignal,
+) {
+  const admit: ChartCasAdmission = fn => withProcessingUpload(ctx, data, ({ tx, session, file, accounting: { budget }, now }) => {
+    if (session.expiresAt <= now || file.blobId !== source.id) throw busy();
+    return fn({ tx, budget, now });
+  });
+  return materializeChartSourceFiles(ctx, admit, source, entries, directory, signal);
+}
+
+export async function materializeChartSourceFiles(
+  ctx: StorageContext, admit: ChartCasAdmission, source: SourceBlob, entries: ChartSourceEntry[],
   directory: string, signal: AbortSignal,
 ) {
   const previous = await ctx.db.select().from(chartSourceEntries)
@@ -104,8 +115,8 @@ export async function saveChartSourceFiles(
   }))) throw new StorageUnavailableError();
 
   const nonempty = new Map(entries.filter(entry => entry.size > 0).map(entry => [entry.sha256, entry.size]));
-  const budgetChecked = await withProcessingUpload(ctx, data, async ({ tx, session, file, accounting: { budget }, now }) => {
-    if (session.expiresAt <= now || file.blobId !== source.id) throw busy();
+  const budgetChecked = await admit(async ({ tx, budget }) => {
+    signal.throwIfAborted();
     const digests = [...nonempty.keys()];
     const known = await tx.select().from(blobs).where(inArray(blobs.sha256, digests));
     for (const object of known) {
@@ -124,15 +135,14 @@ export async function saveChartSourceFiles(
     signal.throwIfAborted();
     let contentBlobId = stored.get(entry.sha256) ?? null;
     if (entry.size && !contentBlobId) {
-      contentBlobId = await storeEntry(ctx, data, source, entry, chartEntryStagingPath(directory, index),
+      contentBlobId = await storeEntry(ctx, admit, source, entry, chartEntryStagingPath(directory, index),
         join(directory, `verified-${index}`), signal);
       stored.set(entry.sha256, contentBlobId);
     }
     refs.push({ ...entry, contentBlobId });
   }
-  const committed = await withProcessingUpload(ctx, data, async ({ tx, session, file, now }) => {
+  const committed = await admit(async ({ tx }) => {
     signal.throwIfAborted();
-    if (session.expiresAt <= now || file.blobId !== source.id) throw busy();
     const [parent] = await tx.select().from(blobs).where(eq(blobs.id, source.id)).for("update");
     if (parent?.state !== "ready") throw busy();
     const ids = [...stored.values()];

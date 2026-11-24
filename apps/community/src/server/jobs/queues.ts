@@ -15,6 +15,7 @@ export const STORAGE_DEAD_QUEUE = "storage.dead";
 export const STORAGE_INGEST_QUEUE = "storage.ingest";
 export const MEDIA_AVATAR_QUEUE = "media.avatar";
 export const MEDIA_CHART_QUEUE = "media.chart-import";
+export const MEDIA_CHART_CAS_QUEUE = "media.chart-source-cas";
 export const STORAGE_FINALIZE_QUEUE = "storage.finalize";
 export const STORAGE_SWEEP_QUEUE = "storage.sweep";
 export const STORAGE_RECONCILE_QUEUE="storage.reconcile";
@@ -60,6 +61,10 @@ export const STORAGE_QUEUES: readonly QueueDefinition[] = [
       deadLetter: STORAGE_DEAD_QUEUE,
     },
   })),
+  {
+    name: MEDIA_CHART_CAS_QUEUE,
+    options: { ...storageDefaults, retryLimit: 0, expireInSeconds: 150, heartbeatSeconds: 30 },
+  },
   {
     name: STORAGE_FINALIZE_QUEUE,
     options: {

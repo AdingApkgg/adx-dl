@@ -16,6 +16,9 @@ import { RECIPE_BUILD } from "./image-child";
 import { requestMissingDerivedRebuild, readDerivedRebuildIntents } from "../worker/storage-reconcile";
 import { rebuildDerivedIntent } from "../server/storage/backup";
 import { resetTestDatabase } from "../server/testing/test-db";
+import { chartBackfillRemaining } from "../server/charts/source-backfill";
+import { createChart } from "../server/charts/service";
+import { MEDIA_CHART_CAS_QUEUE } from "../server/jobs/queues";
 import { createBoss } from "../server/jobs/boss";
 import { registerMediaWorkers } from "./main";
 import { watchProcessingUpload } from "./upload-cancellation";
@@ -116,6 +119,58 @@ describe.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH && !process.env.STORAGE_T
       expect(usage).toMatchObject({usedBytes:bytes.length,reservedBytes:0,activeUploads:0});
     } finally { await worker.stop({graceful:true,timeout:5_000}); }
   },30_000);
+  test("the media worker backfills a legacy chart and keeps its original archive", async () => {
+    const maidata = strToU8(`&title=Legacy ${crypto.randomUUID()}\n&inote_4=(120){4}1,2,E\n`);
+    const bytes = zipSync({ "maidata.txt": maidata, "empty.txt": new Uint8Array() });
+    const u = await upload(bytes);
+    await ingestUpload(f.mediaCtx, u.data);
+    await handleChartImport(f.mediaCtx, u.data);
+    await finalizeUpload(f.mediaCtx, u.data);
+    await createChart(f.ctx, u.userId, u.dto.fileId!);
+    const [file] = await f.ctx.db.select().from(files).where(eq(files.id, u.dto.fileId!));
+    const [source] = await f.ctx.db.select().from(blobs).where(eq(blobs.id, file.blobId));
+    const manifest = await f.ctx.db.delete(chartSourceEntries)
+      .where(eq(chartSourceEntries.sourceBlobId, source.id)).returning();
+    expect(manifest).toHaveLength(2);
+    const [budgetBefore] = await f.ctx.db.select().from(storageBudget);
+    expect(await chartBackfillRemaining(f.ctx, 5)).toContainEqual({ id: source.id, size: bytes.length });
+
+    const worker = createBoss(process.env.TEST_DATABASE_URL!, "worker");
+    await worker.start();
+    try {
+      await registerMediaWorkers({ ...f.mediaCtx, boss: async () => worker });
+      for (const expected of ["migrated", "skipped"]) {
+        const jobId = await worker.send(MEDIA_CHART_CAS_QUEUE, { sourceId: source.id }, { singletonKey: source.id });
+        expect(jobId).toBeTruthy();
+        const deadline = Date.now() + 12_000;
+        let receipt: string | undefined;
+        do {
+          const result = await f.ctx.db.execute<{ state: string; status: string }>(sql`
+            select state, output->>'status' as status from pgboss.job
+            where name = ${MEDIA_CHART_CAS_QUEUE} and id = ${jobId}
+          `);
+          if (result.rows[0]?.state === "completed") {
+            receipt = result.rows[0].status;
+            break;
+          }
+          expect(result.rows[0]?.state).not.toBe("failed");
+          await Bun.sleep(100);
+        } while (Date.now() < deadline);
+        expect(receipt).toBe(expected);
+      }
+    } finally {
+      await worker.stop({ graceful: true, timeout: 5_000 });
+    }
+    expect(await chartBackfillRemaining(f.ctx, 5)).toEqual([]);
+    const entries = await f.ctx.db.select().from(chartSourceEntries)
+      .where(eq(chartSourceEntries.sourceBlobId, source.id));
+    expect(entries.map(row => [row.path, row.contentBlobId]).sort())
+      .toEqual(manifest.map(row => [row.path, row.contentBlobId]).sort());
+    expect(await f.mediaCtx.driver.head({ bucket: "original", key: source.key }))
+      .toMatchObject({ size: bytes.length, sha256: hash(bytes) });
+    const [budgetAfter] = await f.ctx.db.select().from(storageBudget);
+    expect(budgetAfter.originalWritten).toBe(budgetBefore.originalWritten);
+  }, 35_000);
   test("different uploads share identical loose file bytes in original CAS", async () => {
     const attachment = strToU8(`shared ${crypto.randomUUID()}`);
     const sourceIds: string[] = [];
