@@ -277,6 +277,29 @@ html[data-reduced-motion] [data-marquee="on"] {
   }
 }
 
+/* Keep the page control clear of the bottom bar, dock and corner mascot. */
+[data-back-to-top] {
+  --back-to-top-bottom: calc(var(--floating-bottom) + var(--back-to-top-dock-offset, var(--back-to-top-player-offset, 0px)));
+  bottom: max(var(--back-to-top-bottom), var(--back-to-top-mascot-edge, 0px));
+}
+[data-back-to-top][data-batch-bar] {
+  bottom: max(calc(var(--back-to-top-bottom) + var(--batch-download-bar-height, 5rem) + 0.75rem), var(--back-to-top-mascot-edge, 0px));
+}
+@media (max-width: 47.9375rem) {
+  :root[data-music-player="expanded"] [data-back-to-top] {
+    --back-to-top-player-offset: var(--music-player-mobile-reserve);
+  }
+}
+body:has([data-slot="download-dock"] .adx-download-entry) [data-back-to-top] {
+  --back-to-top-dock-offset: calc(var(--music-player-mobile-reserve) + 3.25rem);
+}
+body:has([data-slot="download-dock"] [data-download-manager]) [data-back-to-top] {
+  visibility: hidden;
+}
+body:has([data-placement="corner"]) [data-back-to-top] {
+  --back-to-top-mascot-edge: 20.5rem;
+}
+
 /* data-music-player mirrors the persisted player preference (stamped by the
    boot script in root-layout-shell.tsx before first paint, then kept in sync
    by the preferences store). The surface rules hide the server-rendered

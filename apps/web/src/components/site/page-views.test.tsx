@@ -336,9 +336,8 @@ describe("page views locale-driven content", () => {
     expect(html).toContain("3:21");
     expect(html).toContain("物量");
     expect(html).toContain(">828<");
-    expect(html).toContain("Break 14");
-    // Display level leads, chart constant follows.
-    expect(html).toContain(">13+<");
+    expect(html).toMatch(/>Break<\/span><span[^>]*>14<\/span>/);
+    expect(html).not.toContain(">13+<");
     expect(html).toContain(">13.7<");
     // Size is quoted before the download, with the BGA share broken out.
     expect(html).toContain("含 BGA");

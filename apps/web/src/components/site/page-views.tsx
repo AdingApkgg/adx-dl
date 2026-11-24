@@ -4,6 +4,7 @@ import Link from "next/link";
 import { preload } from "react-dom";
 import {
   ArrowRightIcon,
+  ChevronDownIcon,
   ChevronRightIcon,
   DownloadIcon,
   ExternalLinkIcon,
@@ -43,6 +44,7 @@ import { HomeFaq } from "@/components/site/home-faq";
 import { HomeHeroSearch } from "@/components/site/home-hero-search";
 import styles from "@/components/site/home-page.module.css";
 import { HomeSpotlightCarousel } from "@/components/site/home-spotlight-carousel";
+import { NoteCountBar } from "@/components/site/note-count-bar";
 import { RandomChartButton } from "@/components/site/random-chart-button";
 import { SeoJsonLd } from "@/components/site/seo-json-ld";
 import { VersionBadge } from "@/components/site/version-badge";
@@ -72,6 +74,7 @@ import {
   GENRES,
   genreFilterQuery,
   getChartDownloadSpec,
+  levelSortValue,
   localChartAssetUrl,
   entryAddedAt,
   isRecentlyAdded,
@@ -472,7 +475,6 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
               <ChartCard
                 entry={entry}
                 locale={locale}
-                coverFit="contain"
                 isNew={isRecentlyAdded(entryAddedAt(entry), catalog.generated_at)}
                 sizes={CHART_CARD_SIZES}
               />
@@ -511,7 +513,6 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
                 <ChartCard
                   entry={entry}
                   locale={locale}
-                  coverFit="contain"
                   sizes={CHART_CARD_SIZES}
                 />
               </RevealItem>
@@ -638,7 +639,11 @@ export function ChartDetailPageView({
   const downloadSpec = getChartDownloadSpec(entry);
   const downloadBytes = sumChartDownloadBytes([downloadSpec]);
   const hasChartPreview = Boolean(entry.files.maidata);
+  const difficulties = [...entry.difficulties].sort(
+    (a, b) => levelSortValue(b.level.trim()) - levelSortValue(a.level.trim()) || b.slot - a.slot
+  );
   const peakDifficulty = peakNoteDifficulty(entry);
+  const maximumNoteCount = peakDifficulty?.notes?.total ?? 0;
   const sourceHost = hostnameOf(entry.source_url);
 
   return (
@@ -667,60 +672,66 @@ export function ChartDetailPageView({
                 locale={locale}
                 fit="contain"
                 priority
-                sizes="(min-width: 1280px) 260px, (min-width: 768px) 128px, 80px"
+                sizes="(min-width: 1280px) 260px, 128px"
                 className="h-full w-full"
               />
             </DetailHeroCover>
           </div>
 
           <div data-detail-identity className="flex min-w-0 flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <VersionBadge version={entry.version} label={branchLabel} />
-              <CabinetBadge cabinet={entry.cabinet} className="h-7" />
-              <GenreBadge entry={entry} locale={locale} />
+            <div data-detail-badges className="flex min-w-0 flex-wrap items-center gap-2 max-md:flex-nowrap empty:hidden">
+              <VersionBadge
+                version={entry.version}
+                label={branchLabel}
+                className="max-md:block max-md:min-w-0 max-md:shrink max-md:truncate max-md:object-contain"
+              />
+              <CabinetBadge cabinet={entry.cabinet} className="h-7 max-md:h-6 max-md:shrink-0" />
+              <GenreBadge entry={entry} locale={locale} className="max-md:max-w-[46%] max-md:[overflow-wrap:anywhere]" />
             </div>
-            <div className="flex flex-col gap-2">
-              <h1
-                lang={japaneseTextLang(title)}
-                className="ui-page-title"
-              >
-                {title}
-              </h1>
-              <p lang={japaneseTextLang(artistName)} className="text-sm text-muted-foreground [overflow-wrap:anywhere] md:text-base">
-                {artistHref ? (
-                  <Link
-                    href={artistHref}
-                    className="underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-current"
-                  >
-                    {artistName}
-                  </Link>
-                ) : (
-                  artistName
-                )}
-              </p>
-              <ChartPageViews label={dictionary.pageViews.pageViews} />
-            </div>
-            {entry.difficulties.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {entry.difficulties.map((difficulty) =>
-                  hasChartPreview ? (
-                    <PreviewDifficultyTrigger
-                      key={`${entry.id}-${difficulty.slot}`}
-                      href={buildPreviewHref(entry, locale, difficulty.slot)}
-                      label={detail.chartPreviewAt(difficultySlotLabel(difficulty))}
+            <div data-detail-text className="flex min-w-0 flex-col gap-3">
+              <div className="flex flex-col gap-2">
+                <h1
+                  lang={japaneseTextLang(title)}
+                  className="ui-page-title [overflow-wrap:anywhere]"
+                >
+                  {title}
+                </h1>
+                <p lang={japaneseTextLang(artistName)} className="text-sm text-muted-foreground [overflow-wrap:anywhere] md:text-base">
+                  {artistHref ? (
+                    <Link
+                      href={artistHref}
+                      className="underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-current"
                     >
-                      <DifficultyPill difficulty={difficulty} showConstant />
-                    </PreviewDifficultyTrigger>
+                      {artistName}
+                    </Link>
                   ) : (
-                    <DifficultyPill
-                      key={`${entry.id}-${difficulty.slot}`}
-                      difficulty={difficulty}
-                      showConstant
-                    />
-                  )
-                )}
+                    artistName
+                  )}
+                </p>
+                <ChartPageViews label={dictionary.pageViews.pageViews} />
               </div>
-            ) : null}
+              {entry.difficulties.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {difficulties.map((difficulty) =>
+                    hasChartPreview ? (
+                      <PreviewDifficultyTrigger
+                        key={`${entry.id}-${difficulty.slot}`}
+                        href={buildPreviewHref(entry, locale, difficulty.slot)}
+                        label={detail.chartPreviewAt(difficultySlotLabel(difficulty))}
+                      >
+                        <DifficultyPill difficulty={difficulty} levelFormat="constant" />
+                      </PreviewDifficultyTrigger>
+                    ) : (
+                      <DifficultyPill
+                        key={`${entry.id}-${difficulty.slot}`}
+                        difficulty={difficulty}
+                        levelFormat="constant"
+                      />
+                    )
+                  )}
+                </div>
+              ) : null}
+            </div>
           </div>
           <Surface data-download-panel aria-label={detail.downloadSection} className="col-span-2 space-y-4 bg-card/95">
             <h2 className="ui-section-title">{detail.downloadSection}</h2>
@@ -761,7 +772,7 @@ export function ChartDetailPageView({
             <CardDescription>{detail.metadataDescription}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div data-detail-metadata className="grid grid-cols-2 gap-2.5 md:gap-4">
               {/* Version, genre and BPM all carry the browse filter row's own
                   visuals — the version logo, the genre's colour, the BPM
                   bucket's tint — and link back into that filter. */}
@@ -847,31 +858,30 @@ export function ChartDetailPageView({
             <Separator />
             <div className="flex flex-col gap-3">
               <h2 className="text-lg font-medium">{detail.difficulties}</h2>
-              {/* The table can outgrow a 390px viewport once the note column is
-                  in; the scroller (not a reflow) keeps the columns aligned. */}
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-sm">
+              <div className="sm:overflow-x-auto">
+                {/* biome-ignore-start lint/a11y/noRedundantRoles: Preserve table semantics when the mobile layout changes the CSS display. */}
+                <table role="table" className="w-full border-collapse text-sm max-sm:block">
                   <caption className="sr-only">
                     {formatEntryTitle(entry, locale)} — {detail.difficulties}
                   </caption>
-                  <thead>
-                    <tr className="border-b border-border/60 text-left text-muted-foreground">
-                      <th scope="col" className="py-2 pr-4 font-medium">
+                  <thead role="rowgroup" className="max-sm:sr-only">
+                    <tr role="row" className="border-b border-border/60 text-left text-muted-foreground">
+                      <th role="columnheader" scope="col" className="py-2 pr-4 font-medium">
                         {detail.tableDifficulty}
                       </th>
-                      <th scope="col" className="py-2 pr-4 font-medium">
+                      <th role="columnheader" scope="col" className="py-2 pr-4 font-medium">
                         {detail.tableLevel}
                       </th>
-                      <th scope="col" className="py-2 pr-4 text-right font-medium">
+                      <th role="columnheader" scope="col" className="py-2 pr-4 text-right font-medium">
                         {detail.tableNotes}
                       </th>
-                      <th scope="col" className="py-2 font-medium">
+                      <th role="columnheader" scope="col" className="py-2 font-medium">
                         {detail.tableCharter}
                       </th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {entry.difficulties.map((difficulty) => {
+                  <tbody role="rowgroup" className="max-sm:grid max-sm:gap-3">
+                    {difficulties.map((difficulty) => {
                       // "-" is the source's own placeholder for "unattributed"
                       // (which is why the designer facet drops it too) — it
                       // must not become a filter link that matches nothing.
@@ -883,9 +893,10 @@ export function ChartDetailPageView({
                       return (
                         <tr
                           key={`${entry.id}-${difficulty.slot}`}
-                          className="border-b border-border/40 last:border-0"
+                          role="row"
+                          className="max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:items-center max-sm:gap-3 max-sm:rounded-lg max-sm:border max-sm:border-border/70 max-sm:bg-background/70 max-sm:p-3 sm:border-b sm:border-border/40 sm:last:border-0"
                         >
-                          <th scope="row" className="py-2 pr-4 text-left font-medium">
+                          <th role="rowheader" scope="row" className="text-left font-medium sm:py-2 sm:pr-4">
                             <span className="inline-flex items-center gap-2">
                               <span
                                 aria-hidden="true"
@@ -897,22 +908,23 @@ export function ChartDetailPageView({
                               {difficultySlotLabel(difficulty)}
                             </span>
                           </th>
-                          <td className="py-2 pr-4">
+                          <td role="cell" className="max-sm:justify-self-end sm:py-2 sm:pr-4">
                             {hasChartPreview ? (
                               <PreviewDifficultyTrigger
                                 href={buildPreviewHref(entry, locale, difficulty.slot)}
                                 label={detail.chartPreviewAt(difficultySlotLabel(difficulty))}
                               >
-                                <DifficultyPill difficulty={difficulty} showConstant />
+                                <DifficultyPill difficulty={difficulty} levelFormat="constant" />
                               </PreviewDifficultyTrigger>
                             ) : (
-                              <DifficultyPill difficulty={difficulty} showConstant />
+                              <DifficultyPill difficulty={difficulty} levelFormat="constant" />
                             )}
                           </td>
-                          <td className="py-2 pr-4 align-top text-right">
-                            <NoteCountCell counts={difficulty.notes} detail={detail} />
+                          <td role="cell" className="min-w-0 max-sm:col-span-2 sm:py-2 sm:pr-4 sm:text-right sm:align-top">
+                            <NoteCountCell counts={difficulty.notes} maximum={maximumNoteCount} detail={detail} />
                           </td>
-                          <td className="py-2 text-muted-foreground">
+                          <td role="cell" className="min-w-0 text-muted-foreground [overflow-wrap:anywhere] max-sm:col-span-2 max-sm:border-t max-sm:border-border/60 max-sm:pt-2 sm:py-2">
+                            <span aria-hidden="true" className="mr-2 text-xs sm:hidden">{detail.tableCharter}</span>
                             {designerHref ? (
                               <Link
                                 href={designerHref}
@@ -929,8 +941,8 @@ export function ChartDetailPageView({
                     })}
                   </tbody>
                 </table>
+                {/* biome-ignore-end lint/a11y/noRedundantRoles: End of the responsive difficulty table. */}
               </div>
-              <p className="text-xs text-muted-foreground">{detail.levelConstantHint}</p>
             </div>
           </CardContent>
         </Card>
@@ -1122,46 +1134,53 @@ function hostnameOf(url: string): string | null {
   }
 }
 
-/**
- * A difficulty's note total with its bucket breakdown underneath.
- *
- * The breakdown is text rather than a nested table so it can wrap inside the
- * cell on a phone; the buckets are disjoint, so the parts really do sum to the
- * total shown above them.
- */
 function NoteCountCell({
   counts,
+  maximum,
   detail,
 }: {
   counts: CatalogNoteCounts | undefined;
+  maximum: number;
   detail: ReturnType<typeof getDictionary>["detail"];
 }) {
   if (!counts || counts.total <= 0) {
-    return <span className="text-muted-foreground">{detail.unknownValue}</span>;
-  }
-  const parts: [string, number][] = [
-    [detail.noteTypeTap, counts.tap],
-    [detail.noteTypeHold, counts.hold],
-    [detail.noteTypeSlide, counts.slide],
-    [detail.noteTypeTouch, counts.touch],
-    [detail.noteTypeTouchHold, counts.touch_hold],
-    [detail.noteTypeBreak, counts.break],
-  ];
-  return (
-    <span className="inline-flex flex-col items-end gap-0.5">
-      <span className="font-medium tabular-nums">{counts.total}</span>
-      {/* The cap is what makes the breakdown wrap instead of stretching the
-          table past a 390px viewport — a table cell is max-content otherwise. */}
-      <span className="flex max-w-[8.5rem] flex-wrap justify-end gap-x-1.5 text-[11px] leading-tight text-muted-foreground">
-        {parts
-          .filter(([, value]) => value > 0)
-          .map(([label, value]) => (
-            <span key={label} className="whitespace-nowrap tabular-nums">
-              {label} {value}
-            </span>
-          ))}
+    return (
+      <span className="text-muted-foreground">
+        <span aria-hidden="true" className="mr-2 text-xs sm:hidden">{detail.tableNotes}</span>
+        {detail.unknownValue}
       </span>
-    </span>
+    );
+  }
+
+  const parts = [
+    { label: detail.noteTypeTap, value: counts.tap, color: "#4f80ed" },
+    { label: detail.noteTypeHold, value: counts.hold, color: "#8b5cf6" },
+    { label: detail.noteTypeSlide, value: counts.slide, color: "#0d9488" },
+    { label: detail.noteTypeTouch, value: counts.touch, color: "#d97706" },
+    { label: detail.noteTypeTouchHold, value: counts.touch_hold, color: "#db6ca1" },
+    { label: detail.noteTypeBreak, value: counts.break, color: "#e65459" },
+  ].filter(({ value }) => value > 0);
+
+  return (
+    <div data-note-count className="ml-auto w-24 max-sm:w-full">
+      <NoteCountBar parts={parts} maximum={maximum} />
+      <details className="group/notes">
+        <summary className="flex cursor-pointer list-none items-center justify-end gap-1.5 rounded py-1 font-semibold tabular-nums focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+          <span aria-hidden="true" className="mr-auto text-xs font-normal text-muted-foreground sm:hidden">{detail.tableNotes}</span>
+          {counts.total}
+          <ChevronDownIcon className="size-3 text-muted-foreground group-open/notes:rotate-180" aria-hidden="true" />
+        </summary>
+        <ul className="mt-1 grid gap-y-1 text-[11px] leading-tight text-muted-foreground max-sm:grid-cols-2 max-sm:gap-x-4">
+          {parts.map(({ label, value, color }) => (
+            <li key={label} className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+              <span className="text-left">{label}</span>
+              <span className="ml-auto font-medium tabular-nums text-foreground">{value}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
+    </div>
   );
 }
 
@@ -1188,7 +1207,7 @@ function MetadataItem({
 }) {
   const content = children ?? value;
   return (
-    <div className="rounded-xl border border-border/70 bg-background/70 p-4">
+    <div className="min-w-0 rounded-xl border border-border/70 bg-background/70 p-3 [overflow-wrap:anywhere] md:p-4">
       <p className="text-sm text-muted-foreground">{label}</p>
       {/* A div, not a p: the badge variants render pictures and spans. */}
       <div className="mt-2 flex min-h-9 items-center text-base font-medium">

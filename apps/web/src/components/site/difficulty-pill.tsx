@@ -12,8 +12,8 @@ type DifficultyPillProps = {
   difficulty: CatalogDifficulty;
   /** Render the visible short difficulty name next to the level (needs room). */
   showLabel?: boolean;
-  /** Also show the raw catalog value (the 定数, e.g. "13.7") after the level. */
-  showConstant?: boolean;
+  /** Choose the display level (13+), catalog constant (13.7), or both. */
+  levelFormat?: "display" | "constant" | "both";
   className?: string;
 };
 
@@ -33,7 +33,7 @@ const DIFFICULTY_SHORT_NAME: Record<DifficultyTone, string> = {
 export function DifficultyPill({
   difficulty,
   showLabel = false,
-  showConstant = false,
+  levelFormat = "display",
   className,
 }: DifficultyPillProps) {
   const tone = difficultyTone(difficulty);
@@ -44,8 +44,8 @@ export function DifficultyPill({
   // Non-numeric levels (and UTAGE oddities) have no display form: keep the raw
   // string as-is rather than inventing one.
   const display = difficultyDisplayLevel(raw);
-  const primary = display ?? raw ?? "";
-  const constant = showConstant && display && raw !== display ? raw : null;
+  const primary = levelFormat === "constant" ? raw : (display ?? raw);
+  const constant = levelFormat === "both" && display && raw !== display ? raw : null;
   const slotLabel = difficultySlotLabel(difficulty);
   const shortName = DIFFICULTY_SHORT_NAME[tone];
 

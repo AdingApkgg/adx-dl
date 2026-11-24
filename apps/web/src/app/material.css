@@ -130,16 +130,8 @@ body.adx-site [data-site-header] .text-primary { color: var(--md-seed); }
 .adx-catalog-page [data-layout="card-grid"] { gap: 18px; }
 .adx-catalog-page [data-chart-card] {
   background: var(--md-surface-high);
-  border: 1px solid var(--md-outline);
   border-radius: var(--md-radius);
   box-shadow: var(--md-surface-shadow);
-}
-/* Insets keep the outer card clip away from the full artwork. */
-.adx-catalog-page [data-chart-cover-frame] {
-  margin: 12px 12px 0;
-  border: 0;
-  border-radius: var(--md-artwork-radius);
-  background: var(--md-surface);
 }
 .adx-material [data-cover-fit],
 .adx-material [data-cover-artwork] { border-radius: var(--md-artwork-radius); }
@@ -212,7 +204,11 @@ body.adx-site [data-slot="dropdown-menu-radio-item"],
   .adx-material.ui-page { --type-page-title: 30px; }
   .adx-catalog-page [data-catalog-controls] { padding: 20px; }
   .adx-detail-page [data-detail-hero] { border-radius: var(--md-radius); }
-  .adx-detail-page [data-detail-hero] > .grid { grid-template-columns: 80px minmax(0,1fr); gap: 16px; padding: 18px; }
+  .adx-detail-page [data-detail-hero] > .grid { grid-template-columns: clamp(96px, 28vw, 128px) minmax(0, 1fr); gap: 12px 14px; padding: 18px; }
+  .adx-detail-page [data-detail-identity] { display: contents; }
+  .adx-detail-page [data-detail-badges] { grid-area: 2 / 1 / auto / -1; }
+  .adx-detail-page [data-detail-badges] > picture { display: block; min-width: 0; }
+  .adx-detail-page [data-detail-text] { grid-area: 1 / 2; }
   .adx-detail-page [data-detail-identity] .ui-page-title { font-size: 30px; }
   .adx-material [data-download-panel] { padding: 18px; }
 }
@@ -235,8 +231,8 @@ body.adx-site [data-slot="dropdown-menu-radio-item"],
 .adx-site { --type-page-title: 32px; }
 .adx-site .max-w-7xl { max-width: 1200px; }
 .adx-site main h1 { color: var(--md-title); font-size: 32px; font-weight: 600; line-height: 1.2; letter-spacing: -.02em; }
-.adx-site [data-chart-card] { background: var(--md-surface); border: 1px solid var(--md-outline); border-radius: var(--md-radius); box-shadow: var(--md-surface-shadow); }
-.adx-site [data-chart-cover-frame] { margin: 12px 12px 0; border-radius: var(--md-artwork-radius); border: 0; background: var(--md-surface); }
+.adx-site [data-chart-card] { background: var(--md-surface); border-radius: var(--md-radius); box-shadow: var(--md-surface-shadow); }
+.adx-site [data-chart-cover-frame] [data-cover-fit] { border-radius: 0; }
 .adx-site [data-cover-artwork] { border-radius: var(--md-artwork-radius); }
 .adx-site button[data-music-player-surface="collapsed"],
 .adx-site :is([data-music-player-surface],[data-music-player-panel]) button.rounded-full:is(.size-11,.size-12) { border-radius: 50%; }

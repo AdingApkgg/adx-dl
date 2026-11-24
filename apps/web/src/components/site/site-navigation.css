@@ -1,3 +1,7 @@
+body.adx-site .site-navigation-support:not(:focus-visible) {
+  border-color: var(--border);
+}
+
 /* Desktop navigation shares the same links and controls as the mobile header.
    Keep this scoped to the public shell: community pages own their own chrome. */
 @media (min-width: 64rem) {
@@ -101,7 +105,7 @@
 
   body.adx-site .site-navigation-actions {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     flex-shrink: 0;
     gap: 0.375rem;
     border-top: 1px solid var(--border);
@@ -119,12 +123,6 @@
   body.adx-site .site-navigation-actions .xl\:inline,
   body.adx-site .site-navigation-notices {
     display: none;
-  }
-
-  body.adx-site .site-navigation-actions > .site-navigation-support {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
-    padding-inline: 0.625rem;
   }
 
   body.adx-site [data-music-player-root] {

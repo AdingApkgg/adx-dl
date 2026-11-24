@@ -50,9 +50,9 @@ describe("SiteHeader", () => {
     expect(html).toContain('aria-label="搜索"');
     expect(html).toContain('aria-label="打开设置"');
     const tabBar = html.slice(html.indexOf("data-mobile-tabbar-root"));
-    expect(tabBar).toContain("搜谱");
-    expect(tabBar).toContain("社群");
-    expect(tabBar).toContain("公告");
+    expect([...tabBar.matchAll(/>(首页|公告|搜谱|社群|更多)</g)].map((match) => match[1])).toEqual([
+      "首页", "公告", "搜谱", "社群", "更多",
+    ]);
     expect(tabBar).toContain('href="/charts?focus=search"');
     expect(tabBar).toContain('href="/community"');
     expect(tabBar).not.toContain('href="/charts"');
