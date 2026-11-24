@@ -233,6 +233,10 @@ export type SiteDictionary = {
     danCourseName: (id: string, name: string) => string;
     filterLevel: string;
     filterGenre: string;
+    filterArea: string;
+    areaSearchPlaceholder: string;
+    areaListLabel: string;
+    areaNoMatch: string;
     filterCabinet: string;
     filterBpm: string;
     filterAssets: string;
@@ -1066,6 +1070,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       danCourseName: (_id, name) => name,
       filterLevel: "等级",
       filterGenre: "曲风",
+      filterArea: "联动区域",
+      areaSearchPlaceholder: "搜索区域…",
+      areaListLabel: "联动区域候选",
+      areaNoMatch: "没有匹配的区域",
       filterCabinet: "类型",
       filterBpm: "BPM",
       filterAssets: "资源",
@@ -1884,6 +1892,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       },
       filterLevel: "Level",
       filterGenre: "Genre",
+      filterArea: "Collaboration area",
+      areaSearchPlaceholder: "Search areas…",
+      areaListLabel: "Collaboration area suggestions",
+      areaNoMatch: "No matching areas",
       filterCabinet: "Type",
       filterBpm: "BPM",
       filterAssets: "Assets",
@@ -2731,6 +2743,10 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       danCourseName: (_id, name) => name.replaceAll("传", "伝").replaceAll("里", "裏"),
       filterLevel: "レベル",
       filterGenre: "ジャンル",
+      filterArea: "コラボちほー",
+      areaSearchPlaceholder: "ちほーを検索…",
+      areaListLabel: "コラボちほーの候補",
+      areaNoMatch: "該当するちほーがありません",
       filterCabinet: "種別",
       filterBpm: "BPM",
       filterAssets: "収録",

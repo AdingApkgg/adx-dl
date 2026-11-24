@@ -30,8 +30,9 @@ import {
   CHART_CARD_SIZES,
   CHART_GRID_CLASS,
 } from "@/components/site/chart-card";
-import { CompatibleImage } from "@/components/site/compatible-image";
+import { CompatibleImage, compatibleSourcesFromPng } from "@/components/site/compatible-image";
 import { RandomChartButton } from "@/components/site/random-chart-button";
+import catalogAreaIconIds from "@/lib/catalog-area-icons.json";
 import {
   ALL_CATEGORIES,
   ALL_SUBCATEGORIES,
@@ -45,7 +46,6 @@ import {
   buildLevelGradient,
   cabinetBucket,
   type CabinetBucket,
-  type ChartDesignerFacet,
   clampRange,
   collectChartDesigners,
   collectDifficultyLevels,
@@ -109,6 +109,13 @@ import {
   SelectValue,
 } from "@astrodx/ui/components/select";
 import { tabsListVariants, tabsTriggerClassName } from "@astrodx/ui/components/tabs";
+
+const AREA_ICON_IDS = new Map(Object.entries(catalogAreaIconIds));
+
+function areaIconSrc(label: string): string | undefined {
+  const id = AREA_ICON_IDS.get(label);
+  return id ? `/area-icons/${id}.png` : undefined;
+}
 
 type CatalogBrowserProps = {
   /** Card-level entries only — the heavy per-chart file payload stays off the page. */
@@ -252,6 +259,7 @@ export function CatalogBrowser({
   const [versionMode, setVersionMode] = React.useState<VersionFilterMode>("include");
   const [danSet, setDanSet] = React.useState<ReadonlySet<string>>(new Set());
   const [genreIds, setGenreIds] = React.useState<ReadonlySet<string>>(new Set());
+  const [areaIds, setAreaIds] = React.useState<ReadonlySet<string>>(new Set());
   const [cabinetSet, setCabinetSet] = React.useState<ReadonlySet<string>>(new Set());
   const [assetSet, setAssetSet] = React.useState<ReadonlySet<string>>(new Set());
   // Charters are a multi-select set like the chip dimensions, but there are
@@ -325,6 +333,23 @@ export function CatalogBrowser({
     [designerFacets]
   );
 
+  const areasById = React.useMemo(() => {
+    const areas = new Map<string, string>();
+    for (const { area } of entries) {
+      if (area) areas.set(area.id, area.label);
+    }
+    return areas;
+  }, [entries]);
+  const areaFacets = React.useMemo(() => {
+    const collator = new Intl.Collator(locale, { numeric: true });
+    return [...areasById]
+      .map(([value, name]) => ({ value, name, imageSrc: areaIconSrc(name) }))
+      .sort((a, b) =>
+        Number(a.value.startsWith("lxns-")) - Number(b.value.startsWith("lxns-")) ||
+        collator.compare(a.name, b.name)
+      );
+  }, [areasById, locale]);
+
   const danIdsByEntry = React.useMemo(
     () => new Map(entries.map((entry) => [entry.id, getEntryDanIds(entry)])),
     [entries]
@@ -386,6 +411,8 @@ export function CatalogBrowser({
     const { genreIds: genreFromUrl, cabinetIds: cabinetFromUrl } =
       foldUtageGenreIntoCabinet(genreSet, cabinet);
     if (genreFromUrl) setGenreIds(genreFromUrl);
+    const areaFromUrl = new Set([...(readSet("area") ?? [])].filter((id) => areasById.has(id)));
+    if (areaFromUrl.size > 0) setAreaIds(areaFromUrl);
     if (cabinetFromUrl) setCabinetSet(cabinetFromUrl);
     const versionParam = readSet("version");
     const versionIds = versionParam
@@ -429,6 +456,7 @@ export function CatalogBrowser({
       danIds.size > 0 ||
       level ||
       genreSet ||
+      areaFromUrl.size > 0 ||
       cabinet ||
       bpm ||
       asset ||
@@ -631,6 +659,10 @@ export function CatalogBrowser({
         genreIds.size > 0
           ? (entry: CatalogCardEntry) => genreIds.has(String(resolveGenreId(entry)))
           : null,
+      area:
+        areaIds.size > 0
+          ? (entry: CatalogCardEntry) => Boolean(entry.area && areaIds.has(entry.area.id))
+          : null,
       cabinet:
         cabinetSet.size > 0
           ? (entry: CatalogCardEntry) => cabinetSet.has(cabinetBucket(entry.cabinet))
@@ -661,6 +693,7 @@ export function CatalogBrowser({
     levelScale,
     levelBounds,
     genreIds,
+    areaIds,
     cabinetSet,
     bpmRange,
     bpmBounds,
@@ -719,6 +752,7 @@ export function CatalogBrowser({
       version: withoutDimension("version"),
       dan: withoutDimension("dan"),
       genre: withoutDimension("genre"),
+      area: withoutDimension("area"),
       cabinet: withoutDimension("cabinet"),
       asset: withoutDimension("asset"),
       designer: withoutDimension("designer"),
@@ -730,6 +764,7 @@ export function CatalogBrowser({
         version: tally(bases.version, (entry) => [catalogVersionFilterId(entry)]),
         dan: tally(bases.dan, (entry) => danIdsByEntry.get(entry.id) ?? []),
         genre: tally(bases.genre, (entry) => [String(resolveGenreId(entry))]),
+        area: tally(bases.area, (entry) => entry.area ? [entry.area.id] : []),
         cabinet: tally(bases.cabinet, (entry) => [cabinetBucket(entry.cabinet)]),
         asset: new Map<string, number>([
           ["pv", bases.asset.filter((entry) => entry.assets?.has_pv).length],
@@ -748,6 +783,7 @@ export function CatalogBrowser({
         version: bases.version.length,
         dan: bases.dan.length,
         genre: bases.genre.length,
+        area: bases.area.length,
         cabinet: bases.cabinet.length,
         asset: bases.asset.length,
         designer: bases.designer.length,
@@ -803,6 +839,7 @@ export function CatalogBrowser({
     versionSet.size +
     danSet.size +
     genreIds.size +
+    areaIds.size +
     cabinetSet.size +
     assetSet.size +
     designerSet.size +
@@ -841,6 +878,7 @@ export function CatalogBrowser({
   };
   const toggleDan = toggleIn(setDanSet);
   const toggleGenre = toggleIn(setGenreIds);
+  const toggleArea = toggleIn(setAreaIds);
   const toggleCabinet = toggleIn(setCabinetSet);
   const toggleDesigner = toggleIn(setDesignerSet);
   // Dragging a range back to its full span is the same as not filtering, so it
@@ -871,6 +909,7 @@ export function CatalogBrowser({
     setVersionMode("include");
     setDanSet(new Set());
     setGenreIds(new Set());
+    setAreaIds(new Set());
     setCabinetSet(new Set());
     setAssetSet(new Set());
     setDesignerSet(new Set());
@@ -911,6 +950,7 @@ export function CatalogBrowser({
         : null
     );
     apply("genre", joinSet(genreIds));
+    apply("area", joinSet(areaIds));
     apply("cabinet", joinSet(cabinetSet));
     apply("bpm", bpmRange ? formatRangeParam(bpmRange) : null);
     apply("asset", joinSet(assetSet));
@@ -935,6 +975,7 @@ export function CatalogBrowser({
     levelRange,
     levelScale,
     genreIds,
+    areaIds,
     cabinetSet,
     bpmRange,
     assetSet,
@@ -1079,6 +1120,12 @@ export function CatalogBrowser({
               count: chipCounts.withoutDimension.genre,
             },
             {
+              key: "area",
+              label: dictionary.filterArea,
+              active: dimensionTests.area !== null,
+              count: chipCounts.withoutDimension.area,
+            },
+            {
               key: "cabinet",
               label: dictionary.filterCabinet,
               active: dimensionTests.cabinet !== null,
@@ -1123,6 +1170,8 @@ export function CatalogBrowser({
         return clearSet(setDanSet)();
       case "genre":
         return clearSet(setGenreIds)();
+      case "area":
+        return clearSet(setAreaIds)();
       case "cabinet":
         return clearSet(setCabinetSet)();
       case "asset":
@@ -1360,16 +1409,27 @@ export function CatalogBrowser({
           {DAN_FILTER_COURSES.map((course) => {
             const label = dictionary.danCourseName(course.id, course.name);
             const active = danSet.has(course.id);
+            const rank = Number(course.id);
+            // The badge set reserves 11 for 真传, which is not a fixed course.
+            const badgeId = rank > 10 ? rank + 1 : rank;
             return (
               <ToggleChip
                 key={course.id}
                 active={active}
                 disabled={isChipDisabled("dan", course.id, active)}
                 onClick={() => toggleDan(course.id)}
+                className="px-2 py-1"
                 count={chipCount("dan", course.id)}
                 ariaLabel={dictionary.chipCountLabel(label, chipCount("dan", course.id))}
+                title={label}
               >
-                {label}
+                <CompatibleImage
+                  sources={compatibleSourcesFromPng(`/dan-badges/${badgeId}.png`)}
+                  alt=""
+                  width={380}
+                  height={160}
+                  className="h-6 w-auto shrink-0"
+                />
               </ToggleChip>
             );
           })}
@@ -1426,6 +1486,21 @@ export function CatalogBrowser({
           </ChipFilterRow>
         ) : null}
 
+        {areaFacets.length > 0 ? (
+          <SearchableFilterRow
+            label={dictionary.filterArea}
+            placeholder={dictionary.areaSearchPlaceholder}
+            listLabel={dictionary.areaListLabel}
+            noMatch={dictionary.areaNoMatch}
+            dictionary={dictionary}
+            facets={areaFacets}
+            selected={areaIds}
+            countOf={(id) => chipCount("area", id)}
+            onToggle={toggleArea}
+            onClear={clearSet(setAreaIds)}
+          />
+        ) : null}
+
         {cabinetOptions.length > 0 ? (
           <ChipFilterRow label={dictionary.filterCabinet}>
             <AllChip active={cabinetSet.size === 0} onClick={clearSet(setCabinetSet)}>
@@ -1460,8 +1535,11 @@ export function CatalogBrowser({
         ) : null}
 
         {designerFacets.length > 0 ? (
-          <DesignerFilterRow
+          <SearchableFilterRow
             label={dictionary.filterDesigner}
+            placeholder={dictionary.designerSearchPlaceholder}
+            listLabel={dictionary.designerListLabel}
+            noMatch={dictionary.designerNoMatch}
             dictionary={dictionary}
             facets={designerFacets}
             selected={designerSet}
@@ -1624,6 +1702,20 @@ export function CatalogBrowser({
                 className={info.badge}
               >
                 {info[locale]}
+              </FilterChip>
+            );
+          })}
+          {[...areaIds].map((id) => {
+            const label = areasById.get(id);
+            if (!label) return null;
+            return (
+              <FilterChip
+                key={id}
+                onRemove={() => toggleArea(id)}
+                removeLabel={dictionary.removeFilter(label)}
+                icon={<AreaIcon src={areaIconSrc(label)} />}
+              >
+                {label}
               </FilterChip>
             );
           })}
@@ -2161,24 +2253,28 @@ function RangeFilterRow({
 
 /** How many charter options the combobox offers at once. The full list runs to
  *  several hundred names; anything past a screenful is reached by typing. */
-const DESIGNER_OPTION_LIMIT = 40;
+const SEARCHABLE_FILTER_OPTION_LIMIT = 40;
 
-/**
- * The charter (谱师) filter.
- *
- * A chip row like the other dimensions is impossible here — the catalog credits
- * hundreds of charters, and the prolific ones (はっぴー alone has 645 charts) are
- * indistinguishable from the one-offs in a horizontally scrolling strip. So this
- * is a combobox: type to narrow, Enter or click to toggle, picked names sit in
- * front of the box as removable chips.
- *
- * The option list renders *in flow* rather than as an absolutely positioned
- * popover: the advanced-filter panel animates its height and is therefore
- * `overflow: hidden`, which would clip a floating list. In flow it simply
- * expands the panel.
- */
-function DesignerFilterRow({
+function AreaIcon({ src }: { src?: string }) {
+  if (!src) return null;
+  return (
+    <CompatibleImage
+      sources={compatibleSourcesFromPng(src)}
+      alt=""
+      width={24}
+      height={24}
+      className="size-6 shrink-0 rounded-full object-cover"
+    />
+  );
+}
+
+// A searchable multi-select for dimensions with too many options for a chip row.
+// The list stays in flow so the animated panel doesn't clip it.
+function SearchableFilterRow({
   label,
+  placeholder,
+  listLabel,
+  noMatch,
   dictionary,
   facets,
   selected,
@@ -2188,7 +2284,10 @@ function DesignerFilterRow({
 }: {
   label: string;
   dictionary: SiteDictionary["catalogBrowser"];
-  facets: readonly ChartDesignerFacet[];
+  placeholder: string;
+  listLabel: string;
+  noMatch: string;
+  facets: readonly { name: string; value?: string; imageSrc?: string }[];
   selected: ReadonlySet<string>;
   /** Faceted count for a name, given the other dimensions. */
   countOf: (name: string) => number;
@@ -2207,7 +2306,7 @@ function DesignerFilterRow({
     const matching = needle
       ? facets.filter((facet) => facet.name.toLowerCase().includes(needle))
       : facets;
-    return matching.slice(0, DESIGNER_OPTION_LIMIT);
+    return matching.slice(0, SEARCHABLE_FILTER_OPTION_LIMIT);
   }, [facets, needle]);
 
   const showList = open && (options.length > 0 || needle.length > 0);
@@ -2245,7 +2344,8 @@ function DesignerFilterRow({
       const target = options[activeIndex] ?? (options.length === 1 ? options[0] : null);
       if (target) {
         event.preventDefault();
-        commit(target.name);
+        const value = target.value ?? target.name;
+        if (countOf(value) > 0 || selected.has(value)) commit(value);
       }
     }
   };
@@ -2267,11 +2367,15 @@ function DesignerFilterRow({
           <AllChip active={selected.size === 0} onClick={onClear}>
             {dictionary.filterAll}
           </AllChip>
-          {[...selected].map((name) => (
-            <ToggleChip key={name} active onClick={() => onToggle(name)}>
-              {name}
-            </ToggleChip>
-          ))}
+          {[...selected].map((value) => {
+            const facet = facets.find((item) => (item.value ?? item.name) === value);
+            return (
+              <ToggleChip key={value} active onClick={() => onToggle(value)}>
+                <AreaIcon src={facet?.imageSrc} />
+                {facet?.name ?? value}
+              </ToggleChip>
+            );
+          })}
           <Input
             value={inputValue}
             role="combobox"
@@ -2280,7 +2384,7 @@ function DesignerFilterRow({
             aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
             aria-autocomplete="list"
             aria-label={label}
-            placeholder={dictionary.designerSearchPlaceholder}
+            placeholder={placeholder}
             className="h-8 w-44 text-xs"
             onChange={(event) => {
               setInputValue(event.target.value);
@@ -2308,17 +2412,19 @@ function DesignerFilterRow({
             id={listboxId}
             // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: ARIA combobox pattern; the list roles are what screen readers need here
             role="listbox"
-            aria-label={dictionary.designerListLabel}
-            className="max-h-48 list-none overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground"
+            aria-label={listLabel}
+            aria-multiselectable="true"
+            className="max-h-48 w-64 max-w-full list-none overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground"
           >
             {options.length === 0 ? (
               <li className="px-2 py-1.5 text-xs text-muted-foreground">
-                {dictionary.designerNoMatch}
+                {noMatch}
               </li>
             ) : (
               options.map((facet, index) => {
-                const picked = selected.has(facet.name);
-                const count = countOf(facet.name);
+                const value = facet.value ?? facet.name;
+                const picked = selected.has(value);
+                const count = countOf(value);
                 // Same rule as the chip rows: a charter who has nothing left
                 // under the other filters is a dead end, greyed out rather than
                 // silently emptying the grid. A picked one stays clickable to
@@ -2327,7 +2433,7 @@ function DesignerFilterRow({
                 return (
                   // biome-ignore lint/a11y/useFocusableInteractive: ARIA combobox (aria-activedescendant): focus stays on the input, so the listbox/options are intentionally non-focusable
                   <li
-                    key={facet.name}
+                    key={value}
                     id={optionId(index)}
                     // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: ARIA combobox pattern; the list roles are what screen readers need here
                     role="option"
@@ -2344,7 +2450,7 @@ function DesignerFilterRow({
                       // the click lands.
                       onMouseDown={(event) => event.preventDefault()}
                       onMouseEnter={() => setActiveIndex(index)}
-                      onClick={() => commit(facet.name)}
+                      onClick={() => commit(value)}
                       className={cn(
                         "flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-xs transition-colors",
                         index === activeIndex && !deadEnd && "bg-accent text-accent-foreground",
@@ -2352,7 +2458,10 @@ function DesignerFilterRow({
                         deadEnd && "cursor-not-allowed opacity-40"
                       )}
                     >
-                      <span className="truncate">{facet.name}</span>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <AreaIcon src={facet.imageSrc} />
+                        <span className="truncate">{facet.name}</span>
+                      </span>
                       <span className="shrink-0 tabular-nums text-muted-foreground">
                         {count}
                       </span>

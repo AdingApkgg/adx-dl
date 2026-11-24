@@ -2,6 +2,7 @@ import { cachedPaletteForEntry, type CoverPaletteCache } from "./cover-palette-c
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { cache } from "react";
+import { readCatalogAreas } from "@/lib/catalog-areas";
 import type {
   Catalog,
   CatalogEntry,
@@ -27,8 +28,15 @@ export type { Catalog, CatalogDifficulty, CatalogEntry } from "@/lib/catalog-sha
 const catalogPath = path.resolve(process.cwd(), "..", "..", "data", "catalog", "index.json");
 
 const loadCatalog = createSnapshotReader(async (): Promise<Catalog> => {
-  const raw = await fs.readFile(catalogPath, "utf-8");
+  const [raw, areas] = await Promise.all([
+    fs.readFile(catalogPath, "utf-8"),
+    readCatalogAreas(path.dirname(catalogPath)),
+  ]);
   const catalog = JSON.parse(raw) as Catalog;
+  for (const entry of catalog.entries) {
+    const area = areas.get(entry.short_id);
+    if (area) entry.area = area;
+  }
   try {
     const palettes: CoverPaletteCache = JSON.parse(await fs.readFile(path.join(path.dirname(catalogPath), "cover-palettes.json"), "utf8"));
     for (const entry of catalog.entries) {

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import unquote, urlparse
 
+from tools.catalog_areas import AREA_CACHE, LXNS_SONG_URL, fetch_lxns_songs, refresh_area_snapshot
 from tools.remote_catalog import fetch_bytes as default_fetch_bytes
 from tools.remote_catalog import fetch_text as default_fetch_text
 
@@ -57,7 +58,6 @@ YUZUCHAN_ALIAS_URL = "https://www.yuzuchan.moe/api/maimaidx/maimaidxalias"
 # 藏 where the other 9 use the Japanese 蔵, splitting one UTAGE type across two
 # cabinet values. Lxns' song list exposes the kanji as its own field, so it is
 # both the variant authority below and the cross-check in fetch_utage_kanji_map.
-LXNS_SONG_URL = "https://maimai.lxns.net/api/v0/maimai/song/list"
 UTAGE_KANJI_VARIANTS = {"藏": "蔵"}
 # A chart is UTAGE when the upstream item says so. Three independent signals
 # agree on all 128 UTAGE charts in the current index (see _utage_signals):
@@ -544,12 +544,18 @@ def _parse_lxns_utage_kanji(payload: object) -> dict[int, str]:
     if not isinstance(payload, dict):
         return out
     for song in payload.get("songs", []):
+        if not isinstance(song, dict):
+            continue
         song_id = song.get("id")
         if not isinstance(song_id, int):
             continue
         difficulties = song.get("difficulties")
         utage = difficulties.get("utage", []) if isinstance(difficulties, dict) else []
-        for chart in utage or []:
+        if not isinstance(utage, list):
+            continue
+        for chart in utage:
+            if not isinstance(chart, dict):
+                continue
             kanji = str(chart.get("kanji", "") or "").strip()
             if kanji:
                 out[song_id] = kanji
@@ -792,6 +798,10 @@ def build_catalog(
     max_workers: int = 8,
 ) -> Path:
     generated_at = datetime.now(timezone.utc).isoformat()
+    # Refresh independently of Alice so a fallback catalog can still get new areas.
+    lxns_payload = refresh_area_snapshot(
+        root / AREA_CACHE, fetch_lxns_songs if fetch_text is default_fetch_text else fetch_text
+    )
     items = json.loads(fetch_text(INDEX_URL))
 
     # UTAGE detection reads three upstream signals that currently agree on all of
@@ -806,7 +816,7 @@ def build_catalog(
 
     # The 宴 kanji is parsed out of the title prefix, which is not glyph-normalized
     # upstream; reconcile it against Lxns' dedicated field where it reaches.
-    checked, corrected = _apply_utage_kanji(entries, fetch_utage_kanji_map(fetch_text))
+    checked, corrected = _apply_utage_kanji(entries, _parse_lxns_utage_kanji(lxns_payload))
     print(f"[catalog] utage kanji: corrected {corrected}/{checked} cross-checked")
 
     # Community aliases (别名) so a chart is findable by its nicknames; best-effort.
