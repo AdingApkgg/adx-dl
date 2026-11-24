@@ -48,6 +48,7 @@ export async function cleanupStorageFixture(
     files,
     blobs,
     blobDerivatives,
+    chartSourceEntries,
     derivedObjects,
     blobBlocks,
     uploadSessions,
@@ -100,6 +101,8 @@ export async function cleanupStorageFixture(
     if (originals.length) await tx.delete(files).where(inArray(files.blobId, originals.map(b=>b.id)));
     if (attempts.length) await tx.delete(uploadAttempts).where(inArray(uploadAttempts.id, attempts.map(a=>a.id)));
     if (originals.length) await tx.delete(blobDerivatives).where(inArray(blobDerivatives.sourceBlobId,originals.map(b=>b.id)));
+    const sourceIds = [...new Set([...ownFiles.map(row => row.blobId), ...originals.map(row => row.id)])];
+    if (sourceIds.length) await tx.delete(chartSourceEntries).where(inArray(chartSourceEntries.sourceBlobId, sourceIds));
     if (derivatives.length) await tx.delete(derivedObjects).where(inArray(derivedObjects.id,derivatives.map(b=>b.id)));
     if (ownFiles.length) {
       await tx.delete(blobBlocks).where(

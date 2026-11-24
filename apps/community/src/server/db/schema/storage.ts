@@ -93,6 +93,23 @@ export const blobs = pgTable(
     ),
   ],
 );
+/** Immutable mapping from a verified transport bundle to independently stored file bytes. */
+export const chartSourceEntries = pgTable("chart_source_entries", {
+  sourceBlobId: uuid().notNull().references(() => blobs.id, { onDelete: "restrict" }),
+  ordinal: integer().notNull(),
+  path: text().notNull(),
+  size: bigint({ mode: "number" }).notNull(),
+  sha256: text().notNull(),
+  contentBlobId: uuid().references(() => blobs.id, { onDelete: "restrict" }),
+}, (t) => [
+  primaryKey({ columns: [t.sourceBlobId, t.ordinal] }),
+  uniqueIndex("chart_source_entries_path_uidx").on(t.sourceBlobId, sql`lower(${t.path})`),
+  index("chart_source_entries_content_idx").on(t.contentBlobId),
+  validHash("chart_source_entries_hash_check", t.sha256),
+  check("chart_source_entries_bounds_check", sql`${t.ordinal} between 0 and 127 and ${t.size} between 0 and 134217728 and octet_length(${t.path}) between 1 and 240`),
+  check("chart_source_entries_content_check", sql`(${t.contentBlobId} is null and ${t.size} = 0 and ${t.sha256} = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855') or (${t.contentBlobId} is not null and ${t.size} > 0 and ${t.sourceBlobId} <> ${t.contentBlobId})`),
+]);
+
 export const files = pgTable(
   "files",
   {
