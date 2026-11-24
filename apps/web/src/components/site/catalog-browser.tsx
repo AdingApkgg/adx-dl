@@ -1872,7 +1872,6 @@ export function CatalogBrowser({
                 className="h-full"
               >
                 <ChartCard
-                  coverFit="contain"
                   entry={entry}
                   locale={locale}
                   priority={safeCurrentPage === 1 && index < 6}

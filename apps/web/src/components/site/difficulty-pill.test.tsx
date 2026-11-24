@@ -8,7 +8,7 @@ describe("DifficultyPill", () => {
     // 13.7 is a chart constant; every filter in the browse UI calls it "13+",
     // and quoting the constant as the headline made the two disagree.
     const html = renderToStaticMarkup(
-      <DifficultyPill difficulty={{ slot: 4, level: "13.7", designer: "" }} showConstant />
+      <DifficultyPill difficulty={{ slot: 4, level: "13.7", designer: "" }} levelFormat="both" />
     );
 
     expect(html).toContain(">13+<");
@@ -19,7 +19,7 @@ describe("DifficultyPill", () => {
 
   test("omits the constant when it is the display level already", () => {
     const html = renderToStaticMarkup(
-      <DifficultyPill difficulty={{ slot: 2, level: "7", designer: "" }} showConstant />
+      <DifficultyPill difficulty={{ slot: 2, level: "7", designer: "" }} levelFormat="both" />
     );
 
     expect(html).toContain(">7<");
@@ -37,11 +37,21 @@ describe("DifficultyPill", () => {
     expect(html).toContain('title="Expert 13.7"');
   });
 
+  test("shows the constant alone as the primary level", () => {
+    const html = renderToStaticMarkup(
+      <DifficultyPill difficulty={{ slot: 4, level: "13.7", designer: "" }} levelFormat="constant" />
+    );
+
+    expect(html).toContain(">13.7<");
+    expect(html).not.toContain(">13+<");
+    expect(html).toContain("font-semibold");
+  });
+
   test("falls back to the raw value when it has no display form", () => {
     // UTAGE levels can be free-form; inventing a display level for them would
     // be worse than showing what the source says.
     const html = renderToStaticMarkup(
-      <DifficultyPill difficulty={{ slot: 7, level: "？", designer: "" }} showConstant />
+      <DifficultyPill difficulty={{ slot: 7, level: "？", designer: "" }} levelFormat="both" />
     );
 
     expect(html).toContain("？");

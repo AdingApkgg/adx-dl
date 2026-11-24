@@ -558,15 +558,14 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
         {/* On desktop these controls stay below the scrollable navigation;
             phones keep the compact top bar and bottom navigation. */}
         <div className="site-navigation-actions flex shrink-0 items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            asChild
-            className="site-navigation-support gap-1 px-2 text-primary"
-          >
-            <Link href={switchLocale("/donate", locale)} aria-current={pathname === switchLocale("/donate", locale) ? "page" : undefined}>
-              <HeartHandshakeIcon aria-hidden="true" />
-              {dictionary.donate.supportLabel}
+          <Button variant="outline" size="icon-sm" className="site-navigation-support" asChild>
+            <Link
+              href={switchLocale("/donate", locale)}
+              aria-label={dictionary.donate.supportLabel}
+              title={dictionary.donate.supportLabel}
+              aria-current={pathname === switchLocale("/donate", locale) ? "page" : undefined}
+            >
+              <HeartHandshakeIcon className="text-pink-600 dark:text-pink-400" aria-hidden="true" />
             </Link>
           </Button>
           {/* Search and random sit with the trailing controls rather than in
@@ -656,6 +655,14 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
           active: isActive(primaryNav[0]),
         },
         {
+          href: noticesHref,
+          label: dictionary.notices.navLabel,
+          icon: <MegaphoneIcon />,
+          active: isActive({ href: noticesHref, label: dictionary.notices.navLabel }),
+          noticeCount: true,
+          unreadLabel: dictionary.notices.unreadLabel,
+        },
+        {
           href: searchItem.href,
           label: dictionary.nav.findChartsLabel,
           icon: <SearchIcon />,
@@ -667,14 +674,6 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
           label: dictionary.community.tabLabel,
           icon: <UsersIcon />,
           active: isActive({ href: communityHref, label: dictionary.community.tabLabel }),
-        },
-        {
-          href: noticesHref,
-          label: dictionary.notices.navLabel,
-          icon: <MegaphoneIcon />,
-          active: isActive({ href: noticesHref, label: dictionary.notices.navLabel }),
-          noticeCount: true,
-          unreadLabel: dictionary.notices.unreadLabel,
         },
       ]}
       menuLabel={dictionary.nav.moreLabel}

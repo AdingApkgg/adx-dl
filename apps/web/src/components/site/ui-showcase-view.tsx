@@ -171,7 +171,7 @@ export function UiShowcaseView({
                 key={`${difficulty.slot}-${difficulty.level}`}
                 difficulty={difficulty}
                 showLabel
-                showConstant
+                levelFormat="both"
               />
             ))}
           </div>

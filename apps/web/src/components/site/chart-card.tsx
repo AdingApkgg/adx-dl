@@ -5,12 +5,15 @@ import { DifficultyPill } from "@/components/site/difficulty-pill";
 import { EntryCover } from "@/components/site/entry-cover";
 import { GenreBadge } from "@/components/site/genre-badge";
 import { CardPageViews } from "@/components/site/page-view-counter";
+import { ScrollingLabel } from "@/components/site/scrolling-label";
 import { SelectCheckBadge } from "@/components/site/select-check-badge";
 import { VersionBadge } from "@/components/site/version-badge";
 import {
+  difficultyDisplayLevel,
   formatEntryArtist,
   formatEntrySubcategory,
   formatEntryTitle,
+  levelSortValue,
   type CatalogCardEntry,
   type CatalogEntry,
 } from "@/lib/catalog-shared";
@@ -66,8 +69,6 @@ function toFullEntryStub(entry: CatalogCardEntry): CatalogEntry {
 type ChartCardProps = {
   entry: CatalogCardEntry;
   locale: Locale;
-  /** Homepage/editorial surfaces can preserve the entire cover instead of cropping it. */
-  coverFit?: "cover" | "contain";
   /** Eagerly load above-the-fold covers (LCP). */
   priority?: boolean;
   sizes?: string;
@@ -93,7 +94,6 @@ type ChartCardProps = {
 export function ChartCard({
   entry,
   locale,
-  coverFit = "contain",
   priority = false,
   sizes,
   aliasHit = null,
@@ -122,25 +122,23 @@ export function ChartCard({
   const overflowCount = orderedAliases.length - visibleAliases.length;
 
   const cardClassName = cn(
-    "group flex h-full flex-col overflow-hidden rounded-xl border bg-card/80 transition-all",
+    "group flex h-full flex-col overflow-hidden rounded-xl bg-card/80 transition-all",
     selectable
       ? cn(
           // The selectable card is a bare div, so it never picked up the focus
           // ring the Button/Link primitives carry.
           "cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-          selected
-            ? "border-primary ring-2 ring-primary"
-            : "border-border/70 hover:border-primary/40"
+          selected && "ring-2 ring-primary"
         )
-      : "border-border/70 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10"
+      : "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/10"
   );
 
   const cover = (
-    <div data-chart-cover-frame className="relative aspect-square overflow-hidden border-b border-border/60">
+    <div data-chart-cover-frame className="relative aspect-square overflow-hidden">
       <EntryCover
         entry={fullEntry}
         locale={locale}
-        fit={coverFit}
+        fit="contain"
         priority={priority}
         sizes={sizes}
         className="h-full w-full"
@@ -164,6 +162,13 @@ export function ChartCard({
 
   const title = formatEntryTitle(entry, locale);
   const artist = formatEntryArtist(entry, locale);
+  const difficulties = entry.difficulties
+    .map((difficulty) => ({
+      difficulty,
+      rank: levelSortValue(difficultyDisplayLevel(difficulty.level) ?? ""),
+    }))
+    .sort((a, b) => b.rank - a.rank)
+    .slice(0, 5);
 
   const body = (
     <>
@@ -173,15 +178,12 @@ export function ChartCard({
           <h3
             id={titleId}
             lang={japaneseTextLang(title)}
-            className="line-clamp-1 font-semibold leading-snug"
+            className="font-semibold leading-snug"
           >
-            {title}
+            <ScrollingLabel text={title} />
           </h3>
-          <p
-            lang={japaneseTextLang(artist)}
-            className="line-clamp-1 text-sm text-muted-foreground"
-          >
-            {artist}
+          <p lang={japaneseTextLang(artist)} className="text-sm text-muted-foreground">
+            <ScrollingLabel text={artist} />
           </p>
           {aliases.length > 0 ? (
             // Aliases are Chinese community nicknames; tagging them keeps them
@@ -216,13 +218,19 @@ export function ChartCard({
             </ul>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <VersionBadge version={entry.version} label={formatEntrySubcategory(entry)} />
-          <CabinetBadge cabinet={entry.cabinet} />
+        <div className="flex flex-col items-start gap-1.5">
+          <div data-chart-version-row className="flex min-w-0 max-w-full items-center gap-1.5 empty:hidden">
+            <VersionBadge
+              version={entry.version}
+              label={formatEntrySubcategory(entry)}
+              className="block h-6 min-w-0 shrink truncate object-contain object-left"
+            />
+            <CabinetBadge cabinet={entry.cabinet} className="h-5 shrink-0" />
+          </div>
           <GenreBadge entry={fullEntry} locale={locale} />
         </div>
         <div className="mt-auto flex flex-wrap gap-1.5">
-          {entry.difficulties.slice(0, 5).map((difficulty) => (
+          {difficulties.map(({ difficulty }) => (
             <DifficultyPill key={`${entry.id}-${difficulty.slot}`} difficulty={difficulty} />
           ))}
         </div>

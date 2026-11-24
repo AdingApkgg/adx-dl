@@ -1,6 +1,7 @@
 import type { Viewport } from "next";
 
 import { PageTransition } from "@/app/page-transition";
+import { BackToTop } from "@/components/site/back-to-top";
 import { BrowserCompatibilityProvider } from "@/components/site/browser-compatibility-provider";
 import { SiteBanners } from "@/components/site/banners/site-banners";
 import { DownloadDock } from "@/components/site/downloads/download-dock";
@@ -132,6 +133,7 @@ export async function RootLayoutShell({
           </div>
         </noscript>
         <a
+          id="skip-to-main-content"
           href="#main-content"
           className="sr-only rounded-md bg-primary px-4 py-2 text-primary-foreground focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50"
         >
@@ -147,6 +149,7 @@ export async function RootLayoutShell({
                 <SiteHeader totalEntries={catalog.total_entries} />
                 <PageTransition>{children}</PageTransition>
                 <SiteFooter locale={locale} updatedDate={updatedDate} deriveLocaleFromPath={deriveLocaleFromPath} />
+                <BackToTop locale={locale} deriveLocaleFromPath={deriveLocaleFromPath} />
               </div>
               {/* Live2D 看板娘 (bottom-right, wide screens only). Before the
                   dock so its pinned view-transition group paints under it. */}

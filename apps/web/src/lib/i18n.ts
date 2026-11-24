@@ -23,6 +23,7 @@ export type SiteDictionary = {
     home: string;
     browse: string;
     skipToContent: string;
+    backToTop: string;
     primaryLabel: string;
     languageLabel: string;
     menuLabel: string;
@@ -354,8 +355,6 @@ export type SiteDictionary = {
     /** Source card: the maidata path row and the collapsed license note. */
     sourceMaidataLabel: string;
     licenseLabel: string;
-    /** Level chip legend on the difficulty table (display level vs 定数). */
-    levelConstantHint: string;
     preview: string;
     previewDescription: string;
     /** Accessible name for the row of secondary chart actions. */
@@ -855,6 +854,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       home: "首页",
       browse: "曲库",
       skipToContent: "跳到主要内容",
+      backToTop: "回到顶部",
       primaryLabel: "主导航",
       languageLabel: "语言切换",
       menuLabel: "导航菜单",
@@ -1153,7 +1153,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       unknownValue: "未知",
       notAvailableValue: "暂无",
       tableDifficulty: "难度",
-      tableLevel: "等级",
+      tableLevel: "定数",
       tableCharter: "谱师",
       tableNotes: "物量",
       noteTypeTap: "Tap",
@@ -1170,7 +1170,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       sizeEstimateWithVideo: (total, video) => `约 ${total}（含 BGA ${video}）`,
       sourceMaidataLabel: "谱面文件",
       licenseLabel: "授权说明",
-      levelConstantHint: "加粗为显示等级，浅色数字为定数。",
       preview: "预览",
       previewDescription: "在线观看 PV 或试听音频（资源来自远端目录）。",
       actionsLabel: "谱面操作",
@@ -1658,6 +1657,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       home: "Home",
       browse: "Browse",
       skipToContent: "Skip to main content",
+      backToTop: "Back to top",
       primaryLabel: "Primary",
       languageLabel: "Language",
       menuLabel: "Navigation menu",
@@ -1976,7 +1976,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       unknownValue: "Unknown",
       notAvailableValue: "Not available",
       tableDifficulty: "Difficulty",
-      tableLevel: "Level",
+      tableLevel: "Constant",
       tableCharter: "Charter",
       tableNotes: "Notes",
       noteTypeTap: "Tap",
@@ -1993,7 +1993,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       sizeEstimateWithVideo: (total, video) => `about ${total} (${video} of it BGA)`,
       sourceMaidataLabel: "Chart file",
       licenseLabel: "Licence note",
-      levelConstantHint: "Bold is the display level; the faint number is the chart constant.",
       preview: "Preview",
       previewDescription: "Watch the PV or listen to the audio (served from the remote directory).",
       actionsLabel: "Chart actions",
@@ -2510,6 +2509,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       home: "ホーム",
       browse: "曲一覧",
       skipToContent: "メインコンテンツへ移動",
+      backToTop: "ページトップへ戻る",
       primaryLabel: "メインナビ",
       languageLabel: "言語切り替え",
       menuLabel: "ナビゲーションメニュー",
@@ -2818,7 +2818,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       unknownValue: "不明",
       notAvailableValue: "なし",
       tableDifficulty: "難易度",
-      tableLevel: "レベル",
+      tableLevel: "譜面定数",
       tableCharter: "譜面作者",
       tableNotes: "ノーツ数",
       noteTypeTap: "Tap",
@@ -2835,7 +2835,6 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       sizeEstimateWithVideo: (total, video) => `約 ${total}（うち BGA ${video}）`,
       sourceMaidataLabel: "譜面ファイル",
       licenseLabel: "ライセンス表記",
-      levelConstantHint: "太字が表示レベル、薄い数字が譜面定数です。",
       preview: "プレビュー",
       previewDescription: "PV の視聴や音源の試聴ができます（リモートディレクトリ提供）。",
       actionsLabel: "譜面の操作",

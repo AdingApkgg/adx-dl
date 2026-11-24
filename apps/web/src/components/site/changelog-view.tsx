@@ -100,7 +100,6 @@ export function ChangelogView({ catalog, locale = "zh" }: ChangelogViewProps) {
                   <ChartCard
                     entry={toCatalogCardEntry(entry)}
                     locale={locale}
-                    coverFit="contain"
                     isNew={isRecentlyAdded(entryAddedAt(entry), catalog.generated_at)}
                     sizes={CHART_CARD_SIZES}
                   />
