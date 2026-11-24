@@ -32,7 +32,12 @@
         "en": "Discord Server",
         "ja": "Discord サーバー"
       },
-      "url": "https://discord.gg/rYWgQJCemG"
+      "url": "https://discord.gg/rYWgQJCemG",
+      "description": {
+        "zh": "聊谱面，交流游玩心得。",
+        "en": "Talk charts and share gameplay tips.",
+        "ja": "譜面や遊び方について語り合う場所です。"
+      }
     },
     {
       "name": {
@@ -40,7 +45,12 @@
         "en": "Telegram Group",
         "ja": "Telegram グループ"
       },
-      "url": "https://t.me/FullDiveSAO"
+      "url": "https://t.me/FullDiveSAO",
+      "description": {
+        "zh": "聊谱面，交流游玩心得。",
+        "en": "Talk charts and share gameplay tips.",
+        "ja": "譜面や遊び方について語り合う場所です。"
+      }
     },
     {
       "name": {
@@ -48,7 +58,12 @@
         "en": "QQ Group",
         "ja": "QQ グループ"
       },
-      "url": "https://qm.qq.com/q/xltNzTdL1u"
+      "url": "https://qm.qq.com/q/xltNzTdL1u",
+      "description": {
+        "zh": "聊谱面，交流游玩心得。",
+        "en": "Talk charts and share gameplay tips.",
+        "ja": "譜面や遊び方について語り合う場所です。"
+      }
     }
   ]
 }

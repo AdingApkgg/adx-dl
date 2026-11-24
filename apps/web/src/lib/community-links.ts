@@ -5,6 +5,7 @@ import type { Locale } from "@/lib/i18n";
 export type CommunityChannel = {
   name: Record<Locale, string>;
   url: string;
+  description: Record<Locale, string>;
 };
 
 // Shared community entry points — also used by the site header's Telegram
