@@ -109,6 +109,7 @@ test("a single chart starts, pauses, resumes and saves on its detail page", asyn
   expect((screen.getByRole("button", { name: m.download_save_original() }) as HTMLButtonElement).disabled).toBe(true);
   fixture.snapshot.busy = false;
   page.rerender(view());
+  expect(screen.queryByRole("link", { name: m.public_chart_download() })).toBeNull();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: m.download_save_original() })));
   expect(fixture.store.saveItem).toHaveBeenCalledWith("1", "1", { preserveQueue: true });
 

@@ -79,9 +79,11 @@ export function ChartDownloadAction({ publicId, versionId, size }: { publicId: s
           </Button>
         ) : null}
         {!job && size > 0 ? <span className="text-xs tabular-nums text-muted-foreground">ZIP · {formatDownloadBytes(size)}</span> : null}
-        <Button asChild variant="ghost" className="min-h-11">
-          <a href={publicChartDownloadUrl(publicId)} download>{m.public_chart_download()}</a>
-        </Button>
+        {!job || view?.needsAttention ? (
+          <Button asChild variant="ghost" className="min-h-11">
+            <a href={publicChartDownloadUrl(publicId)} download>{m.public_chart_download()}</a>
+          </Button>
+        ) : null}
       </> : (
         <Button asChild className="min-h-11">
           <a href={publicChartDownloadUrl(publicId)} download><DownloadIcon aria-hidden="true" />{m.public_chart_download()}</a>
