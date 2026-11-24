@@ -5,7 +5,7 @@ import { useFinePointer, useMotionEnabled } from "./motion-preference";
 const SPRING = { stiffness: 240, damping: 25, mass: 0.55 };
 
 /** Pointer feedback belongs to the artwork, never the link, form or player. */
-export function MotionArtwork({ children }: { children: ReactNode }) {
+export function MotionArtwork({ children, zoom = true }: { children: ReactNode; zoom?: boolean }) {
   const allowed = useMotionEnabled(), fine = useFinePointer();
   const enabled = allowed && fine;
   const bounds = useRef<DOMRect | null>(null);
@@ -47,7 +47,7 @@ export function MotionArtwork({ children }: { children: ReactNode }) {
     if (!rect.width || !rect.height) return;
     const x = Math.max(-0.5, Math.min(0.5, (event.clientX - rect.left) / rect.width - 0.5));
     const y = Math.max(-0.5, Math.min(0.5, (event.clientY - rect.top) / rect.height - 0.5));
-    rotateX.set(-y * 10); rotateY.set(x * 10); scale.set(1.03);
+    rotateX.set(-y * 10); rotateY.set(x * 10); scale.set(zoom ? 1.03 : 1);
     lightX.set(x * rect.width * 0.6); lightY.set(y * rect.height * 0.6); light.set(1);
   }
   return <div className="community-artwork-motion" data-community-motion="artwork"
