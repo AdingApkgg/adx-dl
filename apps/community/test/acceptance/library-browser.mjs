@@ -10,7 +10,15 @@ export async function exerciseLibrary({owner,other,anonymous,origin,step,zip,evi
  const original=zip('Library browser original');let chart,list,copied;
  async function downloadGeometry(){for(const width of [320,390,768,1280]){await reader.setViewportSize({width,height:844});assert.equal(await reader.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`populated downloads ${width}`);}await reader.setViewportSize({width:1280,height:900});}
  async function readyQueue(page){await page.getByRole('link',{name:'查看下载队列',exact:true}).click();await page.getByText('已校验，等待保存',{exact:false}).waitFor({timeout:60000});}
- async function enqueue(page){await page.getByRole('button',{name:'加入下载队列',exact:true}).click();await page.getByRole('button',{name:'确认加入并开始',exact:true}).click();await readyQueue(page);}
+ async function enqueue(page){
+  const single = /^\/charts\//.test(new URL(page.url()).pathname);
+  if (single) await page.getByRole('button',{name:'下载谱面',exact:true}).click();
+  else {
+   await page.getByRole('button',{name:'加入下载队列',exact:true}).click();
+   await page.getByRole('button',{name:'确认加入并开始',exact:true}).click();
+  }
+  await readyQueue(page);
+ }
  try{
  await step('library_private_editor_explicit_publication_and_copy',async()=>{
   await writer.goto(url('/me/charts/new'));await chooseFiles(writer.getByLabel("选择 ADX / ZIP",{exact:true}),{name:'library.zip',mimeType:'application/zip',buffer:original});await writer.getByRole('button',{name:'保存私有草稿',exact:true}).waitFor({timeout:90000});const draft=await mutate(writer,'/api/v1/me/charts','POST',()=>writer.getByRole('button',{name:'保存私有草稿',exact:true}).click());await (await openChartPublicationReview(writer)).getByRole('combobox',{name:/公开版本/}).selectOption(draft.currentVersionId);chart=await mutate(writer,`/api/v1/me/charts/${draft.id}/publication`,'PUT',()=>writer.getByRole('button',{name:'确认发布',exact:true}).click());
@@ -38,7 +46,15 @@ export async function exerciseLibrary({owner,other,anonymous,origin,step,zip,evi
   await writer.setViewportSize({width:1280,height:900});await reader.setViewportSize({width:1280,height:900});
  });
  await step('library_download_checkpoints_original_bytes_and_store_collection',async()=>{
-  await reader.goto(url(`/charts/${chart.publicId}`));await enqueue(reader);await reader.reload();await reader.getByRole('button',{name:'继续／重试',exact:true}).click();await reader.getByText('已校验，等待保存',{exact:false}).waitFor({timeout:60000});await downloadGeometry();const [download]=await Promise.all([reader.waitForEvent('download'),reader.getByRole('button',{name:'保存原始 ZIP',exact:true}).click()]);assert.deepEqual(await readFile(await download.path()),original);await reader.getByRole('heading',{name:'最近下载',exact:true}).waitFor();
+  await reader.goto(url(`/charts/${chart.publicId}`));
+  await reader.getByRole('button',{name:'下载谱面',exact:true}).click();
+  const save = reader.getByRole('button',{name:'保存原始 ZIP',exact:true});
+  await save.waitFor({timeout:60000});
+  const [inlineDownload] = await Promise.all([reader.waitForEvent('download'),save.click()]);
+  assert.deepEqual(await readFile(await inlineDownload.path()),original);
+  assert.equal(new URL(reader.url()).pathname,`/charts/${chart.publicId}`);
+  await reader.getByText('已请求浏览器保存',{exact:true}).waitFor();
+  await enqueue(reader);await reader.reload();await reader.getByRole('button',{name:'继续／重试',exact:true}).click();await reader.getByText('已校验，等待保存',{exact:false}).waitFor({timeout:60000});await downloadGeometry();const [download]=await Promise.all([reader.waitForEvent('download'),reader.getByRole('button',{name:'保存原始 ZIP',exact:true}).click()]);assert.deepEqual(await readFile(await download.path()),original);await reader.getByRole('heading',{name:'最近下载',exact:true}).waitFor();
   await reader.goto(url(`/lists/${list.publicId}`));await reader.getByRole('checkbox',{name:`选择谱面 #${chart.publicId}`,exact:true}).check();await enqueue(reader);const [collection]=await Promise.all([reader.waitForEvent('download'),reader.getByRole('button',{name:'保存 ZIP 集合包',exact:true}).click()]);const bytes=await readFile(await collection.path()),entries=new Map();let offset=0;while(bytes.readUInt32LE(offset)===0x04034b50){assert.equal(bytes.readUInt16LE(offset+8),0);const size=bytes.readUInt32LE(offset+18),nameLength=bytes.readUInt16LE(offset+26),extraLength=bytes.readUInt16LE(offset+28),name=bytes.subarray(offset+30,offset+30+nameLength).toString(),start=offset+30+nameLength+extraLength;entries.set(name,bytes.subarray(start,start+size));offset=start+size;}assert.deepEqual(entries.get(`${chart.publicId}/original.zip`),original);const manifest=JSON.parse(entries.get('manifest.json').toString());assert.equal(manifest.items[0].publicId,chart.publicId);assert.equal(manifest.items[0].versionId,chart.publication.versionId);assert.equal(manifest.items[0].page,`/charts/${chart.publicId}`);assert.deepEqual(Object.keys(manifest.items[0]).sort(),['page','path','publicId','sha256','size','versionId']);
   for(const width of [320,390,768,1280]){await reader.setViewportSize({width,height:844});assert.equal(await reader.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}await reader.setViewportSize({width:1280,height:900});await reader.getByRole('region',{name:'当前队列',exact:true}).waitFor();await reader.getByRole('region',{name:'最近下载',exact:true}).waitFor();assert.equal(await reader.locator('.community-download-dock').count(),0);assert.equal(await reader.locator('.community-selection-bar').count(),0,'download page hides unrelated selection actions');await reader.locator('#download-help > summary').click();await reader.getByText('ZIP 集合包包含各首的原始 ZIP 和清单。请先解压外层，再逐个导入；它不是一份可直接导入的 ADX 谱包。',{exact:true}).waitFor();if(evidenceDirectory)await reader.screenshot({path:join(evidenceDirectory,'library-downloads.png'),fullPage:true});await reader.setViewportSize({width:390,height:844});await reader.evaluate(()=>scrollTo(0,0));if(evidenceDirectory)await reader.screenshot({path:join(evidenceDirectory,'library-ux-downloads-mobile.png'),fullPage:true});await reader.setViewportSize({width:1280,height:900});
  });

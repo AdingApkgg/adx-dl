@@ -12,7 +12,8 @@ vi.mock('@/client/downloads/persistence',()=>({
 vi.mock('@/client/downloads/transfer',async original=>{const module=await original<any>();return {...module,downloadPlan:vi.fn(async(ids:string[])=>({items:fixture.items.filter(item=>ids.includes(item.publicId))})),reauthorize:vi.fn(async()=>{}),fetchOriginal:vi.fn(async(item:any)=>({size:item.size} as Blob))};});
 vi.mock('@/client/downloads/worker-client',()=>({hashDownloadBlob:async()=> 'a'.repeat(64),DownloadWorker:class{async hash(){return 'a'.repeat(64);}async collection(){return new Blob(['archive']);}async startHash(){}async chunk(){}async endHash(){return 'a'.repeat(64);}close(){}}}));
 import {DownloadStore,type DirectoryHandle} from '@/client/downloads/store';
-import {reauthorize} from '@/client/downloads/transfer';
+import {activateDownloadScope} from '@/client/downloads/persistence';
+import {fetchOriginal, reauthorize} from '@/client/downloads/transfer';
 let store:DownloadStore;
 const item=(publicId:string,size=3)=>({publicId,versionId:'12345678-1234-4234-8234-123456789abc',size,sha256:'a'.repeat(64),url:`/api/v1/charts/${publicId}/download?expectedVersion=12345678-1234-4234-8234-123456789abc`});
 beforeEach(()=>{fixture.persistent=true;fixture.leaseValid=true;fixture.items=[];fixture.files.clear();fixture.jobs.clear();vi.clearAllMocks();Object.defineProperty(navigator,'locks',{value:{request:async(_name:any,_options:any,fn:any)=>fn({name:'test'})},configurable:true});Object.defineProperty(navigator,'onLine',{value:true,configurable:true});vi.stubGlobal('fetch',vi.fn(async()=>new Response(new Uint8Array([1,2,3]))));vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{});vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:test');vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});store=new DownloadStore();});
@@ -26,3 +27,38 @@ test('a legitimate 50-file directory batch stays below the plan quota',async()=>
 test('an expired fallback lease fences a suspended writer before more bytes or close',async()=>{Object.defineProperty(navigator,'locks',{value:undefined,configurable:true});const job=await ready([item('1')]);let release!:()=>void;const written=new Promise<void>(resolve=>{release=resolve;}),writer={write:vi.fn(()=>written),close:vi.fn(async()=>{}),abort:vi.fn(async()=>{})};const directory:DirectoryHandle={getDirectoryHandle:async()=>directory,getFileHandle:async()=>({createWritable:async()=>writer})};const saving=store.saveDirectory(job.id,directory);await waitFor(()=>expect(writer.write).toHaveBeenCalledOnce());fixture.leaseValid=false;release();await expect(saving).rejects.toMatchObject({code:'busy'});expect(writer.close).not.toHaveBeenCalled();expect(writer.abort).toHaveBeenCalled();expect(store.getSnapshot().history).toHaveLength(0);});
 
 test('scope invalidation releases object URLs and their cleanup timers immediately',async()=>{const job=await ready([item('1')]);vi.useFakeTimers();try{await store.saveCollection(job.id);expect(vi.getTimerCount()).toBe(1);store.halt();expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:test');expect(vi.getTimerCount()).toBe(0);}finally{vi.useRealTimers();}});
+
+test("starting from an older detail page does not enqueue the newly published version", async () => {
+  fixture.items = [item("1")];
+  await store.activate("a");
+  await expect(store.enqueue(["1"], "files", { expectedVersion: "different-version" })).rejects.toMatchObject({ code: "changed" });
+  expect(store.getSnapshot().jobs).toHaveLength(0);
+  expect(fetchOriginal).not.toHaveBeenCalled();
+});
+
+test("an inline save does not pause another download", async () => {
+  const finished = await ready([item("1")]);
+  let release!: (blob: Blob) => void;
+  vi.mocked(fetchOriginal).mockImplementationOnce(() => new Promise<Blob>(resolve => { release = resolve; }));
+  fixture.items.push(item("2"));
+  await store.enqueue(["2"]);
+  await waitFor(() => expect(fetchOriginal).toHaveBeenCalledTimes(2));
+  expect(store.getSnapshot().jobs[1]?.state).toBe("running");
+  await expect(store.saveItem(finished.id, "1", { preserveQueue: true })).rejects.toMatchObject({ code: "busy" });
+  expect(store.getSnapshot().jobs[1]?.state).toBe("running");
+  release(new Blob(["zip"]));
+  await waitFor(() => expect(store.getSnapshot().busy).toBe(false));
+  await store.saveItem(finished.id, "1", { preserveQueue: true });
+  expect(store.getSnapshot().jobs).toHaveLength(1);
+  expect(store.getSnapshot().jobs[0]?.items[0]?.status).toBe("ready");
+});
+
+test("managed controls are unavailable until the download scope is ready", async () => {
+  let activate!: (identity: Awaited<ReturnType<typeof activateDownloadScope>>) => void;
+  vi.mocked(activateDownloadScope).mockImplementationOnce(() => new Promise(resolve => { activate = resolve; }));
+  const activating = store.activate("a");
+  expect(store.getSnapshot().scope).toBeNull();
+  activate({ ...fixture.identity, changed: false });
+  await activating;
+  expect(store.getSnapshot().scope).toBe("a");
+});

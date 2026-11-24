@@ -141,3 +141,22 @@ html:not(.dark):is([data-accent="orange"], [data-accent="teal"]) body.community-
   outline-offset: 2px;
 }
 .community-material .community-publication-notice { border-inline-start: 3px solid var(--md-seed); }
+
+.community-material .community-download-inline-progress {
+  height: 4px;
+  border-radius: var(--md-radius);
+  background: var(--md-container);
+  accent-color: var(--md-seed);
+}
+.community-material .community-download-inline-progress::-webkit-progress-bar {
+  border-radius: var(--md-radius);
+  background: var(--md-container);
+}
+.community-material .community-download-inline-progress::-webkit-progress-value {
+  border-radius: var(--md-radius);
+  background: var(--md-seed);
+}
+.community-material .community-download-inline-progress::-moz-progress-bar {
+  border-radius: var(--md-radius);
+  background: var(--md-seed);
+}

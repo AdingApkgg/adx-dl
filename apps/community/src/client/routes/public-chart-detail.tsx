@@ -2,10 +2,10 @@ import { MotionGroup, MotionSurface } from "../components/motion-ui";
 import {discoveryApi} from "../queries/discovery";
 import {parsePreviewShare,type PreviewShare} from "@/shared/discovery-search";
 import {PublicListCard} from "../components/library-ui";
-import {DownloadAddButton} from "../components/download-actions";
+import { ChartDownloadAction } from "../components/chart-download-action";
 import { FollowAuthor } from "../components/follow-author";
 import {ChartDiscussion} from "../components/chart-discussion";
-import { DownloadIcon, PlayCircleIcon } from "lucide-react";
+import { PlayCircleIcon } from "lucide-react";
 import { ChartCommunityActions } from "../components/chart-community-actions";
 import { ShareChartButton } from "../components/share-chart-button";
 import { Button } from "@astrodx/ui/components/button";
@@ -23,7 +23,7 @@ import { ErrorCard } from "../components/error-card";
 import { PageTitle, textLinkClass } from "../components/page-title";
 import { PrivateChartPreview } from "../components/private-chart-preview";
 import { canonicalLink, localeAlternates, openGraph, originFrom } from "../lib/seo";
-import { publicChartAssetUrl, publicChartDownloadUrl, publicChartsApi } from "../queries/public-charts";
+import { publicChartAssetUrl, publicChartsApi } from "../queries/public-charts";
 import { PUBLIC_CHART_GRID_CLASS, PublicChartCard, PublicChartTags, PublicCover } from "../components/public-chart-card";
 import { publicHeaders } from "./public-charts";
 import type { Route } from "./+types/public-chart-detail";
@@ -80,9 +80,9 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
       </div>
       <div className="community-chart-detail-actions min-w-0 space-y-3">
         <div role="group" aria-label={m.public_chart_actions()} className="flex flex-wrap items-start gap-3">
+          <ChartDownloadAction key={`${chart.publicId}/${chart.versionId}`} publicId={chart.publicId} versionId={chart.versionId} size={chart.sourceSize} />
           {canPreview ? <Button asChild variant="secondary" className="min-h-11"><a href="#chart-preview"><PlayCircleIcon aria-hidden="true" />{m.public_chart_preview_action()}</a></Button> : null}
-          <Button asChild className="min-h-11"><a href={publicChartDownloadUrl(chart.publicId)} download><DownloadIcon aria-hidden="true" />{m.public_chart_download()}</a></Button>
-          <DownloadAddButton publicIds={[chart.publicId]}/>
+
           <ShareChartButton key={chart.id} title={chart.title} publicId={chart.publicId} />
         </div>
         <ChartCommunityActions chart={chart} />
