@@ -48,6 +48,7 @@ export async function exerciseLibrary({owner,other,anonymous,origin,step,zip,evi
  await step('library_download_checkpoints_original_bytes_and_store_collection',async()=>{
   await reader.goto(url(`/charts/${chart.publicId}`));
   await reader.getByRole('button',{name:'下载谱面',exact:true}).click();
+  await reader.getByRole('combobox',{name:'保存格式',exact:true}).selectOption('zip');
   const save = reader.getByRole('button',{name:'保存原始 ZIP',exact:true});
   await save.waitFor({timeout:60000});
   const [inlineDownload] = await Promise.all([reader.waitForEvent('download'),save.click()]);

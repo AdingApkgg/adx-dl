@@ -80,7 +80,7 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
       </div>
       <div className="community-chart-detail-actions min-w-0 space-y-3">
         <div role="group" aria-label={m.public_chart_actions()} className="flex flex-wrap items-start gap-3">
-          <ChartDownloadAction key={`${chart.publicId}/${chart.versionId}`} publicId={chart.publicId} versionId={chart.versionId} size={chart.sourceSize} />
+          <ChartDownloadAction key={`${chart.publicId}/${chart.versionId}`} publicId={chart.publicId} versionId={chart.versionId} size={chart.sourceSize} title={chart.title} />
           {canPreview ? <Button asChild variant="secondary" className="min-h-11"><a href="#chart-preview"><PlayCircleIcon aria-hidden="true" />{m.public_chart_preview_action()}</a></Button> : null}
 
           <ShareChartButton key={chart.id} title={chart.title} publicId={chart.publicId} />

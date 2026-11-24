@@ -4,16 +4,19 @@ import { useRef, useState } from "react";
 import { Link } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
+import type { ChartArchiveFormat } from "../downloads/chart-export";
+import { DownloadFormat } from "./download-format";
 import { canSaveDownloadItem, downloadJobView, formatDownloadBytes } from "../downloads/presentation";
 import { useDownloads } from "../downloads/provider";
 import { DownloadFailure } from "../downloads/transfer";
 import { publicChartDownloadUrl } from "../queries/public-charts";
 
-export function ChartDownloadAction({ publicId, versionId, size }: { publicId: string; versionId: string; size: number }) {
+export function ChartDownloadAction({ publicId, versionId, size, title }: { publicId: string; versionId: string; size: number; title: string }) {
   const downloads = useDownloads();
   const snapshot = downloads?.snapshot;
   const scope = snapshot?.scope;
   const latestRequest = useRef(0);
+  const [format, setFormat] = useState<ChartArchiveFormat>("adx");
   const [request, setRequest] = useState<{ scope: string; status: "starting" | "saving" | "saved" | "error"; message?: string }>();
   const current = request?.scope === scope ? request : undefined;
   const job = snapshot?.jobs.find(candidate => candidate.items.length === 1 &&
@@ -22,8 +25,12 @@ export function ChartDownloadAction({ publicId, versionId, size }: { publicId: s
   const view = job ? downloadJobView(job) : undefined;
   const pending = current?.status === "starting" || current?.status === "saving";
   const needsLatest = item?.status === "changed" || item?.status === "unavailable";
+  const hasLocks = typeof navigator !== "undefined" && Boolean(navigator.locks);
+  const canBuildAdx = Boolean((snapshot?.persistent || hasLocks) &&
+    (!job || item?.status === "ready" || job.warning !== "budget"));
+  const archiveFormat = canBuildAdx ? format : "zip";
   const canSave = !!(job && item && snapshot && !needsLatest &&
-    canSaveDownloadItem(item, job, snapshot.persistent, typeof navigator !== "undefined" && Boolean(navigator.locks)));
+    (archiveFormat === "adx" ? item.status === "ready" : canSaveDownloadItem(item, job, snapshot.persistent, hasLocks)));
 
   async function run(action: "starting" | "saving") {
     if (!downloads || !scope || pending || (action === "saving" && !job)) return;
@@ -35,7 +42,7 @@ export function ChartDownloadAction({ publicId, versionId, size }: { publicId: s
         if (attempt !== latestRequest.current) return;
         setRequest(added ? undefined : { scope, status: "error", message: m.download_duplicate() });
       } else if (job) {
-        await downloads.store.saveItem(job.id, publicId, { preserveQueue: true });
+        await downloads.store.saveItem(job.id, publicId, { preserveQueue: true, format: archiveFormat, title });
         if (attempt === latestRequest.current) setRequest({ scope, status: "saved" });
       }
     } catch (error) {
@@ -67,7 +74,8 @@ export function ChartDownloadAction({ publicId, versionId, size }: { publicId: s
           </Button>
         ) : canSave && job ? (
           <Button type="button" className="min-h-11" disabled={pending || snapshot?.busy} onClick={() => void run("saving")}>
-            <DownloadIcon aria-hidden="true" />{m.download_save_original()}
+            <DownloadIcon aria-hidden="true" />
+            {archiveFormat === "adx" ? m.ui_download_save_adx() : m.download_save_original()}
           </Button>
         ) : job && view?.canResume && !needsLatest ? (
           <Button type="button" className="min-h-11" onClick={() => downloads.store.resume(job.id)}>
@@ -78,7 +86,10 @@ export function ChartDownloadAction({ publicId, versionId, size }: { publicId: s
             <DownloadIcon aria-hidden="true" />{m.ui_download_chart()}
           </Button>
         ) : null}
-        {!job && size > 0 ? <span className="text-xs tabular-nums text-muted-foreground">ZIP · {formatDownloadBytes(size)}</span> : null}
+        {canBuildAdx && (!job || item?.status === "ready") ? (
+          <DownloadFormat value={archiveFormat} disabled={pending} onChange={setFormat} />
+        ) : null}
+        {!job && size > 0 ? <span className="text-xs tabular-nums text-muted-foreground">{formatDownloadBytes(size)}</span> : null}
         {!job || view?.needsAttention ? (
           <Button asChild variant="ghost" className="min-h-11">
             <a href={publicChartDownloadUrl(publicId)} download>{m.public_chart_download()}</a>

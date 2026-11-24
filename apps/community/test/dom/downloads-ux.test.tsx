@@ -85,9 +85,9 @@ test("identity changes clear visual rolling counts synchronously",()=>{
 test("a single chart starts, pauses, resumes and saves on its detail page", async () => {
   const running = job("1", "fetching", "running");
   const versionId = running.items[0]!.versionId;
-  const view = () => <MemoryRouter><ChartDownloadAction publicId="1" versionId={versionId} size={100} /></MemoryRouter>;
+  const view = () => <MemoryRouter><ChartDownloadAction publicId="1" versionId={versionId} size={100} title="Example" /></MemoryRouter>;
   const page = render(view());
-  expect(screen.getByText("ZIP · 100 B")).toBeTruthy();
+  expect(screen.getByText("100 B")).toBeTruthy();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: m.ui_download_chart() })));
   expect(fixture.store.enqueue).toHaveBeenCalledWith(["1"], "files", { expectedVersion: versionId });
   expect(screen.queryByRole("button", { name: m.download_confirm() })).toBeNull();
@@ -106,12 +106,14 @@ test("a single chart starts, pauses, resumes and saves on its detail page", asyn
   fixture.snapshot.jobs = [job("1", "ready", "ready")];
   fixture.snapshot.busy = true;
   page.rerender(view());
+  expect(screen.getByRole("option", { name: m.ui_download_format_adx(), selected: true })).toBeTruthy();
+  fireEvent.change(screen.getByRole("combobox", { name: m.ui_download_format() }), { target: { value: "zip" } });
   expect((screen.getByRole("button", { name: m.download_save_original() }) as HTMLButtonElement).disabled).toBe(true);
   fixture.snapshot.busy = false;
   page.rerender(view());
   expect(screen.queryByRole("link", { name: m.public_chart_download() })).toBeNull();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: m.download_save_original() })));
-  expect(fixture.store.saveItem).toHaveBeenCalledWith("1", "1", { preserveQueue: true });
+  expect(fixture.store.saveItem).toHaveBeenCalledWith("1", "1", { preserveQueue: true, format: "zip", title: "Example" });
 
   fixture.snapshot.jobs = [];
   page.rerender(view());

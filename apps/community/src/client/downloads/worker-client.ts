@@ -5,6 +5,7 @@ export class DownloadWorker {
  private closed=false;
  call(kind:string,data:Record<string,unknown>={},transfer:Transferable[]=[]){if(this.closed)return Promise.reject(new DOMException('Aborted','AbortError'));const id=++this.next;return new Promise<Record<string,unknown>>((resolve,reject)=>{this.pending.set(id,{resolve,reject});try{this.worker.postMessage({id,kind,...data},transfer);}catch(e){this.pending.delete(id);reject(e);}});}
  async hash(blob:Blob){return (await this.call('hash',{blob})).digest as string;}
+ async chartAdx(blob: Blob, title: string) { return (await this.call('chart-adx', {blob, title})).blob as Blob; }
  async collection(files:{item:DownloadPlanItem;blob:Blob}[]){return (await this.call('collection',{files})).blob as Blob;}
  async startHash(){await this.call('hash-start');}
  async chunk(bytes:Uint8Array){const copy=bytes.slice().buffer;await this.call('hash-chunk',{bytes:copy},[copy]);}

@@ -1,5 +1,6 @@
 import {DOWNLOAD_BATCH_LIMIT,DOWNLOAD_CACHE_BYTES,DOWNLOAD_PENDING_LIMIT,type DownloadItem,type DownloadPlanItem} from "@/shared/downloads";
 import {downloadPlan,reauthorize,fetchOriginal,DownloadFailure,planOnly,transient,retryDelay,wait} from "./transfer";
+import { chartExportName, type ChartArchiveFormat } from "./chart-export";
 import {DownloadWorker,hashDownloadBlob} from "./worker-client";
 import * as persistence from "./persistence";
 import type {DownloadJob,DownloadHistory,Scope} from "./persistence";
@@ -75,13 +76,59 @@ export class DownloadStore{
  private holdSave(blob:Blob,job:DownloadJob,items:DownloadItem[],name:string){const url=URL.createObjectURL(blob),scope=this.scope!;const held={keys:items.map(item=>persistence.fileKey(job.scope,item)),job,scope,timer:undefined as ReturnType<typeof setTimeout>|undefined};this.urls.set(url,held);this.requestSave(url,name);held.timer=setTimeout(()=>{const saved=this.urls.get(url);URL.revokeObjectURL(url);this.urls.delete(url);if(!saved)return;for(const key of saved.keys)if(!this.held(key)&&!this.referenced(key,'')){this.blobs.delete(key);this.cacheSizes.delete(key);}if(this.scope?.epoch===scope.epoch&&!job.items.some(item=>this.held(persistence.fileKey(job.scope,item))))void persistence.releaseDownloadFiles(scope,job).catch(()=>{});},60000);}
  private assertJob(generation:number,job:DownloadJob){this.check(generation);if(this.cancelled.has(job.id))throw new DOMException('Aborted','AbortError');}
  private requestSave(url:string,name:string){const link=document.createElement('a');link.href=url;link.download=name;link.rel='noopener';document.body.append(link);link.click();link.remove();}
- async saveItem(jobId: string, publicId: string, { preserveQueue = false }: { preserveQueue?: boolean } = {}) {
+ async saveItem(
+  jobId: string,
+  publicId: string,
+  { preserveQueue = false, format = "zip", title }: { preserveQueue?: boolean; format?: ChartArchiveFormat; title?: string } = {},
+ ) {
   if (preserveQueue) {
    if (this.active) throw new DownloadFailure("busy");
   } else {
    await this.stopForSave();
   }
-  const generation=this.generation,job=this.snapshot.jobs.find(j=>j.id===jobId),item=job?.items.find(i=>i.publicId===publicId);if(!job||!item)throw new DownloadFailure('failed');const nativeFallback=!navigator.locks?.request&&!this.snapshot.persistent;await this.saveOperation(job,async signal=>{try{if(item.status==='ready'&&!nativeFallback){const blob=await this.blob(item,generation);if(await hashDownloadBlob(blob,signal)!==item.sha256)throw new DownloadFailure('corrupt');await reauthorize([item],signal);await this.fence(generation,job);this.holdSave(blob,job,[item],`${item.publicId}-${item.versionId}.zip`);}else if(item.size>DOWNLOAD_CACHE_BYTES||job.warning==='budget'||nativeFallback){await reauthorize([item],signal);await this.fence(generation,job);this.requestSave(item.url,`${item.publicId}-${item.versionId}.zip`);}else throw new DownloadFailure('failed');item.status='save_requested';this.patch(job);await this.persist(job,generation);await this.recordHistory(job,generation);}catch(e){if(generation===this.generation&&e instanceof DownloadFailure){item.status=e.code==='changed'?'changed':e.code==='unavailable'?'unavailable':'failed';item.failure=e.code;this.patch(job);}throw e;}},nativeFallback);}
+  const generation = this.generation;
+  const job = this.snapshot.jobs.find(job => job.id === jobId);
+  const item = job?.items.find(item => item.publicId === publicId);
+  if (!job || !item) throw new DownloadFailure("failed");
+  const nativeFallback = !navigator.locks?.request && !this.snapshot.persistent;
+  if (format === "adx" && (item.status !== "ready" || nativeFallback)) throw new DownloadFailure("failed");
+
+  const fallback = `${item.publicId}-${item.versionId}`;
+  const name = `${title ? chartExportName(title, fallback) : fallback}.${format}`;
+  await this.saveOperation(job, async signal => {
+   try {
+    if (item.status === "ready" && !nativeFallback) {
+     const blob = await this.blob(item, generation);
+     const worker = new DownloadWorker(signal);
+     let archive: Blob;
+     try {
+      if (await worker.hash(blob) !== item.sha256) throw new DownloadFailure("corrupt");
+      archive = format === "adx" ? await worker.chartAdx(blob, title ?? item.publicId) : blob;
+     } finally {
+      worker.close();
+     }
+     await reauthorize([item], signal);
+     await this.fence(generation, job);
+     this.holdSave(archive, job, [item], name);
+    } else if (item.size > DOWNLOAD_CACHE_BYTES || job.warning === "budget" || nativeFallback) {
+     await reauthorize([item], signal);
+     await this.fence(generation, job);
+     this.requestSave(item.url, name);
+    } else throw new DownloadFailure("failed");
+    item.status = "save_requested";
+    this.patch(job);
+    await this.persist(job, generation);
+    await this.recordHistory(job, generation);
+   } catch (error) {
+    if (generation === this.generation && error instanceof DownloadFailure) {
+     item.status = error.code === "changed" ? "changed" : error.code === "unavailable" ? "unavailable" : "failed";
+     item.failure = error.code;
+     this.patch(job);
+    }
+    throw error;
+   }
+  }, nativeFallback);
+ }
  async saveCollection(jobId:string){await this.stopForSave();const generation=this.generation,job=this.snapshot.jobs.find(j=>j.id===jobId);if(!job||job.items.some(i=>i.status!=='ready')||job.items.reduce((n,i)=>n+i.size,0)>DOWNLOAD_CACHE_BYTES)throw new DownloadFailure('budget');await this.saveOperation(job,async signal=>{const worker=new DownloadWorker(signal);try{await reauthorize(job.items,signal);await this.fence(generation,job);const files=[];for(const item of job.items){const blob=await this.blob(item,generation);if(await worker.hash(blob)!==item.sha256)throw new DownloadFailure('corrupt');files.push({item:planOnly(item),blob});}const archive=await worker.collection(files);await reauthorize(job.items,signal);await this.fence(generation,job);this.holdSave(archive,job,job.items,`adxc-collection-${job.id}.zip`);for(const i of job.items)i.status='save_requested';this.patch(job);await this.persist(job,generation);await this.recordHistory(job,generation);}finally{worker.close();}});}
  async saveDirectory(jobId:string,directory:DirectoryHandle){await this.stopForSave();const generation=this.generation,job=this.snapshot.jobs.find(j=>j.id===jobId);if(!job)throw new DownloadFailure('failed');await this.saveOperation(job,async signal=>{await reauthorize(job.items,signal);await this.fence(generation,job);const folder=await directory.getDirectoryHandle(`adxc-${crypto.randomUUID()}`,{create:true});for(const item of job.items){for(let attempt=0;attempt<=3;attempt++){await this.fence(generation,job);let response:Response;try{response=await fetch(item.url,{credentials:'same-origin',cache:'no-store',redirect:'error',signal});}catch(e){signal.throwIfAborted();if(attempt===3)throw e;await wait(750*2**attempt,signal);continue;}if(response.status===409)throw new DownloadFailure('changed');if(!response.ok||!response.body){await response.body?.cancel();if(transient.has(response.status)&&attempt<3){await wait(retryDelay(response,attempt),signal);continue;}throw new DownloadFailure([403,404,410].includes(response.status)?'unavailable':'failed');}await this.fence(generation,job);const handle=await folder.getFileHandle(`${item.publicId}-${item.versionId}.zip`,{create:true}),writer=await handle.createWritable(),hash=new DownloadWorker(signal),abort=()=>{void writer.abort().catch(()=>{});};signal.addEventListener('abort',abort,{once:true});try{await this.fence(generation,job);await hash.startHash();const reader=response.body.getReader();let received=0;try{while(true){const next=await reader.read();await this.fence(generation,job);if(next.done)break;received+=next.value.length;if(received>item.size)throw new DownloadFailure('corrupt');await hash.chunk(next.value);await this.fence(generation,job);await writer.write(next.value);await this.fence(generation,job);item.received=received;item.status='fetching';this.patch(job);}}finally{await reader.cancel().catch(()=>{});}if(received!==item.size||await hash.endHash()!==item.sha256)throw new DownloadFailure('corrupt');await reauthorize([item],signal);await this.fence(generation,job);await writer.close();await this.fence(generation,job);item.status='written';this.patch(job);await this.persist(job,generation);break;}catch(e){await writer.abort().catch(()=>{});if(!signal.aborted&&e instanceof TypeError&&attempt<3){await wait(750*2**attempt,signal);continue;}item.status=e instanceof DownloadFailure&&e.code==='changed'?'changed':'failed';this.patch(job);throw e;}finally{signal.removeEventListener('abort',abort);hash.close();}}}await this.recordHistory(job,generation);});}
 }
