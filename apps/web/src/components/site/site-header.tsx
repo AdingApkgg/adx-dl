@@ -503,6 +503,11 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
           </Badge>
         </div>
         <nav aria-label={dictionary.nav.primaryLabel} className="site-navigation-links hidden shrink-0 items-center gap-2 lg:flex">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={searchItem.href} onClick={onSearchClick}>
+              <NavItemContent item={searchItem} />
+            </Link>
+          </Button>
           {primaryNav.map((item) => {
             const active = isActive(item);
             return (
@@ -568,20 +573,17 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
               <HeartHandshakeIcon className="text-pink-600 dark:text-pink-400" aria-hidden="true" />
             </Link>
           </Button>
-          {/* Search and random sit with the trailing controls rather than in
-              the nav, so neither is repeated in the menu (on phones the tab
-              bar takes over both). */}
+          {/* Tablets use the header search. Phones use the bottom tab bar. */}
           <Button
             variant="outline"
             size="sm"
             asChild
             aria-label={searchItem.label}
             title={searchItem.label}
-            className={cn(HEADER_ACTION_CLASS, "max-sm:hidden")}
+            className={cn(HEADER_ACTION_CLASS, "max-sm:hidden lg:hidden")}
           >
             <Link href={searchItem.href} onClick={onSearchClick}>
               <SearchIcon aria-hidden="true" />
-              <span className="hidden xl:inline">{searchItem.label}</span>
             </Link>
           </Button>
           <Button
@@ -597,10 +599,6 @@ export function SiteHeader({ totalEntries }: SiteHeaderProps) {
             <DicesIcon className={cn(randomBusy && "animate-spin")} aria-hidden="true" />
             <span className="hidden xl:inline">{dictionary.nav.randomLabel}</span>
           </Button>
-          {/* The only visible way to change language used to be a gear icon
-              labelled 设置 in Chinese — unreadable to exactly the visitors who
-              needed it. The switcher shows the current locale's short label so
-              the control announces what it does before it is opened. */}
           <div className="site-navigation-notices contents">
             <NoticesHeaderButton
               href={noticesHref}

@@ -47,7 +47,7 @@ export function DonateView({ locale = "zh" }: { locale?: Locale }) {
               href={method.url}
               name={method.name[locale]}
               description={method.description[locale]}
-              hostname={hostnameOf(method.url)}
+              caption={hostnameOf(method.url)}
               ariaLabel={donate.open(method.name[locale])}
             />
           </li>

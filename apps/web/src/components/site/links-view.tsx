@@ -35,7 +35,7 @@ export function LinksView({ locale = "zh" }: { locale?: Locale }) {
               href={link.url}
               name={link.name[locale]}
               description={link.description[locale]}
-              hostname={hostnameOf(link.url)}
+              caption={hostnameOf(link.url)}
               ariaLabel={links.visitLink(link.name[locale])}
             />
           </li>

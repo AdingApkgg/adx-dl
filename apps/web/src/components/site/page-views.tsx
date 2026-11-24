@@ -332,6 +332,7 @@ export function HomePageView({ catalog, locale = "zh" }: HomePageViewProps) {
               <RandomChartButton
                 locale={locale}
                 label={home.randomCta}
+                iconPosition="end"
                 className={cn(styles.heroAction, styles.randomButton)}
               />
               {/* Points at the question itself, not at the section: `#faq`

@@ -670,7 +670,6 @@ export type SiteDictionary = {
     navLabel: string;
     title: string;
     description: string;
-    intro: string;
     // Card aria-label CTA. A template (not a "verb + name" concat) so ja can
     // put the object first: 「QQ グループに参加」.
     join: (name: string) => string;
@@ -1495,8 +1494,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       homeCta: "找群友，一起打歌",
       navLabel: "玩家社群",
       title: "社区",
-      description: "加入玩家社区，交流谱面与游戏心得。",
-      intro: "以下是本站相关的玩家交流群组，点击卡片即可加入。",
+      description: "选一个常用的平台，和其他玩家聊谱面、交流游玩心得。",
       join: (name) => `加入 ${name}`,
     },
     donate: {
@@ -2341,8 +2339,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       homeCta: "Find friends to play with",
       navLabel: "Community",
       title: "Community",
-      description: "Join the player community to chat about charts and the game.",
-      intro: "These are the player groups around this archive — click a card to join.",
+      description: "Pick your preferred platform to talk charts and share gameplay tips with other players.",
       join: (name) => `Join ${name}`,
     },
     donate: {
@@ -3176,8 +3173,7 @@ const dictionaries: Record<Locale, SiteDictionary> = {
       homeCta: "仲間と一緒に遊ぼう",
       navLabel: "コミュニティ",
       title: "コミュニティ",
-      description: "プレイヤーコミュニティに参加して、譜面やゲームについて交流しましょう。",
-      intro: "以下は本サイト関連のプレイヤーグループです。カードをクリックすると参加できます。",
+      description: "使い慣れたプラットフォームで、他のプレイヤーと譜面や遊び方について語り合いましょう。",
       join: (name) => `${name}に参加`,
     },
     donate: {

@@ -36,6 +36,7 @@ type RandomChartButtonProps = {
   label: string;
   /** Icon-only compact form for toolbars; the label becomes the aria-label. */
   iconOnly?: boolean;
+  iconPosition?: "start" | "end";
   className?: string;
   /**
    * Slugs to draw from. Passed by the catalog browser so "random" respects the
@@ -81,6 +82,7 @@ export function RandomChartButton({
   locale,
   label,
   iconOnly = false,
+  iconPosition = "start",
   className,
   pool,
 }: RandomChartButtonProps) {
@@ -113,6 +115,10 @@ export function RandomChartButton({
     );
   }
 
+  const icon = (
+    <DicesIcon data-icon={`inline-${iconPosition}`} aria-hidden="true" className={cn(busy && "animate-spin")} />
+  );
+
   return (
     <Button
       type="button"
@@ -123,8 +129,9 @@ export function RandomChartButton({
       title={blockedByNetwork ? hint : undefined}
       className={className}
     >
-      <DicesIcon data-icon="inline-start" aria-hidden="true" className={cn(busy && "animate-spin")} />
+      {iconPosition === "start" ? icon : null}
       {label}
+      {iconPosition === "end" ? icon : null}
     </Button>
   );
 }

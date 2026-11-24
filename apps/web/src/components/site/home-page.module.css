@@ -171,6 +171,7 @@
 }
 
 .heroActions {
+  --hero-action-font-weight: 650;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -192,7 +193,7 @@
   color: var(--hero-strong);
   gap: 0.45rem;
   font-size: 0.81rem;
-  font-weight: 650;
+  font-weight: var(--hero-action-font-weight);
   line-height: 1.1;
   text-decoration: none;
   white-space: nowrap;
@@ -235,17 +236,17 @@
   color: var(--hero-card-bg);
 }
 
-.heroAction.randomButton {
+.heroAction.randomButton[data-slot="button"][data-variant="outline"] {
   min-height: 2.75rem;
   height: auto;
-  padding: 0.68rem 0.9rem;
   border-color: var(--hero-control-border);
   border-radius: var(--md-radius, 4px);
   background: var(--hero-control-bg);
   color: var(--hero-strong);
+  font-weight: var(--hero-action-font-weight);
 }
 
-.heroAction.randomButton:hover {
+.heroAction.randomButton[data-slot="button"][data-variant="outline"]:hover {
   border-color: color-mix(in srgb, var(--hero-control-border), var(--hero-accent-line) 55%);
   background: var(--hero-control-hover);
   color: var(--hero-link-hover);
@@ -786,6 +787,7 @@
   .heroActions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
     gap: 0.55rem;
   }
 
@@ -793,10 +795,12 @@
     width: 100%;
     min-width: 0;
     padding-inline: 0.65rem;
+    text-align: center;
+    white-space: normal;
   }
 
-  .heroAction:last-child {
-    grid-column: 1 / -1;
+  .heroAction > svg {
+    flex-shrink: 0;
   }
 
   .heroMetrics {
