@@ -276,7 +276,12 @@ async function acceptance() {
     ]);
     assert.equal(response.status(), 201); draft = await response.json();
     assert.match(draft.id, /^[a-f0-9-]{36}$/); assert.equal(draft.title, "CI private draft");
-    await page.waitForURL(url => url.pathname === `/me/charts/${draft.id}`);
+    await page.waitForURL(url => url.pathname === `/me/charts/${draft.id}` && url.hash === "#publication");
+    const review = page.getByRole("region", { name: "公开发布", exact: true });
+    await review.waitFor();
+    await page.waitForFunction(() => document.activeElement?.id === "publication");
+    assert.equal(await review.getByRole("combobox", { name: /公开版本/ }).inputValue(), draft.currentVersionId);
+    assert.equal(await review.getByRole("button", { name: "确认发布", exact: true }).isEnabled(), false);
     const reloaded = await page.reload(); assert.equal(reloaded.status(), 200);
     await page.getByRole("heading", { level: 1, name: "CI private draft", exact: true }).waitFor();
     const current = await json(owner, `/api/v1/me/charts/${draft.id}`);
@@ -320,7 +325,9 @@ async function acceptance() {
     await page.getByText("已公开", { exact: true }).waitFor();
     await page.getByText(`当前公开：版本 ${publicChart.ordinal}`, { exact: true }).waitFor();
     assert.equal(publicChart.publicId, "1");
-    assert.equal(await page.locator('a[href="/charts/1"]').count(), 1);
+    const review = page.getByRole("region", { name: "公开发布", exact: true });
+    assert.equal(await review.getByRole("link", { name: "查看公开页", exact: true }).getAttribute("href"), "/charts/1");
+    await review.getByRole("button", { name: "复制公开链接", exact: true }).waitFor();
     assert.equal(publicChart.versionId, draft.currentVersionId);
     assert.equal(publicChart.title, draft.title);
     assert.equal(JSON.stringify(publicChart).includes("sourceFileId"), false);
@@ -349,6 +356,9 @@ async function acceptance() {
     assert.equal(saved.status(), 201);
     const latest = await saved.json();
     assert.notEqual(latest.currentVersionId, draft.currentVersionId);
+    const review = page.getByRole("region", { name: "公开发布", exact: true });
+    await review.getByText("私有草稿与公开内容不同；编辑不会自动发布。", { exact: true }).waitFor();
+    assert.equal(await review.getByRole("combobox", { name: /公开版本/ }).inputValue(), latest.currentVersionId);
     await denied(anonymous, `${publicBase()}/versions/${latest.currentVersionId}/assets/maidata`, 404);
     await page.getByLabel("标题", { exact: true }).fill("Private metadata edited");
     const [edited] = await Promise.all([

@@ -2,7 +2,7 @@ import { ConfirmationDialog } from "@astrodx/ui/components/confirmation-dialog";
 import { Badge } from "@astrodx/ui/components/badge";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
@@ -17,6 +17,7 @@ import { chartErrorMessage } from "../lib/chart-errors";
 import { chartsApi } from "../queries/charts";
 import { ChartSummary } from "./chart-summary";
 import { PrivateChartPreview } from "./private-chart-preview";
+import { ShareChartButton } from "./share-chart-button";
 
 type Intent = { versionId: string; title: string; artist: string; description: string; credits: string; tags: ChartDto["tags"]; aliases?:string[]; releaseNote: string } | null;
 function matches(chart: ChartDto, intent: Intent) {
@@ -24,12 +25,20 @@ function matches(chart: ChartDto, intent: Intent) {
   return intent === null ? chart.publication === null : chart.publication?.versionId === intent.versionId &&
     chart.publication.title === intent.title && chart.publication.artist === intent.artist && chart.publication.description === intent.description && chart.publication.credits === intent.credits && JSON.stringify(chart.publication.tags) === JSON.stringify(intent.tags) && JSON.stringify(chart.publication.aliases??[])===JSON.stringify(intent.aliases??[]) && chart.publication.releaseNote === intent.releaseNote;
 }
-export function ChartPublication({ chart, busy, setBusy, refresh, isCurrent = () => true }: {
+export function ChartPublication({ chart, busy, metadataUnsaved = false, setBusy, refresh, isCurrent = () => true }: {
   isCurrent?: () => boolean;
-  chart: ChartDto; busy: boolean; setBusy: (busy: boolean) => void;
+  chart: ChartDto; busy: boolean; metadataUnsaved?: boolean; setBusy: (busy: boolean) => void;
   refresh: (chart: ChartDto) => Promise<void>;
 }) {
   const location = useLocation();
+  const panel = useRef<HTMLElement>(null);
+  const { hash, key } = location;
+  useEffect(() => {
+    if (hash === "#publication") {
+      panel.current?.focus({ preventScroll: true });
+      panel.current?.scrollIntoView({ block: "start" });
+    }
+  }, [hash, key]);
   const [interactive,setInteractive]=useState(false);
   useEffect(()=>setInteractive(true),[]);
   const fail = (error: unknown) => {
@@ -37,7 +46,11 @@ export function ChartPublication({ chart, busy, setBusy, refresh, isCurrent = ()
     const target = accountErrorRedirect(error, `${location.pathname}${location.search}`);
     if (target) window.location.assign(target);
   };
-  const [versionId, setVersionId] = useState("");
+  const [choice, setChoice] = useState<{ versionId: string; currentVersionId: string } | null>(null);
+  const chosenVersionId = choice?.currentVersionId === chart.currentVersionId ? choice.versionId : chart.currentVersionId;
+  const selected = chart.versions.find((version) => version.id === chosenVersionId)
+    ?? chart.versions.find((version) => version.id === chart.currentVersionId);
+  const versionId = selected?.id ?? "";
   const confirmationKey = publicationConfirmationKey(chart,versionId);
   const [confirmedKey,setConfirmedKey] = useState<string|null>(null);
   const confirmed = confirmedKey === confirmationKey;
@@ -55,7 +68,13 @@ export function ChartPublication({ chart, busy, setBusy, refresh, isCurrent = ()
   const uncertain = reconcile || chart.publicationPending !== false;
   const publishedVersion = chart.versions.find(version => version.id === chart.publication?.versionId);
   const privateChanges = !uncertain && chart.publication && (chart.currentVersionId !== chart.publication.versionId || chart.title !== chart.publication.title || chart.artist !== chart.publication.artist || chart.description !== chart.publication.description || chart.credits !== chart.publication.credits || JSON.stringify(chart.tags) !== JSON.stringify(chart.publication.tags) || JSON.stringify(chart.aliases??[])!==JSON.stringify(chart.publication.aliases??[]) || publishedVersion?.releaseNote !== chart.publication.releaseNote);
-  const selected = chart.versions.find((version) => version.id === versionId);
+  const publicId = !uncertain && chart.publication ? chart.publicId ?? chart.id : null;
+  const selectedFingerprint = fingerprints.key === fingerprintKey
+    ? fingerprints.items.find((item) => item.versionId === versionId)
+    : undefined;
+  const packageComparison = fingerprints.key === fingerprintKey && fingerprints.items.length === 2
+    ? compareFingerprints(fingerprints.items[0], fingerprints.items[1])
+    : null;
   const api = chartsApi(getRenderApi());
   const accept = async (actual: ChartDto, target: Intent, allowSuccess: boolean) => {
     if (!isCurrent()) return false;
@@ -93,42 +112,80 @@ export function ChartPublication({ chart, busy, setBusy, refresh, isCurrent = ()
     catch (failure) { setError(failure); fail(failure); }
     finally { if (isCurrent()) setBusy(false); }
   }
-  return <section tabIndex={-1} id="publication" aria-label={m.chart_publication()} className="community-panel space-y-4">
+  return <section ref={panel} tabIndex={-1} id="publication" aria-label={m.chart_publication()} className="community-panel space-y-4">
     <div className="flex flex-wrap items-center gap-2">
       <h2 className="font-semibold">{m.chart_publication()}</h2>
-    <a href={localizeHref("/help/publication")} className="inline-flex min-h-11 items-center text-sm underline">{m.site_help_publication_title()}</a>
+      <a href={localizeHref("/help/publication")} className="inline-flex min-h-11 items-center text-sm underline">{m.site_help_publication_title()}</a>
       <Badge variant={uncertain ? "outline" : chart.publication ? "default" : "secondary"}>
         {uncertain ? m.chart_publication_status_pending() : chart.publication ? m.chart_publication_status_public() : m.chart_publication_status_private()}
       </Badge>
     </div>
-    <p className="text-sm">{m.chart_publication_hint()}</p><p className="text-sm">{m.author_saved_metadata()}</p>
+    {metadataUnsaved ? <p role="status" className="text-sm">{m.chart_publication_save_metadata()}</p> : null}
     {chart.publication && !uncertain ? <div className="space-y-1 text-sm">
       <p>{m.chart_publication_current({ title: chart.publication.title, artist: chart.publication.artist })}</p>
       {publishedVersion ? <p>{m.chart_publication_published_version({ number: String(publishedVersion.ordinal) })}</p> : null}
-      <p className="break-all text-xs text-muted-foreground">{m.chart_publication_version_id({ id: chart.publication.versionId })}</p>
-      <Link className="underline" to={localizeHref(`/charts/${chart.publicId ?? chart.id}`)}>{m.chart_publication_view()}</Link>
     </div> : !uncertain ? <p>{m.chart_publication_private()}</p> : null}
     {privateChanges ? <p className="rounded-md border bg-muted/50 p-3 text-sm">{m.chart_publication_private_changes()}</p> : null}
     <label className="block">{m.chart_publication_version()}
-      <select value={versionId} disabled={!interactive || busy || reconcile || uncertain} onChange={(event) => { setVersionId(event.target.value); setConfirmed(false); setStatus(""); }} className="ml-2 rounded border p-2">
-        <option value="">{m.chart_publication_choose()}</option>
+      <select value={versionId} disabled={!interactive || busy || reconcile || uncertain} onChange={(event) => { setChoice({ versionId: event.target.value, currentVersionId: chart.currentVersionId }); setConfirmed(false); setStatus(""); }} className="ml-2 min-h-11 max-w-full rounded border p-2">
+        {!selected ? <option value="" disabled>{m.chart_publication_choose()}</option> : null}
         {chart.versions.map((version) => <option key={version.id} value={version.id}>{m.chart_version({ number: String(version.ordinal) })}</option>)}
       </select>
     </label>
-    {selected ? <nav className="flex flex-wrap gap-3"><Link className="underline" to={localizeHref(`/me/charts/${chart.id}/review?version=${selected.id}`)}>{m.author_review()}</Link><Link className="underline" to={localizeHref(`/me/charts/${chart.id}/compare?right=${selected.id}${chart.publication?`&left=${chart.publication.versionId}`:""}`)}>{m.author_compare()}</Link></nav>:null}
-    {selected&&fingerprints.key===fingerprintKey?<div className="space-y-2 rounded border p-3"><h3>{m.author_package()}</h3>{fingerprints.error?<p role="status">{m.author_analysis_failed()}</p>:!fingerprints.items.length?<p>{m.author_analysis_loading()}</p>:<>{fingerprints.items.map(f=><p key={f.versionId} className="break-all font-mono text-xs">SHA256 {f.source.sha256} · {f.source.size} B</p>)}{fingerprints.items.length===2?<p>{compareFingerprints(fingerprints.items[0],fingerprints.items[1]).archiveSame?m.author_unchanged():compareFingerprints(fingerprints.items[0],fingerprints.items[1]).previewSame?m.author_archive_changed():m.author_different()}</p>:null}</>}</div>:null}
-    {selected ? <div className="grid gap-3">
-      {chart.publication ? <div className="space-y-2 rounded border p-3"><h3 className="font-semibold">{m.chart_metadata_current_snapshot()}</h3><p>{chart.publication.title} · {chart.publication.artist || "—"}</p>
-        {publishedVersion ? <><p>{m.chart_version({ number: String(publishedVersion.ordinal) })} · {(publishedVersion.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p><ChartSummary summary={publishedVersion.summary} /></> : <p>{m.chart_metadata_unknown()}</p>}
-        <SnapshotMetadata value={chart.publication} /></div> : null}
-      <div className="space-y-2 rounded border p-3"><h3 className="font-semibold">{m.chart_metadata_selected_snapshot()}</h3>
-      <p className="break-words font-semibold">{chart.title} · {chart.artist || "—"}</p>
-      <p>{m.chart_version({ number: String(selected.ordinal) })} · {(selected.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p>
-      <ChartSummary summary={selected.summary} /><p className="text-sm">{m.author_advisory()}</p>
-      <SnapshotMetadata value={{ ...chart, releaseNote: selected.releaseNote }} />
-      <p className="text-xs text-muted-foreground">{m.chart_metadata_comparison_hint()}</p>
-      <PrivateChartPreview key={selected.id} id={chart.id} versionId={selected.id} summary={selected.summary} />
-    </div></div> : null}
+    {selected ? (
+      <div className="space-y-3 rounded-md border p-3">
+        <h3 className="font-semibold">{m.chart_metadata_selected_snapshot()}</h3>
+        <p className="break-words font-semibold">{chart.title} · {chart.artist || "—"}</p>
+        <p className="text-sm">{m.chart_publication_package({ size: (selected.sourceSize / (1024 * 1024)).toFixed(2) })}</p>
+        <ChartSummary summary={selected.summary} />
+        {selected.summary.warnings.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{m.chart_publication_no_warnings()}</p>
+        ) : null}
+        <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+          <Link className="underline" to={localizeHref(`/me/charts/${chart.id}/review?version=${selected.id}`)}>{m.author_review()}</Link>
+          <Link className="underline" to={localizeHref(`/me/charts/${chart.id}/compare?right=${selected.id}${chart.publication ? `&left=${chart.publication.versionId}` : ""}`)}>{m.author_compare()}</Link>
+        </div>
+        <details className="community-source-details">
+          <summary>{m.chart_metadata_heading()}</summary>
+          <SnapshotMetadata value={{ ...chart, releaseNote: selected.releaseNote }} />
+          {chart.publication ? <div className="space-y-2 border-t pt-3">
+            <h4 className="font-semibold">{m.chart_metadata_current_snapshot()}</h4>
+            <p className="break-words">{chart.publication.title} · {chart.publication.artist || "—"}</p>
+            {publishedVersion ? <ChartSummary summary={publishedVersion.summary} /> : null}
+            <SnapshotMetadata value={chart.publication} />
+          </div> : null}
+        </details>
+        {selected.id !== chart.currentVersionId ? (
+          <details className="community-source-details">
+            <summary>{m.chart_preview()}</summary>
+            <PrivateChartPreview key={selected.id} id={chart.id} versionId={selected.id} summary={selected.summary} />
+          </details>
+        ) : null}
+        <details className="community-source-details">
+          <summary>{m.author_package()}</summary>
+          {fingerprints.key === fingerprintKey && fingerprints.error ? (
+            <p>{m.author_analysis_failed()}</p>
+          ) : selectedFingerprint ? (
+            <>
+              <p className="break-all font-mono text-xs">SHA256 {selectedFingerprint.source.sha256}</p>
+              <ul className="space-y-1 text-sm">
+                {([
+                  ["maidata", m.chart_part_maidata()],
+                  ["audio", m.chart_audio()],
+                  ["cover", m.chart_cover()],
+                ] as const).map(([role, label]) => {
+                  const asset = selectedFingerprint.assets[role];
+                  return asset ? <li key={role}>{label} · {asset.size} B</li> : null;
+                })}
+              </ul>
+            </>
+          ) : <p>{m.author_analysis_loading()}</p>}
+          {packageComparison ? (
+            <p>{packageComparison.archiveSame ? m.author_unchanged() : packageComparison.previewSame ? m.author_archive_changed() : m.author_different()}</p>
+          ) : null}
+        </details>
+      </div>
+    ) : null}
     <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} disabled={!interactive || busy || !selected || reconcile || uncertain} onChange={(event) => setConfirmed(event.target.checked)} />{m.chart_publication_archive()}</label>
     <div className="flex flex-wrap gap-2">
       <Button disabled={!interactive || busy || !selected || !confirmed || reconcile || uncertain} onClick={() => void mutate({ versionId, title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits, tags: chart.tags, aliases:chart.aliases??[], releaseNote: selected?.releaseNote ?? "" })}>{chart.publication ? m.chart_publication_update() : m.chart_publication_confirm()}</Button>
@@ -141,6 +198,14 @@ export function ChartPublication({ chart, busy, setBusy, refresh, isCurrent = ()
       {reconcile || uncertain ? <Button variant="outline" disabled={!interactive || busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
     </ConfirmationDialog>
     {!withdrawing && status ? <p role="status">{status}</p> : null}
+    {publicId ? (
+      <div className="flex flex-wrap items-center gap-2">
+        <Button asChild variant="outline" className="min-h-11">
+          <Link to={localizeHref(`/charts/${publicId}`)}>{m.chart_publication_view()}</Link>
+        </Button>
+        <ShareChartButton title={chart.publication?.title ?? chart.title} publicId={publicId} label={m.chart_publication_copy()} copyOnly />
+      </div>
+    ) : null}
     {!withdrawing && error ? <Alert role="alert" variant="destructive">{chartErrorMessage(error)}</Alert> : null}
   </section>;
 }

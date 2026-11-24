@@ -1,12 +1,12 @@
 import { Button } from "@astrodx/ui/components/button";
 import { Input } from "@astrodx/ui/components/input";
-import { Share2Icon } from "lucide-react";
+import { LinkIcon, Share2Icon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import { localizeHref } from "@/paraglide/runtime.js";
 import { m } from "@/paraglide/messages.js";
 
-export function ShareChartButton({ title, publicId, resource="charts",searchParams,label }: { title: string; publicId: string; resource?: "charts"|"lists"|"u"|"forum"|"search";searchParams?:string;label?:string }) {
+export function ShareChartButton({ title, publicId, resource="charts",searchParams,label,copyOnly = false }: { title: string; publicId: string; resource?: "charts"|"lists"|"u"|"forum"|"search";searchParams?:string;label?:string;copyOnly?:boolean }) {
   const { pathname } = useLocation();
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -26,7 +26,7 @@ export function ShareChartButton({ title, publicId, resource="charts",searchPara
     const url = target.href;
     setBusy(true); setCopied(false); setManualUrl(null);
     try {
-      if (typeof navigator.share === "function") {
+      if (!copyOnly && typeof navigator.share === "function") {
         try { await navigator.share({ title, url }); return; }
         catch (error) { if (error instanceof DOMException && error.name === "AbortError") return; }
       }
@@ -37,7 +37,7 @@ export function ShareChartButton({ title, publicId, resource="charts",searchPara
   }
   return <>
     <Button ref={button} type="button" variant="outline" className="min-h-11" disabled={busy} onClick={() => void share()}>
-      <Share2Icon aria-hidden="true" />{label??m.public_chart_share()}
+      {copyOnly ? <LinkIcon aria-hidden="true" /> : <Share2Icon aria-hidden="true" />}{label??m.public_chart_share()}
     </Button>
     {copied ? <p role="status" className="basis-full text-sm text-muted-foreground">{m.public_chart_link_copied()}</p> : null}
     {manualUrl ? <div className="w-full basis-full space-y-2 rounded-lg border p-3">
