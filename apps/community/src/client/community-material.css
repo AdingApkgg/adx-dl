@@ -71,7 +71,7 @@ html:not(.dark):is([data-accent="orange"], [data-accent="teal"]) body.community-
   .community-material .community-brand > span:last-child > span { white-space: normal; }
   .community-material .community-site-navigation { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 2px; margin: -2px; }
   .community-material :is(.community-primary-link, .community-side-link) { display: flex; justify-content: flex-start; gap: .625rem; min-height: 2.75rem; padding: .5rem .625rem; font-size: .8125rem; line-height: 1.35; white-space: normal; }
-  .community-material .community-header-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .375rem; margin: 0; border-top: 1px solid var(--md-outline); padding-top: .75rem; }
+  .community-material .community-header-actions { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .375rem; margin: 0; border-top: 1px solid var(--md-outline); padding-top: .75rem; }
   .community-material .community-desktop-controls { display: contents; }
   .community-material .community-desktop-controls button > span { display: none; }
   .community-material .community-header-actions > :is(a, button),
@@ -116,7 +116,8 @@ html:not(.dark):is([data-accent="orange"], [data-accent="teal"]) body.community-
 }
 .community-material .community-content .community-page-title { font-size: clamp(1.875rem, 3vw, 2rem); line-height: 1.2; letter-spacing: -.02em; }
 .community-material :is(.community-settings-panel, .community-navigation-drawer) a { border-radius: var(--md-radius); }
-.community-material .community-chart-card .community-artwork-motion { margin: 12px 12px 0; border-radius: var(--md-radius); background: var(--md-surface); }
+.community-material .community-chart-card .community-artwork-motion { background: var(--md-surface); }
+.community-material .community-donation { border-color: var(--md-outline); }
 .community-material .community-artwork-plate > div { border-bottom: 0; background: var(--md-surface); }
 
 /* Buttons use transition-all by default. Width must switch immediately when the

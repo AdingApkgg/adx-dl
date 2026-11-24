@@ -45,7 +45,7 @@
 .community-mobile-sections summary::-webkit-details-marker { display:none; }
 .community-mobile-sections[open] summary svg { transform:rotate(180deg); }
 .community-mobile-sections .community-nav-group { margin:0; }
-.community-bottom-nav { position:fixed; z-index:40; inset:auto 0 0; padding:.3rem .5rem max(.3rem,env(safe-area-inset-bottom,0px)); border-top:1px solid var(--border); background:color-mix(in srgb,var(--background) 97%,transparent); backdrop-filter:blur(16px); grid-template-columns:repeat(4,minmax(0,1fr)); }
+.community-bottom-nav { position:fixed; z-index:40; inset:auto 0 0; padding:.3rem .5rem max(.3rem,env(safe-area-inset-bottom,0px)); border-top:1px solid var(--border); background:color-mix(in srgb,var(--background) 97%,transparent); backdrop-filter:blur(16px); grid-template-columns:repeat(5,minmax(0,1fr)); }
 .community-bottom-link { display:flex; min-height:3.1rem; flex-direction:column; align-items:center; justify-content:center; gap:.2rem; border-radius:.7rem; color:var(--muted-foreground); font-size:.65rem; font-weight:600; }
 .community-bottom-link svg { width:1.15rem; height:1.15rem; }
 .community-bottom-link[aria-current=page] { background:color-mix(in srgb,var(--primary) 9%,var(--background)); color:var(--primary); }
@@ -67,8 +67,8 @@
 .community-filter { background:color-mix(in srgb,var(--card) 85%,var(--background)); }
 .community-toolbar { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
 .community-empty { border:1px dashed var(--border); border-radius:1rem; padding:2.5rem 1.25rem; color:var(--muted-foreground); text-align:center; font-size:.875rem; }
-.community-chart-card { height:100%; display:flex; flex-direction:column; overflow:hidden; border:1px solid color-mix(in srgb,var(--border) 85%,transparent); border-radius:1rem; background:var(--card); transition:box-shadow .18s,border-color .18s; }
-.community-chart-card:hover { border-color:color-mix(in srgb,var(--primary) 30%,var(--border)); box-shadow:0 8px 24px -12px #00000025; }
+.community-chart-card { height:100%; display:flex; flex-direction:column; overflow:hidden; border-radius:1rem; background:var(--card); transition:box-shadow .18s; }
+.community-chart-card:hover { box-shadow:0 8px 24px -12px #00000025; }
 .community-chart-cover-placeholder { display:flex; height:100%; align-items:center; justify-content:center; flex-direction:column; gap:.75rem; background:linear-gradient(140deg,color-mix(in srgb,var(--primary) 9%,var(--muted)),var(--muted)); color:var(--muted-foreground); padding:1rem; text-align:center; font-size:.75rem; }
 .community-stat-grid > div { border:1px solid var(--border); border-radius:1rem; background:var(--card); padding:1rem 1.25rem; }
 .community-stat-grid dt { font-size:.75rem; color:var(--muted-foreground); }
@@ -84,6 +84,10 @@
 .community-dash-grid { display:grid; gap:1.5rem; align-items:start; }
 .community-dash-content { min-width:0; }
 .community-chart-detail-hero { display:grid; gap:1.5rem; }
+@media (max-width: 39.9375rem) {
+ .community-chart-detail-hero { grid-template-columns:clamp(88px, 26vw, 128px) minmax(0,1fr); column-gap:.875rem; align-items:start; }
+ .community-chart-detail-actions { grid-column:1 / -1; }
+}
 .community-chart-cover-frame { width:100%; max-width:20rem; overflow:hidden; border:1px solid var(--border); border-radius:1.25rem; }
 .community-source-details { border:1px solid var(--border); border-radius:.75rem; padding:.75rem 1rem; font-size:.75rem; color:var(--muted-foreground); }
 .community-source-details summary { cursor:pointer; min-height:1.5rem; color:var(--foreground); }
@@ -97,6 +101,8 @@
  .community-layout { padding:2rem 1.5rem 3rem; }
  .community-footer { width:calc(100% - 3rem); }
  .community-chart-detail-hero { grid-template-columns:minmax(12rem,18rem) minmax(0,1fr); align-items:start; }
+ .community-chart-detail-hero > .community-chart-cover-frame { grid-row:span 2; }
+ .community-chart-detail-actions { grid-column:2; }
 }
 @media (max-width:1023px) { .community-bottom-nav { display:grid; } }
 @media (min-width:1024px) {
@@ -390,3 +396,17 @@ html[data-motion=off] :is(.community-primary-link svg,.community-bottom-link svg
 html[data-motion=off] .community-artwork-sheen { opacity:0!important; }
 html[data-motion=off] .community-success-ripple { display:none; }
 @media (forced-colors:active) { .community-hero-title { background:none; -webkit-text-fill-color:currentColor; } .community-hero-scene { display:none; } }
+
+
+@keyframes community-chart-marquee {
+  0%, 12%, 92%, 100% { transform: translateX(0); }
+  48%, 60% { transform: translateX(var(--community-chart-marquee-shift)); }
+}
+
+.community-back-to-top {
+  right: max(1rem,env(safe-area-inset-right,0px));
+  bottom: calc(var(--community-bottom-space) + 1rem);
+}
+.community-shell:has(.community-download-dock) .community-back-to-top {
+  bottom: calc(var(--community-bottom-space) + 7rem);
+}

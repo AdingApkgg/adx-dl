@@ -1,13 +1,13 @@
 import { BrandMark } from "@astrodx/ui/components/brand-mark";
-import { CompassIcon, FileMusicIcon, LibraryIcon, MenuIcon, MessageSquareIcon, SearchIcon, UploadIcon, ArrowUpRightIcon } from "lucide-react";
+import { CompassIcon, FileMusicIcon, HeartHandshakeIcon, LibraryIcon, MegaphoneIcon, MenuIcon, MessageSquareIcon, SearchIcon, UploadIcon, ArrowUpRightIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router";
 import { Button } from "@astrodx/ui/components/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@astrodx/ui/components/sheet";
 import { m } from "@/paraglide/messages.js";
-import { deLocalizeHref, localizeHref } from "@/paraglide/runtime.js";
-import { primarySection, workspaceSection } from "../lib/site-navigation";
+import { deLocalizeHref, getLocale, localizeHref } from "@/paraglide/runtime.js";
+import { primarySection } from "../lib/site-navigation";
 import { getRenderApi } from "../lib/browser";
 import { meQuery } from "../queries/me";
 import { AccountMenu } from "./account-menu";
@@ -40,9 +40,9 @@ function PrimaryNavigation({ drawer = false }: { drawer?: boolean }) {
   </nav>;
 }
 
-function MoreNavigation({ workspace }: { workspace: boolean }) {
+function MoreNavigation({ workspace, libraryHref }: { workspace: boolean; libraryHref: string }) {
   return <Sheet>
-    <SheetTrigger asChild><Button variant="ghost" size="icon" className="lg:hidden" aria-label={m.ui_more()} title={m.ui_more()}><MenuIcon aria-hidden="true" /></Button></SheetTrigger>
+    <SheetTrigger asChild><button type="button" className="community-bottom-link community-motion-nav" aria-label={m.ui_more()} title={m.ui_more()}><MenuIcon aria-hidden="true" /><span>{m.ui_tab_more()}</span></button></SheetTrigger>
     <SheetContent closeLabel={m.ui_navigation_close()} className="community-navigation-drawer">
       <SheetHeader className="shrink-0 border-b px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))] pr-14">
         <SheetTitle>{m.site_name()}</SheetTitle><SheetDescription>{m.ui_menu_hint()}</SheetDescription>
@@ -50,7 +50,7 @@ function MoreNavigation({ workspace }: { workspace: boolean }) {
       <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-3 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <PrimaryNavigation drawer />
         <SecondaryNavigation closeOnSelect workspace={workspace} />
-        {workspace ? <WorkspaceLinks closeOnSelect /> : null}
+        {workspace ? <WorkspaceLinks closeOnSelect /> : <SheetClose asChild><Link className="community-side-link" to={localizeHref(libraryHref)}><LibraryIcon aria-hidden="true" />{m.ui_nav_mine()}</Link></SheetClose>}
         <div className="space-y-4 border-t px-2 pt-4"><LanguageOptions /><div className="flex flex-wrap items-center gap-2"><SettingsSheet /><a className="community-side-link" href="https://adxdls.saop.cc">{m.ui_web_site()}<ArrowUpRightIcon aria-hidden="true" className="size-4" /></a></div></div>
       </div>
     </SheetContent>
@@ -61,6 +61,8 @@ export function SiteHeader() {
   const { data: me } = useQuery(meQuery(getRenderApi()));
   const workspace = me?.status === "active";
   const { pathname } = useLocation();
+  const locale = getLocale();
+  const donationPath = locale === "zh" ? "/donate" : `/${locale}/donate`;
   const sidebar = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const nav = sidebar.current;
@@ -73,7 +75,7 @@ export function SiteHeader() {
     else if (item.bottom > viewport.bottom) nav.scrollTop += item.bottom - viewport.bottom;
   }, [pathname, workspace]);
   return <header className="community-header">
-    <a href="#main-content" className="community-skip-link">{m.ui_skip_content()}</a>
+    <a id="community-skip-link" href="#main-content" className="community-skip-link">{m.ui_skip_content()}</a>
     <div className="community-header-inner">
       <Link to={localizeHref("/")} className="community-brand" aria-label={m.site_name()}><span className="community-brand-mark"><BrandMark /></span><span><span className="block text-sm font-bold tracking-tight">INOTE</span><span className="block text-[11px] font-medium text-muted-foreground">{m.ui_brand_subtitle()}</span></span></Link>
       <div ref={sidebar} className="community-site-navigation hidden lg:block" data-community-navigation="sidebar">
@@ -83,18 +85,36 @@ export function SiteHeader() {
       </div>
       <div className="community-header-actions ml-auto flex shrink-0 items-center gap-0.5">
         {workspace ? <Button asChild size="sm" className="community-navigation-upload mr-1 hidden lg:inline-flex"><Link to={localizeHref("/me/charts/new")}><UploadIcon aria-hidden="true" />{m.chart_new()}</Link></Button> : null}
+        <Button asChild variant="outline" size="icon" className="community-donation"><a href={`https://adxdls.saop.cc${donationPath}`} aria-label={m.ui_support_site()} title={m.ui_support_site()}><HeartHandshakeIcon aria-hidden="true" className="text-pink-600 dark:text-pink-400" /></a></Button>
         <Button asChild variant="ghost" size="icon"><Link to={localizeHref("/search")} aria-label={m.discovery_search_label()} title={m.discovery_search_label()}><SearchIcon aria-hidden="true" /></Link></Button>
         <NotificationIndicator compact />
         <div className="community-desktop-controls hidden items-center sm:flex"><LanguageMenu /><SettingsSheet /></div>
         <AccountMenu />
-        <MoreNavigation workspace={workspace} />
       </div>
     </div>
   </header>;
 }
 
 export function MobileNavigation() {
-  const path = deLocalizeHref(useLocation().pathname), active = primarySection(path), { data: me } = useQuery(meQuery(getRenderApi()));
-  const items = [...primaryItems().filter(i => i.key !== "lists"), { key: "mine", href: me?.status === "pending_deletion" ? "/account-deletion" : "/me/library", label: m.ui_nav_mine(), icon: LibraryIcon }];
-  return <nav aria-label={m.ui_mobile_navigation()} className="community-bottom-nav lg:hidden">{items.map(({ key, href, label, icon: Icon }) => <Link key={key} to={localizeHref(href)} aria-current={key === "mine" ? workspaceSection(path) ? "page" : undefined : active === key ? "page" : undefined} className="community-bottom-link community-motion-nav">{(key === "mine" ? Boolean(workspaceSection(path)) : active === key) ? <NavigationIndicator group="mobile" /> : null}<Icon aria-hidden="true" /><span>{label}</span></Link>)}</nav>;
+  const path = deLocalizeHref(useLocation().pathname);
+  const active = primarySection(path);
+  const { data: me } = useQuery(meQuery(getRenderApi()));
+  const items = [
+    { key: "home", href: "/", label: m.ui_tab_home(), icon: CompassIcon, active: active === "discover" },
+    { key: "notices", href: "/notices", label: m.ui_tab_notices(), icon: MegaphoneIcon, active: path.replace(/\/$/, "") === "/notices" },
+    { key: "charts", href: "/charts", label: m.ui_tab_search(), icon: SearchIcon, active: active === "charts" },
+    { key: "forum", href: "/forum", label: m.ui_tab_community(), icon: MessageSquareIcon, active: active === "forum" },
+  ];
+  return (
+    <nav aria-label={m.ui_mobile_navigation()} className="community-bottom-nav lg:hidden">
+      {items.map(({ key, href, label, icon: Icon, active }) => (
+        <Link key={key} to={localizeHref(href)} aria-current={active ? "page" : undefined} className="community-bottom-link community-motion-nav">
+          {active ? <NavigationIndicator group="mobile" /> : null}
+          <Icon aria-hidden="true" />
+          <span>{label}</span>
+        </Link>
+      ))}
+      <MoreNavigation workspace={me?.status === "active"} libraryHref={me?.status === "pending_deletion" ? "/account-deletion" : "/me/library"} />
+    </nav>
+  );
 }

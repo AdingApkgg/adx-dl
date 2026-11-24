@@ -32,6 +32,7 @@
         "react-dom": "19.3.0",
         "react-router": "8.4.0",
         "react-router-hono-server": "4.1.13",
+        "recharts": "^3.10.1",
         "sharp": "0.35.5",
         "yauzl": "3.2.0",
         "zod": "^4.6.5",

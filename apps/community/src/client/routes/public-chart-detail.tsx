@@ -77,6 +77,8 @@ export default function PublicChartDetail({ loaderData: chart }: Route.Component
         {chart.author?.publicId ? <FollowAuthor publicId={chart.author.publicId}/> : null}
         <p className="text-sm text-muted-foreground">{m.chart_version({ number: String(chart.ordinal) })} · {(chart.sourceSize / (1024 * 1024)).toFixed(2)} MiB</p>
         <time className="block text-xs text-muted-foreground" dateTime={chart.updatedAt}>{m.public_chart_updated({ date: chart.updatedAt.slice(0, 10) })}</time>
+      </div>
+      <div className="community-chart-detail-actions min-w-0 space-y-3">
         <div role="group" aria-label={m.public_chart_actions()} className="flex flex-wrap items-start gap-3">
           {canPreview ? <Button asChild variant="secondary" className="min-h-11"><a href="#chart-preview"><PlayCircleIcon aria-hidden="true" />{m.public_chart_preview_action()}</a></Button> : null}
           <Button asChild className="min-h-11"><a href={publicChartDownloadUrl(chart.publicId)} download><DownloadIcon aria-hidden="true" />{m.public_chart_download()}</a></Button>

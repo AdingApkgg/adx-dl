@@ -1,6 +1,7 @@
 import { MotionSurface } from "./motion-ui";
 import { MotionArtwork } from "./motion-artwork";
 import {Music2Icon} from "lucide-react";
+import { ScrollingChartLabel } from "./scrolling-chart-label";
 import {SearchText} from "./search-text";
 import {ChartSelection} from "./library-selection";
 import { cn } from "@astrodx/ui/lib/utils";
@@ -28,6 +29,16 @@ const difficultyStyles: Record<ChartDifficulty, { name: string; tone: string }> 
 export function publicDifficultyName(difficulty: ChartDifficulty): string {
   return difficultyStyles[difficulty].name || m.chart_difficulty({ difficulty: String(difficulty) });
 }
+export function hardestDifficulties(rows: readonly ChartDifficultySummary[]) {
+  const rank = (level: string | null) => {
+    const match = level?.trim().match(/^(\d+(?:\.\d+)?)(\+)?/);
+    return match ? Number(match[1]) + (match[2] ? 0.5 : 0) : -1;
+  };
+  return [...rows].sort((a, b) =>
+    rank(b.level) - rank(a.level) || b.difficulty - a.difficulty
+  );
+}
+
 export function PublicDifficultyPill({ row }: { row: ChartDifficultySummary }) {
   const style = difficultyStyles[row.difficulty];
   return <span className={cn("inline-flex max-w-full flex-wrap items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold tabular-nums", style.tone)}>
@@ -37,9 +48,9 @@ export function PublicDifficultyPill({ row }: { row: ChartDifficultySummary }) {
   </span>;
 }
 
-export function PublicCover({ chart }: { chart: PublicChartDto }) {
+export function PublicCover({ chart, card = false }: { chart: PublicChartDto; card?: boolean }) {
   const [failed, setFailed] = useState(false);
-  return <MotionArtwork><div className="relative aspect-square overflow-hidden border-b border-border/60 bg-muted">
+  return <MotionArtwork zoom={!card}><div className={cn("relative aspect-square overflow-hidden bg-muted", !card && "border-b border-border/60")}>
     {chart.summary.hasCover && !failed ? <img src={publicChartAssetUrl(chart.publicId, chart.versionId, "cover")} alt="" loading="lazy" decoding="async" width={512} height={512} className="h-full w-full object-contain" onError={() => setFailed(true)} /> :
       <div className="community-chart-cover-placeholder"><Music2Icon aria-hidden="true" className="size-10 opacity-40"/><span>{m.chart_cover()} · {m.chart_missing()}</span></div>}
   </div></MotionArtwork>;
@@ -54,12 +65,12 @@ export function PublicChartCard({ chart, headingLevel = 2, query="",selectable=t
     .map(cursor => location.pathname + (cursor ? `?cursor=${cursor}` : ""));
   const history = publicListCursors(favorites ? privateHistory : location.state?.publicChartCursors, href);
   return <MotionSurface as="article" tone={motionTone} hover className="community-chart-card"><Link to={localizeHref(`/charts/${chart.publicId}`)} state={{ publicListHref: href, publicListCursors: history }} className="group flex min-w-0 flex-1 flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-    <PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} />
+    <PublicCover key={`${chart.id}/${chart.versionId}`} chart={chart} card />
     <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3 sm:p-4">
-      <Heading className="line-clamp-2 font-semibold leading-snug" title={chart.title}><SearchText text={chart.title} query={query}/></Heading>
-      <p className="line-clamp-1 text-sm text-muted-foreground">{chart.artist || "—"}</p>
+      <Heading className="min-w-0 font-semibold leading-snug"><ScrollingChartLabel text={chart.title}><SearchText text={chart.title} query={query} /></ScrollingChartLabel></Heading>
+      <p className="min-w-0 text-sm text-muted-foreground"><ScrollingChartLabel text={chart.artist || "—"} /></p>
       <p className="line-clamp-1 text-xs text-muted-foreground">{m.public_chart_author({ name: chart.author?.name ?? m.public_chart_anonymous() })}</p>
-      <ul className="mt-auto flex flex-wrap gap-1.5">{chart.summary.difficulties.map(row => <li key={row.difficulty} className="max-w-full">
+      <ul className="mt-auto flex flex-wrap gap-1.5">{hardestDifficulties(chart.summary.difficulties).map(row => <li key={row.difficulty} className="max-w-full">
         <PublicDifficultyPill row={row} />
       </li>)}</ul>
     </div>
