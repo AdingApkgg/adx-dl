@@ -2,6 +2,7 @@
 
 import type { Variants } from "framer-motion";
 import { ArrowUpRightIcon } from "lucide-react";
+import Image from "next/image";
 
 import { motion, springSoft } from "@astrodx/ui/motion";
 import { Card, CardDescription, CardHeader, CardTitle } from "@astrodx/ui/components/card";
@@ -21,8 +22,9 @@ const arrowVariants: Variants = {
 type FriendLinkCardProps = {
   href: string;
   name: string;
-  description: string;
-  hostname: string;
+  description?: string;
+  caption: string;
+  iconSrc?: string;
   ariaLabel: string;
 };
 
@@ -35,7 +37,8 @@ export function FriendLinkCard({
   href,
   name,
   description,
-  hostname,
+  caption,
+  iconSrc,
   ariaLabel,
 }: FriendLinkCardProps) {
   return (
@@ -52,7 +55,14 @@ export function FriendLinkCard({
       className="group block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <Card className="h-full transition-colors group-hover:ring-primary/40">
-        <CardHeader>
+        <CardHeader className={iconSrc ? "grid-cols-[auto_minmax(0,1fr)] gap-x-3" : undefined}>
+          {iconSrc ? (
+            <span
+              className={`grid size-10 place-items-center rounded-lg bg-muted/60 ${description ? "row-span-3" : "row-span-2"}`}
+            >
+              <Image src={iconSrc} alt="" width={24} height={24} />
+            </span>
+          ) : null}
           <CardTitle className="flex items-center gap-1.5">
             <span>{name}</span>
             <motion.span
@@ -63,8 +73,8 @@ export function FriendLinkCard({
               <ArrowUpRightIcon className="size-4" />
             </motion.span>
           </CardTitle>
-          <CardDescription>{description}</CardDescription>
-          <span className="text-xs text-muted-foreground/80">{hostname}</span>
+          {description ? <CardDescription>{description}</CardDescription> : null}
+          {caption ? <span className="text-xs text-muted-foreground/80">{caption}</span> : null}
         </CardHeader>
       </Card>
     </motion.a>

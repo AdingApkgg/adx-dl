@@ -5,12 +5,12 @@ import type { Locale } from "@/lib/i18n";
 export type CommunityChannel = {
   name: Record<Locale, string>;
   url: string;
-  description: Record<Locale, string>;
 };
 
 // Shared community entry points — also used by the site header's Telegram
 // button and the footer, so the URLs live here rather than per-component.
 export const QQ_COMMUNITY = "https://qm.qq.com/q/xltNzTdL1u";
+export const QQ_COMMUNITY_GROUP_NUMBER = "1037396187";
 export const TELEGRAM_COMMUNITY = "https://t.me/FullDiveSAO";
 
 // This site's own repository. Its issue tracker is the third contact route

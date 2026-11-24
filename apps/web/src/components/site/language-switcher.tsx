@@ -26,13 +26,6 @@ type LanguageSwitcherProps = {
   pathname: string;
 };
 
-// Compact current-locale badge shown next to the globe on wider viewports.
-const localeShortLabel: Record<Locale, string> = {
-  zh: "中",
-  en: "EN",
-  ja: "日",
-};
-
 // framer-motion 12: motion() is removed, wrap components via motion.create.
 const MotionButton = motion.create(Button);
 
@@ -78,7 +71,6 @@ export function LanguageSwitcher({ locale, pathname }: LanguageSwitcherProps) {
         <MotionButton
           variant="outline"
           size="icon-sm"
-          className="gap-1 sm:w-auto sm:px-2.5"
           aria-label={dictionary.nav.languageLabel}
           title={dictionary.nav.languageLabel}
           whileHover="hover"
@@ -90,9 +82,6 @@ export function LanguageSwitcher({ locale, pathname }: LanguageSwitcherProps) {
           <motion.span variants={globeWobble} className="inline-flex">
             <GlobeIcon />
           </motion.span>
-          <span className="hidden text-xs font-medium sm:inline">
-            {localeShortLabel[locale]}
-          </span>
         </MotionButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
