@@ -310,7 +310,7 @@
   "chart_publication_withdraw": "撤回公开",
   "chart_publication_withdraw_confirm": "确认撤回",
   "chart_publication_withdraw_hint": "撤回后新的公开请求将不可访问，已下载的文件无法收回。私有草稿会保留。",
-  "chart_publication_saved": "公开快照已保存。",
+  "chart_publication_saved": "发布成功。",
   "chart_publication_withdrawn": "已撤回公开。",
   "chart_publication_pending": "公开状态尚未确认，请检查状态后再重试。",
   "chart_publication_retry": "已读取最新状态，请核对内容并显式重试。",

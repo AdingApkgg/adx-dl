@@ -146,7 +146,7 @@ test("lost publication response reconciles durable snapshot without replaying PU
     return Response.json(actual);
   });
   choosePublication();
-  await screen.findByText("公开快照已保存。");
+  await screen.findByText("发布成功。");
   expect(requests.filter(row => row.method === "PUT")).toEqual([{ path: "/api/v1/me/charts/chart/publication", method: "PUT", body: { expectedRevision: 2, versionId: "v1", confirmOriginalArchive: true } }]);
   expect(requests.filter(row => row.method === "GET").length).toBeGreaterThan(0);
 });
@@ -159,7 +159,7 @@ test.each([true, undefined])("pending or missing durable flag (%s) cannot report
   const section = choosePublication();
   await within(section).findByRole("button", { name: "检查发布状态" });
   await waitFor(() => expect((within(section).getByRole("button", { name: "检查发布状态" }) as HTMLButtonElement).disabled).toBe(false));
-  expect(screen.queryByText("公开快照已保存。")).toBeNull();
+  expect(screen.queryByText("发布成功。")).toBeNull();
   expect(within(section).queryByRole("button", { name: confirmAction })).toBeNull();
   actual = { ...initial, revision: 3, publication: null, publicationPending: false };
   fireEvent.click(within(section).getByRole("button", { name: "检查发布状态" }));
@@ -185,8 +185,9 @@ test("unsaved private metadata prevents publishing and retains the chosen versio
 test("later concurrent publication returned from mutation is never mistaken for requested snapshot", async () => {
   setup(() => Response.json({ ...initial, revision: 4, publication: { ...publication, title: "Concurrent title" }, publicationPending: false }));
   choosePublication();
-  await screen.findByText("当前公开：Concurrent title · Artist");
-  expect(screen.queryByText("公开快照已保存。")).toBeNull();
+  await waitFor(() => expect(screen.getAllByText("Concurrent title · Artist")
+    .some((element) => element.closest("details") === null)).toBe(true));
+  expect(screen.queryByText("发布成功。")).toBeNull();
 });
 test("published historical version cannot be deleted and withdrawal uses revision plus confirmation", async () => {
   const requests = setup((_path, method) => Response.json(method === "DELETE" ? { ...initial, revision: 4, publication: null, publicationPending: false } : { ...initial, revision: 3, publication, publicationPending: false }), { ...initial, revision: 3, publication, publicationPending: false });
@@ -214,9 +215,9 @@ test("a pending 2xx publication is not success until explicit GET confirms the e
   const section = choosePublication();
   await within(section).findByRole("button", { name: "检查发布状态" });
   await waitFor(() => expect((within(section).getByRole("button", { name: "检查发布状态" }) as HTMLButtonElement).disabled).toBe(false));
-  expect(screen.queryByText("公开快照已保存。")).toBeNull();
+  expect(screen.queryByText("发布成功。")).toBeNull();
   fireEvent.click(within(section).getByRole("button", { name: "检查发布状态" }));
-  await screen.findByText("公开快照已保存。");
+  await screen.findByText("发布成功。");
   expect(requests.filter(row => row.method === "PUT")).toHaveLength(1);
 });
 test("lost withdrawal response reads durable absence without replaying DELETE", async () => {
@@ -246,7 +247,7 @@ test("published state names the published ordinal and distinguishes private chan
   fireEvent.change(within(section).getByLabelText("公开版本"), { target: { value: "v2" } });
   expect(requests.filter(row => row.method === "PUT")).toHaveLength(0);
   fireEvent.click(within(section).getByRole("button", { name: "确认更新公开内容" }));
-  await within(section).findByText("公开快照已保存。");
+  await within(section).findByText("发布成功。");
   expect(requests.filter(row => row.method === "PUT")).toEqual([{ path: "/api/v1/me/charts/chart/publication", method: "PUT", body: { expectedRevision: 3, versionId: "v2", confirmOriginalArchive: true } }]);
   expect(within(section).getByText("当前公开：版本 2")).toBeTruthy();
   expect(within(section).queryByText("私有草稿与公开内容不同；编辑不会自动发布。")).toBeNull();
@@ -255,7 +256,7 @@ test("a private metadata change is distinguished from the published snapshot eve
   const start = { ...initial, currentVersionId: "v1", title: "Saved private edit", publication, publicationPending: false };
   setup(() => Response.json(start), start);
   const section = screen.getByRole("region", { name: "公开发布" });
-  expect(within(section).getByText("当前公开：Original · Artist")).toBeTruthy();
+  expect(within(section).getByText("Original · Artist")).toBeTruthy();
   expect(within(section).getByText("私有草稿与公开内容不同；编辑不会自动发布。")).toBeTruthy();
 });
 test("an unchanged published version does not claim unpublished changes", () => {
@@ -291,7 +292,7 @@ test.each(["publish", "withdraw"])("%s response and follow-up read both lost: pu
   expect(within(section).queryByText("已公开", { exact: true })).toBeNull();
   expect(within(section).queryByText("私有草稿", { exact: true })).toBeNull();
   expect(within(section).queryByText("当前公开：版本 1")).toBeNull();
-  expect(within(section).queryByText("公开快照已保存。")).toBeNull();
+  expect(within(section).queryByText("发布成功。")).toBeNull();
   expect(within(section).queryByText("已撤回公开。")).toBeNull();
   if (action === "publish") expect(within(section).queryByRole("button", { name: confirmAction })).toBeNull();
   else expect((within(screen.getByRole("alertdialog")).getByRole("button", { name: "确认撤回" }) as HTMLButtonElement).disabled).toBe(true);
@@ -357,7 +358,7 @@ test("publication comparison reads public metadata from its snapshot and checks 
   expect(within(section).getByText("Public description")).toBeTruthy(); expect(within(section).getByText("Private description")).toBeTruthy();
   fireEvent.click(within(section).getByRole("button", { name: /^确认(?:发布|更新公开内容)$/ }));
   await within(section).findByText("Concurrent description");
-  expect(within(section).queryByText("公开快照已保存。")).toBeNull();
+  expect(within(section).queryByText("发布成功。")).toBeNull();
 });
 
 test("server-rendered publication controls wait for hydration before accepting a version choice",()=>{

@@ -310,7 +310,7 @@
   "chart_publication_withdraw": "公開を取り消す",
   "chart_publication_withdraw_confirm": "取り消しを確定",
   "chart_publication_withdraw_hint": "取り消すと新しい公開リクエストは利用できません。ダウンロード済みのコピーは回収できません。非公開下書きは残ります。",
-  "chart_publication_saved": "公開スナップショットを保存しました。",
+  "chart_publication_saved": "譜面を公開しました。",
   "chart_publication_withdrawn": "公開を取り消しました。",
   "chart_publication_pending": "公開状態はまだ確定していません。状態を確認してから再試行してください。",
   "chart_publication_retry": "最新の状態を読み込みました。内容を確認して明示的に再試行してください。",

@@ -126,7 +126,9 @@ export function ChartPublication({ chart, busy, metadataUnsaved = false, setBusy
     </header>
     {metadataUnsaved ? <p role="status" className="text-sm">{m.chart_publication_save_metadata()}</p> : null}
     {chart.publication && !uncertain ? <div className="space-y-1 text-sm">
-      <p>{m.chart_publication_current({ title: chart.publication.title, artist: chart.publication.artist })}</p>
+      <p className="break-words font-medium">
+        {chart.publication.title}{chart.publication.artist ? ` · ${chart.publication.artist}` : ""}
+      </p>
       {publishedVersion ? <p>{m.chart_publication_published_version({ number: String(publishedVersion.ordinal) })}</p> : null}
     </div> : null}
     {privateChanges ? <p className="community-publication-notice px-3 py-2 text-sm">{m.chart_publication_private_changes()}</p> : null}

@@ -310,7 +310,7 @@
   "chart_publication_withdraw": "Withdraw publication",
   "chart_publication_withdraw_confirm": "Confirm withdrawal",
   "chart_publication_withdraw_hint": "Withdrawal blocks new public requests. Downloaded copies cannot be recalled. Your private draft is kept.",
-  "chart_publication_saved": "Public snapshot saved.",
+  "chart_publication_saved": "Chart published.",
   "chart_publication_withdrawn": "Publication withdrawn.",
   "chart_publication_pending": "Publication is not confirmed yet. Check its status before retrying.",
   "chart_publication_retry": "Latest state loaded. Review it and retry explicitly.",
