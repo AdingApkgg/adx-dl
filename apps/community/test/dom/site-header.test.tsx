@@ -6,7 +6,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { m } from "@/paraglide/messages.js";
 import { AppProviders } from "@/client/components/app-providers";
-import { SiteHeader } from "@/client/components/site-header";
+import { MobileNavigation, SiteHeader } from "@/client/components/site-header";
 import { makeQueryClient } from "@/shared/query-client";
 
 // 退出登录走 Better Auth 的客户端；它在创建时就记下了 fetch，换不掉，所以直接换掉它的 signOut。
@@ -26,6 +26,7 @@ function renderHeader(path: string, me: typeof USER | null) {
       <MemoryRouter initialEntries={[path]}>
         <AppProviders>
           <SiteHeader />
+          <MobileNavigation />
         </AppProviders>
       </MemoryRouter>
     </QueryClientProvider>

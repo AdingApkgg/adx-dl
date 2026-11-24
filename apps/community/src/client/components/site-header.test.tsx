@@ -8,7 +8,7 @@ import { paraglideMiddleware } from "@/paraglide/server.js";
 import { makeQueryClient } from "@/shared/query-client";
 
 import { languageLinks } from "./language-menu";
-import { SiteHeader } from "./site-header";
+import { MobileNavigation, SiteHeader } from "./site-header";
 
 const USER = { id: "abc2345678", name: "阿丁", image: null, status: "active", createdAt: "", deletionPurgeAt: null };
 
@@ -25,6 +25,7 @@ async function renderHeader(path: string, me?: typeof USER | null): Promise<stri
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={[path]}>
           <SiteHeader />
+          <MobileNavigation />
         </MemoryRouter>
       </QueryClientProvider>
     );
@@ -76,6 +77,14 @@ describe("页头的服务端渲染", () => {
       const language = m[`language_${locale}`]();
       expect(html, path).toContain(`aria-label="${m.nav_language({ language }, { locale })}"`);
     }
+  });
+
+  test("手机底栏依次显示首页、公告、搜谱、社群和更多", async () => {
+    const html = await renderHeader("/notices", null);
+    const nav = html.slice(html.indexOf("community-bottom-nav"));
+    expect([...nav.matchAll(/>(首页|公告|搜谱|社群|更多)</g)].map((match) => match[1]))
+      .toEqual(["首页", "公告", "搜谱", "社群", "更多"]);
+    expect(nav.match(/<a\b[^>]*href="\/notices"[^>]*>/)?.[0]).toContain('aria-current="page"');
   });
 
   test("没登录：'登录'按钮带着当前地址，登录后回来", async () => {
