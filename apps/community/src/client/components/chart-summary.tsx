@@ -69,7 +69,7 @@ export function ChartSummary({ summary, onPreview }: { summary: ChartImportSumma
           </li>
         );
         return (
-          <li key={difficulty.difficulty} className="community-difficulty-card space-y-2">
+          <li key={difficulty.difficulty} data-difficulty-slot={difficulty.difficulty} className="community-difficulty-card space-y-2">
             <div className="flex items-start justify-between gap-2">
               <span className="font-semibold">{name}</span>
               <span className="rounded-md bg-secondary px-2 font-semibold tabular-nums">{level}</span>

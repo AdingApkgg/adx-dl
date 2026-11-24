@@ -223,7 +223,7 @@ try {
       await visit('/charts/1');
       assert.equal(await page.getByRole('navigation',{name:'本页导航',exact:true}).getByRole('link').count(),5);
       const summary=await json('/api/v1/charts/1'),slot=summary.summary.difficulties.find(d=>d.difficulty===6&&d.previewSupported);assert.ok(slot,'REQUIRED_DIFFICULTY_CARD');
-      const card=page.locator('#chart-difficulties li').nth(summary.summary.difficulties.indexOf(slot));
+      const card=page.locator(`#chart-difficulties [data-difficulty-slot="${slot.difficulty}"]`);
       const preview=page.locator('#chart-preview');
       for(let cycle=0;cycle<2;cycle++){
         const audioPath=`/api/v1/charts/1/versions/${summary.versionId}/assets/audio`;
