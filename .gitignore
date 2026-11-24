@@ -23,6 +23,7 @@ apps/web/.tmp-server-ws.json
 
 # Frontend dependencies and build outputs (bun workspaces hoist to the root)
 node_modules/
+/data/catalog/.lxns-areas-cache.json
 apps/web/.next/
 apps/web/out/
 apps/community/build/

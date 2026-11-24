@@ -45,6 +45,8 @@ export type CatalogEntryMedia = {
   pv_url: string;
 };
 
+export type CatalogArea = { id: string; label: string };
+
 export type CatalogEntry = {
   id: string;
   /** Canonical route slug: the unique maimai song id (shortid). */
@@ -64,6 +66,7 @@ export type CatalogEntry = {
   genre: string;
   /** maimai genre id (101–107); stable key for genre color + localized label. */
   genreid?: number;
+  area?: CatalogArea;
   cabinet: string;
   short_id: string;
   /** Community nicknames (别名) for the song; used to find a chart by an alternate name. */
@@ -148,6 +151,7 @@ export type CatalogCardEntry = Pick<
   | "versionid"
   | "genre"
   | "genreid"
+  | "area"
   | "cabinet"
   | "short_id"
   | "aliases"
@@ -192,6 +196,7 @@ export function toCatalogCardEntry(entry: CatalogEntry): CatalogCardEntry {
     ...(entry.versionid !== undefined ? { versionid: entry.versionid } : {}),
     genre: entry.genre,
     ...(entry.genreid !== undefined ? { genreid: entry.genreid } : {}),
+    ...(entry.area ? { area: entry.area } : {}),
     cabinet: entry.cabinet,
     short_id: entry.short_id,
     ...(entry.aliases?.length ? { aliases: entry.aliases } : {}),

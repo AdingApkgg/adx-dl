@@ -89,6 +89,13 @@ jobs:
         with:
           python-version: "3.15"
 
+      - name: Restore LXNS area snapshot
+        uses: actions/cache/restore@v6.1.0
+        with:
+          path: data/catalog/.lxns-areas-cache.json
+          key: lxns-areas-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: lxns-areas-v1-
+
       # Covers (AVIF/WebP) are served from Cloudflare R2, not mirrored into the
       # Pages build — no full-image mirror/cache or libavif/cwebp install.
       # Small colour metadata is cached separately below. build_catalog
@@ -99,6 +106,13 @@ jobs:
         # Falls back to the committed catalog (with a warning) when the origin on
         # alice is unreachable; other failures still fail the job.
         run: python3 -m tools.ci_build_catalog
+
+      - name: Save LXNS area snapshot
+        if: hashFiles('data/catalog/.lxns-areas-cache.json') != ''
+        uses: actions/cache/save@v6.1.0
+        with:
+          path: data/catalog/.lxns-areas-cache.json
+          key: lxns-areas-v1-${{ github.run_id }}-${{ github.run_attempt }}
 
       # maidata.txt is committed under apps/web/public/adxcs/<shortid>/ (served
       # same-origin for the .adx download + chart preview), so there is no mirror
