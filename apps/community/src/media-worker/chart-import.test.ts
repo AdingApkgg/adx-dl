@@ -5,7 +5,7 @@ import { Client } from "pg";
 import { readOriginalManifest } from "../../ops/backup/export";
 import { testDatabaseUrl } from "../server/testing/services";
 import { ingestFixture, hash } from "../../test/storage/ingest-fixture";
-import { blobDerivatives, blobs, chartSourceEntries, derivedObjects, files, storageBudget, storageUsage, uploadSessions } from "../server/db/schema";
+import { blobDerivatives, blobs, charts, chartSourceEntries, derivedObjects, files, storageBudget, storageUsage, uploadSessions } from "../server/db/schema";
 import { initUpload, completeUpload, getUpload, cancelUpload } from "../server/storage/uploads";
 import { putUploadPart } from "../server/storage/parts";
 import { getFile } from "../server/storage/files";
@@ -32,7 +32,11 @@ import { join } from "node:path";
 describe.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH && !process.env.STORAGE_TEST_MEDIA_ACCESS_KEY_ID)("private chart import on isolated PG and authenticated S3",()=>{
   let f: Awaited<ReturnType<typeof ingestFixture>>;
   beforeAll(async()=>{await resetTestDatabase();f=await ingestFixture();f.mediaCtx.config.recipeBuild=RECIPE_BUILD;},30_000);
-  afterAll(async()=>{await f?.cleanup();},30_000);
+  let legacyChartId: string | undefined;
+  afterAll(async () => {
+    if (legacyChartId) await f.ctx.db.delete(charts).where(eq(charts.id, legacyChartId));
+    await f?.cleanup();
+  }, 30_000);
   async function upload(bytes: Uint8Array, name = "fixture.zip") {
     const userId = await f.owner();
     const dto = await initUpload(f.ctx,userId,{purpose:"chart-source",name,size:bytes.length,sha256:hash(bytes)},crypto.randomUUID());
@@ -126,7 +130,7 @@ describe.skipIf(!process.env.STORAGE_TEST_FIXTURE_PATH && !process.env.STORAGE_T
     await ingestUpload(f.mediaCtx, u.data);
     await handleChartImport(f.mediaCtx, u.data);
     await finalizeUpload(f.mediaCtx, u.data);
-    await createChart(f.ctx, u.userId, u.dto.fileId!);
+    legacyChartId = (await createChart(f.ctx, u.userId, u.dto.fileId!)).id;
     const [file] = await f.ctx.db.select().from(files).where(eq(files.id, u.dto.fileId!));
     const [source] = await f.ctx.db.select().from(blobs).where(eq(blobs.id, file.blobId));
     const manifest = await f.ctx.db.delete(chartSourceEntries)
