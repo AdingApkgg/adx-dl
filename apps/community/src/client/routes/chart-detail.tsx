@@ -114,9 +114,6 @@ function Detail({ actor, id, chart, queryError, isOwner }: { actor: string; id: 
   return <main className="community-author-page space-y-6">
     <AuthorNavigation id={id} view="edit" />
     <PageTitle description={m.charts_private_hint()}>{chart.title}</PageTitle>
-    {!chart.publication && chart.publicationPending === false ? (
-      <Button asChild><a href="#publication">{m.chart_publication_review()}</a></Button>
-    ) : null}
     <nav aria-label={m.ui_content_navigation()} className="community-content-nav"><a href="#author-metadata">{m.chart_metadata_heading()}</a><a href="#publication">{m.chart_publication()}</a><a href="#author-versions">{m.chart_versions()}</a><a href="#author-upload">{m.ui_author_add_version()}</a></nav>
     {current ? <div id="author-preview"><PrivateChartPreview key={current.id} id={id} versionId={current.id} summary={current.summary} /></div> : null}
     <div className="community-author-layout"><div id="author-metadata" className="min-w-0"><ChartMetadataEditor chart={chart} busy={pending} setBusy={setPending} refresh={refresh} isCurrent={isCurrent} onDirty={setMetadataUnsaved} /></div>

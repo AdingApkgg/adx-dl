@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {join} from 'node:path';
-import {enabled} from './browser-input.mjs';
+import {enabled,openChartPublicationReview} from './browser-input.mjs';
 /** Continues the author upload flow; all mutations stay in the disposable native fixture. */
 export async function exerciseDiscovery({owner,other,anonymous,origin,step,evidenceDirectory,independentSuite}){
  const writer=await other.newPage(),reader=await owner.newPage(),errors=[];for(const p of [writer,reader])p.on('pageerror',e=>errors.push(e.name));const url=p=>new URL(p,origin).href;
@@ -13,7 +13,7 @@ export async function exerciseDiscovery({owner,other,anonymous,origin,step,evide
   await writer.goto(url(`/me/charts/${chart.id}`));await writer.getByLabel('别名',{exact:true}).fill(alias);
   const saved=writer.waitForResponse(r=>new URL(r.url()).pathname===`/api/v1/me/charts/${chart.id}`&&r.request().method()==='PATCH');await writer.getByRole('button',{name:'保存作品资料',exact:true}).click();assert.equal((await saved).status(),200);
   assert.equal((await get(anonymous,`/api/v1/search?type=charts&q=${encodeURIComponent(alias)}`)).groups.charts.total,0);
-  const publication=writer.getByRole('region',{name:'公开发布',exact:true}),select=publication.getByRole('combobox',{name:/公开版本/});await enabled(select);await select.selectOption(before.version);await publication.getByLabel('我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。',{exact:true}).check();
+  const publication=await openChartPublicationReview(writer),select=publication.getByRole('combobox',{name:/公开版本/});await enabled(select);await select.selectOption(before.version);
   const published=writer.waitForResponse(r=>new URL(r.url()).pathname===`/api/v1/me/charts/${chart.id}/publication`&&r.request().method()==='PUT');await publication.getByRole('button',{name:'确认更新公开内容',exact:true}).click();assert.equal((await published).status(),200);
   chart=await get(other,`/api/v1/me/charts/${chart.id}`);assert.equal(chart.publicId,before.number);assert.equal(chart.publication.versionId,before.version);assert.equal(chart.versions.find(v=>v.id===before.version).sourceFileId,before.source);
   const result=await get(anonymous,`/api/v1/search?type=charts&q=${encodeURIComponent(alias)}`);assert.equal(result.groups.charts.total,1);assert.equal(result.groups.charts.items[0].reason.kind,'alias');

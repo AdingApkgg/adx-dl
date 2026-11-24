@@ -6,7 +6,6 @@ import { m } from "@/paraglide/messages.js";
 import type { ChartDto, ChartVersionDto } from "@/shared/charts";
 
 const api = vi.hoisted(() => ({
-  fingerprint: vi.fn(),
   publish: vi.fn(),
 }));
 
@@ -65,46 +64,34 @@ function mountPublication(chart: ChartDto) {
   return { refresh, update: (chart: ChartDto) => rerender(view(chart)) };
 }
 
-function prepareFingerprint() {
-  api.fingerprint.mockImplementation(async (_chartId: string, versionId: string) => ({
-    versionId,
-    source: { size: 4096, sha256: "a".repeat(64) },
-    assets: { maidata: { size: 512, mime: "text/plain", sha256: "b".repeat(64) } },
-  }));
-}
-
 test("opening the review preselects the current draft without publishing and resets confirmation when version or revision changes", async () => {
-  prepareFingerprint();
   const { update } = mountPublication(draft);
+  expect(screen.queryByRole("combobox")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: m.chart_publication_review() }));
   const versionPicker = screen.getByRole("combobox", { name: m.chart_publication_version() }) as HTMLSelectElement;
-  const confirm = screen.getByRole("checkbox", { name: m.chart_publication_archive() }) as HTMLInputElement;
-  const publish = screen.getByRole("button", { name: m.chart_publication_confirm() }) as HTMLButtonElement;
   expect(versionPicker.value).toBe("second");
-  expect(screen.getByText(m.chart_warning_audio())).toBeTruthy();
-  expect(publish.disabled).toBe(true);
+  const notice = screen.getAllByText(m.chart_warning_audio())[0];
+  expect(notice.closest("details")).toBeNull();
+  expect(screen.queryByText(/SHA256/)).toBeNull();
   expect(api.publish).not.toHaveBeenCalled();
 
-  fireEvent.click(confirm);
-  expect(publish.disabled).toBe(false);
   fireEvent.change(versionPicker, { target: { value: "first" } });
-  expect(publish.disabled).toBe(true);
-  fireEvent.click(confirm);
-  expect(publish.disabled).toBe(false);
+  expect(api.publish).not.toHaveBeenCalled();
 
   update({ ...draft, revision: 8, title: "Edited" });
-  expect(publish.disabled).toBe(true);
-  expect(api.publish).not.toHaveBeenCalled();
-  await waitFor(() => expect(api.fingerprint).toHaveBeenCalledWith("draft", "first", expect.any(AbortSignal)));
+  expect(screen.queryByRole("button", { name: m.chart_publication_confirm() })).toBeNull();
+  expect(screen.getByRole("button", { name: m.chart_publication_review_again() })).toBeTruthy();
 
   const newest = { ...version, id: "third", ordinal: 3 };
   update({ ...draft, revision: 9, currentVersionId: newest.id, versions: [...draft.versions, newest] });
   expect(versionPicker.value).toBe(newest.id);
-  expect(publish.disabled).toBe(true);
-  await waitFor(() => expect(api.fingerprint).toHaveBeenCalledWith("draft", newest.id, expect.any(AbortSignal)));
+  expect(screen.queryByRole("button", { name: m.chart_publication_confirm() })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: m.chart_publication_review_again() }));
+  expect(screen.getByRole("button", { name: m.chart_publication_confirm() })).toBeTruthy();
+  expect(api.publish).not.toHaveBeenCalled();
 });
 
 test("publishing the reviewed version enables the public page and copy action", async () => {
-  prepareFingerprint();
   const published = {
     ...draft,
     revision: 8,
@@ -126,7 +113,7 @@ test("publishing the reviewed version enables the public page and copy action", 
   vi.stubGlobal("navigator", { clipboard: { writeText }, share: vi.fn() });
 
   const { refresh, update } = mountPublication(draft);
-  fireEvent.click(screen.getByRole("checkbox", { name: m.chart_publication_archive() }));
+  fireEvent.click(screen.getByRole("button", { name: m.chart_publication_review() }));
   fireEvent.click(screen.getByRole("button", { name: m.chart_publication_confirm() }));
   await waitFor(() => expect(refresh).toHaveBeenCalledWith(published));
   expect(api.publish).toHaveBeenCalledWith("draft", 7, "second");

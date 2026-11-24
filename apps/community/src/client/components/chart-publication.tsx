@@ -1,5 +1,4 @@
 import { ConfirmationDialog } from "@astrodx/ui/components/confirmation-dialog";
-import { Badge } from "@astrodx/ui/components/badge";
 import { Alert } from "@astrodx/ui/components/alert";
 import { Button } from "@astrodx/ui/components/button";
 import { useEffect, useRef, useState } from "react";
@@ -7,15 +6,14 @@ import { Link, useLocation } from "react-router";
 import { m } from "@/paraglide/messages.js";
 import { localizeHref } from "@/paraglide/runtime.js";
 import { ApiError } from "@/shared/api-client";
-import type { VersionFingerprint } from "@/shared/author-workbench";
 import { publicationConfirmationKey } from "../author/publication-review";
-import { compareFingerprints } from "../author/compare";
 import type { ChartDto } from "@/shared/charts";
 import { accountErrorRedirect } from "../lib/account-errors";
 import { getRenderApi } from "../lib/browser";
 import { chartErrorMessage } from "../lib/chart-errors";
 import { chartsApi } from "../queries/charts";
-import { ChartSummary } from "./chart-summary";
+import { ChartSummary, chartWarningMessage } from "./chart-summary";
+import { PublicDifficultyPill } from "./public-chart-card";
 import { PrivateChartPreview } from "./private-chart-preview";
 import { ShareChartButton } from "./share-chart-button";
 
@@ -32,6 +30,8 @@ export function ChartPublication({ chart, busy, metadataUnsaved = false, setBusy
 }) {
   const location = useLocation();
   const panel = useRef<HTMLElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const previousReview = useRef(false);
   const { hash, key } = location;
   useEffect(() => {
     if (hash === "#publication") {
@@ -52,36 +52,41 @@ export function ChartPublication({ chart, busy, metadataUnsaved = false, setBusy
     ?? chart.versions.find((version) => version.id === chart.currentVersionId);
   const versionId = selected?.id ?? "";
   const confirmationKey = publicationConfirmationKey(chart,versionId);
-  const [confirmedKey,setConfirmedKey] = useState<string|null>(null);
-  const confirmed = confirmedKey === confirmationKey;
-  const setConfirmed = (value:boolean) => setConfirmedKey(value?confirmationKey:null);
-  const [fingerprints,setFingerprints]=useState<{key:string;items:VersionFingerprint[];error:unknown}>({key:"",items:[],error:null});
-  const fingerprintKey=JSON.stringify([chart.id,versionId,chart.publication?.versionId]);
-  useEffect(()=>{const [chartId,versionId,publishedId]=JSON.parse(fingerprintKey) as [string,string,string|null];const aborter=new AbortController();setFingerprints({key:fingerprintKey,items:[],error:null});if(!versionId)return()=>aborter.abort();
-    void(async()=>{const api=chartsApi(getRenderApi()),items=[await api.fingerprint(chartId,versionId,aborter.signal)];if(publishedId&&publishedId!==versionId)items.unshift(await api.fingerprint(chartId,publishedId,aborter.signal));if(!aborter.signal.aborted)setFingerprints({key:fingerprintKey,items,error:null});})().catch(error=>{if(!aborter.signal.aborted)setFingerprints({key:fingerprintKey,items:[],error});});return()=>aborter.abort();
-  },[fingerprintKey]);
+  const [reviewKey, setReviewKey] = useState<string | null>(null);
+  const reviewing = reviewKey !== null;
+  const reviewChanged = reviewing && reviewKey !== confirmationKey;
+  function startReview() {
+    setReviewKey(confirmationKey);
+    setStatus("");
+    setError(undefined);
+  }
   const [withdrawing, setWithdrawing] = useState(false);
   const [reconcile, setReconcile] = useState(false);
   const [intent, setIntent] = useState<Intent>(null);
   const [status, setStatus] = useState("");
   const [error, setError] = useState<unknown>();
   const uncertain = reconcile || chart.publicationPending !== false;
+  const showReview = reviewing && !uncertain;
+  useEffect(() => {
+    if (previousReview.current !== showReview) {
+      heading.current?.focus({ preventScroll: true });
+      previousReview.current = showReview;
+    }
+  }, [showReview]);
   const publishedVersion = chart.versions.find(version => version.id === chart.publication?.versionId);
   const privateChanges = !uncertain && chart.publication && (chart.currentVersionId !== chart.publication.versionId || chart.title !== chart.publication.title || chart.artist !== chart.publication.artist || chart.description !== chart.publication.description || chart.credits !== chart.publication.credits || JSON.stringify(chart.tags) !== JSON.stringify(chart.publication.tags) || JSON.stringify(chart.aliases??[])!==JSON.stringify(chart.publication.aliases??[]) || publishedVersion?.releaseNote !== chart.publication.releaseNote);
   const publicId = !uncertain && chart.publication ? chart.publicId ?? chart.id : null;
-  const selectedFingerprint = fingerprints.key === fingerprintKey
-    ? fingerprints.items.find((item) => item.versionId === versionId)
-    : undefined;
-  const packageComparison = fingerprints.key === fingerprintKey && fingerprints.items.length === 2
-    ? compareFingerprints(fingerprints.items[0], fingerprints.items[1])
+  const reviewHref = selected
+    ? localizeHref(`/me/charts/${chart.id}/review?version=${selected.id}`)
     : null;
+  const warning = selected?.summary.warnings[0];
   const api = chartsApi(getRenderApi());
   const accept = async (actual: ChartDto, target: Intent, allowSuccess: boolean) => {
     if (!isCurrent()) return false;
     await refresh(actual);
     if (!isCurrent()) return false;
     if (allowSuccess && matches(actual, target)) {
-      setReconcile(false); setWithdrawing(false); setConfirmed(false);
+      setReconcile(false); setWithdrawing(false); setReviewKey(null);
       setStatus(target ? m.chart_publication_saved() : m.chart_publication_withdrawn());
       return true;
     }
@@ -112,101 +117,122 @@ export function ChartPublication({ chart, busy, metadataUnsaved = false, setBusy
     catch (failure) { setError(failure); fail(failure); }
     finally { if (isCurrent()) setBusy(false); }
   }
-  return <section ref={panel} tabIndex={-1} id="publication" aria-label={m.chart_publication()} className="community-panel space-y-4">
-    <div className="flex flex-wrap items-center gap-2">
-      <h2 className="font-semibold">{m.chart_publication()}</h2>
-      <a href={localizeHref("/help/publication")} className="inline-flex min-h-11 items-center text-sm underline">{m.site_help_publication_title()}</a>
-      <Badge variant={uncertain ? "outline" : chart.publication ? "default" : "secondary"}>
+  return <section ref={panel} tabIndex={-1} id="publication" aria-label={m.chart_publication()} className="community-panel community-publication space-y-4">
+    <header className="community-publication-header flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b pb-3">
+      <h2 ref={heading} tabIndex={-1} className="community-section-title">{showReview ? m.chart_publication_review_heading() : m.chart_publication_heading()}</h2>
+      <span className="community-status community-publication-status">
         {uncertain ? m.chart_publication_status_pending() : chart.publication ? m.chart_publication_status_public() : m.chart_publication_status_private()}
-      </Badge>
-    </div>
+      </span>
+    </header>
     {metadataUnsaved ? <p role="status" className="text-sm">{m.chart_publication_save_metadata()}</p> : null}
     {chart.publication && !uncertain ? <div className="space-y-1 text-sm">
       <p>{m.chart_publication_current({ title: chart.publication.title, artist: chart.publication.artist })}</p>
       {publishedVersion ? <p>{m.chart_publication_published_version({ number: String(publishedVersion.ordinal) })}</p> : null}
-    </div> : !uncertain ? <p>{m.chart_publication_private()}</p> : null}
-    {privateChanges ? <p className="rounded-md border bg-muted/50 p-3 text-sm">{m.chart_publication_private_changes()}</p> : null}
-    <label className="block">{m.chart_publication_version()}
-      <select value={versionId} disabled={!interactive || busy || reconcile || uncertain} onChange={(event) => { setChoice({ versionId: event.target.value, currentVersionId: chart.currentVersionId }); setConfirmed(false); setStatus(""); }} className="ml-2 min-h-11 max-w-full rounded border p-2">
-        {!selected ? <option value="" disabled>{m.chart_publication_choose()}</option> : null}
-        {chart.versions.map((version) => <option key={version.id} value={version.id}>{m.chart_version({ number: String(version.ordinal) })}</option>)}
-      </select>
-    </label>
-    {selected ? (
-      <div className="space-y-3 rounded-md border p-3">
-        <h3 className="font-semibold">{m.chart_metadata_selected_snapshot()}</h3>
-        <p className="break-words font-semibold">{chart.title} · {chart.artist || "—"}</p>
-        <p className="text-sm">{m.chart_publication_package({ size: (selected.sourceSize / (1024 * 1024)).toFixed(2) })}</p>
-        <ChartSummary summary={selected.summary} />
-        {selected.summary.warnings.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{m.chart_publication_no_warnings()}</p>
-        ) : null}
-        <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-          <Link className="underline" to={localizeHref(`/me/charts/${chart.id}/review?version=${selected.id}`)}>{m.author_review()}</Link>
-          <Link className="underline" to={localizeHref(`/me/charts/${chart.id}/compare?right=${selected.id}${chart.publication ? `&left=${chart.publication.versionId}` : ""}`)}>{m.author_compare()}</Link>
+    </div> : null}
+    {privateChanges ? <p className="community-publication-notice px-3 py-2 text-sm">{m.chart_publication_private_changes()}</p> : null}
+    {showReview ? <div className="space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 flex-1 basis-36">
+          <p className="break-words text-xl font-semibold leading-snug">{chart.title}</p>
+          {chart.artist ? <p className="break-words text-sm text-muted-foreground">{chart.artist}</p> : null}
         </div>
-        <details className="community-source-details">
-          <summary>{m.chart_metadata_heading()}</summary>
-          <SnapshotMetadata value={{ ...chart, releaseNote: selected.releaseNote }} />
-          {chart.publication ? <div className="space-y-2 border-t pt-3">
-            <h4 className="font-semibold">{m.chart_metadata_current_snapshot()}</h4>
-            <p className="break-words">{chart.publication.title} · {chart.publication.artist || "—"}</p>
-            {publishedVersion ? <ChartSummary summary={publishedVersion.summary} /> : null}
-            <SnapshotMetadata value={chart.publication} />
-          </div> : null}
-        </details>
-        {selected.id !== chart.currentVersionId ? (
-          <details className="community-source-details">
-            <summary>{m.chart_preview()}</summary>
-            <PrivateChartPreview key={selected.id} id={chart.id} versionId={selected.id} summary={selected.summary} />
-          </details>
+        <label className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+          {m.chart_publication_version()}
+          <select
+            value={versionId}
+            disabled={!interactive || busy || uncertain}
+            onChange={(event) => {
+              setChoice({ versionId: event.target.value, currentVersionId: chart.currentVersionId });
+              setReviewKey(publicationConfirmationKey(chart, event.target.value));
+              setStatus("");
+            }}
+            className="community-publication-version min-h-11 max-w-full rounded-md border px-2"
+          >
+            {!selected ? <option value="" disabled>{m.chart_publication_choose()}</option> : null}
+            {chart.versions.map((version) => <option key={version.id} value={version.id}>{m.chart_version({ number: String(version.ordinal) })}</option>)}
+          </select>
+        </label>
+      </div>
+      {selected ? <>
+        <ul aria-label={m.chart_difficulties()} className="flex flex-wrap gap-1.5">
+          {selected.summary.difficulties.map((difficulty) => (
+            <li key={difficulty.difficulty} className="min-w-0">
+              <PublicDifficultyPill row={difficulty} />
+            </li>
+          ))}
+        </ul>
+        {warning ? (
+          <div className="community-publication-notice flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2 text-sm">
+            <p>{chartWarningMessage(warning.code)}</p>
+            {reviewHref && selected.summary.warnings.length > 1 ? (
+              <Link className="underline underline-offset-2" to={reviewHref}>
+                {m.chart_publication_more_warnings({ count: String(selected.summary.warnings.length - 1) })}
+              </Link>
+            ) : null}
+          </div>
         ) : null}
-        <details className="community-source-details">
-          <summary>{m.author_package()}</summary>
-          {fingerprints.key === fingerprintKey && fingerprints.error ? (
-            <p>{m.author_analysis_failed()}</p>
-          ) : selectedFingerprint ? (
-            <>
-              <p className="break-all font-mono text-xs">SHA256 {selectedFingerprint.source.sha256}</p>
-              <ul className="space-y-1 text-sm">
-                {([
-                  ["maidata", m.chart_part_maidata()],
-                  ["audio", m.chart_audio()],
-                  ["cover", m.chart_cover()],
-                ] as const).map(([role, label]) => {
-                  const asset = selectedFingerprint.assets[role];
-                  return asset ? <li key={role}>{label} · {asset.size} B</li> : null;
-                })}
-              </ul>
-            </>
-          ) : <p>{m.author_analysis_loading()}</p>}
-          {packageComparison ? (
-            <p>{packageComparison.archiveSame ? m.author_unchanged() : packageComparison.previewSame ? m.author_archive_changed() : m.author_different()}</p>
-          ) : null}
-        </details>
+      </> : null}
+    </div> : null}
+    {showReview ? (
+      <div className="community-publication-actions space-y-3 border-t pt-3">
+        <p className="text-sm">{m.chart_publication_package()}</p>
+        {reviewChanged ? <p role="status" className="text-sm">{m.chart_publication_changed()}</p> : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {reviewChanged ? (
+            <Button type="button" className="min-h-11" disabled={busy || !selected} onClick={startReview}>{m.chart_publication_review_again()}</Button>
+          ) : (
+            <Button type="button" className="min-h-11" disabled={!interactive || busy || !selected} onClick={() => void mutate({
+              versionId, title: chart.title, artist: chart.artist, description: chart.description,
+              credits: chart.credits, tags: chart.tags, aliases: chart.aliases ?? [], releaseNote: selected?.releaseNote ?? "",
+            })}>{chart.publication ? m.chart_publication_update() : m.chart_publication_confirm()}</Button>
+          )}
+          <Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={() => setReviewKey(null)}>{m.dash_cancel()}</Button>
+        </div>
       </div>
     ) : null}
-    <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmed} disabled={!interactive || busy || !selected || reconcile || uncertain} onChange={(event) => setConfirmed(event.target.checked)} />{m.chart_publication_archive()}</label>
-    <div className="flex flex-wrap gap-2">
-      <Button disabled={!interactive || busy || !selected || !confirmed || reconcile || uncertain} onClick={() => void mutate({ versionId, title: chart.title, artist: chart.artist, description: chart.description, credits: chart.credits, tags: chart.tags, aliases:chart.aliases??[], releaseNote: selected?.releaseNote ?? "" })}>{chart.publication ? m.chart_publication_update() : m.chart_publication_confirm()}</Button>
-      {chart.publication ? <Button variant="outline" disabled={!interactive || busy || reconcile || uncertain} onClick={() => setWithdrawing(true)}>{m.chart_publication_withdraw()}</Button> : null}
-      {!withdrawing && (reconcile || uncertain) ? <Button variant="outline" disabled={!interactive || busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
-    </div>
+    {!withdrawing && uncertain ? <Button variant="outline" disabled={!interactive || busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
     <ConfirmationDialog open={withdrawing} onOpenChange={setWithdrawing} title={m.chart_publication_withdraw()} description={m.chart_publication_withdraw_hint()} confirmLabel={m.chart_publication_withdraw_confirm()} cancelLabel={m.dash_cancel()} pending={!interactive || busy} confirmDisabled={reconcile || uncertain} fallbackFocus={() => document.getElementById("publication")} onConfirm={() => void mutate(null)}>
       {status ? <p role="status">{status}</p> : null}
       {error ? <Alert role="alert" variant="destructive">{chartErrorMessage(error)}</Alert> : null}
       {reconcile || uncertain ? <Button variant="outline" disabled={!interactive || busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
     </ConfirmationDialog>
     {!withdrawing && status ? <p role="status">{status}</p> : null}
-    {publicId ? (
+    {!reviewing && !uncertain ? (
       <div className="flex flex-wrap items-center gap-2">
-        <Button asChild variant="outline" className="min-h-11">
-          <Link to={localizeHref(`/charts/${publicId}`)}>{m.chart_publication_view()}</Link>
+        {publicId ? <>
+          <Button asChild className="min-h-11">
+            <Link to={localizeHref(`/charts/${publicId}`)}>{m.chart_publication_view()}</Link>
+          </Button>
+          <ShareChartButton title={chart.publication?.title ?? chart.title} publicId={publicId} label={m.chart_publication_copy()} copyOnly />
+        </> : <p className="basis-full text-sm text-muted-foreground">{m.chart_publication_draft_summary()}</p>}
+        <Button type="button" variant={publicId ? "outline" : "default"} className="min-h-11" disabled={!interactive || busy || !selected} onClick={startReview}>
+          {publicId ? m.chart_publication_update_review() : m.chart_publication_review()}
         </Button>
-        <ShareChartButton title={chart.publication?.title ?? chart.title} publicId={publicId} label={m.chart_publication_copy()} copyOnly />
+        {publicId ? <Button type="button" variant="outline" className="min-h-11" disabled={!interactive || busy} onClick={() => setWithdrawing(true)}>{m.chart_publication_withdraw()}</Button> : null}
       </div>
     ) : null}
     {!withdrawing && error ? <Alert role="alert" variant="destructive">{chartErrorMessage(error)}</Alert> : null}
+    {showReview && selected ? (
+      <details className="community-source-details">
+        <summary>{m.chart_metadata_heading()}</summary>
+        <ChartSummary summary={selected.summary} />
+        <SnapshotMetadata value={{ ...chart, releaseNote: selected.releaseNote }} />
+        {chart.publication ? <div className="space-y-2 border-t pt-3">
+          <h3 className="font-semibold">{m.chart_metadata_current_snapshot()}</h3>
+          <p className="break-words">{chart.publication.title} · {chart.publication.artist || "—"}</p>
+          {publishedVersion ? <ChartSummary summary={publishedVersion.summary} /> : null}
+          <SnapshotMetadata value={chart.publication} />
+        </div> : null}
+        {selected.id !== chart.currentVersionId ? (
+          <PrivateChartPreview key={selected.id} id={chart.id} versionId={selected.id} summary={selected.summary} />
+        ) : null}
+        <Link className="community-inline-action" to={localizeHref(`/me/charts/${chart.id}/compare?right=${selected.id}${chart.publication ? `&left=${chart.publication.versionId}` : ""}`)}>{m.author_compare()}</Link>
+      </details>
+    ) : null}
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+      {showReview && reviewHref ? <Link className="community-inline-action" to={reviewHref}>{m.author_review()}</Link> : null}
+      <Link className="community-inline-action" to={localizeHref("/help/publication")}>{m.site_help_publication_title()}</Link>
+    </div>
   </section>;
 }
 

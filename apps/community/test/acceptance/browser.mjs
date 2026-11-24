@@ -9,7 +9,7 @@ import { exerciseFollowing } from "./following-browser.mjs";
 // Run only on a remote Linux runner against the isolated acceptance Compose project.
 // Playwright is installed outside the repository; no product dependency is needed.
 import assert from "node:assert/strict";
-import {chooseFiles} from "./browser-input.mjs";
+import {chooseFiles,openChartPublicationReview} from "./browser-input.mjs";
 import { exercisePlatform } from "./platform-browser.mjs";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
@@ -280,8 +280,8 @@ async function acceptance() {
     const review = page.getByRole("region", { name: "公开发布", exact: true });
     await review.waitFor();
     await page.waitForFunction(() => document.activeElement?.id === "publication");
-    assert.equal(await review.getByRole("combobox", { name: /公开版本/ }).inputValue(), draft.currentVersionId);
-    assert.equal(await review.getByRole("button", { name: "确认发布", exact: true }).isEnabled(), false);
+    await review.getByRole("button", { name: "检查并发布", exact: true }).waitFor();
+    assert.equal(await review.getByRole("combobox").count(), 0);
     const reloaded = await page.reload(); assert.equal(reloaded.status(), 200);
     await page.getByRole("heading", { level: 1, name: "CI private draft", exact: true }).waitFor();
     const current = await json(owner, `/api/v1/me/charts/${draft.id}`);
@@ -311,10 +311,10 @@ async function acceptance() {
   const publicAssets = () => ["maidata", "audio", "cover"].map(role => `${publicBase()}/versions/${draft.currentVersionId}/assets/${role}`);
   await step("private_draft_not_public_and_explicit_version_confirmation", async () => {
     await denied(anonymous, publicBase(), 404);
-    assert.equal(await page.getByRole("button", { name: "确认发布", exact: true }).isEnabled(), false);
-    await page.getByRole("region", { name: "公开发布", exact: true }).getByRole("combobox", { name: /公开版本/ }).selectOption(draft.currentVersionId);
-    assert.equal(await page.getByRole("button", { name: "确认发布", exact: true }).isEnabled(), false);
-    await page.getByLabel("我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。", { exact: true }).check();
+    assert.equal(await page.getByRole("button", { name: "确认发布", exact: true }).count(), 0);
+    const draftReview = await openChartPublicationReview(page);
+    assert.equal(await draftReview.getByRole("combobox", { name: /公开版本/ }).inputValue(), draft.currentVersionId);
+    await denied(anonymous, publicBase(), 404);
     const [published] = await Promise.all([
       page.waitForResponse(r => new URL(r.url()).pathname === `/api/v1/me/charts/${draft.id}/publication` && r.request().method() === "PUT", { timeout: 60000 }),
       page.getByRole("button", { name: "确认发布", exact: true }).click(),
@@ -358,7 +358,9 @@ async function acceptance() {
     assert.notEqual(latest.currentVersionId, draft.currentVersionId);
     const review = page.getByRole("region", { name: "公开发布", exact: true });
     await review.getByText("私有草稿与公开内容不同；编辑不会自动发布。", { exact: true }).waitFor();
+    await openChartPublicationReview(page);
     assert.equal(await review.getByRole("combobox", { name: /公开版本/ }).inputValue(), latest.currentVersionId);
+    await review.getByRole("button", { name: "取消", exact: true }).click();
     await denied(anonymous, `${publicBase()}/versions/${latest.currentVersionId}/assets/maidata`, 404);
     await page.getByLabel("标题", { exact: true }).fill("Private metadata edited");
     const [edited] = await Promise.all([
@@ -368,7 +370,7 @@ async function acceptance() {
     assert.equal(edited.status(), 200);
     assert.deepEqual(await json(anonymous, publicBase()), publicChart);
     await page.getByText("私有草稿与公开内容不同；编辑不会自动发布。", { exact: true }).waitFor();
-    assert.equal(await page.getByRole("button", { name: "确认更新公开内容", exact: true }).isEnabled(), false);
+    assert.equal(await page.getByRole("button", { name: "确认更新公开内容", exact: true }).count(), 0);
   });
   await step("anonymous_home_catalog_detail_lazy_native_preview_exact_zip", async () => {
     const visitor = await anonymous.newPage(), requested = [];
@@ -515,8 +517,8 @@ async function acceptance() {
     ]);
     assert.equal(saved.status(), 201); const optional = await saved.json(); optionalDraft = optional;
     await page.waitForURL(url => url.pathname === `/me/charts/${optional.id}`);
-    await page.getByRole("region", { name: "公开发布", exact: true }).getByRole("combobox", { name: /公开版本/ }).selectOption(optional.currentVersionId);
-    await page.getByLabel("我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。", { exact: true }).check();
+    const optionalReview = await openChartPublicationReview(page);
+    await optionalReview.getByRole("combobox", { name: /公开版本/ }).selectOption(optional.currentVersionId);
     const [published] = await Promise.all([
       page.waitForResponse(r => new URL(r.url()).pathname.endsWith("/publication") && r.request().method() === "PUT", { timeout: 60000 }),
       page.getByRole("button", { name: "确认发布", exact: true }).click(),

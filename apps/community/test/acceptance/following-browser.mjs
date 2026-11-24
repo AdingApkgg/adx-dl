@@ -1,4 +1,4 @@
-import {chooseFiles} from "./browser-input.mjs";
+import {chooseFiles,openChartPublicationReview} from "./browser-input.mjs";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 /** Real disposable accounts; relationship and publication writes use visible controls. */
@@ -17,8 +17,7 @@ export async function exerciseFollowing({owner,other,anonymous,origin,step,zip,e
  async function socialCurrent(page,path) {const nav=page.getByRole("navigation",{name:"关注与通知导航",exact:true});assert.equal(await nav.locator('[aria-current="page"]').count(),1);assert.equal(await nav.locator('[aria-current="page"]').getAttribute("href"),path);}
 
  async function publish(draft){
-  await writer.getByRole("region",{name:"公开发布",exact:true}).getByRole("combobox",{name:/公开版本/}).selectOption(draft.currentVersionId);
-  await writer.getByLabel("我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。",{exact:true}).check();
+  await (await openChartPublicationReview(writer)).getByRole("combobox",{name:/公开版本/}).selectOption(draft.currentVersionId);
   const saved=await mutate(writer,`/api/v1/me/charts/${draft.id}/publication`,"PUT",()=>writer.getByRole("button",{name:draft.publication?"确认更新公开内容":"确认发布",exact:true}).click());
   await writer.getByText(`当前公开：版本 ${saved.versions.find(v=>v.id===saved.publication.versionId).ordinal}`,{exact:true}).waitFor();
   return saved;
