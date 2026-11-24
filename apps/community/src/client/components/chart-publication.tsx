@@ -31,6 +31,7 @@ export function ChartPublication({ chart, busy, metadataUnsaved = false, setBusy
   const location = useLocation();
   const panel = useRef<HTMLElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const withdrawTrigger = useRef<HTMLButtonElement>(null);
   const previousReview = useRef(false);
   const { hash, key } = location;
   useEffect(() => {
@@ -193,7 +194,7 @@ export function ChartPublication({ chart, busy, metadataUnsaved = false, setBusy
       </div>
     ) : null}
     {!withdrawing && uncertain ? <Button variant="outline" disabled={!interactive || busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
-    <ConfirmationDialog open={withdrawing} onOpenChange={setWithdrawing} title={m.chart_publication_withdraw()} description={m.chart_publication_withdraw_hint()} confirmLabel={m.chart_publication_withdraw_confirm()} cancelLabel={m.dash_cancel()} pending={!interactive || busy} confirmDisabled={reconcile || uncertain} fallbackFocus={() => document.getElementById("publication")} onConfirm={() => void mutate(null)}>
+    <ConfirmationDialog open={withdrawing} onOpenChange={setWithdrawing} title={m.chart_publication_withdraw()} description={m.chart_publication_withdraw_hint()} confirmLabel={m.chart_publication_withdraw_confirm()} cancelLabel={m.dash_cancel()} pending={!interactive || busy} confirmDisabled={reconcile || uncertain} fallbackFocus={() => withdrawTrigger.current ?? panel.current} onConfirm={() => void mutate(null)}>
       {status ? <p role="status">{status}</p> : null}
       {error ? <Alert role="alert" variant="destructive">{chartErrorMessage(error)}</Alert> : null}
       {reconcile || uncertain ? <Button variant="outline" disabled={!interactive || busy} onClick={() => void check()}>{m.chart_publication_check()}</Button> : null}
@@ -210,7 +211,7 @@ export function ChartPublication({ chart, busy, metadataUnsaved = false, setBusy
         <Button type="button" variant={publicId ? "outline" : "default"} className="min-h-11" disabled={!interactive || busy || !selected} onClick={startReview}>
           {publicId ? m.chart_publication_update_review() : m.chart_publication_review()}
         </Button>
-        {publicId ? <Button type="button" variant="outline" className="min-h-11" disabled={!interactive || busy} onClick={() => setWithdrawing(true)}>{m.chart_publication_withdraw()}</Button> : null}
+        {publicId ? <Button ref={withdrawTrigger} type="button" variant="outline" className="min-h-11" disabled={!interactive || busy} onClick={() => setWithdrawing(true)}>{m.chart_publication_withdraw()}</Button> : null}
       </div>
     ) : null}
     {!withdrawing && error ? <Alert role="alert" variant="destructive">{chartErrorMessage(error)}</Alert> : null}

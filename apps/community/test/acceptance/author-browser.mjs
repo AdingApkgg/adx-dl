@@ -84,7 +84,8 @@ export async function exerciseAuthor({owner,other,anonymous,origin,step,zip,evid
   try{
    const trigger=publication.getByRole("button",{name:"撤回公开",exact:true});await trigger.click();const modal=page.getByRole("alertdialog",{name:"撤回公开",exact:true});
    await modal.getByRole("button",{name:"确认撤回",exact:true}).click();await modal.getByRole("alert").waitFor();assert.equal(await modal.getByRole("alert").isVisible(),true,"MODAL_FAILURE_IS_ACCESSIBLE");
-   await modal.getByRole("button",{name:"取消",exact:true}).click();await modal.waitFor({state:"hidden"});assert.equal(withdrawals,1,"WITHDRAWAL_NOT_REPLAYED");assert.equal(await trigger.evaluate(el=>el===document.activeElement),true,"CANCEL_RESTORES_TRIGGER_FOCUS");
+   await modal.getByRole("button",{name:"取消",exact:true}).click();await modal.waitFor({state:"hidden"});assert.equal(withdrawals,1,"WITHDRAWAL_NOT_REPLAYED");
+   await page.waitForFunction(el=>el===document.activeElement,await trigger.elementHandle(),{timeout:5000});
   }finally{await page.unroute(pattern,reject);}
   await page.reload();const versions=page.getByRole("region",{name:"历史版本",exact:true});await versions.waitFor();const oldVersion=versions.getByRole("button",{name:"删除版本",exact:true}).first();await oldVersion.click();
   const modal=page.getByRole("alertdialog");await modal.getByRole("button",{name:"删除草稿",exact:true}).click();await modal.waitFor({state:"hidden"});await page.waitForFunction(()=>document.activeElement?.id==="author-versions");
