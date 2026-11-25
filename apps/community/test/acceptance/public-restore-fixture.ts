@@ -12,7 +12,7 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { strToU8, zipSync } from "fflate";
 import type { StorageContext } from "../../src/server/storage/contracts";
 import type { ingestFixture } from "../storage/ingest-fixture";
-import { charts, chartModerations, chartPublicIds, userPublicIds, storageTombstones, chartVersions, chartPublications, files, user, profiles, uploadSessions } from "../../src/server/db/schema";
+import { blobs, charts, chartModerations, chartSourceEntries, chartPublicIds, userPublicIds, storageTombstones, chartVersions, chartPublications, files, user, profiles, uploadSessions } from "../../src/server/db/schema";
 import { representationResponse } from "../../src/server/storage/files";
 import { initUpload, completeUpload } from "../../src/server/storage/uploads";
 import { putUploadPart } from "../../src/server/storage/parts";
@@ -32,9 +32,14 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
   const source = { ...web, exportChartJournal: async () => { await exportJournal(journal); } };
   const deletion = { ...control, exportChartJournal: source.exportChartJournal };
   const hash = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
+  const sharedNotes = strToU8("Shared attachment in the synthetic restore charts.");
+  const originalHashes = new Set<string>([hash(sharedNotes)]);
   async function upload(owner: string, label: string) {
     const text=label==="Restore legacy"?`\uFEFF&TiTle=${label}\r\n&artist=Synthetic public restore\r\n&INOTE_4=(120){4}1,2,E\r\n`:`&title=${label}\n&artist=Synthetic public restore\n&inote_4=(120){4}1,2,E\n`;
-    const bytes = zipSync({ "maidata.txt": strToU8(text) }, { level: 0 });
+    const maidata = strToU8(text);
+    const bytes = zipSync({ "maidata.txt": maidata, "notes.txt": sharedNotes }, { level: 0 });
+    originalHashes.add(hash(maidata));
+    originalHashes.add(hash(bytes));
     const dto = await initUpload(source, owner, { purpose: "chart-source", name: "private-original-name.zip", size: bytes.length, sha256: hash(bytes) }, crypto.randomUUID());
     for (let index = 0; index < dto.partCount; index++) {
       const part = bytes.subarray(index * dto.partSize, (index + 1) * dto.partSize);
@@ -88,7 +93,7 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
   let lateChart: Awaited<ReturnType<typeof createChart>> | undefined;
   let lateModerated: Awaited<ReturnType<typeof createChart>> | undefined;
   return {
-    additionalOriginals: 8,
+    snapshotOriginalHashes: [...originalHashes],
     communityCases: [...community.cases,...following!.cases,...library.cases,"author-workbench-restored-projection","author-derived-source-map-rebuilt","author-owner-denial-after-restore","discovery-v1-v2-public-alias-replay","discovery-anonymous-retained-alias","discovery-withdrawn-alias-not-revived"],
     async commitLaterFacts() {
       await library.commitLaterFacts();
@@ -139,6 +144,26 @@ export async function publicRestoreFixture(f: Awaited<ReturnType<typeof ingestFi
       await exportJournal(journal);
     },
     async verify(target: StorageContext) {
+      const expectedSources = rows.filter(row => row.kind === "legacy" || row.kind === "retain")
+        .map(row => row.original.id);
+      const restoredEntries = await target.db.select({
+        sourceFileId: files.id,
+        key: blobs.key,
+        sha256: chartSourceEntries.sha256,
+        path: chartSourceEntries.path,
+      }).from(chartSourceEntries)
+        .innerJoin(files, eq(files.blobId, chartSourceEntries.sourceBlobId))
+        .innerJoin(blobs, eq(blobs.id, chartSourceEntries.contentBlobId))
+        .where(inArray(files.id, expectedSources));
+      const shared = restoredEntries.filter(entry => entry.path === "notes.txt");
+      expect(shared.map(entry => entry.sourceFileId).sort()).toEqual(expectedSources.sort());
+      expect(new Set(shared.map(entry => entry.key)).size).toBe(1);
+      expect(new Set(shared.map(entry => entry.sha256))).toEqual(new Set([hash(sharedNotes)]));
+      const restoredShared = await target.driver.get({
+        bucket: "original", key: shared[0].key, signal: AbortSignal.timeout(10000),
+      });
+      expect(new Uint8Array(await new Response(restoredShared.body).arrayBuffer())).toEqual(sharedNotes);
+
       const withdrawnAlias=await searchPublic(target,parseDiscoveryInput(new URLSearchParams({type:"charts",q:"Restore withdraw alias"})));
       expect(withdrawnAlias.groups.charts.total).toBe(0);
       await library.verify(target);
