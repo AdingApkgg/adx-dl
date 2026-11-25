@@ -26,10 +26,14 @@ function NewChart() {
   return <main className="community-author-page space-y-6">
     <AuthorNavigation view="new" />
     <PageTitle description={m.charts_private_hint()}>{m.chart_new()}</PageTitle>
-    <section className="community-panel space-y-3" aria-label={m.ui_author_steps_title()}><h2 className="community-section-title">{m.ui_author_steps_title()}</h2><ol className="community-author-steps"><li>{m.ui_author_step_import()}</li><li>{m.ui_author_step_save()}</li><li>{m.ui_author_step_publish()}</li></ol><p className="text-sm leading-7 text-muted-foreground">{m.ui_author_steps_hint()}</p></section>
+    <details className="community-source-details">
+      <summary>{m.chart_upload_help()}</summary>
+      <p className="text-sm leading-7 text-muted-foreground">{m.ui_author_steps_hint()}</p>
+      <Link to={localizeHref("/help/upload")} className={textLinkClass}>{m.site_help_upload_title()}</Link>
+    </details>
     <ChartUpload userId={me.id} onSaved={async (chart, operation) => {
       await operation.assertActive();
-      await navigate(localizeHref(`/me/charts/${chart.id}`));
+      await navigate(localizeHref(`/me/charts/${chart.id}#publication`));
     }} />
     <Link to={localizeHref("/me/charts")} className={textLinkClass}>{m.charts_title()}</Link>
   </main>;

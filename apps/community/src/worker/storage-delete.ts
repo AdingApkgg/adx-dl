@@ -3,6 +3,7 @@ import { fromDrizzle } from "pg-boss";
 import {
   blobs,
   blobDerivatives,
+  chartSourceEntries,
   derivedObjects,
   files,
   mediaPublications,
@@ -88,6 +89,11 @@ export async function originalHasDependencies(
   const [blob] = await tx.select().from(blobs).where(eq(blobs.id, id));
   if (!blob) return true;
   if (blob.leaseUntil) return true; // Expiry is not proof an old PUT has finished.
+  // A shared entry stays live until every transport source referencing it is deleted.
+  if ((await tx.select({ source: chartSourceEntries.sourceBlobId }).from(chartSourceEntries)
+    .innerJoin(blobs, eq(blobs.id, chartSourceEntries.sourceBlobId))
+    .where(and(eq(chartSourceEntries.contentBlobId, id), sql`${blobs.state} <> 'deleted'`))
+    .limit(1)).length) return true;
   const logical = await tx.select().from(files).where(eq(files.blobId, id));
   for (const file of logical)
     if (file.state !== "deleted" || (await hasFileReferences(tx, file.id, registry))) return true;

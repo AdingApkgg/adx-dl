@@ -148,6 +148,13 @@
       "when": 1792454400000,
       "tag": "0020_community_governance",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795561800000,
+      "tag": "0021_chart_source_entries",
+      "breakpoints": true
     }
   ]
 }

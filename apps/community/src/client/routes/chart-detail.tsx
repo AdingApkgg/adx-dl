@@ -114,10 +114,10 @@ function Detail({ actor, id, chart, queryError, isOwner }: { actor: string; id: 
   return <main className="community-author-page space-y-6">
     <AuthorNavigation id={id} view="edit" />
     <PageTitle description={m.charts_private_hint()}>{chart.title}</PageTitle>
-    <nav aria-label={m.ui_content_navigation()} className="community-content-nav"><a href="#author-metadata">{m.chart_metadata_heading()}</a><a href="#author-publication">{m.chart_publication()}</a><a href="#author-versions">{m.chart_versions()}</a><a href="#author-upload">{m.ui_author_add_version()}</a></nav>
+    <nav aria-label={m.ui_content_navigation()} className="community-content-nav"><a href="#author-metadata">{m.chart_metadata_heading()}</a><a href="#publication">{m.chart_publication()}</a><a href="#author-versions">{m.chart_versions()}</a><a href="#author-upload">{m.ui_author_add_version()}</a></nav>
     {current ? <div id="author-preview"><PrivateChartPreview key={current.id} id={id} versionId={current.id} summary={current.summary} /></div> : null}
     <div className="community-author-layout"><div id="author-metadata" className="min-w-0"><ChartMetadataEditor chart={chart} busy={pending} setBusy={setPending} refresh={refresh} isCurrent={isCurrent} onDirty={setMetadataUnsaved} /></div>
-      <aside id="author-publication" className="min-w-0" aria-label={m.chart_publication()}><ChartPublication chart={chart} busy={pending || metadataUnsaved} setBusy={setPending} refresh={refresh} isCurrent={isCurrent} /></aside></div>
+      <div id="author-publication" className="min-w-0"><ChartPublication chart={chart} busy={pending || metadataUnsaved} metadataUnsaved={metadataUnsaved} setBusy={setPending} refresh={refresh} isCurrent={isCurrent} /></div></div>
     <section tabIndex={-1} id="author-versions" aria-label={m.chart_versions()} className="community-panel space-y-5"><div className="community-section-heading"><h2 className="community-section-title">{m.chart_versions()}</h2><Link to={localizeHref("/me/charts")} className="community-inline-action">{m.charts_title()}</Link></div>
       {current ? <ChartSummary summary={current.summary} /> : null}
       <ul className="community-version-list">{chart.versions.map(version => <li key={version.id}>
@@ -129,7 +129,11 @@ function Detail({ actor, id, chart, queryError, isOwner }: { actor: string; id: 
       </li>)}</ul>
     </section>
     <div id="author-upload"><ChartUpload userId={actor} target={{kind:"append",id,expectedRevision:chart.revision}} onSaved={async (updated,operation) => {
-      await operation.assertActive();await refresh(updated);await operation.assertActive();toast.success(m.chart_saved());
+      await operation.assertActive();
+      await refresh(updated);
+      await operation.assertActive();
+      toast.success(m.chart_saved());
+      if (!metadataUnsaved) await navigate({ hash: "#publication" }, { replace: true });
     }} /></div>
     <section className="community-danger-panel space-y-3" aria-label={m.ui_author_danger()}><h2 className="community-section-title">{m.ui_author_danger()}</h2><p className="text-sm leading-7 text-muted-foreground">{m.chart_delete_hint()}</p><Button type="button" variant="destructive" disabled={pending} onClick={() => setDeleting("chart")}>{m.chart_delete()}</Button></section>
     <ConfirmationDialog open={deleting !== null} onOpenChange={open => { if (!open) setDeleting(null); }} title={m.chart_delete_confirm()} description={deleting === "chart" ? m.chart_delete_hint() : m.ui_author_delete_version({ version: String(chart.versions.find(v => v.id === deleting)?.ordinal ?? "—") })} confirmLabel={m.chart_delete()} cancelLabel={m.dash_cancel()} pending={pending} fallbackFocus={() => document.getElementById("author-versions")} onConfirm={() => void remove(deleting === "chart" ? undefined : deleting ?? undefined)}>

@@ -270,7 +270,10 @@ test.skipIf(!process.env.STORAGE_TEST_FRESH_RESTORE)(
     if (roleProcesses.length)
       console.log("proof: actual coordinated snapshot complete; normal roles stopped and reaped");
     await f.ctx.db.execute(sql`insert into governance_appeals(id,user_id,decision_key,reason) values(${governanceLaterId}::uuid,${good.userId},${`decision:${crypto.randomUUID()}`},'After-snapshot private appeal')`);
-    expect(manifest.originals).toHaveLength(4 + publicCharts.additionalOriginals);
+    const backupHashes = manifest.originals.map(original => original.sha256);
+    expect(backupHashes).toHaveLength(4 + publicCharts.snapshotOriginalHashes.length);
+    expect(new Set(backupHashes).size).toBe(backupHashes.length);
+    expect(backupHashes).toEqual(expect.arrayContaining(publicCharts.snapshotOriginalHashes));
     expect(manifest.dumps.community.size).toBeGreaterThan(1000);
     expect(manifest.dumps.umami.size).toBeGreaterThan(1000);
     const snapshots = Bun.spawn(["restic", "snapshots", "--json"], {

@@ -16,6 +16,7 @@ import {
   STORAGE_INGEST_QUEUE,
   MEDIA_AVATAR_QUEUE,
   MEDIA_CHART_QUEUE,
+  MEDIA_CHART_CAS_QUEUE,
   STORAGE_FINALIZE_QUEUE,
 } from "../server/jobs/queues";
 import { createStorageContext } from "../server/storage/runtime";
@@ -26,6 +27,7 @@ import { finalizeUpload } from "./finalize";
 import { ingestUpload } from "./ingest";
 import { RECIPE_BUILD } from "./image-child";
 import { handleChartImport } from "./chart-import";
+import { backfillChartSource } from "./chart-cas-backfill";
 import { currentChartRecipeBuild, recipeBuildFor } from "../server/charts/recipe";
 /** The supplied boss must be started with the worker role so Navigator advances flow edges. */
 export async function registerMediaWorkers(ctx: StorageContext): Promise<void> {
@@ -51,6 +53,12 @@ export async function registerMediaWorkers(ctx: StorageContext): Promise<void> {
       },
     );
   }
+  await boss.work<{ sourceId: string }>(MEDIA_CHART_CAS_QUEUE, { localConcurrency: 1, batchSize: 1 }, async (jobs) => {
+    const [job] = jobs;
+    if (!job) return;
+    const run = () => backfillChartSource(ctx, job.data.sourceId);
+    return ctx.lifecycle ? ctx.lifecycle.run(run) : run();
+  });
 }
 if (import.meta.main) {
   await assertNormalStorageStartup();

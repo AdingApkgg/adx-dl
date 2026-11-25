@@ -1,4 +1,4 @@
-import {chooseFiles} from "./browser-input.mjs";
+import {chooseFiles,openChartPublicationReview} from "./browser-input.mjs";
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -9,11 +9,23 @@ export async function exerciseLibrary({owner,other,anonymous,origin,step,zip,evi
  const mutate=async(page,path,method,action)=>{const [r]=await Promise.all([page.waitForResponse(r=>new URL(r.url()).pathname===path&&r.request().method()===method,{timeout:60000}),action()]);assert.ok(r.ok(),`${method} ${path}: ${r.status()}`);return r.json();};
  const original=zip('Library browser original');let chart,list,copied;
  async function downloadGeometry(){for(const width of [320,390,768,1280]){await reader.setViewportSize({width,height:844});assert.equal(await reader.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`populated downloads ${width}`);}await reader.setViewportSize({width:1280,height:900});}
- async function readyQueue(page){await page.getByRole('link',{name:'查看下载队列',exact:true}).click();await page.getByText('已校验，等待保存',{exact:false}).waitFor({timeout:60000});}
- async function enqueue(page){await page.getByRole('button',{name:'加入下载队列',exact:true}).click();await page.getByRole('button',{name:'确认加入并开始',exact:true}).click();await readyQueue(page);}
+ async function readyQueue(page){
+  await page.getByRole('link',{name:'查看下载队列',exact:true}).click();
+  await page.waitForURL(u=>u.pathname==='/downloads');
+  await page.getByText('已校验，等待保存',{exact:false}).waitFor({timeout:60000});
+ }
+ async function enqueue(page){
+  const single = /^\/charts\//.test(new URL(page.url()).pathname);
+  if (single) await page.getByRole('button',{name:'下载谱面',exact:true}).click();
+  else {
+   await page.getByRole('button',{name:'加入下载队列',exact:true}).click();
+   await page.getByRole('button',{name:'确认加入并开始',exact:true}).click();
+  }
+  await readyQueue(page);
+ }
  try{
  await step('library_private_editor_explicit_publication_and_copy',async()=>{
-  await writer.goto(url('/me/charts/new'));await chooseFiles(writer.getByLabel("选择 ADX / ZIP",{exact:true}),{name:'library.zip',mimeType:'application/zip',buffer:original});await writer.getByRole('button',{name:'保存私有草稿',exact:true}).waitFor({timeout:90000});const draft=await mutate(writer,'/api/v1/me/charts','POST',()=>writer.getByRole('button',{name:'保存私有草稿',exact:true}).click());await writer.getByRole('region',{name:'公开发布',exact:true}).getByRole('combobox',{name:/公开版本/}).selectOption(draft.currentVersionId);await writer.getByLabel('我确认此版本的原始 ZIP 及其中的全部文件适合公开分享。',{exact:true}).check();chart=await mutate(writer,`/api/v1/me/charts/${draft.id}/publication`,'PUT',()=>writer.getByRole('button',{name:'确认发布',exact:true}).click());
+  await writer.goto(url('/me/charts/new'));await chooseFiles(writer.getByLabel("选择 ADX / ZIP",{exact:true}),{name:'library.zip',mimeType:'application/zip',buffer:original});await writer.getByRole('button',{name:'保存私有草稿',exact:true}).waitFor({timeout:90000});const draft=await mutate(writer,'/api/v1/me/charts','POST',()=>writer.getByRole('button',{name:'保存私有草稿',exact:true}).click());await (await openChartPublicationReview(writer)).getByRole('combobox',{name:/公开版本/}).selectOption(draft.currentVersionId);chart=await mutate(writer,`/api/v1/me/charts/${draft.id}/publication`,'PUT',()=>writer.getByRole('button',{name:'确认发布',exact:true}).click());
   await writer.goto(url('/me/lists/new'));await writer.getByLabel('谱单名称',{exact:true}).fill('Browser public library');await writer.getByLabel('简介',{exact:true}).fill('Explicit public snapshot');await writer.getByLabel('添加谱面编号',{exact:true}).fill(chart.publicId);await writer.getByRole('button',{name:'加入谱单',exact:true}).click();
   const saved=writer.waitForResponse(r=>/\/api\/v1\/me\/lists\/[a-f0-9-]+$/.test(new URL(r.url()).pathname)&&r.request().method()==='PUT');await writer.getByRole('button',{name:'保存私人草稿',exact:true}).click();const response=await saved;assert.equal(response.status(),200);list=await response.json();await writer.waitForURL(u=>u.pathname===`/me/lists/${list.id}`);assert.equal((await anonymous.request.get(url(`/api/v1/me/lists/${list.id}`))).status(),401);assert.equal((await other.request.get(url(`/api/v1/me/lists/${list.id}`))).status(),404);assert.equal((await get(anonymous,'/api/v1/lists')).items.some(i=>i.name===list.name),false);
   await writer.getByRole('button',{name:'预览并发布',exact:true}).click();list=await mutate(writer,`/api/v1/me/lists/${list.id}/publish`,'POST',()=>writer.getByRole('button',{name:'确认发布公开版本',exact:true}).click());assert.match(list.publicId,/^[1-9][0-9]*$/);await reader.goto(url(`/lists/${list.publicId}`));await reader.getByRole('heading',{level:1,name:'Browser public library',exact:true}).waitFor();await reader.getByRole('button',{name:'复制为我的私人谱单',exact:true}).click();await reader.getByText('本次可复制 1 首，另有 0 首不可用，将不复制。',{exact:true}).waitFor();copied=await mutate(reader,`/api/v1/lists/${list.publicId}/copy`,'POST',()=>reader.getByRole('button',{name:'确认复制可用条目',exact:true}).click());assert.equal(copied.publication,null);await reader.waitForURL(u=>u.pathname===`/me/lists/${copied.id}`);
@@ -38,12 +50,33 @@ export async function exerciseLibrary({owner,other,anonymous,origin,step,zip,evi
   await writer.setViewportSize({width:1280,height:900});await reader.setViewportSize({width:1280,height:900});
  });
  await step('library_download_checkpoints_original_bytes_and_store_collection',async()=>{
-  await reader.goto(url(`/charts/${chart.publicId}`));await enqueue(reader);await reader.reload();await reader.getByRole('button',{name:'继续／重试',exact:true}).click();await reader.getByText('已校验，等待保存',{exact:false}).waitFor({timeout:60000});await downloadGeometry();const [download]=await Promise.all([reader.waitForEvent('download'),reader.getByRole('button',{name:'保存原始 ZIP',exact:true}).click()]);assert.deepEqual(await readFile(await download.path()),original);await reader.getByRole('heading',{name:'最近下载',exact:true}).waitFor();
+  await reader.goto(url(`/charts/${chart.publicId}`));
+  await reader.getByRole('button',{name:'下载谱面',exact:true}).click();
+  await reader.getByRole('combobox',{name:'保存格式',exact:true}).selectOption('zip');
+  const save = reader.getByRole('button',{name:'保存原始 ZIP',exact:true});
+  await save.waitFor({timeout:60000});
+  const [inlineDownload] = await Promise.all([reader.waitForEvent('download'),save.click()]);
+  assert.deepEqual(await readFile(await inlineDownload.path()),original);
+  assert.equal(new URL(reader.url()).pathname,`/charts/${chart.publicId}`);
+  await reader.getByText('已请求浏览器保存',{exact:true}).waitFor();
+  await enqueue(reader);await reader.reload();await reader.getByRole('button',{name:'继续／重试',exact:true}).click();await reader.getByText('已校验，等待保存',{exact:false}).waitFor({timeout:60000});await downloadGeometry();const [download]=await Promise.all([reader.waitForEvent('download'),reader.getByRole('button',{name:'保存原始 ZIP',exact:true}).click()]);assert.deepEqual(await readFile(await download.path()),original);await reader.getByRole('heading',{name:'最近下载',exact:true}).waitFor();
   await reader.goto(url(`/lists/${list.publicId}`));await reader.getByRole('checkbox',{name:`选择谱面 #${chart.publicId}`,exact:true}).check();await enqueue(reader);const [collection]=await Promise.all([reader.waitForEvent('download'),reader.getByRole('button',{name:'保存 ZIP 集合包',exact:true}).click()]);const bytes=await readFile(await collection.path()),entries=new Map();let offset=0;while(bytes.readUInt32LE(offset)===0x04034b50){assert.equal(bytes.readUInt16LE(offset+8),0);const size=bytes.readUInt32LE(offset+18),nameLength=bytes.readUInt16LE(offset+26),extraLength=bytes.readUInt16LE(offset+28),name=bytes.subarray(offset+30,offset+30+nameLength).toString(),start=offset+30+nameLength+extraLength;entries.set(name,bytes.subarray(start,start+size));offset=start+size;}assert.deepEqual(entries.get(`${chart.publicId}/original.zip`),original);const manifest=JSON.parse(entries.get('manifest.json').toString());assert.equal(manifest.items[0].publicId,chart.publicId);assert.equal(manifest.items[0].versionId,chart.publication.versionId);assert.equal(manifest.items[0].page,`/charts/${chart.publicId}`);assert.deepEqual(Object.keys(manifest.items[0]).sort(),['page','path','publicId','sha256','size','versionId']);
   for(const width of [320,390,768,1280]){await reader.setViewportSize({width,height:844});assert.equal(await reader.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}await reader.setViewportSize({width:1280,height:900});await reader.getByRole('region',{name:'当前队列',exact:true}).waitFor();await reader.getByRole('region',{name:'最近下载',exact:true}).waitFor();assert.equal(await reader.locator('.community-download-dock').count(),0);assert.equal(await reader.locator('.community-selection-bar').count(),0,'download page hides unrelated selection actions');await reader.locator('#download-help > summary').click();await reader.getByText('ZIP 集合包包含各首的原始 ZIP 和清单。请先解压外层，再逐个导入；它不是一份可直接导入的 ADX 谱包。',{exact:true}).waitFor();if(evidenceDirectory)await reader.screenshot({path:join(evidenceDirectory,'library-downloads.png'),fullPage:true});await reader.setViewportSize({width:390,height:844});await reader.evaluate(()=>scrollTo(0,0));if(evidenceDirectory)await reader.screenshot({path:join(evidenceDirectory,'library-ux-downloads-mobile.png'),fullPage:true});await reader.setViewportSize({width:1280,height:900});
  });
  await step('library_scope_switch_public_controls_and_download_revocation',async()=>{
-  switcher=await other.browser().newContext();await switcher.addCookies(await other.cookies());const switched=await switcher.newPage();await switched.goto(url(`/charts/${chart.publicId}`));await enqueue(switched);await switcher.clearCookies();await switcher.addCookies(await owner.cookies());await switched.reload();await switched.getByText('还没有下载任务。',{exact:true}).waitFor();await switcher.close();switcher=null;
+  switcher=await other.browser().newContext();
+  await switcher.addCookies(await other.cookies());
+  const switched=await switcher.newPage();
+  await switched.goto(url(`/charts/${chart.publicId}`));
+  await enqueue(switched);
+  assert.equal((await get(switcher,'/api/v1/me')).id,(await get(other,'/api/v1/me')).id);
+  await switcher.clearCookies();
+  await switcher.addCookies(await owner.cookies());
+  assert.equal((await get(switcher,'/api/v1/me')).id,(await get(owner,'/api/v1/me')).id);
+  await switched.reload();
+  await switched.getByRole('region',{name:'当前队列',exact:true}).getByText('还没有下载任务。',{exact:true}).waitFor();
+  await switcher.close();
+  switcher=null;
   await writer.getByRole('button',{name:'预览并发布',exact:true}).click();list=await mutate(writer,`/api/v1/me/lists/${list.id}/publish`,'POST',()=>writer.getByRole('button',{name:'确认发布公开版本',exact:true}).click());assert.equal((await get(anonymous,`/api/v1/lists/${list.publicId}`)).name,'Private edit only');assert.equal((await get(other,`/api/v1/me/lists/${copied.id}`)).name,'Browser public library');
   await reader.goto(url(`/lists/${list.publicId}`));await reader.getByRole('button',{name:'举报谱单',exact:true}).click();await reader.getByLabel('情况说明（必填，最多 500 字）',{exact:true}).fill('Isolated list report');const report=await mutate(reader,`/api/v1/lists/${list.publicId}/reports`,'POST',()=>reader.getByRole('button',{name:'提交举报',exact:true}).click());assert.equal(report.publicId,list.publicId);
   await writer.goto(url('/dash/lists'));const row=writer.getByRole('article').filter({has:writer.getByRole('heading',{name:`#${list.publicId} · Private edit only`,exact:true})});await row.getByLabel('处理原因（会告知谱单作者）',{exact:true}).fill('Isolated library moderation');await mutate(writer,`/api/v1/dash/lists/${list.id}/moderation`,'POST',()=>row.getByRole('button',{name:'下架公开谱单',exact:true}).click());assert.equal((await anonymous.request.get(url(`/api/v1/lists/${list.publicId}`))).status(),404);await row.getByLabel('处理原因（会告知谱单作者）',{exact:true}).fill('Reviewed current list publication');await mutate(writer,`/api/v1/dash/lists/${list.id}/moderation`,'POST',()=>row.getByRole('button',{name:'恢复已审核公开版本',exact:true}).click());assert.equal((await anonymous.request.get(url(`/api/v1/lists/${list.publicId}`))).status(),200);

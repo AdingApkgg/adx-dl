@@ -4,7 +4,7 @@ import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { hardestDifficulties, publicDifficultyName } from "./public-chart-card";
 import type { ChartDifficulty, ChartImportSummary } from "@/shared/charts";
 
-function warningMessage(code: string): string {
+export function chartWarningMessage(code: string): string {
   switch (code) {
     case "LEGACY_SINGLE_DIFFICULTY": return m.chart_warning_legacy();
     case "EMPTY_DIFFICULTY": return m.chart_warning_empty();
@@ -94,7 +94,7 @@ export function ChartSummary({ summary, onPreview }: { summary: ChartImportSumma
     {summary.warnings.length ? <div role="status" className="rounded-md border p-3">
       <p>{m.chart_warnings()}</p>
       <ul>{summary.warnings.map((warning, index) => <li key={index}>
-        {warningMessage(warning.code)}{warning.difficulty ? ` · ${m.chart_difficulty({ difficulty: String(warning.difficulty) })}` : ""}
+        {chartWarningMessage(warning.code)}{warning.difficulty ? ` · ${m.chart_difficulty({ difficulty: String(warning.difficulty) })}` : ""}
       </li>)}</ul>
     </div> : null}
   </div>;

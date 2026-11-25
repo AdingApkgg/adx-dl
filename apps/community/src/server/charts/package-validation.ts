@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { open, mkdtemp, readFile, rm, stat, writeFile, type FileHandle } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -185,7 +186,12 @@ async function renderCover(path: string, output: string): Promise<void> {
 }
 
 /** No output is published until every entry, including ignored files, passes actual length and CRC. */
-export async function inspectChartPackage(inputPath: string, outputPath: string, signal?: AbortSignal): Promise<ChartPackageInspection> {
+export type ChartSourceEntry = { path: string; size: number; sha256: string };
+export type ChartInspection = ChartPackageInspection & { entries?: ChartSourceEntry[] };
+export function chartEntryStagingPath(directory: string, index: number) {
+  return join(directory, String(index));
+}
+export async function inspectChartPackage(inputPath: string, outputPath: string, signal?: AbortSignal, entriesDirectory?: string): Promise<ChartInspection> {
   signal?.throwIfAborted();
   const inputSize = (await stat(inputPath)).size;
   if (inputSize < 1 || inputSize > MAX_SOURCE) fail("CHART_ASSET_TOO_LARGE");
@@ -211,12 +217,17 @@ export async function inspectChartPackage(inputPath: string, outputPath: string,
     if (audio) selected.set(audio.entry, { path: join(scratch, "audio"), limit: 33554432 });
     if (cover) selected.set(cover.entry, { path: join(scratch, "cover-source"), limit: 8388608 });
     let expanded = 0;
+    const loose: ChartSourceEntry[] = [];
     for (const item of entries) {
       signal?.throwIfAborted();
       if (item.directory) continue;
       const target = selected.get(item.entry);
       if (target && (item.entry.uncompressedSize < 1 || item.entry.uncompressedSize > target.limit)) fail("CHART_ASSET_TOO_LARGE");
-      const file = target ? await open(target.path, "wx", 0o600) : undefined;
+      const loosePath = entriesDirectory && !item.ignored ? chartEntryStagingPath(entriesDirectory, loose.length) : undefined;
+      const destination = loosePath ?? target?.path;
+      const hash = loosePath ? createHash("sha256") : undefined;
+      if (target && loosePath) target.path = loosePath;
+      const file = destination ? await open(destination, "wx", 0o600) : undefined;
       let size = 0, crc = 0xffffffff;
       try {
         active = await readEntry(zip, item.entry);
@@ -228,9 +239,11 @@ export async function inspectChartPackage(inputPath: string, outputPath: string,
           if (target && size > target.limit) fail("CHART_ASSET_TOO_LARGE");
           if (size > item.entry.uncompressedSize) fail("CHART_PACKAGE_INVALID");
           crc = updateCrc(crc, bytes);
+          hash?.update(bytes);
           if (file) { let offset = 0; while (offset < bytes.length) { const { bytesWritten } = await file.write(bytes, offset, bytes.length - offset); if (!bytesWritten) throw new Error("entry write failed"); offset += bytesWritten; } }
         }
         if (size !== item.entry.uncompressedSize || ((crc ^ 0xffffffff) >>> 0) !== item.entry.crc32) fail("CHART_PACKAGE_INVALID");
+        if (hash) loose.push({ path: item.path, size, sha256: hash.digest("hex") });
       } catch (error) { if (signal?.aborted) signal.throwIfAborted(); throw zipError(error); }
       finally { active?.destroy(); active = undefined; await file?.close(); }
     }
@@ -244,7 +257,7 @@ export async function inspectChartPackage(inputPath: string, outputPath: string,
     if (cover) { const path = join(scratch, "cover.jpg"); await renderCover(selected.get(cover.entry)!.path, path); summary.hasCover = true; inputs.push({ role: "cover", path: cover.path.replace(/\.[^.]+$/, ".jpg"), mime: "image/jpeg", inputPath: path }); }
     if (candidates.some((entry) => /\.(mp4|avi|webm|mov|mkv)$/i.test(entry.path)) && summary.warnings.length < 63) summary.warnings.push({ code: "ASSET_NOT_PREVIEWED" });
     const result = await writeChartArtifact(outputPath, summary, inputs, signal);
-    return { summary, ...result };
+    return { summary, ...result, ...(entriesDirectory ? { entries: loose } : {}) };
   } finally {
     active?.destroy(); signal?.removeEventListener("abort", abort); zip.close(); await closed; zip.removeListener("error", lateError);
     if (scratch) await rm(scratch, { recursive: true, force: true });

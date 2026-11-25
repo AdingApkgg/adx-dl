@@ -6,6 +6,7 @@ import type {DownloadSnapshot} from "@/client/downloads/store";
 import type {DownloadJob} from "@/client/downloads/persistence";
 import {downloadJobView,downloadQueueView,canSaveDownloadItem} from "@/client/downloads/presentation";
 import Downloads from "@/client/routes/downloads";
+import { ChartDownloadAction } from "@/client/components/chart-download-action";
 import {DownloadAddButton,DownloadDock} from "@/client/components/download-actions";
 import {m} from "@/paraglide/messages.js";
 const fixture=vi.hoisted(()=>({snapshot:null as unknown as DownloadSnapshot,store:{clear:vi.fn(async()=>{}),pauseAll:vi.fn(),pause:vi.fn(),resume:vi.fn(),cancel:vi.fn(async()=>{}),saveItem:vi.fn(async()=>{}),saveCollection:vi.fn(async()=>{}),saveDirectory:vi.fn(async()=>{}),enqueue:vi.fn(async()=>true)}}));
@@ -79,4 +80,45 @@ test("identity changes clear visual rolling counts synchronously",()=>{
  result.rerender(view());expect(counts()).toEqual(['0','0','0']);
  fixture.snapshot={...fixture.snapshot,scope:'bob'};
  result.rerender(view());expect(counts()).toEqual(['0','0','0']);
+});
+
+test("a single chart starts, pauses, resumes and saves on its detail page", async () => {
+  const running = job("1", "fetching", "running");
+  const versionId = running.items[0]!.versionId;
+  const view = () => <MemoryRouter><ChartDownloadAction publicId="1" versionId={versionId} size={100} title="Example" /></MemoryRouter>;
+  const page = render(view());
+  expect(screen.getByText("100 B")).toBeTruthy();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: m.ui_download_chart() })));
+  expect(fixture.store.enqueue).toHaveBeenCalledWith(["1"], "files", { expectedVersion: versionId });
+  expect(screen.queryByRole("button", { name: m.download_confirm() })).toBeNull();
+
+  fixture.snapshot.jobs = [running];
+  page.rerender(view());
+  expect(screen.getByRole("progressbar").getAttribute("value")).toBe("25");
+  fireEvent.click(screen.getByRole("button", { name: m.download_pause() }));
+  expect(fixture.store.pause).toHaveBeenCalledWith("1");
+
+  fixture.snapshot.jobs = [job("1", "paused", "paused")];
+  page.rerender(view());
+  fireEvent.click(screen.getByRole("button", { name: m.download_resume() }));
+  expect(fixture.store.resume).toHaveBeenCalledWith("1");
+
+  fixture.snapshot.jobs = [job("1", "ready", "ready")];
+  fixture.snapshot.busy = true;
+  page.rerender(view());
+  expect(screen.getByRole("option", { name: m.ui_download_format_adx(), selected: true })).toBeTruthy();
+  fireEvent.change(screen.getByRole("combobox", { name: m.ui_download_format() }), { target: { value: "zip" } });
+  expect((screen.getByRole("button", { name: m.download_save_original() }) as HTMLButtonElement).disabled).toBe(true);
+  fixture.snapshot.busy = false;
+  page.rerender(view());
+  expect(screen.queryByRole("link", { name: m.public_chart_download() })).toBeNull();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: m.download_save_original() })));
+  expect(fixture.store.saveItem).toHaveBeenCalledWith("1", "1", { preserveQueue: true, format: "zip", title: "Example" });
+
+  fixture.snapshot.jobs = [];
+  page.rerender(view());
+  expect(screen.getByText(m.download_save_requested())).toBeTruthy();
+  fixture.snapshot.scope = "bob";
+  page.rerender(view());
+  expect(screen.queryByText(m.download_save_requested())).toBeNull();
 });

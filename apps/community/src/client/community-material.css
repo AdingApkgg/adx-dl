@@ -95,7 +95,6 @@ html:not(.dark):is([data-accent="orange"], [data-accent="teal"]) body.community-
 .community-material :is(.community-hero, .community-chart-preview, .community-list-card, .community-list-unavailable, .community-library-entry, .community-topic-list, .community-composer, .community-storage-panel, .community-notification, .community-recovery, .community-admin-shortcut, .community-danger-panel, .community-source-details, .community-difficulty-card, .community-download-items, .community-download-dock, .community-version-grid, .community-content-nav),
 .community-material .community-stat-grid > div,
 .community-material .community-workbench-list > li,
-.community-material .community-author-steps li,
 .community-material .community-upload-options > div {
   border-radius: var(--md-radius);
   border-color: var(--md-outline);
@@ -124,4 +123,40 @@ html:not(.dark):is([data-accent="orange"], [data-accent="teal"]) body.community-
    desktop sidebar becomes a mobile header, or its controls overflow mid-resize. */
 .community-material .community-header-actions :is(a, button) {
   transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+}
+
+
+/* The publication surface uses the same fields and dividers as the main site. */
+.community-material .community-publication :is(.community-publication-header, .community-publication-actions) {
+  border-color: var(--md-outline);
+}
+.community-material .community-publication :is(.community-publication-version, .community-publication-status, .community-publication-notice) {
+  background: var(--md-container);
+  color: var(--md-title);
+  border-radius: var(--md-radius);
+}
+.community-material .community-publication-version { border-color: transparent; }
+.community-material .community-publication-version:focus-visible {
+  outline: 2px solid var(--md-seed);
+  outline-offset: 2px;
+}
+.community-material .community-publication-notice { border-inline-start: 3px solid var(--md-seed); }
+
+.community-material .community-download-inline-progress {
+  height: 4px;
+  border-radius: var(--md-radius);
+  background: var(--md-container);
+  accent-color: var(--md-seed);
+}
+.community-material .community-download-inline-progress::-webkit-progress-bar {
+  border-radius: var(--md-radius);
+  background: var(--md-container);
+}
+.community-material .community-download-inline-progress::-webkit-progress-value {
+  border-radius: var(--md-radius);
+  background: var(--md-seed);
+}
+.community-material .community-download-inline-progress::-moz-progress-bar {
+  border-radius: var(--md-radius);
+  background: var(--md-seed);
 }
