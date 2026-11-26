@@ -5,8 +5,8 @@
 &shortid=12025
 &genreid=105
 &genre=maimai
-&versionid=26
-&version=CiRCLE PLUS
+&versionid=27
+&version=maimai DX MAGiCAL
 &demo_seek=2.527
 &demo_len=24.156
 &clock_count=6
