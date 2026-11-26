@@ -23,7 +23,7 @@ COPY packages/maimai-chart-engine/package.json packages/maimai-chart-engine/
 COPY patches/ patches/
 RUN bun install --frozen-lockfile --production --filter community
 
-FROM restic/restic:0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510 AS restic
+FROM restic/restic:0.20.0@sha256:93999df80d4ac6cb148e82d2ef1fe6a81996f17ff535e772723538211b31555a AS restic
 FROM postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
 COPY --from=dependencies /usr/local/bin/bun /usr/local/bin/bun
 COPY --from=dependencies /repo /repo
