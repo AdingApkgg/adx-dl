@@ -31,8 +31,9 @@ function useEnterMotion(tone: MotionTone | "route" = "content") {
     active.current = null;
   }, []);
   useEffect(() => {
+    // useAnimate stops scoped animations on unmount. Completing a transform
+    // after its element detaches can restart Motion's animation group.
     if (reduced) settle();
-    return settle;
   }, [reduced, settle]);
   const enter = useCallback((delay = 0) => {
     settle();

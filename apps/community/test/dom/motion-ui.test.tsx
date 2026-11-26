@@ -69,6 +69,16 @@ test("turning motion off completes an in-flight entry and prevents subsequent en
   expect(driver.animate).toHaveBeenCalledTimes(1);
 });
 
+test("unmounting a route does not complete a detached entry animation", async () => {
+  localStorage.setItem("adx-reduce-motion", "on");
+  const router = editorRouter();
+  await act(async () => { await router.navigate("/another-draft"); });
+  expect(driver.animate).toHaveBeenCalledTimes(1);
+  const controls = driver.animate.mock.results[0]!.value;
+  cleanup();
+  expect(controls.complete).not.toHaveBeenCalled();
+});
+
 test("the boot-script off preference blocks entry before the Provider has synchronized", async () => {
   document.documentElement.dataset.motion = "off";
   const router = editorRouter(false);
